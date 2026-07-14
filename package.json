@@ -9,13 +9,19 @@
     "pnpm": ">=11.3.0 <12"
   },
   "scripts": {
+    "dev": "pnpm --filter @seele-daw/studio dev",
+    "build": "pnpm --filter @seele-daw/studio build",
+    "preview": "pnpm --filter @seele-daw/studio preview",
     "type-check": "vue-tsc --build",
+    "test": "pnpm test:unit",
+    "test:unit": "pnpm --filter @seele-daw/studio test:unit",
+    "test:run": "pnpm --filter @seele-daw/studio test:run",
     "lint": "run-s lint:architecture lint:oxlint lint:eslint",
     "lint:architecture": "node tooling/architecture-rules/check-boundaries.mjs",
-    "lint:oxlint": "oxlint packages --fix",
+    "lint:oxlint": "oxlint apps packages --fix",
     "lint:eslint": "eslint . --fix --cache",
-    "format": "oxfmt packages/ tooling/",
-    "check": "run-s lint:architecture type-check"
+    "format": "oxfmt apps/ packages/ tooling/",
+    "check": "run-s lint:architecture type-check test:run build"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",

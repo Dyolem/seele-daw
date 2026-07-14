@@ -1,0 +1,25 @@
+{
+  "name": "@seele-daw/studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "run-p type-check build-only",
+    "build-only": "vite build",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --build",
+    "test:unit": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "@seele-daw/audio-web": "workspace:*",
+    "@seele-daw/editor": "workspace:*",
+    "@seele-daw/platform-browser": "workspace:*",
+    "@seele-daw/playback": "workspace:*",
+    "@seele-daw/project-core": "workspace:*",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.38",
+    "vue-router": "^5.1.0"
+  }
+}

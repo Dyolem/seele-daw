@@ -1,0 +1,46 @@
+{
+  "name": "seele-daw",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11.3.0 <12"
+  },
+  "scripts": {
+    "type-check": "vue-tsc --build",
+    "lint": "run-s lint:architecture lint:oxlint lint:eslint",
+    "lint:architecture": "node tooling/architecture-rules/check-boundaries.mjs",
+    "lint:oxlint": "oxlint packages --fix",
+    "lint:eslint": "eslint . --fix --cache",
+    "format": "oxfmt packages/ tooling/",
+    "check": "run-s lint:architecture type-check"
+  },
+  "devDependencies": {
+    "@tsconfig/node24": "^24.0.4",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^24.13.2",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vitejs/plugin-vue-jsx": "^5.1.5",
+    "@vitest/eslint-plugin": "^1.6.20",
+    "@vue/eslint-config-typescript": "^14.8.0",
+    "@vue/test-utils": "^2.4.11",
+    "@vue/tsconfig": "^0.9.1",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-oxlint": "~1.69.0",
+    "eslint-plugin-vue": "~10.9.2",
+    "jiti": "^2.7.0",
+    "jsdom": "^29.1.1",
+    "npm-run-all2": "^9.0.2",
+    "oxfmt": "^0.54.0",
+    "oxlint": "~1.69.0",
+    "typescript": "~6.0.0",
+    "vite": "^8.0.16",
+    "vite-plugin-vue-devtools": "^8.1.2",
+    "vitest": "^4.1.9",
+    "vue-eslint-parser": "^10.4.1",
+    "vue-tsc": "^3.3.5"
+  }
+}

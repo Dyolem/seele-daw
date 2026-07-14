@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/project-core/tsconfig.json" },
+    { "path": "./packages/editor/tsconfig.json" },
+    { "path": "./packages/playback/tsconfig.json" },
+    { "path": "./packages/audio-web/tsconfig.json" },
+    { "path": "./packages/platform-browser/tsconfig.json" }
+  ]
+}

@@ -377,5 +377,6 @@ src/
 ## 架构依据
 
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
+- [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [Web DAW 简洁架构总纲](../../docs/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)

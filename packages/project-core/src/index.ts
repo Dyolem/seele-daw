@@ -1,6 +1,22 @@
 /** Public API for the framework-agnostic project kernel. */
 export { DomainValueError } from './model/domain-value-error'
 
+export { createMidiClipRecord, createMidiLoop } from './model/midi-clip'
+export type {
+  ClipBase,
+  ClipRecord,
+  CreateMidiClipRecordInput,
+  CreateMidiLoopInput,
+  MidiClipRecord,
+  MidiLoop,
+} from './model/midi-clip'
+
+export { createMidiNoteRecord } from './model/midi-note'
+export type { CreateMidiNoteRecordInput, MidiNoteAddress, MidiNoteRecord } from './model/midi-note'
+
+export { createMidiSourceRecord } from './model/midi-source'
+export type { CreateMidiSourceRecordInput, MidiSourceRecord } from './model/midi-source'
+
 export {
   parseClipId,
   parseDeviceId,
@@ -55,5 +71,5 @@ export type {
   ProjectColor,
 } from './model/scalars'
 
-export { PROJECT_PPQ, ZERO_TICK, parsePositiveTick, parseTick } from './time/tick'
+export { PROJECT_PPQ, ZERO_TICK, addTicks, parsePositiveTick, parseTick } from './time/tick'
 export type { Tick } from './time/tick'

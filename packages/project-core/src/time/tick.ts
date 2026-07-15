@@ -21,3 +21,16 @@ export function parsePositiveTick(value: unknown): Tick {
 
   return value as Tick
 }
+
+/** Adds two non-negative Tick values and rejects unsafe integer overflow. */
+export function addTicks(left: Tick, right: Tick): Tick {
+  const leftTick = parseTick(left)
+  const rightTick = parseTick(right)
+  const result = leftTick + rightTick
+
+  if (!Number.isSafeInteger(result)) {
+    rejectDomainValue('TickSum', 'a non-negative safe integer')
+  }
+
+  return result as Tick
+}

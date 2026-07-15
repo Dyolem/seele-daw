@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "type-check": "tsc -p tsconfig.json"
+    "type-check": "tsc -p tsconfig.json",
+    "test:run": "vitest run --environment node"
   }
 }

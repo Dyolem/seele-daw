@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：package 骨架已建立，核心存储策略已经确定，领域模型尚未开始实现。
+> 当前状态：package 骨架已建立，核心存储策略和 MIDI V1 数据模型已经确定，领域模型尚未开始实现。
 
 ## 包定位
 
@@ -98,7 +98,16 @@ ModelStore
 └── current modelRevision
 ```
 
-这里描述的是组织原则，不是最终字段定义。具体实体结构将在 MIDI 纵向切片的数据模型设计中确定。
+这里描述的是组织原则。具体字段、所有权、运行时索引、持久化 DTO 和跨实体不变量以 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 为当前实现基线。
+
+该基线已经确定：
+
+- 运行时使用私有 Map，项目文件使用 JSON 友好的 Record DTO；
+- 所有 Clip 位于统一表中，并通过 `trackId` 单向引用 Track；
+- Track 到 Clip 的反向查询由可重建索引提供；
+- V1 中一个 MidiClip 独占一个 MidiSource，普通复制会深复制 Source 和 Note；
+- Note 按 MidiSource 分区存储，不在每个 Note 中重复保存 `sourceId`；
+- Move、Resize、Split 的边界算法留到对应命令实现前单独确定。
 
 必须遵守：
 
@@ -344,13 +353,13 @@ src/
 ## 分阶段计划
 
 1. 建立 ModelStore、opaque ID、Tick 和只读实体记录约定。
-2. 定义最小 Project、Instrument Track、MidiClip、MidiSource 和 Note。
+2. 按 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 定义 Project、Instrument Track、MidiClip、MidiSource、Note、Timeline 和最小 Device Descriptor。
 3. 实现 MutationPlan、MutationApplier 和原子提交骨架。
 4. 实现 `AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand`。
 5. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
 6. 增加类型化 ProjectDelta、QueryIndex 与局部订阅。
 7. 定义 ProjectSnapshot、ProjectFileDTO、schema validation 和迁移。
-8. 接入 snapshot/journal 端口；Audio Clip、Device、Automation 只在对应产品阶段加入。
+8. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
@@ -367,5 +376,6 @@ src/
 
 ## 架构依据
 
+- [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Web DAW 简洁架构总纲](../../docs/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)

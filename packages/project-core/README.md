@@ -98,6 +98,12 @@ ModelStore
 └── current modelRevision
 ```
 
+`ModelStore` 是包内 Class，不从 `@seele-daw/project-core` 的公共入口导出。实体表使用 ECMAScript `#private` 字段；内部消费者通过 `ModelStoreReader` 的类型化查找和迭代方法读取记录，不能取得 `Map`、`ReadonlyMap` 或 `trackOrder` 的数组引用。
+
+构造输入使用已经规范化为实体表的 `ModelStoreSeed`，它不是外部 DTO。构造器复制 `trackOrder`、所有顶层 Map 和每张 MIDI Note 分区 Map，从而取得容器所有权；表中的只读 Record 保持原引用，避免为大型项目重新创建全部实体并保留引用相等语义。
+
+ModelStore 构造器只建立存储结构，不验证或修复跨实体关系。Seed 是否满足 Track 顺序、外键、Source 所有权、Timeline 初始事件和 Device 所有权等全局规则，由后续 `InvariantValidator` 判断。新 Store 的 `modelRevision` 固定从 `0` 开始，本批不提供任何写入或 revision 递增入口；类型化 Mutation 确定后，才由 `MutationApplier` 获得包内受控写入口。
+
 这里描述的是组织原则。具体字段、所有权、运行时索引、持久化 DTO 和跨实体不变量以 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 为当前实现基线。
 
 该基线已经确定：

@@ -454,8 +454,10 @@ interface DeviceDescriptor {
 下面结构只用于说明内核组织方式，不能作为公开 API 导出：
 
 ```ts
+type ModelRevision = Brand<number, 'ModelRevision'>
+
 interface InternalModelStore {
-  modelRevision: number
+  modelRevision: ModelRevision
 
   project: ProjectRecord
   trackOrder: TrackId[]
@@ -474,9 +476,18 @@ interface InternalModelStore {
 }
 ```
 
+ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只读 ID 集合表达已经规范化的输入，但不等同于外部 `ProjectFileDTO`，也不表示跨实体不变量已经通过验证。
+
+构造器复制 `trackOrder`、每张顶层 Map 和 `midiNotesBySource` 中的每张 Note Map，取得所有可变容器的独占所有权；已经由领域工厂创建的只读实体 Record 保持原引用。调用方在构造后修改原 Seed 容器不能改变 Store，未变化实体则继续保持引用相等。
+
+`ModelStoreReader` 只提供实体属性、按 ID 查找和 entry iterator，不返回内部 `Map`、表的 `ReadonlyMap` 视图或 `trackOrder` 数组。`ModelStore`、Seed 和 Reader 都是包内实现，不从 package 公共入口导出。
+
 内部可变性规则：
 
-- Map、分区表和 `trackOrder` 只允许 `MutationApplier` 修改；
+- 新建 ModelStore 的 `modelRevision` 固定为 `0`，Seed 不能恢复或指定运行时 revision；
+- ModelStore 构造器不执行跨实体校验、修复或过滤，完整 Seed 由 `InvariantValidator` 判断是否合法；
+- 当前存储批次不开放 Map、分区表、`trackOrder` 或 revision 的写入口；
+- 类型化 Mutation 确定后，Map、分区表和 `trackOrder` 只允许 `MutationApplier` 通过包内受控入口修改；
 - Map 中的实体是只读记录，字段改变时创建新记录并替换表项；
 - 一次原子事务只让 `modelRevision` 增加一次；
 - `modelRevision` 是运行时并发与订阅版本，不进入 ProjectFileDTO；

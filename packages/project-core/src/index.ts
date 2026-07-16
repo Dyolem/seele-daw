@@ -1,4 +1,12 @@
 /** Public API for the framework-agnostic project kernel. */
+export { createChannelStripDescriptor, createMasterChannelRecord } from './model/channel'
+export type {
+  ChannelStripDescriptor,
+  CreateChannelStripDescriptorInput,
+  CreateMasterChannelRecordInput,
+  MasterChannelRecord,
+} from './model/channel'
+
 export { DomainValueError } from './model/domain-value-error'
 
 export { createMidiClipRecord, createMidiLoop } from './model/midi-clip'
@@ -16,6 +24,20 @@ export type { CreateMidiNoteRecordInput, MidiNoteAddress, MidiNoteRecord } from 
 
 export { createMidiSourceRecord } from './model/midi-source'
 export type { CreateMidiSourceRecordInput, MidiSourceRecord } from './model/midi-source'
+
+export { createProjectRecord } from './model/project'
+export type { CreateProjectRecordInput, ProjectRecord } from './model/project'
+
+export { createAudioTrackRecord, createInstrumentTrackRecord } from './model/track'
+export type {
+  AudioTrackRecord,
+  CreateAudioTrackRecordInput,
+  CreateInstrumentTrackRecordInput,
+  CreateTrackBaseInput,
+  InstrumentTrackRecord,
+  TrackBase,
+  TrackRecord,
+} from './model/track'
 
 export {
   parseClipId,

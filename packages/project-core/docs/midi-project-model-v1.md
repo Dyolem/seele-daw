@@ -309,7 +309,8 @@ note.channel 是整数 0..15
 
 - Note 不保存能够推导的 `endTick`；
 - Note 不保存 `sourceId`，它的所属 Source 由 Note 分区表表达；
-- Note ID 在编辑、选择和 Undo 期间保持稳定；
+- Note ID 在整个项目内唯一，并在编辑、选择和 Undo 期间保持稳定；
+- `MidiNoteAddress` 同时携带 Source ID 是为了直接定位物理分区，不表示 Note ID 只在单个 Source 内唯一；
 - MIDI Note-On velocity 0 在导入时解释为 Note Off，不形成 Note Record；
 - 相同 Source 中允许同音高 Note 重叠；
 - Playback Compiler 必须为播放事件生成唯一 Event Key，Runtime 使用 voice token 结束对应 Voice；
@@ -440,7 +441,7 @@ interface DeviceDescriptor {
 - Device Definition 声明端口类型、参数 schema、稳定 Parameter ID、默认值和状态迁移；
 - Device 不保存 `trackId`；
 - Device ID 必须在一个 Track 或 Master 的设备位置中恰好出现一次；
-- Device 角色和 Track 设备链位置必须兼容；
+- Device 角色和 Track 设备链位置必须兼容；该规则需要 Device Definition Catalog，当前结构 Validator 只验证 Descriptor 存在性和唯一所有权；
 - 第三方运行时实例、AudioNode、Tone.js 对象和不可验证闭包不能进入项目数据；
 - 找不到设备实现时仍保留原始 Descriptor，由上层创建 MissingDevice 占位；
 - 保存项目时不得丢弃未知 `parameters` 或 `opaqueState`。
@@ -571,15 +572,21 @@ parse
 1. `trackOrder` 中的 ID 与 `tracks` 表完全对应，每个 ID 恰好一次。
 2. 每个 Clip 引用存在的 Track，并且 Clip 类型与 Track 拓扑兼容。
 3. 每个 MidiClip 引用存在的 MidiSource。
-4. 每个 MidiSource 被且仅被一个 MidiClip 引用。
-5. 每个 MidiSource 恰好存在一张 Note Table。
-6. 所有 Note 都落在所属 MidiSource 的合法范围内。
-7. 所有 Tick、MIDI 数值、gain、pan、BPM 和拍号字段满足各自范围。
-8. Tick 0 存在唯一的初始 Tempo 和 Time Signature。
-9. 每个 Device 存在唯一且兼容的所有者位置。
+4. 非循环 Clip 的 Source 窗口以及循环 Clip 的 Loop 区域都落在 MidiSource 长度内。
+5. 每个 MidiSource 被且仅被一个 MidiClip 引用。
+6. 每个 MidiSource 恰好存在一张 Note Table，不存在没有 Source 的孤立 Note 分区。
+7. 所有 Note 都落在所属 MidiSource 的合法范围内，Note ID 在全部 Source 分区中保持唯一。
+8. Tick 0 存在唯一的初始 Tempo 和 Time Signature，同类 Timeline 事件在同一 Tick 最多一个。
+9. 每个 Device Descriptor 恰好拥有一个 Track 或 Master 拓扑位置，所有设备引用都存在。
 10. 所有实体表 key 与记录自身 `id` 相同。
 11. 不存在孤立 Source、Device 或悬空外键。
 12. QueryIndex 可以从当前 ModelStore 丢弃并得到等价重建结果。
+
+单实体的 Tick、MIDI 数值、gain、pan、BPM 和拍号值域由 parser 与 Record 工厂保证；`InvariantValidator` 不为每次全局扫描重复执行全部本地解析。外部 DTO 必须先经过 schema 校验、迁移和领域工厂，形成 ModelStore 后再检查跨实体规则。
+
+结构 Validator 接受 `ModelStoreReader`，聚合所有违规并返回稳定排序的 `ModelInvariantViolation`。`assertModelInvariants` 在需要强制合法状态的边界抛出携带完整违规列表的 `ModelInvariantError`。它不修改或自动修复 Store，也不把 Map 插入顺序当作项目语义。
+
+当前尚无 Device Definition Catalog，因此结构 Validator 不判断 MIDI Effect、Instrument 和 Audio Effect 的角色兼容性。Descriptor 存在且拥有唯一位置时，未知 Device Definition 仍然可以加载并由上层显示 MissingDevice；Catalog 建立后再增加 definition-aware 角色检查。
 
 跨实体新增、删除和级联变化必须先形成完整 MutationPlan，通过全部验证后一次提交。任何已发布的 Snapshot 或 ProjectCommit 都不能观察到中间状态。
 

@@ -143,6 +143,14 @@ notes.set(noteId, after)
 - 在开发模式冻结实体，尽早发现越权写入；
 - 保留将单张表替换为其他存储实现的空间。
 
+### 跨实体不变量验证
+
+`InvariantValidator` 是接受 `ModelStoreReader` 的无状态纯函数模块，不持有 Store，也不使用只有静态方法的 Class。它返回带稳定错误码、诊断信息和相关实体引用的完整违规集合；需要强制合法状态的边界再通过 `assertModelInvariants` 抛出包含全部违规的 `ModelInvariantError`。
+
+实体工厂负责名称、Tick、MIDI 值、gain、BPM 等单记录值域，InvariantValidator 负责必须同时观察多个实体或容器才能判断的顺序、外键、唯一所有权、Source 范围、Timeline 初始事件和设备拓扑规则。Validator 不修复模型，也不依赖 Map 插入顺序；违规列表按稳定诊断键排序。
+
+Note 虽然按 MidiSource 分区存储，`NoteId` 仍在整个项目内保持唯一，`MidiNoteAddress` 用于直接定位分区而不是定义局部身份。Device 角色兼容性需要尚未实现的 Device Definition Catalog；当前只验证 Descriptor 存在且恰好拥有一个拓扑位置，未知实现仍可被完整保留。
+
 ## ProjectSession 与内部组件
 
 `ProjectSession` 是供上层使用的门面，不是管理所有系统的 God Object：

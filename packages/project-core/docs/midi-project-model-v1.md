@@ -494,6 +494,23 @@ ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只�
 - `modelRevision` 是运行时并发与订阅版本，不进入 ProjectFileDTO；
 - 包外不能取得内部 Map、可变数组或可写实体引用。
 
+### 新项目的最小合法模型
+
+包内 `createInitialModelStore` 接受 Project ID、项目名称、初始 Tempo Event ID 和初始 Time Signature Event ID。所有 opaque ID 由调用方生成并显式传入；Project Core 不依赖随机数、时钟、浏览器 API 或 Node API 来创建身份。
+
+初始化结果固定为：
+
+- 一个 Project Record；
+- Tick 0 的 120 BPM Tempo Event；
+- Tick 0 的 4/4 Time Signature Event；
+- gain 为 `1`、未静音且没有 Audio Effect 的 Master；
+- 空的 `trackOrder`、Track、Clip、MidiSource、Note 分区和 Device 表；
+- revision 为 `0` 的 ModelStore。
+
+零 Track 是合法项目状态。默认 Instrument Track 必须同时决定 Instrument Device 和对应 Device Definition，因此属于 Studio 的项目模板，而不是 ModelStore 的结构默认值。初始化器构造 Store 后执行 `assertModelInvariants`；ModelStore 构造器本身仍不承担验证或修复职责。
+
+测试使用的完整 fixture 会覆盖当前全部实体关系，但它不是项目模板、持久化示例或产品默认状态。
+
 ## QueryIndex
 
 建议维护以下可重建索引：

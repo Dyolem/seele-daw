@@ -4,25 +4,18 @@ import {
   DEVICE_DEFINITION_VERSION_MIN,
   createAudioTrackRecord,
   createDeviceDescriptor,
-  createInstrumentTrackRecord,
   createMasterChannelRecord,
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
-  createProjectRecord,
   createTempoEventRecord,
   createTimeSignatureEventRecord,
-  parseBipolarValue,
   parseClipId,
   parseDeviceId,
   parseDeviceTypeId,
   parseLinearGain,
-  parseMidiChannel,
-  parseMidiPitch,
   parseMidiSourceId,
-  parseMidiVelocity,
   parseNoteId,
-  parseProjectId,
   parseTempoBpm,
   parseTempoEventId,
   parseTick,
@@ -30,21 +23,13 @@ import {
   parseTimeSignatureEventId,
   parseTimeSignatureNumerator,
   parseTrackId,
-  type ClipId,
-  type ClipRecord,
   type DeviceDescriptor,
   type DeviceId,
-  type MidiNoteRecord,
-  type MidiSourceId,
-  type MidiSourceRecord,
-  type NoteId,
-  type TempoEventId,
-  type TempoEventRecord,
-  type TimeSignatureEventId,
-  type TimeSignatureEventRecord,
-  type TrackId,
-  type TrackRecord,
 } from '..'
+import {
+  createCompleteProjectFixture,
+  type CompleteProjectFixture,
+} from './fixtures/complete-project-fixture'
 import {
   assertModelInvariants,
   ModelInvariantError,
@@ -52,15 +37,6 @@ import {
   type ModelInvariantCode,
 } from '../model/invariant-validator'
 import { ModelStore, type ModelStoreReader, type ModelStoreSeed } from '../model/model-store'
-
-function createChannelInput() {
-  return {
-    gain: parseLinearGain(1),
-    pan: parseBipolarValue(0),
-    muted: false,
-    soloed: false,
-  }
-}
 
 function createDevice(id: DeviceId, typeId = 'vendor.unknown-device'): DeviceDescriptor {
   return createDeviceDescriptor({
@@ -73,117 +49,6 @@ function createDevice(id: DeviceId, typeId = 'vendor.unknown-device'): DeviceDes
   })
 }
 
-function createValidFixture() {
-  const project = createProjectRecord({
-    id: parseProjectId('project-1'),
-    name: 'Invariant Validator Test',
-  })
-  const instrumentDeviceId = parseDeviceId('instrument-1')
-  const track = createInstrumentTrackRecord({
-    id: parseTrackId('track-1'),
-    name: 'Lead',
-    color: null,
-    channel: createChannelInput(),
-    midiEffectIds: [],
-    instrumentDeviceId,
-    audioEffectIds: [],
-  })
-  const source = createMidiSourceRecord({
-    id: parseMidiSourceId('source-1'),
-    lengthTick: parseTick(1_920),
-  })
-  const note = createMidiNoteRecord({
-    id: parseNoteId('note-1'),
-    startTick: parseTick(0),
-    durationTick: parseTick(480),
-    pitch: parseMidiPitch(60),
-    velocity: parseMidiVelocity(100),
-    channel: parseMidiChannel(1),
-  })
-  const clip = createMidiClipRecord({
-    id: parseClipId('clip-1'),
-    trackId: track.id,
-    name: 'Verse',
-    color: null,
-    muted: false,
-    startTick: parseTick(0),
-    spanTick: parseTick(1_920),
-    sourceId: source.id,
-    sourceOffsetTick: parseTick(0),
-    loop: null,
-  })
-  const tempoEvent = createTempoEventRecord({
-    id: parseTempoEventId('tempo-1'),
-    tick: parseTick(0),
-    bpm: parseTempoBpm(120),
-  })
-  const timeSignatureEvent = createTimeSignatureEventRecord({
-    id: parseTimeSignatureEventId('time-signature-1'),
-    tick: parseTick(0),
-    numerator: parseTimeSignatureNumerator(4),
-    denominator: parseTimeSignatureDenominator(4),
-  })
-  const device = createDevice(instrumentDeviceId)
-  const master = createMasterChannelRecord({
-    gain: parseLinearGain(1),
-    muted: false,
-    audioEffectIds: [],
-  })
-
-  const trackOrder = [track.id]
-  const tracks = new Map<TrackId, TrackRecord>([[track.id, track]])
-  const clips = new Map<ClipId, ClipRecord>([[clip.id, clip]])
-  const midiSources = new Map<MidiSourceId, MidiSourceRecord>([[source.id, source]])
-  const notePartition = new Map<NoteId, MidiNoteRecord>([[note.id, note]])
-  const midiNotesBySource = new Map<MidiSourceId, ReadonlyMap<NoteId, MidiNoteRecord>>([
-    [source.id, notePartition],
-  ])
-  const tempoEvents = new Map<TempoEventId, TempoEventRecord>([[tempoEvent.id, tempoEvent]])
-  const timeSignatureEvents = new Map<TimeSignatureEventId, TimeSignatureEventRecord>([
-    [timeSignatureEvent.id, timeSignatureEvent],
-  ])
-  const devices = new Map<DeviceId, DeviceDescriptor>([[device.id, device]])
-
-  const seed = {
-    project,
-    trackOrder,
-    tracks,
-    clips,
-    midiSources,
-    midiNotesBySource,
-    tempoEvents,
-    timeSignatureEvents,
-    devices,
-    master,
-  } satisfies ModelStoreSeed
-
-  return {
-    seed,
-    records: {
-      track,
-      clip,
-      source,
-      note,
-      tempoEvent,
-      timeSignatureEvent,
-      device,
-    },
-    containers: {
-      trackOrder,
-      tracks,
-      clips,
-      midiSources,
-      notePartition,
-      midiNotesBySource,
-      tempoEvents,
-      timeSignatureEvents,
-      devices,
-    },
-  }
-}
-
-type ValidFixture = ReturnType<typeof createValidFixture>
-
 function validateSeed(seed: ModelStoreSeed) {
   return validateModelInvariants(new ModelStore(seed))
 }
@@ -192,12 +57,12 @@ function codesFor(seed: ModelStoreSeed): readonly ModelInvariantCode[] {
   return validateSeed(seed).map(({ code }) => code)
 }
 
-function replaceClip(
-  fixture: ValidFixture,
+function replaceNonLoopClip(
+  fixture: CompleteProjectFixture,
   changes: Partial<Parameters<typeof createMidiClipRecord>[0]>,
 ): void {
   const replacement = createMidiClipRecord({
-    ...fixture.records.clip,
+    ...fixture.records.nonLoopClip,
     ...changes,
   })
 
@@ -205,16 +70,19 @@ function replaceClip(
 }
 
 describe('validateModelInvariants valid model', () => {
-  it('accepts a complete local 120 BPM and 4/4 model', () => {
-    const store = new ModelStore(createValidFixture().seed)
+  it('accepts a complete model containing all currently supported topology positions', () => {
+    const store = new ModelStore(createCompleteProjectFixture().seed)
 
     expect(validateModelInvariants(store)).toEqual([])
     expect(() => assertModelInvariants(store)).not.toThrow()
   })
 
   it('accepts a uniquely owned Descriptor whose Device Definition is unknown', () => {
-    const fixture = createValidFixture()
-    const unknownDevice = createDevice(fixture.records.device.id, 'third-party.future-synth')
+    const fixture = createCompleteProjectFixture()
+    const unknownDevice = createDevice(
+      fixture.records.instrumentDevice.id,
+      'third-party.future-synth',
+    )
 
     fixture.containers.devices.set(unknownDevice.id, unknownDevice)
 
@@ -224,15 +92,15 @@ describe('validateModelInvariants valid model', () => {
 
 describe('Track topology invariants', () => {
   it('rejects duplicate Track IDs in trackOrder', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    fixture.containers.trackOrder.push(fixture.records.track.id)
+    fixture.containers.trackOrder.push(fixture.records.instrumentTrack.id)
 
     expect(codesFor(fixture.seed)).toContain('track-order-duplicate')
   })
 
   it('rejects a trackOrder entry with no Track', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
     fixture.containers.trackOrder.push(parseTrackId('missing-track'))
 
@@ -240,78 +108,88 @@ describe('Track topology invariants', () => {
   })
 
   it('rejects a Track omitted from trackOrder', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
+    const trackIndex = fixture.containers.trackOrder.indexOf(fixture.records.instrumentTrack.id)
 
-    fixture.containers.trackOrder.length = 0
+    fixture.containers.trackOrder.splice(trackIndex, 1)
 
     expect(codesFor(fixture.seed)).toContain('track-missing-from-order')
   })
 })
 
 describe('normalized table key invariants', () => {
-  const cases: readonly [string, (fixture: ValidFixture) => void][] = [
+  const cases: readonly [string, (fixture: CompleteProjectFixture) => void][] = [
     [
       'Track',
       (fixture) => {
-        fixture.containers.tracks.delete(fixture.records.track.id)
-        fixture.containers.tracks.set(parseTrackId('wrong-track-key'), fixture.records.track)
+        fixture.containers.tracks.delete(fixture.records.instrumentTrack.id)
+        fixture.containers.tracks.set(
+          parseTrackId('wrong-track-key'),
+          fixture.records.instrumentTrack,
+        )
       },
     ],
     [
       'Clip',
       (fixture) => {
-        fixture.containers.clips.delete(fixture.records.clip.id)
-        fixture.containers.clips.set(parseClipId('wrong-clip-key'), fixture.records.clip)
+        fixture.containers.clips.delete(fixture.records.nonLoopClip.id)
+        fixture.containers.clips.set(parseClipId('wrong-clip-key'), fixture.records.nonLoopClip)
       },
     ],
     [
       'MIDI Source',
       (fixture) => {
-        fixture.containers.midiSources.delete(fixture.records.source.id)
+        fixture.containers.midiSources.delete(fixture.records.nonLoopSource.id)
         fixture.containers.midiSources.set(
           parseMidiSourceId('wrong-source-key'),
-          fixture.records.source,
+          fixture.records.nonLoopSource,
         )
       },
     ],
     [
       'MIDI Note',
       (fixture) => {
-        fixture.containers.notePartition.delete(fixture.records.note.id)
-        fixture.containers.notePartition.set(parseNoteId('wrong-note-key'), fixture.records.note)
+        fixture.containers.nonLoopNotePartition.delete(fixture.records.nonLoopNote.id)
+        fixture.containers.nonLoopNotePartition.set(
+          parseNoteId('wrong-note-key'),
+          fixture.records.nonLoopNote,
+        )
       },
     ],
     [
       'Tempo Event',
       (fixture) => {
-        fixture.containers.tempoEvents.delete(fixture.records.tempoEvent.id)
+        fixture.containers.tempoEvents.delete(fixture.records.initialTempoEvent.id)
         fixture.containers.tempoEvents.set(
           parseTempoEventId('wrong-tempo-key'),
-          fixture.records.tempoEvent,
+          fixture.records.initialTempoEvent,
         )
       },
     ],
     [
       'Time Signature Event',
       (fixture) => {
-        fixture.containers.timeSignatureEvents.delete(fixture.records.timeSignatureEvent.id)
+        fixture.containers.timeSignatureEvents.delete(fixture.records.initialTimeSignatureEvent.id)
         fixture.containers.timeSignatureEvents.set(
           parseTimeSignatureEventId('wrong-signature-key'),
-          fixture.records.timeSignatureEvent,
+          fixture.records.initialTimeSignatureEvent,
         )
       },
     ],
     [
       'Device',
       (fixture) => {
-        fixture.containers.devices.delete(fixture.records.device.id)
-        fixture.containers.devices.set(parseDeviceId('wrong-device-key'), fixture.records.device)
+        fixture.containers.devices.delete(fixture.records.instrumentDevice.id)
+        fixture.containers.devices.set(
+          parseDeviceId('wrong-device-key'),
+          fixture.records.instrumentDevice,
+        )
       },
     ],
   ]
 
   it.each(cases)('rejects a %s table key that differs from its Record ID', (_name, mutate) => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
     mutate(fixture)
 
@@ -321,50 +199,55 @@ describe('normalized table key invariants', () => {
 
 describe('Clip, Track, and MIDI Source invariants', () => {
   it('rejects a Clip that references a missing Track', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    replaceClip(fixture, { trackId: parseTrackId('missing-track') })
+    replaceNonLoopClip(fixture, { trackId: parseTrackId('missing-track') })
 
     expect(codesFor(fixture.seed)).toContain('clip-missing-track')
   })
 
   it('rejects a MIDI Clip placed on an Audio Track', () => {
-    const fixture = createValidFixture()
-    const audioTrack = createAudioTrackRecord({
-      id: fixture.records.track.id,
+    const fixture = createCompleteProjectFixture()
+    const instrumentTrackAsAudio = createAudioTrackRecord({
+      id: fixture.records.instrumentTrack.id,
       name: 'Audio',
       color: null,
-      channel: createChannelInput(),
-      audioEffectIds: [],
+      channel: fixture.records.instrumentTrack.channel,
+      // Retain every Descriptor owner so this corruption isolates the Track kind rule.
+      audioEffectIds: [
+        fixture.records.midiEffectDevice.id,
+        fixture.records.instrumentDevice.id,
+        fixture.records.instrumentAudioEffectDevice.id,
+      ],
     })
 
-    fixture.containers.tracks.set(audioTrack.id, audioTrack)
+    fixture.containers.tracks.set(instrumentTrackAsAudio.id, instrumentTrackAsAudio)
 
     expect(codesFor(fixture.seed)).toContain('clip-track-kind-mismatch')
   })
 
   it('rejects a Clip that references a missing MIDI Source', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    replaceClip(fixture, { sourceId: parseMidiSourceId('missing-source') })
+    replaceNonLoopClip(fixture, { sourceId: parseMidiSourceId('missing-source') })
 
     expect(codesFor(fixture.seed)).toContain('clip-missing-midi-source')
   })
 
   it('rejects an unowned MIDI Source', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    fixture.containers.clips.clear()
+    fixture.containers.clips.delete(fixture.records.nonLoopClip.id)
 
     expect(codesFor(fixture.seed)).toContain('midi-source-ownership')
   })
 
   it('rejects a MIDI Source shared by multiple Clips', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
     const secondClip = createMidiClipRecord({
-      ...fixture.records.clip,
-      id: parseClipId('clip-2'),
-      startTick: parseTick(1_920),
+      ...fixture.records.nonLoopClip,
+      id: parseClipId('clip-shared-source'),
+      startTick: parseTick(5_760),
     })
 
     fixture.containers.clips.set(secondClip.id, secondClip)
@@ -373,9 +256,9 @@ describe('Clip, Track, and MIDI Source invariants', () => {
   })
 
   it('rejects a non-looping Clip window beyond its MIDI Source', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
     const shortSource = createMidiSourceRecord({
-      id: fixture.records.source.id,
+      id: fixture.records.nonLoopSource.id,
       lengthTick: parseTick(960),
     })
 
@@ -385,15 +268,17 @@ describe('Clip, Track, and MIDI Source invariants', () => {
   })
 
   it('rejects a loop region beyond its MIDI Source', () => {
-    const fixture = createValidFixture()
-
-    replaceClip(fixture, {
-      sourceOffsetTick: parseTick(1_000),
+    const fixture = createCompleteProjectFixture()
+    const replacement = createMidiClipRecord({
+      ...fixture.records.loopingClip,
+      sourceOffsetTick: parseTick(1_200),
       loop: {
-        sourceStartTick: parseTick(1_000),
-        sourceSpanTick: parseTick(1_000),
+        sourceStartTick: parseTick(1_200),
+        sourceSpanTick: parseTick(960),
       },
     })
+
+    fixture.containers.clips.set(replacement.id, replacement)
 
     expect(codesFor(fixture.seed)).toContain('clip-outside-midi-source')
   })
@@ -401,15 +286,15 @@ describe('Clip, Track, and MIDI Source invariants', () => {
 
 describe('MIDI Note partition invariants', () => {
   it('rejects a MIDI Source without a Note partition', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    fixture.containers.midiNotesBySource.delete(fixture.records.source.id)
+    fixture.containers.midiNotesBySource.delete(fixture.records.nonLoopSource.id)
 
     expect(codesFor(fixture.seed)).toContain('midi-source-missing-note-partition')
   })
 
   it('rejects a Note partition without a MIDI Source', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
     fixture.containers.midiNotesBySource.set(parseMidiSourceId('missing-source'), new Map())
 
@@ -417,41 +302,26 @@ describe('MIDI Note partition invariants', () => {
   })
 
   it('rejects a MIDI Note that ends beyond its Source', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
     const note = createMidiNoteRecord({
-      ...fixture.records.note,
+      ...fixture.records.nonLoopNote,
       startTick: parseTick(1_500),
       durationTick: parseTick(500),
     })
 
-    fixture.containers.notePartition.set(note.id, note)
+    fixture.containers.nonLoopNotePartition.set(note.id, note)
 
     expect(codesFor(fixture.seed)).toContain('note-outside-midi-source')
   })
 
   it('requires NoteId values to be unique across Source partitions', () => {
-    const fixture = createValidFixture()
-    const source = createMidiSourceRecord({
-      id: parseMidiSourceId('source-2'),
-      lengthTick: parseTick(960),
-    })
-    const clip = createMidiClipRecord({
-      ...fixture.records.clip,
-      id: parseClipId('clip-2'),
-      sourceId: source.id,
-      spanTick: parseTick(960),
-    })
+    const fixture = createCompleteProjectFixture()
     const duplicateNote = createMidiNoteRecord({
-      ...fixture.records.note,
+      ...fixture.records.nonLoopNote,
       startTick: parseTick(240),
     })
 
-    fixture.containers.midiSources.set(source.id, source)
-    fixture.containers.clips.set(clip.id, clip)
-    fixture.containers.midiNotesBySource.set(
-      source.id,
-      new Map([[duplicateNote.id, duplicateNote]]),
-    )
+    fixture.containers.loopingNotePartition.set(duplicateNote.id, duplicateNote)
 
     expect(codesFor(fixture.seed)).toContain('note-id-duplicate')
   })
@@ -459,21 +329,21 @@ describe('MIDI Note partition invariants', () => {
 
 describe('Timeline invariants', () => {
   it('requires exactly one Tempo Event at Tick 0', () => {
-    const fixture = createValidFixture()
-    const laterTempo = createTempoEventRecord({
-      ...fixture.records.tempoEvent,
+    const fixture = createCompleteProjectFixture()
+    const movedInitialTempo = createTempoEventRecord({
+      ...fixture.records.initialTempoEvent,
       tick: parseTick(480),
     })
 
-    fixture.containers.tempoEvents.set(laterTempo.id, laterTempo)
+    fixture.containers.tempoEvents.set(movedInitialTempo.id, movedInitialTempo)
 
     expect(codesFor(fixture.seed)).toContain('tempo-initial-event-count')
   })
 
   it('rejects multiple Tempo Events at the same Tick', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    for (const id of ['tempo-2', 'tempo-3']) {
+    for (const id of ['tempo-duplicate-a', 'tempo-duplicate-b']) {
       const event = createTempoEventRecord({
         id: parseTempoEventId(id),
         tick: parseTick(480),
@@ -486,21 +356,21 @@ describe('Timeline invariants', () => {
   })
 
   it('requires exactly one Time Signature Event at Tick 0', () => {
-    const fixture = createValidFixture()
-    const laterSignature = createTimeSignatureEventRecord({
-      ...fixture.records.timeSignatureEvent,
+    const fixture = createCompleteProjectFixture()
+    const movedInitialSignature = createTimeSignatureEventRecord({
+      ...fixture.records.initialTimeSignatureEvent,
       tick: parseTick(480),
     })
 
-    fixture.containers.timeSignatureEvents.set(laterSignature.id, laterSignature)
+    fixture.containers.timeSignatureEvents.set(movedInitialSignature.id, movedInitialSignature)
 
     expect(codesFor(fixture.seed)).toContain('time-signature-initial-event-count')
   })
 
   it('rejects multiple Time Signature Events at the same Tick', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    for (const id of ['time-signature-2', 'time-signature-3']) {
+    for (const id of ['time-signature-duplicate-a', 'time-signature-duplicate-b']) {
       const event = createTimeSignatureEventRecord({
         id: parseTimeSignatureEventId(id),
         tick: parseTick(480),
@@ -516,15 +386,15 @@ describe('Timeline invariants', () => {
 
 describe('Device topology invariants', () => {
   it('rejects a topology reference with no Device Descriptor', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    fixture.containers.devices.delete(fixture.records.device.id)
+    fixture.containers.devices.delete(fixture.records.instrumentDevice.id)
 
     expect(codesFor(fixture.seed)).toContain('device-missing')
   })
 
   it('rejects an orphan Device Descriptor', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
     const orphanDevice = createDevice(parseDeviceId('orphan-device'))
 
     fixture.containers.devices.set(orphanDevice.id, orphanDevice)
@@ -533,29 +403,31 @@ describe('Device topology invariants', () => {
   })
 
   it('rejects a Device shared by two Tracks', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
     const audioTrack = createAudioTrackRecord({
-      id: parseTrackId('track-2'),
-      name: 'Audio',
-      color: null,
-      channel: createChannelInput(),
-      audioEffectIds: [fixture.records.device.id],
+      ...fixture.records.audioTrack,
+      audioEffectIds: [
+        ...fixture.records.audioTrack.audioEffectIds,
+        fixture.records.instrumentDevice.id,
+      ],
     })
 
     fixture.containers.tracks.set(audioTrack.id, audioTrack)
-    fixture.containers.trackOrder.push(audioTrack.id)
 
     expect(codesFor(fixture.seed)).toContain('device-ownership')
   })
 
   it('rejects a Device shared by a Track and Master', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
     const seed = {
       ...fixture.seed,
       master: createMasterChannelRecord({
         gain: parseLinearGain(1),
         muted: false,
-        audioEffectIds: [fixture.records.device.id],
+        audioEffectIds: [
+          fixture.records.masterAudioEffectDevice.id,
+          fixture.records.instrumentDevice.id,
+        ],
       }),
     } satisfies ModelStoreSeed
 
@@ -565,10 +437,10 @@ describe('Device topology invariants', () => {
 
 describe('Invariant diagnostics', () => {
   it('collects multiple independent violations in one validation pass', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    fixture.containers.trackOrder.push(fixture.records.track.id)
-    fixture.containers.devices.delete(fixture.records.device.id)
+    fixture.containers.trackOrder.push(fixture.records.instrumentTrack.id)
+    fixture.containers.devices.delete(fixture.records.instrumentDevice.id)
     fixture.containers.tempoEvents.clear()
 
     expect(codesFor(fixture.seed)).toEqual(
@@ -582,7 +454,7 @@ describe('Invariant diagnostics', () => {
 
   it('returns the same sorted diagnostics regardless of Map insertion order', () => {
     function createSeedWithOrphans(reverse: boolean): ModelStoreSeed {
-      const fixture = createValidFixture()
+      const fixture = createCompleteProjectFixture()
       const devices = [
         createDevice(parseDeviceId('orphan-a')),
         createDevice(parseDeviceId('orphan-b')),
@@ -607,10 +479,10 @@ describe('Invariant diagnostics', () => {
   })
 
   it('exposes the complete sorted violation list through ModelInvariantError', () => {
-    const fixture = createValidFixture()
+    const fixture = createCompleteProjectFixture()
 
-    fixture.containers.trackOrder.push(fixture.records.track.id)
-    fixture.containers.devices.delete(fixture.records.device.id)
+    fixture.containers.trackOrder.push(fixture.records.instrumentTrack.id)
+    fixture.containers.devices.delete(fixture.records.instrumentDevice.id)
 
     const store = new ModelStore(fixture.seed)
     const expectedViolations = validateModelInvariants(store)
@@ -633,7 +505,7 @@ describe('Invariant diagnostics', () => {
   })
 
   it('does not modify the ModelStore while validating it', () => {
-    const store: ModelStoreReader = new ModelStore(createValidFixture().seed)
+    const store: ModelStoreReader = new ModelStore(createCompleteProjectFixture().seed)
     const before = {
       revision: store.modelRevision,
       trackOrder: [...store.orderedTrackIds()],

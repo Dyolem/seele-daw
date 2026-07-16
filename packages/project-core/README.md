@@ -151,6 +151,16 @@ notes.set(noteId, after)
 
 Note 虽然按 MidiSource 分区存储，`NoteId` 仍在整个项目内保持唯一，`MidiNoteAddress` 用于直接定位分区而不是定义局部身份。Device 角色兼容性需要尚未实现的 Device Definition Catalog；当前只验证 Descriptor 存在且恰好拥有一个拓扑位置，未知实现仍可被完整保留。
 
+### 合法项目初始化
+
+`createInitialModelStore` 是包内的新项目初始化入口。调用方提供 Project、Tempo Event 和 Time Signature Event 的 opaque ID 以及项目名称；内核不调用 `crypto.randomUUID()`，因此初始化过程保持确定性并且不依赖浏览器或 Node 环境。
+
+初始模型包含 Tick 0 的 120 BPM Tempo、Tick 0 的 4/4 Time Signature、unity gain 且未静音的空 Master，以及空的 Track、Clip、MidiSource、Note 分区和 Device 表。初始化完成后必须通过 `assertModelInvariants`，从而在未来增加新不变量时让过期的初始化逻辑立即失败，而不是发布非法 Store。
+
+内核不会自动创建默认 Track。Instrument Track 需要明确的 Device Definition 和 Device ID，“新建项目时出现哪些轨道与设备”属于 Studio 产品模板。完整测试 fixture 也不等于产品默认项目：它只用于覆盖所有当前实体关系和拓扑位置。
+
+该入口暂不从 package root 导出，因为它返回包内私有的 `ModelStore`；未来由 `ProjectSession` 创建流程调用。`ModelStore` 构造器仍保持低层职责，只复制已经规范化的 Seed，不自动验证或修复外部加载结果。
+
 ## ProjectSession 与内部组件
 
 `ProjectSession` 是供上层使用的门面，不是管理所有系统的 God Object：

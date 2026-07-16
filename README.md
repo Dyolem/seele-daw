@@ -53,6 +53,12 @@ pnpm build
 pnpm check
 ```
 
+## 导入路径
+
+每个 app 和 package 都将 `@/*`、`~/*` 映射到自身的 `src/*`，其中 `@/` 是项目代码的首选写法。跨目录的向上导航使用别名，位于同一目录或紧邻局部模块的 `./` 引用保持相对路径，以保留局部依赖关系。
+
+别名只能访问 importer 所属 workspace 的源码。跨 package 依赖必须继续使用 `@seele-daw/<package>` 的公开入口并在 `package.json` 声明依赖，不能借助别名深层导入其他 package。Vite 和 Vitest 根据每个 importer 匹配到的 tsconfig 解析别名，因此不要再增加指向单一 app 的全局静态 alias。
+
 ## 架构基线
 
 - [简洁架构总纲](docs/architecture/web-daw-architecture-brief.md)

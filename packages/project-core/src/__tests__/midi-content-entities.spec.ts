@@ -22,7 +22,7 @@ import {
   type MidiLoop,
   type MidiNoteRecord,
   type MidiSourceRecord,
-} from '..'
+} from '@/index'
 
 describe('Tick arithmetic', () => {
   it('adds non-negative Tick values without losing the Tick brand', () => {

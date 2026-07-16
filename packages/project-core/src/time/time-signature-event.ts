@@ -1,6 +1,6 @@
-import type { Brand } from '../model/brand'
-import { rejectDomainValue } from '../model/domain-value-error'
-import { parseTimeSignatureEventId, type TimeSignatureEventId } from '../model/ids'
+import type { Brand } from '@/model/brand'
+import { rejectDomainValue } from '@/model/domain-value-error'
+import { parseTimeSignatureEventId, type TimeSignatureEventId } from '@/model/ids'
 import { parseTick, type Tick } from './tick'
 
 export type TimeSignatureNumerator = Brand<number, 'TimeSignatureNumerator'>

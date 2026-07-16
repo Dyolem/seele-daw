@@ -16,8 +16,8 @@ import type {
   TimeSignatureEventId,
   TrackId,
 } from './ids'
-import type { TempoEventRecord } from '../time/tempo-event'
-import type { TimeSignatureEventRecord } from '../time/time-signature-event'
+import type { TempoEventRecord } from '@/time/tempo-event'
+import type { TimeSignatureEventRecord } from '@/time/time-signature-event'
 
 export type ModelEntityKind =
   | 'clip'

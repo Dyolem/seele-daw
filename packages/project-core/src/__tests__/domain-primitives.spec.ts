@@ -27,7 +27,7 @@ import {
   type ProjectColor,
   type Tick,
   type TrackId,
-} from '..'
+} from '@/index'
 
 describe('opaque identifiers', () => {
   it('brands valid opaque strings without changing their runtime value', () => {

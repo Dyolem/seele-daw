@@ -1,5 +1,5 @@
-import type { Brand } from '../model/brand'
-import { rejectDomainValue } from '../model/domain-value-error'
+import type { Brand } from '@/model/brand'
+import { rejectDomainValue } from '@/model/domain-value-error'
 
 export type Tick = Brand<number, 'Tick'>
 

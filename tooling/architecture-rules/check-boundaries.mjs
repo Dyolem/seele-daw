@@ -5,6 +5,10 @@ import process from 'node:process'
 const root = process.cwd()
 const packageRoot = path.join(root, 'packages')
 const packageNames = ['project-core', 'editor', 'playback', 'audio-web', 'platform-browser']
+const workspaceDirectories = [
+  path.join(root, 'apps', 'studio'),
+  ...packageNames.map((packageName) => path.join(packageRoot, packageName)),
+]
 const allowedWorkspaceImports = new Map([
   ['project-core', new Set()],
   ['editor', new Set(['project-core'])],
@@ -55,6 +59,23 @@ function ownerOf(file) {
   return packageNames.includes(owner) ? owner : undefined
 }
 
+function isInside(directory, target) {
+  const relative = path.relative(directory, target)
+  return (
+    relative === '' ||
+    (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  )
+}
+
+function workspaceDirectoryOf(file) {
+  return workspaceDirectories.find((workspaceDirectory) => isInside(workspaceDirectory, file))
+}
+
+function workspaceAliasTarget(specifier, workspaceDirectory) {
+  const match = /^[@~]\/(.+)$/.exec(specifier)
+  return match ? path.resolve(workspaceDirectory, 'src', match[1]) : undefined
+}
+
 function workspacePackageOf(specifier) {
   const match = /^@seele-daw\/([^/]+)(?:\/(.+))?$/.exec(specifier)
   return match ? { name: match[1], deepPath: match[2] } : undefined
@@ -62,10 +83,23 @@ function workspacePackageOf(specifier) {
 
 for (const file of await collectFiles(root)) {
   const owner = ownerOf(file)
-  if (!owner) continue
+  const workspaceDirectory = workspaceDirectoryOf(file)
+  if (!workspaceDirectory) continue
 
   const source = await readFile(file, 'utf8')
   for (const specifier of importsFrom(source)) {
+    const aliasTarget = workspaceAliasTarget(specifier, workspaceDirectory)
+
+    if (aliasTarget) {
+      const sourceDirectory = path.join(workspaceDirectory, 'src')
+      if (!isInside(sourceDirectory, aliasTarget)) {
+        errors.push(`${path.relative(root, file)}: 禁止用 @/ 或 ~/ 越过 workspace 源码边界`)
+      }
+      continue
+    }
+
+    if (!owner) continue
+
     const workspaceImport = workspacePackageOf(specifier)
 
     if (workspaceImport) {

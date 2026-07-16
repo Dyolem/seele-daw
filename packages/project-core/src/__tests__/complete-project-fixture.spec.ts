@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { createCompleteProjectFixture } from './fixtures/complete-project-fixture'
-import { validateModelInvariants } from '../model/invariant-validator'
-import { ModelStore, type ModelStoreReader } from '../model/model-store'
+import { validateModelInvariants } from '@/model/invariant-validator'
+import { ModelStore, type ModelStoreReader } from '@/model/model-store'
 
 describe('complete project fixture contract', () => {
   it('always creates a complete cross-entity-valid model', () => {

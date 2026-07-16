@@ -42,8 +42,8 @@ import {
   type TimeSignatureEventRecord,
   type TrackId,
   type TrackRecord,
-} from '../..'
-import type { ModelStoreSeed } from '../../model/model-store'
+} from '~/index'
+import type { ModelStoreSeed } from '@/model/model-store'
 
 function createChannelInput(gain: number, pan: number) {
   return {

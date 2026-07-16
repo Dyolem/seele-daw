@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import * as projectCore from '..'
-import { DomainValueError, parseProjectId, parseTempoEventId, parseTimeSignatureEventId } from '..'
-import { assertModelInvariants, validateModelInvariants } from '../model/invariant-validator'
-import { INITIAL_MODEL_REVISION } from '../model/model-revision'
+import * as projectCore from '@/index'
+import {
+  DomainValueError,
+  parseProjectId,
+  parseTempoEventId,
+  parseTimeSignatureEventId,
+} from '@/index'
+import { assertModelInvariants, validateModelInvariants } from '@/model/invariant-validator'
+import { INITIAL_MODEL_REVISION } from '@/model/model-revision'
 import {
   createInitialModelStore,
   type CreateInitialModelStoreInput,
-} from '../model/project-initializer'
+} from '@/model/project-initializer'
 
 function createInput(): CreateInitialModelStoreInput {
   return {

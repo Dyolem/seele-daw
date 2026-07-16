@@ -1,6 +1,6 @@
-import type { Brand } from '../model/brand'
-import { rejectDomainValue, requireFiniteNumber } from '../model/domain-value-error'
-import { parseTempoEventId, type TempoEventId } from '../model/ids'
+import type { Brand } from '@/model/brand'
+import { rejectDomainValue, requireFiniteNumber } from '@/model/domain-value-error'
+import { parseTempoEventId, type TempoEventId } from '@/model/ids'
 import { parseTick, type Tick } from './tick'
 
 export type TempoBpm = Brand<number, 'TempoBpm'>

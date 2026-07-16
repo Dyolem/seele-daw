@@ -25,7 +25,7 @@ import {
   parseTrackId,
   type DeviceDescriptor,
   type DeviceId,
-} from '..'
+} from '@/index'
 import {
   createCompleteProjectFixture,
   type CompleteProjectFixture,
@@ -35,8 +35,8 @@ import {
   ModelInvariantError,
   validateModelInvariants,
   type ModelInvariantCode,
-} from '../model/invariant-validator'
-import { ModelStore, type ModelStoreReader, type ModelStoreSeed } from '../model/model-store'
+} from '@/model/invariant-validator'
+import { ModelStore, type ModelStoreReader, type ModelStoreSeed } from '@/model/model-store'
 
 function createDevice(id: DeviceId, typeId = 'vendor.unknown-device'): DeviceDescriptor {
   return createDeviceDescriptor({

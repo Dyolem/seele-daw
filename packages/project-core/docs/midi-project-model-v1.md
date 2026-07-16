@@ -373,17 +373,21 @@ Move、Resize、Split 如何改变这些字段，以及 Loop 边界的事件排�
 ## Timeline、Tempo 与 Time Signature
 
 ```ts
+type TempoBpm = Brand<number, 'TempoBpm'>
+type TimeSignatureNumerator = Brand<number, 'TimeSignatureNumerator'>
+type TimeSignatureDenominator = 1 | 2 | 4 | 8 | 16 | 32
+
 interface TempoEventRecord {
   readonly id: TempoEventId
   readonly tick: Tick
-  readonly bpm: number
+  readonly bpm: TempoBpm
 }
 
 interface TimeSignatureEventRecord {
   readonly id: TimeSignatureEventId
   readonly tick: Tick
-  readonly numerator: number
-  readonly denominator: number
+  readonly numerator: TimeSignatureNumerator
+  readonly denominator: TimeSignatureDenominator
 }
 ```
 
@@ -399,6 +403,10 @@ interface TimeSignatureEventRecord {
 - Tempo Event 和 Time Signature Event 保留独立 ID，以支持选择、移动和 Undo；
 - V1 UI 可以只开放 Tick 0 的编辑，存储结构允许以后加入多个 step event；
 - TempoMap 的有序段、累计秒数和查找缓存是 QueryIndex，不进入项目文件。
+
+Timeline 当前不是包含事件数组的大型 Record。两类事件分别进入规范化实体表，时间顺序由 `tick` 派生；项目不保存重复的事件顺序数组或固定的 Timeline 结束 Tick。
+
+单事件工厂只验证 ID、Tick、BPM 和拍号值域。同类事件在同一 Tick 的唯一性，以及 Tick 0 必须恰好存在一个初始 Tempo Event 和 Time Signature Event，属于需要观察整张实体表的跨实体不变量，由 `InvariantValidator` 负责。
 
 ## Device Descriptor
 

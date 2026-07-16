@@ -101,3 +101,26 @@ export type {
 
 export { PROJECT_PPQ, ZERO_TICK, addTicks, parsePositiveTick, parseTick } from './time/tick'
 export type { Tick } from './time/tick'
+
+export {
+  TEMPO_BPM_MAX,
+  TEMPO_BPM_MIN,
+  createTempoEventRecord,
+  parseTempoBpm,
+} from './time/tempo-event'
+export type { CreateTempoEventRecordInput, TempoBpm, TempoEventRecord } from './time/tempo-event'
+
+export {
+  TIME_SIGNATURE_DENOMINATORS,
+  TIME_SIGNATURE_NUMERATOR_MAX,
+  TIME_SIGNATURE_NUMERATOR_MIN,
+  createTimeSignatureEventRecord,
+  parseTimeSignatureDenominator,
+  parseTimeSignatureNumerator,
+} from './time/time-signature-event'
+export type {
+  CreateTimeSignatureEventRecordInput,
+  TimeSignatureDenominator,
+  TimeSignatureEventRecord,
+  TimeSignatureNumerator,
+} from './time/time-signature-event'

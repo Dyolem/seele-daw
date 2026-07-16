@@ -46,13 +46,20 @@ describe('opaque identifiers', () => {
     parseDeviceId,
     parseTempoEventId,
     parseTimeSignatureEventId,
-    parseDeviceTypeId,
     parseParameterId,
   ])('uses the same validation boundary for every ID domain', (parseId) => {
     expect(parseId('opaque-id')).toBe('opaque-id')
     expect(() => parseId('')).toThrow(DomainValueError)
     expect(() => parseId(' padded-id ')).toThrow(DomainValueError)
     expect(() => parseId('invalid\u0000id')).toThrow(DomainValueError)
+  })
+
+  it('requires a stable lowercase namespace for Device Type IDs', () => {
+    expect(parseDeviceTypeId('seele.basic-synth')).toBe('seele.basic-synth')
+    expect(parseDeviceTypeId('com.vendor.super-synth')).toBe('com.vendor.super-synth')
+    expect(() => parseDeviceTypeId('opaque-id')).toThrow(DomainValueError)
+    expect(() => parseDeviceTypeId('Seele.basic-synth')).toThrow(DomainValueError)
+    expect(() => parseDeviceTypeId('seele..basic-synth')).toThrow(DomainValueError)
   })
 })
 

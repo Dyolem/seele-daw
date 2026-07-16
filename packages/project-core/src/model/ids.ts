@@ -14,6 +14,8 @@ export type ParameterId = Brand<string, 'ParameterId'>
 
 const OPAQUE_ID_CONSTRAINT =
   'a non-empty opaque string without surrounding whitespace or control characters'
+const DEVICE_TYPE_ID_CONSTRAINT = 'a lowercase namespaced identifier such as seele.basic-synth'
+const DEVICE_TYPE_ID_PATTERN = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/u
 
 function containsControlCharacter(value: string): boolean {
   return Array.from(value).some((character) => {
@@ -69,7 +71,13 @@ export function parseTimeSignatureEventId(value: unknown): TimeSignatureEventId 
 }
 
 export function parseDeviceTypeId(value: unknown): DeviceTypeId {
-  return parseOpaqueId<DeviceTypeId>(value, 'DeviceTypeId')
+  const typeId = parseOpaqueId<DeviceTypeId>(value, 'DeviceTypeId')
+
+  if (!DEVICE_TYPE_ID_PATTERN.test(typeId)) {
+    rejectDomainValue('DeviceTypeId', DEVICE_TYPE_ID_CONSTRAINT)
+  }
+
+  return typeId
 }
 
 export function parseParameterId(value: unknown): ParameterId {

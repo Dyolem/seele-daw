@@ -407,7 +407,13 @@ V1 只确定稳定、可迁移的设备描述外壳。具体合成器参数由�
 ```ts
 type JsonPrimitive = string | number | boolean | null
 
-type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+type JsonArray = readonly JsonValue[]
+
+interface JsonObject {
+  readonly [key: string]: JsonValue
+}
+
+type JsonValue = JsonPrimitive | JsonArray | JsonObject
 
 interface DeviceDescriptor {
   readonly id: DeviceId
@@ -421,8 +427,8 @@ interface DeviceDescriptor {
 
 规则：
 
-- `typeId` 是稳定且带命名空间的类型，例如 `seele.basic-synth`；
-- `definitionVersion` 用于设备状态迁移，不等于项目文件格式版本；
+- `typeId` 是稳定且带命名空间的类型，例如 `seele.basic-synth`；每个命名空间段以小写 ASCII 字母开头，只包含小写字母、数字和连字符，并且至少包含两个由 `.` 分隔的段；
+- `definitionVersion` 是从 `1` 开始的安全整数，用于设备状态迁移，不等于项目文件格式版本；
 - Device Definition 声明端口类型、参数 schema、稳定 Parameter ID、默认值和状态迁移；
 - Device 不保存 `trackId`；
 - Device ID 必须在一个 Track 或 Master 的设备位置中恰好出现一次；
@@ -430,6 +436,10 @@ interface DeviceDescriptor {
 - 第三方运行时实例、AudioNode、Tone.js 对象和不可验证闭包不能进入项目数据；
 - 找不到设备实现时仍保留原始 Descriptor，由上层创建 MissingDevice 占位；
 - 保存项目时不得丢弃未知 `parameters` 或 `opaqueState`。
+
+`JsonValue` 边界只接受能够被 JSON 完整、确定表达的数据：number 必须有限；数组必须稠密且不能带额外属性；对象必须是普通对象或 null-prototype 对象，并且只包含自有、可枚举的字符串数据属性。`undefined`、BigInt、Symbol、函数、访问器、Class 实例、Date、Map、Set 和循环引用都必须拒绝。
+
+创建 Descriptor 时递归复制 `parameters` 和 `opaqueState`。外部输入之后发生的修改不能改变已经创建的 Descriptor；`__proto__` 等合法 JSON key 必须作为普通数据安全保留。通用边界不解释具体参数含义，参数 schema、默认值和版本迁移仍由对应 Device Definition 负责。
 
 ## 私有 ModelStore
 

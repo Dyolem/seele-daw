@@ -9,6 +9,9 @@ export type {
 
 export { DomainValueError } from './model/domain-value-error'
 
+export { DEVICE_DEFINITION_VERSION_MIN, createDeviceDescriptor } from './model/device'
+export type { CreateDeviceDescriptorInput, DeviceDescriptor } from './model/device'
+
 export { createMidiClipRecord, createMidiLoop } from './model/midi-clip'
 export type {
   ClipBase,
@@ -51,6 +54,9 @@ export {
   parseTimeSignatureEventId,
   parseTrackId,
 } from './model/ids'
+
+export { parseJsonValue } from './model/json-value'
+export type { JsonArray, JsonObject, JsonPrimitive, JsonValue } from './model/json-value'
 export type {
   ClipId,
   DeviceId,

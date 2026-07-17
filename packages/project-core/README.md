@@ -425,6 +425,7 @@ src/
 
 ## 架构依据
 
+- [阶段成果：安全模型与原子 Mutation 内核](./docs/project-core-transaction-foundation-milestone.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

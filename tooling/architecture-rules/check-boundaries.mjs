@@ -25,6 +25,10 @@ const bannedExternalImports = new Map([
 
 const sourceExtensions = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.tsx', '.vue'])
 const ignoredDirectories = new Set(['node_modules', 'dist', 'coverage'])
+const modelStoreWriteAccessConsumers = new Set([
+  'packages/project-core/src/model/model-store.ts',
+  'packages/project-core/src/mutation/mutation-applier.ts',
+])
 const errors = []
 
 async function collectFiles(directory) {
@@ -81,13 +85,72 @@ function workspacePackageOf(specifier) {
   return match ? { name: match[1], deepPath: match[2] } : undefined
 }
 
+function withoutSourceExtension(specifier) {
+  return specifier.replace(/\.(?:[cm]?[jt]sx?|vue)$/, '')
+}
+
+function explicitlyExportsWriteAccess(source, specifier) {
+  const normalizedSpecifier = withoutSourceExtension(specifier)
+
+  for (const match of source.matchAll(/export\s*\*\s*from\s*['"]([^'"]+)['"]/g)) {
+    if (
+      withoutSourceExtension(match[1]).endsWith('/model-store-write-access') &&
+      normalizedSpecifier.endsWith('/model-store-write-access')
+    ) {
+      return true
+    }
+  }
+
+  const protectedNames = [
+    'ModelStoreWriteAccess',
+    'claimModelStoreWriteAccess',
+    'registerModelStoreWriteAccess',
+  ]
+
+  for (const match of source.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/gs)) {
+    if (protectedNames.some((name) => new RegExp(`\\b${name}\\b`).test(match[1]))) {
+      return true
+    }
+  }
+
+  return false
+}
+
 for (const file of await collectFiles(root)) {
   const owner = ownerOf(file)
   const workspaceDirectory = workspaceDirectoryOf(file)
   if (!workspaceDirectory) continue
 
   const source = await readFile(file, 'utf8')
+  const relativeFile = path.relative(root, file).split(path.sep).join('/')
+
   for (const specifier of importsFrom(source)) {
+    if (withoutSourceExtension(specifier).endsWith('/model-store-write-access')) {
+      if (!modelStoreWriteAccessConsumers.has(relativeFile)) {
+        errors.push(
+          `${relativeFile}: ModelStore 写能力只能由 ModelStore 注册并由 MutationApplier 领取`,
+        )
+      }
+
+      if (
+        source.includes('registerModelStoreWriteAccess') &&
+        relativeFile !== 'packages/project-core/src/model/model-store.ts'
+      ) {
+        errors.push(`${relativeFile}: 只有 ModelStore 可以注册内部写能力`)
+      }
+
+      if (
+        source.includes('claimModelStoreWriteAccess') &&
+        relativeFile !== 'packages/project-core/src/mutation/mutation-applier.ts'
+      ) {
+        errors.push(`${relativeFile}: 只有 MutationApplier 可以领取内部写能力`)
+      }
+
+      if (explicitlyExportsWriteAccess(source, specifier)) {
+        errors.push(`${relativeFile}: 禁止重新导出 ModelStore 内部写能力`)
+      }
+    }
+
     const aliasTarget = workspaceAliasTarget(specifier, workspaceDirectory)
 
     if (aliasTarget) {

@@ -12,11 +12,101 @@ import type {
 import type { ClipRecord } from './midi-clip'
 import type { MidiNoteRecord } from './midi-note'
 import type { MidiSourceRecord } from './midi-source'
-import { INITIAL_MODEL_REVISION, type ModelRevision } from './model-revision'
+import { INITIAL_MODEL_REVISION, nextModelRevision, type ModelRevision } from './model-revision'
+import {
+  ModelStoreWriteAccessError,
+  registerModelStoreWriteAccess,
+} from './model-store-write-access'
 import type { ProjectRecord } from './project'
 import type { TrackRecord } from './track'
 import type { TempoEventRecord } from '@/time/tempo-event'
 import type { TimeSignatureEventRecord } from '@/time/time-signature-event'
+
+interface IdentifiedRecord<Id extends string> {
+  readonly id: Id
+}
+
+function rejectStoreWrite(detail: string): never {
+  throw new ModelStoreWriteAccessError('write-precondition-failed', detail)
+}
+
+/**
+ * Performs an entity-table compare-and-swap without exposing the table itself.
+ * All checks finish before the single set/delete that changes authoritative state.
+ */
+function writeEntityRecord<Id extends string, RecordType extends IdentifiedRecord<Id>>(
+  table: Map<Id, RecordType>,
+  entityName: string,
+  expected: RecordType | undefined,
+  next: RecordType | undefined,
+): void {
+  if (expected === undefined && next === undefined) {
+    rejectStoreWrite(`${entityName} write requires an expected or next record`)
+  }
+
+  if (expected !== undefined && next !== undefined && expected.id !== next.id) {
+    rejectStoreWrite(`${entityName} write cannot change record identity`)
+  }
+
+  const id = expected?.id ?? next?.id
+
+  if (id === undefined) {
+    rejectStoreWrite(`${entityName} write could not resolve a record identity`)
+  }
+
+  const current = table.get(id)
+
+  if (expected === undefined) {
+    if (current !== undefined) {
+      rejectStoreWrite(`${entityName} ${id} already exists`)
+    }
+  } else if (current !== expected) {
+    rejectStoreWrite(`${entityName} ${id} no longer matches the expected record`)
+  }
+
+  if (next === undefined) {
+    table.delete(id)
+  } else {
+    table.set(id, next)
+  }
+}
+
+function createMidiNoteTable(notes: readonly MidiNoteRecord[]): Map<NoteId, MidiNoteRecord> {
+  const noteTable = new Map<NoteId, MidiNoteRecord>()
+
+  for (const note of notes) {
+    if (noteTable.has(note.id)) {
+      rejectStoreWrite(`MIDI Note partition contains duplicate Note ID ${note.id}`)
+    }
+
+    noteTable.set(note.id, note)
+  }
+
+  return noteTable
+}
+
+function midiNotePartitionMatches(
+  noteTable: ReadonlyMap<NoteId, MidiNoteRecord>,
+  expectedNotes: readonly MidiNoteRecord[],
+): boolean {
+  if (noteTable.size !== expectedNotes.length) {
+    return false
+  }
+
+  const expectedById = new Map(expectedNotes.map((note) => [note.id, note] as const))
+
+  if (expectedById.size !== expectedNotes.length) {
+    return false
+  }
+
+  for (const [noteId, note] of noteTable) {
+    if (expectedById.get(noteId) !== note) {
+      return false
+    }
+  }
+
+  return true
+}
 
 export interface ModelStoreSeed {
   readonly project: ProjectRecord
@@ -101,6 +191,112 @@ export class ModelStore implements ModelStoreReader {
 
     this.#devices = new Map(seed.devices)
     this.#master = seed.master
+
+    // The closures retain #private access while the registry hands them to one applier only.
+    registerModelStoreWriteAccess(this, {
+      writeProject: (expected, next) => {
+        if (this.#project !== expected) {
+          rejectStoreWrite('Project no longer matches the expected record')
+        }
+
+        this.#project = next
+      },
+      writeMaster: (expected, next) => {
+        if (this.#master !== expected) {
+          rejectStoreWrite('Master Channel no longer matches the expected record')
+        }
+
+        this.#master = next
+      },
+      writeTrack: (expected, next) => {
+        writeEntityRecord(this.#tracks, 'Track', expected, next)
+      },
+      writeClip: (expected, next) => {
+        writeEntityRecord(this.#clips, 'Clip', expected, next)
+      },
+      writeMidiSource: (expected, next) => {
+        writeEntityRecord(this.#midiSources, 'MIDI Source', expected, next)
+      },
+      writeTempoEvent: (expected, next) => {
+        writeEntityRecord(this.#tempoEvents, 'Tempo Event', expected, next)
+      },
+      writeTimeSignatureEvent: (expected, next) => {
+        writeEntityRecord(this.#timeSignatureEvents, 'Time Signature Event', expected, next)
+      },
+      writeDevice: (expected, next) => {
+        writeEntityRecord(this.#devices, 'Device', expected, next)
+      },
+      insertTrackOrder: (index, trackId) => {
+        if (!Number.isSafeInteger(index) || index < 0 || index > this.#trackOrder.length) {
+          rejectStoreWrite(
+            `Cannot insert Track ${trackId} at index ${index} for length ${this.#trackOrder.length}`,
+          )
+        }
+
+        this.#trackOrder.splice(index, 0, trackId)
+      },
+      removeTrackOrder: (index, trackId) => {
+        if (!Number.isSafeInteger(index) || index < 0 || index >= this.#trackOrder.length) {
+          rejectStoreWrite(
+            `Cannot remove Track ${trackId} at index ${index} for length ${this.#trackOrder.length}`,
+          )
+        }
+
+        if (this.#trackOrder[index] !== trackId) {
+          rejectStoreWrite(
+            `Track order index ${index} no longer contains the expected Track ${trackId}`,
+          )
+        }
+
+        this.#trackOrder.splice(index, 1)
+      },
+      insertMidiNotePartition: (sourceId, notes) => {
+        if (this.#midiNotesBySource.has(sourceId)) {
+          rejectStoreWrite(`MIDI Note partition ${sourceId} already exists`)
+        }
+
+        // Build first so duplicate IDs or allocation failures cannot leave a partial partition.
+        const noteTable = createMidiNoteTable(notes)
+
+        this.#midiNotesBySource.set(sourceId, noteTable)
+      },
+      removeMidiNotePartition: (sourceId, expectedNotes) => {
+        const noteTable = this.#midiNotesBySource.get(sourceId)
+
+        if (noteTable === undefined) {
+          rejectStoreWrite(`MIDI Note partition ${sourceId} does not exist`)
+        }
+
+        if (!midiNotePartitionMatches(noteTable, expectedNotes)) {
+          rejectStoreWrite(`MIDI Note partition ${sourceId} no longer matches the expected records`)
+        }
+
+        this.#midiNotesBySource.delete(sourceId)
+      },
+      writeMidiNote: (sourceId, expected, next) => {
+        const noteTable = this.#midiNotesBySource.get(sourceId)
+
+        if (noteTable === undefined) {
+          rejectStoreWrite(`MIDI Note partition ${sourceId} does not exist`)
+        }
+
+        writeEntityRecord(noteTable, `MIDI Note in partition ${sourceId}`, expected, next)
+      },
+      commitModelRevision: (expected, next) => {
+        if (this.#modelRevision !== expected) {
+          rejectStoreWrite(
+            `Model revision ${this.#modelRevision} no longer matches expected revision ${expected}`,
+          )
+        }
+
+        if (nextModelRevision(expected) !== next) {
+          rejectStoreWrite(`Model revision must advance exactly once from ${expected} to ${next}`)
+        }
+
+        // This assignment is deliberately the last state change in a successful transaction.
+        this.#modelRevision = next
+      },
+    })
   }
 
   get modelRevision(): ModelRevision {

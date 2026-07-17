@@ -12,6 +12,8 @@ export interface MutationPlan {
   readonly inverse: readonly ProjectMutation[]
 }
 
+const createdMutationPlans = new WeakSet<object>()
+
 function assertBaseRevision(baseRevision: ModelRevision): void {
   if (!Number.isSafeInteger(baseRevision) || baseRevision < 0) {
     throw new MutationPlanError(
@@ -43,9 +45,25 @@ export function createMutationPlan(
   )
   const inverseCopy = Object.freeze([...forwardCopy].reverse().map(invertNormalizedProjectMutation))
 
-  return Object.freeze({
+  const plan: MutationPlan = Object.freeze({
     baseRevision,
     forward: forwardCopy,
     inverse: inverseCopy,
   })
+
+  // Membership proves this frozen mutation sequence and inverse were paired by this factory.
+  // Payload Records remain shared references under the project's immutable-Record contract.
+  createdMutationPlans.add(plan)
+
+  return plan
+}
+
+/** @internal Rejects structural lookalikes that do not carry a factory-generated inverse. */
+export function assertCreatedMutationPlan(plan: MutationPlan): void {
+  if (!createdMutationPlans.has(plan)) {
+    throw new MutationPlanError(
+      'unrecognized-plan',
+      'MutationPlan must be created by createMutationPlan before it can be applied',
+    )
+  }
 }

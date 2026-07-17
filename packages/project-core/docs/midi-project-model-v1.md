@@ -487,12 +487,16 @@ ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只�
 
 - 新建 ModelStore 的 `modelRevision` 固定为 `0`，Seed 不能恢复或指定运行时 revision；
 - ModelStore 构造器不执行跨实体校验、修复或过滤，完整 Seed 由 `InvariantValidator` 判断是否合法；
-- 当前存储批次不开放 Map、分区表、`trackOrder` 或 revision 的写入口；
-- 类型化 Mutation 确定后，Map、分区表和 `trackOrder` 只允许 `MutationApplier` 通过包内受控入口修改；
+- ModelStore 构造时注册捕获 `#private` 字段的细粒度写闭包，但不开放 Map、分区表、`trackOrder`、通用 setter 或 revision setter；
+- `MutationApplier` 是唯一允许领取写 capability 的组件，同一个 ModelStore 的 lease 只能领取一次；
+- 实体表、Note 分区和 `trackOrder` 通过 expected / next 或 index / ID 形式的 CAS primitive 修改；全部前置检查和临时 Map 构建必须先于那一次权威容器写；
 - Map 中的实体是只读记录，字段改变时创建新记录并替换表项；
 - 一次原子事务只让 `modelRevision` 增加一次；
+- revision 是成功事务的最后一次写入；失败回滚不改变 revision，Undo 则是产生新 revision 的新事务；
 - `modelRevision` 是运行时并发与订阅版本，不进入 ProjectFileDTO；
 - 包外不能取得内部 Map、可变数组或可写实体引用。
+
+Map insertion order 不表达实体表的领域顺序。防御性回滚或 Undo 中的 remove → insert 可以让键移动到 Map 尾部，但必须恢复相同实体引用、所有权关系和显式 ID 顺序。持久化 DTO 若需要确定性顺序，应在投影边界稳定排序。
 
 ### 新项目的最小合法模型
 

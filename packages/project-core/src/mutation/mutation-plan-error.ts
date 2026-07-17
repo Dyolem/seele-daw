@@ -5,6 +5,7 @@ export type MutationPlanErrorCode =
   | 'invalid-track-order-index'
   | 'no-op-replace'
   | 'record-id-changed'
+  | 'unrecognized-plan'
   | 'unknown-mutation-type'
 
 /** Raised when a mutation or plan is structurally unsafe to execute. */

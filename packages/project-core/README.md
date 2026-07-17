@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：package 骨架已建立，核心存储策略和 MIDI V1 数据模型已经确定，领域模型尚未开始实现。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影和 MutationApplier 原子写入骨架已经实现；具体 Project Command、History、Query 和 Snapshot 尚未开始。
 
 ## 包定位
 
@@ -102,7 +102,9 @@ ModelStore
 
 构造输入使用已经规范化为实体表的 `ModelStoreSeed`，它不是外部 DTO。构造器复制 `trackOrder`、所有顶层 Map 和每张 MIDI Note 分区 Map，从而取得容器所有权；表中的只读 Record 保持原引用，避免为大型项目重新创建全部实体并保留引用相等语义。
 
-ModelStore 构造器只建立存储结构，不验证或修复跨实体关系。Seed 是否满足 Track 顺序、外键、Source 所有权、Timeline 初始事件和 Device 所有权等全局规则，由后续 `InvariantValidator` 判断。新 Store 的 `modelRevision` 固定从 `0` 开始，本批不提供任何写入或 revision 递增入口；类型化 Mutation 确定后，才由 `MutationApplier` 获得包内受控写入口。
+ModelStore 构造器只取得存储容器所有权并注册内部 write lease，不验证或修复跨实体关系。Seed 是否满足 Track 顺序、外键、Source 所有权、Timeline 初始事件和 Device 所有权等全局规则，由 `InvariantValidator` 判断。新 Store 的 `modelRevision` 固定从 `0` 开始；构造器向包内 `WeakMap` 注册一组捕获 `#private` 字段的细粒度写闭包，只有 `MutationApplier` 可以一次性领取这份 lease。同一个 Store 不能创建第二个写入者，也不能从 Store 实例取得 Map、数组、通用 setter 或任意 patch 能力。
+
+写闭包使用 compare-and-swap 语义：entity write 携带 expected / next Record，顺序 write 携带 index / ID，Note 分区删除携带完整 expected Record 集合。每个 primitive 必须先完成全部检查和临时结构准备，最后只执行一次权威容器修改。这样真实写入与投影之间一旦出现程序错误，MutationApplier 能准确知道哪些 forward mutation 已经完整完成。
 
 这里描述的是组织原则。具体字段、所有权、运行时索引、持久化 DTO 和跨实体不变量以 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 为当前实现基线。
 
@@ -209,7 +211,7 @@ MutationPlan 是结构完整且可逆的变化计划。它只包含：
 - 类型化的 forward mutations；
 - 由工厂自动生成、按执行顺序排列的 inverse mutations。
 
-Mutation 使用领域类型表达，例如 entity insert/remove/replace、ordered relation insert/remove，而不是任意 JSON Patch。计划工厂负责拒绝空计划、身份变化、同引用 replace 和无效顺序索引，并复制自身拥有的数组；它不读取 ModelStore，因此不声称该计划适用于某个具体 Store。`MutationApplier` 必须先在写时复制投影上验证 revision、当前记录引用、关系位置和最终跨实体不变量，全部通过后才进入真实写入阶段。
+Mutation 使用领域类型表达，例如 entity insert/remove/replace、ordered relation insert/remove，而不是任意 JSON Patch。计划工厂负责拒绝空计划、身份变化、同引用 replace 和无效顺序索引，并冻结自身拥有的 mutation / 数组；包内 `WeakSet` 证明 plan 外壳、mutation 序列和 inverse 由同一个工厂配对，使 Applier 不会信任仅在 TypeScript 结构上相似的对象或 plan Proxy。该证明不会复制或深冻结 payload Record；Record 仍遵守项目既定的运行时共享、逻辑不可变契约。计划工厂不读取 ModelStore，因此仍不声称该计划适用于某个具体 Store。`MutationApplier` 必须先在写时复制投影上验证 revision、当前记录引用、关系位置和最终跨实体不变量，全部通过后才进入真实写入阶段。
 
 所有 mutation 判别名称集中在包内 `PROJECT_MUTATION_TYPE` 常量表中；类型定义、穷尽分支和测试共同引用这份运行时词汇。Mutation 的 payload 结构仍由显式判别联合描述，不从常量表动态生成。
 
@@ -217,15 +219,19 @@ History label、merge key、Editor restore point 和 Delta 提示分别属于后
 
 ### 原子性保障
 
+- `MutationApplier` 构造时验证初始 Store，并一次性领取该 Store 的唯一写 lease；第二个 Applier 无法绕过 faulted 状态继续写入；
+- apply 首先拒绝 faulted / reentrant 调用，再精确检查 `baseRevision`，并在任何写入前计算不会溢出的下一 revision；
 - 所有存在性、权限、范围和跨实体不变量在 apply 前验证；
 - `ProjectedModelStoreReader` 通过实体表 overlay、删除标记和按需复制的 Track 顺序 / Note 分区预演完整 forward 序列，不复制整个项目；
 - 每条基础 mutation 只检查当前投影视图上的存在性、`before` 引用和顺序位置，最终投影只执行一次全局 `InvariantValidator`，因此允许级联操作的中间状态暂时不完整；
-- MutationApplier 按确定顺序执行已经验证的基础操作；
-- `modelRevision` 只在 ModelStore 与必要索引达到一致状态后递增；
+- MutationApplier 通过 CAS 写闭包按确定顺序执行已经验证的基础操作，并在真实 Store 上再次执行防御性不变量检查；
+- `modelRevision` 是成功路径的最后一次写入，一份计划只递增一次，失败和回滚都不能递增或倒退 revision；
 - Commit 和事件只在全部成功后创建并发布；
 - 业务失败不会产生部分模型、History Entry 或 Delta；
-- 意外程序错误发生在 apply 中时，使用已准备的 inverse 按反序回滚；
-- 如果连防御性回滚也失败，Session 进入 faulted/read-only 状态并保留诊断，禁止继续在未知状态上写入。
+- 意外程序错误发生在第 `k` 条已完成的 forward 之后时，只执行完整 inverse 数组末尾对应的 `k` 条 mutation；回滚后重新验证不变量和原计划前置条件。这里依赖唯一写 lease 与 CAS primitive 的正确性，不通过每次提交前复制整个 Store 来对抗任意内部实现错误；
+- 如果防御性回滚或恢复验证失败，MutationApplier 立即锁存为 faulted，并同时保留 apply cause 与 rollback cause；未来 Session 在此基础上进入 faulted/read-only 状态。
+
+普通实体表和 Note 表的 Map insertion order 不是项目语义。remove 后通过 inverse insert 会恢复原 Record 引用和项目关系，但键可能追加到 Map 尾部；显式顺序只由 `trackOrder` 等 ID 序列表达。未来 Snapshot / DTO 如需确定性输出，应在对应边界稳定排序，不能让内部 Map 顺序成为隐藏领域规则。
 
 QueryIndex 不是事实。索引的增量更新失败时，应从已经一致的 ModelStore 重建；不能让模型与索引各自成为一份可写真相。
 
@@ -402,6 +408,11 @@ src/
 ## 测试与验收
 
 - 只有 MutationApplier 可以修改内部表的架构约束测试；
+- 同一个 ModelStore 的 writer lease 只能领取一次；
+- 全部 mutation 分支的真实结果与写时投影一致，成功计划只递增一次 revision；
+- 陈旧计划、重复 apply、revision 溢出和投影验证失败都不会执行真实写入；
+- apply 中部分写入失败时只回滚已经完成的 forward 前缀，成功恢复后 revision 保持不变；
+- rollback 失败时保留双重 cause、锁存 faulted，并永久拒绝后续 apply；
 - 命令成功、拒绝和陈旧 `baseRevision` 的确定性测试；
 - apply 中意外失败时不发布部分 Commit，并能完成防御性回滚；
 - 每种命令的 forward/inverse round trip；

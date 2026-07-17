@@ -1,4 +1,5 @@
 export type MutationPlanErrorCode =
+  | 'duplicate-note-id-in-partition'
   | 'empty-forward'
   | 'invalid-base-revision'
   | 'invalid-track-order-index'

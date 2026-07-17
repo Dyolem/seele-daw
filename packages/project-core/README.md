@@ -218,6 +218,8 @@ History label、merge key、Editor restore point 和 Delta 提示分别属于后
 ### 原子性保障
 
 - 所有存在性、权限、范围和跨实体不变量在 apply 前验证；
+- `ProjectedModelStoreReader` 通过实体表 overlay、删除标记和按需复制的 Track 顺序 / Note 分区预演完整 forward 序列，不复制整个项目；
+- 每条基础 mutation 只检查当前投影视图上的存在性、`before` 引用和顺序位置，最终投影只执行一次全局 `InvariantValidator`，因此允许级联操作的中间状态暂时不完整；
 - MutationApplier 按确定顺序执行已经验证的基础操作；
 - `modelRevision` 只在 ModelStore 与必要索引达到一致状态后递增；
 - Commit 和事件只在全部成功后创建并发布；

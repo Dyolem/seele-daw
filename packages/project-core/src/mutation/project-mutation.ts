@@ -176,6 +176,22 @@ function assertTrackOrderIndex(index: number, mutationIndex: number | null): voi
   }
 }
 
+function assertUniqueNoteIds(notes: readonly MidiNoteRecord[], mutationIndex: number | null): void {
+  const noteIds = new Set<MidiNoteRecord['id']>()
+
+  for (const note of notes) {
+    if (noteIds.has(note.id)) {
+      rejectMutation(
+        'duplicate-note-id-in-partition',
+        `contains duplicate MIDI Note ID ${note.id}`,
+        mutationIndex,
+      )
+    }
+
+    noteIds.add(note.id)
+  }
+}
+
 function assertNeverMutation(mutation: never, index: number | null): never {
   const type = (mutation as { readonly type?: unknown }).type
 
@@ -204,6 +220,14 @@ function validateProjectMutation(mutation: ProjectMutation, index: number | null
       assertTrackOrderIndex(mutation.index, index)
       return
 
+    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
+      assertUniqueNoteIds(mutation.after, index)
+      return
+
+    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
+      assertUniqueNoteIds(mutation.before, index)
+      return
+
     case PROJECT_MUTATION_TYPE.TRACK.INSERT:
     case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
     case PROJECT_MUTATION_TYPE.CLIP.INSERT:
@@ -216,8 +240,6 @@ function validateProjectMutation(mutation: ProjectMutation, index: number | null
     case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
     case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
     case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
     case PROJECT_MUTATION_TYPE.NOTE.INSERT:
     case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
       return

@@ -753,6 +753,38 @@ describe('MutationPlanError', () => {
     }
   })
 
+  it('rejects duplicate Note IDs in inserted and removed partition payloads at plan index', () => {
+    const fixture = createCompleteProjectFixture()
+    const duplicateNotes = [fixture.records.nonLoopNote, fixture.records.nonLoopNote]
+    const invalidPartitionMutations: readonly ProjectMutation[] = [
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        sourceId: fixture.records.nonLoopSource.id,
+        after: duplicateNotes,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: duplicateNotes,
+      },
+    ]
+
+    for (const mutation of invalidPartitionMutations) {
+      const error = captureMutationPlanError(() =>
+        createMutationPlan(INITIAL_MODEL_REVISION, [
+          {
+            type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+            before: fixture.records.audioTrack,
+          },
+          mutation,
+        ]),
+      )
+
+      expect(error.code).toBe('duplicate-note-id-in-partition')
+      expect(error.mutationIndex).toBe(1)
+    }
+  })
+
   it('rejects unknown mutation types without a mutation index when inverted directly', () => {
     const unknownMutation = {
       type: 'future.unsupported',

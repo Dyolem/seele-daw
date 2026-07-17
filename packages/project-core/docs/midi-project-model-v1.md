@@ -4,7 +4,7 @@
 
 它是当前实现阶段的数据模型基线。字段或规则发生变化时，应先更新本文档；涉及不可逆文件格式或跨模块产品语义的决定，再补充 ADR。
 
-本文档不定义 Command handler 的具体实现，也暂不定义 Move、Resize、Split 的边界算法。
+本文档不定义 Command handler 的具体实现。Add Note 和同一 MidiSource 内的 Move Note 已确定采用严格 Source 边界；Clip Move、跨 Source Note Move、Resize 与 Split 的算法仍暂缓。
 
 ## 目标与范围
 
@@ -38,7 +38,7 @@ V1 数据模型需要支持以下闭环：
 - Recording、Asset 和媒体垃圾回收；
 - Linked Clip、Take Lane、Comping；
 - Group、Return、Send 和任意路由图；
-- Move、Resize、Split 的边界算法；
+- Clip Move、跨 Source Note Move、Resize、Split 的边界算法；
 - Loop 边界事件排序。
 
 这些能力不提前创建空表或占位抽象，在对应产品语义确定后通过新字段、联合类型分支和 schema migration 加入。
@@ -317,6 +317,8 @@ note.channel 是整数 0..15
 - Selection、hover 和拖拽预览不进入 Note Record；
 - Release Velocity、CC、Pitch Bend、Aftertouch 和 MPE 等到真正实现时再设计对应事件表。
 
+Add Note 和同一 MidiSource 内的 Move Note 使用严格边界：新 Note 区间必须完整落在 Source 的半开区间内。越界 Command 必须拒绝，不执行 clamp、loop wrap 或 MidiSource / Clip 自动扩展。Move Note 使用同一 Source 内的绝对 `nextStartTick` 与 `nextPitch`，保持 Note ID、duration、velocity 和 channel；目标与当前值相同时返回 `no-change`，不形成空 MutationPlan。Snap、量化和像素坐标转换由 Editor 在创建 Command 前完成。详细执行边界见 [MIDI Note Command 层执行计划](./midi-note-command-layer-plan.md)。
+
 运行时按 Source 分区存储 Note：
 
 ```ts
@@ -369,7 +371,7 @@ sourceStartTick
   < sourceStartTick + sourceSpanTick
 ```
 
-Move、Resize、Split 如何改变这些字段，以及 Loop 边界的事件排序，留到相应命令和 Playback 实现前单独讨论。
+Clip Move、跨 Source Note Move、Resize、Split 如何改变这些字段，以及 Loop 边界的事件排序，留到相应命令和 Playback 实现前单独讨论。
 
 ## Timeline、Tempo 与 Time Signature
 
@@ -640,7 +642,7 @@ Loop 边界 Note Off / Note On 的排序仍需在 Playback Compiler 实现前确
 
 以下内容将在对应命令或模块开始实现前单独讨论并形成测试：
 
-- Move Clip / Note 的边界与目标兼容性算法；
+- Move Clip、跨 Source Note Move 的边界与目标兼容性算法；
 - Resize Clip / Note 的最小长度、裁剪和扩展算法；
 - Split Clip 对 Source 复制、窗口和 Note 的具体处理；
 - Loop 边界事件排序；

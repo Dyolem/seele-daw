@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影和 MutationApplier 原子写入骨架已经实现；具体 Project Command、History、Query 和 Snapshot 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入骨架，以及 Add / Move / Remove MIDI Note Command 已经实现；ProjectSession、Commit、Delta、History、Query 和 Snapshot 尚未开始。
 
 ## 包定位
 
@@ -115,7 +115,7 @@ ModelStore 构造器只取得存储容器所有权并注册内部 write lease，
 - Track 到 Clip 的反向查询由可重建索引提供；
 - V1 中一个 MidiClip 独占一个 MidiSource，普通复制会深复制 Source 和 Note；
 - Note 按 MidiSource 分区存储，不在每个 Note 中重复保存 `sourceId`；
-- Move、Resize、Split 的边界算法留到对应命令实现前单独确定。
+- Add Note 与同一 MidiSource 内 Move Note 的严格边界已经确定；Clip Move、跨 Source Note Move、Resize 与 Split 留到对应命令实现前单独讨论。
 
 必须遵守：
 
@@ -202,6 +202,12 @@ ProjectCommand
 -> notify subscribers
 -> enqueue durability / playback side effects
 ```
+
+### MIDI Note Command 纵向切片
+
+当前已经实现 `AddNoteCommand`、`MoveNoteCommand` 和 `RemoveNoteCommand`。公开 Command 使用稳定判别字段、完整领域参数和 `baseRevision`；包内 preparer 重新验证 Command、拒绝陈旧 revision，并通过无状态 handler 读取 `ModelStoreReader`、创建 MidiNoteRecord 和一条 Note mutation，最终形成 MutationPlan。
+
+Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wrap 或自动扩展 Source / Clip。Move 使用绝对 `nextStartTick` 与 `nextPitch`，目标未变化时返回包内 `no-change`，不创建空 MutationPlan。Command preparer 与 handler 不从 package root 导出；未来 ProjectSession 将成为正式执行入口。完整规则和实现边界见 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
 
 ### MutationPlan 的作用
 
@@ -407,6 +413,8 @@ src/
 
 ## 测试与验收
 
+当前 Project Core 基线为 13 个测试文件、252 项测试，其中 MIDI Note Command 新增 22 项。
+
 - 只有 MutationApplier 可以修改内部表的架构约束测试；
 - 同一个 ModelStore 的 writer lease 只能领取一次；
 - 全部 mutation 分支的真实结果与写时投影一致，成功计划只递增一次 revision；
@@ -426,6 +434,7 @@ src/
 ## 架构依据
 
 - [阶段成果：安全模型与原子 Mutation 内核](./docs/project-core-transaction-foundation-milestone.md)
+- [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

@@ -1,4 +1,26 @@
 /** Public API for the framework-agnostic project kernel. */
+export {
+  PROJECT_COMMAND_TYPE,
+  createAddNoteCommand,
+  createMoveNoteCommand,
+  createRemoveNoteCommand,
+} from './commands/project-command'
+export type {
+  AddNoteCommand,
+  CreateAddNoteCommandInput,
+  CreateMoveNoteCommandInput,
+  CreateRemoveNoteCommandInput,
+  MoveNoteCommand,
+  ProjectCommand,
+  ProjectCommandType,
+  RemoveNoteCommand,
+} from './commands/project-command'
+export { ProjectCommandError } from './commands/project-command-error'
+export type {
+  ProjectCommandErrorCode,
+  ProjectCommandErrorDetails,
+} from './commands/project-command-error'
+
 export { createChannelStripDescriptor, createMasterChannelRecord } from './model/channel'
 export type {
   ChannelStripDescriptor,
@@ -30,6 +52,8 @@ export type { CreateMidiSourceRecordInput, MidiSourceRecord } from './model/midi
 
 export { createProjectRecord } from './model/project'
 export type { CreateProjectRecordInput, ProjectRecord } from './model/project'
+
+export type { ModelRevision } from './model/model-revision'
 
 export { createAudioTrackRecord, createInstrumentTrackRecord } from './model/track'
 export type {

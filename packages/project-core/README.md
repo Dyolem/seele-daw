@@ -189,8 +189,9 @@ ProjectCommand
 -> resolve handler
 -> validate command and baseRevision
 -> read current entity records
--> build forward + inverse MutationPlan
--> validate all domain invariants
+-> build forward mutations
+-> create a closed MutationPlan with generated inverse mutations
+-> project the plan and validate all preconditions and domain invariants
 -> apply mutations through MutationApplier
 -> update or rebuild QueryIndex
 -> modelRevision + 1
@@ -202,15 +203,17 @@ ProjectCommand
 
 ### MutationPlan 的作用
 
-MutationPlan 是经过验证、即将机械执行的变化计划。它应包含：
+MutationPlan 是结构完整且可逆的变化计划。它只包含：
 
 - 当前 `baseRevision`；
 - 类型化的 forward mutations；
-- 与 forward 对称的 inverse mutations；
-- History label、merge key 和可选 Editor restore point；
-- 将生成 ProjectDelta 所需的实体、轨道和时间范围信息。
+- 由工厂自动生成、按执行顺序排列的 inverse mutations。
 
-Mutation 使用领域类型表达，例如 entity insert/remove/replace、ordered relation insert/remove，而不是任意 JSON Patch。Command handler 可以失败；MutationPlan 一旦进入 apply 阶段，就不应再出现业务条件分支。
+Mutation 使用领域类型表达，例如 entity insert/remove/replace、ordered relation insert/remove，而不是任意 JSON Patch。计划工厂负责拒绝空计划、身份变化、同引用 replace 和无效顺序索引，并复制自身拥有的数组；它不读取 ModelStore，因此不声称该计划适用于某个具体 Store。`MutationApplier` 必须先在写时复制投影上验证 revision、当前记录引用、关系位置和最终跨实体不变量，全部通过后才进入真实写入阶段。
+
+所有 mutation 判别名称集中在包内 `PROJECT_MUTATION_TYPE` 常量表中；类型定义、穷尽分支和测试共同引用这份运行时词汇。Mutation 的 payload 结构仍由显式判别联合描述，不从常量表动态生成。
+
+History label、merge key、Editor restore point 和 Delta 提示分别属于后续 History、Command 或 Commit 包装层，不放进底层 MutationPlan。这样回滚机制不会反向依赖界面交互或发布协议。
 
 ### 原子性保障
 
@@ -341,7 +344,8 @@ V1 中 Project Kernel 运行在主线程并保持单写者：
 src/
 ├── model/          ModelStore、实体、ID 与不变量
 ├── time/           Tick、区间、TempoMap
-├── commands/       Command、handler、MutationPlan
+├── mutation/       可逆基础变化、MutationPlan 与原子应用
+├── commands/       Command 与 handler
 ├── session/        ProjectSession、提交管线与通知
 ├── history/        Undo / Redo 与合并策略
 ├── queries/        QueryIndex、查询与订阅

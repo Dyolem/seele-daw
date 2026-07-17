@@ -1,4 +1,4 @@
-import type { Brand } from './brand'
+import type { Brand } from '@seele-daw/type-utils'
 import { rejectDomainValue, requireFiniteNumber } from './domain-value-error'
 
 export type MidiPitch = Brand<number, 'MidiPitch'>

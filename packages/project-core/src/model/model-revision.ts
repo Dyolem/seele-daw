@@ -1,4 +1,4 @@
-import type { Brand } from './brand'
+import type { Brand } from '@seele-daw/type-utils'
 
 export type ModelRevision = Brand<number, 'ModelRevision'>
 

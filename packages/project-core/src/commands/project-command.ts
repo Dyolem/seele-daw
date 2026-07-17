@@ -2,6 +2,7 @@ import { ProjectCommandError } from '@/commands/project-command-error'
 import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '@/model/ids'
 import { createMidiNoteRecord } from '@/model/midi-note'
 import type { ModelRevision } from '@/model/model-revision'
+import type { ValueOf } from '@seele-daw/type-utils'
 import {
   parseMidiPitch,
   type MidiChannel,
@@ -19,7 +20,6 @@ export const PROJECT_COMMAND_TYPE = {
   },
 } as const
 
-type ValueOf<T> = T extends object ? T[keyof T] : never
 type ProjectCommandTypeGroup = ValueOf<typeof PROJECT_COMMAND_TYPE>
 
 export type ProjectCommandType = ValueOf<ProjectCommandTypeGroup>

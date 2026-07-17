@@ -4,20 +4,29 @@ import process from 'node:process'
 
 const root = process.cwd()
 const packageRoot = path.join(root, 'packages')
-const packageNames = ['project-core', 'editor', 'playback', 'audio-web', 'platform-browser']
+const packageNames = [
+  'type-utils',
+  'project-core',
+  'editor',
+  'playback',
+  'audio-web',
+  'platform-browser',
+]
 const workspaceDirectories = [
   path.join(root, 'apps', 'studio'),
   ...packageNames.map((packageName) => path.join(packageRoot, packageName)),
 ]
 const allowedWorkspaceImports = new Map([
-  ['project-core', new Set()],
-  ['editor', new Set(['project-core'])],
-  ['playback', new Set(['project-core'])],
-  ['audio-web', new Set(['playback'])],
-  ['platform-browser', new Set(['project-core', 'playback'])],
+  ['type-utils', new Set()],
+  ['project-core', new Set(['type-utils'])],
+  ['editor', new Set(['project-core', 'type-utils'])],
+  ['playback', new Set(['project-core', 'type-utils'])],
+  ['audio-web', new Set(['playback', 'type-utils'])],
+  ['platform-browser', new Set(['project-core', 'playback', 'type-utils'])],
 ])
 
 const bannedExternalImports = new Map([
+  ['type-utils', new Set(['vue', 'pinia', 'vue-router'])],
   ['project-core', new Set(['vue', 'pinia', 'vue-router'])],
   ['editor', new Set(['vue', 'pinia', 'vue-router'])],
   ['playback', new Set(['vue', 'pinia', 'vue-router'])],

@@ -384,6 +384,7 @@ web-daw/
 │           └── features/
 │               └── piano-roll/
 ├── packages/
+│   ├── type-utils/
 │   ├── project-core/
 │   ├── editor/
 │   │   ├── common/
@@ -396,12 +397,17 @@ web-daw/
     └── adr/
 ~~~
 
-初期只建立这五个 package。Asset、Persistence、Renderer 等先作为所属 package 的内部模块，边界稳定后再拆。
+初期业务边界保持这五个 package，另设一个不产生运行时代码的 `type-utils` 基础叶子包。Asset、Persistence、Renderer 等先作为所属 package 的内部模块，边界稳定后再拆。
 
 ## 16. 依赖规则
 
 ~~~text
+type-utils
+  只提供纯编译期、跨领域的 TypeScript 类型工具
+  不依赖任何业务 package
+
 project-core
+  只依赖 type-utils
   不依赖 Vue、DOM、Web Audio、IndexedDB
 
 editor
@@ -423,6 +429,8 @@ studio
   可以依赖所有模块
   是唯一 Composition Root
 ~~~
+
+所有业务 package 都可以按需直接依赖 `type-utils`，但类型工具不得引用任何业务领域或演变为运行时 `shared` / `utils` 收容包。
 
 额外规则：
 

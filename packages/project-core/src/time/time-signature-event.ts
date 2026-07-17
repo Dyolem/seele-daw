@@ -1,4 +1,4 @@
-import type { Brand } from '@/model/brand'
+import type { Brand } from '@seele-daw/type-utils'
 import { rejectDomainValue } from '@/model/domain-value-error'
 import { parseTimeSignatureEventId, type TimeSignatureEventId } from '@/model/ids'
 import { parseTick, type Tick } from './tick'

@@ -9,6 +9,7 @@ seele-daw/
 ├── apps/
 │   └── studio/              Vue 应用与唯一 Composition Root
 ├── packages/
+│   ├── type-utils/          纯编译期、跨领域的共享 TypeScript 类型工具
 │   ├── project-core/        项目模型、命令、事务、历史与查询端口
 │   ├── editor/              Tool、Interaction、Selection 与编辑器浏览器层
 │   ├── playback/            Transport、Compiler、Scheduler 契约与播放计划
@@ -23,7 +24,7 @@ seele-daw/
     └── adr/                 Architecture Decision Records
 ```
 
-当前遵循架构总纲的初期五包方案；`editor-renderer`、Asset 和 Persistence 等边界稳定后再拆包。
+当前采用五个业务硬边界包，并增加一个无运行时代码的 `type-utils` 基础叶子包；`editor-renderer`、Asset 和 Persistence 等边界稳定后再拆包。
 
 ## 工具链
 

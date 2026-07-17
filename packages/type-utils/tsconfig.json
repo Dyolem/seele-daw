@@ -1,0 +1,12 @@
+{
+  "extends": "../../tooling/tsconfig/base.json",
+  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "~/*": ["./src/*"]
+    },
+    "tsBuildInfoFile": "../../node_modules/.tmp/tsconfig.type-utils.tsbuildinfo"
+  }
+}

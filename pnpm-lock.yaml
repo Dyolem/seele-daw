@@ -143,7 +143,13 @@ importers:
         specifier: workspace:*
         version: link:../project-core
 
-  packages/project-core: {}
+  packages/project-core:
+    dependencies:
+      '@seele-daw/type-utils':
+        specifier: workspace:*
+        version: link:../type-utils
+
+  packages/type-utils: {}
 
 packages:
 

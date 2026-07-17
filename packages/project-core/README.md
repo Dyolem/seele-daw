@@ -6,7 +6,7 @@
 
 ## 包定位
 
-本包位于依赖图最内层。Track、Clip、Note、Tempo、Device 等可保存、可撤销的数据只能由这里的 Project Model 持有。Vue、Canvas、AudioNode、Selection、波形缓存和播放头都不是项目事实源。
+本包是依赖图最内层的业务包，只对纯编译期的 `@seele-daw/type-utils` 建立 package 依赖。Track、Clip、Note、Tempo、Device 等可保存、可撤销的数据只能由这里的 Project Model 持有。Vue、Canvas、AudioNode、Selection、波形缓存和播放头都不是项目事实源。
 
 ```text
 Editor / Workbench
@@ -389,6 +389,8 @@ src/
 - 索引、缓存和运行时计划必须可以从 Snapshot 重建。
 
 ## 依赖边界
+
+本包只允许依赖不产生运行时代码的 `@seele-daw/type-utils`；Brand、ValueOf 等跨领域类型工具由该独立包拥有。
 
 本包禁止依赖：
 

@@ -1,3 +1,5 @@
+import type { ValueOf } from '@seele-daw/type-utils'
+
 /**
  * Canonical runtime discriminants for every supported project mutation.
  * Payload shapes remain explicit in ProjectMutation so each variant stays readable.
@@ -54,7 +56,6 @@ export const PROJECT_MUTATION_TYPE = {
   },
 } as const
 
-type ValueOf<T> = T extends object ? T[keyof T] : never
 type ProjectMutationTypeGroup = ValueOf<typeof PROJECT_MUTATION_TYPE>
 
 export type ProjectMutationType = ValueOf<ProjectMutationTypeGroup>

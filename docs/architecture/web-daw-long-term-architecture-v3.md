@@ -236,6 +236,7 @@ web-daw/
 ├── apps/
 │   └── studio/                    Vue 3 应用与 Composition Root
 ├── packages/
+│   ├── type-utils/                纯编译期、跨领域 TypeScript 类型工具
 │   ├── project-core/              模型、时间、命令、事务、历史、查询端口
 │   ├── editor-core/               Tool、Interaction、Selection、Snap、Clipboard
 │   ├── playback-core/             Compiler、Transport、Scheduler 契约、RuntimePlan
@@ -254,6 +255,7 @@ web-daw/
 
 ```mermaid
 flowchart TD
+  TU["type-utils"]
   APP["studio"] --> ED["editor-core"]
   APP --> REN["editor-renderer"]
   APP --> AW["audio-web"]
@@ -262,6 +264,10 @@ flowchart TD
   PB["playback-core"] --> PC
   AW --> PB
   APP --> PB
+  PC -. "type-only" .-> TU
+  ED -. "type-only" .-> TU
+  PB -. "type-only" .-> TU
+  AW -. "type-only" .-> TU
 ```
 
 browser-infra 由 studio 组合根注入各核心端口。它可以 import 端口类型，但任何核心包都不能 import browser-infra。
@@ -275,7 +281,7 @@ browser-infra 由 studio 组合根注入各核心端口。它可以 import 端�
 - 至少两个上层模块需要它，或它必须隔离平台代码；
 - 拆分后不会产生大量双向 DTO 与 re-export。
 
-禁止建立 shared、utils、common 这类无语义收容包。共享代码必须有领域名称和所有者。
+禁止建立 shared、utils、common 这类无语义收容包。共享代码必须有领域名称和所有者。`type-utils` 只拥有不产生运行时代码、与业务领域无关且经过实际复用验证的 TypeScript 类型代数，不是该规则的例外收容箱。
 
 ### 8.3 边界执行
 

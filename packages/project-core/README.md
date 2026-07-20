@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入骨架，以及 Add / Move / Remove MIDI Note Command 已经实现；ProjectSession、Commit、Delta、History、Query 和 Snapshot 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入骨架、Add / Move / Remove MIDI Note Command，以及 Note 级 ProjectCommit / ProjectDelta 基础契约已经实现；ProjectSession、History、Query 和 Snapshot 尚未开始。
 
 ## 包定位
 
@@ -193,11 +193,11 @@ ProjectCommand
 -> read current entity records
 -> build forward mutations
 -> create a closed MutationPlan with generated inverse mutations
--> project the plan and validate all preconditions and domain invariants
--> apply mutations through MutationApplier
--> update or rebuild QueryIndex
+-> prepare immutable ProjectCommit + ProjectDelta candidate
+-> MutationApplier projects and validates the plan, then applies mutations
 -> modelRevision + 1
--> create immutable ProjectCommit + ProjectDelta
+-> verify applied revision matches the prepared candidate
+-> update or rebuild QueryIndex
 -> record HistoryEntry
 -> notify subscribers
 -> enqueue durability / playback side effects
@@ -208,6 +208,12 @@ ProjectCommand
 当前已经实现 `AddNoteCommand`、`MoveNoteCommand` 和 `RemoveNoteCommand`。公开 Command 使用稳定判别字段、完整领域参数和 `baseRevision`；包内 preparer 重新验证 Command、拒绝陈旧 revision，并通过无状态 handler 读取 `ModelStoreReader`、创建 MidiNoteRecord 和一条 Note mutation，最终形成 MutationPlan。
 
 Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wrap 或自动扩展 Source / Clip。Move 使用绝对 `nextStartTick` 与 `nextPitch`，目标未变化时返回包内 `no-change`，不创建空 MutationPlan。Command preparer 与 handler 不从 package root 导出；未来 ProjectSession 将成为正式执行入口。完整规则和实现边界见 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
+
+### ProjectCommit / ProjectDelta 基础层
+
+当前公开契约能够表达 `midi-note.added`、`midi-note.removed` 和 `midi-note.updated` 三种语义变化。每条 change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围；Move 使用旧、新区间的保守并集。Delta 保持 forward mutation 顺序并携带提交后的 `modelRevision`，Commit 记录 base / committed revision 和 Command origin。
+
+包内 preparer 在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；候选只有在未来 Session 确认 apply 返回相同 revision 后才能返回或发布。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
 ### MutationPlan 的作用
 
@@ -232,8 +238,8 @@ History label、merge key、Editor restore point 和 Delta 提示分别属于后
 - 每条基础 mutation 只检查当前投影视图上的存在性、`before` 引用和顺序位置，最终投影只执行一次全局 `InvariantValidator`，因此允许级联操作的中间状态暂时不完整；
 - MutationApplier 通过 CAS 写闭包按确定顺序执行已经验证的基础操作，并在真实 Store 上再次执行防御性不变量检查；
 - `modelRevision` 是成功路径的最后一次写入，一份计划只递增一次，失败和回滚都不能递增或倒退 revision；
-- Commit 和事件只在全部成功后创建并发布；
-- 业务失败不会产生部分模型、History Entry 或 Delta；
+- Commit / Delta 候选在写入前完整准备，只有全部成功后才能返回和发布；
+- 业务失败不会产生部分模型、History Entry 或可观察的 Delta；
 - 意外程序错误发生在第 `k` 条已完成的 forward 之后时，只执行完整 inverse 数组末尾对应的 `k` 条 mutation；回滚后重新验证不变量和原计划前置条件。这里依赖唯一写 lease 与 CAS primitive 的正确性，不通过每次提交前复制整个 Store 来对抗任意内部实现错误；
 - 如果防御性回滚或恢复验证失败，MutationApplier 立即锁存为 faulted，并同时保留 apply cause 与 rollback cause；未来 Session 在此基础上进入 faulted/read-only 状态。
 
@@ -317,6 +323,8 @@ asset reference changes
 - Persistence 使用 `journalSequence`，不能复用 modelRevision；
 - Delta 可以丢弃；消费者错过增量后必须能从 Snapshot 全量重建。
 
+当前已实现 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
+
 ## 并发与线程模型
 
 V1 中 Project Kernel 运行在主线程并保持单写者：
@@ -360,6 +368,7 @@ src/
 ├── time/           Tick、区间、TempoMap
 ├── mutation/       可逆基础变化、MutationPlan 与原子应用
 ├── commands/       Command 与 handler
+├── commit/         ProjectCommit、ProjectDelta 与语义 change
 ├── session/        ProjectSession、提交管线与通知
 ├── history/        Undo / Redo 与合并策略
 ├── queries/        QueryIndex、查询与订阅
@@ -408,14 +417,16 @@ src/
 2. 按 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 定义 Project、Instrument Track、MidiClip、MidiSource、Note、Timeline 和最小 Device Descriptor。
 3. 实现 MutationPlan、MutationApplier 和原子提交骨架。
 4. 实现 `AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand`。
-5. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
-6. 增加类型化 ProjectDelta、QueryIndex 与局部订阅。
-7. 定义 ProjectSnapshot、ProjectFileDTO、schema validation 和迁移。
-8. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
+5. 建立 Note 级 ProjectCommit、ProjectDelta 与写前准备边界。
+6. 实现 ProjectSession 最小执行门面和提交发布时机。
+7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
+8. 增加 QueryIndex 与局部订阅。
+9. 定义 ProjectSnapshot、ProjectFileDTO、schema validation 和迁移。
+10. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 13 个测试文件、252 项测试，其中 MIDI Note Command 新增 22 项。
+当前 Project Core 基线为 14 个测试文件、266 项测试，其中 ProjectCommit / ProjectDelta 基础层新增 14 项。
 
 - 只有 MutationApplier 可以修改内部表的架构约束测试；
 - 同一个 ModelStore 的 writer lease 只能领取一次；

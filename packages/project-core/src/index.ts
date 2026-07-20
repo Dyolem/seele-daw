@@ -21,6 +21,24 @@ export type {
   ProjectCommandErrorDetails,
 } from './commands/project-command-error'
 
+export { PROJECT_CHANGE_TYPE } from './commit/project-change'
+export type {
+  AffectedTickRange,
+  MidiNoteAddedChange,
+  MidiNoteRemovedChange,
+  MidiNoteUpdatedChange,
+  ProjectChange,
+  ProjectChangeType,
+} from './commit/project-change'
+export { PROJECT_COMMIT_ORIGIN_KIND } from './commit/project-commit'
+export type {
+  ProjectCommandCommitOrigin,
+  ProjectCommit,
+  ProjectCommitOrigin,
+  ProjectCommitOriginKind,
+} from './commit/project-commit'
+export type { ProjectDelta } from './commit/project-delta'
+
 export { createChannelStripDescriptor, createMasterChannelRecord } from './model/channel'
 export type {
   ChannelStripDescriptor,

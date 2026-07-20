@@ -30,12 +30,14 @@ export type {
   ProjectChange,
   ProjectChangeType,
 } from './commit/project-change'
-export { PROJECT_COMMIT_ORIGIN_KIND } from './commit/project-commit'
+export { PROJECT_COMMIT_ORIGIN_KIND, PROJECT_HISTORY_DIRECTION } from './commit/project-commit'
 export type {
   ProjectCommandCommitOrigin,
   ProjectCommit,
   ProjectCommitOrigin,
   ProjectCommitOriginKind,
+  ProjectHistoryCommitOrigin,
+  ProjectHistoryDirection,
 } from './commit/project-commit'
 export type { ProjectDelta } from './commit/project-delta'
 

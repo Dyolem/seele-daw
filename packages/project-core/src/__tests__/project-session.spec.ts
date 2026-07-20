@@ -26,14 +26,7 @@ import {
 import { ModelStore } from '@/model/model-store'
 import { createProjectSession } from '@/session/project-session'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
-
-function createFixtureSession() {
-  const fixture = createCompleteProjectFixture()
-  const store = new ModelStore(fixture.seed)
-  const session = createProjectSession(store)
-
-  return { fixture, store, session }
-}
+import { createFixtureProjectSession } from './support/project-session-test-support'
 
 describe('ProjectSession public contract', () => {
   it('exports the minimal Session API without exposing composition or write internals', () => {
@@ -65,7 +58,7 @@ describe('ProjectSession public contract', () => {
 
 describe('ProjectSession command execution', () => {
   it('executes Add, Move, and Remove as three atomic committed results', () => {
-    const { fixture, store, session } = createFixtureSession()
+    const { fixture, store, session } = createFixtureProjectSession()
     const noteId = parseNoteId('note-session-sequence')
     const addResult = session.execute(
       createAddNoteCommand({
@@ -138,7 +131,7 @@ describe('ProjectSession command execution', () => {
   })
 
   it('returns a fully frozen committed result after successful application', () => {
-    const { fixture, session } = createFixtureSession()
+    const { fixture, session } = createFixtureProjectSession()
     const result = session.execute(
       createRemoveNoteCommand({
         baseRevision: session.modelRevision,
@@ -160,7 +153,7 @@ describe('ProjectSession command execution', () => {
   })
 
   it('returns a frozen no-change result without writing or advancing revision', () => {
-    const { fixture, store, session } = createFixtureSession()
+    const { fixture, store, session } = createFixtureProjectSession()
     const before = fixture.records.nonLoopNote
     const result = session.execute(
       createMoveNoteCommand({
@@ -183,7 +176,7 @@ describe('ProjectSession command execution', () => {
   })
 
   it('propagates stale Command errors without changing model state', () => {
-    const { fixture, store, session } = createFixtureSession()
+    const { fixture, store, session } = createFixtureProjectSession()
     const before = fixture.records.nonLoopNote
     const command = createRemoveNoteCommand({
       baseRevision: 1 as ModelRevision,
@@ -199,7 +192,7 @@ describe('ProjectSession command execution', () => {
   })
 
   it('propagates range rejection before any authoritative write', () => {
-    const { fixture, store, session } = createFixtureSession()
+    const { fixture, store, session } = createFixtureProjectSession()
     const before = fixture.records.nonLoopNote
     const command = createMoveNoteCommand({
       baseRevision: session.modelRevision,

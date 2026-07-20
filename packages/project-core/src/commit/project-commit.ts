@@ -5,16 +5,29 @@ import type { ValueOf } from '@seele-daw/type-utils'
 
 export const PROJECT_COMMIT_ORIGIN_KIND = {
   COMMAND: 'command',
+  HISTORY: 'history',
+} as const
+
+export const PROJECT_HISTORY_DIRECTION = {
+  REDO: 'redo',
+  UNDO: 'undo',
 } as const
 
 export type ProjectCommitOriginKind = ValueOf<typeof PROJECT_COMMIT_ORIGIN_KIND>
+export type ProjectHistoryDirection = ValueOf<typeof PROJECT_HISTORY_DIRECTION>
 
 export interface ProjectCommandCommitOrigin {
   readonly kind: typeof PROJECT_COMMIT_ORIGIN_KIND.COMMAND
   readonly commandType: ProjectCommandType
 }
 
-export type ProjectCommitOrigin = ProjectCommandCommitOrigin
+export interface ProjectHistoryCommitOrigin {
+  readonly kind: typeof PROJECT_COMMIT_ORIGIN_KIND.HISTORY
+  readonly direction: ProjectHistoryDirection
+  readonly commandType: ProjectCommandType
+}
+
+export type ProjectCommitOrigin = ProjectCommandCommitOrigin | ProjectHistoryCommitOrigin
 
 /** Public result of one atomic project-model commit. */
 export interface ProjectCommit {

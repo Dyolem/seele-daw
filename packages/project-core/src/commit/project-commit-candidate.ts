@@ -4,6 +4,7 @@ import {
   type AddNoteCommand,
   type MoveNoteCommand,
   type ProjectCommand,
+  type ProjectCommandType,
   type RemoveNoteCommand,
 } from '@/commands/project-command'
 import {
@@ -22,6 +23,8 @@ import {
   PROJECT_COMMIT_ORIGIN_KIND,
   type ProjectCommit,
   type ProjectCommandCommitOrigin,
+  type ProjectHistoryCommitOrigin,
+  type ProjectHistoryDirection,
 } from '@/commit/project-commit'
 import type { ProjectDelta } from '@/commit/project-delta'
 import type { MidiNoteRecord } from '@/model/midi-note'
@@ -176,6 +179,19 @@ function createProjectDelta(plan: MutationPlan): ProjectDelta {
   return Object.freeze({ modelRevision, changes })
 }
 
+function createCandidate(
+  plan: MutationPlan,
+  origin: ProjectCommandCommitOrigin | ProjectHistoryCommitOrigin,
+  delta: ProjectDelta,
+): ProjectCommit {
+  return Object.freeze({
+    baseRevision: plan.baseRevision,
+    modelRevision: delta.modelRevision,
+    origin,
+    delta,
+  })
+}
+
 /**
  * Builds an immutable candidate before MutationApplier runs. A future Session
  * may publish it only after apply returns the same modelRevision.
@@ -205,10 +221,27 @@ export function createProjectCommitCandidate(
     commandType: normalizedCommand.type,
   })
 
-  return Object.freeze({
-    baseRevision: plan.baseRevision,
-    modelRevision: delta.modelRevision,
-    origin,
-    delta,
+  return createCandidate(plan, origin, delta)
+}
+
+export interface CreateHistoryProjectCommitCandidateInput {
+  readonly direction: ProjectHistoryDirection
+  readonly commandType: ProjectCommandType
+}
+
+/** @internal Builds the new commit produced by executing one History replay plan. */
+export function createHistoryProjectCommitCandidate(
+  input: CreateHistoryProjectCommitCandidateInput,
+  plan: MutationPlan,
+): ProjectCommit {
+  assertCreatedMutationPlan(plan)
+
+  const delta = createProjectDelta(plan)
+  const origin = Object.freeze<ProjectHistoryCommitOrigin>({
+    kind: PROJECT_COMMIT_ORIGIN_KIND.HISTORY,
+    direction: input.direction,
+    commandType: input.commandType,
   })
+
+  return createCandidate(plan, origin, delta)
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import * as projectCore from '~/index'
 import {
@@ -14,6 +14,7 @@ import {
   snapshotSemanticProjectFacts,
 } from './support/mutation-applier-fixture'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
+import { withMapSetInterceptor } from './support/map-set-interceptor'
 import { ModelInvariantError } from '@/model/invariant-validator'
 import {
   INITIAL_MODEL_REVISION,
@@ -29,8 +30,6 @@ import { MutationPlanError } from '@/mutation/mutation-plan-error'
 import { MutationPreconditionError } from '@/mutation/mutation-precondition-error'
 import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
 import { ProjectedModelStoreReader } from '@/mutation/projected-model-store-reader'
-
-const nativeMapSet = Map.prototype.set
 
 function captureThrown(operation: () => unknown): unknown {
   let didThrow = false
@@ -48,32 +47,6 @@ function captureThrown(operation: () => unknown): unknown {
   }
 
   return caughtError
-}
-
-/**
- * Intercepts only Map.set calls selected by exact key and value identity. Projection tables
- * store patch wrappers, so matching an entity Record reaches the authoritative Store write
- * without importing or exposing the private writer capability.
- */
-function withMapSetInterceptor<Result>(
-  intercept: (key: unknown, value: unknown) => void,
-  operation: () => Result,
-): Result {
-  const setSpy = vi.spyOn(Map.prototype, 'set').mockImplementation(function (
-    this: Map<unknown, unknown>,
-    key: unknown,
-    value: unknown,
-  ) {
-    intercept(key, value)
-    nativeMapSet.call(this, key, value)
-    return this
-  })
-
-  try {
-    return operation()
-  } finally {
-    setSpy.mockRestore()
-  }
 }
 
 function createProjectReplacement(fixture: ReturnType<typeof createCompleteProjectFixture>) {

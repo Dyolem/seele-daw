@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta，以及 ProjectSession 最小执行门面已经实现；History、Query、Snapshot 和订阅尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession，以及会话级 History / Undo / Redo 已经实现；Query、Snapshot 和订阅尚未开始。
 
 ## 包定位
 
@@ -174,7 +174,7 @@ ProjectSession
 ├── InvariantValidator     验证跨实体和时间不变量
 ├── MutationApplier        唯一允许修改 ModelStore 的组件
 ├── ModelStore             保存实体表和 revision
-├── HistoryController      forward/inverse、merge、Undo/Redo
+├── HistoryController      forward/inverse、Undo/Redo 双栈
 ├── QueryIndex             派生索引和局部查询
 ├── SnapshotFactory        生成 revision-consistent snapshot
 └── ChangePublisher        在成功提交后发布 ProjectCommit
@@ -182,7 +182,7 @@ ProjectSession
 
 Durability 和 Playback 通过端口或订阅接收结果。Project commit 不等待磁盘、音频设备或 Worker；外部失败不能回滚已经合法的创作事实。
 
-当前最小 `ProjectSession` 已经公开 `modelRevision` 和同步 `execute(command)`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier 和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit 与结果外壳，apply 成功后直接返回；no-change 不生成计划、Commit 或 revision。History、Query、Snapshot、listener 和故障恢复状态留给后续独立模块，详见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)。
+当前 `ProjectSession` 已经公开 `modelRevision`、`canUndo`、`canRedo`、同步 `execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController 和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳与 History transition，apply 成功后直接返回；no-change 不生成计划、Commit、revision 或 History entry。空 History 的 Undo / Redo 返回 `null`，实际重放则返回新的 ProjectCommit。Query、Snapshot、listener 和故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md) 与 [Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)。
 
 ## 命令与原子提交管线
 
@@ -197,12 +197,13 @@ ProjectCommand
 -> create a closed MutationPlan with generated inverse mutations
 -> prepare immutable ProjectCommit + ProjectDelta candidate
 -> freeze committed execute result
+-> prepare and stage the History transition
 -> MutationApplier projects and validates the plan, then applies mutations
 -> modelRevision + 1
 -> return the already prepared result
 ```
 
-History、QueryIndex、ChangePublisher、durability 和 Playback 尚未接入这条当前管线。它们必须延续同一边界：可预计算内容在写前准备，可重建派生状态在提交后恢复，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
+History 已接入同一原子边界：普通 committed Command 进入 undo 栈，Undo / Redo 从当前 revision 重新建立 MutationPlan，并在模型写入前暂存新的双栈头；apply 失败会恢复旧栈头。QueryIndex、ChangePublisher、durability 和 Playback 尚未接入。它们必须延续同一边界：可预计算内容在写前准备，可重建派生状态在提交后恢复，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
 
 ### MIDI Note Command 纵向切片
 
@@ -212,7 +213,7 @@ Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wr
 
 ### ProjectCommit / ProjectDelta 基础层
 
-当前公开契约能够表达 `midi-note.added`、`midi-note.removed` 和 `midi-note.updated` 三种语义变化。每条 change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围；Move 使用旧、新区间的保守并集。Delta 保持 forward mutation 顺序并携带提交后的 `modelRevision`，Commit 记录 base / committed revision 和 Command origin。
+当前公开契约能够表达 `midi-note.added`、`midi-note.removed` 和 `midi-note.updated` 三种语义变化。每条 change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围；Move 使用旧、新区间的保守并集。Delta 保持实际执行方向的 mutation 顺序并携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
 
 包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
@@ -241,6 +242,7 @@ History label、merge key、Editor restore point 和 Delta 提示分别属于后
 - `modelRevision` 是成功路径的最后一次写入，一份计划只递增一次，失败和回滚都不能递增或倒退 revision；
 - Commit / Delta 候选在写入前完整准备，只有全部成功后才能返回和发布；
 - 业务失败不会产生部分模型、History Entry 或可观察的 Delta；
+- History transition 在模型写入前只替换私有 undo / redo 栈头；apply 失败时恢复旧栈头，成功 revision 写入后不再分配 History 节点；
 - 意外程序错误发生在第 `k` 条已完成的 forward 之后时，只执行完整 inverse 数组末尾对应的 `k` 条 mutation；回滚后重新验证不变量和原计划前置条件。这里依赖唯一写 lease 与 CAS primitive 的正确性，不通过每次提交前复制整个 Store 来对抗任意内部实现错误；
 - 如果防御性回滚或恢复验证失败，MutationApplier 立即锁存为 faulted，并同时保留 apply cause 与 rollback cause；未来 Session 在此基础上进入 faulted/read-only 状态。
 
@@ -250,22 +252,21 @@ QueryIndex 不是事实。索引的增量更新失败时，应从已经一致的
 
 ## Undo、Redo 与 Journal
 
-Undo / Redo 保存类型化的 forward/inverse mutations：
+当前 History 是 `ProjectSession` 私有的会话状态，每个 entry 保存原始 Command 类型和类型化的 forward / inverse mutations：
 
 ```text
 HistoryEntry
+├── commandType
 ├── forward mutations
-├── inverse mutations
-├── label / mergeKey
-├── editorBefore
-└── editorAfter
+└── inverse mutations
 ```
 
-- Undo 和 Redo 仍通过完整提交管线，继续验证不变量并产生 ProjectCommit；
-- pointermove 只更新 Editor Preview，pointerup 才形成一个 History Entry；
-- 连续旋钮等操作按明确 gesture/merge key 合并，不用任意时间窗口猜测；
-- 新的普通提交清空 redo 分支；
-- History 默认是会话状态，不直接写入项目文件；
+- undo / redo 使用不可变单链栈节点，push / pop 只替换栈头，复杂度为 O(1)；
+- Undo 和 Redo 从当前 revision 创建新的 MutationPlan，仍通过完整提交管线、继续验证不变量并产生新的 ProjectCommit / ProjectDelta；
+- 新的 committed Command 清空 redo 分支；no-change、命令拒绝和 apply 失败保留原分支；
+- 空栈返回 `null`，不推进 revision；
+- History 不直接写入项目文件，也不跨 Session 保留；
+- label、Editor restore point、gesture merge 和容量淘汰需要后续产品规则，本阶段没有猜测默认行为；
 - Journal 用于崩溃恢复，具有独立 sequence、checksum 和持久化格式；
 - 不能把内存 Mutation 对象未经版本化就永久保存为 Journal。
 
@@ -392,7 +393,7 @@ src/
 
 - 其他包只能从 `@seele-daw/project-core` 公开入口导入，禁止深层路径导入；
 - 不导出内部 Map、可变数组、MutationApplier 或 ModelStore；
-- 包外写入只通过 ProjectSession.execute，不提供直接 plan/apply 入口；
+- 包外写入只通过 ProjectSession.execute / undo / redo，不提供直接 plan/apply 入口；
 - 命令必须携带稳定实体 ID 和完整参数，不能读取 Editor Selection；
 - 一次用户动作只增加一次 modelRevision，并只产生一个 History Entry；
 - Commit、Delta、Snapshot 和 Query Result 在包外视为不可变；
@@ -428,7 +429,7 @@ src/
 
 ## 测试与验收
 
-当前 Project Core 基线为 15 个测试文件、273 项测试，其中 ProjectSession 最小执行门面新增 7 项。
+当前 Project Core 基线为 16 个测试文件、282 项测试，其中 History / Undo / Redo 基础层新增 9 项。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -454,6 +455,7 @@ src/
 - [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)
 - [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
 - [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)
+- [Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

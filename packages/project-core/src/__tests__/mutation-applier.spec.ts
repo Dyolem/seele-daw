@@ -12,8 +12,8 @@ import {
   createCompleteMutationScenario,
   snapshotModelReader,
   snapshotSemanticProjectFacts,
-} from './fixtures/mutation-applier-fixture'
-import { createCompleteProjectFixture } from './fixtures/complete-project-fixture'
+} from './support/mutation-applier-fixture'
+import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { ModelInvariantError } from '@/model/invariant-validator'
 import {
   INITIAL_MODEL_REVISION,

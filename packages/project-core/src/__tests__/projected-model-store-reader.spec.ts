@@ -22,7 +22,7 @@ import {
 import {
   createCompleteProjectFixture,
   type CompleteProjectFixture,
-} from './fixtures/complete-project-fixture'
+} from './support/complete-project-fixture'
 import { ModelInvariantError } from '@/model/invariant-validator'
 import { ModelStore, type ModelStoreReader } from '@/model/model-store'
 import { MutationPreconditionError } from '@/mutation/mutation-precondition-error'

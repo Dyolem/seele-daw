@@ -1,31 +1,31 @@
 import type { ProjectCommandType } from '@/commands/project-command'
 import type { ProjectMutationType } from '@/mutation/mutation-type'
 
-export type ProjectCommitPreparationErrorCode =
+export type ProjectCommitCandidateErrorCode =
   | 'base-revision-mismatch'
   | 'command-plan-mismatch'
   | 'unsupported-mutation-type'
 
-export interface ProjectCommitPreparationErrorDetails {
+export interface ProjectCommitCandidateErrorDetails {
   readonly commandType?: ProjectCommandType
   readonly mutationIndex?: number
   readonly mutationType?: ProjectMutationType | string
 }
 
-/** Raised before model writes when a plan cannot produce a truthful public commit. */
-export class ProjectCommitPreparationError extends Error {
-  readonly code: ProjectCommitPreparationErrorCode
+/** Raised when a write-free candidate cannot truthfully describe its Command and plan. */
+export class ProjectCommitCandidateError extends Error {
+  readonly code: ProjectCommitCandidateErrorCode
   readonly commandType?: ProjectCommandType
   readonly mutationIndex?: number
   readonly mutationType?: ProjectMutationType | string
 
   constructor(
-    code: ProjectCommitPreparationErrorCode,
+    code: ProjectCommitCandidateErrorCode,
     message: string,
-    details: ProjectCommitPreparationErrorDetails = {},
+    details: ProjectCommitCandidateErrorDetails = {},
   ) {
     super(message)
-    this.name = 'ProjectCommitPreparationError'
+    this.name = 'ProjectCommitCandidateError'
     this.code = code
     this.commandType = details.commandType
     this.mutationIndex = details.mutationIndex

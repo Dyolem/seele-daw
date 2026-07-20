@@ -29,7 +29,7 @@ import {
 import {
   createCompleteProjectFixture,
   type CompleteProjectFixture,
-} from './fixtures/complete-project-fixture'
+} from './support/complete-project-fixture'
 import {
   assertModelInvariants,
   ModelInvariantError,

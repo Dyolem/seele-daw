@@ -15,9 +15,9 @@ import {
   type ProjectChange,
 } from '@/commit/project-change'
 import {
-  ProjectCommitPreparationError,
-  type ProjectCommitPreparationErrorDetails,
-} from '@/commit/project-commit-preparation-error'
+  ProjectCommitCandidateError,
+  type ProjectCommitCandidateErrorDetails,
+} from '@/commit/project-commit-candidate-error'
 import {
   PROJECT_COMMIT_ORIGIN_KIND,
   type ProjectCommit,
@@ -31,12 +31,12 @@ import type { ProjectMutation } from '@/mutation/project-mutation'
 import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
 import { addTicks } from '@/time/tick'
 
-function rejectPreparation(
-  code: ProjectCommitPreparationError['code'],
+function rejectCandidate(
+  code: ProjectCommitCandidateError['code'],
   message: string,
-  details: ProjectCommitPreparationErrorDetails = {},
+  details: ProjectCommitCandidateErrorDetails = {},
 ): never {
-  throw new ProjectCommitPreparationError(code, message, details)
+  throw new ProjectCommitCandidateError(code, message, details)
 }
 
 function createNoteRange(note: MidiNoteRecord): AffectedTickRange {
@@ -87,7 +87,7 @@ function mapMutationToChange(mutation: ProjectMutation, mutationIndex: number): 
       })
 
     default:
-      return rejectPreparation(
+      return rejectCandidate(
         'unsupported-mutation-type',
         `Mutation ${mutation.type} at index ${mutationIndex} does not have ProjectDelta semantics`,
         { mutationIndex, mutationType: mutation.type },
@@ -151,7 +151,7 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
   }
 
   if (!matches) {
-    rejectPreparation(
+    rejectCandidate(
       'command-plan-mismatch',
       `Command ${command.type} does not correspond to its MutationPlan`,
       {
@@ -167,7 +167,7 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
  * Derives every semantic change before authoritative writes begin. Unsupported
  * mutation types fail closed so a commit can never silently omit a model change.
  */
-export function prepareProjectDelta(plan: MutationPlan): ProjectDelta {
+function createProjectDelta(plan: MutationPlan): ProjectDelta {
   assertCreatedMutationPlan(plan)
 
   const modelRevision = nextModelRevision(plan.baseRevision)
@@ -180,22 +180,26 @@ export function prepareProjectDelta(plan: MutationPlan): ProjectDelta {
  * Builds an immutable candidate before MutationApplier runs. A future Session
  * may publish it only after apply returns the same modelRevision.
  */
-export function prepareProjectCommit(command: ProjectCommand, plan: MutationPlan): ProjectCommit {
+export function createProjectCommitCandidate(
+  command: ProjectCommand,
+  plan: MutationPlan,
+): ProjectCommit {
   assertCreatedMutationPlan(plan)
 
   const normalizedCommand = normalizeProjectCommand(command)
 
   if (normalizedCommand.baseRevision !== plan.baseRevision) {
-    rejectPreparation(
+    rejectCandidate(
       'base-revision-mismatch',
       `Command revision ${normalizedCommand.baseRevision} does not match plan revision ${plan.baseRevision}`,
       { commandType: normalizedCommand.type },
     )
   }
 
+  // Delta construction stays private: only a complete Commit candidate is a current
+  // production boundary. History may introduce another real origin when it is built.
+  const delta = createProjectDelta(plan)
   assertCommandPlanCorrespondence(normalizedCommand, plan)
-
-  const delta = prepareProjectDelta(plan)
   const origin = Object.freeze<ProjectCommandCommitOrigin>({
     kind: PROJECT_COMMIT_ORIGIN_KIND.COMMAND,
     commandType: normalizedCommand.type,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createCompleteProjectFixture } from './fixtures/complete-project-fixture'
+import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { validateModelInvariants } from '@/model/invariant-validator'
 import { ModelStore, type ModelStoreReader } from '@/model/model-store'
 

@@ -21,34 +21,24 @@ import {
   type ProjectDelta,
 } from '~/index'
 import { prepareProjectCommand } from '@/commands/project-command-preparer'
-import type { ProjectCommandPreparation } from '@/commands/project-command-preparation'
 import {
-  ProjectCommitPreparationError,
-  type ProjectCommitPreparationErrorCode,
-} from '@/commit/project-commit-preparation-error'
-import { prepareProjectCommit, prepareProjectDelta } from '@/commit/project-commit-preparer'
+  ProjectCommitCandidateError,
+  type ProjectCommitCandidateErrorCode,
+} from '@/commit/project-commit-candidate-error'
+import { createProjectCommitCandidate } from '@/commit/project-commit-candidate'
 import { ModelStore } from '@/model/model-store'
 import { ModelRevisionError } from '@/model/model-revision'
 import { MutationApplier } from '@/mutation/mutation-applier'
 import { MutationPlanError } from '@/mutation/mutation-plan-error'
 import { createMutationPlan, type MutationPlan } from '@/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
-import { createCompleteProjectFixture } from './fixtures/complete-project-fixture'
+import { createCompleteProjectFixture } from './support/complete-project-fixture'
+import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 
-function requireReady(preparation: ProjectCommandPreparation): MutationPlan {
-  expect(preparation.status).toBe('ready')
-
-  if (preparation.status !== 'ready') {
-    throw new Error('Expected a ready ProjectCommand preparation')
-  }
-
-  return preparation.plan
-}
-
-function capturePreparationError(
+function captureCandidateError(
   operation: () => unknown,
-  code: ProjectCommitPreparationErrorCode,
-): ProjectCommitPreparationError {
+  code: ProjectCommitCandidateErrorCode,
+): ProjectCommitCandidateError {
   let caughtError: unknown
 
   try {
@@ -57,11 +47,11 @@ function capturePreparationError(
     caughtError = error
   }
 
-  expect(caughtError).toBeInstanceOf(ProjectCommitPreparationError)
+  expect(caughtError).toBeInstanceOf(ProjectCommitCandidateError)
   expect(caughtError).toMatchObject({ code })
 
-  if (!(caughtError instanceof ProjectCommitPreparationError)) {
-    throw new Error('Expected a ProjectCommitPreparationError')
+  if (!(caughtError instanceof ProjectCommitCandidateError)) {
+    throw new Error('Expected a ProjectCommitCandidateError')
   }
 
   return caughtError
@@ -89,9 +79,8 @@ describe('ProjectCommit public contract', () => {
     expectTypeOf<ProjectCommit['delta']>().toEqualTypeOf<ProjectDelta>()
     expectTypeOf<ProjectDelta['changes'][number]>().toEqualTypeOf<ProjectChange>()
 
-    expect('prepareProjectCommit' in projectCore).toBe(false)
-    expect('prepareProjectDelta' in projectCore).toBe(false)
-    expect('ProjectCommitPreparationError' in projectCore).toBe(false)
+    expect('createProjectCommitCandidate' in projectCore).toBe(false)
+    expect('ProjectCommitCandidateError' in projectCore).toBe(false)
     expect('createMutationPlan' in projectCore).toBe(false)
     expect('MutationApplier' in projectCore).toBe(false)
   })
@@ -102,8 +91,8 @@ describe('ProjectDelta Note semantics', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const plan = requireReady(prepareProjectCommand(store, command))
-    const commit = prepareProjectCommit(command, plan)
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const commit = createProjectCommitCandidate(command, plan)
     const mutation = plan.forward[0]
     const change = commit.delta.changes[0]
 
@@ -144,8 +133,8 @@ describe('ProjectDelta Note semantics', () => {
       sourceId: fixture.records.nonLoopSource.id,
       noteId: fixture.records.nonLoopNote.id,
     })
-    const plan = requireReady(prepareProjectCommand(store, command))
-    const commit = prepareProjectCommit(command, plan)
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const commit = createProjectCommitCandidate(command, plan)
     const change = commit.delta.changes[0]
 
     expect(change).toEqual({
@@ -167,8 +156,8 @@ describe('ProjectDelta Note semantics', () => {
       nextStartTick: parseTick(1_200),
       nextPitch: parseMidiPitch(67),
     })
-    const plan = requireReady(prepareProjectCommand(store, command))
-    const change = prepareProjectCommit(command, plan).delta.changes[0]
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const change = createProjectCommitCandidate(command, plan).delta.changes[0]
 
     expect(change).toMatchObject({
       type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
@@ -189,73 +178,20 @@ describe('ProjectDelta Note semantics', () => {
       nextStartTick: fixture.records.nonLoopNote.startTick,
       nextPitch: parseMidiPitch(61),
     })
-    const plan = requireReady(prepareProjectCommand(store, command))
-    const change = prepareProjectCommit(command, plan).delta.changes[0]
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const change = createProjectCommitCandidate(command, plan).delta.changes[0]
 
     expect(change?.affected).toEqual({ startTick: parseTick(240), endTick: parseTick(720) })
   })
-
-  it('preserves forward mutation order in a multi-change Delta', () => {
-    const fixture = createCompleteProjectFixture()
-    const added = createMidiNoteRecord({
-      ...fixture.records.nonLoopNote,
-      id: parseNoteId('note-delta-ordered'),
-      startTick: parseTick(1_200),
-    })
-    const plan = createMutationPlan(0 as ModelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopHarmonyNote,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
-        sourceId: fixture.records.nonLoopSource.id,
-        after: added,
-      },
-    ])
-
-    expect(prepareProjectDelta(plan).changes.map((change) => change.type)).toEqual([
-      PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
-      PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED,
-    ])
-  })
-
-  it('maps inverse plans by their executable mutation direction', () => {
-    const fixture = createCompleteProjectFixture()
-    const after = createMidiNoteRecord({
-      ...fixture.records.nonLoopNote,
-      startTick: parseTick(960),
-      pitch: parseMidiPitch(70),
-    })
-    const forwardPlan = createMutationPlan(0 as ModelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
-        after,
-      },
-    ])
-    const inversePlan = createMutationPlan(1 as ModelRevision, forwardPlan.inverse)
-    const inverseChange = prepareProjectDelta(inversePlan).changes[0]
-
-    expect(inverseChange).toMatchObject({
-      type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
-      before: after,
-      after: fixture.records.nonLoopNote,
-      affected: { startTick: parseTick(240), endTick: parseTick(1_440) },
-    })
-    expect(prepareProjectDelta(inversePlan).modelRevision).toBe(2)
-  })
 })
 
-describe('ProjectCommit preparation boundary', () => {
+describe('ProjectCommit candidate boundary', () => {
   it('freezes every owned result shell while retaining Record references', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const plan = requireReady(prepareProjectCommand(store, command))
-    const commit = prepareProjectCommit(command, plan)
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const commit = createProjectCommitCandidate(command, plan)
     const change = commit.delta.changes[0]
 
     expect(Object.isFrozen(commit)).toBe(true)
@@ -280,8 +216,8 @@ describe('ProjectCommit preparation boundary', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const plan = requireReady(prepareProjectCommand(store, command))
-    const commit = prepareProjectCommit(command, plan)
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const commit = createProjectCommitCandidate(command, plan)
 
     expect(store.modelRevision).toBe(0)
     expect(store.getMidiNote(command.sourceId, command.noteId)).toBeUndefined()
@@ -311,14 +247,26 @@ describe('ProjectCommit preparation boundary', () => {
       inverse: [],
     } as MutationPlan
 
-    expect(() => prepareProjectDelta(fakePlan)).toThrowError(
+    const command = createRemoveNoteCommand({
+      baseRevision: fakePlan.baseRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteId: fixture.records.nonLoopNote.id,
+    })
+
+    expect(() => createProjectCommitCandidate(command, fakePlan)).toThrowError(
       expect.objectContaining<Partial<MutationPlanError>>({ code: 'unrecognized-plan' }),
     )
   })
 
   it('rejects revision exhaustion before a candidate can be produced', () => {
     const fixture = createCompleteProjectFixture()
-    const plan = createMutationPlan(Number.MAX_SAFE_INTEGER as ModelRevision, [
+    const baseRevision = Number.MAX_SAFE_INTEGER as ModelRevision
+    const command = createRemoveNoteCommand({
+      baseRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteId: fixture.records.nonLoopNote.id,
+    })
+    const plan = createMutationPlan(baseRevision, [
       {
         type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
         sourceId: fixture.records.nonLoopSource.id,
@@ -326,7 +274,7 @@ describe('ProjectCommit preparation boundary', () => {
       },
     ])
 
-    expect(() => prepareProjectDelta(plan)).toThrowError(
+    expect(() => createProjectCommitCandidate(command, plan)).toThrowError(
       expect.objectContaining<Partial<ModelRevisionError>>({ code: 'model-revision-overflow' }),
     )
   })
@@ -334,14 +282,19 @@ describe('ProjectCommit preparation boundary', () => {
   it('rejects an unsupported mutation instead of emitting a partial Delta', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
+    const command = createRemoveNoteCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteId: fixture.records.nonLoopNote.id,
+    })
     const plan = createMutationPlan(store.modelRevision, [
       {
         type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
         before: fixture.records.audioTrack,
       },
     ])
-    const error = capturePreparationError(
-      () => prepareProjectDelta(plan),
+    const error = captureCandidateError(
+      () => createProjectCommitCandidate(command, plan),
       'unsupported-mutation-type',
     )
 
@@ -369,12 +322,63 @@ describe('ProjectCommit preparation boundary', () => {
         }),
       },
     ])
-    const error = capturePreparationError(
-      () => prepareProjectCommit(command, plan),
+    const error = captureCandidateError(
+      () => createProjectCommitCandidate(command, plan),
       'base-revision-mismatch',
     )
 
     expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD)
+  })
+
+  it('rejects an AddNote Plan whose Note payload differs from the Command', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createAddCommand(store)
+    const plan = createMutationPlan(store.modelRevision, [
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+        sourceId: command.sourceId,
+        after: createMidiNoteRecord({
+          id: command.noteId,
+          startTick: command.startTick,
+          durationTick: command.durationTick,
+          pitch: parseMidiPitch(71),
+          velocity: command.velocity,
+          channel: command.channel,
+        }),
+      },
+    ])
+    const error = captureCandidateError(
+      () => createProjectCommitCandidate(command, plan),
+      'command-plan-mismatch',
+    )
+
+    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD)
+    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.INSERT)
+  })
+
+  it('rejects a RemoveNote Plan for a different Note address', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createRemoveNoteCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteId: fixture.records.nonLoopNote.id,
+    })
+    const plan = createMutationPlan(store.modelRevision, [
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+        sourceId: command.sourceId,
+        before: fixture.records.nonLoopHarmonyNote,
+      },
+    ])
+    const error = captureCandidateError(
+      () => createProjectCommitCandidate(command, plan),
+      'command-plan-mismatch',
+    )
+
+    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE)
+    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REMOVE)
   })
 
   it('rejects Plans that change extra fields or bypass MoveNote no-change semantics', () => {
@@ -400,8 +404,8 @@ describe('ProjectCommit preparation boundary', () => {
         }),
       },
     ])
-    const error = capturePreparationError(
-      () => prepareProjectCommit(command, plan),
+    const error = captureCandidateError(
+      () => createProjectCommitCandidate(command, plan),
       'command-plan-mismatch',
     )
     const noChangeCommand = createMoveNoteCommand({
@@ -423,8 +427,8 @@ describe('ProjectCommit preparation boundary', () => {
     expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE)
     expect(error.mutationIndex).toBe(0)
     expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
-    capturePreparationError(
-      () => prepareProjectCommit(noChangeCommand, noChangePlan),
+    captureCandidateError(
+      () => createProjectCommitCandidate(noChangeCommand, noChangePlan),
       'command-plan-mismatch',
     )
     expect(store.modelRevision).toBe(0)

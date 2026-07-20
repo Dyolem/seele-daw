@@ -81,8 +81,8 @@ Commit、origin、Delta、change、affected range 及其数组在运行时冻结
 ## 实施顺序
 
 1. 定义公开 `ProjectChange`、`ProjectDelta`、`ProjectCommit` 值类型与稳定判别常量；
-2. 实现包内 Commit 写前准备器和稳定错误码；
-3. 覆盖 Add / Move / Remove、inverse、revision、顺序和不可变性测试；
+2. 实现包内 Commit candidate 工厂和稳定错误码；
+3. 覆盖 Add / Move / Remove、revision、Command / Plan 对应关系和不可变性测试；
 4. 从 package root 仅导出公开结果契约；
 5. 更新 README 状态与管线说明；
 6. 运行 Project Core、workspace 类型、架构、lint、格式、测试和 Studio 构建检查。
@@ -95,7 +95,8 @@ Commit、origin、Delta、change、affected range 及其数组在运行时冻结
 
 本阶段已于 2026-07-17 按上述边界完成：
 
-- `src/commit/` 已拥有公开值类型和包内写前准备器；
-- Add / Move / Remove、multi-change 顺序、inverse、revision overflow、计划来源、不支持 mutation、Command / Plan 对应关系与运行时冻结均有确定性测试；
-- package root 只导出 Change / Delta / Commit 的公开常量与类型，不导出 preparer、错误类型或任何 Mutation / Store 写能力；
+- `src/commit/` 已拥有公开值类型和包内 Commit candidate 工厂；
+- Add / Move / Remove、revision overflow、计划来源、不支持 mutation、Command / Plan 对应关系与运行时冻结均有确定性测试；
+- package root 只导出 Change / Delta / Commit 的公开常量与类型，不导出 candidate 工厂、错误类型或任何 Mutation / Store 写能力；
+- Delta 构造保持 candidate 工厂的私有实现，不为白盒测试提供独立生产导出；测试 fixture 和快捷断言统一位于 `src/__tests__/support/`；
 - Project Core 基线为 14 个测试文件、266 项测试；workspace 类型检查、架构检查、lint、递归测试和 Studio production build 通过。

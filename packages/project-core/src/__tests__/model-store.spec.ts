@@ -11,7 +11,7 @@ import {
   parseTimeSignatureEventId,
   parseTrackId,
 } from '@/index'
-import { createCompleteProjectFixture } from './fixtures/complete-project-fixture'
+import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { INITIAL_MODEL_REVISION, type ModelRevision } from '@/model/model-revision'
 import { ModelStore, type ModelStoreReader } from '@/model/model-store'
 

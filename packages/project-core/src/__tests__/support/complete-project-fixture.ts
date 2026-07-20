@@ -67,7 +67,7 @@ function createFixtureDevice(id: string, typeId: string): DeviceDescriptor {
 
 /**
  * Creates a complete valid project graph with deterministic values and fresh mutable
- * containers. Tests may deliberately corrupt the containers without leaking state.
+ * containers. Test support may deliberately corrupt them without leaking state.
  */
 export function createCompleteProjectFixture() {
   const project = createProjectRecord({

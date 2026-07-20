@@ -94,6 +94,12 @@ function workspacePackageOf(specifier) {
   return match ? { name: match[1], deepPath: match[2] } : undefined
 }
 
+function importsTestCodeFromProduction(file, target, workspaceDirectory) {
+  const testDirectory = path.join(workspaceDirectory, 'src', '__tests__')
+
+  return !isInside(testDirectory, file) && isInside(testDirectory, target)
+}
+
 function withoutSourceExtension(specifier) {
   return specifier.replace(/\.(?:[cm]?[jt]sx?|vue)$/, '')
 }
@@ -167,6 +173,9 @@ for (const file of await collectFiles(root)) {
       if (!isInside(sourceDirectory, aliasTarget)) {
         errors.push(`${path.relative(root, file)}: 禁止用 @/ 或 ~/ 越过 workspace 源码边界`)
       }
+      if (importsTestCodeFromProduction(file, aliasTarget, workspaceDirectory)) {
+        errors.push(`${relativeFile}: 生产源码禁止导入 __tests__ 中的测试支持代码`)
+      }
       continue
     }
 
@@ -198,6 +207,9 @@ for (const file of await collectFiles(root)) {
       const relativeTarget = path.relative(ownerDirectory, target)
       if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
         errors.push(`${path.relative(root, file)}: 禁止用相对路径跨越 package 边界`)
+      }
+      if (importsTestCodeFromProduction(file, target, workspaceDirectory)) {
+        errors.push(`${relativeFile}: 生产源码禁止导入 __tests__ 中的测试支持代码`)
       }
     }
   }

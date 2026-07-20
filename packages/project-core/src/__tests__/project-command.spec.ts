@@ -21,9 +21,9 @@ import {
   type ProjectCommand,
   type RemoveNoteCommand,
 } from '~/index'
-import { createCompleteProjectFixture } from './fixtures/complete-project-fixture'
+import { createCompleteProjectFixture } from './support/complete-project-fixture'
+import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 import { prepareProjectCommand } from '@/commands/project-command-preparer'
-import type { ProjectCommandPreparation } from '@/commands/project-command-preparation'
 import { ModelStore } from '@/model/model-store'
 import { MutationApplier } from '@/mutation/mutation-applier'
 import { createMutationPlan, type MutationPlan } from '@/mutation/mutation-plan'
@@ -45,16 +45,6 @@ function captureCommandError(operation: () => unknown): ProjectCommandError {
   }
 
   return caughtError
-}
-
-function requireReady(preparation: ProjectCommandPreparation): MutationPlan {
-  expect(preparation.status).toBe('ready')
-
-  if (preparation.status !== 'ready') {
-    throw new Error('Expected a ready ProjectCommand preparation')
-  }
-
-  return preparation.plan
 }
 
 function createAddCommand(
@@ -259,7 +249,7 @@ describe('AddNoteCommand', () => {
       startTick: parseTick(1_680),
       durationTick: parseTick(240),
     })
-    const plan = requireReady(prepareProjectCommand(store, command))
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
     const mutation = plan.forward[0]
 
     expect(plan.baseRevision).toBe(store.modelRevision)
@@ -316,7 +306,7 @@ describe('AddNoteCommand', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store, fixture.records.nonLoopSource.id)
-    const plan = requireReady(prepareProjectCommand(store, command))
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
 
     applyAndInverse(store, plan)
 
@@ -334,7 +324,7 @@ describe('RemoveNoteCommand', () => {
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
     )
-    const plan = requireReady(prepareProjectCommand(store, command))
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
     const mutation = plan.forward[0]
 
     expect(mutation?.type).toBe(PROJECT_MUTATION_TYPE.NOTE.REMOVE)
@@ -366,7 +356,7 @@ describe('RemoveNoteCommand', () => {
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
     )
-    const plan = requireReady(prepareProjectCommand(store, command))
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
 
     applyAndInverse(store, plan)
 
@@ -388,7 +378,7 @@ describe('MoveNoteCommand', () => {
         nextPitch: parseMidiPitch(74),
       },
     )
-    const plan = requireReady(prepareProjectCommand(store, command))
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
     const mutation = plan.forward[0]
 
     expect(mutation?.type).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
@@ -451,7 +441,7 @@ describe('MoveNoteCommand', () => {
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
     )
-    const plan = requireReady(prepareProjectCommand(store, command))
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
 
     applyAndInverse(store, plan)
 

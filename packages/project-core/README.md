@@ -213,7 +213,7 @@ Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wr
 
 当前公开契约能够表达 `midi-note.added`、`midi-note.removed` 和 `midi-note.updated` 三种语义变化。每条 change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围；Move 使用旧、新区间的保守并集。Delta 保持 forward mutation 顺序并携带提交后的 `modelRevision`，Commit 记录 base / committed revision 和 Command origin。
 
-包内 preparer 在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；候选只有在未来 Session 确认 apply 返回相同 revision 后才能返回或发布。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
+包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；候选只有在未来 Session 确认 apply 返回相同 revision 后才能返回或发布。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
 ### MutationPlan 的作用
 
@@ -427,6 +427,8 @@ src/
 ## 测试与验收
 
 当前 Project Core 基线为 14 个测试文件、266 项测试，其中 ProjectCommit / ProjectDelta 基础层新增 14 项。
+
+测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
 - 只有 MutationApplier 可以修改内部表的架构约束测试；
 - 同一个 ModelStore 的 writer lease 只能领取一次；

@@ -21,7 +21,7 @@ import {
   parseTimeSignatureDenominator,
   parseTimeSignatureNumerator,
 } from '~/index'
-import { createCompleteProjectFixture } from './fixtures/complete-project-fixture'
+import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import type { ModelRevision } from '@/model/model-revision'
 import { INITIAL_MODEL_REVISION } from '@/model/model-revision'
 import { MutationPlanError } from '@/mutation/mutation-plan-error'

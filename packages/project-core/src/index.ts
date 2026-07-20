@@ -82,6 +82,8 @@ export type {
   ProjectSubscriptionErrorDetails,
 } from './subscriptions/project-subscription-error'
 
+export type { MidiNotePartitionSnapshot, ProjectSnapshot } from './snapshots/project-snapshot'
+
 export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'
 export type {
   CommittedProjectCommandExecution,

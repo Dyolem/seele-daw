@@ -21,6 +21,7 @@ import {
   type NoChangeProjectCommandExecution,
   type ProjectCommandExecutionResult,
 } from '@/session/project-command-execution'
+import { createProjectSnapshot, type ProjectSnapshot } from '@/snapshots/project-snapshot'
 import { ChangePublisher } from '@/subscriptions/change-publisher'
 import type {
   ProjectSubscription,
@@ -36,6 +37,7 @@ export interface ProjectSession {
   readonly canUndo: boolean
   readonly canRedo: boolean
 
+  getSnapshot(): ProjectSnapshot
   query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query>
   subscribe(
     subscription: ProjectSubscription,
@@ -82,6 +84,10 @@ class ProjectSessionImpl implements ProjectSession {
 
   get canRedo(): boolean {
     return this.#history.canRedo
+  }
+
+  getSnapshot(): ProjectSnapshot {
+    return createProjectSnapshot(this.#store)
   }
 
   query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query> {

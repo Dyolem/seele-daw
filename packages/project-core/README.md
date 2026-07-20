@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex，以及 ChangePublisher / 局部订阅已经实现；Snapshot 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅，以及 ProjectSnapshot 已经实现；ProjectFileDTO 尚未开始。
 
 ## 包定位
 
@@ -182,7 +182,7 @@ ProjectSession
 
 Durability 和 Playback 通过端口或订阅接收结果。Project commit 不等待磁盘、音频设备或 Worker；外部失败不能回滚已经合法的创作事实。
 
-当前 `ProjectSession` 已经公开 `modelRevision`、`canUndo`、`canRedo`、同步 `query(query)`、`subscribe(subscription, observer)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex、ChangePublisher 和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History / QueryIndex transition 与 gated publication，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry、索引 root 或通知。空 History 的 Undo / Redo 返回 `null`，实际重放则返回并异步发布新的 ProjectCommit。Snapshot 和显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)、[ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md) 与 [ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md)。
+当前 `ProjectSession` 已经公开 `modelRevision`、`canUndo`、`canRedo`、同步 `getSnapshot()`、`query(query)`、`subscribe(subscription, observer)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex、ChangePublisher、Snapshot 生成器和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History / QueryIndex transition 与 gated publication，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry、索引 root 或通知。空 History 的 Undo / Redo 返回 `null`，实际重放则返回并异步发布新的 ProjectCommit。显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)、[ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)、[ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md) 与 [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)。
 
 ## 命令与原子提交管线
 
@@ -303,7 +303,7 @@ Query 返回只读投影或稳定实体记录：未变化实体可以保持引�
 
 ## Snapshot 语义
 
-`ProjectSnapshot` 必须是某个明确 `modelRevision` 的稳定不可变值，不能只是指向仍会变化的内部 Map。
+`ProjectSnapshot` 是某个明确 `modelRevision` 的稳定只读投影，不能只是指向仍会变化的内部 Map。
 
 Snapshot 主要用于：
 
@@ -312,7 +312,9 @@ Snapshot 主要用于：
 - 发送到 Worker 的版本化输入；
 - 导出、诊断和测试 fixture。
 
-Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 可以在低频边界显式复制规范化表；如果大项目 checkpoint 的复制成本成为瓶颈，再根据 benchmark 引入分块、copy-on-write 或结构共享。优化只能发生在 SnapshotFactory/ModelStore 内部，不能改变外部稳定语义。
+当前 `ProjectSession.getSnapshot()` 在调用时同步复制并冻结 Track order、实体数组和按 Source 分区的 Note 数组，记录当前 `modelRevision`，同时共享逻辑不可变的领域 Record。普通实体按 ID、Timeline 按 `[tick, id]` 规范排序，不依赖 Map insertion order；后续提交只替换 Record，因此旧 Snapshot 保留原 revision 与 Record 版本。Snapshot 不携带 Map、writer lease、History、Index 或 listener，也不直接充当 ProjectFileDTO。
+
+Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playback 全量编译、保存/checkpoint、Worker 或离线任务开始、消费者增量恢复等低频边界显式复制容器；如果大项目复制成本成为瓶颈，再根据 benchmark 引入分块、copy-on-write 或结构共享。优化只能发生在 Snapshot 生成器/ModelStore 内部，不能改变外部稳定语义。完整规则见 [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)。
 
 ## ProjectDelta 与消费者同步
 
@@ -404,7 +406,7 @@ src/
 - 其他包只能从 `@seele-daw/project-core` 公开入口导入，禁止深层路径导入；
 - 不导出内部 Map、可变数组、MutationApplier 或 ModelStore；
 - 包外写入只通过 ProjectSession.execute / undo / redo，不提供直接 plan/apply 入口；
-- 包外读取只通过类型化 ProjectSession.query 和后续 Snapshot，不提供内部 Store / Index 入口；
+- 包外读取只通过类型化 ProjectSession.query 和 ProjectSession.getSnapshot，不提供内部 Store / Index 入口；
 - 包外通知只通过类型化 ProjectSession.subscribe，不导出 ChangePublisher 或内部 subscription entry；
 - 命令必须携带稳定实体 ID 和完整参数，不能读取 Editor Selection；
 - 一次用户动作只增加一次 modelRevision，并只产生一个 History Entry；
@@ -437,12 +439,12 @@ src/
 7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
 8. 建立 MIDI Note ProjectQuery 与可重建 QueryIndex。
 9. 增加 ChangePublisher 与局部订阅。
-10. 定义 ProjectSnapshot、ProjectFileDTO、schema validation 和迁移。
+10. 定义 ProjectSnapshot；随后独立实现 ProjectFileDTO、schema validation 和迁移。
 11. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 19 个测试文件、304 项测试，其中 ChangePublisher / 局部订阅基础层新增 11 项。
+当前 Project Core 基线为 20 个测试文件、311 项测试，其中 ProjectSnapshot 基础层新增 7 项。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -459,7 +461,7 @@ src/
 - 未变化实体保持引用，变化实体产生新只读记录；
 - QueryIndex 与全量扫描结果一致，索引重建结果一致；
 - ChangePublisher 的局部过滤、异步顺序、取消、重入和 listener failure 隔离；
-- Snapshot 在后续提交后仍保持原 revision 内容；
+- Snapshot 使用确定性顺序，并在后续提交后仍保持原 revision、容器和 Record 版本；
 - snapshot、迁移与 journal replay 的 golden fixtures；
 - 100k Note / 32 Track 下的 command、apply、query 和 snapshot benchmark。
 
@@ -472,6 +474,7 @@ src/
 - [Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)
 - [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)
 - [ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md)
+- [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

@@ -61,6 +61,27 @@ export type {
 export { ProjectQueryError } from './queries/project-query-error'
 export type { ProjectQueryErrorCode, ProjectQueryErrorDetails } from './queries/project-query-error'
 
+export {
+  PROJECT_SUBSCRIPTION_TYPE,
+  createAllProjectCommitsSubscription,
+  createMidiNoteChangesSubscription,
+} from './subscriptions/project-subscription'
+export type {
+  AllProjectCommitsSubscription,
+  CreateMidiNoteChangesSubscriptionInput,
+  MidiNoteChangesSubscription,
+  ProjectSubscription,
+  ProjectSubscriptionDeliveryFailure,
+  ProjectSubscriptionObserver,
+  ProjectSubscriptionType,
+  ProjectUnsubscribe,
+} from './subscriptions/project-subscription'
+export { ProjectSubscriptionError } from './subscriptions/project-subscription-error'
+export type {
+  ProjectSubscriptionErrorCode,
+  ProjectSubscriptionErrorDetails,
+} from './subscriptions/project-subscription-error'
+
 export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'
 export type {
   CommittedProjectCommandExecution,

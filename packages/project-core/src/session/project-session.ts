@@ -21,6 +21,12 @@ import {
   type NoChangeProjectCommandExecution,
   type ProjectCommandExecutionResult,
 } from '@/session/project-command-execution'
+import { ChangePublisher } from '@/subscriptions/change-publisher'
+import type {
+  ProjectSubscription,
+  ProjectSubscriptionObserver,
+  ProjectUnsubscribe,
+} from '@/subscriptions/project-subscription'
 
 export type CreateInitialProjectSessionInput = CreateInitialModelStoreInput
 
@@ -31,6 +37,10 @@ export interface ProjectSession {
   readonly canRedo: boolean
 
   query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query>
+  subscribe(
+    subscription: ProjectSubscription,
+    observer: ProjectSubscriptionObserver,
+  ): ProjectUnsubscribe
   execute(command: ProjectCommand): ProjectCommandExecutionResult
   undo(): ProjectCommit | null
   redo(): ProjectCommit | null
@@ -52,6 +62,7 @@ class ProjectSessionImpl implements ProjectSession {
   readonly #applier: MutationApplier
   readonly #history = new HistoryController()
   readonly #queryIndex: QueryIndex
+  readonly #changePublisher = new ChangePublisher()
 
   constructor(store: ModelStore) {
     this.#store = store
@@ -77,6 +88,13 @@ class ProjectSessionImpl implements ProjectSession {
     return this.#queryIndex.execute(this.#store, query)
   }
 
+  subscribe(
+    subscription: ProjectSubscription,
+    observer: ProjectSubscriptionObserver,
+  ): ProjectUnsubscribe {
+    return this.#changePublisher.subscribe(subscription, observer)
+  }
+
   execute(command: ProjectCommand): ProjectCommandExecutionResult {
     const preparation = prepareProjectCommand(this.#store, command)
 
@@ -95,7 +113,7 @@ class ProjectSessionImpl implements ProjectSession {
     )
     const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
 
-    return this.#applySessionTransition(historyTransition, queryTransition, result)
+    return this.#applySessionTransition(historyTransition, queryTransition, commit, result)
   }
 
   undo(): ProjectCommit | null {
@@ -112,7 +130,7 @@ class ProjectSessionImpl implements ProjectSession {
     )
     const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
 
-    return this.#applySessionTransition(historyTransition, queryTransition, commit)
+    return this.#applySessionTransition(historyTransition, queryTransition, commit, commit)
   }
 
   redo(): ProjectCommit | null {
@@ -129,19 +147,28 @@ class ProjectSessionImpl implements ProjectSession {
     )
     const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
 
-    return this.#applySessionTransition(historyTransition, queryTransition, commit)
+    return this.#applySessionTransition(historyTransition, queryTransition, commit, commit)
   }
 
   #applySessionTransition<Result>(
     historyTransition: PreparedHistoryTransition,
     queryTransition: PreparedQueryIndexTransition,
+    commit: ProjectCommit,
     result: Result,
   ): Result {
-    queryTransition.stage()
+    const publication = this.#changePublisher.prepare(commit)
+
+    try {
+      queryTransition.stage()
+    } catch (error) {
+      publication.cancel()
+      throw error
+    }
 
     try {
       historyTransition.stage()
     } catch (error) {
+      publication.cancel()
       queryTransition.rollback()
       throw error
     }
@@ -149,12 +176,13 @@ class ProjectSessionImpl implements ProjectSession {
     try {
       this.#applier.apply(historyTransition.plan)
     } catch (error) {
+      publication.cancel()
       historyTransition.rollback()
       queryTransition.rollback()
       throw error
     }
 
-    // History, QueryIndex, Commit/result objects, and rollback closures all exist
+    // History, QueryIndex, Commit/result objects, and the gated publication all exist
     // before apply. A successful revision write is followed only by this bare return.
     return result
   }

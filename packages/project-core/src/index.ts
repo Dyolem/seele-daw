@@ -84,6 +84,31 @@ export type {
 
 export type { MidiNotePartitionSnapshot, ProjectSnapshot } from './snapshots/project-snapshot'
 
+export { PROJECT_FILE_FORMAT_VERSION } from './persistence/project-file-dto'
+export type {
+  AudioTrackDTO,
+  ChannelStripDTO,
+  ClipDTO,
+  DeviceDTO,
+  InstrumentTrackDTO,
+  MasterChannelDTO,
+  MidiClipDTO,
+  MidiLoopDTO,
+  MidiNoteDTO,
+  MidiSourceDTO,
+  ProjectFileDTO,
+  ProjectFileFormatVersion,
+  TempoEventDTO,
+  TimeSignatureEventDTO,
+  TrackDTO,
+} from './persistence/project-file-dto'
+export { ProjectFileProjectionError } from './persistence/project-file-projection-error'
+export type {
+  ProjectFileProjectionErrorCode,
+  ProjectFileProjectionErrorDetails,
+} from './persistence/project-file-projection-error'
+export { createProjectFileDTO } from './persistence/project-file-projector'
+
 export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'
 export type {
   CommittedProjectCommandExecution,

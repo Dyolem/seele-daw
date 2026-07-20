@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅，以及 ProjectSnapshot 已经实现；ProjectFileDTO 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot，以及 ProjectFileDTO V1 写出边界已经实现；文件加载与迁移尚未开始。
 
 ## 包定位
 
@@ -316,6 +316,14 @@ Snapshot 主要用于：
 
 Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playback 全量编译、保存/checkpoint、Worker 或离线任务开始、消费者增量恢复等低频边界显式复制容器；如果大项目复制成本成为瓶颈，再根据 benchmark 引入分块、copy-on-write 或结构共享。优化只能发生在 Snapshot 生成器/ModelStore 内部，不能改变外部稳定语义。完整规则见 [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)。
 
+## ProjectFileDTO V1 写出边界
+
+`createProjectFileDTO(snapshot)` 把可信运行时 Snapshot 显式投影为 `formatVersion: 1` 的 JSON-friendly 文件值。DTO 使用无 Brand 的 primitive 和普通 object table，Note 嵌套到所属 MidiSource；本地 `modelRevision`、History、QueryIndex 和订阅状态不会进入文件。
+
+投影器重新创建并冻结全部 DTO object、数组和 table，Device parameters / opaque state 经过 JsonValue 边界深复制与递归冻结，不与 Snapshot 共享复合引用。Entity table 使用安全 own data property 保留 `__proto__` 等合法 opaque ID；Snapshot 的规范顺序和递归排序后的 Device JSON 保证等价事实得到确定性 DTO。V1 `requiredFeatures` 当前为空，Device type ID 不被误当作文件格式 feature。
+
+该 API 只负责可信 Snapshot 的写出，不代表 JSON text 已经过 canonical checksum 编码，也不允许把外部 `unknown` cast 成 ProjectFileDTO。文件加载仍必须依次执行 schema validation、ordered migration、领域 Record 创建、跨实体不变量验证和 QueryIndex rebuild。完整规则见 [ProjectFileDTO V1 写出边界计划](./docs/project-file-dto-v1-write-plan.md)。
+
 ## ProjectDelta 与消费者同步
 
 ProjectDelta 描述一次提交造成的语义变化，例如：
@@ -439,12 +447,12 @@ src/
 7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
 8. 建立 MIDI Note ProjectQuery 与可重建 QueryIndex。
 9. 增加 ChangePublisher 与局部订阅。
-10. 定义 ProjectSnapshot；随后独立实现 ProjectFileDTO、schema validation 和迁移。
+10. 定义 ProjectSnapshot 与 ProjectFileDTO V1 写出边界；随后独立实现 schema validation、迁移和加载。
 11. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 20 个测试文件、311 项测试，其中 ProjectSnapshot 基础层新增 7 项。
+当前 Project Core 基线为 21 个测试文件、321 项测试，其中 ProjectFileDTO V1 写出边界新增 10 项。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -462,6 +470,7 @@ src/
 - QueryIndex 与全量扫描结果一致，索引重建结果一致；
 - ChangePublisher 的局部过滤、异步顺序、取消、重入和 listener failure 隔离；
 - Snapshot 使用确定性顺序，并在后续提交后仍保持原 revision、容器和 Record 版本；
+- ProjectFileDTO 的版本、字段完整性、JSON 往返、深度所有权、特殊 ID 和分区失败关闭；
 - snapshot、迁移与 journal replay 的 golden fixtures；
 - 100k Note / 32 Track 下的 command、apply、query 和 snapshot benchmark。
 
@@ -475,6 +484,7 @@ src/
 - [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)
 - [ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md)
 - [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)
+- [ProjectFileDTO V1 写出边界计划](./docs/project-file-dto-v1-write-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

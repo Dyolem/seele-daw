@@ -588,6 +588,8 @@ parse
 
 保存时执行相反方向的显式投影，不调用 `JSON.stringify(ModelStore)`。
 
+当前已经实现 `formatVersion: 1` 的 ProjectFileDTO 类型和 `ProjectSnapshot -> ProjectFileDTO` 写出投影。输出会复制并冻结全部 DTO 容器、把 Note 嵌入所属 MidiSource、深复制 Device JsonValue，并省略本地 `modelRevision`。外部 JSON 的 schema validation、历史版本迁移、领域 normalize 和 ProjectSession 加载仍是后续独立边界，不能把未知数据直接 cast 为当前 DTO。详细决策见 [ProjectFileDTO V1 写出边界计划](./project-file-dto-v1-write-plan.md)。
+
 ## 跨实体不变量
 
 每次提交完成后，至少必须满足：

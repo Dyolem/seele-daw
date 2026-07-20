@@ -89,7 +89,7 @@ Commit、origin、Delta、change、affected range 及其数组在运行时冻结
 
 ## 完成边界
 
-本阶段完成后，Project Core 能在不暴露 ModelStore、MutationPlan 或 MutationApplier 的前提下，提前构造一次 Note 编辑的不可变提交结果。正式执行门面、发布时机和消费接口仍由下一阶段 `ProjectSession` 负责。
+本阶段完成后，Project Core 能在不暴露 ModelStore、MutationPlan 或 MutationApplier 的前提下，提前构造一次 Note 编辑的不可变提交结果。正式执行门面和返回时机由随后完成的 `ProjectSession` 最小执行模块负责；订阅消费接口仍未实现。
 
 ## 实施结果
 

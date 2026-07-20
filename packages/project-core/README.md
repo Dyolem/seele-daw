@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入骨架、Add / Move / Remove MIDI Note Command，以及 Note 级 ProjectCommit / ProjectDelta 基础契约已经实现；ProjectSession、History、Query 和 Snapshot 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta，以及 ProjectSession 最小执行门面已经实现；History、Query、Snapshot 和订阅尚未开始。
 
 ## 包定位
 
@@ -161,7 +161,7 @@ Note 虽然按 MidiSource 分区存储，`NoteId` 仍在整个项目内保持唯
 
 内核不会自动创建默认 Track。Instrument Track 需要明确的 Device Definition 和 Device ID，“新建项目时出现哪些轨道与设备”属于 Studio 产品模板。完整测试 fixture 也不等于产品默认项目：它只用于覆盖所有当前实体关系和拓扑位置。
 
-该入口暂不从 package root 导出，因为它返回包内私有的 `ModelStore`；未来由 `ProjectSession` 创建流程调用。`ModelStore` 构造器仍保持低层职责，只复制已经规范化的 Seed，不自动验证或修复外部加载结果。
+底层初始化器不从 package root 导出，因为它返回包内私有的 `ModelStore`；公开 `createInitialProjectSession` 已经包装该流程。`ModelStore` 构造器仍保持低层职责，只复制已经规范化的 Seed，不自动验证或修复外部加载结果。
 
 ## ProjectSession 与内部组件
 
@@ -182,6 +182,8 @@ ProjectSession
 
 Durability 和 Playback 通过端口或订阅接收结果。Project commit 不等待磁盘、音频设备或 Worker；外部失败不能回滚已经合法的创作事实。
 
+当前最小 `ProjectSession` 已经公开 `modelRevision` 和同步 `execute(command)`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier 和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit 与结果外壳，apply 成功后直接返回；no-change 不生成计划、Commit 或 revision。History、Query、Snapshot、listener 和故障恢复状态留给后续独立模块，详见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)。
+
 ## 命令与原子提交管线
 
 一次写入严格经过：
@@ -194,26 +196,25 @@ ProjectCommand
 -> build forward mutations
 -> create a closed MutationPlan with generated inverse mutations
 -> prepare immutable ProjectCommit + ProjectDelta candidate
+-> freeze committed execute result
 -> MutationApplier projects and validates the plan, then applies mutations
 -> modelRevision + 1
--> verify applied revision matches the prepared candidate
--> update or rebuild QueryIndex
--> record HistoryEntry
--> notify subscribers
--> enqueue durability / playback side effects
+-> return the already prepared result
 ```
+
+History、QueryIndex、ChangePublisher、durability 和 Playback 尚未接入这条当前管线。它们必须延续同一边界：可预计算内容在写前准备，可重建派生状态在提交后恢复，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
 
 ### MIDI Note Command 纵向切片
 
 当前已经实现 `AddNoteCommand`、`MoveNoteCommand` 和 `RemoveNoteCommand`。公开 Command 使用稳定判别字段、完整领域参数和 `baseRevision`；包内 preparer 重新验证 Command、拒绝陈旧 revision，并通过无状态 handler 读取 `ModelStoreReader`、创建 MidiNoteRecord 和一条 Note mutation，最终形成 MutationPlan。
 
-Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wrap 或自动扩展 Source / Clip。Move 使用绝对 `nextStartTick` 与 `nextPitch`，目标未变化时返回包内 `no-change`，不创建空 MutationPlan。Command preparer 与 handler 不从 package root 导出；未来 ProjectSession 将成为正式执行入口。完整规则和实现边界见 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
+Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wrap 或自动扩展 Source / Clip。Move 使用绝对 `nextStartTick` 与 `nextPitch`，目标未变化时返回包内 `no-change`，不创建空 MutationPlan。Command preparer 与 handler 不从 package root 导出；ProjectSession 是正式执行入口。完整规则和实现边界见 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
 
 ### ProjectCommit / ProjectDelta 基础层
 
 当前公开契约能够表达 `midi-note.added`、`midi-note.removed` 和 `midi-note.updated` 三种语义变化。每条 change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围；Move 使用旧、新区间的保守并集。Delta 保持 forward mutation 顺序并携带提交后的 `modelRevision`，Commit 记录 base / committed revision 和 Command origin。
 
-包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；候选只有在未来 Session 确认 apply 返回相同 revision 后才能返回或发布。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
+包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
 ### MutationPlan 的作用
 
@@ -391,6 +392,7 @@ src/
 
 - 其他包只能从 `@seele-daw/project-core` 公开入口导入，禁止深层路径导入；
 - 不导出内部 Map、可变数组、MutationApplier 或 ModelStore；
+- 包外写入只通过 ProjectSession.execute，不提供直接 plan/apply 入口；
 - 命令必须携带稳定实体 ID 和完整参数，不能读取 Editor Selection；
 - 一次用户动作只增加一次 modelRevision，并只产生一个 History Entry；
 - Commit、Delta、Snapshot 和 Query Result 在包外视为不可变；
@@ -426,7 +428,7 @@ src/
 
 ## 测试与验收
 
-当前 Project Core 基线为 14 个测试文件、266 项测试，其中 ProjectCommit / ProjectDelta 基础层新增 14 项。
+当前 Project Core 基线为 15 个测试文件、273 项测试，其中 ProjectSession 最小执行门面新增 7 项。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -450,6 +452,8 @@ src/
 
 - [阶段成果：安全模型与原子 Mutation 内核](./docs/project-core-transaction-foundation-milestone.md)
 - [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)
+- [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
+- [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

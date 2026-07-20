@@ -39,6 +39,16 @@ export type {
 } from './commit/project-commit'
 export type { ProjectDelta } from './commit/project-delta'
 
+export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'
+export type {
+  CommittedProjectCommandExecution,
+  NoChangeProjectCommandExecution,
+  ProjectCommandExecutionResult,
+  ProjectCommandExecutionStatus,
+} from './session/project-command-execution'
+export { createInitialProjectSession } from './session/project-session'
+export type { CreateInitialProjectSessionInput, ProjectSession } from './session/project-session'
+
 export { createChannelStripDescriptor, createMasterChannelRecord } from './model/channel'
 export type {
   ChannelStripDescriptor,

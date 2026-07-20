@@ -175,7 +175,7 @@ type ProjectCommandPreparation =
     }
 ```
 
-当前结果保持包内。未来 ProjectSession 将把它映射为公开的 execute result，并只对 `ready` 分支调用 MutationApplier。
+准备结果保持包内。ProjectSession 已将它映射为公开的 execute result，并只对 `ready` 分支调用 MutationApplier。
 
 ## 准备管线
 
@@ -263,7 +263,7 @@ ID、Tick、duration、pitch、velocity 和 channel 的本地值域继续由已�
 - `MutationPlan`；
 - `MutationApplier`。
 
-公开 Command 表达上层可以创建的意图，公开 API 不提供绕过未来 ProjectSession 执行这些意图的写入口。
+公开 Command 表达上层可以创建的意图，公开 API 不提供绕过 ProjectSession 执行这些意图的写入口。
 
 ## 实现顺序
 

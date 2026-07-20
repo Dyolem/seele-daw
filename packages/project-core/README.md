@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession，以及会话级 History / Undo / Redo 已经实现；Query、Snapshot 和订阅尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo，以及 MIDI Note ProjectQuery / QueryIndex 已经实现；Snapshot 和订阅尚未开始。
 
 ## 包定位
 
@@ -182,7 +182,7 @@ ProjectSession
 
 Durability 和 Playback 通过端口或订阅接收结果。Project commit 不等待磁盘、音频设备或 Worker；外部失败不能回滚已经合法的创作事实。
 
-当前 `ProjectSession` 已经公开 `modelRevision`、`canUndo`、`canRedo`、同步 `execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController 和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳与 History transition，apply 成功后直接返回；no-change 不生成计划、Commit、revision 或 History entry。空 History 的 Undo / Redo 返回 `null`，实际重放则返回新的 ProjectCommit。Query、Snapshot、listener 和故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md) 与 [Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)。
+当前 `ProjectSession` 已经公开 `modelRevision`、`canUndo`、`canRedo`、同步 `query(query)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex 和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History transition 与 QueryIndex transition，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry 或索引 root。空 History 的 Undo / Redo 返回 `null`，实际重放则返回新的 ProjectCommit。Snapshot、listener 和显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md) 与 [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)。
 
 ## 命令与原子提交管线
 
@@ -197,13 +197,13 @@ ProjectCommand
 -> create a closed MutationPlan with generated inverse mutations
 -> prepare immutable ProjectCommit + ProjectDelta candidate
 -> freeze committed execute result
--> prepare and stage the History transition
+-> prepare and stage History + QueryIndex transitions
 -> MutationApplier projects and validates the plan, then applies mutations
 -> modelRevision + 1
 -> return the already prepared result
 ```
 
-History 已接入同一原子边界：普通 committed Command 进入 undo 栈，Undo / Redo 从当前 revision 重新建立 MutationPlan，并在模型写入前暂存新的双栈头；apply 失败会恢复旧栈头。QueryIndex、ChangePublisher、durability 和 Playback 尚未接入。它们必须延续同一边界：可预计算内容在写前准备，可重建派生状态在提交后恢复，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
+History 与 MIDI Note QueryIndex 已接入同一原子边界：普通 committed Command 进入 undo 栈，Undo / Redo 从当前 revision 重新建立 MutationPlan；Session 在模型写入前暂存新的 History 双栈头和 QueryIndex root，apply 失败时按相反顺序一起恢复。ChangePublisher、durability 和 Playback 尚未接入。它们必须延续同一边界：可预计算内容在写前准备，可重建派生状态在提交后恢复，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
 
 ### MIDI Note Command 纵向切片
 
@@ -243,6 +243,7 @@ History label、merge key、Editor restore point 和 Delta 提示分别属于后
 - Commit / Delta 候选在写入前完整准备，只有全部成功后才能返回和发布；
 - 业务失败不会产生部分模型、History Entry 或可观察的 Delta；
 - History transition 在模型写入前只替换私有 undo / redo 栈头；apply 失败时恢复旧栈头，成功 revision 写入后不再分配 History 节点；
+- QueryIndex transition 在模型写入前准备受影响 Source 的 copy-on-write 分区并暂存新 root；apply 失败时恢复旧 root，成功时 Index 与 ModelStore revision 一致；
 - 意外程序错误发生在第 `k` 条已完成的 forward 之后时，只执行完整 inverse 数组末尾对应的 `k` 条 mutation；回滚后重新验证不变量和原计划前置条件。这里依赖唯一写 lease 与 CAS primitive 的正确性，不通过每次提交前复制整个 Store 来对抗任意内部实现错误；
 - 如果防御性回滚或恢复验证失败，MutationApplier 立即锁存为 faulted，并同时保留 apply cause 与 rollback cause；未来 Session 在此基础上进入 faulted/read-only 状态。
 
@@ -272,23 +273,27 @@ HistoryEntry
 
 ## Query、订阅与 Read Model
 
-外部读取通过 Query 和局部订阅完成，禁止取得内部表：
+外部读取通过 Query 和后续局部订阅完成，禁止取得内部表：
 
 ```text
 session.query(query)
-session.subscribe(filter, listener)
-session.getSnapshot()
+session.query(createMidiNoteByIdQuery(...))
+session.query(createMidiNotesIntersectingRangeQuery(...))
 ```
 
-QueryIndex 规划维护：
+当前 MIDI Note Query 已实现：
 
-- `trackId -> ordered clips`；
-- 时间范围到 Clip；
-- `sourceId + tick/pitch range -> notes`；
-- `assetId -> referencing entities`；
-- Track 到 Device / Routing summary。
+- `sourceId + noteId` 单实体查询；
+- `sourceId + [startTick, endTick) + [minimumPitch, maximumPitch]` 区间相交查询；
+- 结果携带 `modelRevision`，范围结果按 `[startTick, pitch, noteId]` 稳定排序；
+- Source 或 Note 不存在属于正常读取结果，分别返回空集合或 `undefined`；
+- Query descriptor、结果外壳和结果数组运行时冻结，Record 保持引用共享。
 
-订阅使用 topic、entity ID 和时间范围过滤。不能用单个全局 revision ref 让 Mixer、Piano Roll、Inspector 和 Arrangement 在任意 Note 变化后全部重算。
+包内 QueryIndex 为每个 MidiSource 维护 ID Map、startTick 排序数组和 prefix maximum end，从而通过二分边界缩小区间候选。Index 按 ProjectDelta 在写前增量准备，只复制受影响 Source；revision 落后时 Query 使用权威 ModelStore 扫描降级，Index 也可以从 Store 完整 rebuild。扫描与索引结果必须等价，内部结构不进入项目文件、History 或 package root。完整决策见 [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)。
+
+Track / Clip、Tempo、Device、Asset 和 Automation Query 要等对应 Command / Delta 纵向切片出现后再加入，不能预建一个无业务语义的通用查询语言。
+
+后续订阅使用 topic、entity ID 和时间范围过滤。不能用单个全局 revision ref 让 Mixer、Piano Roll、Inspector 和 Arrangement 在任意 Note 变化后全部重算。
 
 Query 返回只读投影或稳定实体记录：未变化实体可以保持引用相等，变化实体必须是新引用。大型集合优先返回窗口化、分页或迭代结果，不能把十万 Note 在每次提交后复制给 Vue。
 
@@ -394,6 +399,7 @@ src/
 - 其他包只能从 `@seele-daw/project-core` 公开入口导入，禁止深层路径导入；
 - 不导出内部 Map、可变数组、MutationApplier 或 ModelStore；
 - 包外写入只通过 ProjectSession.execute / undo / redo，不提供直接 plan/apply 入口；
+- 包外读取只通过类型化 ProjectSession.query 和后续 Snapshot，不提供内部 Store / Index 入口；
 - 命令必须携带稳定实体 ID 和完整参数，不能读取 Editor Selection；
 - 一次用户动作只增加一次 modelRevision，并只产生一个 History Entry；
 - Commit、Delta、Snapshot 和 Query Result 在包外视为不可变；
@@ -423,13 +429,14 @@ src/
 5. 建立 Note 级 ProjectCommit、ProjectDelta 与写前准备边界。
 6. 实现 ProjectSession 最小执行门面和提交发布时机。
 7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
-8. 增加 QueryIndex 与局部订阅。
-9. 定义 ProjectSnapshot、ProjectFileDTO、schema validation 和迁移。
-10. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
+8. 建立 MIDI Note ProjectQuery 与可重建 QueryIndex。
+9. 增加 ChangePublisher 与局部订阅。
+10. 定义 ProjectSnapshot、ProjectFileDTO、schema validation 和迁移。
+11. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 16 个测试文件、282 项测试，其中 History / Undo / Redo 基础层新增 9 项。
+当前 Project Core 基线为 18 个测试文件、293 项测试，其中 ProjectQuery / MIDI Note QueryIndex 基础层新增 11 项。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -456,6 +463,7 @@ src/
 - [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
 - [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)
 - [Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)
+- [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

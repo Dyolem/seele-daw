@@ -21,7 +21,7 @@ import {
   type ProjectSession,
 } from '~/index'
 import { MutationApplyError } from '@/mutation/mutation-apply-error'
-import { withMapSetInterceptor } from './support/map-set-interceptor'
+import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
 function requireCommitted(result: ProjectCommandExecutionResult): ProjectCommit {
@@ -325,10 +325,8 @@ describe('ProjectSession Undo / Redo', () => {
       channel: parseMidiChannel(0),
     })
     const injectedFailure = new Error('injected History write failure')
-    let matchingSetCount = 0
-
     expect(() =>
-      withMapSetInterceptor(
+      withAuthoritativeMapSetInterceptor(
         (key, value) => {
           if (
             key === noteId &&
@@ -337,10 +335,7 @@ describe('ProjectSession Undo / Redo', () => {
             'id' in value &&
             value.id === noteId
           ) {
-            matchingSetCount += 1
-
-            // MutationApplier projects once before reaching the authoritative table.
-            if (matchingSetCount === 2) throw injectedFailure
+            throw injectedFailure
           }
         },
         () => session.execute(command),
@@ -376,16 +371,10 @@ describe('ProjectSession Undo / Redo', () => {
 
     const after = moveChange.after
     const failAuthoritativeWrite = (expectedValue: unknown, operation: () => unknown): void => {
-      let matchingSetCount = 0
-
       expect(() =>
-        withMapSetInterceptor((key, value) => {
+        withAuthoritativeMapSetInterceptor((key, value) => {
           if (key === before.id && value === expectedValue) {
-            matchingSetCount += 1
-
-            if (matchingSetCount === 2) {
-              throw new Error('injected History replay write failure')
-            }
+            throw new Error('injected History replay write failure')
           }
         }, operation),
       ).toThrowError(expect.objectContaining<Partial<MutationApplyError>>({ code: 'write-failed' }))

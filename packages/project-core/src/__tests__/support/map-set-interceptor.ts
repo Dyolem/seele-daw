@@ -23,3 +23,18 @@ export function withMapSetInterceptor<Result>(
     setSpy.mockRestore()
   }
 }
+
+/**
+ * Filters projection, index, and fixture writes out of a fault-injection test. The
+ * stack check stays test-only so production code does not expose its private tables.
+ */
+export function withAuthoritativeMapSetInterceptor<Result>(
+  intercept: (key: unknown, value: unknown) => void,
+  operation: () => Result,
+): Result {
+  return withMapSetInterceptor((key, value) => {
+    const stack = new Error().stack
+
+    if (stack?.includes('/src/model/model-store.ts:')) intercept(key, value)
+  }, operation)
+}

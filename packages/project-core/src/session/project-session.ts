@@ -13,6 +13,8 @@ import {
 import type { ModelRevision } from '@/model/model-revision'
 import { ModelStore } from '@/model/model-store'
 import { MutationApplier } from '@/mutation/mutation-applier'
+import { QueryIndex, type PreparedQueryIndexTransition } from '@/queries/query-index'
+import type { ProjectQuery, ProjectQueryResultFor } from '@/queries/project-query'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   type CommittedProjectCommandExecution,
@@ -22,12 +24,13 @@ import {
 
 export type CreateInitialProjectSessionInput = CreateInitialModelStoreInput
 
-/** Public write facade for one in-memory project lifetime. */
+/** Public read/write facade for one in-memory project lifetime. */
 export interface ProjectSession {
   readonly modelRevision: ModelRevision
   readonly canUndo: boolean
   readonly canRedo: boolean
 
+  query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query>
   execute(command: ProjectCommand): ProjectCommandExecutionResult
   undo(): ProjectCommit | null
   redo(): ProjectCommit | null
@@ -48,9 +51,13 @@ class ProjectSessionImpl implements ProjectSession {
   readonly #store: ModelStore
   readonly #applier: MutationApplier
   readonly #history = new HistoryController()
+  readonly #queryIndex: QueryIndex
 
   constructor(store: ModelStore) {
     this.#store = store
+    this.#queryIndex = new QueryIndex(store)
+    // Claim the unique writer only after every other fallible Session component
+    // has constructed successfully, so a failed composition does not strand the Store.
     this.#applier = new MutationApplier(store)
   }
 
@@ -64,6 +71,10 @@ class ProjectSessionImpl implements ProjectSession {
 
   get canRedo(): boolean {
     return this.#history.canRedo
+  }
+
+  query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query> {
+    return this.#queryIndex.execute(this.#store, query)
   }
 
   execute(command: ProjectCommand): ProjectCommandExecutionResult {
@@ -82,8 +93,9 @@ class ProjectSessionImpl implements ProjectSession {
       commit.origin.commandType,
       preparation.plan,
     )
+    const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
 
-    return this.#applyHistoryTransition(historyTransition, result)
+    return this.#applySessionTransition(historyTransition, queryTransition, result)
   }
 
   undo(): ProjectCommit | null {
@@ -98,8 +110,9 @@ class ProjectSessionImpl implements ProjectSession {
       },
       historyTransition.plan,
     )
+    const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
 
-    return this.#applyHistoryTransition(historyTransition, commit)
+    return this.#applySessionTransition(historyTransition, queryTransition, commit)
   }
 
   redo(): ProjectCommit | null {
@@ -114,25 +127,35 @@ class ProjectSessionImpl implements ProjectSession {
       },
       historyTransition.plan,
     )
+    const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
 
-    return this.#applyHistoryTransition(historyTransition, commit)
+    return this.#applySessionTransition(historyTransition, queryTransition, commit)
   }
 
-  #applyHistoryTransition<Result>(
+  #applySessionTransition<Result>(
     historyTransition: PreparedHistoryTransition,
+    queryTransition: PreparedQueryIndexTransition,
     result: Result,
   ): Result {
-    historyTransition.stage()
+    queryTransition.stage()
+
+    try {
+      historyTransition.stage()
+    } catch (error) {
+      queryTransition.rollback()
+      throw error
+    }
 
     try {
       this.#applier.apply(historyTransition.plan)
     } catch (error) {
       historyTransition.rollback()
+      queryTransition.rollback()
       throw error
     }
 
-    // The History nodes, Commit/result objects, and rollback closure all exist before
-    // apply. A successful revision write is followed only by this bare return.
+    // History, QueryIndex, Commit/result objects, and rollback closures all exist
+    // before apply. A successful revision write is followed only by this bare return.
     return result
   }
 }

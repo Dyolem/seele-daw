@@ -41,6 +41,26 @@ export type {
 } from './commit/project-commit'
 export type { ProjectDelta } from './commit/project-delta'
 
+export {
+  PROJECT_QUERY_TYPE,
+  createMidiNoteByIdQuery,
+  createMidiNotesIntersectingRangeQuery,
+} from './queries/project-query'
+export type {
+  CreateMidiNoteByIdQueryInput,
+  CreateMidiNotesIntersectingRangeQueryInput,
+  MidiNoteByIdQuery,
+  MidiNoteByIdQueryResult,
+  MidiNotesIntersectingRangeQuery,
+  MidiNotesIntersectingRangeQueryResult,
+  ProjectQuery,
+  ProjectQueryResult,
+  ProjectQueryResultFor,
+  ProjectQueryType,
+} from './queries/project-query'
+export { ProjectQueryError } from './queries/project-query-error'
+export type { ProjectQueryErrorCode, ProjectQueryErrorDetails } from './queries/project-query-error'
+
 export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'
 export type {
   CommittedProjectCommandExecution,

@@ -8,6 +8,14 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "type-check": "tsc -p tsconfig.json"
+    "type-check": "tsc -p tsconfig.json",
+    "test:run": "vitest run --environment node"
+  },
+  "dependencies": {
+    "@seele-daw/project-core": "workspace:*",
+    "idb": "8.0.3"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.5"
   }
 }

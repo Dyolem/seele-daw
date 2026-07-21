@@ -1,2 +1,9 @@
 /** Public API for browser infrastructure implementations. */
-export {}
+export { IndexedDBProjectCheckpointStore } from './storage/indexed-db/indexed-db-project-checkpoint-store'
+export type { IndexedDBProjectCheckpointStoreOptions } from './storage/indexed-db/indexed-db-project-checkpoint-store'
+export { IndexedDBStorageError } from './storage/indexed-db/indexed-db-storage-error'
+export type {
+  IndexedDBStorageErrorCode,
+  IndexedDBStorageErrorDetails,
+  IndexedDBStorageOperation,
+} from './storage/indexed-db/indexed-db-storage-error'

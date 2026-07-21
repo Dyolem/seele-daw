@@ -588,7 +588,7 @@ parse
 
 保存时执行相反方向的显式投影，不调用 `JSON.stringify(ModelStore)`。
 
-当前已经实现 `formatVersion: 1` 的 ProjectFileDTO 类型、`ProjectSnapshot -> ProjectFileDTO` 写出投影以及 `unknown -> ProjectFileDTO V1` 运行时解码。写出会复制并冻结全部 DTO 容器、把 Note 嵌入所属 MidiSource、深复制 Device JsonValue，并省略本地 `modelRevision`。读取解码严格校验 V1 字段、版本、required feature、数字形状、判别联合、entity table key / ID 和 JsonValue，然后返回完全隔离且深度冻结的 DTO。V1 可执行字段定义受 DTO mapped type 校准，静态 golden JSON 同时保护 reader 与 writer 的历史兼容。历史版本迁移、领域 normalize 和 ProjectSession 加载仍是后续独立边界。规范性协议见 [Seele Project File Format V1](./project-file-format-v1.md)，实施决策见 [ProjectFileDTO V1 写出边界计划](./project-file-dto-v1-write-plan.md) 与 [ProjectFileDTO V1 读取校验计划](./project-file-dto-v1-read-validation-plan.md)。
+当前已经实现 `formatVersion: 1` 的完整内存往返边界：`ProjectSnapshot -> ProjectFileDTO` 写出投影、`unknown -> ProjectFileDTO V1` 严格解码，以及 `ProjectFileDTO -> domain Records -> ModelStore -> ProjectSession` 领域加载。写出会复制并冻结全部 DTO 容器、把 Note 嵌入所属 MidiSource、深复制 Device JsonValue，并省略本地 `modelRevision`。读取解码严格校验 V1 字段、版本、required feature、数字形状、判别联合、entity table key / ID 和 JsonValue；领域 normalizer 随后调用当前 parser 与 Record factory，并在完整 Store 上验证跨实体不变量。加载成功创建 revision `0`、空 History、重建 QueryIndex 的 fresh Session。V1 可执行字段定义受 DTO mapped type 校准，静态 golden JSON 同时保护 reader 与 writer 的历史兼容。历史版本迁移、JSON codec、checkpoint storage 与 Journal 仍是后续独立边界。规范性协议见 [Seele Project File Format V1](./project-file-format-v1.md)，实施决策见 [ProjectFileDTO V1 写出边界计划](./project-file-dto-v1-write-plan.md)、[ProjectFileDTO V1 读取校验计划](./project-file-dto-v1-read-validation-plan.md) 与 [Project File V1 Session 加载计划](./project-file-v1-session-load-plan.md)。
 
 ## 跨实体不变量
 

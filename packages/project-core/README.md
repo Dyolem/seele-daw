@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 写出边界与运行时读取校验已经实现；领域 normalize、Session 加载与迁移尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot，以及 ProjectFileDTO V1 写出、严格读取和 fresh Session 加载闭环已经实现；JSON codec、迁移与实际 storage adapter 尚未开始。
 
 ## 包定位
 
@@ -324,7 +324,7 @@ Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playb
 
 该 API 只负责可信 Snapshot 的写出，不代表 JSON text 已经过 canonical checksum 编码。完整写出规则见 [ProjectFileDTO V1 写出边界计划](./docs/project-file-dto-v1-write-plan.md)。
 
-## ProjectFileDTO V1 读取校验
+## ProjectFileDTO V1 读取与 Session 加载
 
 `decodeProjectFileDTO(input)` 接受来自 JSON parse、IndexedDB structured clone 或 Worker 的不可信 `unknown`，严格校验 V1 object、数组、判别联合、数字形状、entity table key / ID 和 Device JsonValue。它不读取 accessor，并安全保留 `__proto__` 等 opaque key。
 
@@ -332,7 +332,9 @@ Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playb
 
 解码器直接消费类型校准的包内 `PROJECT_FILE_V1_PROTOCOL`。它的每组 field map 都通过 mapped type 覆盖对应 DTO 的全部 key，字段漏写、多写或重命名会使类型检查失败。静态 V1 golden JSON 另外将当前 writer 与 reader 校准到一份不随运行时代码动态生成的历史样本。
 
-解码器只完成文件协议结构边界。空 ID、数值业务范围、外键、Source 所有权和 Timeline 初始事件仍要在下一阶段通过领域工厂与 `InvariantValidator`。规范性协议见 [Seele Project File Format V1](./docs/project-file-format-v1.md)，实施决策见 [ProjectFileDTO V1 读取校验计划](./docs/project-file-dto-v1-read-validation-plan.md)。
+解码器只完成文件协议结构边界。公开 `createProjectSessionFromProjectFile(input)` 在其后显式执行 DTO -> 当前领域模型映射：每个 primitive 重新经过 Brand 解析器，每个实体经过 Record factory，嵌套 Note table 被规范化为按 MidiSource 分区的 Store 表，最后由 `InvariantValidator` 聚合检查外键、唯一所有权、Source 范围、Timeline 初始事件和 Device 拓扑。领域失败通过带稳定 path 的 `ProjectFileLoadError` 报告，结构失败仍保持原 `ProjectFileValidationError`。
+
+加载成功组合的是 fresh Session：`modelRevision` 从 `0` 开始，History 和 subscriptions 为空，QueryIndex 从权威 ModelStore 重建。V1 不保存进程内 revision、undo / redo 栈、索引或 listener。normalizer、ModelStoreSeed、ModelStore 和 Session 组合入口继续保持包内私有。规范性协议见 [Seele Project File Format V1](./docs/project-file-format-v1.md)，阶段决策见 [ProjectFileDTO V1 读取校验计划](./docs/project-file-dto-v1-read-validation-plan.md) 与 [Project File V1 Session 加载计划](./docs/project-file-v1-session-load-plan.md)。
 
 ## ProjectDelta 与消费者同步
 
@@ -457,12 +459,12 @@ src/
 7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
 8. 建立 MIDI Note ProjectQuery 与可重建 QueryIndex。
 9. 增加 ChangePublisher 与局部订阅。
-10. 定义 ProjectSnapshot、ProjectFileDTO V1 写出边界与 V1 运行时读取校验；随后独立实现领域 normalize、迁移和 Session 加载。
-11. 接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
+10. 定义 ProjectSnapshot、ProjectFileDTO V1 写出边界、严格读取校验、领域 normalize 与 fresh Session 加载。
+11. 独立定义 JSON codec、migration 和 storage adapter，再接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 22 个测试文件、333 项测试，其中 ProjectFileDTO V1 运行时读取与协议校准新增 12 项。
+当前 Project Core 基线为 23 个测试文件、339 项测试，其中 Project File V1 Session 加载闭环新增 6 项。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -482,6 +484,7 @@ src/
 - Snapshot 使用确定性顺序，并在后续提交后仍保持原 revision、容器和 Record 版本；
 - ProjectFileDTO 的版本、字段完整性、JSON 往返、深度所有权、特殊 ID 和分区失败关闭；
 - ProjectFileDTO 输入的严格字段、版本 / feature 分流、结构化错误路径、安全属性检查和深度隔离；
+- Project File 到 fresh Session 的无损往返、领域错误定位、跨实体拒绝、查询和后续 Command；
 - snapshot、迁移与 journal replay 的 golden fixtures；
 - 100k Note / 32 Track 下的 command、apply、query 和 snapshot benchmark。
 
@@ -498,6 +501,7 @@ src/
 - [Seele Project File Format V1](./docs/project-file-format-v1.md)
 - [ProjectFileDTO V1 写出边界计划](./docs/project-file-dto-v1-write-plan.md)
 - [ProjectFileDTO V1 读取校验计划](./docs/project-file-dto-v1-read-validation-plan.md)
+- [Project File V1 Session 加载计划](./docs/project-file-v1-session-load-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

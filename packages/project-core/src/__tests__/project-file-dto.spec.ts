@@ -57,7 +57,7 @@ function snapshotWithDevice(seed: ModelStoreSeed, device: DeviceDescriptor): Pro
 }
 
 describe('ProjectFileDTO V1 public contract', () => {
-  it('exports the V1 format and projector without exposing future load internals', () => {
+  it('exports the V1 format and projector without exposing persistence internals', () => {
     const { session } = createFixtureProjectSession()
     const dto = createProjectFileDTO(session.getSnapshot())
 
@@ -71,7 +71,7 @@ describe('ProjectFileDTO V1 public contract', () => {
     >()
     expect('modelRevision' in dto).toBe(false)
     expect('parseProjectFileDTO' in projectCore).toBe(false)
-    expect('createProjectSessionFromFileDTO' in projectCore).toBe(false)
+    expect('normalizeProjectFileDTO' in projectCore).toBe(false)
     expect('migrateProjectFileDTO' in projectCore).toBe(false)
   })
 

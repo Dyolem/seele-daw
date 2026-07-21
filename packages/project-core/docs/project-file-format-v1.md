@@ -295,6 +295,8 @@ V1 Track 是封闭的 `instrument | audio` 判别联合，每个分支也拒绝�
 - DTO 类型：`src/persistence/project-file-dto.ts`
 - 可执行字段协议：`src/persistence/project-file-v1-protocol.ts`
 - 运行时解码：`src/persistence/project-file-decoder.ts`
+- 当前领域映射：`src/persistence/project-file-normalizer.ts`
+- fresh Session 加载：`src/persistence/project-file-loader.ts`
 - 当前写出投影：`src/persistence/project-file-projector.ts`
 - 静态兼容样本：`src/__tests__/fixtures/project-files/v1/complete-project.json`
 

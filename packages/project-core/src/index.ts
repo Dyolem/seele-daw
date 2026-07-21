@@ -103,6 +103,13 @@ export type {
   TrackDTO,
 } from './persistence/project-file-dto'
 export { decodeProjectFileDTO } from './persistence/project-file-decoder'
+export { ProjectFileLoadError } from './persistence/project-file-load-error'
+export type {
+  ProjectFileLoadErrorCode,
+  ProjectFileLoadErrorDetails,
+  ProjectFileLoadPathSegment,
+} from './persistence/project-file-load-error'
+export { createProjectSessionFromProjectFile } from './persistence/project-file-loader'
 export { ProjectFileProjectionError } from './persistence/project-file-projection-error'
 export type {
   ProjectFileProjectionErrorCode,

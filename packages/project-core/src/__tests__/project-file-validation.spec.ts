@@ -77,7 +77,7 @@ describe('ProjectFileDTO V1 input decoding', () => {
     expect(decoded).not.toBe(input)
     expectDeeplyFrozen(direct)
     expectDeeplyFrozen(decoded)
-    expect('createProjectSessionFromFileDTO' in projectCore).toBe(false)
+    expect('normalizeProjectFileDTO' in projectCore).toBe(false)
     expect('migrateProjectFileDTO' in projectCore).toBe(false)
   })
 

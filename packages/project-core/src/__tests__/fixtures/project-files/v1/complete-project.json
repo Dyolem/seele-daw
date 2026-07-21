@@ -1,0 +1,187 @@
+{
+  "formatVersion": 1,
+  "requiredFeatures": [],
+  "projectId": "project-complete-fixture",
+  "name": "Complete Project Fixture",
+  "trackOrder": ["track-instrument", "track-audio"],
+  "tracks": {
+    "track-audio": {
+      "id": "track-audio",
+      "kind": "audio",
+      "name": "Fixture Audio",
+      "color": null,
+      "channel": {
+        "gain": 0.9,
+        "pan": 0.1,
+        "muted": false,
+        "soloed": false
+      },
+      "audioEffectIds": ["device-audio-track-effect"]
+    },
+    "track-instrument": {
+      "id": "track-instrument",
+      "kind": "instrument",
+      "name": "Fixture Instrument",
+      "color": null,
+      "channel": {
+        "gain": 0.8,
+        "pan": -0.1,
+        "muted": false,
+        "soloed": false
+      },
+      "audioEffectIds": ["device-instrument-audio-effect"],
+      "midiEffectIds": ["device-instrument-midi-effect"],
+      "instrumentDeviceId": "device-instrument"
+    }
+  },
+  "clips": {
+    "clip-looping": {
+      "id": "clip-looping",
+      "kind": "midi",
+      "trackId": "track-instrument",
+      "name": "Fixture Loop",
+      "color": null,
+      "muted": false,
+      "startTick": 1920,
+      "spanTick": 3840,
+      "sourceId": "source-looping",
+      "sourceOffsetTick": 240,
+      "loop": {
+        "sourceStartTick": 0,
+        "sourceSpanTick": 960
+      }
+    },
+    "clip-non-loop": {
+      "id": "clip-non-loop",
+      "kind": "midi",
+      "trackId": "track-instrument",
+      "name": "Fixture Verse",
+      "color": null,
+      "muted": false,
+      "startTick": 0,
+      "spanTick": 960,
+      "sourceId": "source-non-loop",
+      "sourceOffsetTick": 240,
+      "loop": null
+    }
+  },
+  "midiSources": {
+    "source-looping": {
+      "id": "source-looping",
+      "lengthTick": 1920,
+      "notes": {
+        "note-looping-harmony": {
+          "id": "note-looping-harmony",
+          "startTick": 480,
+          "durationTick": 480,
+          "pitch": 71,
+          "velocity": 92,
+          "channel": 1
+        },
+        "note-looping-primary": {
+          "id": "note-looping-primary",
+          "startTick": 0,
+          "durationTick": 480,
+          "pitch": 67,
+          "velocity": 108,
+          "channel": 1
+        }
+      }
+    },
+    "source-non-loop": {
+      "id": "source-non-loop",
+      "lengthTick": 1920,
+      "notes": {
+        "note-non-loop-harmony": {
+          "id": "note-non-loop-harmony",
+          "startTick": 720,
+          "durationTick": 240,
+          "pitch": 64,
+          "velocity": 96,
+          "channel": 0
+        },
+        "note-non-loop-primary": {
+          "id": "note-non-loop-primary",
+          "startTick": 240,
+          "durationTick": 480,
+          "pitch": 60,
+          "velocity": 100,
+          "channel": 0
+        }
+      }
+    }
+  },
+  "tempoEvents": {
+    "tempo-initial": {
+      "id": "tempo-initial",
+      "tick": 0,
+      "bpm": 120
+    },
+    "tempo-later": {
+      "id": "tempo-later",
+      "tick": 3840,
+      "bpm": 128
+    }
+  },
+  "timeSignatureEvents": {
+    "time-signature-initial": {
+      "id": "time-signature-initial",
+      "tick": 0,
+      "numerator": 4,
+      "denominator": 4
+    },
+    "time-signature-later": {
+      "id": "time-signature-later",
+      "tick": 7680,
+      "numerator": 3,
+      "denominator": 4
+    }
+  },
+  "devices": {
+    "device-audio-track-effect": {
+      "id": "device-audio-track-effect",
+      "typeId": "seele.fixture.audio-effect",
+      "definitionVersion": 1,
+      "enabled": true,
+      "parameters": {},
+      "opaqueState": null
+    },
+    "device-instrument": {
+      "id": "device-instrument",
+      "typeId": "seele.fixture.instrument",
+      "definitionVersion": 1,
+      "enabled": true,
+      "parameters": {},
+      "opaqueState": null
+    },
+    "device-instrument-audio-effect": {
+      "id": "device-instrument-audio-effect",
+      "typeId": "seele.fixture.audio-effect",
+      "definitionVersion": 1,
+      "enabled": true,
+      "parameters": {},
+      "opaqueState": null
+    },
+    "device-instrument-midi-effect": {
+      "id": "device-instrument-midi-effect",
+      "typeId": "seele.fixture.midi-effect",
+      "definitionVersion": 1,
+      "enabled": true,
+      "parameters": {},
+      "opaqueState": null
+    },
+    "device-master-effect": {
+      "id": "device-master-effect",
+      "typeId": "seele.fixture.audio-effect",
+      "definitionVersion": 1,
+      "enabled": true,
+      "parameters": {},
+      "opaqueState": null
+    }
+  },
+  "master": {
+    "gain": 1,
+    "muted": false,
+    "audioEffectIds": ["device-master-effect"]
+  }
+}

@@ -102,12 +102,19 @@ export type {
   TimeSignatureEventDTO,
   TrackDTO,
 } from './persistence/project-file-dto'
+export { decodeProjectFileDTO } from './persistence/project-file-decoder'
 export { ProjectFileProjectionError } from './persistence/project-file-projection-error'
 export type {
   ProjectFileProjectionErrorCode,
   ProjectFileProjectionErrorDetails,
 } from './persistence/project-file-projection-error'
 export { createProjectFileDTO } from './persistence/project-file-projector'
+export { ProjectFileValidationError } from './persistence/project-file-validation-error'
+export type {
+  ProjectFileValidationErrorCode,
+  ProjectFileValidationErrorDetails,
+  ProjectFileValidationPathSegment,
+} from './persistence/project-file-validation-error'
 
 export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'
 export type {

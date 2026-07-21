@@ -13,6 +13,8 @@ ModelStore
 
 本阶段只建立可信 Snapshot 的写出边界。外部 `unknown` 数据的 schema validation、迁移、语义 normalize 和 Session 加载属于下一独立模块，不能因为 TypeScript 定义存在就直接 cast 文件输入。
 
+本计划描述统一 [Seele Project File Format V1](./project-file-format-v1.md) 的 writer 分支。Snapshot 是 projector 的可信运行时输入，不是独立文件协议；后续 decoder 使用同一份 V1 协议，不定义另一份导入格式。
+
 ## 为什么 DTO 不直接等于 Snapshot
 
 Snapshot 服务当前运行时消费者，携带本地 `modelRevision`，按 ModelStore 的规范化表表达全部项目事实，并允许共享逻辑不可变的领域 Record。ProjectFileDTO 服务跨 Session、跨版本和跨实现的长期数据交换：

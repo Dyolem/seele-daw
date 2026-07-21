@@ -1,6 +1,9 @@
 import type { JsonValue } from '@/model/json-value'
 
-export const PROJECT_FILE_FORMAT_VERSION = 1 as const
+export const PROJECT_FILE_V1_FORMAT_VERSION = 1 as const
+
+// Public writers emit the current format; historical protocol modules use their fixed constant.
+export const PROJECT_FILE_FORMAT_VERSION = PROJECT_FILE_V1_FORMAT_VERSION
 
 export type ProjectFileFormatVersion = typeof PROJECT_FILE_FORMAT_VERSION
 

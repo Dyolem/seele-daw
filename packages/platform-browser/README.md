@@ -2,7 +2,7 @@
 
 `platform-browser` 封装浏览器基础设施，为项目内核、编辑器和播放系统定义的服务端口提供 IndexedDB、OPFS、文件、权限、Worker、设备与运行能力实现。
 
-> 当前状态：仅完成 package 骨架和公开入口。长期架构中的 `browser-infra` 对应当前包。
+> 当前状态：已完成基于 `idb` 的 Project Checkpoint IndexedDB V1 适配器；Studio 接入、Journal、OPFS 和其他浏览器能力尚未开始。长期架构中的 `browser-infra` 对应当前包。
 
 ## 包定位
 
@@ -44,6 +44,8 @@ Project journal 只能引用 completed blob。显式 Save 只有在待引用资�
 
 Snapshot 采用新记录加 checkpoint 指针切换，不能原地覆盖唯一有效副本；Asset GC 使用 snapshot、checkpoint、journal 和 pending recording 作为 roots 做保守 mark-and-sweep。
 
+首个持久化纵向切片使用轻量 `idb` 包装原生 IndexedDB。`idb` 类型不会进入 Project Core 端口或本包公开 API；真正稳定的是数据库名称、版本、object store、keyPath 和事务协议。当前不建立通用 Repository、CRUD 或查询 DSL，避免在项目内重复实现一套数据访问框架。完整决策与物理格式见 [IndexedDB Project Checkpoint Store 计划](./docs/indexed-db-project-checkpoint-store-plan.md)。
+
 ## 建议的内部模块
 
 ```text
@@ -82,13 +84,15 @@ src/
 ## 分阶段计划
 
 1. 实现 RuntimeCapabilities probe 和统一错误/降级状态。
-2. 用 IndexedDB 保存和恢复 Project Snapshot，完成首条 MIDI 纵向切片。
+2. 用 IndexedDB 保存和恢复 Project Snapshot，完成首条 MIDI 纵向切片。（Checkpoint adapter 已完成，待 Studio 接入）
 3. 增加 journal queue、连续 sequence、checkpoint 和崩溃恢复。
 4. 建立 Worker 协议、项目迁移和大任务执行通道。
 5. 增加 OPFS asset store、导入 pipeline、引用提交与项目 bundle。
 6. 后续实现 recording pending files、Storage Worker、配额处理和保守 GC。
 
 ## 测试与验收
+
+当前基线为 1 个测试文件、13 项测试，覆盖 Physical Schema V1、事务轮换、失败回滚、候选回退、项目隔离、并发写入和连接重开。
 
 - IndexedDB transaction abort、quota failure 和 crash injection；
 - snapshot + 连续 journal 恢复到最后一致 `modelRevision`；

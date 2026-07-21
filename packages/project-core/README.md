@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；IndexedDB adapter、JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 也已完成，Studio 接入、JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -471,8 +471,9 @@ src/
 9. 增加 ChangePublisher 与局部订阅。
 10. 定义 ProjectSnapshot、ProjectFileDTO V1 写出边界、严格读取校验、领域 normalize 与 fresh Session 加载。
 11. 定义 storage-neutral Project Checkpoint 协议、Store port、保存 receipt 与候选恢复协调。
-12. 在 `platform-browser` 实现 IndexedDB immutable checkpoint + active/previous 指针事务，再接入 Studio 保存和刷新恢复。
-13. 有真实格式演进或恢复需求后分别实现 JSON codec、migration、Journal；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
+12. 在 `platform-browser` 实现 IndexedDB immutable checkpoint + active/previous 指针事务。（已完成）
+13. 在 Studio 组合根接入保存和刷新恢复，形成第一条浏览器持久化纵向切片。
+14. 有真实格式演进或恢复需求后分别实现 JSON codec、migration、Journal；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 

@@ -1760,7 +1760,7 @@ CI 必须检查：
 | App State     | Pinia                    | 只放 UI、偏好和轻量会话状态                 |
 | Dense Editor  | Canvas 2D + DOM          | 先分层、裁剪和缓存，profile 后升级           |
 | Audio         | Web Audio + AudioWorklet | 自有 Backend 与 Device contract    |
-| Storage       | IndexedDB + OPFS         | 元数据事务与大型 Blob 分工                |
+| Storage       | IndexedDB（`idb` adapter）+ OPFS | 元数据事务与大型 Blob 分工                |
 | Unit Test     | Vitest                   | 与 Vite / TypeScript 集成          |
 | Property Test | fast-check 类工具           | 时间、Undo 与随机操作序列                 |
 | E2E           | Playwright               | Chromium / Firefox / WebKit     |
@@ -1770,7 +1770,7 @@ CI 必须检查：
 以下选项在 spike / benchmark 后决定，不写入领域契约：
 
 ```text
-Dexie 是否作为 IndexedDB adapter
+Dexie 是否在明确收益出现后替换当前 idb adapter
 具体 runtime schema library
 Immer 或自定义 structural sharing
 Comlink 是否用于普通 Worker RPC
@@ -1781,6 +1781,8 @@ Turborepo
 ```
 
 无论选哪个库，都必须隐藏在端口后，不能让其类型进入 Project Model、Command 或保存格式。
+
+首个 Project Checkpoint 持久化切片选择轻量 `idb`，保留接近原生 IndexedDB 的事务与物理 Schema 控制，并避免自行维护通用 Promise / CRUD 包装。Dexie 继续作为延迟替换选项；只有 Schema 迁移链、复合索引、批量 Journal benchmark、多上下文观察或重复数据访问模式证明收益明确时才重新评估。访问库的替换不能改变已落盘数据库名称、version、object store、keyPath、index 与升级兼容性。
 
 ## 60. Tone.js 最终结论
 

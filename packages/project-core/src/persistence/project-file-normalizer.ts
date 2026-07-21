@@ -3,9 +3,9 @@ import {
   createMasterChannelRecord,
   type ChannelStripDescriptor,
   type MasterChannelRecord,
-} from '@/model/channel'
-import { createDeviceDescriptor, type DeviceDescriptor } from '@/model/device'
-import { DomainValueError } from '@/model/domain-value-error'
+} from '#internal/model/channel'
+import { createDeviceDescriptor, type DeviceDescriptor } from '#internal/model/device'
+import { DomainValueError } from '#internal/model/domain-value-error'
 import {
   parseClipId,
   parseDeviceId,
@@ -25,13 +25,13 @@ import {
   type TempoEventId,
   type TimeSignatureEventId,
   type TrackId,
-} from '@/model/ids'
-import { parseJsonValue, type JsonValue } from '@/model/json-value'
-import { createMidiClipRecord, createMidiLoop, type ClipRecord } from '@/model/midi-clip'
-import { createMidiNoteRecord, type MidiNoteRecord } from '@/model/midi-note'
-import { createMidiSourceRecord, type MidiSourceRecord } from '@/model/midi-source'
-import type { ModelStoreSeed } from '@/model/model-store'
-import { createProjectRecord } from '@/model/project'
+} from '#internal/model/ids'
+import { parseJsonValue, type JsonValue } from '#internal/model/json-value'
+import { createMidiClipRecord, createMidiLoop, type ClipRecord } from '#internal/model/midi-clip'
+import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
+import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
+import type { ModelStoreSeed } from '#internal/model/model-store'
+import { createProjectRecord } from '#internal/model/project'
 import {
   parseBipolarValue,
   parseEntityName,
@@ -40,12 +40,12 @@ import {
   parseMidiPitch,
   parseMidiVelocity,
   parseProjectColor,
-} from '@/model/scalars'
+} from '#internal/model/scalars'
 import {
   createAudioTrackRecord,
   createInstrumentTrackRecord,
   type TrackRecord,
-} from '@/model/track'
+} from '#internal/model/track'
 import type {
   ChannelStripDTO,
   DeviceDTO,
@@ -54,19 +54,19 @@ import type {
   MidiNoteDTO,
   ProjectFileDTO,
   TrackDTO,
-} from '@/persistence/project-file-dto'
+} from '#internal/persistence/project-file-dto'
 import {
   ProjectFileLoadError,
   type ProjectFileLoadPathSegment,
-} from '@/persistence/project-file-load-error'
-import { createTempoEventRecord, parseTempoBpm, type TempoEventRecord } from '@/time/tempo-event'
+} from '#internal/persistence/project-file-load-error'
+import { createTempoEventRecord, parseTempoBpm, type TempoEventRecord } from '#internal/time/tempo-event'
 import {
   createTimeSignatureEventRecord,
   parseTimeSignatureDenominator,
   parseTimeSignatureNumerator,
   type TimeSignatureEventRecord,
-} from '@/time/time-signature-event'
-import { parsePositiveTick, parseTick } from '@/time/tick'
+} from '#internal/time/time-signature-event'
+import { parsePositiveTick, parseTick } from '#internal/time/tick'
 
 type LoadPath = readonly ProjectFileLoadPathSegment[]
 

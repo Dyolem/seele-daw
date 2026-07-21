@@ -4,7 +4,7 @@ import {
   SEELE_PROJECT_DATABASE_VERSION,
   type ProjectCheckpointKey,
   type SeeleProjectDatabaseSchema,
-} from '~/storage/indexed-db/indexed-db-schema'
+} from '#internal/storage/indexed-db/indexed-db-schema'
 import { deleteDB, openDB } from 'idb'
 
 let nextDatabaseId = 0

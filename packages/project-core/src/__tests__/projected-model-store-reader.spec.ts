@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   createAudioTrackRecord,
   createDeviceDescriptor,
@@ -18,18 +18,18 @@ import {
   parseTimeSignatureDenominator,
   parseTimeSignatureNumerator,
   type MidiNoteRecord,
-} from '~/index'
+} from '#internal/index'
 import {
   createCompleteProjectFixture,
   type CompleteProjectFixture,
 } from './support/complete-project-fixture'
-import { ModelInvariantError } from '@/model/invariant-validator'
-import { ModelStore, type ModelStoreReader } from '@/model/model-store'
-import { MutationPreconditionError } from '@/mutation/mutation-precondition-error'
-import { createMutationPlan } from '@/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
-import type { ProjectMutation } from '@/mutation/project-mutation'
-import { ProjectedModelStoreReader } from '@/mutation/projected-model-store-reader'
+import { ModelInvariantError } from '#internal/model/invariant-validator'
+import { ModelStore, type ModelStoreReader } from '#internal/model/model-store'
+import { MutationPreconditionError } from '#internal/mutation/mutation-precondition-error'
+import { createMutationPlan } from '#internal/mutation/mutation-plan'
+import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import { ProjectedModelStoreReader } from '#internal/mutation/projected-model-store-reader'
 
 function snapshotReader(reader: ModelStoreReader) {
   const partitionIds = [...reader.midiNotePartitionIds()]

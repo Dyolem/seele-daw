@@ -1,5 +1,5 @@
 import { parseMidiSourceId, type MidiSourceId } from './ids'
-import { parsePositiveTick, type Tick } from '@/time/tick'
+import { parsePositiveTick, type Tick } from '#internal/time/tick'
 
 export interface MidiSourceRecord {
   readonly id: MidiSourceId

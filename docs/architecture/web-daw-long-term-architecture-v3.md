@@ -294,6 +294,7 @@ playback-core 禁止 Vue、DOM、具体 AudioNode imports
 audio-web 禁止 import editor-core
 所有 Worklet 入口禁止 import 应用层和持久化层
 包之间禁止绕过 public entry 引用内部路径
+源码 package 的包内导入使用 package.json#imports 定义的 #internal/*，不能依赖消费者 tsconfig paths
 ```
 
 ---

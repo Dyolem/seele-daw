@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 
-import * as platformBrowser from '~/index'
+import * as platformBrowser from '#internal/index'
 import {
   createProjectCheckpointKey,
   PROJECT_CHECKPOINTS_STORE,
@@ -8,7 +8,7 @@ import {
   SEELE_PROJECT_DATABASE_STORES,
   SEELE_PROJECT_DATABASE_VERSION,
   type SeeleProjectDatabaseSchema,
-} from '~/storage/indexed-db/indexed-db-schema'
+} from '#internal/storage/indexed-db/indexed-db-schema'
 import {
   createTestDatabaseName,
   deleteRawCheckpoint,
@@ -16,7 +16,7 @@ import {
   putRawCheckpoint,
   putRawCheckpointHead,
   readRawCheckpoint,
-} from '~/__tests__/support/indexed-db-test-support'
+} from '#internal/__tests__/support/indexed-db-test-support'
 import {
   ProjectCheckpointOperationError,
   createInitialProjectSession,
@@ -33,7 +33,7 @@ import {
 import { openDB } from 'idb'
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 
-import { IndexedDBProjectCheckpointStore, IndexedDBStorageError } from '~/index'
+import { IndexedDBProjectCheckpointStore, IndexedDBStorageError } from '#internal/index'
 
 interface CheckpointFixture {
   readonly checkpoints: readonly ProjectCheckpoint[]

@@ -1,9 +1,9 @@
-import { assertModelInvariants, ModelInvariantError } from '@/model/invariant-validator'
-import { ModelStore } from '@/model/model-store'
-import { decodeProjectFileDTO } from '@/persistence/project-file-decoder'
-import { ProjectFileLoadError } from '@/persistence/project-file-load-error'
-import { normalizeProjectFileDTO } from '@/persistence/project-file-normalizer'
-import { createProjectSession, type ProjectSession } from '@/session/project-session'
+import { assertModelInvariants, ModelInvariantError } from '#internal/model/invariant-validator'
+import { ModelStore } from '#internal/model/model-store'
+import { decodeProjectFileDTO } from '#internal/persistence/project-file-decoder'
+import { ProjectFileLoadError } from '#internal/persistence/project-file-load-error'
+import { normalizeProjectFileDTO } from '#internal/persistence/project-file-normalizer'
+import { createProjectSession, type ProjectSession } from '#internal/session/project-session'
 
 /**
  * Creates a fresh in-memory Session from one structured project-file value.

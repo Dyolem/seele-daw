@@ -14,8 +14,8 @@ import type { MidiSourceRecord } from './midi-source'
 import type { ModelRevision } from './model-revision'
 import type { ProjectRecord } from './project'
 import type { TrackRecord } from './track'
-import type { TempoEventRecord } from '@/time/tempo-event'
-import type { TimeSignatureEventRecord } from '@/time/time-signature-event'
+import type { TempoEventRecord } from '#internal/time/tempo-event'
+import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 
 export type ModelStoreWriteAccessErrorCode =
   | 'write-access-already-registered'

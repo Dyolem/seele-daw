@@ -1,8 +1,8 @@
-import type { ModelStoreReader } from '@/model/model-store'
+import type { ModelStoreReader } from '#internal/model/model-store'
 import {
   compareMidiNotesForQuery,
   midiNoteIntersectsQuery,
-} from '@/queries/midi-note-query-semantics'
+} from '#internal/queries/midi-note-query-semantics'
 import {
   PROJECT_QUERY_TYPE,
   createMidiNoteByIdQueryResult,
@@ -11,7 +11,7 @@ import {
   type ProjectQuery,
   type ProjectQueryResult,
   type ProjectQueryResultFor,
-} from '@/queries/project-query'
+} from '#internal/queries/project-query'
 
 function rejectUnhandledQuery(query: never): never {
   throw new Error(`Unhandled normalized ProjectQuery: ${String((query as ProjectQuery).type)}`)

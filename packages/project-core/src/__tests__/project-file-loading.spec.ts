@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   ProjectFileLoadError,
@@ -17,9 +17,9 @@ import {
   parseNoteId,
   parseTick,
   type ProjectSession,
-} from '~/index'
-import { DomainValueError } from '@/model/domain-value-error'
-import { ModelInvariantError } from '@/model/invariant-validator'
+} from '#internal/index'
+import { DomainValueError } from '#internal/model/domain-value-error'
+import { ModelInvariantError } from '#internal/model/invariant-validator'
 import projectFileV1Golden from './fixtures/project-files/v1/complete-project.json'
 
 type MutableDataObject = Record<string, unknown>

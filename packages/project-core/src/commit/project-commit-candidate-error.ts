@@ -1,5 +1,5 @@
-import type { ProjectCommandType } from '@/commands/project-command'
-import type { ProjectMutationType } from '@/mutation/mutation-type'
+import type { ProjectCommandType } from '#internal/commands/project-command'
+import type { ProjectMutationType } from '#internal/mutation/mutation-type'
 
 export type ProjectCommitCandidateErrorCode =
   | 'base-revision-mismatch'

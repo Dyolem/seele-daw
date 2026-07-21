@@ -1,5 +1,5 @@
-import type { ProjectCommit } from '@/commit/project-commit'
-import type { ModelRevision } from '@/model/model-revision'
+import type { ProjectCommit } from '#internal/commit/project-commit'
+import type { ModelRevision } from '#internal/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 export const PROJECT_COMMAND_EXECUTION_STATUS = {

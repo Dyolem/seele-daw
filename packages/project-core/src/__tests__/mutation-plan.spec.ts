@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   DEVICE_DEFINITION_VERSION_MIN,
   createAudioTrackRecord,
@@ -20,14 +20,14 @@ import {
   parseTick,
   parseTimeSignatureDenominator,
   parseTimeSignatureNumerator,
-} from '~/index'
+} from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
-import type { ModelRevision } from '@/model/model-revision'
-import { INITIAL_MODEL_REVISION } from '@/model/model-revision'
-import { MutationPlanError } from '@/mutation/mutation-plan-error'
-import { createMutationPlan } from '@/mutation/mutation-plan'
-import { invertProjectMutation, type ProjectMutation } from '@/mutation/project-mutation'
-import { PROJECT_MUTATION_TYPE, type ProjectMutationType } from '@/mutation/mutation-type'
+import type { ModelRevision } from '#internal/model/model-revision'
+import { INITIAL_MODEL_REVISION } from '#internal/model/model-revision'
+import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
+import { createMutationPlan } from '#internal/mutation/mutation-plan'
+import { invertProjectMutation, type ProjectMutation } from '#internal/mutation/project-mutation'
+import { PROJECT_MUTATION_TYPE, type ProjectMutationType } from '#internal/mutation/mutation-type'
 
 interface MutationExample {
   readonly label: string

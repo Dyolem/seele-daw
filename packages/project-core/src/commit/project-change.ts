@@ -1,6 +1,6 @@
-import type { MidiSourceId, NoteId } from '@/model/ids'
-import type { MidiNoteRecord } from '@/model/midi-note'
-import type { Tick } from '@/time/tick'
+import type { MidiSourceId, NoteId } from '#internal/model/ids'
+import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { Tick } from '#internal/time/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 /** Canonical runtime discriminants for semantic project changes. */

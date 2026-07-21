@@ -1,24 +1,24 @@
-import { parseProjectId, type ProjectId } from '@/model/ids'
-import type { ModelRevision } from '@/model/model-revision'
+import { parseProjectId, type ProjectId } from '#internal/model/ids'
+import type { ModelRevision } from '#internal/model/model-revision'
 import {
   createProjectCheckpoint,
   type CreateProjectCheckpointInput,
   type ProjectCheckpoint,
   type ProjectCheckpointId,
-} from '@/persistence/checkpoint/project-checkpoint'
+} from '#internal/persistence/checkpoint/project-checkpoint'
 import {
   decodeProjectCheckpoint,
   rejectProjectCheckpointRequestMismatch,
-} from '@/persistence/checkpoint/project-checkpoint-decoder'
+} from '#internal/persistence/checkpoint/project-checkpoint-decoder'
 import {
   ProjectCheckpointOperationError,
   ProjectCheckpointValidationError,
   type ProjectCheckpointCandidateFailure,
-} from '@/persistence/checkpoint/project-checkpoint-error'
-import type { ProjectCheckpointStore } from '@/persistence/checkpoint/project-checkpoint-store'
-import { ProjectFileLoadError } from '@/persistence/project-file-load-error'
-import { createProjectSessionFromDecodedProjectFile } from '@/persistence/project-file-loader'
-import type { ProjectSession } from '@/session/project-session'
+} from '#internal/persistence/checkpoint/project-checkpoint-error'
+import type { ProjectCheckpointStore } from '#internal/persistence/checkpoint/project-checkpoint-store'
+import { ProjectFileLoadError } from '#internal/persistence/project-file-load-error'
+import { createProjectSessionFromDecodedProjectFile } from '#internal/persistence/project-file-loader'
+import type { ProjectSession } from '#internal/session/project-session'
 
 export type SaveProjectCheckpointInput = CreateProjectCheckpointInput
 

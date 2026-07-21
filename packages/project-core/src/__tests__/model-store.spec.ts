@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '@/index'
+import * as projectCore from '#internal/index'
 import {
   createInstrumentTrackRecord,
   parseClipId,
@@ -10,10 +10,10 @@ import {
   parseTempoEventId,
   parseTimeSignatureEventId,
   parseTrackId,
-} from '@/index'
+} from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
-import { INITIAL_MODEL_REVISION, type ModelRevision } from '@/model/model-revision'
-import { ModelStore, type ModelStoreReader } from '@/model/model-store'
+import { INITIAL_MODEL_REVISION, type ModelRevision } from '#internal/model/model-revision'
+import { ModelStore, type ModelStoreReader } from '#internal/model/model-store'
 
 describe('ModelStore ownership boundary', () => {
   it('starts at revision zero and retains the root records by reference', () => {

@@ -21,7 +21,7 @@ import {
   type TimeSignatureDenominator,
   type TimeSignatureEventRecord,
   type TimeSignatureNumerator,
-} from '@/index'
+} from '#internal/index'
 
 describe('TempoBpm', () => {
   it('accepts inclusive boundaries and fractional BPM values', () => {

@@ -1,4 +1,4 @@
-import { rejectDomainValue } from '@/model/domain-value-error'
+import { rejectDomainValue } from '#internal/model/domain-value-error'
 
 const OPAQUE_ID_CONSTRAINT =
   'a non-empty opaque string without surrounding whitespace or control characters'

@@ -10,7 +10,7 @@ import {
   parseParameterId,
   type DeviceDescriptor,
   type JsonValue,
-} from '@/index'
+} from '#internal/index'
 
 describe('JsonValue', () => {
   it.each([null, 'lead', true, false, 0, -12.5])('accepts the JSON primitive %s', (value) => {

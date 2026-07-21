@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   MIDI_PITCH_MAX,
   MIDI_PITCH_MIN,
@@ -20,9 +20,9 @@ import {
   type MidiNoteByIdQueryResult,
   type MidiNotesIntersectingRangeQueryResult,
   type ProjectQuery,
-} from '~/index'
-import { MutationApplyError } from '@/mutation/mutation-apply-error'
-import { executeProjectQueryByScan } from '@/queries/project-query-executor'
+} from '#internal/index'
+import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
+import { executeProjectQueryByScan } from '#internal/queries/project-query-executor'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 

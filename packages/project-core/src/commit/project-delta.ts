@@ -1,5 +1,5 @@
-import type { ProjectChange } from '@/commit/project-change'
-import type { ModelRevision } from '@/model/model-revision'
+import type { ProjectChange } from '#internal/commit/project-change'
+import type { ModelRevision } from '#internal/model/model-revision'
 
 /** Immutable semantic changes produced by one committed model revision. */
 export interface ProjectDelta {

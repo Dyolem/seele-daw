@@ -1,9 +1,9 @@
-import { parseProjectId, type ProjectId } from '@/model/ids'
-import { parseModelRevision, type ModelRevision } from '@/model/model-revision'
-import { parseOpaqueId } from '@/model/opaque-id'
-import type { ProjectFileDTO } from '@/persistence/project-file-dto'
-import { createProjectFileDTO } from '@/persistence/project-file-projector'
-import type { ProjectSnapshot } from '@/snapshots/project-snapshot'
+import { parseProjectId, type ProjectId } from '#internal/model/ids'
+import { parseModelRevision, type ModelRevision } from '#internal/model/model-revision'
+import { parseOpaqueId } from '#internal/model/opaque-id'
+import type { ProjectFileDTO } from '#internal/persistence/project-file-dto'
+import { createProjectFileDTO } from '#internal/persistence/project-file-projector'
+import type { ProjectSnapshot } from '#internal/snapshots/project-snapshot'
 import type { Brand } from '@seele-daw/type-utils'
 
 export const PROJECT_CHECKPOINT_FORMAT_VERSION = 1 as const

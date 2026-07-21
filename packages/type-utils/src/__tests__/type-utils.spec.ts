@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from 'vitest'
 
-import type { Brand, ValueOf } from '~/index'
+import type { Brand, ValueOf } from '#internal/index'
 
 describe('Brand', () => {
   it('keeps the runtime value type while separating nominal domains', () => {

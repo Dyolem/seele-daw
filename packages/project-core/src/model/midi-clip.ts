@@ -8,7 +8,7 @@ import {
   type TrackId,
 } from './ids'
 import { parseEntityName, parseProjectColor, type ProjectColor } from './scalars'
-import { addTicks, parsePositiveTick, parseTick, type Tick } from '@/time/tick'
+import { addTicks, parsePositiveTick, parseTick, type Tick } from '#internal/time/tick'
 
 export interface ClipBase {
   readonly id: ClipId

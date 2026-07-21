@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   DomainValueError,
   PROJECT_COMMAND_TYPE,
@@ -20,14 +20,14 @@ import {
   type MoveNoteCommand,
   type ProjectCommand,
   type RemoveNoteCommand,
-} from '~/index'
+} from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
-import { prepareProjectCommand } from '@/commands/project-command-preparer'
-import { ModelStore } from '@/model/model-store'
-import { MutationApplier } from '@/mutation/mutation-applier'
-import { createMutationPlan, type MutationPlan } from '@/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
+import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
+import { ModelStore } from '#internal/model/model-store'
+import { MutationApplier } from '#internal/mutation/mutation-applier'
+import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
+import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 
 function captureCommandError(operation: () => unknown): ProjectCommandError {
   let caughtError: unknown

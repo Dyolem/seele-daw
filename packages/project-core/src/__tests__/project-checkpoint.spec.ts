@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   PROJECT_CHECKPOINT_FORMAT_VERSION,
   PROJECT_COMMAND_EXECUTION_STATUS,
@@ -25,7 +25,7 @@ import {
   type ProjectId,
   type ProjectSession,
   type MidiSourceId,
-} from '~/index'
+} from '#internal/index'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
 type MutableDataObject = Record<string, unknown>

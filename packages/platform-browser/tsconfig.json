@@ -3,12 +3,6 @@
   "include": ["src/**/*.ts", "vitest.config.ts"],
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
-    "paths": {
-      // Workspace packages export source. Reserve @ for Project Core's internal
-      // imports while this consumer is type-checked; platform-browser uses ~.
-      "@/*": ["../project-core/src/*"],
-      "~/*": ["./src/*"]
-    },
     "tsBuildInfoFile": "../../node_modules/.tmp/tsconfig.platform-browser.tsbuildinfo"
   }
 }

@@ -1,4 +1,4 @@
-import type { JsonValue } from '@/model/json-value'
+import type { JsonValue } from '#internal/model/json-value'
 
 export const PROJECT_FILE_V1_FORMAT_VERSION = 1 as const
 

@@ -4,18 +4,18 @@ import {
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
   type ProjectChange,
-} from '@/commit/project-change'
-import type { ProjectDelta } from '@/commit/project-delta'
-import type { MidiSourceId, NoteId } from '@/model/ids'
-import type { MidiNoteRecord } from '@/model/midi-note'
-import type { ModelRevision } from '@/model/model-revision'
-import type { ModelStoreReader } from '@/model/model-store'
+} from '#internal/commit/project-change'
+import type { ProjectDelta } from '#internal/commit/project-delta'
+import type { MidiSourceId, NoteId } from '#internal/model/ids'
+import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { ModelRevision } from '#internal/model/model-revision'
+import type { ModelStoreReader } from '#internal/model/model-store'
 import {
   compareMidiNotesForQuery,
   midiNoteEndTick,
   midiNoteIntersectsQuery,
-} from '@/queries/midi-note-query-semantics'
-import { executeProjectQueryByScan } from '@/queries/project-query-executor'
+} from '#internal/queries/midi-note-query-semantics'
+import { executeProjectQueryByScan } from '#internal/queries/project-query-executor'
 import {
   PROJECT_QUERY_TYPE,
   createMidiNoteByIdQueryResult,
@@ -25,9 +25,9 @@ import {
   type ProjectQuery,
   type ProjectQueryResult,
   type ProjectQueryResultFor,
-} from '@/queries/project-query'
-import { nextModelRevision } from '@/model/model-revision'
-import type { Tick } from '@/time/tick'
+} from '#internal/queries/project-query'
+import { nextModelRevision } from '#internal/model/model-revision'
+import type { Tick } from '#internal/time/tick'
 
 interface MidiNotePartitionIndex {
   readonly byId: ReadonlyMap<NoteId, MidiNoteRecord>

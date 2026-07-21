@@ -1,8 +1,8 @@
-import type { AffectedTickRange } from '@/commit/project-change'
-import type { ProjectCommit } from '@/commit/project-commit'
-import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '@/model/ids'
-import { ProjectSubscriptionError } from '@/subscriptions/project-subscription-error'
-import { parseTick } from '@/time/tick'
+import type { AffectedTickRange } from '#internal/commit/project-change'
+import type { ProjectCommit } from '#internal/commit/project-commit'
+import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '#internal/model/ids'
+import { ProjectSubscriptionError } from '#internal/subscriptions/project-subscription-error'
+import { parseTick } from '#internal/time/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 /** Canonical runtime discriminants for commit subscriptions. */

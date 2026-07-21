@@ -1,9 +1,9 @@
-import { ProjectQueryError } from '@/queries/project-query-error'
-import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '@/model/ids'
-import type { MidiNoteRecord } from '@/model/midi-note'
-import type { ModelRevision } from '@/model/model-revision'
-import { parseMidiPitch, type MidiPitch } from '@/model/scalars'
-import { parseTick, type Tick } from '@/time/tick'
+import { ProjectQueryError } from '#internal/queries/project-query-error'
+import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '#internal/model/ids'
+import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { ModelRevision } from '#internal/model/model-revision'
+import { parseMidiPitch, type MidiPitch } from '#internal/model/scalars'
+import { parseTick, type Tick } from '#internal/time/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 /** Canonical runtime discriminants for read-only project queries. */

@@ -13,7 +13,7 @@ import {
   type TempoEventDTO,
   type TimeSignatureEventDTO,
   type TrackDTO,
-} from '@/persistence/project-file-dto'
+} from '#internal/persistence/project-file-dto'
 
 type ExactFieldMap<Value extends object> = Readonly<{
   [Field in keyof Value]-?: true

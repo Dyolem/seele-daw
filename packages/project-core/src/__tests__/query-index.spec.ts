@@ -10,13 +10,13 @@ import {
   parseNoteId,
   parseTick,
   type ProjectCommand,
-} from '~/index'
-import { prepareProjectCommand } from '@/commands/project-command-preparer'
-import { createProjectCommitCandidate } from '@/commit/project-commit-candidate'
-import { ModelStore } from '@/model/model-store'
-import { MutationApplier } from '@/mutation/mutation-applier'
-import { executeProjectQueryByScan } from '@/queries/project-query-executor'
-import { QueryIndex, QueryIndexError } from '@/queries/query-index'
+} from '#internal/index'
+import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
+import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
+import { ModelStore } from '#internal/model/model-store'
+import { MutationApplier } from '#internal/mutation/mutation-applier'
+import { executeProjectQueryByScan } from '#internal/queries/project-query-executor'
+import { QueryIndex, QueryIndexError } from '#internal/queries/query-index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 
 function requireReady(command: ProjectCommand, store: ModelStore) {

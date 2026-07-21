@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   PROJECT_FILE_FORMAT_VERSION,
   ProjectFileProjectionError,
@@ -21,9 +21,9 @@ import {
   type ProjectFileDTO,
   type ProjectSnapshot,
   type TrackDTO,
-} from '~/index'
-import { ModelStore, type ModelStoreSeed } from '@/model/model-store'
-import { createProjectSession } from '@/session/project-session'
+} from '#internal/index'
+import { ModelStore, type ModelStoreSeed } from '#internal/model/model-store'
+import { createProjectSession } from '#internal/session/project-session'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 

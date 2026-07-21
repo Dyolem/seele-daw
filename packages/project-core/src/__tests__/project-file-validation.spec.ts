@@ -1,13 +1,13 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   ProjectFileValidationError,
   createProjectFileDTO,
   decodeProjectFileDTO,
   type JsonValue,
   type ProjectFileDTO,
-} from '~/index'
+} from '#internal/index'
 import projectFileV1Golden from './fixtures/project-files/v1/complete-project.json'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 

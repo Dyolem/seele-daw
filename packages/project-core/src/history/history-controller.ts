@@ -1,12 +1,12 @@
-import type { ProjectCommandType } from '@/commands/project-command'
-import { PROJECT_HISTORY_DIRECTION, type ProjectHistoryDirection } from '@/commit/project-commit'
-import type { ModelRevision } from '@/model/model-revision'
+import type { ProjectCommandType } from '#internal/commands/project-command'
+import { PROJECT_HISTORY_DIRECTION, type ProjectHistoryDirection } from '#internal/commit/project-commit'
+import type { ModelRevision } from '#internal/model/model-revision'
 import {
   assertCreatedMutationPlan,
   createMutationPlan,
   type MutationPlan,
-} from '@/mutation/mutation-plan'
-import type { ProjectMutation } from '@/mutation/project-mutation'
+} from '#internal/mutation/mutation-plan'
+import type { ProjectMutation } from '#internal/mutation/project-mutation'
 
 interface HistoryEntry {
   readonly commandType: ProjectCommandType

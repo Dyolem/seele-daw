@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMIT_ORIGIN_KIND,
@@ -28,9 +28,9 @@ import {
   type ProjectSubscriptionObserver,
   type ProjectUnsubscribe,
   type Tick,
-} from '~/index'
-import { MutationApplyError } from '@/mutation/mutation-apply-error'
-import { ChangePublisher } from '@/subscriptions/change-publisher'
+} from '#internal/index'
+import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
+import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 

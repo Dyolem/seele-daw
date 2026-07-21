@@ -1,15 +1,15 @@
-import { ProjectCommandError } from '@/commands/project-command-error'
-import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '@/model/ids'
-import { createMidiNoteRecord } from '@/model/midi-note'
-import { ModelRevisionError, parseModelRevision, type ModelRevision } from '@/model/model-revision'
+import { ProjectCommandError } from '#internal/commands/project-command-error'
+import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '#internal/model/ids'
+import { createMidiNoteRecord } from '#internal/model/midi-note'
+import { ModelRevisionError, parseModelRevision, type ModelRevision } from '#internal/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'
 import {
   parseMidiPitch,
   type MidiChannel,
   type MidiPitch,
   type MidiVelocity,
-} from '@/model/scalars'
-import { parseTick, type Tick } from '@/time/tick'
+} from '#internal/model/scalars'
+import { parseTick, type Tick } from '#internal/time/tick'
 
 /** Canonical runtime discriminants for product-level project commands. */
 export const PROJECT_COMMAND_TYPE = {

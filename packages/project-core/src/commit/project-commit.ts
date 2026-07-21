@@ -1,6 +1,6 @@
-import type { ProjectCommandType } from '@/commands/project-command'
-import type { ProjectDelta } from '@/commit/project-delta'
-import type { ModelRevision } from '@/model/model-revision'
+import type { ProjectCommandType } from '#internal/commands/project-command'
+import type { ProjectDelta } from '#internal/commit/project-delta'
+import type { ModelRevision } from '#internal/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 export const PROJECT_COMMIT_ORIGIN_KIND = {

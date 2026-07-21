@@ -89,6 +89,11 @@ function workspaceAliasTarget(specifier, workspaceDirectory) {
   return match ? path.resolve(workspaceDirectory, 'src', match[1]) : undefined
 }
 
+function workspacePrivateImportTarget(specifier, workspaceDirectory) {
+  const match = /^#internal\/(.+)$/.exec(specifier)
+  return match ? path.resolve(workspaceDirectory, 'src', match[1]) : undefined
+}
+
 function workspacePackageOf(specifier) {
   const match = /^@seele-daw\/([^/]+)(?:\/(.+))?$/.exec(specifier)
   return match ? { name: match[1], deepPath: match[2] } : undefined
@@ -166,10 +171,29 @@ for (const file of await collectFiles(root)) {
       }
     }
 
+    const privateImportTarget = workspacePrivateImportTarget(specifier, workspaceDirectory)
+
+    if (privateImportTarget) {
+      const sourceDirectory = path.join(workspaceDirectory, 'src')
+      if (!owner) {
+        errors.push(`${relativeFile}: #internal/* 只用于源码 package 的包内导入`)
+      }
+      if (!isInside(sourceDirectory, privateImportTarget)) {
+        errors.push(`${relativeFile}: 禁止用 #internal/* 越过 workspace 源码边界`)
+      }
+      if (importsTestCodeFromProduction(file, privateImportTarget, workspaceDirectory)) {
+        errors.push(`${relativeFile}: 生产源码禁止导入 __tests__ 中的测试支持代码`)
+      }
+      continue
+    }
+
     const aliasTarget = workspaceAliasTarget(specifier, workspaceDirectory)
 
     if (aliasTarget) {
       const sourceDirectory = path.join(workspaceDirectory, 'src')
+      if (owner) {
+        errors.push(`${relativeFile}: 源码 package 的包内导入必须使用 #internal/*`)
+      }
       if (!isInside(sourceDirectory, aliasTarget)) {
         errors.push(`${path.relative(root, file)}: 禁止用 @/ 或 ~/ 越过 workspace 源码边界`)
       }
@@ -212,6 +236,15 @@ for (const file of await collectFiles(root)) {
         errors.push(`${relativeFile}: 生产源码禁止导入 __tests__ 中的测试支持代码`)
       }
     }
+  }
+}
+
+for (const packageName of packageNames) {
+  const manifestPath = path.join(packageRoot, packageName, 'package.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+
+  if (manifest.imports?.['#internal/*'] !== './src/*.ts') {
+    errors.push(`packages/${packageName}/package.json: 必须声明 #internal/* 包内映射`)
   }
 }
 

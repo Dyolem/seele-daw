@@ -1,6 +1,6 @@
-import type { MidiSourceId, NoteId } from '@/model/ids'
-import type { ModelRevision } from '@/model/model-revision'
-import type { Tick } from '@/time/tick'
+import type { MidiSourceId, NoteId } from '#internal/model/ids'
+import type { ModelRevision } from '#internal/model/model-revision'
+import type { Tick } from '#internal/time/tick'
 
 export type ProjectCommandErrorCode =
   | 'base-revision-mismatch'

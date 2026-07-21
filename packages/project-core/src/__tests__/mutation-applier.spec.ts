@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   createAudioTrackRecord,
   createMasterChannelRecord,
   createMidiClipRecord,
   createProjectRecord,
   parseLinearGain,
-} from '~/index'
+} from '#internal/index'
 import {
   createCompleteMutationScenario,
   snapshotModelReader,
@@ -15,21 +15,21 @@ import {
 } from './support/mutation-applier-fixture'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { withMapSetInterceptor } from './support/map-set-interceptor'
-import { ModelInvariantError } from '@/model/invariant-validator'
+import { ModelInvariantError } from '#internal/model/invariant-validator'
 import {
   INITIAL_MODEL_REVISION,
   ModelRevisionError,
   nextModelRevision,
   type ModelRevision,
-} from '@/model/model-revision'
-import { ModelStore } from '@/model/model-store'
-import { MutationApplier } from '@/mutation/mutation-applier'
-import { MutationApplyError, MutationRollbackError } from '@/mutation/mutation-apply-error'
-import { createMutationPlan, type MutationPlan } from '@/mutation/mutation-plan'
-import { MutationPlanError } from '@/mutation/mutation-plan-error'
-import { MutationPreconditionError } from '@/mutation/mutation-precondition-error'
-import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
-import { ProjectedModelStoreReader } from '@/mutation/projected-model-store-reader'
+} from '#internal/model/model-revision'
+import { ModelStore } from '#internal/model/model-store'
+import { MutationApplier } from '#internal/mutation/mutation-applier'
+import { MutationApplyError, MutationRollbackError } from '#internal/mutation/mutation-apply-error'
+import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
+import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
+import { MutationPreconditionError } from '#internal/mutation/mutation-precondition-error'
+import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import { ProjectedModelStoreReader } from '#internal/mutation/projected-model-store-reader'
 
 function captureThrown(operation: () => unknown): unknown {
   let didThrow = false

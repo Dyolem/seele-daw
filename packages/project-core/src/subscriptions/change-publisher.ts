@@ -2,9 +2,9 @@ import {
   PROJECT_CHANGE_TYPE,
   type AffectedTickRange,
   type ProjectChange,
-} from '@/commit/project-change'
-import type { ProjectCommit } from '@/commit/project-commit'
-import { ProjectSubscriptionError } from '@/subscriptions/project-subscription-error'
+} from '#internal/commit/project-change'
+import type { ProjectCommit } from '#internal/commit/project-commit'
+import { ProjectSubscriptionError } from '#internal/subscriptions/project-subscription-error'
 import {
   PROJECT_SUBSCRIPTION_TYPE,
   normalizeProjectSubscription,
@@ -13,7 +13,7 @@ import {
   type ProjectSubscriptionDeliveryFailure,
   type ProjectSubscriptionObserver,
   type ProjectUnsubscribe,
-} from '@/subscriptions/project-subscription'
+} from '#internal/subscriptions/project-subscription'
 
 interface SubscriptionEntry {
   active: boolean

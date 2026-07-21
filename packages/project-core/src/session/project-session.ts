@@ -1,33 +1,33 @@
-import { prepareProjectCommand } from '@/commands/project-command-preparer'
-import type { ProjectCommand } from '@/commands/project-command'
+import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
+import type { ProjectCommand } from '#internal/commands/project-command'
 import {
   createHistoryProjectCommitCandidate,
   createProjectCommitCandidate,
-} from '@/commit/project-commit-candidate'
-import type { ProjectCommit } from '@/commit/project-commit'
-import { HistoryController, type PreparedHistoryTransition } from '@/history/history-controller'
+} from '#internal/commit/project-commit-candidate'
+import type { ProjectCommit } from '#internal/commit/project-commit'
+import { HistoryController, type PreparedHistoryTransition } from '#internal/history/history-controller'
 import {
   createInitialModelStore,
   type CreateInitialModelStoreInput,
-} from '@/model/project-initializer'
-import type { ModelRevision } from '@/model/model-revision'
-import { ModelStore } from '@/model/model-store'
-import { MutationApplier } from '@/mutation/mutation-applier'
-import { QueryIndex, type PreparedQueryIndexTransition } from '@/queries/query-index'
-import type { ProjectQuery, ProjectQueryResultFor } from '@/queries/project-query'
+} from '#internal/model/project-initializer'
+import type { ModelRevision } from '#internal/model/model-revision'
+import { ModelStore } from '#internal/model/model-store'
+import { MutationApplier } from '#internal/mutation/mutation-applier'
+import { QueryIndex, type PreparedQueryIndexTransition } from '#internal/queries/query-index'
+import type { ProjectQuery, ProjectQueryResultFor } from '#internal/queries/project-query'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   type CommittedProjectCommandExecution,
   type NoChangeProjectCommandExecution,
   type ProjectCommandExecutionResult,
-} from '@/session/project-command-execution'
-import { createProjectSnapshot, type ProjectSnapshot } from '@/snapshots/project-snapshot'
-import { ChangePublisher } from '@/subscriptions/change-publisher'
+} from '#internal/session/project-command-execution'
+import { createProjectSnapshot, type ProjectSnapshot } from '#internal/snapshots/project-snapshot'
+import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import type {
   ProjectSubscription,
   ProjectSubscriptionObserver,
   ProjectUnsubscribe,
-} from '@/subscriptions/project-subscription'
+} from '#internal/subscriptions/project-subscription'
 
 export type CreateInitialProjectSessionInput = CreateInitialModelStoreInput
 

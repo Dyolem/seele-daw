@@ -14,14 +14,14 @@ import {
   parseTick,
   parseTimeSignatureDenominator,
   parseTimeSignatureNumerator,
-} from '~/index'
+} from '#internal/index'
 import {
   createCompleteProjectFixture,
   type CompleteProjectFixture,
 } from './complete-project-fixture'
-import type { ModelStoreReader } from '@/model/model-store'
-import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
-import type { ProjectMutation } from '@/mutation/project-mutation'
+import type { ModelStoreReader } from '#internal/model/model-store'
+import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import type { ProjectMutation } from '#internal/mutation/project-mutation'
 
 function compareEntryKeys(
   [leftKey]: readonly [string, unknown],

@@ -3,8 +3,8 @@
  * Local storage preconditions are checked per mutation; cross-entity invariants are
  * checked once after the final projected state exists. The base reader is never mutated.
  */
-import type { MasterChannelRecord } from '@/model/channel'
-import type { DeviceDescriptor } from '@/model/device'
+import type { MasterChannelRecord } from '#internal/model/channel'
+import type { DeviceDescriptor } from '#internal/model/device'
 import type {
   ClipId,
   DeviceId,
@@ -13,17 +13,17 @@ import type {
   TempoEventId,
   TimeSignatureEventId,
   TrackId,
-} from '@/model/ids'
-import { assertModelInvariants } from '@/model/invariant-validator'
-import type { ClipRecord } from '@/model/midi-clip'
-import type { MidiNoteRecord } from '@/model/midi-note'
-import type { MidiSourceRecord } from '@/model/midi-source'
-import type { ModelRevision } from '@/model/model-revision'
-import type { ModelStoreReader } from '@/model/model-store'
-import type { ProjectRecord } from '@/model/project'
-import type { TrackRecord } from '@/model/track'
-import type { TempoEventRecord } from '@/time/tempo-event'
-import type { TimeSignatureEventRecord } from '@/time/time-signature-event'
+} from '#internal/model/ids'
+import { assertModelInvariants } from '#internal/model/invariant-validator'
+import type { ClipRecord } from '#internal/model/midi-clip'
+import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { MidiSourceRecord } from '#internal/model/midi-source'
+import type { ModelRevision } from '#internal/model/model-revision'
+import type { ModelStoreReader } from '#internal/model/model-store'
+import type { ProjectRecord } from '#internal/model/project'
+import type { TrackRecord } from '#internal/model/track'
+import type { TempoEventRecord } from '#internal/time/tempo-event'
+import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 import { MutationPlanError } from './mutation-plan-error'
 import {
   MutationPreconditionError,

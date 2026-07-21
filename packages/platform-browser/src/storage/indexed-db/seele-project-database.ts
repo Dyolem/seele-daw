@@ -4,8 +4,8 @@ import {
   SEELE_PROJECT_DATABASE_STORES,
   SEELE_PROJECT_DATABASE_VERSION,
   type SeeleProjectDatabaseSchema,
-} from '~/storage/indexed-db/indexed-db-schema'
-import { IndexedDBStorageError } from '~/storage/indexed-db/indexed-db-storage-error'
+} from '#internal/storage/indexed-db/indexed-db-schema'
+import { IndexedDBStorageError } from '#internal/storage/indexed-db/indexed-db-storage-error'
 import { openDB, type IDBPDatabase } from 'idb'
 
 type SeeleProjectDatabaseConnection = IDBPDatabase<SeeleProjectDatabaseSchema>

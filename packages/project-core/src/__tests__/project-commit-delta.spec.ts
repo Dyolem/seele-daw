@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_TYPE,
@@ -19,19 +19,19 @@ import {
   type ProjectChange,
   type ProjectCommit,
   type ProjectDelta,
-} from '~/index'
-import { prepareProjectCommand } from '@/commands/project-command-preparer'
+} from '#internal/index'
+import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
 import {
   ProjectCommitCandidateError,
   type ProjectCommitCandidateErrorCode,
-} from '@/commit/project-commit-candidate-error'
-import { createProjectCommitCandidate } from '@/commit/project-commit-candidate'
-import { ModelStore } from '@/model/model-store'
-import { ModelRevisionError } from '@/model/model-revision'
-import { MutationApplier } from '@/mutation/mutation-applier'
-import { MutationPlanError } from '@/mutation/mutation-plan-error'
-import { createMutationPlan, type MutationPlan } from '@/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
+} from '#internal/commit/project-commit-candidate-error'
+import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
+import { ModelStore } from '#internal/model/model-store'
+import { ModelRevisionError } from '#internal/model/model-revision'
+import { MutationApplier } from '#internal/mutation/mutation-applier'
+import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
+import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
+import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 

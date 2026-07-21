@@ -1,5 +1,5 @@
-import type { ProjectId } from '@/model/ids'
-import type { ProjectCheckpoint } from '@/persistence/checkpoint/project-checkpoint'
+import type { ProjectId } from '#internal/model/ids'
+import type { ProjectCheckpoint } from '#internal/persistence/checkpoint/project-checkpoint'
 
 /** Storage-neutral port implemented by platform infrastructure such as IndexedDB. */
 export interface ProjectCheckpointStore {

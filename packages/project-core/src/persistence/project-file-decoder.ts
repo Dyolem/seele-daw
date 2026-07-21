@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue } from '@/model/json-value'
+import type { JsonObject, JsonValue } from '#internal/model/json-value'
 import {
   type ChannelStripDTO,
   type ClipDTO,
@@ -11,14 +11,14 @@ import {
   type TempoEventDTO,
   type TimeSignatureEventDTO,
   type TrackDTO,
-} from '@/persistence/project-file-dto'
+} from '#internal/persistence/project-file-dto'
 import {
   ProjectFileValidationError,
   type ProjectFileValidationErrorCode,
   type ProjectFileValidationErrorDetails,
   type ProjectFileValidationPathSegment,
-} from '@/persistence/project-file-validation-error'
-import { PROJECT_FILE_V1_PROTOCOL } from '@/persistence/project-file-v1-protocol'
+} from '#internal/persistence/project-file-validation-error'
+import { PROJECT_FILE_V1_PROTOCOL } from '#internal/persistence/project-file-v1-protocol'
 
 type ValidationPath = readonly ProjectFileValidationPathSegment[]
 type DataFields = ReadonlyMap<string, unknown>

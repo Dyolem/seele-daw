@@ -1,5 +1,5 @@
 import type { Brand } from '@seele-daw/type-utils'
-import { rejectDomainValue } from '@/model/domain-value-error'
+import { rejectDomainValue } from '#internal/model/domain-value-error'
 
 export type Tick = Brand<number, 'Tick'>
 

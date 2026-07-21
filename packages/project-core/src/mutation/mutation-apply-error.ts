@@ -1,4 +1,4 @@
-import type { ModelRevision } from '@/model/model-revision'
+import type { ModelRevision } from '#internal/model/model-revision'
 
 export type MutationApplyErrorCode =
   | 'applier-faulted'

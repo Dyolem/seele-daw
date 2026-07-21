@@ -19,7 +19,7 @@ import {
   type MasterChannelRecord,
   type ProjectRecord,
   type TrackRecord,
-} from '@/index'
+} from '#internal/index'
 
 function createChannelInput() {
   return {

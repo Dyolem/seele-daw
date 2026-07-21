@@ -1,21 +1,21 @@
-import { DomainValueError } from '@/model/domain-value-error'
-import { parseProjectId, type ProjectId } from '@/model/ids'
-import { ModelRevisionError, parseModelRevision, type ModelRevision } from '@/model/model-revision'
+import { DomainValueError } from '#internal/model/domain-value-error'
+import { parseProjectId, type ProjectId } from '#internal/model/ids'
+import { ModelRevisionError, parseModelRevision, type ModelRevision } from '#internal/model/model-revision'
 import {
   PROJECT_CHECKPOINT_FORMAT_VERSION,
   parseProjectCheckpointId,
   type ProjectCheckpoint,
   type ProjectCheckpointId,
-} from '@/persistence/checkpoint/project-checkpoint'
+} from '#internal/persistence/checkpoint/project-checkpoint'
 import {
   ProjectCheckpointValidationError,
   type ProjectCheckpointValidationErrorCode,
   type ProjectCheckpointValidationErrorDetails,
   type ProjectCheckpointValidationPathSegment,
-} from '@/persistence/checkpoint/project-checkpoint-error'
-import { decodeProjectFileDTO } from '@/persistence/project-file-decoder'
-import type { ProjectFileDTO } from '@/persistence/project-file-dto'
-import { ProjectFileValidationError } from '@/persistence/project-file-validation-error'
+} from '#internal/persistence/checkpoint/project-checkpoint-error'
+import { decodeProjectFileDTO } from '#internal/persistence/project-file-decoder'
+import type { ProjectFileDTO } from '#internal/persistence/project-file-dto'
+import { ProjectFileValidationError } from '#internal/persistence/project-file-validation-error'
 
 type ValidationPath = readonly ProjectCheckpointValidationPathSegment[]
 type DataFields = ReadonlyMap<string, unknown>

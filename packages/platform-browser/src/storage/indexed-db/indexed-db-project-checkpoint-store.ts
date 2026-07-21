@@ -4,9 +4,9 @@ import {
   PROJECT_CHECKPOINT_HEADS_STORE,
   SEELE_PROJECT_DATABASE_NAME,
   type ProjectCheckpointHeadRecordV1,
-} from '~/storage/indexed-db/indexed-db-schema'
-import { IndexedDBStorageError } from '~/storage/indexed-db/indexed-db-storage-error'
-import { SeeleProjectDatabase } from '~/storage/indexed-db/seele-project-database'
+} from '#internal/storage/indexed-db/indexed-db-schema'
+import { IndexedDBStorageError } from '#internal/storage/indexed-db/indexed-db-storage-error'
+import { SeeleProjectDatabase } from '#internal/storage/indexed-db/seele-project-database'
 import {
   parseProjectCheckpointId,
   parseProjectId,

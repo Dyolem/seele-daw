@@ -1,6 +1,6 @@
 import type { Brand } from '@seele-daw/type-utils'
-import { rejectDomainValue } from '@/model/domain-value-error'
-import { parseOpaqueId } from '@/model/opaque-id'
+import { rejectDomainValue } from '#internal/model/domain-value-error'
+import { parseOpaqueId } from '#internal/model/opaque-id'
 
 export type ProjectId = Brand<string, 'ProjectId'>
 export type TrackId = Brand<string, 'TrackId'>

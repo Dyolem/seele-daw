@@ -1,22 +1,22 @@
-import { ProjectCommandError } from '@/commands/project-command-error'
+import { ProjectCommandError } from '#internal/commands/project-command-error'
 import {
   type AddNoteCommand,
   type MoveNoteCommand,
   type RemoveNoteCommand,
-} from '@/commands/project-command'
+} from '#internal/commands/project-command'
 import type {
   NoChangeProjectCommandPreparation,
   ReadyProjectCommandPreparation,
-} from '@/commands/project-command-preparation'
-import type { NoteId } from '@/model/ids'
-import { createMidiNoteRecord, type MidiNoteRecord } from '@/model/midi-note'
-import type { ModelRevision } from '@/model/model-revision'
-import type { MidiSourceRecord } from '@/model/midi-source'
-import type { ModelStoreReader } from '@/model/model-store'
-import { createMutationPlan } from '@/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
-import type { ProjectMutation } from '@/mutation/project-mutation'
-import { addTicks } from '@/time/tick'
+} from '#internal/commands/project-command-preparation'
+import type { NoteId } from '#internal/model/ids'
+import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
+import type { ModelRevision } from '#internal/model/model-revision'
+import type { MidiSourceRecord } from '#internal/model/midi-source'
+import type { ModelStoreReader } from '#internal/model/model-store'
+import { createMutationPlan } from '#internal/mutation/mutation-plan'
+import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import { addTicks } from '#internal/time/tick'
 
 type MidiNoteCommand = AddNoteCommand | MoveNoteCommand | RemoveNoteCommand
 

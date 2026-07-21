@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '~/index'
+import * as projectCore from '#internal/index'
 import {
   PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
@@ -22,9 +22,9 @@ import {
   type NoChangeProjectCommandExecution,
   type ProjectCommandExecutionResult,
   type ProjectSession,
-} from '~/index'
-import { ModelStore } from '@/model/model-store'
-import { createProjectSession } from '@/session/project-session'
+} from '#internal/index'
+import { ModelStore } from '#internal/model/model-store'
+import { createProjectSession } from '#internal/session/project-session'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 

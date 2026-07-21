@@ -1,11 +1,11 @@
-import type { MasterChannelRecord } from '@/model/channel'
-import type { DeviceDescriptor } from '@/model/device'
-import type { JsonObject, JsonValue } from '@/model/json-value'
-import { parseJsonValue } from '@/model/json-value'
-import type { ClipRecord, MidiLoop } from '@/model/midi-clip'
-import type { MidiNoteRecord } from '@/model/midi-note'
-import type { MidiSourceRecord } from '@/model/midi-source'
-import type { TrackRecord } from '@/model/track'
+import type { MasterChannelRecord } from '#internal/model/channel'
+import type { DeviceDescriptor } from '#internal/model/device'
+import type { JsonObject, JsonValue } from '#internal/model/json-value'
+import { parseJsonValue } from '#internal/model/json-value'
+import type { ClipRecord, MidiLoop } from '#internal/model/midi-clip'
+import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { MidiSourceRecord } from '#internal/model/midi-source'
+import type { TrackRecord } from '#internal/model/track'
 import {
   PROJECT_FILE_FORMAT_VERSION,
   type ChannelStripDTO,
@@ -19,14 +19,14 @@ import {
   type TempoEventDTO,
   type TimeSignatureEventDTO,
   type TrackDTO,
-} from '@/persistence/project-file-dto'
+} from '#internal/persistence/project-file-dto'
 import {
   ProjectFileProjectionError,
   type ProjectFileProjectionErrorDetails,
-} from '@/persistence/project-file-projection-error'
-import type { MidiNotePartitionSnapshot, ProjectSnapshot } from '@/snapshots/project-snapshot'
-import type { TempoEventRecord } from '@/time/tempo-event'
-import type { TimeSignatureEventRecord } from '@/time/time-signature-event'
+} from '#internal/persistence/project-file-projection-error'
+import type { MidiNotePartitionSnapshot, ProjectSnapshot } from '#internal/snapshots/project-snapshot'
+import type { TempoEventRecord } from '#internal/time/tempo-event'
+import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 
 interface IdentifiedRecord {
   readonly id: string

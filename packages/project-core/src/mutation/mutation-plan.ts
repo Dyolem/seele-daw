@@ -1,4 +1,4 @@
-import type { ModelRevision } from '@/model/model-revision'
+import type { ModelRevision } from '#internal/model/model-revision'
 import { MutationPlanError } from './mutation-plan-error'
 import {
   copyProjectMutationForPlan,

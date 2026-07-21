@@ -5,13 +5,13 @@
  * Real writes use compare-and-swap operations, revision advances only after the final
  * invariant check, and unexpected failures trigger inverse-prefix restoration.
  */
-import { assertModelInvariants } from '@/model/invariant-validator'
-import { nextModelRevision, type ModelRevision } from '@/model/model-revision'
-import { ModelStore } from '@/model/model-store'
+import { assertModelInvariants } from '#internal/model/invariant-validator'
+import { nextModelRevision, type ModelRevision } from '#internal/model/model-revision'
+import { ModelStore } from '#internal/model/model-store'
 import {
   claimModelStoreWriteAccess,
   type ModelStoreWriteAccess,
-} from '@/model/model-store-write-access'
+} from '#internal/model/model-store-write-access'
 import { MutationApplyError, MutationRollbackError } from './mutation-apply-error'
 import { assertCreatedMutationPlan, type MutationPlan } from './mutation-plan'
 import { MutationPlanError } from './mutation-plan-error'

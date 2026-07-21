@@ -19,8 +19,8 @@ import {
 } from './model-store-write-access'
 import type { ProjectRecord } from './project'
 import type { TrackRecord } from './track'
-import type { TempoEventRecord } from '@/time/tempo-event'
-import type { TimeSignatureEventRecord } from '@/time/time-signature-event'
+import type { TempoEventRecord } from '#internal/time/tempo-event'
+import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 
 interface IdentifiedRecord<Id extends string> {
   readonly id: Id

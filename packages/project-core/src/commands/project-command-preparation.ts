@@ -1,5 +1,5 @@
-import type { ModelRevision } from '@/model/model-revision'
-import type { MutationPlan } from '@/mutation/mutation-plan'
+import type { ModelRevision } from '#internal/model/model-revision'
+import type { MutationPlan } from '#internal/mutation/mutation-plan'
 
 export interface ReadyProjectCommandPreparation {
   readonly status: 'ready'

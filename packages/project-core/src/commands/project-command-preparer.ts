@@ -2,15 +2,15 @@ import {
   normalizeProjectCommand,
   PROJECT_COMMAND_TYPE,
   type ProjectCommand,
-} from '@/commands/project-command'
-import { ProjectCommandError } from '@/commands/project-command-error'
-import type { ProjectCommandPreparation } from '@/commands/project-command-preparation'
+} from '#internal/commands/project-command'
+import { ProjectCommandError } from '#internal/commands/project-command-error'
+import type { ProjectCommandPreparation } from '#internal/commands/project-command-preparation'
 import {
   prepareAddNoteCommand,
   prepareMoveNoteCommand,
   prepareRemoveNoteCommand,
-} from '@/commands/midi-note-command-handler'
-import type { ModelStoreReader } from '@/model/model-store'
+} from '#internal/commands/midi-note-command-handler'
+import type { ModelStoreReader } from '#internal/model/model-store'
 
 function rejectUnknownCommand(command: never): never {
   const type = (command as { readonly type?: unknown }).type

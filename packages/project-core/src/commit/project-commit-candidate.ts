@@ -6,7 +6,7 @@ import {
   type ProjectCommand,
   type ProjectCommandType,
   type RemoveNoteCommand,
-} from '@/commands/project-command'
+} from '#internal/commands/project-command'
 import {
   PROJECT_CHANGE_TYPE,
   type AffectedTickRange,
@@ -14,25 +14,25 @@ import {
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
   type ProjectChange,
-} from '@/commit/project-change'
+} from '#internal/commit/project-change'
 import {
   ProjectCommitCandidateError,
   type ProjectCommitCandidateErrorDetails,
-} from '@/commit/project-commit-candidate-error'
+} from '#internal/commit/project-commit-candidate-error'
 import {
   PROJECT_COMMIT_ORIGIN_KIND,
   type ProjectCommit,
   type ProjectCommandCommitOrigin,
   type ProjectHistoryCommitOrigin,
   type ProjectHistoryDirection,
-} from '@/commit/project-commit'
-import type { ProjectDelta } from '@/commit/project-delta'
-import type { MidiNoteRecord } from '@/model/midi-note'
-import { nextModelRevision } from '@/model/model-revision'
-import { assertCreatedMutationPlan, type MutationPlan } from '@/mutation/mutation-plan'
-import type { ProjectMutation } from '@/mutation/project-mutation'
-import { PROJECT_MUTATION_TYPE } from '@/mutation/mutation-type'
-import { addTicks } from '@/time/tick'
+} from '#internal/commit/project-commit'
+import type { ProjectDelta } from '#internal/commit/project-delta'
+import type { MidiNoteRecord } from '#internal/model/midi-note'
+import { nextModelRevision } from '#internal/model/model-revision'
+import { assertCreatedMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
+import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import { addTicks } from '#internal/time/tick'
 
 function rejectCandidate(
   code: ProjectCommitCandidateError['code'],

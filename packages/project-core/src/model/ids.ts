@@ -1,5 +1,6 @@
 import type { Brand } from '@seele-daw/type-utils'
-import { rejectDomainValue } from './domain-value-error'
+import { rejectDomainValue } from '@/model/domain-value-error'
+import { parseOpaqueId } from '@/model/opaque-id'
 
 export type ProjectId = Brand<string, 'ProjectId'>
 export type TrackId = Brand<string, 'TrackId'>
@@ -12,31 +13,8 @@ export type TimeSignatureEventId = Brand<string, 'TimeSignatureEventId'>
 export type DeviceTypeId = Brand<string, 'DeviceTypeId'>
 export type ParameterId = Brand<string, 'ParameterId'>
 
-const OPAQUE_ID_CONSTRAINT =
-  'a non-empty opaque string without surrounding whitespace or control characters'
 const DEVICE_TYPE_ID_CONSTRAINT = 'a lowercase namespaced identifier such as seele.basic-synth'
 const DEVICE_TYPE_ID_PATTERN = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/u
-
-function containsControlCharacter(value: string): boolean {
-  return Array.from(value).some((character) => {
-    const codePoint = character.codePointAt(0)
-
-    return codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f)
-  })
-}
-
-function parseOpaqueId<Id extends string>(value: unknown, valueName: string): Id {
-  if (
-    typeof value !== 'string' ||
-    value.length === 0 ||
-    value.trim() !== value ||
-    containsControlCharacter(value)
-  ) {
-    rejectDomainValue(valueName, OPAQUE_ID_CONSTRAINT)
-  }
-
-  return value as Id
-}
 
 export function parseProjectId(value: unknown): ProjectId {
   return parseOpaqueId<ProjectId>(value, 'ProjectId')

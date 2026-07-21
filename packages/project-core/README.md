@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot，以及 ProjectFileDTO V1 写出、严格读取和 fresh Session 加载闭环已经实现；JSON codec、迁移与实际 storage adapter 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；IndexedDB adapter、JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -336,6 +336,16 @@ Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playb
 
 加载成功组合的是 fresh Session：`modelRevision` 从 `0` 开始，History 和 subscriptions 为空，QueryIndex 从权威 ModelStore 重建。V1 不保存进程内 revision、undo / redo 栈、索引或 listener。normalizer、ModelStoreSeed、ModelStore 和 Session 组合入口继续保持包内私有。规范性协议见 [Seele Project File Format V1](./docs/project-file-format-v1.md)，阶段决策见 [ProjectFileDTO V1 读取校验计划](./docs/project-file-dto-v1-read-validation-plan.md) 与 [Project File V1 Session 加载计划](./docs/project-file-v1-session-load-plan.md)。
 
+## Project Checkpoint 基础层
+
+`ProjectCheckpoint` 是包裹完整 `ProjectFileDTO` 的 storage-neutral 持久化 envelope，拥有独立 `checkpointFormatVersion`、opaque checkpoint ID、Project ID 和来源 `modelRevision`。来源 revision 只用于判断异步保存完成时 Session 是否又发生编辑；恢复出的 fresh Session 仍从 revision `0` 开始。
+
+直接按 Project ID 覆盖一份 ProjectFileDTO 足以实现最简浏览器保存；Checkpoint 是为了异步 revision 对账、不可变 active/previous 保存记录、损坏候选回退和独立版本演进。它只属于应用内部持久化，不进入用户导出的项目文件。
+
+`saveProjectCheckpoint(store, session, input)` 只捕获一次 Snapshot，再创建 DTO 和 frozen checkpoint，异步保存完成后返回包含来源 revision 的 receipt。存储失败不会回滚或改变 Session。`ProjectCheckpointStore` 只定义保存可信 checkpoint 与读取按恢复优先级排列的 `unknown` candidates，不暴露 IndexedDB、OPFS 或 DOM 类型。
+
+`restoreProjectCheckpoint(store, projectId)` 逐个严格解码候选，验证 envelope、内部 Project File 与请求 Project ID，并只从完整通过领域不变量的 DTO 组合 Session。active 候选结构损坏、领域非法或属于其他项目时会保留 frozen 诊断并继续 previous；空候选返回 `null`，存在候选但全部失败则抛出 `ProjectCheckpointOperationError`。完整决策见 [Project Checkpoint 基础协议与存储端口计划](./docs/project-checkpoint-foundation-plan.md)。
+
 ## ProjectDelta 与消费者同步
 
 ProjectDelta 描述一次提交造成的语义变化，例如：
@@ -460,11 +470,13 @@ src/
 8. 建立 MIDI Note ProjectQuery 与可重建 QueryIndex。
 9. 增加 ChangePublisher 与局部订阅。
 10. 定义 ProjectSnapshot、ProjectFileDTO V1 写出边界、严格读取校验、领域 normalize 与 fresh Session 加载。
-11. 独立定义 JSON codec、migration 和 storage adapter，再接入 snapshot/journal 端口；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
+11. 定义 storage-neutral Project Checkpoint 协议、Store port、保存 receipt 与候选恢复协调。
+12. 在 `platform-browser` 实现 IndexedDB immutable checkpoint + active/previous 指针事务，再接入 Studio 保存和刷新恢复。
+13. 有真实格式演进或恢复需求后分别实现 JSON codec、migration、Journal；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 23 个测试文件、339 项测试，其中 Project File V1 Session 加载闭环新增 6 项。
+当前 Project Core 基线为 24 个测试文件、347 项测试，其中 Project Checkpoint 基础层新增 8 项。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -485,6 +497,7 @@ src/
 - ProjectFileDTO 的版本、字段完整性、JSON 往返、深度所有权、特殊 ID 和分区失败关闭；
 - ProjectFileDTO 输入的严格字段、版本 / feature 分流、结构化错误路径、安全属性检查和深度隔离；
 - Project File 到 fresh Session 的无损往返、领域错误定位、跨实体拒绝、查询和后续 Command；
+- Checkpoint envelope 严格校验、异步 revision receipt、存储失败隔离与 active/previous 候选回退；
 - snapshot、迁移与 journal replay 的 golden fixtures；
 - 100k Note / 32 Track 下的 command、apply、query 和 snapshot benchmark。
 
@@ -502,6 +515,7 @@ src/
 - [ProjectFileDTO V1 写出边界计划](./docs/project-file-dto-v1-write-plan.md)
 - [ProjectFileDTO V1 读取校验计划](./docs/project-file-dto-v1-read-validation-plan.md)
 - [Project File V1 Session 加载计划](./docs/project-file-v1-session-load-plan.md)
+- [Project Checkpoint 基础协议与存储端口计划](./docs/project-checkpoint-foundation-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)

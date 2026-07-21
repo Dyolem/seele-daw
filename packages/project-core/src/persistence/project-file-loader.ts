@@ -11,6 +11,14 @@ import { createProjectSession, type ProjectSession } from '@/session/project-ses
  */
 export function createProjectSessionFromProjectFile(input: unknown): ProjectSession {
   const dto = decodeProjectFileDTO(input)
+
+  return createProjectSessionFromDecodedProjectFile(dto)
+}
+
+/** @internal Composes a Session after an owning decoder has already validated the DTO. */
+export function createProjectSessionFromDecodedProjectFile(
+  dto: ReturnType<typeof decodeProjectFileDTO>,
+): ProjectSession {
   const store = new ModelStore(normalizeProjectFileDTO(dto))
 
   try {

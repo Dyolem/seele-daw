@@ -19,26 +19,33 @@ export class ModelRevisionError extends Error {
   }
 }
 
+/** Revalidates a numeric revision before it crosses a protocol or commit boundary. */
+export function parseModelRevision(value: number): ModelRevision {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new ModelRevisionError(
+      'invalid-model-revision',
+      value,
+      'Model revision must be a non-negative safe integer',
+    )
+  }
+
+  return value as ModelRevision
+}
+
 /**
  * Computes the next commit revision without wrapping or losing integer precision.
  * Callers must do this before touching ModelStore so exhaustion remains a no-write failure.
  */
 export function nextModelRevision(current: ModelRevision): ModelRevision {
-  if (!Number.isSafeInteger(current) || current < 0) {
-    throw new ModelRevisionError(
-      'invalid-model-revision',
-      current,
-      'Model revision must be a non-negative safe integer',
-    )
-  }
+  const parsedCurrent = parseModelRevision(current)
 
-  if (current === Number.MAX_SAFE_INTEGER) {
+  if (parsedCurrent === Number.MAX_SAFE_INTEGER) {
     throw new ModelRevisionError(
       'model-revision-overflow',
-      current,
+      parsedCurrent,
       'Model revision cannot advance beyond Number.MAX_SAFE_INTEGER',
     )
   }
 
-  return (current + 1) as ModelRevision
+  return (parsedCurrent + 1) as ModelRevision
 }

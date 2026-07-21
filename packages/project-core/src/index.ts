@@ -84,6 +84,41 @@ export type {
 
 export type { MidiNotePartitionSnapshot, ProjectSnapshot } from './snapshots/project-snapshot'
 
+export {
+  PROJECT_CHECKPOINT_FORMAT_VERSION,
+  createProjectCheckpoint,
+  parseProjectCheckpointId,
+} from './persistence/checkpoint/project-checkpoint'
+export type {
+  CreateProjectCheckpointInput,
+  ProjectCheckpoint,
+  ProjectCheckpointFormatVersion,
+  ProjectCheckpointId,
+} from './persistence/checkpoint/project-checkpoint'
+export {
+  restoreProjectCheckpoint,
+  saveProjectCheckpoint,
+} from './persistence/checkpoint/project-checkpoint-coordinator'
+export type {
+  ProjectCheckpointRestoreResult,
+  ProjectCheckpointSaveReceipt,
+  SaveProjectCheckpointInput,
+} from './persistence/checkpoint/project-checkpoint-coordinator'
+export { decodeProjectCheckpoint } from './persistence/checkpoint/project-checkpoint-decoder'
+export {
+  ProjectCheckpointOperationError,
+  ProjectCheckpointValidationError,
+} from './persistence/checkpoint/project-checkpoint-error'
+export type {
+  ProjectCheckpointCandidateFailure,
+  ProjectCheckpointOperationErrorCode,
+  ProjectCheckpointOperationErrorDetails,
+  ProjectCheckpointValidationErrorCode,
+  ProjectCheckpointValidationErrorDetails,
+  ProjectCheckpointValidationPathSegment,
+} from './persistence/checkpoint/project-checkpoint-error'
+export type { ProjectCheckpointStore } from './persistence/checkpoint/project-checkpoint-store'
+
 export { PROJECT_FILE_FORMAT_VERSION } from './persistence/project-file-dto'
 export type {
   AudioTrackDTO,

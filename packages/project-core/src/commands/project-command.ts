@@ -1,7 +1,7 @@
 import { ProjectCommandError } from '@/commands/project-command-error'
 import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '@/model/ids'
 import { createMidiNoteRecord } from '@/model/midi-note'
-import type { ModelRevision } from '@/model/model-revision'
+import { ModelRevisionError, parseModelRevision, type ModelRevision } from '@/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'
 import {
   parseMidiPitch,
@@ -74,15 +74,17 @@ export interface CreateMoveNoteCommandInput extends CreateNoteCommandInputBase {
 export type CreateRemoveNoteCommandInput = CreateNoteCommandInputBase
 
 function parseCommandBaseRevision(value: ModelRevision): ModelRevision {
-  if (!Number.isSafeInteger(value) || value < 0) {
+  try {
+    return parseModelRevision(value)
+  } catch (cause) {
+    if (!(cause instanceof ModelRevisionError)) throw cause
+
     throw new ProjectCommandError(
       'invalid-base-revision',
       'ProjectCommand.baseRevision must be a non-negative safe integer',
       { baseRevision: value },
     )
   }
-
-  return value
 }
 
 export function createAddNoteCommand(input: CreateAddNoteCommandInput): AddNoteCommand {

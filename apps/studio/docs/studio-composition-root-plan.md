@@ -162,7 +162,7 @@ binding created ? binding.dispose() : skip
 - `main.ts` 使用应用组合工厂，并在 HMR 时 dispose；
 - Studio、workspace 类型、架构、测试和生产构建保持通过。
 
-完成本独立模块后停止等待审阅。Router 入口适配、Entry UI、选择动作和 dirty navigation guard 留到后续阶段。
+完成本独立模块后停止等待审阅。Router 入口适配、Entry UI、选择动作和 dirty navigation guard 留到后续阶段；其中框架无关的离开许可语义随后由 [Project Navigation Confirmation 基础协议](./project-navigation-confirmation-plan.md) 单独承载。
 
 ## 实施结果
 

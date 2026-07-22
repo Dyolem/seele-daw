@@ -114,7 +114,7 @@ Recent choice
 
 ## 并发与导航
 
-本阶段结果是一次调用对应一个 Promise，不持有 Vue state，也不尝试取消 Router navigation。未来 Router adapter 必须用 navigation token 忽略迟到的入口结果，并在离开 dirty Project 时实现 Save / Discard / Cancel。
+本阶段结果是一次调用对应一个 Promise，不持有 Vue state，也不尝试取消 Router navigation。未来 Router adapter 必须用 navigation token 忽略迟到的入口结果，并在离开 dirty Project 时调用 [Project Navigation Confirmation 基础协议](./project-navigation-confirmation-plan.md) 取得 Save / Discard / Cancel 决定。
 
 持续 route 切换、关闭 Active Project 和 dirty navigation guard 需要共同设计，不能在当前无 Router 模块中假装已经解决。本阶段测试单次入口解析及底层失败，不扩张 ActiveProjectService 生命周期。
 

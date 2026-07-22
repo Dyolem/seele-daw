@@ -179,3 +179,5 @@ apps/studio/
 - workspace 架构检查、类型检查、全部测试和 Studio 生产构建通过。
 
 Vue / Router 接入、真实 `IndexedDBProjectCheckpointStore` Composition Root、项目 ID discovery、默认 MIDI 模板、自动保存、Journal 与多标签页协调仍未进入本阶段。
+
+后续框架无关的 dirty 离开许可已由 [Project Navigation Confirmation 基础协议](./project-navigation-confirmation-plan.md) 实现；它消费本模块的精确 `isDirty` 与 `save()`，但不反向改变 Active Project 的职责。

@@ -16,6 +16,15 @@ import {
   createProjectEntryCoordinator,
   type ProjectEntryCoordinator,
 } from '@/workbench/project/entry/project-entry-coordinator'
+import {
+  createProjectNavigationConfirmationCoordinator,
+  type ProjectNavigationConfirmationCoordinator,
+} from '@/workbench/project/navigation/project-navigation-confirmation'
+import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import {
+  createProjectNavigationDecisionVueBinding,
+  type ProjectNavigationDecisionVueBinding,
+} from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
 import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/workbench/project/vue/active-project-context'
 import {
   createActiveProjectVueBinding,
@@ -34,15 +43,18 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
 
 export interface StudioApplication {
   readonly projectEntry: ProjectEntryCoordinator
+  readonly projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator
   mount(rootContainer: Element | string): ComponentPublicInstance
   dispose(): void
 }
 
 class StudioApplicationImpl implements StudioApplication {
   readonly projectEntry: ProjectEntryCoordinator
+  readonly projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator
   readonly #vueApplication: VueApplication
   readonly #projectRuntime: BrowserActiveProjectRuntime
   readonly #activeProjectBinding: ActiveProjectVueBinding
+  readonly #projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding
   #mounted = false
   #disposed = false
   #resourcesReleased = false
@@ -51,12 +63,16 @@ class StudioApplicationImpl implements StudioApplication {
     vueApplication: VueApplication,
     projectRuntime: BrowserActiveProjectRuntime,
     activeProjectBinding: ActiveProjectVueBinding,
+    projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding,
     projectEntry: ProjectEntryCoordinator,
+    projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator,
   ) {
     this.#vueApplication = vueApplication
     this.#projectRuntime = projectRuntime
     this.#activeProjectBinding = activeProjectBinding
+    this.#projectNavigationDecisionBinding = projectNavigationDecisionBinding
     this.projectEntry = projectEntry
+    this.projectNavigationConfirmation = projectNavigationConfirmation
   }
 
   mount(rootContainer: Element | string): ComponentPublicInstance {
@@ -94,11 +110,15 @@ class StudioApplicationImpl implements StudioApplication {
     if (this.#resourcesReleased) return
 
     this.#resourcesReleased = true
-    // Stop Vue state delivery before the Runtime tears down the Service and IndexedDB resources.
+    // Settle one-shot UI capabilities before tearing down state observation and browser resources.
     try {
-      this.#activeProjectBinding.dispose()
+      this.#projectNavigationDecisionBinding.dispose()
     } finally {
-      this.#projectRuntime.dispose()
+      try {
+        this.#activeProjectBinding.dispose()
+      } finally {
+        this.#projectRuntime.dispose()
+      }
     }
   }
 }
@@ -109,16 +129,26 @@ export function composeStudioApplication(
 ): StudioApplication {
   const { projectRuntime } = composition
   let activeProjectBinding: ActiveProjectVueBinding | null = null
+  let projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding | null = null
 
   try {
     activeProjectBinding = createActiveProjectVueBinding(projectRuntime.activeProject)
+    projectNavigationDecisionBinding = createProjectNavigationDecisionVueBinding()
     const projectEntry = createProjectEntryCoordinator({
       activeProject: projectRuntime.activeProject,
       projectCatalog: projectRuntime.projectCatalog,
     })
+    const projectNavigationConfirmation = createProjectNavigationConfirmationCoordinator({
+      activeProject: projectRuntime.activeProject,
+      requestDecision: projectNavigationDecisionBinding.requestDecision,
+    })
     const vueApplication = createApp(composition.rootComponent)
 
     vueApplication.provide(ACTIVE_PROJECT_CONTEXT_KEY, activeProjectBinding.context)
+    vueApplication.provide(
+      PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
+      projectNavigationDecisionBinding.context,
+    )
     vueApplication.use(createPinia())
     // Router installation may start initial navigation, so app-scoped dependencies go first.
     vueApplication.use(composition.router)
@@ -127,13 +157,19 @@ export function composeStudioApplication(
       vueApplication,
       projectRuntime,
       activeProjectBinding,
+      projectNavigationDecisionBinding,
       projectEntry,
+      projectNavigationConfirmation,
     )
   } catch (failureCause) {
     try {
-      activeProjectBinding?.dispose()
+      projectNavigationDecisionBinding?.dispose()
     } finally {
-      projectRuntime.dispose()
+      try {
+        activeProjectBinding?.dispose()
+      } finally {
+        projectRuntime.dispose()
+      }
     }
     throw failureCause
   }

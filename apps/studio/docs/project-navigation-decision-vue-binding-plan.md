@@ -133,4 +133,4 @@ apps/studio/
 - Context 只公开 pending 与受控 resolve，缺少 Provider 和非法运行时 decision 均有稳定 Vue adapter error；
 - 文档明确该一次性 Promise/resolver 状态不进入 Pinia，也不持久化或代理 Project 内容图；
 - 新增 1 个测试文件、5 项测试，Studio 当前为 8 个测试文件、57 项测试；
-- Composition Root 注入、真实对话框、Router adapter 和 Route 仍未修改。
+- Composition Root 注入随后由 [Studio Project Navigation Composition](./studio-project-navigation-composition-plan.md) 完成；真实对话框、Router adapter 和 Route 仍未修改。

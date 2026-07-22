@@ -178,3 +178,5 @@ binding created ? binding.dispose() : skip
 - workspace lint、架构检查、类型检查、全部测试和 Studio 生产构建通过。
 
 Router / Project Entry UI 尚未进入实现。
+
+后续 Navigation Confirmation Coordinator 与 Decision Vue Binding 的应用级所有权、Provider 和释放顺序由 [Studio Project Navigation Composition](./studio-project-navigation-composition-plan.md) 扩展，不改变本基础 Composition Root 的职责。

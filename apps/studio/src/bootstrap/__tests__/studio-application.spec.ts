@@ -6,10 +6,25 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import { composeStudioApplication } from '@/bootstrap/studio-application'
+import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
-import { ACTIVE_PROJECT_PHASE, type ActiveProjectState } from '@/workbench/project/active-project-state'
+import {
+  ACTIVE_PROJECT_PHASE,
+  ACTIVE_PROJECT_SAVE_STATUS,
+  type ActiveProjectState,
+} from '@/workbench/project/active-project-state'
 import type { BrowserActiveProjectRuntime } from '@/workbench/project/browser-active-project-runtime'
 import { PROJECT_ENTRY_RESOLUTION_KIND } from '@/workbench/project/entry/project-entry-coordinator'
+import {
+  PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
+  PROJECT_NAVIGATION_DECISION,
+  PROJECT_NAVIGATION_INTENT_KIND,
+  PROJECT_NAVIGATION_PROCEED_REASON,
+} from '@/workbench/project/navigation/project-navigation-confirmation'
+import {
+  useProjectNavigationDecision,
+  type ProjectNavigationDecisionVueContext,
+} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
 interface RuntimeFixture {
@@ -19,6 +34,7 @@ interface RuntimeFixture {
     typeof vi.fn<BrowserActiveProjectRuntime['projectCatalog']['listRecentProjects']>
   >
   readonly unsubscribe: ReturnType<typeof vi.fn<() => void>>
+  readonly save: ReturnType<typeof vi.fn<() => Promise<void>>>
   readonly dispose: ReturnType<typeof vi.fn<() => void>>
 }
 
@@ -29,8 +45,10 @@ function createTestRouter(): Router {
   })
 }
 
-function createRuntimeFixture(order: string[] = []): RuntimeFixture {
-  const state = Object.freeze<ActiveProjectState>({ phase: ACTIVE_PROJECT_PHASE.IDLE })
+function createRuntimeFixture(
+  order: string[] = [],
+  state: ActiveProjectState = Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE }),
+): RuntimeFixture {
   const unsubscribe = vi.fn<() => void>(() => {
     order.push('binding')
   })
@@ -38,11 +56,12 @@ function createRuntimeFixture(order: string[] = []): RuntimeFixture {
   const listRecentProjects = vi.fn<
     BrowserActiveProjectRuntime['projectCatalog']['listRecentProjects']
   >(() => Promise.resolve([]))
+  const save = vi.fn<() => Promise<void>>(() => Promise.resolve())
   const activeProject: ActiveProjectService = {
     state,
     create: () => Promise.resolve(parseProjectId('studio-created-project')),
     open,
-    save: () => Promise.resolve(),
+    save,
     subscribe: () => unsubscribe,
     dispose() {},
   }
@@ -59,8 +78,34 @@ function createRuntimeFixture(order: string[] = []): RuntimeFixture {
     open,
     listRecentProjects,
     unsubscribe,
+    save,
     dispose,
   }
+}
+
+function createDirtyReadyState(projectId: ProjectId): ActiveProjectState {
+  const session = createTestSession(projectId)
+
+  return Object.freeze({
+    phase: ACTIVE_PROJECT_PHASE.READY,
+    projectId,
+    session,
+    modelRevision: session.modelRevision,
+    contentStateId: session.contentStateId,
+    savedRevision: null,
+    savedContentStateId: null,
+    isDirty: true,
+    saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    saveFailure: null,
+    recoveryFailures: Object.freeze([]),
+  })
+}
+
+function requireNavigationDecisionContext(
+  context: ProjectNavigationDecisionVueContext | null,
+): ProjectNavigationDecisionVueContext {
+  if (context === null) throw new Error('Expected the Project navigation decision Context')
+  return context
 }
 
 describe('StudioApplication', () => {
@@ -73,13 +118,14 @@ describe('StudioApplication', () => {
     const rootComponent = defineComponent({
       setup() {
         const activeProject = useActiveProject()
+        const projectNavigationDecision = useProjectNavigationDecision()
         const installedRouter = useRouter()
         const store = useCompositionStore()
 
         return () =>
           h(
             'p',
-            `${activeProject.state.value.phase}|${store.label}|${installedRouter === router}`,
+            `${activeProject.state.value.phase}|${projectNavigationDecision.pendingDecision.value === null}|${store.label}|${installedRouter === router}`,
           )
       },
     })
@@ -92,8 +138,76 @@ describe('StudioApplication', () => {
 
     application.mount(container)
 
-    expect(container.textContent).toBe('idle|pinia|true')
+    expect(container.textContent).toBe('idle|true|pinia|true')
     application.dispose()
+  })
+
+  it('wires Project Navigation Confirmation to the provided Vue decision channel', async () => {
+    const projectId = parseProjectId('studio-navigation-project')
+    const fixture = createRuntimeFixture([], createDirtyReadyState(projectId))
+    let decisionContext: ProjectNavigationDecisionVueContext | null = null
+    const application = composeStudioApplication({
+      rootComponent: defineComponent({
+        setup() {
+          decisionContext = useProjectNavigationDecision()
+          return () => null
+        },
+      }),
+      router: createTestRouter(),
+      projectRuntime: fixture.runtime,
+    })
+    application.mount(document.createElement('div'))
+    const context = requireNavigationDecisionContext(decisionContext)
+
+    const confirmation = application.projectNavigationConfirmation.confirm({
+      kind: PROJECT_NAVIGATION_INTENT_KIND.LEAVE_PROJECT,
+    })
+    await vi.waitFor(() => expect(context.pendingDecision.value).not.toBeNull())
+    const pending = context.pendingDecision.value
+    if (pending === null) {
+      throw new Error('Expected a provided pending Project navigation decision')
+    }
+
+    expect(pending.request.activeProjectId).toBe(projectId)
+    expect(context.resolve(pending, PROJECT_NAVIGATION_DECISION.DISCARD)).toBe(true)
+    await expect(confirmation).resolves.toEqual({
+      kind: PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.PROCEED,
+      reason: PROJECT_NAVIGATION_PROCEED_REASON.DISCARDED,
+      activeProjectId: projectId,
+    })
+    expect(fixture.save).not.toHaveBeenCalled()
+    application.dispose()
+  })
+
+  it('cancels a pending Project navigation decision when the application is disposed', async () => {
+    const projectId = parseProjectId('studio-navigation-dispose')
+    const fixture = createRuntimeFixture([], createDirtyReadyState(projectId))
+    let decisionContext: ProjectNavigationDecisionVueContext | null = null
+    const application = composeStudioApplication({
+      rootComponent: defineComponent({
+        setup() {
+          decisionContext = useProjectNavigationDecision()
+          return () => null
+        },
+      }),
+      router: createTestRouter(),
+      projectRuntime: fixture.runtime,
+    })
+    application.mount(document.createElement('div'))
+    const context = requireNavigationDecisionContext(decisionContext)
+    const confirmation = application.projectNavigationConfirmation.confirm({
+      kind: PROJECT_NAVIGATION_INTENT_KIND.CREATE_PROJECT,
+    })
+    await vi.waitFor(() => expect(context.pendingDecision.value).not.toBeNull())
+
+    application.dispose()
+
+    await expect(confirmation).resolves.toEqual({
+      kind: PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.CANCELLED,
+      activeProjectId: projectId,
+    })
+    expect(context.pendingDecision.value).toBeNull()
+    expect(fixture.dispose).toHaveBeenCalledOnce()
   })
 
   it('wires Project Entry to the same owned Active Project Runtime', async () => {

@@ -1,12 +1,14 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import App from '@/App.vue'
+import { createBrowserStudioApplication } from '@/bootstrap/studio-application'
+import router from '@/router'
 
-import App from './App.vue'
-import router from './router'
+const studioApplication = createBrowserStudioApplication({
+  rootComponent: App,
+  router,
+})
 
-const app = createApp(App)
+studioApplication.mount('#app')
 
-app.use(createPinia())
-app.use(router)
-
-app.mount('#app')
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => studioApplication.dispose())
+}

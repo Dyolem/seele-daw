@@ -179,4 +179,4 @@ apps/studio/
 - 确认有效性由 Project ID 与稳定 `ProjectContentStateId` 校准：新内容会重新确认，Undo 回同一内容位置不会重复确认；
 - 保存期间继续编辑会在旧 Checkpoint 完成后对新内容重新确认，不会把“保存完成”错误等同为“当前 clean”；
 - 新增 1 个生产协议目录、1 个测试文件与 8 项测试，Studio 当前为 7 个测试文件、52 项测试；
-- Vue 对话框、Router navigation token / guard、`beforeunload` 和真实 Route 保持在本阶段之外。
+- Vue Decision Port 的浅响应式桥接随后由 [Project Navigation Decision Vue Binding](./project-navigation-decision-vue-binding-plan.md) 独立承载；真实对话框、Router navigation token / guard、`beforeunload` 和 Route 保持在本阶段之外。

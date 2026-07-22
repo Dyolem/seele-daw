@@ -16,6 +16,10 @@ import {
 import type { BrowserActiveProjectRuntime } from '@/workbench/project/browser-active-project-runtime'
 import { PROJECT_ENTRY_RESOLUTION_KIND } from '@/workbench/project/entry/project-entry-coordinator'
 import {
+  useProjectEntry,
+  type ProjectEntryVueContext,
+} from '@/workbench/project/entry/vue/project-entry-context'
+import {
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
   PROJECT_NAVIGATION_DECISION,
   PROJECT_NAVIGATION_INTENT_KIND,
@@ -108,6 +112,13 @@ function requireNavigationDecisionContext(
   return context
 }
 
+function requireProjectEntryContext(
+  context: ProjectEntryVueContext | null,
+): ProjectEntryVueContext {
+  if (context === null) throw new Error('Expected the Project Entry Context')
+  return context
+}
+
 describe('StudioApplication', () => {
   it('installs Pinia and Router while providing the owned Active Project Context', () => {
     const fixture = createRuntimeFixture()
@@ -115,9 +126,11 @@ describe('StudioApplication', () => {
     const useCompositionStore = defineStore('studio-composition-root', {
       state: () => ({ label: 'pinia' }),
     })
+    let projectEntryContext: ProjectEntryVueContext | null = null
     const rootComponent = defineComponent({
       setup() {
         const activeProject = useActiveProject()
+        projectEntryContext = useProjectEntry()
         const projectNavigationDecision = useProjectNavigationDecision()
         const installedRouter = useRouter()
         const store = useCompositionStore()
@@ -139,6 +152,9 @@ describe('StudioApplication', () => {
     application.mount(container)
 
     expect(container.textContent).toBe('idle|true|pinia|true')
+    expect(requireProjectEntryContext(projectEntryContext).projectEntry).toBe(
+      application.projectEntry,
+    )
     application.dispose()
   })
 

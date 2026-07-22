@@ -16,6 +16,7 @@ import {
   createProjectEntryCoordinator,
   type ProjectEntryCoordinator,
 } from '@/workbench/project/entry/project-entry-coordinator'
+import { PROJECT_ENTRY_CONTEXT_KEY } from '@/workbench/project/entry/vue/project-entry-context'
 import {
   createProjectNavigationConfirmationCoordinator,
   type ProjectNavigationConfirmationCoordinator,
@@ -145,6 +146,7 @@ export function composeStudioApplication(
     const vueApplication = createApp(composition.rootComponent)
 
     vueApplication.provide(ACTIVE_PROJECT_CONTEXT_KEY, activeProjectBinding.context)
+    vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
     vueApplication.provide(
       PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
       projectNavigationDecisionBinding.context,

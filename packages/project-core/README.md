@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 也已完成，Studio 接入、JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -77,7 +77,7 @@ nextNotes.set(noteId, changedNote)
 | ProjectSnapshot | 某一 revision 的稳定视图 | 否             | 用于首次编译、保存、Worker 和诊断          |
 | ProjectCommit   | 否                       | 否             | 一次提交的结果、版本和元数据               |
 | ProjectDelta    | 否                       | 否             | 告知消费者哪些语义范围失效                 |
-| History         | 否                       | 受控维护       | 保存可逆 mutation，不是项目文件            |
+| History         | 否                       | 受控维护       | 保存可逆 mutation 与内容状态身份，不是项目文件 |
 | Journal         | 否                       | 外部持久化     | 用于崩溃恢复，不等于 Undo History          |
 
 只有 ModelStore 中的项目实体是当前创作事实。Snapshot 是某一 revision 的固定观察结果，QueryIndex 和 Delta 都可以丢弃并重新生成。
@@ -182,7 +182,7 @@ ProjectSession
 
 Durability 和 Playback 通过端口或订阅接收结果。Project commit 不等待磁盘、音频设备或 Worker；外部失败不能回滚已经合法的创作事实。
 
-当前 `ProjectSession` 已经公开 `modelRevision`、`canUndo`、`canRedo`、同步 `getSnapshot()`、`query(query)`、`subscribe(subscription, observer)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex、ChangePublisher、Snapshot 生成器和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History / QueryIndex transition 与 gated publication，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry、索引 root 或通知。空 History 的 Undo / Redo 返回 `null`，实际重放则返回并异步发布新的 ProjectCommit。显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)、[ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)、[ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md) 与 [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)。
+当前 `ProjectSession` 已经公开 `modelRevision`、会话级 `contentStateId`、`canUndo`、`canRedo`、同步 `getSnapshot()`、`query(query)`、`subscribe(subscription, observer)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex、ChangePublisher、Snapshot 生成器和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History / QueryIndex transition 与 gated publication，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry、内容状态身份、索引 root 或通知。空 History 的 Undo / Redo 返回 `null`，实际重放则恢复 before / after content identity、返回并异步发布新的 ProjectCommit。显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)、[Project Content State Identity 与精确保存点计划](./docs/project-content-state-identity-plan.md)、[ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)、[ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md) 与 [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)。
 
 ## 命令与原子提交管线
 
@@ -338,11 +338,11 @@ Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playb
 
 ## Project Checkpoint 基础层
 
-`ProjectCheckpoint` 是包裹完整 `ProjectFileDTO` 的 storage-neutral 持久化 envelope，拥有独立 `checkpointFormatVersion`、opaque checkpoint ID、Project ID 和来源 `modelRevision`。来源 revision 只用于判断异步保存完成时 Session 是否又发生编辑；恢复出的 fresh Session 仍从 revision `0` 开始。
+`ProjectCheckpoint` 是包裹完整 `ProjectFileDTO` 的 storage-neutral 持久化 envelope，拥有独立 `checkpointFormatVersion`、opaque checkpoint ID、Project ID 和来源 `modelRevision`。来源 revision 用于保存顺序诊断；恢复出的 fresh Session 仍从 revision `0` 开始。
 
 直接按 Project ID 覆盖一份 ProjectFileDTO 足以实现最简浏览器保存；Checkpoint 是为了异步 revision 对账、不可变 active/previous 保存记录、损坏候选回退和独立版本演进。它只属于应用内部持久化，不进入用户导出的项目文件。
 
-`saveProjectCheckpoint(store, session, input)` 只捕获一次 Snapshot，再创建 DTO 和 frozen checkpoint，异步保存完成后返回包含来源 revision 的 receipt。存储失败不会回滚或改变 Session。`ProjectCheckpointStore` 只定义保存可信 checkpoint 与读取按恢复优先级排列的 `unknown` candidates，不暴露 IndexedDB、OPFS 或 DOM 类型。
+`saveProjectCheckpoint(store, session, input)` 只捕获一次 Snapshot，再创建 DTO 和 frozen checkpoint，异步保存完成后返回包含来源 revision 与会话级 `sourceContentStateId` 的 receipt。content identity 不进入持久化 envelope；上层以它精确判断 Undo / Redo 是否回到保存点。存储失败不会回滚或改变 Session。`ProjectCheckpointStore` 只定义保存可信 checkpoint 与读取按恢复优先级排列的 `unknown` candidates，不暴露 IndexedDB、OPFS 或 DOM 类型。
 
 `restoreProjectCheckpoint(store, projectId)` 逐个严格解码候选，验证 envelope、内部 Project File 与请求 Project ID，并只从完整通过领域不变量的 DTO 组合 Session。active 候选结构损坏、领域非法或属于其他项目时会保留 frozen 诊断并继续 previous；空候选返回 `null`，存在候选但全部失败则抛出 `ProjectCheckpointOperationError`。完整决策见 [Project Checkpoint 基础协议与存储端口计划](./docs/project-checkpoint-foundation-plan.md)。
 
@@ -509,6 +509,7 @@ src/
 - [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
 - [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)
 - [Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)
+- [Project Content State Identity 与精确保存点计划](./docs/project-content-state-identity-plan.md)
 - [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)
 - [ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md)
 - [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)

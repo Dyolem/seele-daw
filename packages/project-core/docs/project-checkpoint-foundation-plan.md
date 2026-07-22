@@ -50,7 +50,7 @@ ProjectCheckpoint   哪一次本地保存接受了这些事实，以及它来自
 
 本项目增加 envelope 有四个已知需求：
 
-1. **异步 revision 对账**：Project File 按设计不保存 `modelRevision`。若 revision 10 开始写入后用户已经编辑到 revision 11，写入完成不能把当前状态错误标记为 fully saved。Checkpoint receipt 保留 `sourceModelRevision`，上层只有在当前 revision 仍相等时才能清除 dirty 状态。
+1. **异步保存对账**：Project File 按设计不保存 Session 运行时状态。Checkpoint receipt 最初保留 `sourceModelRevision`；后续精确保存点阶段又加入不持久化的 `sourceContentStateId`。若保存期间继续编辑，完成回执仍能指向真正被捕获的 History 内容状态。
 2. **不可变保存记录**：后续 IndexedDB adapter 写入新的 checkpoint record，成功后再原子切换 active pointer，而不是原地覆盖唯一有效 ProjectFileDTO；previous checkpoint 可以继续作为恢复候选。
 3. **候选恢复与诊断**：active checkpoint 的 envelope、Project File 或领域关系损坏时，核心可以按顺序拒绝它并尝试 previous，同时保留每个 candidate failure。一个只返回单份 DTO 的端口没有表达这一恢复协议的位置。
 4. **版本概念分离**：`projectFile.formatVersion`、`checkpointFormatVersion`、IndexedDB database version 和未来 `journalSequence` 分别演进。增加保存元数据或修改数据库布局不应迫使 Project File V1 升级。
@@ -76,16 +76,16 @@ interface ProjectCheckpoint {
 - `checkpointFormatVersion` 只版本化 checkpoint envelope，不复用 `projectFile.formatVersion`、IndexedDB database version、Journal sequence 或 cloud version；
 - `checkpointId` 是非空 opaque string，由调用方生成并注入，project-core 不读取时钟或调用随机数 API；
 - `projectId` 与嵌套 `projectFile.projectId` 必须完全一致；
-- `sourceModelRevision` 记录生成 Snapshot 时的 Session revision，用于保存完成后的 dirty/saved 判断；
+- `sourceModelRevision` 记录生成 Snapshot 时的 Session revision，用于提交顺序和保存来源诊断；精确 dirty 判断由 save receipt 的会话级 content-state identity 完成；
 - 恢复后的 fresh Session 仍从 revision `0` 开始，不能把旧进程 revision 写回 ModelStore。
 
 本阶段不加入 `createdAt`。墙上时钟属于 adapter 或产品元数据，不能参与 checkpoint 正确性。
 
 ## Snapshot 一致性与异步保存
 
-保存协调函数必须只调用一次 `session.getSnapshot()`，再从该 Snapshot 同时取得 `sourceModelRevision`、Project ID 和 ProjectFileDTO。不能在异步存储前后分别读取 Session 字段，否则一次 checkpoint 可能混入两个 revision。
+保存协调函数必须只调用一次 `session.getSnapshot()`，再从该 Snapshot 同时取得 `sourceModelRevision`、Project ID 和 ProjectFileDTO。后续精确保存点阶段会在同一个同步调用栈内先读取当前 `session.contentStateId`，紧接着捕获 Snapshot；中间没有 await、外部 callback 或可重入写入口，因此二者描述同一 Session 状态。不能在异步存储前后分别读取这些字段。
 
-`saveProjectCheckpoint` 返回 frozen receipt，其中保留 checkpoint ID、Project ID 和来源 revision。保存期间 Session 可以继续编辑；调用方只有在当前 `session.modelRevision === receipt.sourceModelRevision` 时才能显示完全 saved。Checkpoint 保存不阻塞或回滚已提交 Command。
+`saveProjectCheckpoint` 返回 frozen receipt，其中保留 checkpoint ID、Project ID、来源 revision，以及后续加入的 `sourceContentStateId`。后者只返回调用方，不写入 ProjectCheckpoint envelope 或 Store。保存期间 Session 可以继续编辑；调用方以当前 `session.contentStateId === receipt.sourceContentStateId` 判断是否回到被保存的同一个 History 状态。Checkpoint 保存不阻塞或回滚已提交 Command。
 
 本阶段不在 core 中实现 debounce、save queue 或 dirty ref。这些需要 Studio 生命周期与产品策略；receipt 提供正确组合它们所需的 revision 事实。
 
@@ -153,7 +153,8 @@ Project File loader 增加包内“从已解码 DTO 组合 Session”的入口�
 - Checkpoint factory 只捕获一次 Snapshot，输出深度冻结并与 Session 后续编辑隔离；
 - envelope version、字段、data property、checkpoint ID、revision 和三处 Project ID 对应关系严格校验；
 - decoder 输出与输入容器分离，并安全接受合法 opaque ID；
-- 保存 receipt 固定来源 revision；异步保存期间继续编辑不会改变 receipt 或 checkpoint；
+- 保存 receipt 固定来源 revision 与会话级 content-state identity；异步保存期间继续编辑不会改变 receipt 或 checkpoint；
+- content-state identity 不进入持久化 envelope，fresh 恢复 Session 生成自己的初始 identity；
 - store write/read failure 使用稳定 operation error 且不改变 Session；
 - 空候选返回 `null`；
 - active 有效时直接恢复，active 损坏时回退 previous 并保留诊断；
@@ -171,7 +172,7 @@ Project File loader 增加包内“从已解码 DTO 组合 Session”的入口�
 
 - package root 已公开独立版本的 `ProjectCheckpoint`、opaque ID parser、factory、严格 decoder 与错误协议；
 - `ProjectCheckpointStore` 只暴露可信 save 和按优先级返回不可信 candidates 的 storage-neutral 契约；
-- `saveProjectCheckpoint` 只捕获一次 Snapshot，并以 frozen receipt 返回来源 revision；
+- `saveProjectCheckpoint` 只捕获一次 Snapshot，并以 frozen receipt 返回来源 revision；后续精确保存点阶段又在 receipt 中返回同一同步捕获边界的 Session content-state identity，但不改变 Checkpoint V1；
 - `restoreProjectCheckpoint` 能区分空存储与全部候选损坏，并在结构、领域或请求 Project 错误后按顺序回退；
 - Project File loader 增加未公开的 decoded-DTO 组合入口，避免恢复大型项目时重复全量 decode/copy；
 - opaque ID 与 ModelRevision 的公共包内解析逻辑已复用，未为 Checkpoint 重复定义同一规则；

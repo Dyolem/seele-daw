@@ -68,6 +68,7 @@ describe('ActiveProjectService creation and opening', () => {
       recoveryFailures: [],
     })
     expect(Object.isFrozen(state)).toBe(true)
+    expect(state.contentStateId).toBe(state.savedContentStateId)
     expect(Object.isFrozen(state.recoveryFailures)).toBe(true)
     expect(store.saved).toHaveLength(1)
     expect(store.saved[0]).toMatchObject({ projectId, sourceModelRevision: 0 })
@@ -338,6 +339,9 @@ describe('ActiveProjectService saving and dirty state', () => {
       isDirty: false,
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
     })
+    expect(requireReady(service.state).contentStateId).toBe(
+      requireReady(service.state).savedContentStateId,
+    )
     expect(store.saved).toHaveLength(1)
 
     await session?.emitCommit()
@@ -346,13 +350,64 @@ describe('ActiveProjectService saving and dirty state', () => {
       savedRevision: 0,
       isDirty: true,
     })
+    expect(requireReady(service.state).contentStateId).not.toBe(
+      requireReady(service.state).savedContentStateId,
+    )
 
     await service.save()
     expect(requireReady(service.state)).toMatchObject({
       savedRevision: 1,
       isDirty: false,
     })
+    expect(requireReady(service.state).contentStateId).toBe(
+      requireReady(service.state).savedContentStateId,
+    )
     expect(store.saved).toHaveLength(2)
+  })
+
+  it('uses History content identity when Undo or Redo returns to the saved state', async () => {
+    const projectId = createTestProjectId('history-save-point')
+    let session: MutableTestProjectSession | undefined
+    const { service } = createServiceFixture(
+      undefined,
+      vi.fn((requestedProjectId: ProjectId) => {
+        session = createTestSession(requestedProjectId)
+        return session
+      }),
+      () => projectId,
+    )
+    await service.create()
+    const initialContentStateId = requireReady(service.state).contentStateId
+
+    await session?.emitCommit()
+    const savedEditedContentStateId = requireReady(service.state).contentStateId
+    await service.save()
+
+    await session?.emitCommit(initialContentStateId)
+    expect(requireReady(service.state)).toMatchObject({
+      modelRevision: 2,
+      savedRevision: 1,
+      isDirty: true,
+    })
+
+    await session?.emitCommit(savedEditedContentStateId)
+    expect(requireReady(service.state)).toMatchObject({
+      modelRevision: 3,
+      savedRevision: 1,
+      isDirty: false,
+    })
+
+    await session?.emitCommit()
+    expect(requireReady(service.state).isDirty).toBe(true)
+
+    await session?.emitCommit(savedEditedContentStateId)
+    const returnedToSavePoint = requireReady(service.state)
+    expect(returnedToSavePoint).toMatchObject({
+      modelRevision: 5,
+      savedRevision: 1,
+      isDirty: false,
+    })
+    expect(returnedToSavePoint.contentStateId).toBe(returnedToSavePoint.savedContentStateId)
   })
 
   it('remains dirty when editing continues during a save and rejects a concurrent save', async () => {
@@ -384,6 +439,40 @@ describe('ActiveProjectService saving and dirty state', () => {
       isDirty: true,
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
     })
+  })
+
+  it('becomes clean when an in-flight save completes after History returns to its source state', async () => {
+    const projectId = createTestProjectId('save-history-race')
+    let session: MutableTestProjectSession | undefined
+    const { service, store } = createServiceFixture(
+      undefined,
+      vi.fn((requestedProjectId: ProjectId) => {
+        session = createTestSession(requestedProjectId)
+        return session
+      }),
+      () => projectId,
+    )
+    await service.create()
+    await session?.emitCommit()
+    const savingContentStateId = requireReady(service.state).contentStateId
+    const gate = createDeferred()
+    store.saveGate = gate.promise
+
+    const saving = service.save()
+    await session?.emitCommit()
+    await session?.emitCommit(savingContentStateId)
+    gate.resolve()
+    await saving
+
+    const ready = requireReady(service.state)
+    expect(ready).toMatchObject({
+      modelRevision: 3,
+      savedRevision: 1,
+      isDirty: false,
+      saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    })
+    expect(ready.contentStateId).toBe(savingContentStateId)
+    expect(ready.savedContentStateId).toBe(savingContentStateId)
   })
 
   it('keeps the Session and saved baseline after a failed save, then allows retry', async () => {

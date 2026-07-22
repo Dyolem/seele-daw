@@ -7,11 +7,17 @@ import {
   type MutationPlan,
 } from '#internal/mutation/mutation-plan'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import {
+  createProjectContentStateId,
+  type ProjectContentStateId,
+} from '#internal/session/project-content-state-id'
 
 interface HistoryEntry {
   readonly commandType: ProjectCommandType
   readonly forward: readonly ProjectMutation[]
   readonly inverse: readonly ProjectMutation[]
+  readonly beforeContentStateId: ProjectContentStateId
+  readonly afterContentStateId: ProjectContentStateId
 }
 
 interface HistoryStackNode {
@@ -36,6 +42,11 @@ export interface PreparedHistoryTransition<
 export class HistoryController {
   #undoHead: HistoryStackNode | null = null
   #redoHead: HistoryStackNode | null = null
+  #contentStateId = createProjectContentStateId()
+
+  get contentStateId(): ProjectContentStateId {
+    return this.#contentStateId
+  }
 
   get canUndo(): boolean {
     return this.#undoHead !== null
@@ -51,17 +62,27 @@ export class HistoryController {
   ): PreparedHistoryTransition<null> {
     assertCreatedMutationPlan(plan)
 
+    const afterContentStateId = createProjectContentStateId()
     const entry = Object.freeze<HistoryEntry>({
       commandType,
       forward: plan.forward,
       inverse: plan.inverse,
+      beforeContentStateId: this.#contentStateId,
+      afterContentStateId,
     })
     const nextUndoHead = Object.freeze<HistoryStackNode>({
       entry,
       next: this.#undoHead,
     })
 
-    return this.#createTransition(plan, commandType, null, nextUndoHead, null)
+    return this.#createTransition(
+      plan,
+      commandType,
+      null,
+      nextUndoHead,
+      null,
+      afterContentStateId,
+    )
   }
 
   prepareUndo(
@@ -70,6 +91,9 @@ export class HistoryController {
     const node = this.#undoHead
 
     if (node === null) return null
+    if (this.#contentStateId !== node.entry.afterContentStateId) {
+      throw new Error('Undo entry does not match the current Project content state')
+    }
 
     const plan = createMutationPlan(baseRevision, node.entry.inverse)
     const nextRedoHead = Object.freeze<HistoryStackNode>({
@@ -83,6 +107,7 @@ export class HistoryController {
       PROJECT_HISTORY_DIRECTION.UNDO,
       node.next,
       nextRedoHead,
+      node.entry.beforeContentStateId,
     )
   }
 
@@ -92,6 +117,9 @@ export class HistoryController {
     const node = this.#redoHead
 
     if (node === null) return null
+    if (this.#contentStateId !== node.entry.beforeContentStateId) {
+      throw new Error('Redo entry does not match the current Project content state')
+    }
 
     const plan = createMutationPlan(baseRevision, node.entry.forward)
     const nextUndoHead = Object.freeze<HistoryStackNode>({
@@ -105,6 +133,7 @@ export class HistoryController {
       PROJECT_HISTORY_DIRECTION.REDO,
       nextUndoHead,
       node.next,
+      node.entry.afterContentStateId,
     )
   }
 
@@ -114,9 +143,11 @@ export class HistoryController {
     direction: Direction,
     nextUndoHead: HistoryStackNode | null,
     nextRedoHead: HistoryStackNode | null,
+    nextContentStateId: ProjectContentStateId,
   ): PreparedHistoryTransition<Direction> {
     const expectedUndoHead = this.#undoHead
     const expectedRedoHead = this.#redoHead
+    const expectedContentStateId = this.#contentStateId
     let state: HistoryTransitionState = 'prepared'
 
     const stage = (): void => {
@@ -124,12 +155,17 @@ export class HistoryController {
         throw new Error(`History transition cannot stage from state ${state}`)
       }
 
-      if (this.#undoHead !== expectedUndoHead || this.#redoHead !== expectedRedoHead) {
-        throw new Error('History transition no longer matches the current stack heads')
+      if (
+        this.#undoHead !== expectedUndoHead ||
+        this.#redoHead !== expectedRedoHead ||
+        this.#contentStateId !== expectedContentStateId
+      ) {
+        throw new Error('History transition no longer matches the current History state')
       }
 
       this.#undoHead = nextUndoHead
       this.#redoHead = nextRedoHead
+      this.#contentStateId = nextContentStateId
       state = 'staged'
     }
 
@@ -140,6 +176,7 @@ export class HistoryController {
 
       this.#undoHead = expectedUndoHead
       this.#redoHead = expectedRedoHead
+      this.#contentStateId = expectedContentStateId
       state = 'rolled-back'
     }
 

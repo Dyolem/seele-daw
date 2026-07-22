@@ -16,6 +16,7 @@ import {
   type ProjectQuery,
   type ProjectQueryResultFor,
   type ProjectSession,
+  type ProjectContentStateId,
   type ProjectSnapshot,
   type ProjectSubscription,
   type ProjectSubscriptionDeliveryFailure,
@@ -76,6 +77,7 @@ export class MutableTestProjectSession implements ProjectSession {
   readonly #baseSession: ProjectSession
   readonly #subscriptions = new Set<TestSubscriptionEntry>()
   #modelRevision: ModelRevision
+  #contentStateId: ProjectContentStateId
 
   constructor(projectId: ProjectId) {
     this.#baseSession = createInitialProjectSession({
@@ -85,10 +87,15 @@ export class MutableTestProjectSession implements ProjectSession {
       timeSignatureEventId: parseTimeSignatureEventId(`meter-${projectId}`),
     })
     this.#modelRevision = this.#baseSession.modelRevision
+    this.#contentStateId = this.#baseSession.contentStateId
   }
 
   get modelRevision(): ModelRevision {
     return this.#modelRevision
+  }
+
+  get contentStateId(): ProjectContentStateId {
+    return this.#contentStateId
   }
 
   get canUndo(): boolean {
@@ -135,8 +142,11 @@ export class MutableTestProjectSession implements ProjectSession {
     return null
   }
 
-  async emitCommit(): Promise<void> {
+  async emitCommit(
+    contentStateId: ProjectContentStateId = Symbol('TestProjectContentStateId') as ProjectContentStateId,
+  ): Promise<void> {
     this.#modelRevision = (this.#modelRevision + 1) as ModelRevision
+    this.#contentStateId = contentStateId
     await Promise.resolve()
 
     // ActiveProjectService intentionally observes the commit fact, not its payload.

@@ -259,6 +259,7 @@ describe('Project Checkpoint coordination', () => {
       },
     })
     store.saveGate = deferred.promise
+    const sourceContentStateId = session.contentStateId
 
     const saving = saveProjectCheckpoint(store, countingSession, {
       checkpointId: parseProjectCheckpointId('checkpoint-stale-completion'),
@@ -274,11 +275,16 @@ describe('Project Checkpoint coordination', () => {
       checkpointId: 'checkpoint-stale-completion',
       projectId: fixture.records.project.id,
       sourceModelRevision: 0,
+      sourceContentStateId,
     })
     expect(Object.isFrozen(receipt)).toBe(true)
+    expect(typeof receipt.sourceContentStateId).toBe('symbol')
     expect(store.saved[0]?.sourceModelRevision).toBe(0)
+    expect('sourceContentStateId' in store.saved[0]!).toBe(false)
+    expect('contentStateId' in session.getSnapshot()).toBe(false)
     expect(session.modelRevision).toBe(1)
     expect(session.modelRevision).not.toBe(receipt.sourceModelRevision)
+    expect(session.contentStateId).not.toBe(receipt.sourceContentStateId)
   })
 
   it('wraps store write and read failures without changing the Session', async () => {
@@ -325,6 +331,8 @@ describe('Project Checkpoint coordination', () => {
     expect(restored?.checkpoint.sourceModelRevision).toBe(1)
     expect(store.readProjectIds).toEqual([fixture.records.project.id])
     expect(restored?.session.modelRevision).toBe(0)
+    expect(restored?.session.contentStateId).not.toBe(session.contentStateId)
+    expect(typeof restored?.session.contentStateId).toBe('symbol')
     expect(restored?.session.canUndo).toBe(false)
     expect(restored?.session.canRedo).toBe(false)
     expect(restored?.rejectedCandidates).toEqual([])

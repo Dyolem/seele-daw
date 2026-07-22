@@ -21,6 +21,7 @@ import {
   type NoChangeProjectCommandExecution,
   type ProjectCommandExecutionResult,
 } from '#internal/session/project-command-execution'
+import type { ProjectContentStateId } from '#internal/session/project-content-state-id'
 import { createProjectSnapshot, type ProjectSnapshot } from '#internal/snapshots/project-snapshot'
 import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import type {
@@ -34,6 +35,7 @@ export type CreateInitialProjectSessionInput = CreateInitialModelStoreInput
 /** Public read/write facade for one in-memory project lifetime. */
 export interface ProjectSession {
   readonly modelRevision: ModelRevision
+  readonly contentStateId: ProjectContentStateId
   readonly canUndo: boolean
   readonly canRedo: boolean
 
@@ -76,6 +78,10 @@ class ProjectSessionImpl implements ProjectSession {
 
   get modelRevision(): ModelRevision {
     return this.#store.modelRevision
+  }
+
+  get contentStateId(): ProjectContentStateId {
+    return this.#history.contentStateId
   }
 
   get canUndo(): boolean {

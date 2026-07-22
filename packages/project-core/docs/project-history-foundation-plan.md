@@ -61,7 +61,9 @@ History Commit 仍携带新的 revision 和按实际执行方向生成的 Delta�
 HistoryEntry
 ├── original commandType
 ├── forward mutations
-└── inverse mutations
+├── inverse mutations
+├── before content-state identity（后续精确保存点阶段加入）
+└── after content-state identity（后续精确保存点阶段加入）
 ```
 
 `commandType` 记录产生 entry 的原始产品命令类型，当前用于 History Commit origin；它不参与反向操作计算。`forward` 和 `inverse` 才是可以应用到模型的规范化存储变化。
@@ -69,6 +71,8 @@ HistoryEntry
 当前三个 Note Command 各自产生一条 mutation，但 entry 使用数组，因为未来的 Duplicate、Split 或级联删除等一个用户动作可能同时改变多个实体。无论包含多少 mutation，一次成功 Command 只产生一个 entry，一次 Undo 也撤销整个 entry。
 
 entry 共享 MutationPlan 已冻结的 mutation 数组与领域 Record 引用。它不是完整模型快照，不复制整张实体表；但会保留被修改 Record 的准确 before / after 引用，以便恢复相同的不可变 Record，而不是重新构造一个字段恰好相同的对象。
+
+后续精确保存点阶段为每条 entry 增加了 before / after `ProjectContentStateId`。普通 Command 进入新的 after identity；Undo 恢复 before；Redo 恢复同一个 after。它标识 History 状态位置，不是此前延期的 entry ID，也不进入持久化。完整规则见 [Project Content State Identity 与精确保存点计划](./project-content-state-identity-plan.md)。
 
 ### Command 与反向操作
 
@@ -102,7 +106,7 @@ ProjectCommand
 
 Undo 使用 `createMutationPlan(currentRevision, entry.inverse)`，Redo 使用 `createMutationPlan(currentRevision, entry.forward)`。因此每次重放都会获得当前 baseRevision、新的 plan 来源证明、反向计划和完整不变量验证；它们不是绕过前置条件、把模型强制改回旧状态。
 
-History label、gesture merge key、Editor restore point、entry ID 和持久化格式都需要新的产品输入，本阶段不猜测默认值。
+History label、gesture merge key、Editor restore point、entry ID 和持久化格式都需要新的产品输入，本阶段不猜测默认值。后续加入的 content-state identity 不是 entry ID；它只为 Session 当前内容位置和保存点提供会话级相等判断。
 
 ## 栈结构
 
@@ -219,4 +223,5 @@ HistoryController、HistoryEntry、stack node、transition 和 MutationPlan 保�
 - History Commit 使用新的 revision、实际重放方向的 Delta，以及包含原始 Command 类型的 `history` origin；
 - 新 committed Command 清空 redo，no-change、命令拒绝和 apply 失败保留原 History 分支；
 - Add / Move / Remove 的 Record 引用、LIFO 顺序、分支规则，以及普通提交与 Undo / Redo 重放的写入失败恢复均已覆盖；
+- 后续精确保存点阶段已让 History transition 原子推进 content-state identity，Undo / Redo 恢复同一状态身份，失败回滚同时恢复栈头与身份；
 - Project Core 基线为 16 个测试文件、282 项测试。

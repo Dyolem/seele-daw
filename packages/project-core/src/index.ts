@@ -167,6 +167,7 @@ export type {
 } from './session/project-command-execution'
 export { createInitialProjectSession } from './session/project-session'
 export type { CreateInitialProjectSessionInput, ProjectSession } from './session/project-session'
+export type { ProjectContentStateId } from './session/project-content-state-id'
 
 export { createChannelStripDescriptor, createMasterChannelRecord } from './model/channel'
 export type {

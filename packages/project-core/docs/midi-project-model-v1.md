@@ -496,6 +496,7 @@ ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只�
 - 一次原子事务只让 `modelRevision` 增加一次；
 - revision 是成功事务的最后一次写入；失败回滚不改变 revision，Undo 则是产生新 revision 的新事务；
 - `modelRevision` 是运行时并发与订阅版本，不进入 ProjectFileDTO；
+- `ProjectContentStateId` 是 Session History 位置的 opaque 会话身份，用于 Undo / Redo 保存点判断，同样不进入 ModelStore、Snapshot 或 ProjectFileDTO；
 - 包外不能取得内部 Map、可变数组或可写实体引用。
 
 Map insertion order 不表达实体表的领域顺序。防御性回滚或 Undo 中的 remove → insert 可以让键移动到 Map 尾部，但必须恢复相同实体引用、所有权关系和显式 ID 顺序。持久化 DTO 若需要确定性顺序，应在投影边界稳定排序。

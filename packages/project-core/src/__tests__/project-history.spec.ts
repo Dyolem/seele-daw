@@ -65,12 +65,55 @@ describe('Project History public boundary', () => {
     expect(session.undo()).toBeNull()
     expect(session.redo()).toBeNull()
     expect(session.modelRevision).toBe(0)
+    expect(typeof session.contentStateId).toBe('symbol')
     expect('HistoryController' in projectCore).toBe(false)
+    expect('createProjectContentStateId' in projectCore).toBe(false)
     expect('createHistoryProjectCommitCandidate' in projectCore).toBe(false)
   })
 })
 
 describe('ProjectSession Undo / Redo', () => {
+  it('restores stable content-state identities and assigns a new identity to a branch', () => {
+    const { fixture, session } = createFixtureProjectSession()
+    const initialContentStateId = session.contentStateId
+
+    executeMove(
+      session,
+      fixture.records.nonLoopSource.id,
+      fixture.records.nonLoopNote.id,
+      parseTick(960),
+      parseMidiPitch(67),
+    )
+    const movedContentStateId = session.contentStateId
+    expect(movedContentStateId).not.toBe(initialContentStateId)
+
+    session.undo()
+    expect(session.contentStateId).toBe(initialContentStateId)
+
+    session.redo()
+    expect(session.contentStateId).toBe(movedContentStateId)
+
+    session.undo()
+    requireCommitted(
+      session.execute(
+        createAddNoteCommand({
+          baseRevision: session.modelRevision,
+          sourceId: fixture.records.nonLoopSource.id,
+          noteId: parseNoteId('note-history-content-state-branch'),
+          startTick: parseTick(1_200),
+          durationTick: parseTick(240),
+          pitch: parseMidiPitch(72),
+          velocity: parseMidiVelocity(100),
+          channel: parseMidiChannel(0),
+        }),
+      ),
+    )
+
+    expect(session.contentStateId).not.toBe(initialContentStateId)
+    expect(session.contentStateId).not.toBe(movedContentStateId)
+    expect(session.canRedo).toBe(false)
+  })
+
   it('undoes and redoes AddNote with new commits and the original Record reference', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const noteId = parseNoteId('note-history-added')
@@ -268,6 +311,7 @@ describe('ProjectSession Undo / Redo', () => {
       parseMidiPitch(67),
     )
     session.undo()
+    const contentStateId = session.contentStateId
 
     const noChange = session.execute(
       createMoveNoteCommand({
@@ -281,6 +325,7 @@ describe('ProjectSession Undo / Redo', () => {
 
     expect(noChange.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE)
     expect(session.canRedo).toBe(true)
+    expect(session.contentStateId).toBe(contentStateId)
 
     expect(() =>
       session.execute(
@@ -296,6 +341,7 @@ describe('ProjectSession Undo / Redo', () => {
       expect.objectContaining<Partial<ProjectCommandError>>({ code: 'note-out-of-source-range' }),
     )
     expect(session.canRedo).toBe(true)
+    expect(session.contentStateId).toBe(contentStateId)
   })
 
   it('restores the previous History branch when authoritative apply fails', () => {
@@ -310,6 +356,7 @@ describe('ProjectSession Undo / Redo', () => {
       parseMidiPitch(67),
     )
     session.undo()
+    const contentStateIdBeforeFailure = session.contentStateId
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
@@ -343,6 +390,7 @@ describe('ProjectSession Undo / Redo', () => {
     ).toThrowError(expect.objectContaining<Partial<MutationApplyError>>({ code: 'write-failed' }))
 
     expect(session.modelRevision).toBe(2)
+    expect(session.contentStateId).toBe(contentStateIdBeforeFailure)
     expect(store.getMidiNote(command.sourceId, noteId)).toBeUndefined()
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
@@ -370,6 +418,7 @@ describe('ProjectSession Undo / Redo', () => {
     }
 
     const after = moveChange.after
+    const afterContentStateId = session.contentStateId
     const failAuthoritativeWrite = (expectedValue: unknown, operation: () => unknown): void => {
       expect(() =>
         withAuthoritativeMapSetInterceptor((key, value) => {
@@ -383,24 +432,29 @@ describe('ProjectSession Undo / Redo', () => {
     failAuthoritativeWrite(before, () => session.undo())
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
     expect(session.modelRevision).toBe(1)
+    expect(session.contentStateId).toBe(afterContentStateId)
     expect(session.canUndo).toBe(true)
     expect(session.canRedo).toBe(false)
 
     session.undo()
+    const beforeContentStateId = session.contentStateId
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
     expect(session.modelRevision).toBe(2)
+    expect(session.contentStateId).toBe(beforeContentStateId)
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
     failAuthoritativeWrite(after, () => session.redo())
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
     expect(session.modelRevision).toBe(2)
+    expect(session.contentStateId).toBe(beforeContentStateId)
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
     session.redo()
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
     expect(session.modelRevision).toBe(3)
+    expect(session.contentStateId).toBe(afterContentStateId)
     expect(session.canUndo).toBe(true)
     expect(session.canRedo).toBe(false)
   })

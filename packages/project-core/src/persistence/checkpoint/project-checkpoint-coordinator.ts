@@ -19,6 +19,7 @@ import type { ProjectCheckpointStore } from '#internal/persistence/checkpoint/pr
 import { ProjectFileLoadError } from '#internal/persistence/project-file-load-error'
 import { createProjectSessionFromDecodedProjectFile } from '#internal/persistence/project-file-loader'
 import type { ProjectSession } from '#internal/session/project-session'
+import type { ProjectContentStateId } from '#internal/session/project-content-state-id'
 
 export type SaveProjectCheckpointInput = CreateProjectCheckpointInput
 
@@ -26,6 +27,7 @@ export interface ProjectCheckpointSaveReceipt {
   readonly checkpointId: ProjectCheckpointId
   readonly projectId: ProjectId
   readonly sourceModelRevision: ModelRevision
+  readonly sourceContentStateId: ProjectContentStateId
 }
 
 export interface ProjectCheckpointRestoreResult {
@@ -34,11 +36,15 @@ export interface ProjectCheckpointRestoreResult {
   readonly rejectedCandidates: readonly ProjectCheckpointCandidateFailure[]
 }
 
-function createSaveReceipt(checkpoint: ProjectCheckpoint): ProjectCheckpointSaveReceipt {
+function createSaveReceipt(
+  checkpoint: ProjectCheckpoint,
+  sourceContentStateId: ProjectContentStateId,
+): ProjectCheckpointSaveReceipt {
   return Object.freeze({
     checkpointId: checkpoint.checkpointId,
     projectId: checkpoint.projectId,
     sourceModelRevision: checkpoint.sourceModelRevision,
+    sourceContentStateId,
   })
 }
 
@@ -61,6 +67,7 @@ export async function saveProjectCheckpoint(
   session: ProjectSession,
   input: SaveProjectCheckpointInput,
 ): Promise<ProjectCheckpointSaveReceipt> {
+  const sourceContentStateId = session.contentStateId
   const checkpoint = createProjectCheckpoint(session.getSnapshot(), input)
 
   try {
@@ -73,7 +80,7 @@ export async function saveProjectCheckpoint(
     )
   }
 
-  return createSaveReceipt(checkpoint)
+  return createSaveReceipt(checkpoint, sourceContentStateId)
 }
 
 /** Restores the first fully valid candidate as a fresh Session. */

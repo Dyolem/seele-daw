@@ -1,5 +1,6 @@
 import type {
   ModelRevision,
+  ProjectContentStateId,
   ProjectCheckpointCandidateFailure,
   ProjectId,
   ProjectSession,
@@ -66,7 +67,9 @@ export interface ReadyActiveProjectState {
   readonly session: ProjectSession
   /** Revision observed when this immutable state value was published. */
   readonly modelRevision: ModelRevision
+  readonly contentStateId: ProjectContentStateId
   readonly savedRevision: ModelRevision | null
+  readonly savedContentStateId: ProjectContentStateId | null
   readonly isDirty: boolean
   readonly saveStatus: ActiveProjectSaveStatus
   readonly saveFailure: unknown

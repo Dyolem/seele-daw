@@ -71,7 +71,8 @@ ready
 
 - 当前 `ProjectSession` 和观测到的 `modelRevision`；
 - `savedRevision`；当前 Create 会先保存初始 Checkpoint，因此正常 ready 不再从 `null` 开始；该类型仍保留 `null` 以表达未来导入或临时项目等未保存来源；
-- 由 revision 对账得出的 `isDirty`；
+- 当前 `contentStateId` 与最近成功保存的 `savedContentStateId`；二者是同一 Session 内的 opaque History 状态身份；
+- 由 content-state identity 对账得出的 `isDirty`；
 - `saveStatus` 与最近一次保存失败；
 - 恢复成功前被拒绝的 checkpoint candidates，供未来 UI 提示发生过 previous fallback。
 
@@ -82,13 +83,15 @@ ready
 Dirty 不作为独立、可随意翻转的事实保存，而只按下式派生：
 
 ```text
-isDirty = savedRevision is null
-       or observedModelRevision != savedRevision
+isDirty = savedContentStateId is null
+       or currentContentStateId !== savedContentStateId
 ```
 
 服务订阅 Session 的 all-project-commits。普通 Command、undo 和 redo 都会发布 commit，因此三条编辑路径使用同一个 dirty 规则，不需要 UI 记得在每种操作后手动置脏。
 
-Checkpoint 恢复会创建 revision `0` 的 fresh Session，所以恢复成功时 `savedRevision` 取该 Session 的 `0`，不能取旧进程写入 envelope 的 `sourceModelRevision`。后者只描述 checkpoint 当时捕获自哪个旧 Session revision。
+`modelRevision` 仍是递增的提交序号：Undo / Redo 也会产生新 revision，因此不能准确表达“回到保存点”。Project Core History 为每个内容状态提供稳定的会话级 `ProjectContentStateId`；Command 进入新身份，Undo 恢复 before identity，Redo 恢复同一个 after identity。完整协议见 [Project Content State Identity 与精确保存点计划](../../../packages/project-core/docs/project-content-state-identity-plan.md)。
+
+Checkpoint 恢复会创建 revision `0`、新初始 content identity 的 fresh Session。恢复成功时 `savedRevision` 取该 Session 的 `0`，`savedContentStateId` 取该 Session 的当前身份；不能复用旧进程 envelope 的 `sourceModelRevision`，也不存在需要持久化的旧 content identity。
 
 ## 新建与打开语义
 
@@ -111,12 +114,13 @@ create fresh checkpoint ID
 -> capture one Session Snapshot
 -> saveProjectCheckpoint
 -> use receipt.sourceModelRevision as savedRevision
--> compare with the current Session revision
+-> use receipt.sourceContentStateId as savedContentStateId
+-> compare with the current Session contentStateId
 ```
 
-保存期间不锁定编辑。若 revision `10` 开始保存、写入完成前 Session 已到 `11`，成功回执只把 `savedRevision` 推进到 `10`，状态仍然 dirty；不能因为一次异步写入成功就无条件显示 Saved。
+保存期间不锁定编辑。若状态 B 开始保存、写入完成前 Session 已到 C，成功回执把 saved baseline 推进到 B：当前仍在 C 时是 dirty；如果期间 Undo 回 B，则即使 revision 已继续递增，也会准确恢复 clean。不能因为一次异步写入成功就无条件显示 Saved，也不能只因 revision 不同就永远保持 dirty。
 
-保存失败保留当前 Session 和旧 `savedRevision`，进入 `saveStatus: failed` 并暴露原始错误。后续显式保存可以重试。首版同一个活动项目只允许一个在途保存，重复 `save()` 返回稳定的 `save-in-progress` 使用错误；不在此阶段提前实现 save queue 或 coalescing。
+保存失败保留当前 Session、旧 `savedRevision` 与旧 `savedContentStateId`，进入 `saveStatus: failed` 并暴露原始错误。后续显式保存可以重试。首版同一个活动项目只允许一个在途保存，重复 `save()` 返回稳定的 `save-in-progress` 使用错误；不在此阶段提前实现 save queue 或 coalescing。
 
 若打开另一个项目或销毁服务时旧保存仍在途，底层写入可以正常结束，但其 completion 不得修改新项目或 disposed 状态。
 
@@ -149,8 +153,8 @@ apps/studio/
 - 有效 checkpoint 恢复为 clean fresh Session；
 - active 损坏而 previous 有效时保留恢复诊断；全部无效时进入 open-failed 且不新建空项目；
 - store read/write 失败保持原始 cause 和正确状态；
-- commit（包含未来的 command / undo / redo 共同发布路径）更新 observed revision 与 dirty；
-- 保存成功推进 `savedRevision`，保存期间继续编辑不会误清 dirty；
+- commit（包含 command / undo / redo 共同发布路径）更新 observed revision、content identity 与 dirty；
+- 保存成功推进 `savedRevision` 与 `savedContentStateId`，保存期间继续编辑或回到保存来源状态均能准确判断 dirty；
 - 保存失败保留 Session 与已保存基线，并允许重试；
 - 并发保存被拒绝；连续打开只允许最后请求生效；
 - dispose 或项目切换后的 stale async completion 不污染状态；
@@ -164,9 +168,9 @@ apps/studio/
 本阶段已于 2026-07-21 按上述边界完成：
 
 - `ActiveProjectService` 已在 Studio Workbench 内组合 Project Session 与 storage-neutral Checkpoint 协调函数，没有依赖 Vue、Pinia、Router、`idb` 或 platform-browser 内部实现；
-- idle、creating、create-failed、opening、open-failed、ready、session-failed、disposed 与保存子状态均为 frozen 判别联合，dirty 只由观测 revision 和 `savedRevision` 派生；
+- idle、creating、create-failed、opening、open-failed、ready、session-failed、disposed 与保存子状态均为 frozen 判别联合；后续精确保存点阶段已把 dirty 改为只由当前与已保存的 content-state identity 派生，revision 保留作顺序诊断；
 - 明确 Create 内部分配 ID 并保存初始 Checkpoint、Open 只恢复已有项目、previous fallback 诊断、全部损坏失败、显式保存和失败重试已经形成完整应用服务语义；
-- 保存期间允许继续编辑，并只按 receipt 的来源 revision 推进保存基线；同一项目的并发保存被明确拒绝；
+- 保存期间允许继续编辑，并按 receipt 的来源 revision 与 content-state identity 推进保存基线；同一项目的并发保存被明确拒绝；
 - generation guard 保证重叠打开、切换项目或 dispose 后的旧异步 completion 不能污染当前状态；
 - Session all-commits 订阅统一覆盖 command / undo / redo 的 dirty 观察，状态 observer failure 与其他 observer 隔离；
 - 新建 Session 工厂会校验 Project ID；恢复得到的 Session 已由核心恢复协议校准，不再额外生成一次大型 Snapshot；

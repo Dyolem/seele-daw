@@ -4,6 +4,7 @@ import {
   restoreProjectCheckpoint,
   saveProjectCheckpoint,
   type ModelRevision,
+  type ProjectContentStateId,
   type ProjectCheckpointCandidateFailure,
   type ProjectCheckpointId,
   type ProjectCheckpointStore,
@@ -44,6 +45,7 @@ interface ReadyStateInput {
   readonly projectId: ProjectId
   readonly session: ProjectSession
   readonly savedRevision: ModelRevision | null
+  readonly savedContentStateId: ProjectContentStateId | null
   readonly saveStatus: ReadyActiveProjectState['saveStatus']
   readonly saveFailure: unknown
   readonly recoveryFailures: readonly ProjectCheckpointCandidateFailure[]
@@ -75,15 +77,23 @@ function cloneRecoveryFailures(
 }
 
 function createReadyState(input: ReadyStateInput): ReadyActiveProjectState {
+  if ((input.savedRevision === null) !== (input.savedContentStateId === null)) {
+    throw new Error('Saved revision and content-state identity must be present together')
+  }
+
   const modelRevision = input.session.modelRevision
+  const contentStateId = input.session.contentStateId
 
   return Object.freeze({
     phase: ACTIVE_PROJECT_PHASE.READY,
     projectId: input.projectId,
     session: input.session,
     modelRevision,
+    contentStateId,
     savedRevision: input.savedRevision,
-    isDirty: input.savedRevision === null || modelRevision !== input.savedRevision,
+    savedContentStateId: input.savedContentStateId,
+    isDirty:
+      input.savedContentStateId === null || contentStateId !== input.savedContentStateId,
     saveStatus: input.saveStatus,
     saveFailure: input.saveFailure,
     recoveryFailures: cloneRecoveryFailures(input.recoveryFailures),
@@ -152,6 +162,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
             projectId,
             session,
             savedRevision: receipt.sourceModelRevision,
+            savedContentStateId: receipt.sourceContentStateId,
             saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
             saveFailure: null,
             recoveryFailures: [],
@@ -217,6 +228,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
           projectId: expectedProjectId,
           session,
           savedRevision: session.modelRevision,
+          savedContentStateId: session.contentStateId,
           saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
           saveFailure: null,
           recoveryFailures: restored.rejectedCandidates,
@@ -265,6 +277,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
         projectId: current.projectId,
         session,
         savedRevision: current.savedRevision,
+        savedContentStateId: current.savedContentStateId,
         saveStatus: ACTIVE_PROJECT_SAVE_STATUS.SAVING,
         saveFailure: null,
         recoveryFailures: current.recoveryFailures,
@@ -285,6 +298,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
           projectId: ready.projectId,
           session,
           savedRevision: receipt.sourceModelRevision,
+          savedContentStateId: receipt.sourceContentStateId,
           saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
           saveFailure: null,
           recoveryFailures: ready.recoveryFailures,
@@ -298,6 +312,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
             projectId: ready.projectId,
             session,
             savedRevision: ready.savedRevision,
+            savedContentStateId: ready.savedContentStateId,
             saveStatus: ACTIVE_PROJECT_SAVE_STATUS.FAILED,
             saveFailure,
             recoveryFailures: ready.recoveryFailures,
@@ -346,6 +361,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
             projectId,
             session,
             savedRevision: ready.savedRevision,
+            savedContentStateId: ready.savedContentStateId,
             saveStatus: ready.saveStatus,
             saveFailure: ready.saveFailure,
             recoveryFailures: ready.recoveryFailures,

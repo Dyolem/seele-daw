@@ -21,6 +21,7 @@ import {
   type ModelRevision,
   type NoChangeProjectCommandExecution,
   type ProjectCommandExecutionResult,
+  type ProjectContentStateId,
   type ProjectSession,
 } from '#internal/index'
 import { ModelStore } from '#internal/model/model-store'
@@ -43,6 +44,7 @@ describe('ProjectSession public contract', () => {
       NO_CHANGE: 'no-change',
     })
     expectTypeOf(session).toEqualTypeOf<ProjectSession>()
+    expectTypeOf(session.contentStateId).toEqualTypeOf<ProjectContentStateId>()
     expectTypeOf<ProjectCommandExecutionResult>().toEqualTypeOf<
       CommittedProjectCommandExecution | NoChangeProjectCommandExecution
     >()

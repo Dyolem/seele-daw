@@ -1,7 +1,6 @@
 import {
   IndexedDBProjectCatalog,
   IndexedDBProjectCheckpointStore,
-  type RecentProjectSummary,
 } from '@seele-daw/platform-browser'
 import { parseProjectCheckpointId, parseProjectId } from '@seele-daw/project-core'
 
@@ -13,16 +12,13 @@ import {
   createMinimalNewProjectSession,
   MINIMAL_NEW_PROJECT_NAME,
 } from '@/workbench/project/minimal-new-project-session'
+import type { ProjectCatalogReader } from '@/workbench/project/project-catalog-reader'
 
 export interface BrowserActiveProjectRuntimeOptions {
   readonly databaseName?: string
   readonly getCurrentTime?: () => number
   readonly newProjectName?: string
   readonly createUniqueId?: () => string
-}
-
-export interface ProjectCatalogReader {
-  listRecentProjects(): Promise<readonly RecentProjectSummary[]>
 }
 
 export interface BrowserActiveProjectRuntime {

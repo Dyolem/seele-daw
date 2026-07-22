@@ -1,6 +1,7 @@
 import {
   PROJECT_CHECKPOINTS_STORE,
   PROJECT_CHECKPOINT_HEADS_STORE,
+  PROJECT_CATALOG_STORE,
   SEELE_PROJECT_DATABASE_STORES,
   SEELE_PROJECT_DATABASE_VERSION,
   type SeeleProjectDatabaseSchema,
@@ -39,12 +40,15 @@ async function assertPhysicalSchema(
   const transaction = database.transaction(SEELE_PROJECT_DATABASE_STORES, 'readonly')
   const checkpoints = transaction.objectStore(PROJECT_CHECKPOINTS_STORE)
   const heads = transaction.objectStore(PROJECT_CHECKPOINT_HEADS_STORE)
+  const catalog = transaction.objectStore(PROJECT_CATALOG_STORE)
 
   const hasExpectedLayout =
     isCompoundKeyPath(checkpoints.keyPath, ['projectId', 'checkpointId']) &&
     checkpoints.indexNames.length === 0 &&
     heads.keyPath === 'projectId' &&
-    heads.indexNames.length === 0
+    heads.indexNames.length === 0 &&
+    catalog.keyPath === 'projectId' &&
+    catalog.indexNames.length === 0
 
   await transaction.done
 
@@ -64,6 +68,9 @@ function upgradePhysicalSchema(database: SeeleProjectDatabaseConnection, oldVers
     keyPath: ['projectId', 'checkpointId'],
   })
   database.createObjectStore(PROJECT_CHECKPOINT_HEADS_STORE, {
+    keyPath: 'projectId',
+  })
+  database.createObjectStore(PROJECT_CATALOG_STORE, {
     keyPath: 'projectId',
   })
 }

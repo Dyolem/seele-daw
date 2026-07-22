@@ -2,7 +2,7 @@
 
 `platform-browser` 封装浏览器基础设施，为项目内核、编辑器和播放系统定义的服务端口提供 IndexedDB、OPFS、文件、权限、Worker、设备与运行能力实现。
 
-> 当前状态：已完成基于 `idb` 的 Project Checkpoint IndexedDB V1 适配器；Studio 接入、Journal、OPFS 和其他浏览器能力尚未开始。长期架构中的 `browser-infra` 对应当前包。
+> 当前状态：已完成基于 `idb` 的 Project Checkpoint + Project Catalog IndexedDB V1 适配器并接入 Studio Browser Runtime；Journal、OPFS 和其他浏览器能力尚未开始。长期架构中的 `browser-infra` 对应当前包。
 
 ## 包定位
 
@@ -44,7 +44,11 @@ Project journal 只能引用 completed blob。显式 Save 只有在待引用资�
 
 Snapshot 采用新记录加 checkpoint 指针切换，不能原地覆盖唯一有效副本；Asset GC 使用 snapshot、checkpoint、journal 和 pending recording 作为 roots 做保守 mark-and-sweep。
 
-首个持久化纵向切片使用轻量 `idb` 包装原生 IndexedDB。`idb` 类型不会进入 Project Core 端口或本包公开 API；真正稳定的是数据库名称、版本、object store、keyPath 和事务协议。当前不建立通用 Repository、CRUD 或查询 DSL，避免在项目内重复实现一套数据访问框架。完整决策与物理格式见 [IndexedDB Project Checkpoint Store 计划](./docs/indexed-db-project-checkpoint-store-plan.md)。
+首个持久化纵向切片使用轻量 `idb` 包装原生 IndexedDB。`idb` 类型不会进入 Project Core 端口或本包公开 API；真正稳定的是数据库名称、版本、object store、keyPath 和事务协议。当前不建立通用 Repository、CRUD 或查询 DSL，避免在项目内重复实现一套数据访问框架。完整决策与物理格式见 [IndexedDB Project Checkpoint Store 计划](./docs/indexed-db-project-checkpoint-store-plan.md) 与 [IndexedDB Project Catalog V1 计划](./docs/indexed-db-project-catalog-plan.md)。
+
+Project Catalog 保存项目名称和最后一次成功 Checkpoint 时间，供 Studio 发现最近项目。它与 Checkpoint / Head 在同一事务内更新，但只是本地导航元数据，不进入 Project Core 或导出文件。数据库尚未产生需要兼容的真实产品数据，因此 Catalog 直接属于首次完整 Physical Schema V1，database version 仍为 `1`，没有伪造 V2 migration。
+
+Head 与 Catalog value 各自包含独立 Record V1 判别字段。普通 value property 演进使用记录格式版本，不与 IndexedDB database version 混用；只有 object store、keyPath 或 index 改变才需要真实数据库升级。最后保存时间是本机存储事实，不加入确定性的 Project Model / Project File；未来可移植的文档时间应由 bundle manifest 等独立协议拥有。
 
 ## 建议的内部模块
 
@@ -84,7 +88,7 @@ src/
 ## 分阶段计划
 
 1. 实现 RuntimeCapabilities probe 和统一错误/降级状态。
-2. 用 IndexedDB 保存和恢复 Project Snapshot，完成首条 MIDI 纵向切片。（Checkpoint adapter 已完成，待 Studio 接入）
+2. 用 IndexedDB 保存和恢复 Project Snapshot，并提供最近项目目录。（Checkpoint、Catalog 与 Studio Runtime 接入已完成）
 3. 增加 journal queue、连续 sequence、checkpoint 和崩溃恢复。
 4. 建立 Worker 协议、项目迁移和大任务执行通道。
 5. 增加 OPFS asset store、导入 pipeline、引用提交与项目 bundle。
@@ -92,7 +96,7 @@ src/
 
 ## 测试与验收
 
-当前基线为 1 个测试文件、13 项测试，覆盖 Physical Schema V1、事务轮换、失败回滚、候选回退、项目隔离、并发写入和连接重开。
+当前基线为 2 个测试文件、18 项测试，覆盖完整 Physical Schema V1、Checkpoint/Catalog 原子事务、最近项目排序、失败回滚、候选回退、项目隔离、并发写入和连接重开。
 
 - IndexedDB transaction abort、quota failure 和 crash injection；
 - snapshot + 连续 journal 恢复到最后一致 `modelRevision`；

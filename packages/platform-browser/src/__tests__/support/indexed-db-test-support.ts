@@ -1,6 +1,7 @@
 import {
   PROJECT_CHECKPOINTS_STORE,
   PROJECT_CHECKPOINT_HEADS_STORE,
+  PROJECT_CATALOG_STORE,
   SEELE_PROJECT_DATABASE_VERSION,
   type ProjectCheckpointKey,
   type SeeleProjectDatabaseSchema,
@@ -71,6 +72,22 @@ export async function putRawCheckpointHead(databaseName: string, value: unknown)
 
   try {
     await database.put(PROJECT_CHECKPOINT_HEADS_STORE, value)
+  } finally {
+    database.close()
+  }
+}
+
+export async function putRawProjectCatalogRecord(
+  databaseName: string,
+  value: unknown,
+): Promise<void> {
+  const database = await openDB<SeeleProjectDatabaseSchema>(
+    databaseName,
+    SEELE_PROJECT_DATABASE_VERSION,
+  )
+
+  try {
+    await database.put(PROJECT_CATALOG_STORE, value)
   } finally {
     database.close()
   }

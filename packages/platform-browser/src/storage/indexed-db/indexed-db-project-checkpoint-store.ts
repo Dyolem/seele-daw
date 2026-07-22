@@ -1,11 +1,16 @@
 import {
   createProjectCheckpointKey,
+  PROJECT_CHECKPOINT_HEAD_RECORD_VERSION,
   PROJECT_CHECKPOINTS_STORE,
   PROJECT_CHECKPOINT_HEADS_STORE,
+  PROJECT_CATALOG_STORE,
   SEELE_PROJECT_DATABASE_NAME,
+  type ProjectCatalogRecordV1,
   type ProjectCheckpointHeadRecordV1,
 } from '#internal/storage/indexed-db/indexed-db-schema'
 import { IndexedDBStorageError } from '#internal/storage/indexed-db/indexed-db-storage-error'
+import { createProjectCatalogRecord } from '#internal/storage/indexed-db/indexed-db-project-catalog-record'
+import { abortAndObserve } from '#internal/storage/indexed-db/indexed-db-transaction'
 import { SeeleProjectDatabase } from '#internal/storage/indexed-db/seele-project-database'
 import {
   parseProjectCheckpointId,
@@ -17,15 +22,11 @@ import {
 } from '@seele-daw/project-core'
 
 const HEAD_FIELDS = Object.freeze([
+  'headRecordVersion',
   'projectId',
   'activeCheckpointId',
   'previousCheckpointId',
 ] as const)
-
-interface TransactionCompletion {
-  abort(): void
-  readonly done: Promise<unknown>
-}
 
 class InvalidProjectCheckpointHeadError extends Error {
   constructor(message: string, cause?: unknown) {
@@ -36,6 +37,7 @@ class InvalidProjectCheckpointHeadError extends Error {
 
 export interface IndexedDBProjectCheckpointStoreOptions {
   readonly databaseName?: string
+  readonly getCurrentTime?: () => number
 }
 
 interface DecodedProjectCheckpointHead {
@@ -48,20 +50,6 @@ function describeValue(value: unknown): string {
   if (value === null) return 'null'
   if (Array.isArray(value)) return 'array'
   return typeof value
-}
-
-async function abortAndObserve(transaction: TransactionCompletion): Promise<void> {
-  try {
-    transaction.abort()
-  } catch {
-    // A failed request may already have aborted the transaction.
-  }
-
-  try {
-    await transaction.done
-  } catch {
-    // The original stable adapter error is reported by the caller.
-  }
 }
 
 function readHeadFields(value: unknown): Readonly<Record<string, unknown>> {
@@ -97,6 +85,9 @@ function decodeHeadRecord(
 ): DecodedProjectCheckpointHead {
   try {
     const fields = readHeadFields(value)
+    if (fields.headRecordVersion !== PROJECT_CHECKPOINT_HEAD_RECORD_VERSION) {
+      throw new TypeError(`unsupported Head record version ${String(fields.headRecordVersion)}`)
+    }
     const projectId = parseProjectId(fields.projectId)
     const activeCheckpointId = parseProjectCheckpointId(fields.activeCheckpointId)
     const previousCheckpointId =
@@ -125,12 +116,18 @@ function createHeadRecord(
   activeCheckpointId: ProjectCheckpointId,
   previousCheckpointId: ProjectCheckpointId | null,
 ): ProjectCheckpointHeadRecordV1 {
-  return { projectId, activeCheckpointId, previousCheckpointId }
+  return {
+    headRecordVersion: PROJECT_CHECKPOINT_HEAD_RECORD_VERSION,
+    projectId,
+    activeCheckpointId,
+    previousCheckpointId,
+  }
 }
 
 /** IndexedDB implementation of the storage-neutral Project Checkpoint port. */
 export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
   readonly #database: SeeleProjectDatabase
+  readonly #getCurrentTime: () => number
 
   constructor(options: IndexedDBProjectCheckpointStoreOptions = {}) {
     const databaseName = options.databaseName ?? SEELE_PROJECT_DATABASE_NAME
@@ -143,6 +140,7 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
     }
 
     this.#database = new SeeleProjectDatabase(databaseName)
+    this.#getCurrentTime = options.getCurrentTime ?? Date.now
   }
 
   get databaseName(): string {
@@ -156,12 +154,14 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
   async save(checkpoint: ProjectCheckpoint): Promise<void> {
     let projectId: ProjectId
     let checkpointId: ProjectCheckpointId
+    let catalogRecord: ProjectCatalogRecordV1
 
     try {
       projectId = parseProjectId(checkpoint.projectId)
       checkpointId = parseProjectCheckpointId(checkpoint.checkpointId)
+      catalogRecord = createProjectCatalogRecord(checkpoint, projectId, this.#getCurrentTime())
     } catch (cause) {
-      throw new IndexedDBStorageError('invalid-input', 'Invalid Project Checkpoint storage key', {
+      throw new IndexedDBStorageError('invalid-input', 'Invalid Project Checkpoint storage input', {
         cause,
         databaseName: this.databaseName,
         operation: 'save-checkpoint',
@@ -171,11 +171,12 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
     const database = await this.#database.getConnection()
     // The immutable row, pointer rotation, and old-row eviction form one durability boundary.
     const transaction = database.transaction(
-      [PROJECT_CHECKPOINTS_STORE, PROJECT_CHECKPOINT_HEADS_STORE],
+      [PROJECT_CHECKPOINTS_STORE, PROJECT_CHECKPOINT_HEADS_STORE, PROJECT_CATALOG_STORE],
       'readwrite',
     )
     const checkpoints = transaction.objectStore(PROJECT_CHECKPOINTS_STORE)
     const heads = transaction.objectStore(PROJECT_CHECKPOINT_HEADS_STORE)
+    const catalog = transaction.objectStore(PROJECT_CATALOG_STORE)
 
     try {
       const storedHead = await heads.get(projectId)
@@ -199,6 +200,8 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
       await heads.put(
         createHeadRecord(projectId, checkpointId, currentHead?.activeCheckpointId ?? null),
       )
+      // Catalog metadata is committed with the Checkpoint so “recent” never advertises a failed save.
+      await catalog.put(catalogRecord)
 
       if (
         currentHead?.previousCheckpointId !== null &&

@@ -8,6 +8,7 @@ export type IndexedDBStorageErrorCode =
 
 export type IndexedDBStorageOperation =
   | 'open-database'
+  | 'list-recent-projects'
   | 'read-checkpoint-candidates'
   | 'save-checkpoint'
 

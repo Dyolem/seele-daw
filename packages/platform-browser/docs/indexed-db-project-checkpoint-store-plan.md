@@ -13,7 +13,7 @@ ProjectSession
 -> browser IndexedDB
 ```
 
-本阶段只实现 immutable checkpoint、active/previous 指针、恢复候选和数据库生命周期。不接入 Studio，不实现自动保存、dirty 状态、Journal、JSON codec、迁移链、checksum、OPFS 或多标签页编辑冲突协调。
+本阶段最初只实现 immutable checkpoint、active/previous 指针、恢复候选和数据库生命周期。随后在数据库进入真实产品前补齐同属 Physical Schema V1 的 Project Catalog；完整目录决策见 [IndexedDB Project Catalog V1 计划](./indexed-db-project-catalog-plan.md)。自动保存、dirty 状态、Journal、JSON codec、checksum、OPFS 或多标签页编辑冲突协调不属于本层。
 
 ## 为什么先使用 idb
 
@@ -29,6 +29,8 @@ ProjectSession
 
 默认数据库名称为 `seele-daw`，IndexedDB database version 为 `1`。这与 Project File format、Checkpoint format 和未来 Journal format 分别版本化。
 
+数据库尚未通过产品入口产生需要保留的真实数据，因此后补的 `projectCatalog` 被视为首次完整 V1 的组成部分，database version 不提升。当前没有 V2 migration 或旧布局回填；数据库发布使用后的一切物理变化仍必须正常升级版本并提供迁移测试。
+
 ### `projectCheckpoints`
 
 ```text
@@ -43,6 +45,7 @@ value: structured-cloned ProjectCheckpoint
 
 ```ts
 interface ProjectCheckpointHeadRecordV1 {
+  headRecordVersion: 1
   projectId: string
   activeCheckpointId: string
   previousCheckpointId: string | null
@@ -54,11 +57,29 @@ keyPath: projectId
 indexes: none
 ```
 
-Head 是浏览器内部恢复元数据，不进入导出的 Project File 或 Project Checkpoint envelope。读取时必须严格验证字段集合、data property、ID 形状、Project ID 对应关系，以及 active/previous 不重复。
+Head 是浏览器内部恢复元数据，不进入导出的 Project File 或 Project Checkpoint envelope。`headRecordVersion` 独立版本化 value 协议；读取时必须严格验证版本、字段集合、data property、ID 形状、Project ID 对应关系，以及 active/previous 不重复。
+
+### `projectCatalog`
+
+```ts
+interface ProjectCatalogRecordV1 {
+  catalogRecordVersion: 1
+  projectId: string
+  name: string
+  lastCheckpointSavedAt: number
+}
+```
+
+```text
+keyPath: projectId
+indexes: none
+```
+
+Catalog 是由成功 Checkpoint 保存产生的本地导航摘要。ID / 名称派生自项目事实，最后保存时间是 adapter 本地事实。它不进入 Project Core 项目模型或导出文件；`catalogRecordVersion` 独立版本化 value 协议，读取时同样从 `unknown` 严格解码。
 
 ## 保存事务
 
-每次 `save(checkpoint)` 在覆盖两个 object store 的同一个 `readwrite` transaction 中执行：
+每次 `save(checkpoint)` 在覆盖三个 object store 的同一个 `readwrite` transaction 中执行：
 
 ```text
 读取并验证当前 Head
@@ -66,6 +87,7 @@ Head 是浏览器内部恢复元数据，不进入导出的 Project File 或 Pro
 -> add 新 immutable Checkpoint
 -> 原 active 变为 previous
 -> 新 Checkpoint 变为 active
+-> 更新 Catalog name 与 lastCheckpointSavedAt
 -> 删除更旧 previous
 -> 等待 transaction.done
 ```
@@ -90,7 +112,9 @@ Checkpoint value 本身保持为 `unknown`，由 Project Core 的正式 decoder 
 
 ## 连接与错误边界
 
-私有 `SeeleProjectDatabase` 负责 lazy open、复用连接、V1 upgrade、物理 Schema 校准、显式 close，以及在 `versionchange` 或异常 termination 后丢弃连接。Schema 校准检查 store 名称、keyPath 和 index 集合，避免 TypeScript Schema 与实际浏览器数据库静默分叉。
+私有 `SeeleProjectDatabase` 负责 lazy open、复用连接、首次创建完整 V1、物理 Schema 校准、显式 close，以及在 `versionchange` 或异常 termination 后丢弃连接。Schema 校准检查三个 store 的名称、keyPath 和 index 集合，避免 TypeScript Schema 与实际浏览器数据库静默分叉。
+
+IndexedDB database version 只版本化 object store、keyPath 和 index 等物理布局；Head / Catalog value 分别使用自己的 Record version。未来普通 value 字段演进可以在 database V1 中按记录版本解码，不能为了一个字段机械升级数据库，也不能在没有 record discriminant 的情况下猜测形状。
 
 公开 `IndexedDBStorageError` 提供稳定 code、operation、database name、可选 Project/Checkpoint ID 和原始 cause。Project Core 的协调函数仍会把它包装为 storage-neutral `ProjectCheckpointOperationError`。
 
@@ -99,12 +123,14 @@ Checkpoint value 本身保持为 `unknown`，由 Project Core 的正式 decoder 
 ```text
 src/storage/indexed-db/
 ├── indexed-db-project-checkpoint-store.ts
+├── indexed-db-project-catalog.ts
+├── indexed-db-project-catalog-record.ts
 ├── indexed-db-schema.ts
 ├── indexed-db-storage-error.ts
 └── seele-project-database.ts
 ```
 
-只有 adapter、构造选项和平台错误从 package root 导出。数据库 Schema、`idb` 类型和连接对象保持包内私有。
+只有 adapter、Catalog 查询、构造选项、最近项目摘要和平台错误从 package root 导出。数据库 Schema、物理 record、`idb` 类型和连接对象保持包内私有。
 
 ## 测试与验收
 
@@ -117,6 +143,8 @@ src/storage/indexed-db/
 - active 缺失或内容损坏时，Project Core 可以诊断并恢复 previous；
 - Head 损坏是稳定 adapter 错误；
 - Physical Schema V1 的 stores、keyPath 和 indexes 与文档一致；
+- Checkpoint 与 Catalog 摘要同事务提交，失败写入不推进最近保存时间；
+- 最近项目按最后一次成功 Checkpoint 时间排序，Catalog 物理记录经过严格校验；
 - 并发保存由重叠 readwrite transaction 串行化；
 - 空数据库返回空 candidates；
 - adapter 可关闭并重新打开数据库。
@@ -129,8 +157,9 @@ src/storage/indexed-db/
 
 - `platform-browser` 已显式依赖 `@seele-daw/project-core` 与 `idb 8.0.3`，测试使用 `fake-indexeddb 6.2.5`；
 - 私有 `SeeleProjectDatabase` 已实现 lazy open、连接复用、V1 upgrade、物理 Schema 校准、close、`versionchange` 让路和异常 termination 失效；
-- `IndexedDBProjectCheckpointStore` 已实现双 store 原子轮换、active/previous 候选顺序、旧记录清理、重复 ID 冲突和稳定平台错误；
+- `IndexedDBProjectCheckpointStore` 已实现三 store 原子写入、active/previous 候选顺序、旧记录清理、Catalog 摘要更新、重复 ID 冲突和稳定平台错误；
 - 持久化 Checkpoint 继续以 `unknown` 返回 Project Core，缺失 active 保留 `undefined` 诊断位置，损坏 active 可回退 previous；
 - package root 只公开 adapter、构造选项与 `IndexedDBStorageError`，没有公开 Schema、连接、store 常量或 `idb` 类型；
-- 当前 `platform-browser` 基线为 1 个测试文件、13 项测试；Project Core 24 个测试文件、347 项测试保持通过；
+- `IndexedDBProjectCatalog` 已实现只读最近项目查询；Physical Schema 仍为 database version 1，没有制造 V2 或迁移历史；
+- 当前 `platform-browser` 基线为 2 个测试文件、18 项测试；Project Core 24 个测试文件、347 项测试保持通过；
 - workspace 类型检查、架构检查、全部测试与 Studio 构建通过；Studio 接入、Journal、迁移、checksum、OPFS 和多标签页编辑协调未进入本阶段。

@@ -5,6 +5,7 @@ import {
   createProjectCheckpointKey,
   PROJECT_CHECKPOINTS_STORE,
   PROJECT_CHECKPOINT_HEADS_STORE,
+  PROJECT_CATALOG_STORE,
   SEELE_PROJECT_DATABASE_STORES,
   SEELE_PROJECT_DATABASE_VERSION,
   type SeeleProjectDatabaseSchema,
@@ -116,12 +117,16 @@ describe('IndexedDB Physical Schema V1', () => {
     const transaction = database.transaction(SEELE_PROJECT_DATABASE_STORES, 'readonly')
     const checkpoints = transaction.objectStore(PROJECT_CHECKPOINTS_STORE)
     const heads = transaction.objectStore(PROJECT_CHECKPOINT_HEADS_STORE)
+    const catalog = transaction.objectStore(PROJECT_CATALOG_STORE)
 
+    expect(database.version).toBe(1)
     expect([...database.objectStoreNames].sort()).toEqual([...SEELE_PROJECT_DATABASE_STORES].sort())
     expect(checkpoints.keyPath).toEqual(['projectId', 'checkpointId'])
     expect([...checkpoints.indexNames]).toEqual([])
     expect(heads.keyPath).toBe('projectId')
     expect([...heads.indexNames]).toEqual([])
+    expect(catalog.keyPath).toBe('projectId')
+    expect([...catalog.indexNames]).toEqual([])
 
     await transaction.done
     database.close()
@@ -302,6 +307,7 @@ describe('Checkpoint recovery candidates', () => {
     const { projectId } = createCheckpointFixture('corrupt-head', [])
     await store.readCandidates(projectId)
     await putRawCheckpointHead(store.databaseName, {
+      headRecordVersion: 99,
       projectId,
       activeCheckpointId: '',
       previousCheckpointId: null,

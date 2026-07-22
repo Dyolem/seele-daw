@@ -122,6 +122,10 @@ importers:
       vue-router:
         specifier: ^5.1.0
         version: 5.1.0(pinia@3.0.4(typescript@6.0.3)(vue@3.6.0-beta.17(typescript@6.0.3)))(rolldown@1.1.5)(vite@8.1.4(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@6.0.3))
+    devDependencies:
+      fake-indexeddb:
+        specifier: 6.2.5
+        version: 6.2.5
 
   packages/audio-web:
     dependencies:

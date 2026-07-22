@@ -6,11 +6,14 @@ import type {
 } from '@seele-daw/project-core'
 
 export const ACTIVE_PROJECT_PHASE = {
+  CREATE_FAILED: 'create-failed',
+  CREATING: 'creating',
   DISPOSED: 'disposed',
   IDLE: 'idle',
   OPEN_FAILED: 'open-failed',
   OPENING: 'opening',
   READY: 'ready',
+  SESSION_FAILED: 'session-failed',
 } as const
 
 export type ActiveProjectPhase = (typeof ACTIVE_PROJECT_PHASE)[keyof typeof ACTIVE_PROJECT_PHASE]
@@ -33,8 +36,26 @@ export interface OpeningActiveProjectState {
   readonly projectId: ProjectId
 }
 
+export interface CreatingActiveProjectState {
+  readonly phase: typeof ACTIVE_PROJECT_PHASE.CREATING
+  readonly projectId: ProjectId
+}
+
 export interface OpenFailedActiveProjectState {
   readonly phase: typeof ACTIVE_PROJECT_PHASE.OPEN_FAILED
+  readonly projectId: ProjectId
+  readonly failureCause: unknown
+}
+
+export interface CreateFailedActiveProjectState {
+  readonly phase: typeof ACTIVE_PROJECT_PHASE.CREATE_FAILED
+  /** Null only when the injected identity source itself failed validation. */
+  readonly projectId: ProjectId | null
+  readonly failureCause: unknown
+}
+
+export interface SessionFailedActiveProjectState {
+  readonly phase: typeof ACTIVE_PROJECT_PHASE.SESSION_FAILED
   readonly projectId: ProjectId
   readonly failureCause: unknown
 }
@@ -58,8 +79,11 @@ export interface DisposedActiveProjectState {
 
 export type ActiveProjectState =
   | IdleActiveProjectState
+  | CreatingActiveProjectState
   | OpeningActiveProjectState
+  | CreateFailedActiveProjectState
   | OpenFailedActiveProjectState
+  | SessionFailedActiveProjectState
   | ReadyActiveProjectState
   | DisposedActiveProjectState
 

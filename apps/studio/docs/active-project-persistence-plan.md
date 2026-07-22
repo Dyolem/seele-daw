@@ -31,14 +31,15 @@ Studio UI（后续）
 ```ts
 interface ActiveProjectServiceDependencies {
   checkpointStore: ProjectCheckpointStore
+  createProjectId(): ProjectId
   createNewSession(projectId: ProjectId): ProjectSession
   createCheckpointId(): ProjectCheckpointId
 }
 ```
 
-`createNewSession` 是产品模板边界。当前可以组合最小合法项目，未来加入默认 Instrument Track 或其他模板时不需要修改持久化协调。Checkpoint ID 也由外层生成，使服务不读取浏览器随机数或时钟，并保持测试确定性。
+`createProjectId` 是新项目身份分配边界，`createNewSession` 是产品模板边界。当前可以组合最小合法项目，未来加入默认 Instrument Track 或其他模板时不需要修改持久化协调。Project / Checkpoint ID 都由外层生成，使服务不读取浏览器随机数并保持测试确定性。
 
-服务提供当前只读状态、`open(projectId)`、`save()`、状态订阅和 `dispose()`。首版订阅不会同步重放当前状态；订阅者先读取 `state`，之后只接收状态变化。
+服务提供当前只读状态、`create()`、`open(projectId)`、`save()`、状态订阅和 `dispose()`。订阅不会同步重放当前状态；订阅者先读取 `state`，之后只接收状态变化。
 
 ## 状态机
 
@@ -46,6 +47,9 @@ interface ActiveProjectServiceDependencies {
 
 ```text
 idle
+  -> creating(projectId)
+     -> ready(projectId, session, ...)
+     -> create-failed(projectId, failureCause)
   -> opening(projectId)
      -> ready(projectId, session, ...)
      -> open-failed(projectId, failureCause)
@@ -58,12 +62,15 @@ ready
 
 any live state
   -> disposed
+
+ready
+  -> session-failed(projectId, failureCause)
 ```
 
 `ready` 状态同时记录：
 
 - 当前 `ProjectSession` 和观测到的 `modelRevision`；
-- `savedRevision`，新建且从未成功保存时为 `null`；
+- `savedRevision`；当前 Create 会先保存初始 Checkpoint，因此正常 ready 不再从 `null` 开始；该类型仍保留 `null` 以表达未来导入或临时项目等未保存来源；
 - 由 revision 对账得出的 `isDirty`；
 - `saveStatus` 与最近一次保存失败；
 - 恢复成功前被拒绝的 checkpoint candidates，供未来 UI 提示发生过 previous fallback。
@@ -83,17 +90,17 @@ isDirty = savedRevision is null
 
 Checkpoint 恢复会创建 revision `0` 的 fresh Session，所以恢复成功时 `savedRevision` 取该 Session 的 `0`，不能取旧进程写入 envelope 的 `sourceModelRevision`。后者只描述 checkpoint 当时捕获自哪个旧 Session revision。
 
-## 打开语义
+## 新建与打开语义
 
-`open(projectId)` 先调用 `restoreProjectCheckpoint`：
+Create 与 Open 的公开意图不同：
 
-1. 有有效 candidate：激活恢复得到的 fresh Session，标记为 clean，并保留 earlier candidate failures；
-2. 没有任何 candidate：调用注入的 `createNewSession(projectId)`，进入从未保存的 dirty 状态；
-3. store read 失败、存在 candidates 但全部无效，或新建工厂失败：进入 `open-failed`，并把原始稳定错误保留为 `failureCause`。
+- `create()` 由注入来源分配 Project ID，防御性确认没有身份碰撞，创建最小 Session，并在首个 Checkpoint 保存成功后才进入 clean ready；
+- `open(projectId)` 只激活已有有效 candidate，恢复 fresh clean Session 并保留 earlier candidate failures；没有 candidate 返回 `project-not-found`，绝不创建空项目；
+- 两种操作分别使用 creating / create-failed 与 opening / open-failed，使 UI 不需要从错误猜测意图。
 
-“损坏”不能伪装成“从未保存”，因此第三种情况绝不静默创建空项目。服务还会校验新建工厂返回的 Session 确实属于请求的 Project ID，避免 Composition Root 接错模板或 ID。
+“损坏”不能伪装成“从未保存”。服务还会校验新建工厂返回的 Session 确实属于生成的 Project ID，避免 Composition Root 接错模板或 ID。完整的最终产品语义见 [Active Project Create / Open 产品语义计划](./active-project-create-open-semantics-plan.md)。
 
-连续调用 `open` 使用 latest-request-wins：后一次调用立即解除旧 Session 订阅并成为当前 generation；较早的异步读取可以完成，但不得覆盖新状态或重新挂载旧 Session。这不是取消 IndexedDB request，而是阻止 stale completion 污染应用状态。
+连续调用 Create / Open 使用同一个 latest-request-wins generation：后一次调用立即解除旧 Session 订阅并成为当前 generation；较早的 completion 不得覆盖新状态或重新挂载旧 Session。已经开始的 Create 仍完成自己的 durable 初始 Checkpoint，因为它是明确的新建命令；只是不会夺回 Active Project。
 
 ## 保存与编辑并发
 
@@ -138,7 +145,7 @@ apps/studio/
 
 ## 测试与验收
 
-- 空存储创建新 Session，状态为 ready、unsaved、dirty；
+- Create 内部分配身份，并且只在初始 Checkpoint 成功后进入 ready、saved、clean；
 - 有效 checkpoint 恢复为 clean fresh Session；
 - active 损坏而 previous 有效时保留恢复诊断；全部无效时进入 open-failed 且不新建空项目；
 - store read/write 失败保持原始 cause 和正确状态；
@@ -157,8 +164,8 @@ apps/studio/
 本阶段已于 2026-07-21 按上述边界完成：
 
 - `ActiveProjectService` 已在 Studio Workbench 内组合 Project Session 与 storage-neutral Checkpoint 协调函数，没有依赖 Vue、Pinia、Router、`idb` 或 platform-browser 内部实现；
-- idle、opening、open-failed、ready、disposed 与保存子状态均为 frozen 判别联合，dirty 只由观测 revision 和 `savedRevision` 派生；
-- 空存储新建、有效恢复、previous fallback 诊断、全部损坏失败、显式保存和失败重试已经形成完整应用服务语义；
+- idle、creating、create-failed、opening、open-failed、ready、session-failed、disposed 与保存子状态均为 frozen 判别联合，dirty 只由观测 revision 和 `savedRevision` 派生；
+- 明确 Create 内部分配 ID 并保存初始 Checkpoint、Open 只恢复已有项目、previous fallback 诊断、全部损坏失败、显式保存和失败重试已经形成完整应用服务语义；
 - 保存期间允许继续编辑，并只按 receipt 的来源 revision 推进保存基线；同一项目的并发保存被明确拒绝；
 - generation guard 保证重叠打开、切换项目或 dispose 后的旧异步 completion 不能污染当前状态；
 - Session all-commits 订阅统一覆盖 command / undo / redo 的 dirty 观察，状态 observer failure 与其他 observer 隔离；

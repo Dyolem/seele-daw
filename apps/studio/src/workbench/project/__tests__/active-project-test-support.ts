@@ -18,6 +18,7 @@ import {
   type ProjectSession,
   type ProjectSnapshot,
   type ProjectSubscription,
+  type ProjectSubscriptionDeliveryFailure,
   type ProjectSubscriptionObserver,
   type ProjectUnsubscribe,
 } from '@seele-daw/project-core'
@@ -67,6 +68,7 @@ export class ControlledProjectCheckpointStore implements ProjectCheckpointStore 
 interface TestSubscriptionEntry {
   active: boolean
   readonly observer: ProjectSubscriptionObserver
+  readonly subscription: ProjectSubscription
 }
 
 /** Small mutable Session double used only to drive the public commit-observation boundary. */
@@ -112,7 +114,7 @@ export class MutableTestProjectSession implements ProjectSession {
     _subscription: ProjectSubscription,
     observer: ProjectSubscriptionObserver,
   ): ProjectUnsubscribe {
-    const entry: TestSubscriptionEntry = { active: true, observer }
+    const entry: TestSubscriptionEntry = { active: true, observer, subscription: _subscription }
     this.#subscriptions.add(entry)
 
     return () => {
@@ -142,6 +144,22 @@ export class MutableTestProjectSession implements ProjectSession {
     const entries = Array.from(this.#subscriptions)
     for (const entry of entries) {
       if (entry.active) entry.observer.onCommit(commit)
+    }
+  }
+
+  async emitSubscriptionFailure(cause: unknown): Promise<void> {
+    await Promise.resolve()
+
+    const commit = Object.freeze({}) as ProjectCommit
+    for (const entry of Array.from(this.#subscriptions)) {
+      if (!entry.active) continue
+
+      const failure = Object.freeze<ProjectSubscriptionDeliveryFailure>({
+        subscription: entry.subscription,
+        commit,
+        cause,
+      })
+      entry.observer.onError(failure)
     }
   }
 }

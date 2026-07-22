@@ -2,7 +2,9 @@ import type { ProjectId } from '@seele-daw/project-core'
 
 export type ActiveProjectErrorCode =
   | 'invalid-observer'
+  | 'generated-project-id-conflict'
   | 'new-session-project-id-mismatch'
+  | 'project-not-found'
   | 'project-not-ready'
   | 'save-in-progress'
   | 'service-disposed'

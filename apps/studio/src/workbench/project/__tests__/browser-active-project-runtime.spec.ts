@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 
-import { DomainValueError, parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import { DomainValueError, parseProjectId } from '@seele-daw/project-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -25,10 +25,6 @@ function createDatabaseName(suffix: string): string {
   return databaseName
 }
 
-function createProjectId(suffix: string): ProjectId {
-  return parseProjectId(`project-browser-runtime-${suffix}`)
-}
-
 function createSequentialUniqueId(prefix: string) {
   let sequence = 0
 
@@ -46,6 +42,7 @@ function createRuntime(
   const runtime = createBrowserActiveProjectRuntime({
     databaseName,
     createUniqueId,
+    getCurrentTime: () => 1_000,
     newProjectName,
   })
   runtimes.push(runtime)
@@ -78,41 +75,37 @@ afterEach(async () => {
 describe('BrowserActiveProjectRuntime', () => {
   it('saves and restores a minimal Project across complete Runtime lifetimes', async () => {
     const databaseName = createDatabaseName('recovery')
-    const projectId = createProjectId('recovery')
+    const projectId = parseProjectId('first-runtime-1')
     const firstIds = createSequentialUniqueId('first-runtime')
     const firstRuntime = createRuntime(databaseName, firstIds, 'Persisted Runtime Project')
 
-    await firstRuntime.activeProject.open(projectId)
+    await expect(firstRuntime.activeProject.create()).resolves.toBe(projectId)
 
     const initial = requireReady(firstRuntime.activeProject.state)
     const initialSnapshot = initial.session.getSnapshot()
     expect(initial).toMatchObject({
       projectId,
       modelRevision: 0,
-      savedRevision: null,
-      isDirty: true,
-      saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
-    })
-    expect(initialSnapshot.project).toEqual({ id: projectId, name: 'Persisted Runtime Project' })
-    expect(initialSnapshot.tempoEvents.map(({ id }) => id)).toEqual(['first-runtime-1'])
-    expect(initialSnapshot.timeSignatureEvents.map(({ id }) => id)).toEqual(['first-runtime-2'])
-    expect(initialSnapshot.trackOrder).toEqual([])
-    expect(initialSnapshot.tracks).toEqual([])
-    expect(initialSnapshot.clips).toEqual([])
-    expect(initialSnapshot.devices).toEqual([])
-    expect(firstIds).toHaveBeenCalledTimes(2)
-
-    await firstRuntime.activeProject.save()
-
-    const saved = requireReady(firstRuntime.activeProject.state)
-    expect(saved).toMatchObject({
-      modelRevision: 0,
       savedRevision: 0,
       isDirty: false,
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
     })
-    expect(firstIds).toHaveBeenCalledTimes(3)
-    const savedSession = saved.session
+    expect(initialSnapshot.project).toEqual({ id: projectId, name: 'Persisted Runtime Project' })
+    expect(initialSnapshot.tempoEvents.map(({ id }) => id)).toEqual(['first-runtime-2'])
+    expect(initialSnapshot.timeSignatureEvents.map(({ id }) => id)).toEqual(['first-runtime-3'])
+    expect(initialSnapshot.trackOrder).toEqual([])
+    expect(initialSnapshot.tracks).toEqual([])
+    expect(initialSnapshot.clips).toEqual([])
+    expect(initialSnapshot.devices).toEqual([])
+    expect(firstIds).toHaveBeenCalledTimes(4)
+    await expect(firstRuntime.projectCatalog.listRecentProjects()).resolves.toEqual([
+      {
+        projectId,
+        name: 'Persisted Runtime Project',
+        lastCheckpointSavedAt: 1_000,
+      },
+    ])
+    const savedSession = initial.session
     firstRuntime.dispose()
     firstRuntime.dispose()
     expect(firstRuntime.activeProject.state).toEqual({ phase: ACTIVE_PROJECT_PHASE.DISPOSED })
@@ -138,8 +131,7 @@ describe('BrowserActiveProjectRuntime', () => {
   it('closes its IndexedDB connection when disposed', async () => {
     const databaseName = createDatabaseName('dispose')
     const runtime = createRuntime(databaseName)
-    await runtime.activeProject.open(createProjectId('dispose'))
-    await runtime.activeProject.save()
+    await runtime.activeProject.create()
 
     runtime.dispose()
     runtime.dispose()
@@ -152,14 +144,13 @@ describe('BrowserActiveProjectRuntime', () => {
     const databaseName = createDatabaseName('invalid-id')
     const createInvalidId = vi.fn<() => string>(() => '')
     const runtime = createRuntime(databaseName, createInvalidId)
-    const projectId = createProjectId('invalid-id')
 
-    await expect(runtime.activeProject.open(projectId)).rejects.toBeInstanceOf(DomainValueError)
+    await expect(runtime.activeProject.create()).rejects.toBeInstanceOf(DomainValueError)
 
     expect(createInvalidId).toHaveBeenCalledTimes(1)
     expect(runtime.activeProject.state).toMatchObject({
-      phase: ACTIVE_PROJECT_PHASE.OPEN_FAILED,
-      projectId,
+      phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
+      projectId: null,
       failureCause: expect.any(DomainValueError),
     })
   })
@@ -168,13 +159,13 @@ describe('BrowserActiveProjectRuntime', () => {
     const databaseName = createDatabaseName('invalid-name')
     const createUniqueId = createSequentialUniqueId('invalid-name')
     const runtime = createRuntime(databaseName, createUniqueId, '   ')
-    const projectId = createProjectId('invalid-name')
+    const projectId = parseProjectId('invalid-name-1')
 
-    await expect(runtime.activeProject.open(projectId)).rejects.toBeInstanceOf(DomainValueError)
+    await expect(runtime.activeProject.create()).rejects.toBeInstanceOf(DomainValueError)
 
-    expect(createUniqueId).toHaveBeenCalledTimes(2)
+    expect(createUniqueId).toHaveBeenCalledTimes(3)
     expect(runtime.activeProject.state).toMatchObject({
-      phase: ACTIVE_PROJECT_PHASE.OPEN_FAILED,
+      phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
       failureCause: expect.any(DomainValueError),
     })

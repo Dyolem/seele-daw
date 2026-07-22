@@ -25,6 +25,7 @@ import {
 
 export interface ActiveProjectServiceDependencies {
   readonly checkpointStore: ProjectCheckpointStore
+  readonly createProjectId: () => ProjectId
   readonly createNewSession: (projectId: ProjectId) => ProjectSession
   readonly createCheckpointId: () => ProjectCheckpointId
 }
@@ -32,6 +33,7 @@ export interface ActiveProjectServiceDependencies {
 export interface ActiveProjectService {
   readonly state: ActiveProjectState
 
+  create(): Promise<ProjectId>
   open(projectId: ProjectId): Promise<void>
   save(): Promise<void>
   subscribe(observer: ActiveProjectStateObserver): ActiveProjectUnsubscribe
@@ -118,17 +120,78 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
     return this.#state
   }
 
+  async create(): Promise<ProjectId> {
+    this.#assertLive()
+    const generation = ++this.#generation
+    let projectId: ProjectId | null = null
+
+    this.#detachSession()
+
+    try {
+      projectId = parseProjectId(this.#dependencies.createProjectId())
+      this.#setState(Object.freeze({ phase: ACTIVE_PROJECT_PHASE.CREATING, projectId }))
+
+      const existing = await restoreProjectCheckpoint(this.#dependencies.checkpointStore, projectId)
+      if (existing !== null) {
+        throw new ActiveProjectError(
+          'generated-project-id-conflict',
+          `Generated Project ID ${projectId} already has a saved Checkpoint`,
+          { projectId },
+        )
+      }
+
+      const session = this.#createAndValidateNewSession(projectId)
+      const receipt = await saveProjectCheckpoint(this.#dependencies.checkpointStore, session, {
+        checkpointId: this.#dependencies.createCheckpointId(),
+      })
+
+      if (this.#isCurrent(generation)) {
+        this.#attachSession(projectId, session, generation)
+        this.#setState(
+          createReadyState({
+            projectId,
+            session,
+            savedRevision: receipt.sourceModelRevision,
+            saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+            saveFailure: null,
+            recoveryFailures: [],
+          }),
+        )
+      }
+
+      return projectId
+    } catch (failureCause) {
+      if (this.#isCurrent(generation)) {
+        this.#detachSession()
+        this.#setState(
+          Object.freeze({
+            phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
+            projectId,
+            failureCause,
+          }),
+        )
+      }
+
+      throw failureCause
+    }
+  }
+
   async open(projectId: ProjectId): Promise<void> {
     this.#assertLive()
     const expectedProjectId = parseProjectId(projectId)
+
+    if (
+      this.#state.phase === ACTIVE_PROJECT_PHASE.READY &&
+      this.#state.projectId === expectedProjectId
+    ) {
+      return
+    }
+
     const generation = ++this.#generation
 
     this.#detachSession()
     this.#setState(
-      Object.freeze({
-        phase: ACTIVE_PROJECT_PHASE.OPENING,
-        projectId: expectedProjectId,
-      }),
+      Object.freeze({ phase: ACTIVE_PROJECT_PHASE.OPENING, projectId: expectedProjectId }),
     )
 
     try {
@@ -139,18 +202,24 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
 
       if (!this.#isCurrent(generation)) return
 
-      const session = restored?.session ?? this.#createAndValidateNewSession(expectedProjectId)
+      if (restored === null) {
+        throw new ActiveProjectError(
+          'project-not-found',
+          `Project ${expectedProjectId} has no saved Checkpoint`,
+          { projectId: expectedProjectId },
+        )
+      }
 
-      const recoveryFailures = restored?.rejectedCandidates ?? []
+      const session = restored.session
       this.#attachSession(expectedProjectId, session, generation)
       this.#setState(
         createReadyState({
           projectId: expectedProjectId,
           session,
-          savedRevision: restored === null ? null : session.modelRevision,
+          savedRevision: session.modelRevision,
           saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
           saveFailure: null,
-          recoveryFailures,
+          recoveryFailures: restored.rejectedCandidates,
         }),
       )
     } catch (failureCause) {
@@ -323,7 +392,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
     this.#detachSession()
     this.#setState(
       Object.freeze({
-        phase: ACTIVE_PROJECT_PHASE.OPEN_FAILED,
+        phase: ACTIVE_PROJECT_PHASE.SESSION_FAILED,
         projectId,
         failureCause: error,
       }),

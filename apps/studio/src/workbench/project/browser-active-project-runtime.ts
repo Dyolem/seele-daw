@@ -1,5 +1,9 @@
-import { IndexedDBProjectCheckpointStore } from '@seele-daw/platform-browser'
-import { parseProjectCheckpointId } from '@seele-daw/project-core'
+import {
+  IndexedDBProjectCatalog,
+  IndexedDBProjectCheckpointStore,
+  type RecentProjectSummary,
+} from '@seele-daw/platform-browser'
+import { parseProjectCheckpointId, parseProjectId } from '@seele-daw/project-core'
 
 import {
   createActiveProjectService,
@@ -12,12 +16,18 @@ import {
 
 export interface BrowserActiveProjectRuntimeOptions {
   readonly databaseName?: string
+  readonly getCurrentTime?: () => number
   readonly newProjectName?: string
   readonly createUniqueId?: () => string
 }
 
+export interface ProjectCatalogReader {
+  listRecentProjects(): Promise<readonly RecentProjectSummary[]>
+}
+
 export interface BrowserActiveProjectRuntime {
   readonly activeProject: ActiveProjectService
+  readonly projectCatalog: ProjectCatalogReader
   dispose(): void
 }
 
@@ -27,18 +37,26 @@ function createBrowserUniqueId(): string {
 
 class BrowserActiveProjectRuntimeImpl implements BrowserActiveProjectRuntime {
   readonly activeProject: ActiveProjectService
+  readonly projectCatalog: ProjectCatalogReader
   readonly #checkpointStore: IndexedDBProjectCheckpointStore
+  readonly #projectCatalogStorage: IndexedDBProjectCatalog
   #disposed = false
 
   constructor(options: BrowserActiveProjectRuntimeOptions) {
     const createUniqueId = options.createUniqueId ?? createBrowserUniqueId
     const newProjectName = options.newProjectName ?? MINIMAL_NEW_PROJECT_NAME
-    this.#checkpointStore =
-      options.databaseName === undefined
-        ? new IndexedDBProjectCheckpointStore()
-        : new IndexedDBProjectCheckpointStore({ databaseName: options.databaseName })
+    const storageOptions = {
+      ...(options.databaseName === undefined ? {} : { databaseName: options.databaseName }),
+      ...(options.getCurrentTime === undefined ? {} : { getCurrentTime: options.getCurrentTime }),
+    }
+    this.#checkpointStore = new IndexedDBProjectCheckpointStore(storageOptions)
+    this.#projectCatalogStorage = new IndexedDBProjectCatalog(
+      options.databaseName === undefined ? {} : { databaseName: options.databaseName },
+    )
+    this.projectCatalog = this.#projectCatalogStorage
     this.activeProject = createActiveProjectService({
       checkpointStore: this.#checkpointStore,
+      createProjectId: () => parseProjectId(createUniqueId()),
       createCheckpointId: () => parseProjectCheckpointId(createUniqueId()),
       createNewSession: (projectId) =>
         createMinimalNewProjectSession({ projectId, projectName: newProjectName, createUniqueId }),
@@ -52,7 +70,11 @@ class BrowserActiveProjectRuntimeImpl implements BrowserActiveProjectRuntime {
     try {
       this.activeProject.dispose()
     } finally {
-      this.#checkpointStore.close()
+      try {
+        this.#projectCatalogStorage.close()
+      } finally {
+        this.#checkpointStore.close()
+      }
     }
   }
 }

@@ -30,7 +30,7 @@ main.ts（后续）
 Workbench component
   useActiveProject()
   -> read shallow state
-  -> call activeProject.open / save
+  -> call activeProject.create / open / save
 ```
 
 这样测试可以提供隔离的 Service；未来多个独立 Workbench 也可以在不同组件子树提供不同实例。依赖注入不取得 Service 的所有权，Binding dispose 只解除自己的订阅，Browser Runtime 仍负责销毁 Service 与关闭 IndexedDB。
@@ -43,7 +43,7 @@ Active Project Context 是 Workbench 级入口，典型消费者包括：
 - 标题栏显示项目名称和 dirty 标记；
 - Save 按钮读取 saving / failed 并调用 `activeProject.save()`；
 - 恢复提示读取 candidate fallback 诊断；
-- 项目启动流程调用 `activeProject.open(projectId)`；
+- 项目启动流程根据明确意图调用 `activeProject.create()` 或 `activeProject.open(projectId)`；
 - Feature 入口在 ready 状态取得当前 `ProjectSession`。
 
 Piano Roll 中的大量 Note 组件不能通过该 Context 读取完整 Snapshot。后续内容视图应使用 Project Query、精细 Project Subscription 和独立的 `useProjectSelector`，只观察可见范围或指定实体。Active Project state 在每次 commit 后更新是为了 revision / dirty 对账，不是一个通用项目 read model。
@@ -148,13 +148,13 @@ Vue 依赖只进入 Studio 的 `vue/` 适配目录，不反向进入 Active Proj
 
 - `ActiveProjectVueBinding` 已使用内部 `shallowRef` 接收 Service state，并通过 `shallowReadonly` 暴露同一 immutable value；
 - ActiveProjectService 门面由 `markRaw` 标记，ready state 内的 ProjectSession 与 Snapshot 均保持原始对象身份，没有进入 Vue Proxy 图；
-- frozen `ActiveProjectVueContext` 只包含原始 Service 与只读 shallow state，没有复制或重新实现 open / save 状态机；
+- frozen `ActiveProjectVueContext` 只包含原始 Service 与只读 shallow state，没有复制或重新实现 create / open / save 状态机；
 - 类型安全的 `ACTIVE_PROJECT_CONTEXT_KEY` 与 `useActiveProject()` 已建立，缺失 Provider 会抛出稳定 `missing-context` ActiveProjectVueError；
-- Binding state 已验证同步覆盖 opening、ready、commit revision、saving 与 save completion；
+- Binding state 已验证同步覆盖 creating、opening、ready、commit revision、saving 与 save completion；
 - Binding dispose 只解除自身订阅且幂等，解除后 Service 仍能切换项目；Service、Runtime 和 IndexedDB 的所有权没有转移给 Vue；
 - 单独的 `stateDeliveryFailure` shallow readonly channel 已保留 Vue state observer 异常，不与打开、恢复或保存业务错误混合；
 - 文档已明确 provide / inject、Pinia、ProjectSession、ActiveProjectService 和未来 Editor Store 各自的状态所有权；
-- Studio 当前为 4 个测试文件、21 项测试；Project Core 24 个测试文件、347 项测试和 platform-browser 13 项测试保持通过；
+- Studio 当前为 4 个测试文件、28 项测试；Project Core 24 个测试文件、347 项测试和 platform-browser 18 项测试保持通过；
 - 目标 lint、workspace 架构检查、类型检查、全部测试和 Studio 生产构建通过。
 
-`main.ts`、`App.vue`、Pinia stores 与 Router 均未修改。Project ID discovery、明确 create / open 语义、Composition Root 安装、业务界面和局部 `useProjectSelector` 继续作为后续独立阶段。
+`main.ts`、`App.vue`、Pinia stores 与 Router 均未修改。Project Catalog 已由 Browser Runtime 提供，但启动选择界面、Composition Root 安装、业务界面和局部 `useProjectSelector` 继续作为后续独立阶段；Create / Open 最终语义已按专项计划完成。

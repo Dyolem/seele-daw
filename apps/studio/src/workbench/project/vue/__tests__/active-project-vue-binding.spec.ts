@@ -22,6 +22,7 @@ import {
   ControlledProjectCheckpointStore,
   createCheckpointIdFactory,
   createDeferred,
+  createTestCheckpoint,
   createTestProjectId,
   createTestSession,
   type MutableTestProjectSession,
@@ -35,11 +36,14 @@ function requireReady(state: ActiveProjectState): ReadyActiveProjectState {
   return state
 }
 
-function createServiceFixture() {
+function createServiceFixture(
+  createProjectId = () => createTestProjectId('vue-binding-generated'),
+) {
   const store = new ControlledProjectCheckpointStore()
   let session: MutableTestProjectSession | null = null
   const activeProject = createActiveProjectService({
     checkpointStore: store,
+    createProjectId,
     createCheckpointId: createCheckpointIdFactory('checkpoint-vue-binding'),
     createNewSession: (projectId) => {
       session = createTestSession(projectId)
@@ -59,10 +63,10 @@ function createServiceFixture() {
 
 describe('ActiveProjectVueBinding', () => {
   it('mirrors lifecycle and save state through a shallow readonly ref', async () => {
-    const { activeProject, requireSession, store } = createServiceFixture()
+    const projectId = createTestProjectId('vue-state')
+    const { activeProject, requireSession, store } = createServiceFixture(() => projectId)
     const binding = createActiveProjectVueBinding(activeProject)
     const state = binding.context.state
-    const projectId = createTestProjectId('vue-state')
 
     expect(state.value).toBe(activeProject.state)
     expect(isShallow(state)).toBe(true)
@@ -70,14 +74,14 @@ describe('ActiveProjectVueBinding', () => {
     expect(isProxy(state.value)).toBe(false)
     expect(binding.stateDeliveryFailure.value).toBeNull()
 
-    const opening = activeProject.open(projectId)
+    const creating = activeProject.create()
     expect(state.value).toBe(activeProject.state)
-    expect(state.value).toMatchObject({ phase: ACTIVE_PROJECT_PHASE.OPENING, projectId })
-    await opening
+    expect(state.value).toMatchObject({ phase: ACTIVE_PROJECT_PHASE.CREATING, projectId })
+    await creating
 
     const ready = requireReady(state.value)
     expect(ready).toBe(activeProject.state)
-    expect(ready.isDirty).toBe(true)
+    expect(ready.isDirty).toBe(false)
     expect(binding.context.activeProject).toBe(activeProject)
     expect(isProxy(binding.context.activeProject)).toBe(false)
     expect(isProxy(ready.session)).toBe(false)
@@ -86,7 +90,7 @@ describe('ActiveProjectVueBinding', () => {
     await requireSession().emitCommit()
     expect(requireReady(state.value)).toMatchObject({
       modelRevision: 1,
-      savedRevision: null,
+      savedRevision: 0,
       isDirty: true,
     })
 
@@ -101,6 +105,22 @@ describe('ActiveProjectVueBinding', () => {
       savedRevision: 1,
       isDirty: false,
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    })
+
+    const restoredProjectId = createTestProjectId('vue-state-restored')
+    store.candidatesByProject.set(restoredProjectId, [
+      createTestCheckpoint(restoredProjectId, 'checkpoint-vue-state-restored'),
+    ])
+    const opening = activeProject.open(restoredProjectId)
+    expect(state.value).toMatchObject({
+      phase: ACTIVE_PROJECT_PHASE.OPENING,
+      projectId: restoredProjectId,
+    })
+    await opening
+    expect(requireReady(state.value)).toMatchObject({
+      projectId: restoredProjectId,
+      savedRevision: 0,
+      isDirty: false,
     })
 
     binding.dispose()
@@ -128,16 +148,17 @@ describe('ActiveProjectVueBinding', () => {
   })
 
   it('stops observing without disposing the Active Project Service', async () => {
-    const { activeProject } = createServiceFixture()
-    const binding = createActiveProjectVueBinding(activeProject)
     const firstProjectId = createTestProjectId('vue-dispose-first')
     const secondProjectId = createTestProjectId('vue-dispose-second')
-    await activeProject.open(firstProjectId)
+    const projectIds = [firstProjectId, secondProjectId]
+    const { activeProject } = createServiceFixture(() => projectIds.shift()!)
+    const binding = createActiveProjectVueBinding(activeProject)
+    await activeProject.create()
     const lastObservedState = binding.context.state.value
 
     binding.dispose()
     binding.dispose()
-    await activeProject.open(secondProjectId)
+    await activeProject.create()
 
     expect(binding.context.state.value).toBe(lastObservedState)
     expect(requireReady(activeProject.state).projectId).toBe(secondProjectId)
@@ -153,6 +174,7 @@ describe('ActiveProjectVueBinding', () => {
     const unsubscribe = vi.fn<() => void>()
     const activeProject: ActiveProjectService = {
       state,
+      create: () => Promise.resolve(createTestProjectId('vue-stub')),
       open: () => Promise.resolve(),
       save: () => Promise.resolve(),
       subscribe(observer) {

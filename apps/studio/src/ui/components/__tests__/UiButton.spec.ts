@@ -28,6 +28,20 @@ describe('UiButton', () => {
     expect(button.classes()).toContain('ui-button--small')
   })
 
+  it('keeps an optional leading icon in the shared Button layout', () => {
+    const wrapper = mount(UiButton, {
+      slots: {
+        default: 'Save',
+        leading: '<span data-testid="save-icon"></span>',
+      },
+    })
+
+    expect(
+      wrapper.get('.ui-button__icon [data-testid="save-icon"]').attributes('data-testid'),
+    ).toBe('save-icon')
+    expect(wrapper.get('.ui-button__label').text()).toBe('Save')
+  })
+
   it('marks busy work and prevents repeated activation', () => {
     const wrapper = mount(UiButton, {
       props: { busy: true },

@@ -79,6 +79,7 @@
   --sd-motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
 
   --sd-shadow-overlay: 0 1.5rem 5rem rgb(0 0 0 / 48%), 0 0 0 1px rgb(242 238 229 / 5%);
+  --sd-layer-popover: 400;
   --sd-layer-modal: 500;
 }
 

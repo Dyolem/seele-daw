@@ -95,9 +95,9 @@ Hover、Pressed、Selected、Focused、Disabled、Busy 和 Error 在所有组件
 | ------------------- | ---------------------------------------- | ------------------------ | ----------------------- |
 | Project Entry       | 新建、打开、最近项目、失败反馈           | 启动页                   | Piano Black 首批入口    |
 | Project Lifecycle   | 当前项目、保存、dirty、离开确认          | 全局状态与对话框         | 已有应用服务，UI 待完善 |
-| Global Bar          | 品牌入口、项目名、保存状态、全局菜单     | 顶部全局区               | 编辑器首批外壳          |
-| Transport           | 播放、停止、录音、循环、时间、速度、拍号 | 顶部全局区或独立控制行   | 编辑器首批外壳          |
-| Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸       | 整个编辑器框架           | 编辑器首批外壳          |
+| Global Bar          | 品牌入口、项目名、保存状态、全局菜单     | 顶部全局区               | 首批外壳已实现          |
+| Transport           | 播放、停止、录音、循环、时间、速度、拍号 | 顶部全局区或独立控制行   | 外壳已实现，播放待接入  |
+| Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸       | 整个编辑器框架           | 首批外壳已实现          |
 | Track List          | 轨道身份、颜色、静音、独奏、音量等       | Arrangement 左列         | Arrangement 切片        |
 | Arrangement         | 时间线、Clip、播放头、选择与编辑         | 主工作区                 | 核心编辑表面            |
 | Context Editor Dock | 承载当前内容的下方编辑器                 | 下方可调整面板           | Piano Roll 切片         |

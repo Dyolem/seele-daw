@@ -3,6 +3,7 @@ import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
@@ -17,12 +18,27 @@ const props = defineProps<{
   readonly projectId: string
 }>()
 
-const { state } = useActiveProject()
+interface ProjectPresentation {
+  readonly projectId: ProjectId | null
+  readonly projectName: string
+  readonly tempo: number
+  readonly timeSignatureDenominator: number
+  readonly timeSignatureNumerator: number
+}
+
+const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
 const router = useRouter()
 const requestedProjectId = shallowRef<ProjectId | null>(null)
 const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
+const projectPresentation = shallowRef<ProjectPresentation>({
+  projectId: null,
+  projectName: 'Untitled Project',
+  tempo: 120,
+  timeSignatureDenominator: 4,
+  timeSignatureNumerator: 4,
+})
 let requestGeneration = 0
 let isUnmounted = false
 
@@ -82,9 +98,61 @@ function retry(): void {
   void openRequestedProject(props.projectId)
 }
 
+async function saveProject(): Promise<void> {
+  try {
+    await activeProject.save()
+  } catch {
+    // ActiveProjectService publishes the failed save state consumed by the Workbench.
+  }
+}
+
+function undoProject(): void {
+  readyProject.value?.session.undo()
+}
+
+function redoProject(): void {
+  readyProject.value?.session.redo()
+}
+
+function describeSaveFailure(saveFailure: unknown): string | null {
+  if (saveFailure instanceof Error && saveFailure.message.trim().length > 0) {
+    return saveFailure.message
+  }
+  return saveFailure === null ? null : 'The project could not be saved.'
+}
+
 watch(
   () => props.projectId,
   (projectId) => void openRequestedProject(projectId),
+  { immediate: true },
+)
+
+watch(
+  () => readyProject.value?.projectId ?? null,
+  (projectId) => {
+    const ready = readyProject.value
+    if (projectId === null || ready === null) {
+      projectPresentation.value = {
+        projectId: null,
+        projectName: 'Untitled Project',
+        tempo: 120,
+        timeSignatureDenominator: 4,
+        timeSignatureNumerator: 4,
+      }
+      return
+    }
+
+    const snapshot = ready.session.getSnapshot()
+    const tempo = snapshot.tempoEvents[0]
+    const timeSignature = snapshot.timeSignatureEvents[0]
+    projectPresentation.value = {
+      projectId,
+      projectName: snapshot.project.name,
+      tempo: tempo?.bpm ?? 120,
+      timeSignatureDenominator: timeSignature?.denominator ?? 4,
+      timeSignatureNumerator: timeSignature?.numerator ?? 4,
+    }
+  },
   { immediate: true },
 )
 
@@ -95,13 +163,23 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section v-if="readyProject" class="project-ready" aria-labelledby="project-ready-title">
-    <div class="project-ready__mark" aria-hidden="true">✓</div>
-    <p>PROJECT READY</p>
-    <h1 id="project-ready-title">Project ready</h1>
-    <code>{{ readyProject.projectId }}</code>
-    <span>The editor interface will be designed in the next UI phase.</span>
-  </section>
+  <ProjectWorkbenchShell
+    v-if="readyProject"
+    :can-redo="readyProject.session.canRedo"
+    :can-undo="readyProject.session.canUndo"
+    :is-dirty="readyProject.isDirty"
+    :project-id="readyProject.projectId"
+    :project-name="projectPresentation.projectName"
+    :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
+    :save-status="readyProject.saveStatus"
+    :tempo="projectPresentation.tempo"
+    :time-signature-denominator="projectPresentation.timeSignatureDenominator"
+    :time-signature-numerator="projectPresentation.timeSignatureNumerator"
+    @leave-project="router.push(createProjectEntryLocation())"
+    @redo="redoProject"
+    @save="saveProject"
+    @undo="undoProject"
+  />
 
   <main v-else class="project-route-state" aria-labelledby="project-open-title">
     <div v-if="isOpening" class="project-route-state__spinner" aria-hidden="true"></div>
@@ -125,7 +203,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.project-ready,
 .project-route-state {
   display: grid;
   min-height: 100vh;
@@ -137,21 +214,6 @@ onUnmounted(() => {
   background: var(--sd-color-surface-workspace);
 }
 
-.project-ready__mark {
-  display: grid;
-  width: 3.625rem;
-  height: 3.625rem;
-  margin-bottom: var(--sd-space-5);
-  place-items: center;
-  border: 1px solid var(--sd-color-border-focus);
-  border-radius: var(--sd-radius-lg);
-  color: var(--sd-color-border-focus);
-  background: var(--sd-color-surface-raised);
-  font-size: 1.5625rem;
-  font-weight: 800;
-}
-
-.project-ready p,
 .project-route-state__eyebrow {
   margin: 0 0 var(--sd-space-3);
   color: var(--sd-color-border-focus);
@@ -160,21 +222,12 @@ onUnmounted(() => {
   letter-spacing: 0.18em;
 }
 
-.project-ready h1,
 .project-route-state h1 {
   margin: 0;
   font-size: clamp(2.25rem, 7vw, 4.25rem);
   letter-spacing: -0.05em;
 }
 
-.project-ready code {
-  margin: var(--sd-space-2) 0 var(--sd-space-6);
-  color: var(--sd-color-text-muted);
-  font-family: var(--sd-font-family-numeric);
-  font-size: var(--sd-font-size-sm);
-}
-
-.project-ready span,
 .project-route-state__message {
   color: var(--sd-color-text-secondary);
   font-size: var(--sd-font-size-md);

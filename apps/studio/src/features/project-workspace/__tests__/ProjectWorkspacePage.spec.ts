@@ -37,6 +37,7 @@ import {
 interface PageFixture {
   readonly activeProjectContext: ActiveProjectVueContext
   readonly resolve: ReturnType<typeof vi.fn<ProjectEntryCoordinator['resolve']>>
+  readonly save: ReturnType<typeof vi.fn<ActiveProjectService['save']>>
   readonly projectEntryContext: ProjectEntryVueContext
   readonly state: ShallowRef<ActiveProjectState>
 }
@@ -84,13 +85,14 @@ function createFixture(
 ): PageFixture {
   const state = shallowRef(initialState)
   const resolve = vi.fn<ProjectEntryCoordinator['resolve']>(resolveImplementation)
+  const save = vi.fn<ActiveProjectService['save']>(async () => undefined)
   const activeProject: ActiveProjectService = {
     get state() {
       return state.value
     },
     create: async () => parseProjectId('workspace-created-project'),
     open: async () => undefined,
-    save: async () => undefined,
+    save,
     subscribe: () => () => undefined,
     dispose() {},
   }
@@ -104,6 +106,7 @@ function createFixture(
       projectEntry: Object.freeze({ resolve }),
     }),
     resolve,
+    save,
     state,
   }
 }
@@ -127,7 +130,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
 }
 
 describe('ProjectWorkspacePage', () => {
-  it('resolves a deep-linked Project and renders the neutral ready handoff', async () => {
+  it('resolves a deep-linked Project and renders its Workbench Shell', async () => {
     const projectId = parseProjectId('project-workspace-page-ready')
     const fixture = createFixture(
       async () =>
@@ -141,8 +144,34 @@ describe('ProjectWorkspacePage', () => {
     await flushPromises()
 
     expect(fixture.resolve).toHaveBeenCalledExactlyOnceWith(projectId)
-    expect(wrapper.text()).toContain('PROJECT READY')
+    expect(wrapper.find('.project-workbench').exists()).toBe(true)
+    expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
+  })
+
+  it('delegates a dirty Workbench Save action to Active Project', async () => {
+    const projectId = parseProjectId('project-workspace-page-save')
+    const ready = createReadyState(projectId)
+    const fixture = createFixture(
+      async () =>
+        Object.freeze({
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId,
+        }),
+      Object.freeze({
+        ...ready,
+        isDirty: true,
+        savedRevision: null,
+        savedContentStateId: null,
+      }),
+    )
+    const { wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    await wrapper.get('.project-workbench__save').trigger('click')
+    await flushPromises()
+
+    expect(fixture.save).toHaveBeenCalledOnce()
   })
 
   it('returns a missing requested Project to Entry with an exclusion notice', async () => {

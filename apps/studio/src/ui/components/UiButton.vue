@@ -29,6 +29,9 @@ const props = withDefaults(defineProps<UiButtonProps>(), {
     :aria-busy="props.busy || undefined"
   >
     <span v-if="props.busy" class="ui-button__progress" aria-hidden="true"></span>
+    <span v-else-if="$slots.leading" class="ui-button__icon">
+      <slot name="leading" />
+    </span>
     <span class="ui-button__label"><slot /></span>
   </button>
 </template>
@@ -144,6 +147,11 @@ const props = withDefaults(defineProps<UiButtonProps>(), {
 
 .ui-button__label {
   white-space: nowrap;
+}
+
+.ui-button__icon {
+  display: inline-grid;
+  place-items: center;
 }
 
 @keyframes ui-button-progress {

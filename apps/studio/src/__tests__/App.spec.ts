@@ -111,7 +111,7 @@ describe('App', () => {
     expect(wrapper.text()).toContain('Recent projects')
   })
 
-  it('shows only a neutral handoff for a ready Project Route', async () => {
+  it('composes the Workbench Shell for a ready Project Route', async () => {
     const projectId = parseProjectId('app-ready-project')
     const session = createTestSession(projectId)
     const wrapper = await mountApp(
@@ -131,10 +131,10 @@ describe('App', () => {
       projectId,
     )
 
-    expect(wrapper.text()).toContain('PROJECT READY')
-    expect(wrapper.get('h1').text()).toBe('Project ready')
+    expect(wrapper.find('.project-workbench').exists()).toBe(true)
+    expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
-    expect(wrapper.text()).toContain('The editor interface will be designed in the next UI phase.')
+    expect(wrapper.text()).toContain('Select a MIDI clip to edit')
     expect(wrapper.find('.project-entry').exists()).toBe(false)
   })
 })

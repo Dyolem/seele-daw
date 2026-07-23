@@ -9,6 +9,10 @@ import type { Router } from 'vue-router'
 
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import {
+  installProjectNavigationGuard,
+  type ProjectNavigationGuardDispose,
+} from '@/router/project-navigation-guard'
+import {
   createBrowserActiveProjectRuntime,
   type BrowserActiveProjectRuntime,
 } from '@/workbench/project/browser-active-project-runtime'
@@ -56,6 +60,7 @@ class StudioApplicationImpl implements StudioApplication {
   readonly #projectRuntime: BrowserActiveProjectRuntime
   readonly #activeProjectBinding: ActiveProjectVueBinding
   readonly #projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding
+  readonly #projectNavigationGuardDispose: ProjectNavigationGuardDispose
   #mounted = false
   #disposed = false
   #resourcesReleased = false
@@ -65,6 +70,7 @@ class StudioApplicationImpl implements StudioApplication {
     projectRuntime: BrowserActiveProjectRuntime,
     activeProjectBinding: ActiveProjectVueBinding,
     projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding,
+    projectNavigationGuardDispose: ProjectNavigationGuardDispose,
     projectEntry: ProjectEntryCoordinator,
     projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator,
   ) {
@@ -72,6 +78,7 @@ class StudioApplicationImpl implements StudioApplication {
     this.#projectRuntime = projectRuntime
     this.#activeProjectBinding = activeProjectBinding
     this.#projectNavigationDecisionBinding = projectNavigationDecisionBinding
+    this.#projectNavigationGuardDispose = projectNavigationGuardDispose
     this.projectEntry = projectEntry
     this.projectNavigationConfirmation = projectNavigationConfirmation
   }
@@ -111,14 +118,18 @@ class StudioApplicationImpl implements StudioApplication {
     if (this.#resourcesReleased) return
 
     this.#resourcesReleased = true
-    // Settle one-shot UI capabilities before tearing down state observation and browser resources.
+    // Stop new navigation before settling one-shot UI capabilities and browser-owned resources.
     try {
-      this.#projectNavigationDecisionBinding.dispose()
+      this.#projectNavigationGuardDispose()
     } finally {
       try {
-        this.#activeProjectBinding.dispose()
+        this.#projectNavigationDecisionBinding.dispose()
       } finally {
-        this.#projectRuntime.dispose()
+        try {
+          this.#activeProjectBinding.dispose()
+        } finally {
+          this.#projectRuntime.dispose()
+        }
       }
     }
   }
@@ -131,6 +142,7 @@ export function composeStudioApplication(
   const { projectRuntime } = composition
   let activeProjectBinding: ActiveProjectVueBinding | null = null
   let projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding | null = null
+  let projectNavigationGuardDispose: ProjectNavigationGuardDispose | null = null
 
   try {
     activeProjectBinding = createActiveProjectVueBinding(projectRuntime.activeProject)
@@ -143,6 +155,10 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       requestDecision: projectNavigationDecisionBinding.requestDecision,
     })
+    projectNavigationGuardDispose = installProjectNavigationGuard(
+      composition.router,
+      projectNavigationConfirmation,
+    )
     const vueApplication = createApp(composition.rootComponent)
 
     vueApplication.provide(ACTIVE_PROJECT_CONTEXT_KEY, activeProjectBinding.context)
@@ -160,17 +176,22 @@ export function composeStudioApplication(
       projectRuntime,
       activeProjectBinding,
       projectNavigationDecisionBinding,
+      projectNavigationGuardDispose,
       projectEntry,
       projectNavigationConfirmation,
     )
   } catch (failureCause) {
     try {
-      projectNavigationDecisionBinding?.dispose()
+      projectNavigationGuardDispose?.()
     } finally {
       try {
-        activeProjectBinding?.dispose()
+        projectNavigationDecisionBinding?.dispose()
       } finally {
-        projectRuntime.dispose()
+        try {
+          activeProjectBinding?.dispose()
+        } finally {
+          projectRuntime.dispose()
+        }
       }
     }
     throw failureCause

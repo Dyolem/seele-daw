@@ -1,14 +1,10 @@
-import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import { parseProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
-import { shallowReadonly, shallowRef } from 'vue'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import ProjectEntryPage from '@/features/project-entry/ProjectEntryPage.vue'
-import type { ActiveProjectService } from '@/workbench/project/active-project-service'
-import {
-  ACTIVE_PROJECT_PHASE,
-  type ActiveProjectState,
-} from '@/workbench/project/active-project-state'
+import { PROJECT_ROUTE_NAME, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import {
   PROJECT_ENTRY_FAILURE_OPERATION,
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -21,15 +17,8 @@ import {
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'
 import type { RecentProjectSummary } from '@/workbench/project/project-catalog-reader'
-import {
-  ACTIVE_PROJECT_CONTEXT_KEY,
-  type ActiveProjectVueContext,
-} from '@/workbench/project/vue/active-project-context'
 
 interface PageFixture {
-  readonly activeProject: ActiveProjectService
-  readonly activeProjectContext: ActiveProjectVueContext
-  readonly create: ReturnType<typeof vi.fn<() => Promise<ProjectId>>>
   readonly projectEntryContext: ProjectEntryVueContext
   readonly resolve: ReturnType<typeof vi.fn<ProjectEntryCoordinator['resolve']>>
 }
@@ -54,29 +43,9 @@ function createSelection(projects: readonly RecentProjectSummary[]): ProjectEntr
 function createFixture(
   initialResolution: ProjectEntryResolution = createSelection([]),
 ): PageFixture {
-  const state = shallowRef<ActiveProjectState>(Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE }))
-  const create = vi.fn<() => Promise<ProjectId>>(async () =>
-    parseProjectId('project-entry-page-created'),
-  )
   const resolve = vi.fn<ProjectEntryCoordinator['resolve']>(async () => initialResolution)
-  const activeProject: ActiveProjectService = {
-    get state() {
-      return state.value
-    },
-    create,
-    open: async () => undefined,
-    save: async () => undefined,
-    subscribe: () => () => undefined,
-    dispose() {},
-  }
 
   return {
-    activeProject,
-    activeProjectContext: Object.freeze({
-      activeProject,
-      state: shallowReadonly(state),
-    }),
-    create,
     projectEntryContext: Object.freeze({
       projectEntry: Object.freeze({ resolve }),
     }),
@@ -84,21 +53,50 @@ function createFixture(
   }
 }
 
-function mountPage(fixture: PageFixture) {
-  return mount(ProjectEntryPage, {
+async function createPageRouter(initialLocation = '/'): Promise<Router> {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/',
+        name: PROJECT_ROUTE_NAME.ENTRY,
+        component: { render: () => null },
+      },
+      {
+        path: '/projects/new',
+        name: PROJECT_ROUTE_NAME.CREATE,
+        component: { render: () => null },
+      },
+      {
+        path: '/projects/:projectId',
+        name: PROJECT_ROUTE_NAME.WORKSPACE,
+        component: { render: () => null },
+      },
+    ],
+  })
+  await router.push(initialLocation)
+  await router.isReady()
+  return router
+}
+
+async function mountPage(fixture: PageFixture, initialLocation = '/') {
+  const router = await createPageRouter(initialLocation)
+  const wrapper = mount(ProjectEntryPage, {
     global: {
+      plugins: [router],
       provide: {
-        [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
       },
     },
   })
+
+  return { router, wrapper }
 }
 
 describe('ProjectEntryPage', () => {
   it('shows the Create-only empty state after loading the local Catalog', async () => {
     const fixture = createFixture()
-    const wrapper = mountPage(fixture)
+    const { wrapper } = await mountPage(fixture)
 
     await flushPromises()
 
@@ -108,21 +106,22 @@ describe('ProjectEntryPage', () => {
     expect(wrapper.get('.project-entry__create').text()).toContain('New project')
   })
 
-  it('creates a minimal Project from the primary action', async () => {
+  it('navigates the primary action to the guarded Create Route', async () => {
     const fixture = createFixture()
-    const wrapper = mountPage(fixture)
+    const { router, wrapper } = await mountPage(fixture)
     await flushPromises()
 
     await wrapper.get('.project-entry__create').trigger('click')
     await flushPromises()
 
-    expect(fixture.create).toHaveBeenCalledOnce()
+    expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.CREATE)
+    expect(fixture.resolve).toHaveBeenCalledExactlyOnceWith(null)
   })
 
-  it('renders recent Projects and opens the selected identity through the Coordinator', async () => {
+  it('renders recent Projects and navigates to the selected Project Route', async () => {
     const recentProject = createProject('Recent', Date.UTC(2026, 6, 22, 4, 30))
     const fixture = createFixture(createSelection([recentProject]))
-    const wrapper = mountPage(fixture)
+    const { router, wrapper } = await mountPage(fixture)
     await flushPromises()
 
     expect(wrapper.text()).toContain('Project Recent')
@@ -131,25 +130,19 @@ describe('ProjectEntryPage', () => {
     await wrapper.get('.project-entry__project').trigger('click')
     await flushPromises()
 
-    expect(fixture.resolve).toHaveBeenNthCalledWith(2, recentProject.projectId)
+    expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.WORKSPACE)
+    expect(router.currentRoute.value.params.projectId).toBe(recentProject.projectId)
+    expect(fixture.resolve).toHaveBeenCalledExactlyOnceWith(null)
   })
 
-  it('keeps selection visible and explains when a recent Project disappeared', async () => {
+  it('explains and hides a Project that a requested Route could not find', async () => {
     const missingProject = createProject('Missing', 100)
     const availableProject = createProject('Available', 90)
-    const fixture = createFixture(createSelection([missingProject]))
-    fixture.resolve.mockResolvedValueOnce(createSelection([missingProject])).mockResolvedValueOnce(
-      Object.freeze({
-        kind: PROJECT_ENTRY_RESOLUTION_KIND.SELECTION_REQUIRED,
-        reason: PROJECT_ENTRY_SELECTION_REASON.REQUESTED_PROJECT_NOT_FOUND,
-        requestedProjectId: missingProject.projectId,
-        recentProjects: Object.freeze([availableProject]),
-      }),
+    const fixture = createFixture(createSelection([missingProject, availableProject]))
+    const { wrapper } = await mountPage(
+      fixture,
+      `/?${PROJECT_ROUTE_QUERY.UNAVAILABLE_PROJECT_ID}=${missingProject.projectId}`,
     )
-    const wrapper = mountPage(fixture)
-    await flushPromises()
-
-    await wrapper.get('.project-entry__project').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toBe('That project is no longer available.')
@@ -167,7 +160,7 @@ describe('ProjectEntryPage', () => {
         failureCause: new Error('Local project catalog is unavailable'),
       }),
     )
-    const wrapper = mountPage(fixture)
+    const { wrapper } = await mountPage(fixture)
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Local project catalog is unavailable')

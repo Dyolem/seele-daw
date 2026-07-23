@@ -1,0 +1,224 @@
+import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import { flushPromises, mount } from '@vue/test-utils'
+import { shallowReadonly, shallowRef, type ShallowRef } from 'vue'
+import { createMemoryHistory } from 'vue-router'
+import { describe, expect, it, vi } from 'vitest'
+
+import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
+import { createStudioRouter } from '@/router'
+import {
+  createProjectWorkspaceLocation,
+  PROJECT_ROUTE_NAME,
+  PROJECT_ROUTE_QUERY,
+} from '@/router/project-routes'
+import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
+import type { ActiveProjectService } from '@/workbench/project/active-project-service'
+import {
+  ACTIVE_PROJECT_PHASE,
+  ACTIVE_PROJECT_SAVE_STATUS,
+  type ActiveProjectState,
+} from '@/workbench/project/active-project-state'
+import {
+  PROJECT_ENTRY_FAILURE_OPERATION,
+  PROJECT_ENTRY_RESOLUTION_KIND,
+  PROJECT_ENTRY_SELECTION_REASON,
+  type ProjectEntryCoordinator,
+  type ProjectEntryResolution,
+} from '@/workbench/project/entry/project-entry-coordinator'
+import {
+  PROJECT_ENTRY_CONTEXT_KEY,
+  type ProjectEntryVueContext,
+} from '@/workbench/project/entry/vue/project-entry-context'
+import {
+  ACTIVE_PROJECT_CONTEXT_KEY,
+  type ActiveProjectVueContext,
+} from '@/workbench/project/vue/active-project-context'
+
+interface PageFixture {
+  readonly activeProjectContext: ActiveProjectVueContext
+  readonly resolve: ReturnType<typeof vi.fn<ProjectEntryCoordinator['resolve']>>
+  readonly projectEntryContext: ProjectEntryVueContext
+  readonly state: ShallowRef<ActiveProjectState>
+}
+
+interface Deferred<T> {
+  readonly promise: Promise<T>
+  resolve(value: T): void
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolvePromise: ((value: T) => void) | null = null
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+
+  return {
+    promise,
+    resolve(value) {
+      if (resolvePromise === null) throw new Error('Deferred resolver is unavailable')
+      resolvePromise(value)
+    },
+  }
+}
+
+function createReadyState(projectId: ProjectId): ActiveProjectState {
+  const session = createTestSession(projectId)
+  return Object.freeze({
+    phase: ACTIVE_PROJECT_PHASE.READY,
+    projectId,
+    session,
+    modelRevision: session.modelRevision,
+    contentStateId: session.contentStateId,
+    savedRevision: session.modelRevision,
+    savedContentStateId: session.contentStateId,
+    isDirty: false,
+    saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    saveFailure: null,
+    recoveryFailures: Object.freeze([]),
+  })
+}
+
+function createFixture(
+  resolveImplementation: ProjectEntryCoordinator['resolve'],
+  initialState: ActiveProjectState = Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE }),
+): PageFixture {
+  const state = shallowRef(initialState)
+  const resolve = vi.fn<ProjectEntryCoordinator['resolve']>(resolveImplementation)
+  const activeProject: ActiveProjectService = {
+    get state() {
+      return state.value
+    },
+    create: async () => parseProjectId('workspace-created-project'),
+    open: async () => undefined,
+    save: async () => undefined,
+    subscribe: () => () => undefined,
+    dispose() {},
+  }
+
+  return {
+    activeProjectContext: Object.freeze({
+      activeProject,
+      state: shallowReadonly(state),
+    }),
+    projectEntryContext: Object.freeze({
+      projectEntry: Object.freeze({ resolve }),
+    }),
+    resolve,
+    state,
+  }
+}
+
+async function mountPage(fixture: PageFixture, projectId: ProjectId) {
+  const router = createStudioRouter(createMemoryHistory())
+  await router.push(createProjectWorkspaceLocation(projectId))
+  await router.isReady()
+  const wrapper = mount(ProjectWorkspacePage, {
+    props: { projectId },
+    global: {
+      plugins: [router],
+      provide: {
+        [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
+        [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
+      },
+    },
+  })
+
+  return { router, wrapper }
+}
+
+describe('ProjectWorkspacePage', () => {
+  it('resolves a deep-linked Project and renders the neutral ready handoff', async () => {
+    const projectId = parseProjectId('project-workspace-page-ready')
+    const fixture = createFixture(
+      async () =>
+        Object.freeze({
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId,
+        }),
+      createReadyState(projectId),
+    )
+    const { wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    expect(fixture.resolve).toHaveBeenCalledExactlyOnceWith(projectId)
+    expect(wrapper.text()).toContain('PROJECT READY')
+    expect(wrapper.text()).toContain(projectId)
+  })
+
+  it('returns a missing requested Project to Entry with an exclusion notice', async () => {
+    const projectId = parseProjectId('project-workspace-page-missing')
+    const fixture = createFixture(async () =>
+      Object.freeze({
+        kind: PROJECT_ENTRY_RESOLUTION_KIND.SELECTION_REQUIRED,
+        reason: PROJECT_ENTRY_SELECTION_REASON.REQUESTED_PROJECT_NOT_FOUND,
+        requestedProjectId: projectId,
+        recentProjects: Object.freeze([]),
+      }),
+    )
+    const { router } = await mountPage(fixture, projectId)
+
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.ENTRY))
+    expect(router.currentRoute.value.query[PROJECT_ROUTE_QUERY.UNAVAILABLE_PROJECT_ID]).toBe(
+      projectId,
+    )
+  })
+
+  it('keeps storage failures visible and retries the same Project', async () => {
+    const projectId = parseProjectId('project-workspace-page-failed')
+    const failedResolution: ProjectEntryResolution = Object.freeze({
+      kind: PROJECT_ENTRY_RESOLUTION_KIND.FAILED,
+      operation: PROJECT_ENTRY_FAILURE_OPERATION.OPEN_REQUESTED_PROJECT,
+      requestedProjectId: projectId,
+      failureCause: new Error('Checkpoint candidates are damaged'),
+    })
+    const fixture = createFixture(async () => failedResolution)
+    const { wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('Checkpoint candidates are damaged')
+
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(fixture.resolve).toHaveBeenCalledTimes(2)
+    expect(fixture.resolve).toHaveBeenNthCalledWith(2, projectId)
+  })
+
+  it('ignores a result from an older Project prop after a newer request starts', async () => {
+    const firstProjectId = parseProjectId('project-workspace-page-first')
+    const secondProjectId = parseProjectId('project-workspace-page-second')
+    const first = createDeferred<ProjectEntryResolution>()
+    const second = createDeferred<ProjectEntryResolution>()
+    const fixture = createFixture((projectId) =>
+      projectId === firstProjectId ? first.promise : second.promise,
+    )
+    const { router, wrapper } = await mountPage(fixture, firstProjectId)
+    await vi.waitFor(() => expect(fixture.resolve).toHaveBeenCalledOnce())
+
+    await wrapper.setProps({ projectId: secondProjectId })
+    await vi.waitFor(() => expect(fixture.resolve).toHaveBeenCalledTimes(2))
+    fixture.state.value = createReadyState(secondProjectId)
+    second.resolve(
+      Object.freeze({
+        kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+        projectId: secondProjectId,
+      }),
+    )
+    await flushPromises()
+    first.resolve(
+      Object.freeze({
+        kind: PROJECT_ENTRY_RESOLUTION_KIND.SELECTION_REQUIRED,
+        reason: PROJECT_ENTRY_SELECTION_REASON.REQUESTED_PROJECT_NOT_FOUND,
+        requestedProjectId: firstProjectId,
+        recentProjects: Object.freeze([]),
+      }),
+    )
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(secondProjectId)
+    expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.WORKSPACE)
+    expect(
+      router.currentRoute.value.query[PROJECT_ROUTE_QUERY.UNAVAILABLE_PROJECT_ID],
+    ).toBeUndefined()
+  })
+})

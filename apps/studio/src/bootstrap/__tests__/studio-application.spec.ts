@@ -195,6 +195,51 @@ describe('StudioApplication', () => {
     application.dispose()
   })
 
+  it('guards a protected Router navigation through the same Vue decision channel', async () => {
+    const projectId = parseProjectId('studio-router-navigation-project')
+    const fixture = createRuntimeFixture([], createDirtyReadyState(projectId))
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { render: () => null } },
+        {
+          path: '/projects/new',
+          component: { render: () => null },
+          meta: { projectNavigation: PROJECT_NAVIGATION_INTENT_KIND.CREATE_PROJECT },
+        },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
+    let decisionContext: ProjectNavigationDecisionVueContext | null = null
+    const application = composeStudioApplication({
+      rootComponent: defineComponent({
+        setup() {
+          decisionContext = useProjectNavigationDecision()
+          return () => null
+        },
+      }),
+      router,
+      projectRuntime: fixture.runtime,
+    })
+    application.mount(document.createElement('div'))
+    const context = requireNavigationDecisionContext(decisionContext)
+
+    const navigation = router.push('/projects/new')
+    await vi.waitFor(() => expect(context.pendingDecision.value).not.toBeNull())
+    const pending = context.pendingDecision.value
+    if (pending === null) throw new Error('Expected a guarded Router decision')
+
+    expect(pending.request.intent).toEqual({
+      kind: PROJECT_NAVIGATION_INTENT_KIND.CREATE_PROJECT,
+    })
+    expect(context.resolve(pending, PROJECT_NAVIGATION_DECISION.DISCARD)).toBe(true)
+    await navigation
+
+    expect(router.currentRoute.value.path).toBe('/projects/new')
+    application.dispose()
+  })
+
   it('cancels a pending Project navigation decision when the application is disposed', async () => {
     const projectId = parseProjectId('studio-navigation-dispose')
     const fixture = createRuntimeFixture([], createDirtyReadyState(projectId))

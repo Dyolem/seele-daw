@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import type { ProjectId } from '@seele-daw/project-core'
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
+import {
+  createProjectCreationLocation,
+  createProjectEntryLocation,
+  createProjectWorkspaceLocation,
+  PROJECT_ROUTE_QUERY,
+} from '@/router/project-routes'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   type ProjectSelectionRequiredResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
 import type { RecentProjectSummary } from '@/workbench/project/project-catalog-reader'
-import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
 type ProjectEntryAction =
   | { readonly kind: 'create' }
   | { readonly kind: 'open'; readonly projectId: ProjectId }
   | null
 
-const { activeProject } = useActiveProject()
 const { projectEntry } = useProjectEntry()
+const route = useRoute()
+const router = useRouter()
 const selection = shallowRef<ProjectSelectionRequiredResolution | null>(null)
 const failureMessage = shallowRef<string | null>(null)
 const activeAction = shallowRef<ProjectEntryAction>(null)
@@ -24,7 +31,27 @@ const isLoadingProjects = shallowRef(true)
 let requestGeneration = 0
 let isUnmounted = false
 
-const recentProjects = computed(() => selection.value?.recentProjects ?? [])
+const unavailableProjectId = computed(() => {
+  const value = route.query[PROJECT_ROUTE_QUERY.UNAVAILABLE_PROJECT_ID]
+  return typeof value === 'string' ? value : null
+})
+const routeNotice = computed(() => {
+  const invalidProjectId = route.query[PROJECT_ROUTE_QUERY.INVALID_PROJECT_ID]
+  if (typeof invalidProjectId === 'string') {
+    return 'That project address is invalid.'
+  }
+  if (unavailableProjectId.value !== null) {
+    return 'That project is no longer available.'
+  }
+  return null
+})
+const recentProjects = computed(
+  () =>
+    selection.value?.recentProjects.filter(
+      ({ projectId }) => projectId !== unavailableProjectId.value,
+    ) ?? [],
+)
+const displayedFailureMessage = computed(() => failureMessage.value ?? routeNotice.value)
 const isBusy = computed(() => isLoadingProjects.value || activeAction.value !== null)
 
 function describeFailure(failure: unknown): string {
@@ -66,14 +93,17 @@ async function loadRecentProjects(): Promise<void> {
 async function createProject(): Promise<void> {
   if (isBusy.value) return
 
+  const generation = ++requestGeneration
   activeAction.value = Object.freeze({ kind: 'create' })
   failureMessage.value = null
   try {
-    await activeProject.create()
+    await router.push(createProjectCreationLocation())
   } catch (failureCause) {
-    if (!isUnmounted) failureMessage.value = describeFailure(failureCause)
+    if (!isUnmounted && generation === requestGeneration) {
+      failureMessage.value = describeFailure(failureCause)
+    }
   } finally {
-    if (!isUnmounted) activeAction.value = null
+    if (!isUnmounted && generation === requestGeneration) activeAction.value = null
   }
 }
 
@@ -83,19 +113,22 @@ async function openProject(project: RecentProjectSummary): Promise<void> {
   const generation = ++requestGeneration
   activeAction.value = Object.freeze({ kind: 'open', projectId: project.projectId })
   failureMessage.value = null
-  const resolution = await projectEntry.resolve(project.projectId)
-  if (isUnmounted || generation !== requestGeneration) return
-
-  activeAction.value = null
-  if (resolution.kind === PROJECT_ENTRY_RESOLUTION_KIND.SELECTION_REQUIRED) {
-    selection.value = resolution
-    failureMessage.value = 'That project is no longer available.'
-    return
+  try {
+    await router.push(createProjectWorkspaceLocation(project.projectId))
+  } catch (failureCause) {
+    if (!isUnmounted && generation === requestGeneration) {
+      failureMessage.value = describeFailure(failureCause)
+    }
+  } finally {
+    if (!isUnmounted && generation === requestGeneration) activeAction.value = null
   }
+}
 
-  if (resolution.kind === PROJECT_ENTRY_RESOLUTION_KIND.FAILED) {
-    failureMessage.value = describeFailure(resolution)
+async function retryRecentProjects(): Promise<void> {
+  if (routeNotice.value !== null) {
+    await router.replace(createProjectEntryLocation())
   }
+  await loadRecentProjects()
 }
 
 onMounted(() => void loadRecentProjects())
@@ -132,18 +165,18 @@ onUnmounted(() => {
           <h2 id="recent-projects-title">Recent projects</h2>
         </div>
         <button
-          v-if="failureMessage"
+          v-if="displayedFailureMessage"
           class="project-entry__retry"
           type="button"
           :disabled="isBusy"
-          @click="loadRecentProjects"
+          @click="retryRecentProjects"
         >
           Refresh
         </button>
       </div>
 
-      <p v-if="failureMessage" class="project-entry__error" role="alert">
-        {{ failureMessage }}
+      <p v-if="displayedFailureMessage" class="project-entry__error" role="alert">
+        {{ displayedFailureMessage }}
       </p>
 
       <div v-if="isLoadingProjects" class="project-entry__loading" aria-live="polite">

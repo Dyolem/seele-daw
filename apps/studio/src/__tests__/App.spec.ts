@@ -1,11 +1,12 @@
-import { parseProjectId } from '@seele-daw/project-core'
-import { mount } from '@vue/test-utils'
+import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import { flushPromises, mount } from '@vue/test-utils'
 import { shallowReadonly, shallowRef } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import App from '@/App.vue'
-import ProjectEntryPage from '@/features/project-entry/ProjectEntryPage.vue'
+import { createStudioRouter } from '@/router'
+import { createProjectWorkspaceLocation, PROJECT_ROUTE_NAME } from '@/router/project-routes'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
@@ -47,17 +48,24 @@ function createActiveProjectContext(state: ActiveProjectState): ActiveProjectVue
   return Object.freeze({ activeProject, state: shallowReadonly(stateRef) })
 }
 
-function createProjectEntryContext(): ProjectEntryVueContext {
+function createProjectEntryContext(readyProjectId: ProjectId | null): ProjectEntryVueContext {
   return Object.freeze({
     projectEntry: Object.freeze({
-      resolve: vi.fn<ProjectEntryCoordinator['resolve']>(async () =>
-        Object.freeze({
+      resolve: vi.fn<ProjectEntryCoordinator['resolve']>(async (requestedProjectId) => {
+        if (requestedProjectId !== null && requestedProjectId === readyProjectId) {
+          return Object.freeze({
+            kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+            projectId: requestedProjectId,
+          })
+        }
+
+        return Object.freeze({
           kind: PROJECT_ENTRY_RESOLUTION_KIND.SELECTION_REQUIRED,
           reason: PROJECT_ENTRY_SELECTION_REASON.NO_REQUESTED_PROJECT,
           requestedProjectId: null,
           recentProjects: Object.freeze([]),
-        }),
-      ),
+        })
+      }),
     }),
   })
 }
@@ -71,41 +79,39 @@ function createProjectNavigationDecisionContext(): ProjectNavigationDecisionVueC
   })
 }
 
-async function mountApp(state: ActiveProjectState) {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      {
-        path: '/',
-        component: ProjectEntryPage,
-      },
-    ],
-  })
-  await router.push('/')
+async function mountApp(state: ActiveProjectState, projectId: ProjectId | null = null) {
+  const router = createStudioRouter(createMemoryHistory())
+  await router.push(
+    projectId === null
+      ? { name: PROJECT_ROUTE_NAME.ENTRY }
+      : createProjectWorkspaceLocation(projectId),
+  )
   await router.isReady()
 
-  return mount(App, {
+  const wrapper = mount(App, {
     global: {
       plugins: [router],
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(state),
-        [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(),
+        [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
           createProjectNavigationDecisionContext(),
       },
     },
   })
+  await flushPromises()
+  return wrapper
 }
 
 describe('App', () => {
-  it('renders Project Entry while no Project is ready', async () => {
+  it('renders Project Entry while the Entry Route is active', async () => {
     const wrapper = await mountApp(Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE }))
 
     await vi.waitFor(() => expect(wrapper.text()).toContain('No projects yet'))
     expect(wrapper.text()).toContain('Recent projects')
   })
 
-  it('shows only a neutral handoff after a Project becomes ready', async () => {
+  it('shows only a neutral handoff for a ready Project Route', async () => {
     const projectId = parseProjectId('app-ready-project')
     const session = createTestSession(projectId)
     const wrapper = await mountApp(
@@ -122,6 +128,7 @@ describe('App', () => {
         saveFailure: null,
         recoveryFailures: Object.freeze([]),
       }),
+      projectId,
     )
 
     expect(wrapper.text()).toContain('PROJECT READY')

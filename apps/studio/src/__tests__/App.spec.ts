@@ -23,6 +23,10 @@ import {
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'
 import {
+  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
+  type ProjectNavigationDecisionVueContext,
+} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import {
   ACTIVE_PROJECT_CONTEXT_KEY,
   type ActiveProjectVueContext,
 } from '@/workbench/project/vue/active-project-context'
@@ -58,6 +62,15 @@ function createProjectEntryContext(): ProjectEntryVueContext {
   })
 }
 
+function createProjectNavigationDecisionContext(): ProjectNavigationDecisionVueContext {
+  const pendingDecision = shallowRef(null)
+
+  return Object.freeze({
+    pendingDecision: shallowReadonly(pendingDecision),
+    resolve: () => false,
+  })
+}
+
 async function mountApp(state: ActiveProjectState) {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -77,6 +90,8 @@ async function mountApp(state: ActiveProjectState) {
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(state),
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(),
+        [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
+          createProjectNavigationDecisionContext(),
       },
     },
   })

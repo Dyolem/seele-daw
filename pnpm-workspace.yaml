@@ -26,3 +26,6 @@ overrides:
 peerDependencyRules:
   allowAny:
     - 'vue'
+
+allowBuilds:
+  vue-demi: true

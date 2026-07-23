@@ -1,0 +1,92 @@
+:root {
+  color-scheme: dark;
+
+  --sd-color-surface-canvas: #070809;
+  --sd-color-surface-workspace: #0b0d0f;
+  --sd-color-surface-panel: #101317;
+  --sd-color-surface-raised: #171b20;
+  --sd-color-surface-overlay: #1d2228;
+  --sd-color-surface-sunken: #050607;
+  --sd-color-surface-scrim: rgb(0 0 0 / 72%);
+
+  --sd-color-text-primary: #f2eee5;
+  --sd-color-text-secondary: #b8b2a8;
+  --sd-color-text-muted: #8b8b8d;
+  --sd-color-text-disabled: #5e6165;
+  --sd-color-text-inverse: #08090a;
+
+  --sd-color-border-subtle: rgb(242 238 229 / 8%);
+  --sd-color-border-default: rgb(242 238 229 / 14%);
+  --sd-color-border-strong: rgb(242 238 229 / 24%);
+  --sd-color-border-focus: #c7ae72;
+
+  --sd-color-state-info: #68a8ff;
+  --sd-color-state-success: #59c28c;
+  --sd-color-state-warning: #e5b45b;
+  --sd-color-state-danger: #f06c68;
+  --sd-color-state-record: #ff4d47;
+
+  --sd-color-control-primary: #e4ded2;
+  --sd-color-control-primary-hover: #f2eee5;
+  --sd-color-control-primary-pressed: #cfc7b9;
+  --sd-color-control-secondary: #252a30;
+  --sd-color-control-secondary-hover: #30363d;
+  --sd-color-control-secondary-pressed: #1d2228;
+  --sd-color-control-danger: #4a2427;
+  --sd-color-control-danger-hover: #5b2b2f;
+  --sd-color-control-danger-pressed: #391c1f;
+  --sd-color-control-danger-text: #ffd8d5;
+  --sd-color-control-ghost-hover: rgb(242 238 229 / 8%);
+  --sd-color-control-ghost-pressed: rgb(242 238 229 / 14%);
+
+  --sd-font-family-ui:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sd-font-family-numeric: 'SFMono-Regular', Consolas, 'Liberation Mono', ui-monospace, monospace;
+
+  --sd-font-size-xs: 0.6875rem;
+  --sd-font-size-sm: 0.75rem;
+  --sd-font-size-md: 0.875rem;
+  --sd-font-size-lg: 1rem;
+  --sd-font-size-xl: 1.25rem;
+  --sd-line-height-tight: 1.25;
+  --sd-line-height-default: 1.45;
+  --sd-line-height-relaxed: 1.65;
+
+  --sd-space-0-5: 0.125rem;
+  --sd-space-1: 0.25rem;
+  --sd-space-2: 0.5rem;
+  --sd-space-3: 0.75rem;
+  --sd-space-4: 1rem;
+  --sd-space-5: 1.25rem;
+  --sd-space-6: 1.5rem;
+  --sd-space-8: 2rem;
+  --sd-space-10: 2.5rem;
+
+  --sd-radius-xs: 0.1875rem;
+  --sd-radius-sm: 0.3125rem;
+  --sd-radius-md: 0.5rem;
+  --sd-radius-lg: 0.75rem;
+  --sd-radius-pill: 999px;
+
+  --sd-control-height-sm: 1.75rem;
+  --sd-control-height-md: 2.25rem;
+
+  --sd-motion-duration-instant: 60ms;
+  --sd-motion-duration-fast: 80ms;
+  --sd-motion-duration-normal: 140ms;
+  --sd-motion-duration-slow: 220ms;
+  --sd-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --sd-motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  --sd-shadow-overlay: 0 1.5rem 5rem rgb(0 0 0 / 48%), 0 0 0 1px rgb(242 238 229 / 5%);
+  --sd-layer-modal: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sd-motion-duration-instant: 1ms;
+    --sd-motion-duration-fast: 1ms;
+    --sd-motion-duration-normal: 1ms;
+    --sd-motion-duration-slow: 1ms;
+  }
+}

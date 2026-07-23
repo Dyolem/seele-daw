@@ -103,7 +103,8 @@ describe('ProjectEntryPage', () => {
     expect(fixture.resolve).toHaveBeenCalledExactlyOnceWith(null)
     expect(wrapper.get('h1').text()).toBe('Create something worth hearing.')
     expect(wrapper.text()).toContain('No projects yet')
-    expect(wrapper.get('.project-entry__create').text()).toContain('New project')
+    expect(wrapper.get('.project-entry__create').text()).toContain('Create new project')
+    expect(wrapper.get('.project-entry__create').classes()).toContain('ui-button--primary')
   })
 
   it('navigates the primary action to the guarded Create Route', async () => {
@@ -126,6 +127,7 @@ describe('ProjectEntryPage', () => {
 
     expect(wrapper.text()).toContain('Project Recent')
     expect(wrapper.text()).toContain('Saved')
+    expect(wrapper.get('.project-entry__count').text()).toBe('1')
 
     await wrapper.get('.project-entry__project').trigger('click')
     await flushPromises()
@@ -145,7 +147,9 @@ describe('ProjectEntryPage', () => {
     )
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toBe('That project is no longer available.')
+    expect(wrapper.get('.project-entry__error > span').text()).toBe(
+      'That project is no longer available.',
+    )
     expect(wrapper.text()).toContain('Project Available')
     expect(wrapper.text()).not.toContain('Project Missing')
   })
@@ -163,7 +167,9 @@ describe('ProjectEntryPage', () => {
     const { wrapper } = await mountPage(fixture)
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toBe('Local project catalog is unavailable')
+    expect(wrapper.get('.project-entry__error > span').text()).toBe(
+      'Local project catalog is unavailable',
+    )
 
     await wrapper.get('.project-entry__retry').trigger('click')
     await flushPromises()

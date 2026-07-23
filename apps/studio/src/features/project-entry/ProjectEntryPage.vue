@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import type { ProjectId } from '@seele-daw/project-core'
+import AddIcon from '~icons/fluent/add-24-regular'
+import ArrowRightIcon from '~icons/fluent/arrow-right-20-regular'
+import ErrorCircleIcon from '~icons/fluent/error-circle-20-regular'
+import LockClosedIcon from '~icons/fluent/lock-closed-16-regular'
+import MidiIcon from '~icons/fluent/midi-24-regular'
+import MusicNotesIcon from '~icons/fluent/music-note-2-24-regular'
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -9,6 +15,8 @@ import {
   createProjectWorkspaceLocation,
   PROJECT_ROUTE_QUERY,
 } from '@/router/project-routes'
+import UiButton from '@/ui/components/UiButton.vue'
+import UiIcon from '@/ui/components/UiIcon.vue'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   type ProjectSelectionRequiredResolution,
@@ -140,147 +148,287 @@ onUnmounted(() => {
 
 <template>
   <main class="project-entry">
-    <section class="project-entry__intro" aria-labelledby="project-entry-title">
-      <div class="project-entry__brand" aria-label="Seele DAW">
-        <span class="project-entry__brand-mark" aria-hidden="true">S</span>
-        <span>SEELE</span>
-      </div>
-
-      <div class="project-entry__copy">
-        <p class="project-entry__eyebrow">YOUR MUSIC STARTS HERE</p>
-        <h1 id="project-entry-title">Create something worth hearing.</h1>
-        <p>Start a new project or continue from your most recent local checkpoint.</p>
-      </div>
-
-      <button class="project-entry__create" type="button" :disabled="isBusy" @click="createProject">
-        <span aria-hidden="true">+</span>
-        {{ activeAction?.kind === 'create' ? 'Creating project…' : 'New project' }}
-      </button>
-    </section>
-
-    <section class="project-entry__projects" aria-labelledby="recent-projects-title">
-      <div class="project-entry__section-heading">
-        <div>
-          <p class="project-entry__eyebrow">LOCAL PROJECTS</p>
-          <h2 id="recent-projects-title">Recent projects</h2>
+    <div class="project-entry__frame">
+      <header class="project-entry__masthead">
+        <div class="project-entry__brand" aria-label="Seele Studio">
+          <span class="project-entry__brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <path
+                d="M22.5 8.4A9.2 9.2 0 0 0 16 6c-4.1 0-7 2-7 5 0 3.1 3 4.1 7 4.9 4 .8 7 1.8 7 5 0 3.1-3 5.1-7.1 5.1a10.8 10.8 0 0 1-7.4-2.8"
+              />
+            </svg>
+          </span>
+          <span class="project-entry__brand-copy">
+            <strong>SEELE</strong>
+            <span>STUDIO</span>
+          </span>
         </div>
-        <button
-          v-if="displayedFailureMessage"
-          class="project-entry__retry"
-          type="button"
-          :disabled="isBusy"
-          @click="retryRecentProjects"
-        >
-          Refresh
-        </button>
-      </div>
 
-      <p v-if="displayedFailureMessage" class="project-entry__error" role="alert">
-        {{ displayedFailureMessage }}
-      </p>
+        <div class="project-entry__local-status">
+          <span aria-hidden="true"></span>
+          Local workspace
+        </div>
+      </header>
 
-      <div v-if="isLoadingProjects" class="project-entry__loading" aria-live="polite">
-        <span class="project-entry__spinner" aria-hidden="true"></span>
-        Loading recent projects…
-      </div>
+      <section class="project-entry__hero" aria-labelledby="project-entry-title">
+        <div class="project-entry__copy">
+          <p class="project-entry__eyebrow">
+            <span aria-hidden="true"></span>
+            Piano Black
+          </p>
+          <h1 id="project-entry-title">Create something worth hearing.</h1>
+          <p>
+            A focused local studio for shaping ideas into music. Start fresh or return to your most
+            recent checkpoint.
+          </p>
+        </div>
 
-      <div v-else-if="recentProjects.length === 0" class="project-entry__empty">
-        <div class="project-entry__empty-icon" aria-hidden="true">♪</div>
-        <h3>No projects yet</h3>
-        <p>Your saved projects will appear here.</p>
-      </div>
-
-      <ul v-else class="project-entry__list" aria-label="Recent projects">
-        <li v-for="project in recentProjects" :key="project.projectId">
-          <button
-            class="project-entry__project"
-            type="button"
+        <aside class="project-entry__start" aria-labelledby="new-project-title">
+          <div class="project-entry__start-heading">
+            <span class="project-entry__start-icon">
+              <UiIcon :icon="AddIcon" :size="24" />
+            </span>
+            <div>
+              <p>START A SESSION</p>
+              <h2 id="new-project-title">New project</h2>
+            </div>
+          </div>
+          <p class="project-entry__start-copy">
+            Create a minimal project and its first recoverable checkpoint.
+          </p>
+          <UiButton
+            class="project-entry__create"
+            variant="primary"
+            :busy="activeAction?.kind === 'create'"
             :disabled="isBusy"
-            @click="openProject(project)"
+            @click="createProject"
           >
-            <span class="project-entry__project-art" aria-hidden="true">♪</span>
-            <span class="project-entry__project-copy">
-              <strong>{{ project.name }}</strong>
-              <span>Saved {{ formatLastSaved(project.lastCheckpointSavedAt) }}</span>
-            </span>
-            <span class="project-entry__project-action">
-              {{
+            {{ activeAction?.kind === 'create' ? 'Creating project…' : 'Create new project' }}
+          </UiButton>
+          <p class="project-entry__local-note">
+            <UiIcon :icon="LockClosedIcon" :size="16" />
+            Projects stay in this browser.
+          </p>
+        </aside>
+      </section>
+
+      <section class="project-entry__projects" aria-labelledby="recent-projects-title">
+        <div class="project-entry__section-heading">
+          <div>
+            <p class="project-entry__eyebrow">
+              <span aria-hidden="true"></span>
+              Project library
+            </p>
+            <div class="project-entry__title-line">
+              <h2 id="recent-projects-title">Recent projects</h2>
+              <span v-if="!isLoadingProjects" class="project-entry__count">
+                {{ recentProjects.length }}
+              </span>
+            </div>
+          </div>
+          <p>Stored locally · newest checkpoint first</p>
+        </div>
+
+        <div v-if="displayedFailureMessage" class="project-entry__error" role="alert">
+          <UiIcon class="project-entry__error-icon" :icon="ErrorCircleIcon" :size="20" />
+          <span>{{ displayedFailureMessage }}</span>
+          <UiButton
+            class="project-entry__retry"
+            size="small"
+            variant="ghost"
+            :disabled="isBusy"
+            @click="retryRecentProjects"
+          >
+            Refresh
+          </UiButton>
+        </div>
+
+        <div v-if="isLoadingProjects" class="project-entry__loading" aria-live="polite">
+          <span class="project-entry__spinner" aria-hidden="true"></span>
+          <div>
+            <strong>Loading project library</strong>
+            <span>Reading local checkpoints…</span>
+          </div>
+        </div>
+
+        <div v-else-if="recentProjects.length === 0" class="project-entry__empty">
+          <span class="project-entry__empty-icon">
+            <UiIcon :icon="MusicNotesIcon" :size="24" />
+          </span>
+          <h3>No projects yet</h3>
+          <p>Your saved projects will appear here after their first checkpoint.</p>
+        </div>
+
+        <ul v-else class="project-entry__list" aria-label="Recent projects">
+          <li v-for="project in recentProjects" :key="project.projectId">
+            <button
+              class="project-entry__project"
+              :class="{
+                'project-entry__project--opening':
+                  activeAction?.kind === 'open' && activeAction.projectId === project.projectId,
+              }"
+              type="button"
+              :disabled="isBusy"
+              :aria-busy="
                 activeAction?.kind === 'open' && activeAction.projectId === project.projectId
-                  ? 'Opening…'
-                  : 'Open'
-              }}
-              <span aria-hidden="true">→</span>
-            </span>
-          </button>
-        </li>
-      </ul>
-    </section>
+                  ? true
+                  : undefined
+              "
+              @click="openProject(project)"
+            >
+              <span class="project-entry__project-art">
+                <UiIcon :icon="MidiIcon" :size="24" />
+              </span>
+              <span class="project-entry__project-copy">
+                <strong>{{ project.name }}</strong>
+                <span>Saved {{ formatLastSaved(project.lastCheckpointSavedAt) }}</span>
+              </span>
+              <span class="project-entry__project-action">
+                {{
+                  activeAction?.kind === 'open' && activeAction.projectId === project.projectId
+                    ? 'Opening…'
+                    : 'Open'
+                }}
+                <UiIcon :icon="ArrowRightIcon" :size="20" />
+              </span>
+            </button>
+          </li>
+        </ul>
+      </section>
+    </div>
   </main>
 </template>
 
 <style scoped>
 .project-entry {
-  --entry-bg: #0b0b0d;
-  --entry-panel: #141418;
-  --entry-panel-strong: #1a1a20;
-  --entry-border: #2a2a31;
-  --entry-muted: #9898a2;
-  --entry-accent: #c8ff45;
   min-height: 100vh;
-  padding: clamp(32px, 6vw, 84px);
-  color: #f5f5f7;
+  overflow: hidden;
+  padding: clamp(var(--sd-space-6), 5vw, calc(var(--sd-space-10) + var(--sd-space-4)));
+  color: var(--sd-color-text-primary);
   background:
-    radial-gradient(circle at 14% 12%, rgb(200 255 69 / 9%), transparent 24rem), var(--entry-bg);
+    radial-gradient(
+      circle at 18% -12%,
+      color-mix(in srgb, var(--sd-color-border-focus) 12%, transparent),
+      transparent 30rem
+    ),
+    linear-gradient(
+      to bottom,
+      var(--sd-color-surface-canvas),
+      var(--sd-color-surface-workspace) 48%,
+      var(--sd-color-surface-canvas)
+    );
 }
 
-.project-entry__intro,
-.project-entry__projects {
-  width: min(100%, 1040px);
+.project-entry__frame {
+  width: min(100%, 72rem);
   margin-inline: auto;
 }
 
-.project-entry__intro {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 36px 48px;
-  align-items: end;
-  padding-bottom: clamp(48px, 8vw, 88px);
-  border-bottom: 1px solid var(--entry-border);
+.project-entry__masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--sd-space-5);
+  border-bottom: 1px solid var(--sd-color-border-subtle);
 }
 
 .project-entry__brand {
-  grid-column: 1 / -1;
   display: inline-flex;
-  gap: 10px;
+  gap: var(--sd-space-3);
   align-items: center;
-  width: fit-content;
-  font-size: 13px;
-  font-weight: 750;
-  letter-spacing: 0.22em;
 }
 
 .project-entry__brand-mark {
   display: grid;
-  width: 30px;
-  height: 30px;
+  inline-size: var(--sd-control-height-md);
+  block-size: var(--sd-control-height-md);
   place-items: center;
-  color: #0b0b0d;
-  background: var(--entry-accent);
-  border-radius: 9px;
-  font-size: 15px;
-  letter-spacing: 0;
+  border: 1px solid var(--sd-color-border-focus);
+  border-radius: var(--sd-radius-md);
+  color: var(--sd-color-border-focus);
+  background: var(--sd-color-surface-raised);
+}
+
+.project-entry__brand-mark svg {
+  inline-size: var(--sd-space-5);
+  block-size: var(--sd-space-5);
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.project-entry__brand-copy {
+  display: grid;
+  line-height: var(--sd-line-height-tight);
+}
+
+.project-entry__brand-copy strong {
+  font-size: var(--sd-font-size-sm);
+  letter-spacing: 0.2em;
+}
+
+.project-entry__brand-copy span {
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+  letter-spacing: 0.16em;
+}
+
+.project-entry__local-status {
+  display: inline-flex;
+  gap: var(--sd-space-2);
+  align-items: center;
+  min-block-size: var(--sd-control-height-sm);
+  padding-inline: var(--sd-space-3);
+  border: 1px solid var(--sd-color-border-subtle);
+  border-radius: var(--sd-radius-pill);
+  color: var(--sd-color-text-muted);
+  background: var(--sd-color-surface-panel);
+  font-size: var(--sd-font-size-sm);
+}
+
+.project-entry__local-status > span {
+  inline-size: var(--sd-space-2);
+  block-size: var(--sd-space-2);
+  border: 1px solid var(--sd-color-surface-panel);
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-color-state-success);
+  outline: 1px solid color-mix(in srgb, var(--sd-color-state-success) 54%, transparent);
+  outline-offset: 1px;
+}
+
+.project-entry__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 0.75fr);
+  gap: clamp(var(--sd-space-8), 7vw, calc(var(--sd-space-10) * 2));
+  align-items: center;
+  padding-block: clamp(
+    calc(var(--sd-space-10) + var(--sd-space-4)),
+    9vw,
+    calc(var(--sd-space-10) * 3)
+  );
 }
 
 .project-entry__copy {
-  max-width: 680px;
+  max-inline-size: 44rem;
 }
 
 .project-entry__eyebrow {
-  margin: 0 0 12px;
-  color: var(--entry-accent);
-  font-size: 11px;
+  display: flex;
+  gap: var(--sd-space-2);
+  align-items: center;
+  margin: 0 0 var(--sd-space-4);
+  color: var(--sd-color-border-focus);
+  font-size: var(--sd-font-size-xs);
   font-weight: 750;
   letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.project-entry__eyebrow > span {
+  inline-size: var(--sd-space-6);
+  block-size: 1px;
+  background: currentcolor;
 }
 
 .project-entry h1,
@@ -290,255 +438,425 @@ onUnmounted(() => {
   margin-top: 0;
 }
 
-.project-entry h1 {
-  max-width: 620px;
-  margin-bottom: 18px;
-  font-size: clamp(42px, 7vw, 76px);
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+.project-entry__copy h1 {
+  max-inline-size: 42rem;
+  margin-bottom: var(--sd-space-6);
+  font-size: clamp(2.75rem, 6.5vw, 5.5rem);
+  font-weight: 720;
+  line-height: 0.96;
+  letter-spacing: -0.06em;
 }
 
 .project-entry__copy > p:last-child {
-  max-width: 540px;
+  max-inline-size: 37rem;
   margin-bottom: 0;
-  color: var(--entry-muted);
-  font-size: 16px;
-  line-height: 1.65;
+  color: var(--sd-color-text-secondary);
+  font-size: var(--sd-font-size-lg);
+  line-height: var(--sd-line-height-relaxed);
 }
 
-.project-entry button {
-  font: inherit;
+.project-entry__start {
+  position: relative;
+  padding: var(--sd-space-6);
+  border: 1px solid var(--sd-color-border-default);
+  border-radius: var(--sd-radius-lg);
+  background: linear-gradient(
+    to bottom,
+    var(--sd-color-surface-raised),
+    var(--sd-color-surface-panel)
+  );
+}
+
+.project-entry__start::before {
+  position: absolute;
+  inset: 0 var(--sd-space-6) auto;
+  block-size: 1px;
+  background: linear-gradient(to right, transparent, var(--sd-color-border-focus), transparent);
+  content: '';
+}
+
+.project-entry__start-heading {
+  display: flex;
+  gap: var(--sd-space-3);
+  align-items: center;
+}
+
+.project-entry__start-icon {
+  display: grid;
+  inline-size: calc(var(--sd-control-height-md) + var(--sd-space-1));
+  block-size: calc(var(--sd-control-height-md) + var(--sd-space-1));
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--sd-color-border-strong);
+  border-radius: var(--sd-radius-md);
+  color: var(--sd-color-text-primary);
+  background: var(--sd-color-surface-sunken);
+}
+
+.project-entry__start-heading p {
+  margin-bottom: var(--sd-space-1);
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.project-entry__start-heading h2 {
+  margin-bottom: 0;
+  font-size: var(--sd-font-size-xl);
+  letter-spacing: -0.02em;
+}
+
+.project-entry__start-copy {
+  margin: var(--sd-space-5) 0;
+  color: var(--sd-color-text-secondary);
+  font-size: var(--sd-font-size-md);
+  line-height: var(--sd-line-height-relaxed);
 }
 
 .project-entry__create {
-  display: inline-flex;
-  gap: 12px;
+  inline-size: 100%;
+  min-block-size: calc(var(--sd-control-height-md) + var(--sd-space-2));
+}
+
+.project-entry__local-note {
+  display: flex;
+  gap: var(--sd-space-2);
   align-items: center;
   justify-content: center;
-  min-width: 172px;
-  padding: 15px 20px;
-  border: 1px solid var(--entry-accent);
-  border-radius: 12px;
-  color: #101105;
-  background: var(--entry-accent);
-  font-weight: 720;
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.project-entry__create:hover:not(:disabled) {
-  box-shadow: 0 12px 38px rgb(200 255 69 / 18%);
-  transform: translateY(-2px);
-}
-
-.project-entry__create > span {
-  font-size: 22px;
-  font-weight: 400;
-  line-height: 0;
-}
-
-.project-entry button:focus-visible {
-  outline: 3px solid rgb(200 255 69 / 35%);
-  outline-offset: 3px;
-}
-
-.project-entry button:disabled {
-  cursor: wait;
-  opacity: 0.58;
+  margin: var(--sd-space-3) 0 0;
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
 }
 
 .project-entry__projects {
-  padding-top: 38px;
+  overflow: hidden;
+  border: 1px solid var(--sd-color-border-default);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-color-surface-panel);
 }
 
 .project-entry__section-heading {
   display: flex;
-  gap: 24px;
-  align-items: end;
+  gap: var(--sd-space-6);
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 22px;
+  padding: var(--sd-space-5) var(--sd-space-6);
+  border-bottom: 1px solid var(--sd-color-border-subtle);
 }
 
-.project-entry h2 {
+.project-entry__section-heading .project-entry__eyebrow {
+  margin-bottom: var(--sd-space-2);
+}
+
+.project-entry__title-line {
+  display: flex;
+  gap: var(--sd-space-3);
+  align-items: center;
+}
+
+.project-entry__title-line h2 {
   margin-bottom: 0;
-  font-size: 28px;
-  letter-spacing: -0.025em;
+  font-size: var(--sd-font-size-xl);
+  letter-spacing: -0.02em;
 }
 
-.project-entry__retry {
-  padding: 8px 12px;
-  border: 0;
-  color: var(--entry-accent);
-  background: transparent;
-  cursor: pointer;
+.project-entry__count {
+  display: grid;
+  min-inline-size: var(--sd-control-height-sm);
+  block-size: var(--sd-control-height-sm);
+  place-items: center;
+  padding-inline: var(--sd-space-2);
+  border: 1px solid var(--sd-color-border-subtle);
+  border-radius: var(--sd-radius-pill);
+  color: var(--sd-color-text-muted);
+  background: var(--sd-color-surface-sunken);
+  font-family: var(--sd-font-family-numeric);
+  font-size: var(--sd-font-size-xs);
+}
+
+.project-entry__section-heading > p {
+  margin-bottom: 0;
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-sm);
 }
 
 .project-entry__error {
-  padding: 12px 14px;
-  border: 1px solid #63363b;
-  border-radius: 10px;
-  color: #ffc4c8;
-  background: #26171a;
-  font-size: 14px;
+  display: flex;
+  gap: var(--sd-space-3);
+  align-items: center;
+  margin: var(--sd-space-4) var(--sd-space-6) 0;
+  padding: var(--sd-space-3) var(--sd-space-4);
+  border: 1px solid var(--sd-color-state-danger);
+  border-radius: var(--sd-radius-md);
+  color: var(--sd-color-control-danger-text);
+  background: color-mix(in srgb, var(--sd-color-control-danger) 72%, var(--sd-color-surface-panel));
+  font-size: var(--sd-font-size-sm);
+}
+
+.project-entry__error-icon {
+  color: var(--sd-color-state-danger);
+}
+
+.project-entry__error > span {
+  min-inline-size: 0;
+}
+
+.project-entry__retry {
+  margin-inline-start: auto;
 }
 
 .project-entry__loading,
 .project-entry__empty {
   display: grid;
-  min-height: 240px;
+  min-block-size: 15rem;
   place-items: center;
   align-content: center;
-  border: 1px dashed var(--entry-border);
-  border-radius: 18px;
-  color: var(--entry-muted);
-  background: rgb(255 255 255 / 1.5%);
+  color: var(--sd-color-text-muted);
+  text-align: center;
 }
 
 .project-entry__loading {
   grid-auto-flow: column;
-  gap: 12px;
+  gap: var(--sd-space-3);
+}
+
+.project-entry__loading > div {
+  display: grid;
+  gap: var(--sd-space-1);
+  text-align: start;
+}
+
+.project-entry__loading strong {
+  color: var(--sd-color-text-secondary);
+  font-size: var(--sd-font-size-md);
+}
+
+.project-entry__loading span:last-child {
+  font-size: var(--sd-font-size-sm);
 }
 
 .project-entry__spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgb(255 255 255 / 18%);
-  border-top-color: var(--entry-accent);
-  border-radius: 50%;
-  animation: entry-spin 700ms linear infinite;
-}
-
-.project-entry__empty-icon,
-.project-entry__project-art {
-  display: grid;
-  place-items: center;
-  color: var(--entry-accent);
-  background: linear-gradient(145deg, #2d3320, #181b13);
+  inline-size: var(--sd-space-5);
+  block-size: var(--sd-space-5);
+  border: 2px solid var(--sd-color-border-default);
+  border-top-color: var(--sd-color-border-focus);
+  border-radius: var(--sd-radius-pill);
+  animation: entry-spin var(--sd-motion-duration-slow) linear infinite;
 }
 
 .project-entry__empty-icon {
-  width: 54px;
-  height: 54px;
-  margin-bottom: 18px;
-  border-radius: 16px;
-  font-size: 23px;
+  display: grid;
+  inline-size: calc(var(--sd-space-10) + var(--sd-space-4));
+  block-size: calc(var(--sd-space-10) + var(--sd-space-4));
+  margin-bottom: var(--sd-space-4);
+  place-items: center;
+  border: 1px solid var(--sd-color-border-default);
+  border-radius: var(--sd-radius-lg);
+  color: var(--sd-color-border-focus);
+  background: var(--sd-color-surface-sunken);
 }
 
 .project-entry__empty h3 {
-  margin-bottom: 6px;
-  color: #f5f5f7;
-  font-size: 17px;
+  margin-bottom: var(--sd-space-2);
+  color: var(--sd-color-text-primary);
+  font-size: var(--sd-font-size-lg);
 }
 
 .project-entry__empty p {
+  max-inline-size: 24rem;
   margin-bottom: 0;
-  font-size: 14px;
+  font-size: var(--sd-font-size-md);
+  line-height: var(--sd-line-height-default);
 }
 
 .project-entry__list {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sd-space-3);
   margin: 0;
-  padding: 0;
+  padding: var(--sd-space-4);
   list-style: none;
 }
 
 .project-entry__project {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: var(--sd-space-3);
   align-items: center;
-  width: 100%;
-  padding: 13px 16px;
-  border: 1px solid var(--entry-border);
-  border-radius: 14px;
-  color: inherit;
-  text-align: left;
-  background: var(--entry-panel);
+  inline-size: 100%;
+  min-block-size: 5rem;
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-color-border-default);
+  border-radius: var(--sd-radius-md);
+  color: var(--sd-color-text-primary);
+  text-align: start;
+  background: var(--sd-color-surface-raised);
   cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+    color var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    border-color var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    background var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
 }
 
 .project-entry__project:hover:not(:disabled) {
-  border-color: #44444d;
-  background: var(--entry-panel-strong);
-  transform: translateX(3px);
+  border-color: var(--sd-color-border-strong);
+  background: var(--sd-color-surface-overlay);
+}
+
+.project-entry__project:active:not(:disabled) {
+  background: var(--sd-color-control-secondary-pressed);
+}
+
+.project-entry__project:focus-visible {
+  outline: 2px solid var(--sd-color-border-focus);
+  outline-offset: 2px;
+}
+
+.project-entry__project:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.project-entry__project--opening {
+  border-color: var(--sd-color-border-strong);
 }
 
 .project-entry__project-art {
-  width: 44px;
-  height: 44px;
-  border-radius: 11px;
-  font-size: 18px;
+  display: grid;
+  inline-size: calc(var(--sd-control-height-md) + var(--sd-space-2));
+  block-size: calc(var(--sd-control-height-md) + var(--sd-space-2));
+  place-items: center;
+  border: 1px solid var(--sd-color-border-subtle);
+  border-radius: var(--sd-radius-md);
+  color: var(--sd-color-border-focus);
+  background: var(--sd-color-surface-sunken);
 }
 
 .project-entry__project-copy {
   display: grid;
-  gap: 5px;
-  min-width: 0;
+  gap: var(--sd-space-1);
+  min-inline-size: 0;
 }
 
 .project-entry__project-copy strong {
   overflow: hidden;
-  font-size: 15px;
+  font-size: var(--sd-font-size-md);
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .project-entry__project-copy span {
-  color: var(--entry-muted);
-  font-size: 12px;
+  overflow: hidden;
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-entry__project-action {
   display: inline-flex;
-  gap: 10px;
+  gap: var(--sd-space-2);
   align-items: center;
-  color: var(--entry-muted);
-  font-size: 13px;
+  color: var(--sd-color-text-secondary);
+  font-size: var(--sd-font-size-sm);
+  font-weight: 650;
 }
 
 @keyframes entry-spin {
   to {
-    transform: rotate(360deg);
+    transform: rotate(1turn);
   }
 }
 
-@media (max-width: 680px) {
-  .project-entry {
-    padding: 28px 20px 48px;
+@media (max-width: 56rem) {
+  .project-entry__hero {
+    grid-template-columns: 1fr;
+    gap: var(--sd-space-8);
   }
 
-  .project-entry__intro {
+  .project-entry__start {
+    max-inline-size: 32rem;
+  }
+}
+
+@media (max-width: 44rem) {
+  .project-entry {
+    padding: var(--sd-space-5) var(--sd-space-4) var(--sd-space-8);
+  }
+
+  .project-entry__hero {
+    padding-block: calc(var(--sd-space-10) + var(--sd-space-4));
+  }
+
+  .project-entry__copy h1 {
+    font-size: clamp(2.5rem, 13vw, 4rem);
+  }
+
+  .project-entry__section-heading {
+    align-items: flex-start;
+    padding: var(--sd-space-4);
+  }
+
+  .project-entry__section-heading > p {
+    max-inline-size: 10rem;
+    text-align: end;
+  }
+
+  .project-entry__error {
+    align-items: flex-start;
+    margin: var(--sd-space-4) var(--sd-space-4) 0;
+  }
+
+  .project-entry__list {
     grid-template-columns: 1fr;
   }
 
-  .project-entry__create {
-    width: 100%;
+  .project-entry__loading,
+  .project-entry__empty {
+    min-block-size: 13rem;
+    padding-inline: var(--sd-space-4);
+  }
+}
+
+@media (max-width: 28rem) {
+  .project-entry__local-status {
+    padding-inline: var(--sd-space-2);
+    font-size: var(--sd-font-size-xs);
+  }
+
+  .project-entry__brand-copy span {
+    display: none;
+  }
+
+  .project-entry__section-heading {
+    display: grid;
+  }
+
+  .project-entry__section-heading > p {
+    max-inline-size: none;
+    text-align: start;
+  }
+
+  .project-entry__error {
+    flex-wrap: wrap;
+  }
+
+  .project-entry__retry {
+    inline-size: 100%;
+    margin-inline-start: 0;
   }
 
   .project-entry__project-action {
     font-size: 0;
   }
-
-  .project-entry__project-action span {
-    font-size: 18px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .project-entry *,
-  .project-entry *::before,
-  .project-entry *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .project-entry__spinner {
+    animation: none;
+    border-color: var(--sd-color-border-focus);
   }
 }
 </style>

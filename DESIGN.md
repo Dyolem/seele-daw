@@ -7,7 +7,8 @@
 
 本文档定义 Seele Studio 编辑器的产品界面、交互模型与视觉语言。它是产品设计、前端实现、Canvas 渲染、主题开发和设计评审共同遵循的基线。
 
-当前 Project Entry 页面是临时入口，不属于本规范的视觉基准。它可以在编辑器设计稳定后重新设计。
+Project Entry 与编辑器共享主题语义、组件状态和可访问性基线，但其宽松欢迎布局不是
+Workbench 高密度布局的参考。
 
 ## 1. 如何使用本规范
 
@@ -90,22 +91,22 @@ Hover、Pressed、Selected、Focused、Disabled、Busy 和 Error 在所有组件
 
 ### 4.1 模块总览
 
-| 模块                | 主要职责                                 | 主要表面                 | 当前定位                 |
-| ------------------- | ---------------------------------------- | ------------------------ | ------------------------ |
-| Project Entry       | 新建、打开、最近项目、失败反馈           | 启动页                   | 已有临时页面，视觉非规范 |
-| Project Lifecycle   | 当前项目、保存、dirty、离开确认          | 全局状态与对话框         | 已有应用服务，UI 待完善  |
-| Global Bar          | 品牌入口、项目名、保存状态、全局菜单     | 顶部全局区               | 编辑器首批外壳           |
-| Transport           | 播放、停止、录音、循环、时间、速度、拍号 | 顶部全局区或独立控制行   | 编辑器首批外壳           |
-| Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸       | 整个编辑器框架           | 编辑器首批外壳           |
-| Track List          | 轨道身份、颜色、静音、独奏、音量等       | Arrangement 左列         | Arrangement 切片         |
-| Arrangement         | 时间线、Clip、播放头、选择与编辑         | 主工作区                 | 核心编辑表面             |
-| Context Editor Dock | 承载当前内容的下方编辑器                 | 下方可调整面板           | Piano Roll 切片          |
-| Piano Roll          | MIDI 音符编辑、键盘、网格、力度          | 下方面板或工作区全屏     | 第一类业务编辑器         |
-| Inspector           | 当前选择的属性与批量操作                 | 左下或侧边区域           | 随业务能力渐进实现       |
-| Browser / Library   | 乐器、Loop、文件和预设浏览               | 可停靠侧栏               | 后续阶段                 |
-| Mixer               | 通道、路由、发送、插件与电平             | 独立工作区或面板         | 后续阶段                 |
-| Menus & Commands    | 可发现命令、快捷键、上下文动作           | 菜单、右键菜单、命令面板 | 随功能同步建设           |
-| Feedback Layer      | 对话框、Toast、进度、内联错误            | 覆盖层与状态区           | 跨模块能力               |
+| 模块                | 主要职责                                 | 主要表面                 | 当前定位                |
+| ------------------- | ---------------------------------------- | ------------------------ | ----------------------- |
+| Project Entry       | 新建、打开、最近项目、失败反馈           | 启动页                   | Piano Black 首批入口    |
+| Project Lifecycle   | 当前项目、保存、dirty、离开确认          | 全局状态与对话框         | 已有应用服务，UI 待完善 |
+| Global Bar          | 品牌入口、项目名、保存状态、全局菜单     | 顶部全局区               | 编辑器首批外壳          |
+| Transport           | 播放、停止、录音、循环、时间、速度、拍号 | 顶部全局区或独立控制行   | 编辑器首批外壳          |
+| Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸       | 整个编辑器框架           | 编辑器首批外壳          |
+| Track List          | 轨道身份、颜色、静音、独奏、音量等       | Arrangement 左列         | Arrangement 切片        |
+| Arrangement         | 时间线、Clip、播放头、选择与编辑         | 主工作区                 | 核心编辑表面            |
+| Context Editor Dock | 承载当前内容的下方编辑器                 | 下方可调整面板           | Piano Roll 切片         |
+| Piano Roll          | MIDI 音符编辑、键盘、网格、力度          | 下方面板或工作区全屏     | 第一类业务编辑器        |
+| Inspector           | 当前选择的属性与批量操作                 | 左下或侧边区域           | 随业务能力渐进实现      |
+| Browser / Library   | 乐器、Loop、文件和预设浏览               | 可停靠侧栏               | 后续阶段                |
+| Mixer               | 通道、路由、发送、插件与电平             | 独立工作区或面板         | 后续阶段                |
+| Menus & Commands    | 可发现命令、快捷键、上下文动作           | 菜单、右键菜单、命令面板 | 随功能同步建设          |
+| Feedback Layer      | 对话框、Toast、进度、内联错误            | 覆盖层与状态区           | 跨模块能力              |
 
 ### 4.2 Workbench Shell 的定义
 
@@ -237,6 +238,8 @@ Vue 或 Pinia MAY 保存轻量、可重建的 UI 状态。它们 MUST NOT 接管
 
 - 新建项目成功前，应先建立可恢复的最小 Checkpoint。
 - 打开项目只打开已有项目；找不到、损坏或恢复失败必须给出明确结果。
+- Project Entry 应保持一个清晰的 New Project 主操作，并把最近项目作为本地资源库呈现。
+- Project Entry 的 Loading、Empty、Route notice 与恢复错误使用局部反馈，不阻塞无关信息。
 - Global Bar 应持续显示项目名与保存状态，但不使用频繁跳动的通知。
 - 保存进行中使用短暂的 Busy 状态；成功后回到安静状态。
 - 保存失败必须保留 dirty，并提供可重试动作。
@@ -586,7 +589,13 @@ Piano Black 的轮廓应像精密乐器：外层柔和、内部网格锐利。�
 
 ## 13. 图标
 
-- 使用统一图标集和一致的 Stroke 视觉重量。
+- 产品功能图标 MUST 使用 Iconify 收录的 Fluent UI System Icons，prefix 为 `fluent`。
+- 默认使用与显示尺寸匹配的 Regular 图标，例如 `fluent:midi-20-regular`；Filled 只表达
+  Selected、Checked 或 Active 等持续状态。
+- 图标在构建期按需编译为本地 SVG Component，生产运行时 MUST NOT 请求 Iconify API。
+- 品牌标记与 Fluent 无法准确表达的专业 DAW 语义 MAY 使用 Seele 自有图标；自有图标必须遵循
+  相同网格、视觉重量和圆角语言，并作为受控集合维护。
+- Feature MUST NOT 为接近语义而临时混用其他 Iconify 图标集，也不得复制 Fluent SVG Path。
 - 常规图标尺寸为 16、20、24 px。
 - 图标按钮必须有可访问名称和 Tooltip。
 - 禁止使用 Emoji 作为生产功能图标。
@@ -891,7 +900,7 @@ Canvas 不是绕开可访问性和状态边界的理由。DOM 与 Canvas 必须�
 - 每帧向 Project Core 提交拖动结果；
 - 把 ProjectSession 或大型 Model 放入 Pinia 深代理；
 - 用轨道颜色表达 Focus、Error 或 Record；
-- 将临时 Project Entry 页的视觉样式当作编辑器设计依据；
+- 将 Project Entry 的宽松欢迎布局当作编辑器密度与区域布局依据；
 - 为尚无产品场景的能力提前搭建通用框架。
 
 ### 21.3 组件与主题验证
@@ -959,7 +968,7 @@ Canvas 功能至少检查：
 ## 23. 已确认的产品决定
 
 1. 默认主题为 Piano Black，追求黑色三角钢琴般精致、克制、专业的质感。
-2. Project Entry 是临时页面，不决定编辑器视觉风格。
+2. Project Entry 使用同一主题语义，但其欢迎布局不决定编辑器的信息密度与区域结构。
 3. 轨道拥有多种主题色；创建时受控随机，之后可手动修改。
 4. 轨道色是 Project fact，应持久化并最终支持 Undo / Redo。
 5. Piano Roll 默认停靠在下方，支持最小化、拖动调整高度、最大化和工作区全屏。

@@ -71,6 +71,20 @@ Roll 提供明确挂载区域。
 
 Project 切换时 Shell 必须销毁本地交互状态；Splitter 的 Pointer Capture 不能越过组件生命周期。
 
+## 组件边界
+
+`ProjectWorkbenchShell` 只负责把 Project presentation 和用户意图连接到以下子组件：
+
+- `ProjectWorkbenchGlobalBar`：Project menu、身份与 Save 状态；
+- `ProjectWorkbenchTransport`：History、Project meter 与尚未接入的 playback chrome；
+- `ProjectWorkbenchWorkspace`：Arrangement / Context Editor 的区域关系与 Dock 生命周期；
+- `ProjectWorkbenchArrangement`：Track column 和 Arrangement host；
+- `ProjectWorkbenchContextEditorDock`：Inspector、MIDI editor host 与 Dock 控件。
+
+Dock mode、height、resize interaction 只由 `ProjectWorkbenchWorkspace` 拥有。Global Bar 和
+Transport 通过一个窄的 `openContextEditor()` capability 请求打开 Dock，不读取或修改其内部模式。
+各子组件只接收显示所需 props 和语义 intent，不接收 `ProjectSession`。
+
 ## 交互与可访问性
 
 - Icon-only Button 使用 `UiIconButton`，必须提供 `aria-label` 与 Tooltip；
@@ -106,6 +120,8 @@ Project 切换时 Shell 必须销毁本地交互状态；Splitter 的 Pointer Ca
   Pointer / Keyboard resize；
 - 通用 `UiIconButton` 和 `UiButton` leading icon slot 已纳入同一 Piano Black 交互语义；
 - 所有功能图标继续使用构建期按需引入的 Fluent UI System Icons；
+- 原本单文件的 Shell 已按 Global Bar、Transport、Workspace、Arrangement 和 Context Editor
+  Dock 拆分；顶层 `ProjectWorkbenchShell` 仅保留组合职责；
 - architecture、workspace type-check、全部测试和 Studio production build 已通过；
-- Studio 当前为 20 个测试文件、108 项测试；
+- Studio 当前为 20 个测试文件、110 项测试；
 - 按本轮约定未执行浏览器视觉验证，界面外观由项目负责人直接审查。

@@ -3,6 +3,11 @@ import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
+import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
+import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
+import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
+import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
+import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue'
 import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectSaveStatus,
@@ -32,6 +37,16 @@ function mountShell(options: MountShellOptions = {}) {
 }
 
 describe('ProjectWorkbenchShell', () => {
+  it('composes the Workbench modules through explicit component boundaries', () => {
+    const wrapper = mountShell()
+    const workspace = wrapper.getComponent(ProjectWorkbenchWorkspace)
+
+    expect(wrapper.findComponent(ProjectWorkbenchGlobalBar).exists()).toBe(true)
+    expect(wrapper.findComponent(ProjectWorkbenchTransport).exists()).toBe(true)
+    expect(workspace.findComponent(ProjectWorkbenchArrangement).exists()).toBe(true)
+    expect(workspace.findComponent(ProjectWorkbenchContextEditorDock).exists()).toBe(true)
+  })
+
   it('renders authentic Project chrome and keeps unavailable product controls disabled', () => {
     const wrapper = mountShell()
 
@@ -118,9 +133,15 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Close MIDI editor"]').trigger('click')
     expect(workspace.attributes('data-dock-mode')).toBe('closed')
     expect(wrapper.find('.project-workbench__dock').exists()).toBe(false)
+    expect(wrapper.get('button[aria-label="Open MIDI editor"]').attributes('aria-pressed')).toBe(
+      'false',
+    )
 
     await wrapper.get('button[aria-label="Open MIDI editor"]').trigger('click')
     expect(workspace.attributes('data-dock-mode')).toBe('docked')
+    expect(wrapper.get('button[aria-label="Open MIDI editor"]').attributes('aria-pressed')).toBe(
+      'true',
+    )
   })
 
   it('supports keyboard resizing through the semantic Splitter', async () => {

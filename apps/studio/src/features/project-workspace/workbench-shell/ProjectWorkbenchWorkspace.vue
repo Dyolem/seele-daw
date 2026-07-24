@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 
+import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
 import {
@@ -15,6 +16,9 @@ interface DockResizeInteraction {
   readonly startHeight: number
 }
 
+const props = defineProps<{
+  readonly tracks: readonly ProjectTrackPresentation[]
+}>()
 const emit = defineEmits<{
   contextEditorOpenChange: [isOpen: boolean]
 }>()
@@ -203,7 +207,10 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
     :style="workspaceStyle"
     aria-label="Project workbench"
   >
-    <ProjectWorkbenchArrangement v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN" />
+    <ProjectWorkbenchArrangement
+      v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN"
+      :tracks="props.tracks"
+    />
 
     <div
       v-if="dockMode === PROJECT_WORKBENCH_DOCK_MODE.DOCKED"
@@ -240,6 +247,8 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
 .project-workbench__workspace {
   --project-workbench-track-width: 16.25rem;
   --project-workbench-ruler-height: 2rem;
+  --project-workbench-track-actions-height: 3.3125rem;
+  --project-workbench-track-row-height: 4.75rem;
   display: grid;
   min-block-size: 0;
   block-size: 100%;

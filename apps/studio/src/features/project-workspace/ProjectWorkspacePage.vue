@@ -4,6 +4,7 @@ import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
+import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
@@ -48,6 +49,12 @@ const readyProject = computed(() => {
     activeState.projectId === requestedProjectId.value
     ? activeState
     : null
+})
+const trackPresentations = computed(() => {
+  const ready = readyProject.value
+  return ready === null
+    ? Object.freeze([])
+    : createProjectTrackPresentations(ready.session.getSnapshot())
 })
 
 function describeFailure(resolution: FailedProjectEntryResolution): string {
@@ -175,6 +182,7 @@ onUnmounted(() => {
     :tempo="projectPresentation.tempo"
     :time-signature-denominator="projectPresentation.timeSignatureDenominator"
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
+    :tracks="trackPresentations"
     @leave-project="router.push(createProjectEntryLocation())"
     @redo="redoProject"
     @save="saveProject"

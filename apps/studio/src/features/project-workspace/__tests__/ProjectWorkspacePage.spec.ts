@@ -1,4 +1,8 @@
-import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import {
+  parseProjectId,
+  type ProjectCommit,
+  type ProjectId,
+} from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { shallowReadonly, shallowRef, type ShallowRef } from 'vue'
 import { createMemoryHistory } from 'vue-router'
@@ -33,6 +37,11 @@ import {
   ACTIVE_PROJECT_CONTEXT_KEY,
   type ActiveProjectVueContext,
 } from '@/workbench/project/vue/active-project-context'
+import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import {
+  PROJECT_TRACK_CONTEXT_KEY,
+  type ProjectTrackVueContext,
+} from '@/workbench/project/track/vue/project-track-context'
 
 interface PageFixture {
   readonly activeProjectContext: ActiveProjectVueContext
@@ -115,6 +124,12 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   const router = createStudioRouter(createMemoryHistory())
   await router.push(createProjectWorkspaceLocation(projectId))
   await router.isReady()
+  const projectTracks: ProjectTrackCoordinator = Object.freeze({
+    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
+      () => Object.freeze({}) as ProjectCommit,
+    ),
+  })
+  const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
   const wrapper = mount(ProjectWorkspacePage, {
     props: { projectId },
     global: {
@@ -122,6 +137,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
+        [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
       },
     },
   })

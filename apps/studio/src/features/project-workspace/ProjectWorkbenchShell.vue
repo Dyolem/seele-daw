@@ -2,6 +2,7 @@
 import OptionsIcon from '~icons/fluent/options-20-regular'
 import { shallowRef } from 'vue'
 
+import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
 import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue'
@@ -21,6 +22,7 @@ interface ProjectWorkbenchShellProps {
   readonly tempo: number
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
+  readonly tracks: readonly ProjectTrackPresentation[]
 }
 
 const props = withDefaults(defineProps<ProjectWorkbenchShellProps>(), {
@@ -75,6 +77,7 @@ function openContextEditor(): void {
 
       <ProjectWorkbenchWorkspace
         ref="workspace"
+        :tracks="props.tracks"
         @context-editor-open-change="isContextEditorOpen = $event"
       />
     </main>

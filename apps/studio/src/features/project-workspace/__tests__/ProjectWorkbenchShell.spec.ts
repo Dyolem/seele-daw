@@ -1,6 +1,7 @@
+import type { ProjectCommit } from '@seele-daw/project-core'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
@@ -12,6 +13,11 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectSaveStatus,
 } from '@/workbench/project/active-project-state'
+import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import {
+  PROJECT_TRACK_CONTEXT_KEY,
+  type ProjectTrackVueContext,
+} from '@/workbench/project/track/vue/project-track-context'
 
 interface MountShellOptions {
   readonly isDirty?: boolean
@@ -20,6 +26,13 @@ interface MountShellOptions {
 }
 
 function mountShell(options: MountShellOptions = {}) {
+  const projectTracks: ProjectTrackCoordinator = Object.freeze({
+    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
+      () => Object.freeze({}) as ProjectCommit,
+    ),
+  })
+  const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
+
   return mount(ProjectWorkbenchShell, {
     props: {
       canRedo: false,
@@ -32,6 +45,12 @@ function mountShell(options: MountShellOptions = {}) {
       tempo: 120,
       timeSignatureDenominator: 4,
       timeSignatureNumerator: 4,
+      tracks: Object.freeze([]),
+    },
+    global: {
+      provide: {
+        [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
+      },
     },
   })
 }
@@ -58,7 +77,7 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('button[aria-label^="Play —"]').attributes('disabled')).toBeDefined()
     expect(
       wrapper.get('.project-workbench__track-actions button').attributes('disabled'),
-    ).toBeDefined()
+    ).toBeUndefined()
   })
 
   it('emits history intents only from enabled controls', async () => {

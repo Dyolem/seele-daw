@@ -1,14 +1,91 @@
 <script setup lang="ts">
-import AddIcon from '~icons/fluent/add-20-regular'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
+import { shallowRef, type StyleValue } from 'vue'
 
-import UiButton from '@/ui/components/UiButton.vue'
+import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
+import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
+import {
+  PROJECT_ADD_TRACK_TYPE,
+  type ProjectAddTrackType,
+} from '@/features/project-workspace/workbench-shell/project-add-track-option'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
+import UiToastRegion from '@/ui/components/UiToastRegion.vue'
+import {
+  UI_TOAST_TONE,
+  type UiToastMessage,
+} from '@/ui/components/ui-toast'
+import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
+
+const props = defineProps<{
+  readonly tracks: readonly ProjectTrackPresentation[]
+}>()
+
+const { projectTracks } = useProjectTracks()
+const notification = shallowRef<UiToastMessage | null>(null)
+let notificationSequence = 0
+
+const UNAVAILABLE_TRACK_LABELS: Readonly<
+  Record<Exclude<ProjectAddTrackType, 'instrument'>, string>
+> = Object.freeze({
+  [PROJECT_ADD_TRACK_TYPE.AUDIO]: 'Voice / audio',
+  [PROJECT_ADD_TRACK_TYPE.BASS]: 'Bass',
+  [PROJECT_ADD_TRACK_TYPE.DRUM_MACHINE]: 'Drum machine',
+  [PROJECT_ADD_TRACK_TYPE.GUITAR]: 'Guitar',
+  [PROJECT_ADD_TRACK_TYPE.SAMPLER]: 'Sampler',
+})
+
+function showNotification(
+  tone: UiToastMessage['tone'],
+  title: string,
+  description: string,
+): void {
+  notificationSequence += 1
+  notification.value = Object.freeze({
+    description,
+    id: notificationSequence,
+    title,
+    tone,
+  })
+}
+
+function handleTrackTypeSelection(trackType: ProjectAddTrackType): void {
+  if (trackType !== PROJECT_ADD_TRACK_TYPE.INSTRUMENT) {
+    showNotification(
+      UI_TOAST_TONE.INFO,
+      `${UNAVAILABLE_TRACK_LABELS[trackType]} is in development`,
+      'This track type will become available in a later product slice.',
+    )
+    return
+  }
+
+  try {
+    projectTracks.addInstrumentTrack()
+  } catch (cause) {
+    showNotification(
+      UI_TOAST_TONE.DANGER,
+      'Instrument track could not be added',
+      cause instanceof Error && cause.message.trim().length > 0
+        ? cause.message
+        : 'The Project rejected the Track command. Please try again.',
+    )
+  }
+}
+
+function dismissNotification(messageId: number): void {
+  if (notification.value?.id === messageId) notification.value = null
+}
+
+function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
+  return {
+    '--project-track-color': track.color ?? 'var(--sd-color-border-focus)',
+  }
+}
 </script>
 
 <template>
@@ -24,19 +101,21 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
         />
       </header>
       <div class="project-workbench__track-actions">
-        <UiButton disabled size="small" variant="secondary">
-          <template #leading>
-            <UiIcon :icon="AddIcon" :size="16" />
-          </template>
-          Add track
-        </UiButton>
+        <ProjectAddTrackMenu @select="handleTrackTypeSelection" />
       </div>
-      <div class="project-workbench__track-empty">
+      <div v-if="props.tracks.length === 0" class="project-workbench__track-empty">
         <span>
           <UiIcon :icon="MusicNoteIcon" :size="20" />
         </span>
         <strong>No tracks yet</strong>
-        <p>Track creation will arrive with the Arrangement editor.</p>
+        <p>Add a virtual instrument to start arranging your Project.</p>
+      </div>
+      <div v-else class="project-workbench__track-list">
+        <ProjectWorkbenchTrackRow
+          v-for="track in props.tracks"
+          :key="track.id"
+          :track="track"
+        />
       </div>
     </aside>
 
@@ -66,14 +145,30 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
           />
         </div>
       </header>
+      <div class="project-workbench__lane-heading" aria-hidden="true">
+        <span>Track lanes</span>
+      </div>
       <div class="project-workbench__arrangement-host">
-        <div class="project-workbench__surface-empty">
+        <div v-if="props.tracks.length === 0" class="project-workbench__surface-empty">
           <span><UiIcon :icon="GridIcon" :size="24" /></span>
           <strong>Arrangement</strong>
-          <p>The editor surface will be composed here in the next product slice.</p>
+          <p>Add a Track to prepare the Arrangement surface.</p>
+        </div>
+        <div v-else class="project-workbench__arrangement-lanes">
+          <div
+            v-for="track in props.tracks"
+            :key="track.id"
+            class="project-workbench__arrangement-lane"
+            :style="createTrackStyle(track)"
+          >
+            <span aria-hidden="true"></span>
+            <p>Drop MIDI clips here</p>
+          </div>
         </div>
       </div>
     </section>
+
+    <UiToastRegion :message="notification" @dismiss="dismissNotification" />
   </div>
 </template>
 
@@ -109,12 +204,19 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
 }
 
 .project-workbench__track-actions {
+  box-sizing: border-box;
+  block-size: var(--project-workbench-track-actions-height);
   padding: var(--sd-space-3);
   border-bottom: 1px solid var(--sd-color-border-subtle);
 }
 
 .project-workbench__track-actions :deep(.ui-button) {
   inline-size: 100%;
+}
+
+.project-workbench__track-list {
+  min-block-size: 0;
+  overflow: auto;
 }
 
 .project-workbench__track-empty {
@@ -158,7 +260,9 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
   display: grid;
   min-inline-size: 0;
   min-block-size: 0;
-  grid-template-rows: var(--project-workbench-ruler-height) minmax(0, 1fr);
+  grid-template-rows:
+    var(--project-workbench-ruler-height) var(--project-workbench-track-actions-height)
+    minmax(0, 1fr);
   background: var(--sd-color-surface-canvas);
 }
 
@@ -196,6 +300,16 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
   background: var(--sd-color-surface-panel);
 }
 
+.project-workbench__lane-heading {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--sd-space-3);
+  border-block-end: 1px solid var(--sd-color-border-subtle);
+  color: var(--sd-color-text-disabled);
+  background: var(--sd-color-surface-panel);
+  font-size: var(--sd-font-size-xs);
+}
+
 .project-workbench__arrangement-host {
   position: relative;
   min-inline-size: 0;
@@ -205,6 +319,34 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
     linear-gradient(to right, var(--sd-color-border-subtle) 1px, transparent 1px),
     var(--sd-color-surface-canvas);
   background-size: calc(100% / 8) 100%;
+}
+
+.project-workbench__arrangement-lanes {
+  min-inline-size: 40rem;
+  min-block-size: 100%;
+}
+
+.project-workbench__arrangement-lane {
+  position: relative;
+  display: grid;
+  min-block-size: var(--project-workbench-track-row-height);
+  place-items: center;
+  border-block-end: 1px solid var(--sd-color-border-subtle);
+  background: color-mix(in srgb, var(--project-track-color) 3%, transparent);
+}
+
+.project-workbench__arrangement-lane > span {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--sd-space-0-5);
+  background: color-mix(in srgb, var(--project-track-color) 72%, transparent);
+}
+
+.project-workbench__arrangement-lane p {
+  margin: 0;
+  color: var(--sd-color-text-disabled);
+  font-size: var(--sd-font-size-xs);
 }
 
 .project-workbench__surface-empty {

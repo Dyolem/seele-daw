@@ -1,4 +1,8 @@
-import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import {
+  parseProjectId,
+  type ProjectCommit,
+  type ProjectId,
+} from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { shallowReadonly, shallowRef } from 'vue'
 import { createMemoryHistory } from 'vue-router'
@@ -27,6 +31,11 @@ import {
   PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
   type ProjectNavigationDecisionVueContext,
 } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import {
+  PROJECT_TRACK_CONTEXT_KEY,
+  type ProjectTrackVueContext,
+} from '@/workbench/project/track/vue/project-track-context'
 import {
   ACTIVE_PROJECT_CONTEXT_KEY,
   type ActiveProjectVueContext,
@@ -79,6 +88,16 @@ function createProjectNavigationDecisionContext(): ProjectNavigationDecisionVueC
   })
 }
 
+function createProjectTrackContext(): ProjectTrackVueContext {
+  return Object.freeze({
+    projectTracks: Object.freeze({
+      addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
+        () => Object.freeze({}) as ProjectCommit,
+      ),
+    }),
+  })
+}
+
 async function mountApp(state: ActiveProjectState, projectId: ProjectId | null = null) {
   const router = createStudioRouter(createMemoryHistory())
   await router.push(
@@ -96,6 +115,7 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
           createProjectNavigationDecisionContext(),
+        [PROJECT_TRACK_CONTEXT_KEY as symbol]: createProjectTrackContext(),
       },
     },
   })

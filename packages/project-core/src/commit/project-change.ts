@@ -1,10 +1,16 @@
-import type { MidiSourceId, NoteId } from '#internal/model/ids'
+import type { DeviceDescriptor } from '#internal/model/device'
+import type { MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { InstrumentTrackRecord } from '#internal/model/track'
 import type { Tick } from '#internal/time/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 /** Canonical runtime discriminants for semantic project changes. */
 export const PROJECT_CHANGE_TYPE = {
+  INSTRUMENT_TRACK: {
+    ADDED: 'instrument-track.added',
+    REMOVED: 'instrument-track.removed',
+  },
   MIDI_NOTE: {
     ADDED: 'midi-note.added',
     REMOVED: 'midi-note.removed',
@@ -20,6 +26,30 @@ export type ProjectChangeType = ValueOf<ProjectChangeTypeGroup>
 export interface AffectedTickRange {
   readonly startTick: Tick
   readonly endTick: Tick
+}
+
+/** Complete placement created or removed by one Instrument Track product intent. */
+export interface InstrumentTrackPlacement {
+  readonly track: InstrumentTrackRecord
+  readonly instrumentDevice: DeviceDescriptor
+  readonly index: number
+}
+
+interface InstrumentTrackChangeBase<Type extends ProjectChangeType> {
+  readonly type: Type
+  readonly trackId: TrackId
+}
+
+export interface InstrumentTrackAddedChange extends InstrumentTrackChangeBase<
+  typeof PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED
+> {
+  readonly after: InstrumentTrackPlacement
+}
+
+export interface InstrumentTrackRemovedChange extends InstrumentTrackChangeBase<
+  typeof PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED
+> {
+  readonly before: InstrumentTrackPlacement
 }
 
 interface MidiNoteChangeBase<Type extends ProjectChangeType> {
@@ -48,4 +78,9 @@ export interface MidiNoteUpdatedChange extends MidiNoteChangeBase<
   readonly after: MidiNoteRecord
 }
 
-export type ProjectChange = MidiNoteAddedChange | MidiNoteRemovedChange | MidiNoteUpdatedChange
+export type ProjectChange =
+  | InstrumentTrackAddedChange
+  | InstrumentTrackRemovedChange
+  | MidiNoteAddedChange
+  | MidiNoteRemovedChange
+  | MidiNoteUpdatedChange

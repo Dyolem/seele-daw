@@ -252,15 +252,35 @@ describe('ProjectSession Undo / Redo', () => {
       parseMidiPitch(65),
     )
 
-    expect(session.undo()?.delta.changes[0]?.noteId).toBe(second.id)
+    const secondUndoChange = session.undo()?.delta.changes[0]
+    expect(secondUndoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
+    if (secondUndoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
+      throw new Error('Expected the second MoveNote undo change')
+    }
+    expect(secondUndoChange.noteId).toBe(second.id)
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, second.id)).toBe(second)
-    expect(session.undo()?.delta.changes[0]?.noteId).toBe(first.id)
+    const firstUndoChange = session.undo()?.delta.changes[0]
+    expect(firstUndoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
+    if (firstUndoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
+      throw new Error('Expected the first MoveNote undo change')
+    }
+    expect(firstUndoChange.noteId).toBe(first.id)
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toBe(first)
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
-    expect(session.redo()?.delta.changes[0]?.noteId).toBe(first.id)
-    expect(session.redo()?.delta.changes[0]?.noteId).toBe(second.id)
+    const firstRedoChange = session.redo()?.delta.changes[0]
+    expect(firstRedoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
+    if (firstRedoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
+      throw new Error('Expected the first MoveNote redo change')
+    }
+    expect(firstRedoChange.noteId).toBe(first.id)
+    const secondRedoChange = session.redo()?.delta.changes[0]
+    expect(secondRedoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
+    if (secondRedoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
+      throw new Error('Expected the second MoveNote redo change')
+    }
+    expect(secondRedoChange.noteId).toBe(second.id)
     expect(session.canRedo).toBe(false)
     expect(session.modelRevision).toBe(6)
   })

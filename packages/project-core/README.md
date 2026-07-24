@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add / Move / Remove MIDI Note Command、Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track 与 Add / Move / Remove MIDI Note Command、Track / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -213,9 +213,15 @@ History、MIDI Note QueryIndex 与 ChangePublisher 已接入同一提交边界�
 
 Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wrap 或自动扩展 Source / Clip。Move 使用绝对 `nextStartTick` 与 `nextPitch`，目标未变化时返回包内 `no-change`，不创建空 MutationPlan。Command preparer 与 handler 不从 package root 导出；ProjectSession 是正式执行入口。完整规则和实现边界见 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
 
+### Add Instrument Track 纵向切片
+
+`AddInstrumentTrackCommand` 把一条空白乐器音轨、它唯一的初始 Instrument Slot Device 和 Track Order 位置作为一个完整产品意图。Handler 原子准备 `DEVICE.INSERT`、`TRACK.INSERT` 与 `TRACK_ORDER.INSERT`，其 inverse 按相反顺序撤销；成功提交、Undo 和 Redo 都只发布一条聚合的 `instrument-track.added` 或 `instrument-track.removed` change。
+
+Project Core 不生成 Track ID、默认名称或随机颜色，也不选择 Soundbank。调用方必须提供已确定的名称、颜色、Channel Strip、Device 和插入位置；新音轨不自动创建 Clip、MidiSource 或 Note。完整边界见 [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)。
+
 ### ProjectCommit / ProjectDelta 基础层
 
-当前公开契约能够表达 `midi-note.added`、`midi-note.removed` 和 `midi-note.updated` 三种语义变化。每条 change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围；Move 使用旧、新区间的保守并集。Delta 保持实际执行方向的 mutation 顺序并携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
+当前公开契约能够表达 Instrument Track Add / Remove 与 MIDI Note Add / Remove / Update。Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
 
 包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
@@ -366,7 +372,7 @@ asset reference changes
 - Persistence 使用 `journalSequence`，不能复用 modelRevision；
 - Delta 可以丢弃；消费者错过增量后必须能从 Snapshot 全量重建。
 
-当前已实现 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
+当前已实现 Instrument Track Add / Remove 的聚合 placement，以及 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
 
 ## 并发与线程模型
 
@@ -505,6 +511,7 @@ src/
 ## 架构依据
 
 - [阶段成果：安全模型与原子 Mutation 内核](./docs/project-core-transaction-foundation-milestone.md)
+- [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)
 - [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)
 - [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
 - [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)

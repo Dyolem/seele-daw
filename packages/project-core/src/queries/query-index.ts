@@ -3,7 +3,6 @@ import {
   type MidiNoteAddedChange,
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
-  type ProjectChange,
 } from '#internal/commit/project-change'
 import type { ProjectDelta } from '#internal/commit/project-delta'
 import type { MidiSourceId, NoteId } from '#internal/model/ids'
@@ -41,6 +40,7 @@ interface QueryIndexRoot {
 }
 
 type QueryIndexTransitionState = 'prepared' | 'staged' | 'rolled-back'
+type MidiNoteChange = MidiNoteAddedChange | MidiNoteRemovedChange | MidiNoteUpdatedChange
 
 export type QueryIndexErrorCode =
   | 'change-precondition-failed'
@@ -173,7 +173,7 @@ function queryPartitionRange(
 }
 
 function rejectChangePrecondition(
-  change: ProjectChange,
+  change: MidiNoteChange,
   changeIndex: number,
   detail: string,
 ): never {
@@ -238,7 +238,7 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
   const workingPartitions = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>()
 
   const requireWorkingPartition = (
-    change: ProjectChange,
+    change: MidiNoteChange,
     changeIndex: number,
   ): Map<NoteId, MidiNoteRecord> => {
     const existing = workingPartitions.get(change.sourceId)
@@ -261,18 +261,23 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
   }
 
   for (const [changeIndex, change] of delta.changes.entries()) {
-    const notes = requireWorkingPartition(change, changeIndex)
-
     switch (change.type) {
+      case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED:
+      case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
+        break
+
       case PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED:
-        applyAddedNote(notes, change, changeIndex)
+        applyAddedNote(requireWorkingPartition(change, changeIndex), change, changeIndex)
         break
+
       case PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED:
-        applyRemovedNote(notes, change, changeIndex)
+        applyRemovedNote(requireWorkingPartition(change, changeIndex), change, changeIndex)
         break
+
       case PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED:
-        applyUpdatedNote(notes, change, changeIndex)
+        applyUpdatedNote(requireWorkingPartition(change, changeIndex), change, changeIndex)
         break
+
       default:
         return rejectUnsupportedChange(change, changeIndex)
     }

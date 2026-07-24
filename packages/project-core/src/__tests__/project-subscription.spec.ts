@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import * as projectCore from '#internal/index'
 import {
+  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMIT_ORIGIN_KIND,
   PROJECT_HISTORY_DIRECTION,
@@ -329,6 +330,13 @@ describe('ProjectSession commit publication', () => {
     const publisher = new ChangePublisher()
     const received: ProjectCommit[] = []
     const crossedConstraints: ProjectCommit[] = []
+
+    if (
+      firstChange.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED ||
+      secondChange.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED
+    ) {
+      throw new Error('Expected synthetic MIDI Note changes')
+    }
 
     publisher.subscribe(
       createMidiNoteChangesSubscription({

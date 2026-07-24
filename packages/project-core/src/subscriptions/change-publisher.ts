@@ -36,6 +36,10 @@ function matchesMidiNoteChange(
   change: ProjectChange,
 ): boolean {
   switch (change.type) {
+    case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED:
+    case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
+      return false
+
     case PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED:
     case PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED:
     case PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED:

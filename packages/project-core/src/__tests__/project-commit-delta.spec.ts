@@ -181,7 +181,11 @@ describe('ProjectDelta Note semantics', () => {
     const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
     const change = createProjectCommitCandidate(command, plan).delta.changes[0]
 
-    expect(change?.affected).toEqual({ startTick: parseTick(240), endTick: parseTick(720) })
+    expect(change?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
+    if (change?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
+      throw new Error('Expected an updated Note change')
+    }
+    expect(change.affected).toEqual({ startTick: parseTick(240), endTick: parseTick(720) })
   })
 })
 
@@ -199,7 +203,6 @@ describe('ProjectCommit candidate boundary', () => {
     expect(Object.isFrozen(commit.delta)).toBe(true)
     expect(Object.isFrozen(commit.delta.changes)).toBe(true)
     expect(Object.isFrozen(change)).toBe(true)
-    expect(Object.isFrozen(change?.affected)).toBe(true)
 
     if (
       change === undefined ||
@@ -209,6 +212,7 @@ describe('ProjectCommit candidate boundary', () => {
       throw new Error('Expected an added Note change')
     }
 
+    expect(Object.isFrozen(change.affected)).toBe(true)
     expect(change.after).toBe(plan.forward[0].after)
   })
 

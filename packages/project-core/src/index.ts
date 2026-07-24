@@ -1,12 +1,15 @@
 /** Public API for the framework-agnostic project kernel. */
 export {
   PROJECT_COMMAND_TYPE,
+  createAddInstrumentTrackCommand,
   createAddNoteCommand,
   createMoveNoteCommand,
   createRemoveNoteCommand,
 } from './commands/project-command'
 export type {
+  AddInstrumentTrackCommand,
   AddNoteCommand,
+  CreateAddInstrumentTrackCommandInput,
   CreateAddNoteCommandInput,
   CreateMoveNoteCommandInput,
   CreateRemoveNoteCommandInput,
@@ -24,6 +27,9 @@ export type {
 export { PROJECT_CHANGE_TYPE } from './commit/project-change'
 export type {
   AffectedTickRange,
+  InstrumentTrackAddedChange,
+  InstrumentTrackPlacement,
+  InstrumentTrackRemovedChange,
   MidiNoteAddedChange,
   MidiNoteRemovedChange,
   MidiNoteUpdatedChange,

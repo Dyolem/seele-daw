@@ -29,6 +29,10 @@ import {
   useProjectNavigationDecision,
   type ProjectNavigationDecisionVueContext,
 } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import {
+  useProjectTracks,
+  type ProjectTrackVueContext,
+} from '@/workbench/project/track/vue/project-track-context'
 import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
 interface RuntimeFixture {
@@ -119,6 +123,13 @@ function requireProjectEntryContext(
   return context
 }
 
+function requireProjectTrackContext(
+  context: ProjectTrackVueContext | null,
+): ProjectTrackVueContext {
+  if (context === null) throw new Error('Expected the Project Track Context')
+  return context
+}
+
 describe('StudioApplication', () => {
   it('installs Pinia and Router while providing the owned Active Project Context', () => {
     const fixture = createRuntimeFixture()
@@ -127,10 +138,12 @@ describe('StudioApplication', () => {
       state: () => ({ label: 'pinia' }),
     })
     let projectEntryContext: ProjectEntryVueContext | null = null
+    let projectTrackContext: ProjectTrackVueContext | null = null
     const rootComponent = defineComponent({
       setup() {
         const activeProject = useActiveProject()
         projectEntryContext = useProjectEntry()
+        projectTrackContext = useProjectTracks()
         const projectNavigationDecision = useProjectNavigationDecision()
         const installedRouter = useRouter()
         const store = useCompositionStore()
@@ -146,6 +159,8 @@ describe('StudioApplication', () => {
       rootComponent,
       router,
       projectRuntime: fixture.runtime,
+      createProjectEntityId: () => 'studio-project-entity',
+      createRandomValue: () => 0,
     })
     const container = document.createElement('div')
 
@@ -155,6 +170,7 @@ describe('StudioApplication', () => {
     expect(requireProjectEntryContext(projectEntryContext).projectEntry).toBe(
       application.projectEntry,
     )
+    expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(true)
     application.dispose()
   })
 

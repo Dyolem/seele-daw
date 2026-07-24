@@ -30,6 +30,10 @@ import {
   createProjectNavigationDecisionVueBinding,
   type ProjectNavigationDecisionVueBinding,
 } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
+import {
+  createProjectTrackCoordinator,
+} from '@/workbench/project/track/project-track-coordinator'
+import { PROJECT_TRACK_CONTEXT_KEY } from '@/workbench/project/track/vue/project-track-context'
 import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/workbench/project/vue/active-project-context'
 import {
   createActiveProjectVueBinding,
@@ -44,6 +48,8 @@ export interface BrowserStudioApplicationOptions {
 export interface StudioApplicationComposition extends BrowserStudioApplicationOptions {
   /** Ownership transfers to the composed application. */
   readonly projectRuntime: BrowserActiveProjectRuntime
+  readonly createProjectEntityId?: () => string
+  readonly createRandomValue?: () => number
 }
 
 export interface StudioApplication {
@@ -135,6 +141,10 @@ class StudioApplicationImpl implements StudioApplication {
   }
 }
 
+function createBrowserProjectEntityId(): string {
+  return globalThis.crypto.randomUUID()
+}
+
 /** Composes an owned Project Runtime into one Studio application graph. */
 export function composeStudioApplication(
   composition: StudioApplicationComposition,
@@ -155,6 +165,11 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       requestDecision: projectNavigationDecisionBinding.requestDecision,
     })
+    const projectTracks = createProjectTrackCoordinator({
+      activeProject: projectRuntime.activeProject,
+      createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
+      createRandomValue: composition.createRandomValue ?? Math.random,
+    })
     projectNavigationGuardDispose = installProjectNavigationGuard(
       composition.router,
       projectNavigationConfirmation,
@@ -163,6 +178,7 @@ export function composeStudioApplication(
 
     vueApplication.provide(ACTIVE_PROJECT_CONTEXT_KEY, activeProjectBinding.context)
     vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
+    vueApplication.provide(PROJECT_TRACK_CONTEXT_KEY, Object.freeze({ projectTracks }))
     vueApplication.provide(
       PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
       projectNavigationDecisionBinding.context,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import DismissIcon from '~icons/fluent/dismiss-16-regular'
 import FullScreenMaximizeIcon from '~icons/fluent/full-screen-maximize-16-regular'
 import FullScreenMinimizeIcon from '~icons/fluent/full-screen-minimize-16-regular'
@@ -8,6 +9,11 @@ import OptionsIcon from '~icons/fluent/options-20-regular'
 import MinimizeIcon from '~icons/fluent/subtract-16-regular'
 import { computed } from 'vue'
 
+import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
+import {
+  PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
+  type ProjectPianoRollPresentation,
+} from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import {
@@ -18,10 +24,14 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
 interface ProjectWorkbenchContextEditorDockProps {
+  readonly barSpanTick: Tick
   readonly dockMode: ProjectWorkbenchDockMode
   readonly isMaximized: boolean
+  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly selectedClip: ProjectMidiClipPresentation | null
   readonly selectedTrack: ProjectTrackPresentation | null
+  readonly timeSignatureNumerator: number
 }
 
 const props = defineProps<ProjectWorkbenchContextEditorDockProps>()
@@ -127,11 +137,29 @@ const contextEmptyTitle = computed(() => {
         v-if="props.dockMode !== PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED"
         class="project-workbench__context-host"
       >
-        <div class="project-workbench__surface-empty">
+        <ProjectPianoRollSurface
+          v-if="
+            props.pianoRollPresentation?.status ===
+            PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+          "
+          :bar-span-tick="props.barSpanTick"
+          :presentation="props.pianoRollPresentation"
+          :session="props.projectSession"
+          :time-signature-numerator="props.timeSignatureNumerator"
+        />
+        <div v-else class="project-workbench__surface-empty">
           <span><UiIcon :icon="MidiIcon" :size="24" /></span>
           <strong>{{ contextEmptyTitle }}</strong>
-          <p v-if="props.selectedClip">
-            This MIDI clip is selected and ready for the Piano Roll editing slice.
+          <p
+            v-if="
+              props.pianoRollPresentation?.status ===
+              PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
+            "
+          >
+            Looped MIDI clips are not supported by the first Piano Roll slice.
+          </p>
+          <p v-else-if="props.selectedClip">
+            This MIDI clip is selected, but its Piano Roll context is unavailable.
           </p>
           <p v-else-if="props.selectedTrack">
             Add or select a MIDI clip on {{ props.selectedTrack.name }} to open the Piano Roll.

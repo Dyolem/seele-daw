@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { Tick } from '@seele-daw/project-core'
+import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 
+import type { ProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
@@ -22,6 +23,9 @@ interface DockResizeInteraction {
 const props = defineProps<{
   readonly barSpanTick: Tick
   readonly clips: readonly ProjectMidiClipPresentation[]
+  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
+  readonly timeSignatureNumerator: number
   readonly tracks: readonly ProjectTrackPresentation[]
 }>()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
@@ -251,8 +255,12 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED"
       :dock-mode="dockMode"
       :is-maximized="isDockMaximized"
+      :piano-roll-presentation="props.pianoRollPresentation"
+      :project-session="props.projectSession"
       :selected-clip="selectedClip"
       :selected-track="selectedTrack"
+      :bar-span-tick="props.barSpanTick"
+      :time-signature-numerator="props.timeSignatureNumerator"
       @close="closeDock"
       @minimize="minimizeDock"
       @toggle-fullscreen="toggleDockFullscreen"

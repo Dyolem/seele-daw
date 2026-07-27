@@ -10,6 +10,7 @@ import {
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { createProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { createProjectMidiClipPresentations } from '@/features/project-workspace/project-clip-presentation'
 import {
@@ -74,6 +75,13 @@ const trackPresentations = computed(() => {
 const clipPresentations = computed(() => {
   const snapshot = projectSnapshot.value
   return snapshot === null ? Object.freeze([]) : createProjectMidiClipPresentations(snapshot)
+})
+const pianoRollPresentation = computed(() => {
+  const snapshot = projectSnapshot.value
+  const selectedClipId = workbenchSelection.selectedClipId
+  return snapshot === null || selectedClipId === null
+    ? null
+    : createProjectPianoRollPresentation(snapshot, selectedClipId)
 })
 const clipSelectionCandidates = computed(
   (): readonly ProjectWorkbenchClipSelectionCandidate[] => {
@@ -230,8 +238,10 @@ onUnmounted(() => {
     :can-undo="readyProject.session.canUndo"
     :clips="clipPresentations"
     :is-dirty="readyProject.isDirty"
+    :piano-roll-presentation="pianoRollPresentation"
     :project-id="readyProject.projectId"
     :project-name="projectPresentation.projectName"
+    :project-session="readyProject.session"
     :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
     :save-status="readyProject.saveStatus"
     :tempo="projectPresentation.tempo"

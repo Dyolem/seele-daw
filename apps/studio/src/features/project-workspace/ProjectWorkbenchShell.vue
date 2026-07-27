@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { Tick } from '@seele-daw/project-core'
+import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import OptionsIcon from '~icons/fluent/options-20-regular'
 import { shallowRef } from 'vue'
 
+import type { ProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
@@ -19,8 +20,10 @@ interface ProjectWorkbenchShellProps {
   readonly canUndo: boolean
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly isDirty: boolean
+  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
   readonly projectId: string
   readonly projectName: string
+  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly saveFailureMessage?: string | null
   readonly saveStatus: ActiveProjectSaveStatus
   readonly tempo: number
@@ -83,6 +86,9 @@ function openContextEditor(): void {
         ref="workspace"
         :bar-span-tick="props.barSpanTick"
         :clips="props.clips"
+        :piano-roll-presentation="props.pianoRollPresentation"
+        :project-session="props.projectSession"
+        :time-signature-numerator="props.timeSignatureNumerator"
         :tracks="props.tracks"
         @context-editor-open-change="isContextEditorOpen = $event"
       />

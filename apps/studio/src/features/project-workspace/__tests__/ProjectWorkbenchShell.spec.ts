@@ -27,6 +27,7 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectSaveStatus,
 } from '@/workbench/project/active-project-state'
+import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
 import {
   PROJECT_CLIP_CONTEXT_KEY,
@@ -85,8 +86,12 @@ function mountShell(options: MountShellOptions = {}) {
       canUndo: true,
       clips: options.clips ?? Object.freeze([]),
       isDirty: options.isDirty ?? false,
+      pianoRollPresentation: null,
       projectId: 'workbench-shell-project',
       projectName: 'Midnight Study',
+      projectSession: createTestSession(
+        parseProjectId('workbench-shell-project-session'),
+      ),
       saveFailureMessage: options.saveFailureMessage,
       saveStatus: options.saveStatus ?? ACTIVE_PROJECT_SAVE_STATUS.IDLE,
       tempo: 120,
@@ -276,7 +281,7 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('.project-workbench__inspector').text()).toContain('Midnight Keys')
     expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Midnight Keys')
     expect(wrapper.get('.project-workbench__context-host').text()).toContain(
-      'ready for the Piano Roll editing slice',
+      'Piano Roll context is unavailable',
     )
   })
 })

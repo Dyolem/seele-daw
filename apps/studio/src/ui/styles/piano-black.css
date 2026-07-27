@@ -20,6 +20,16 @@
   --sd-color-border-strong: rgb(242 238 229 / 24%);
   --sd-color-border-focus: #c7ae72;
 
+  --sd-editor-pitch-row-white: #101317;
+  --sd-editor-pitch-row-black: #090b0d;
+  --sd-editor-pitch-row-border: rgb(242 238 229 / 5%);
+  --sd-editor-grid-subdivision: rgb(242 238 229 / 7%);
+  --sd-editor-grid-beat: rgb(242 238 229 / 13%);
+  --sd-editor-grid-bar: rgb(242 238 229 / 28%);
+  --sd-editor-note-border: rgb(242 238 229 / 72%);
+  --sd-editor-key-white: #d8d5cd;
+  --sd-editor-key-black: #111419;
+
   --sd-color-state-info: #68a8ff;
   --sd-color-state-success: #59c28c;
   --sd-color-state-warning: #e5b45b;

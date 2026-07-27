@@ -10,7 +10,6 @@ import type {
 } from '#internal/commands/project-command-preparation'
 import type { NoteId } from '#internal/model/ids'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
-import type { ModelRevision } from '#internal/model/model-revision'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
@@ -123,12 +122,13 @@ function assertNoteWithinSource(
 }
 
 function ready(
-  baseRevision: ModelRevision,
+  command: MidiNoteCommand,
   mutation: ProjectMutation,
 ): ReadyProjectCommandPreparation {
   return {
     status: 'ready',
-    plan: createMutationPlan(baseRevision, [mutation]),
+    command,
+    plan: createMutationPlan(command.baseRevision, [mutation]),
   }
 }
 
@@ -151,7 +151,7 @@ export function prepareAddNoteCommand(
 
   assertNoteWithinSource(command, source, note)
 
-  return ready(command.baseRevision, {
+  return ready(command, {
     type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
     sourceId: command.sourceId,
     after: note,
@@ -166,7 +166,7 @@ export function prepareRemoveNoteCommand(
   assertNotePartitionExists(reader, command)
   const note = requireMidiNote(reader, command)
 
-  return ready(command.baseRevision, {
+  return ready(command, {
     type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
     sourceId: command.sourceId,
     before: note,
@@ -197,7 +197,7 @@ export function prepareMoveNoteCommand(
 
   assertNoteWithinSource(command, source, after)
 
-  return ready(command.baseRevision, {
+  return ready(command, {
     type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
     sourceId: command.sourceId,
     before,

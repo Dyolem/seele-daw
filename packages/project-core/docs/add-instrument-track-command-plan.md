@@ -80,6 +80,10 @@ ProjectedModelStoreReader 继续负责最终跨实体不变量验证，MutationA
 
 Commit candidate 必须识别完整且顺序正确的三条 Mutation。任何缺失、额外、错序或与 Command 参数不一致的计划都失败关闭；不把部分模型变化静默遗漏在 Delta 之外。
 
+Preparer 返回的规范化 Command 与 MutationPlan 共享 Track 和 Device Record 引用。Commit
+candidate 以引用、Track -> Device 和 Track Order -> Track 的图关系验证对应性，不逐字段重写
+Track / Device 的相等判断；未来 Record 增加字段时无需同步维护第二份比较清单。
+
 ## QueryIndex 与订阅
 
 当前 QueryIndex 只索引 MIDI Note。它必须显式识别 Instrument Track added / removed，并在保持 Note 分区引用不变的同时推进自己的 revision；未知 ProjectChange 仍失败关闭。

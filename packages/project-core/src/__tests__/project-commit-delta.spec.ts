@@ -33,7 +33,7 @@ import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
 import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
-import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
+import { requireReadyProjectCommandPreparation } from './support/project-command-test-support'
 
 function captureCandidateError(
   operation: () => unknown,
@@ -91,8 +91,11 @@ describe('ProjectDelta Note semantics', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
-    const commit = createProjectCommitCandidate(command, plan)
+    const preparation = requireReadyProjectCommandPreparation(
+      prepareProjectCommand(store, command),
+    )
+    const plan = preparation.plan
+    const commit = createProjectCommitCandidate(preparation.command, plan)
     const mutation = plan.forward[0]
     const change = commit.delta.changes[0]
 
@@ -133,8 +136,10 @@ describe('ProjectDelta Note semantics', () => {
       sourceId: fixture.records.nonLoopSource.id,
       noteId: fixture.records.nonLoopNote.id,
     })
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
-    const commit = createProjectCommitCandidate(command, plan)
+    const preparation = requireReadyProjectCommandPreparation(
+      prepareProjectCommand(store, command),
+    )
+    const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
     const change = commit.delta.changes[0]
 
     expect(change).toEqual({
@@ -156,8 +161,13 @@ describe('ProjectDelta Note semantics', () => {
       nextStartTick: parseTick(1_200),
       nextPitch: parseMidiPitch(67),
     })
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
-    const change = createProjectCommitCandidate(command, plan).delta.changes[0]
+    const preparation = requireReadyProjectCommandPreparation(
+      prepareProjectCommand(store, command),
+    )
+    const change = createProjectCommitCandidate(
+      preparation.command,
+      preparation.plan,
+    ).delta.changes[0]
 
     expect(change).toMatchObject({
       type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
@@ -178,8 +188,13 @@ describe('ProjectDelta Note semantics', () => {
       nextStartTick: fixture.records.nonLoopNote.startTick,
       nextPitch: parseMidiPitch(61),
     })
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
-    const change = createProjectCommitCandidate(command, plan).delta.changes[0]
+    const preparation = requireReadyProjectCommandPreparation(
+      prepareProjectCommand(store, command),
+    )
+    const change = createProjectCommitCandidate(
+      preparation.command,
+      preparation.plan,
+    ).delta.changes[0]
 
     expect(change?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
     if (change?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
@@ -194,8 +209,11 @@ describe('ProjectCommit candidate boundary', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
-    const commit = createProjectCommitCandidate(command, plan)
+    const preparation = requireReadyProjectCommandPreparation(
+      prepareProjectCommand(store, command),
+    )
+    const plan = preparation.plan
+    const commit = createProjectCommitCandidate(preparation.command, plan)
     const change = commit.delta.changes[0]
 
     expect(Object.isFrozen(commit)).toBe(true)
@@ -220,8 +238,11 @@ describe('ProjectCommit candidate boundary', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
-    const commit = createProjectCommitCandidate(command, plan)
+    const preparation = requireReadyProjectCommandPreparation(
+      prepareProjectCommand(store, command),
+    )
+    const plan = preparation.plan
+    const commit = createProjectCommitCandidate(preparation.command, plan)
 
     expect(store.modelRevision).toBe(0)
     expect(store.getMidiNote(command.sourceId, command.noteId)).toBeUndefined()

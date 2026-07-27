@@ -1,6 +1,8 @@
 import type { DeviceDescriptor } from '#internal/model/device'
-import type { MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
+import type { ClipId, MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
+import type { MidiClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import type { Tick } from '#internal/time/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
@@ -10,6 +12,10 @@ export const PROJECT_CHANGE_TYPE = {
   INSTRUMENT_TRACK: {
     ADDED: 'instrument-track.added',
     REMOVED: 'instrument-track.removed',
+  },
+  MIDI_CLIP: {
+    ADDED: 'midi-clip.added',
+    REMOVED: 'midi-clip.removed',
   },
   MIDI_NOTE: {
     ADDED: 'midi-note.added',
@@ -52,6 +58,33 @@ export interface InstrumentTrackRemovedChange extends InstrumentTrackChangeBase<
   readonly before: InstrumentTrackPlacement
 }
 
+/** Complete ownership graph created or removed by one MIDI Clip product intent. */
+export interface MidiClipPlacement {
+  readonly clip: MidiClipRecord
+  readonly source: MidiSourceRecord
+  readonly notes: readonly MidiNoteRecord[]
+}
+
+interface MidiClipChangeBase<Type extends ProjectChangeType> {
+  readonly type: Type
+  readonly clipId: ClipId
+  readonly sourceId: MidiSourceId
+  readonly trackId: TrackId
+  readonly affected: AffectedTickRange
+}
+
+export interface MidiClipAddedChange extends MidiClipChangeBase<
+  typeof PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED
+> {
+  readonly after: MidiClipPlacement
+}
+
+export interface MidiClipRemovedChange extends MidiClipChangeBase<
+  typeof PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED
+> {
+  readonly before: MidiClipPlacement
+}
+
 interface MidiNoteChangeBase<Type extends ProjectChangeType> {
   readonly type: Type
   readonly sourceId: MidiSourceId
@@ -81,6 +114,8 @@ export interface MidiNoteUpdatedChange extends MidiNoteChangeBase<
 export type ProjectChange =
   | InstrumentTrackAddedChange
   | InstrumentTrackRemovedChange
+  | MidiClipAddedChange
+  | MidiClipRemovedChange
   | MidiNoteAddedChange
   | MidiNoteRemovedChange
   | MidiNoteUpdatedChange

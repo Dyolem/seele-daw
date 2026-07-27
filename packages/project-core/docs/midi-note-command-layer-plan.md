@@ -166,6 +166,7 @@ Remove 只删除指定 Note，不缩短 MidiSource，不改变 Clip，也不清�
 type ProjectCommandPreparation =
   | {
       readonly status: 'ready'
+      readonly command: ProjectCommand
       readonly plan: MutationPlan
     }
   | {
@@ -175,7 +176,10 @@ type ProjectCommandPreparation =
     }
 ```
 
-准备结果保持包内。ProjectSession 已将它映射为公开的 execute result，并只对 `ready` 分支调用 MutationApplier。
+准备结果保持包内。`ready.command` 是 preparer 重新验证后得到的规范化实例；它和
+MutationPlan 共享由 Command 直接拥有的 Record 引用，供 Commit candidate 验证二者确实来自
+同一次准备。ProjectSession 已将准备结果映射为公开的 execute result，并只对 `ready` 分支调用
+MutationApplier。
 
 ## 准备管线
 

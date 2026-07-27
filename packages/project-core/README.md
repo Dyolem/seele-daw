@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track 与 Add / Move / Remove MIDI Note Command、Track / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Add MIDI Clip 与 Add / Move / Remove MIDI Note Command、Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -194,7 +194,7 @@ ProjectCommand
 -> validate command and baseRevision
 -> read current entity records
 -> build forward mutations
--> create a closed MutationPlan with generated inverse mutations
+-> return the normalized Command with a closed MutationPlan and generated inverse mutations
 -> prepare immutable ProjectCommit + ProjectDelta candidate
 -> freeze committed execute result
 -> prepare and stage History + QueryIndex transitions
@@ -204,6 +204,10 @@ ProjectCommand
 -> return the already prepared result
 -> deliver the committed ProjectCommit asynchronously
 ```
+
+`ready` preparation 中的规范化 Command 与计划共享聚合 Record 引用。Commit candidate
+通过这些引用和实体所有权关系校验 Command / Plan 对应性，避免为 Track、Device、Clip 或
+Source 再维护一份会随领域类型演进而漏改的逐字段比较清单。
 
 History、MIDI Note QueryIndex 与 ChangePublisher 已接入同一提交边界：普通 committed Command 进入 undo 栈，Undo / Redo 从当前 revision 重新建立 MutationPlan；Session 在模型写入前暂存新的 History 双栈头和 QueryIndex root，并注册可取消的发布 microtask。apply 失败时先取消发布，再恢复 History 与 QueryIndex；成功的 revision 写入后仍然直接返回，listener 只在当前同步栈结束后运行。Durability 和 Playback 尚未接入；它们必须延续相同原则，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
 
@@ -219,9 +223,15 @@ Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wr
 
 Project Core 不生成 Track ID、默认名称或随机颜色，也不选择 Soundbank。调用方必须提供已确定的名称、颜色、Channel Strip、Device 和插入位置；新音轨不自动创建 Clip、MidiSource 或 Note。完整边界见 [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)。
 
+### Add MIDI Clip 纵向切片
+
+`AddMidiClipCommand` 把一个 MidiClip、它独占的 MidiSource 和空 Note Partition 作为一个完整产品意图。Handler 原子准备 `MIDI_SOURCE.INSERT`、`NOTE_PARTITION.INSERT` 与 `CLIP.INSERT`，其 inverse 按相反顺序撤销；成功提交、Undo 和 Redo 都只发布一条聚合的 `midi-clip.added` 或 `midi-clip.removed` change。
+
+Project Core 验证目标 Instrument Track、Clip / Source / Partition 身份和 Source 读取范围，但不决定双击手势、按小节吸附、默认长度、名称或颜色。MIDI Clip change 携带完整 ownership placement 与时间线受影响范围；QueryIndex 同步增加或移除对应 Note Partition，使新 Clip 可以立即接收现有 Note Command。完整边界见 [Add MIDI Clip Command 实施计划](./docs/add-midi-clip-command-plan.md)。
+
 ### ProjectCommit / ProjectDelta 基础层
 
-当前公开契约能够表达 Instrument Track Add / Remove 与 MIDI Note Add / Remove / Update。Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
+当前公开契约能够表达 Instrument Track Add / Remove、MIDI Clip Add / Remove 与 MIDI Note Add / Remove / Update。Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip change 聚合 Clip、Source 与 Note Partition，并携带时间线受影响范围；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
 
 包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
@@ -297,9 +307,9 @@ session.query(createMidiNotesIntersectingRangeQuery(...))
 - Source 或 Note 不存在属于正常读取结果，分别返回空集合或 `undefined`；
 - Query descriptor、结果外壳和结果数组运行时冻结，Record 保持引用共享。
 
-包内 QueryIndex 为每个 MidiSource 维护 ID Map、startTick 排序数组和 prefix maximum end，从而通过二分边界缩小区间候选。Index 按 ProjectDelta 在写前增量准备，只复制受影响 Source；revision 落后时 Query 使用权威 ModelStore 扫描降级，Index 也可以从 Store 完整 rebuild。扫描与索引结果必须等价，内部结构不进入项目文件、History 或 package root。完整决策见 [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)。
+包内 QueryIndex 为每个 MidiSource 维护 ID Map、startTick 排序数组和 prefix maximum end，从而通过二分边界缩小区间候选。Index 按 ProjectDelta 在写前增量准备，只复制受影响 Source；MIDI Clip Add / Remove 同步增加或移除完整 Source Partition。revision 落后时 Query 使用权威 ModelStore 扫描降级，Index 也可以从 Store 完整 rebuild。扫描与索引结果必须等价，内部结构不进入项目文件、History 或 package root。完整决策见 [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)。
 
-Track / Clip、Tempo、Device、Asset 和 Automation Query 要等对应 Command / Delta 纵向切片出现后再加入，不能预建一个无业务语义的通用查询语言。
+Track / Clip、Tempo、Device、Asset 和 Automation Query 要等对应 UI 消费出现后再加入，不能因为已有 Command / Delta 就预建一个无业务语义的通用查询语言。
 
 当前局部订阅支持全部 Commit，以及按 MidiSource ID、Note ID 和半开 Tick 区间过滤 MIDI Note changes。多个约束必须在同一条 change 上同时命中，一个 Commit 即使有多条 change 命中也只通知一次。订阅者收到 Commit 后按需重新 Query；不能用单个全局 revision ref 让 Mixer、Piano Roll、Inspector 和 Arrangement 在任意 Note 变化后全部重算。
 
@@ -372,7 +382,7 @@ asset reference changes
 - Persistence 使用 `journalSequence`，不能复用 modelRevision；
 - Delta 可以丢弃；消费者错过增量后必须能从 Snapshot 全量重建。
 
-当前已实现 Instrument Track Add / Remove 的聚合 placement，以及 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
+当前已实现 Instrument Track Add / Remove 与 MIDI Clip Add / Remove 的聚合 placement，以及 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
 
 ## 并发与线程模型
 
@@ -469,7 +479,7 @@ src/
 1. 建立 ModelStore、opaque ID、Tick 和只读实体记录约定。
 2. 按 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 定义 Project、Instrument Track、MidiClip、MidiSource、Note、Timeline 和最小 Device Descriptor。
 3. 实现 MutationPlan、MutationApplier 和原子提交骨架。
-4. 实现 `AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand`。
+4. 实现 `AddMidiClipCommand`、`AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand`。
 5. 建立 Note 级 ProjectCommit、ProjectDelta 与写前准备边界。
 6. 实现 ProjectSession 最小执行门面和提交发布时机。
 7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
@@ -483,7 +493,7 @@ src/
 
 ## 测试与验收
 
-当前 Project Core 基线为 24 个测试文件、347 项测试，其中 Project Checkpoint 基础层新增 8 项。
+当前 Project Core 基线为 26 个测试文件、370 项测试。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -512,6 +522,7 @@ src/
 
 - [阶段成果：安全模型与原子 Mutation 内核](./docs/project-core-transaction-foundation-milestone.md)
 - [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)
+- [Add MIDI Clip Command 实施计划](./docs/add-midi-clip-command-plan.md)
 - [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)
 - [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
 - [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)

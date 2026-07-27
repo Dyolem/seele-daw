@@ -54,7 +54,7 @@ Commit / Delta 使用写前准备模型：
 
 ```text
 prepare ProjectCommand
--> MutationPlan
+-> normalized Command + MutationPlan
 -> prepare ProjectCommit candidate
    -> validate plan provenance
    -> validate command / plan correspondence
@@ -73,6 +73,12 @@ prepare ProjectCommand
 - Remove -> `NOTE.REMOVE`。
 
 不支持的 mutation 或 Command / Plan 不匹配会在写入前失败。未来新增 Command 时，必须同时定义其 Delta 语义，不能静默发布缺失变化的 Commit。
+
+Preparer 的 `ready` 结果同时携带规范化 Command 与 MutationPlan。由 Command 直接拥有的聚合
+Record（如 Instrument Track、Device、MidiClip 和 MidiSource）在两者之间共享引用，candidate
+通过引用与所有权图关系校验对应性，不维护容易随 Record 字段扩展而遗漏的逐字段比较清单。
+Note Command 只表达编辑参数而非完整 Record；其候选 Record 由领域工厂构造，并通过全部自有
+字段比较验证，新增 Record 字段会自动进入对应性检查。
 
 ## 不可变性与引用策略
 

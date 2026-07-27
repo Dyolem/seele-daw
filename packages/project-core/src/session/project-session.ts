@@ -114,7 +114,7 @@ class ProjectSessionImpl implements ProjectSession {
       return createNoChangeResult(preparation.baseRevision, preparation.reason)
     }
 
-    const commit = createProjectCommitCandidate(command, preparation.plan)
+    const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
     const result = Object.freeze<CommittedProjectCommandExecution>({
       status: PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED,
       commit,

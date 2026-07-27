@@ -2,14 +2,17 @@
 export {
   PROJECT_COMMAND_TYPE,
   createAddInstrumentTrackCommand,
+  createAddMidiClipCommand,
   createAddNoteCommand,
   createMoveNoteCommand,
   createRemoveNoteCommand,
 } from './commands/project-command'
 export type {
   AddInstrumentTrackCommand,
+  AddMidiClipCommand,
   AddNoteCommand,
   CreateAddInstrumentTrackCommandInput,
+  CreateAddMidiClipCommandInput,
   CreateAddNoteCommandInput,
   CreateMoveNoteCommandInput,
   CreateRemoveNoteCommandInput,
@@ -30,6 +33,9 @@ export type {
   InstrumentTrackAddedChange,
   InstrumentTrackPlacement,
   InstrumentTrackRemovedChange,
+  MidiClipAddedChange,
+  MidiClipPlacement,
+  MidiClipRemovedChange,
   MidiNoteAddedChange,
   MidiNoteRemovedChange,
   MidiNoteUpdatedChange,

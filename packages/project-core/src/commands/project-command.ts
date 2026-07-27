@@ -1,7 +1,9 @@
 import { ProjectCommandError } from '#internal/commands/project-command-error'
 import {
+  parseClipId,
   parseMidiSourceId,
   parseNoteId,
+  type ClipId,
   type MidiSourceId,
   type NoteId,
   type TrackId,
@@ -12,7 +14,11 @@ import {
   type DeviceDescriptor,
 } from '#internal/model/device'
 import { createMidiNoteRecord } from '#internal/model/midi-note'
-import { ModelRevisionError, parseModelRevision, type ModelRevision } from '#internal/model/model-revision'
+import {
+  ModelRevisionError,
+  parseModelRevision,
+  type ModelRevision,
+} from '#internal/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'
 import {
   parseMidiPitch,
@@ -21,10 +27,13 @@ import {
   type MidiPitch,
   type MidiVelocity,
 } from '#internal/model/scalars'
+import { createInstrumentTrackRecord, type InstrumentTrackRecord } from '#internal/model/track'
 import {
-  createInstrumentTrackRecord,
-  type InstrumentTrackRecord,
-} from '#internal/model/track'
+  createMidiClipRecord,
+  type CreateMidiLoopInput,
+  type MidiClipRecord,
+} from '#internal/model/midi-clip'
+import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
 import type { CreateChannelStripDescriptorInput } from '#internal/model/channel'
 import { parseTick, type Tick } from '#internal/time/tick'
 
@@ -32,6 +41,9 @@ import { parseTick, type Tick } from '#internal/time/tick'
 export const PROJECT_COMMAND_TYPE = {
   INSTRUMENT_TRACK: {
     ADD: 'instrument-track.add',
+  },
+  MIDI_CLIP: {
+    ADD: 'midi-clip.add',
   },
   MIDI_NOTE: {
     ADD: 'midi-note.add',
@@ -49,8 +61,7 @@ interface ProjectCommandBase<Type extends ProjectCommandType> {
   readonly baseRevision: ModelRevision
 }
 
-interface MidiNoteCommandBase<Type extends ProjectCommandType>
-  extends ProjectCommandBase<Type> {
+interface MidiNoteCommandBase<Type extends ProjectCommandType> extends ProjectCommandBase<Type> {
   readonly sourceId: MidiSourceId
   readonly noteId: NoteId
 }
@@ -61,6 +72,13 @@ export interface AddInstrumentTrackCommand extends ProjectCommandBase<
   readonly track: InstrumentTrackRecord
   readonly instrumentDevice: DeviceDescriptor
   readonly insertAt: number
+}
+
+export interface AddMidiClipCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD
+> {
+  readonly clip: MidiClipRecord
+  readonly source: MidiSourceRecord
 }
 
 export interface AddNoteCommand extends MidiNoteCommandBase<
@@ -80,12 +98,11 @@ export interface MoveNoteCommand extends MidiNoteCommandBase<
   readonly nextPitch: MidiPitch
 }
 
-export type RemoveNoteCommand = MidiNoteCommandBase<
-  typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE
->
+export type RemoveNoteCommand = MidiNoteCommandBase<typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE>
 
 export type ProjectCommand =
   | AddInstrumentTrackCommand
+  | AddMidiClipCommand
   | AddNoteCommand
   | MoveNoteCommand
   | RemoveNoteCommand
@@ -98,6 +115,21 @@ export interface CreateAddInstrumentTrackCommandInput {
   readonly channel: CreateChannelStripDescriptorInput
   readonly instrumentDevice: CreateDeviceDescriptorInput
   readonly insertAt: number
+}
+
+export interface CreateAddMidiClipCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly clipId: ClipId
+  readonly trackId: TrackId
+  readonly name: string
+  readonly color: ProjectColor | null
+  readonly muted: boolean
+  readonly startTick: Tick
+  readonly spanTick: Tick
+  readonly sourceId: MidiSourceId
+  readonly sourceLengthTick: Tick
+  readonly sourceOffsetTick: Tick
+  readonly loop: CreateMidiLoopInput | null
 }
 
 interface CreateNoteCommandInputBase {
@@ -170,6 +202,32 @@ export function createAddInstrumentTrackCommand(
   }
 }
 
+export function createAddMidiClipCommand(input: CreateAddMidiClipCommandInput): AddMidiClipCommand {
+  const source = createMidiSourceRecord({
+    id: parseMidiSourceId(input.sourceId),
+    lengthTick: input.sourceLengthTick,
+  })
+  const clip = createMidiClipRecord({
+    id: parseClipId(input.clipId),
+    trackId: input.trackId,
+    name: input.name,
+    color: input.color,
+    muted: input.muted,
+    startTick: input.startTick,
+    spanTick: input.spanTick,
+    sourceId: source.id,
+    sourceOffsetTick: input.sourceOffsetTick,
+    loop: input.loop,
+  })
+
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    clip,
+    source,
+  }
+}
+
 export function createAddNoteCommand(input: CreateAddNoteCommandInput): AddNoteCommand {
   const note = createMidiNoteRecord({
     id: input.noteId,
@@ -235,6 +293,21 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
         channel: command.track.channel,
         instrumentDevice: command.instrumentDevice,
         insertAt: command.insertAt,
+      })
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
+      return createAddMidiClipCommand({
+        baseRevision: command.baseRevision,
+        clipId: command.clip.id,
+        trackId: command.clip.trackId,
+        name: command.clip.name,
+        color: command.clip.color,
+        muted: command.clip.muted,
+        startTick: command.clip.startTick,
+        spanTick: command.clip.spanTick,
+        sourceId: command.source.id,
+        sourceLengthTick: command.source.lengthTick,
+        sourceOffsetTick: command.clip.sourceOffsetTick,
+        loop: command.clip.loop,
       })
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
       return createAddNoteCommand(command)

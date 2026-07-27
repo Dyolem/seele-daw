@@ -1,7 +1,7 @@
 import {
-  normalizeProjectCommand,
   PROJECT_COMMAND_TYPE,
   type AddInstrumentTrackCommand,
+  type AddMidiClipCommand,
   type AddNoteCommand,
   type MoveNoteCommand,
   type ProjectCommand,
@@ -14,6 +14,9 @@ import {
   type InstrumentTrackAddedChange,
   type InstrumentTrackPlacement,
   type InstrumentTrackRemovedChange,
+  type MidiClipAddedChange,
+  type MidiClipPlacement,
+  type MidiClipRemovedChange,
   type MidiNoteAddedChange,
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
@@ -31,8 +34,9 @@ import {
   type ProjectHistoryDirection,
 } from '#internal/commit/project-commit'
 import type { ProjectDelta } from '#internal/commit/project-delta'
-import type { MidiNoteRecord } from '#internal/model/midi-note'
-import type { JsonValue } from '#internal/model/json-value'
+import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
+import type { MidiClipRecord } from '#internal/model/midi-clip'
+import type { MidiSourceRecord } from '#internal/model/midi-source'
 import { nextModelRevision } from '#internal/model/model-revision'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import { assertCreatedMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
@@ -73,10 +77,22 @@ function createInstrumentTrackPlacement(
   return Object.freeze({ track, instrumentDevice, index })
 }
 
-function mapNoteMutationToChange(
-  mutation: ProjectMutation,
-  mutationIndex: number,
-): ProjectChange {
+function createMidiClipPlacement(
+  clip: MidiClipRecord,
+  source: MidiSourceRecord,
+  notes: readonly MidiNoteRecord[],
+): MidiClipPlacement {
+  return Object.freeze({ clip, source, notes })
+}
+
+function createClipRange(clip: MidiClipRecord): AffectedTickRange {
+  return Object.freeze({
+    startTick: clip.startTick,
+    endTick: addTicks(clip.startTick, clip.spanTick),
+  })
+}
+
+function mapNoteMutationToChange(mutation: ProjectMutation, mutationIndex: number): ProjectChange {
   switch (mutation.type) {
     case PROJECT_MUTATION_TYPE.NOTE.INSERT:
       return Object.freeze<MidiNoteAddedChange>({
@@ -183,6 +199,74 @@ function mapRemovedInstrumentTrack(
   })
 }
 
+function mapAddedMidiClip(
+  mutations: readonly ProjectMutation[],
+  mutationIndex: number,
+): MidiClipAddedChange {
+  const sourceMutation = mutations[mutationIndex]
+  const partitionMutation = mutations[mutationIndex + 1]
+  const clipMutation = mutations[mutationIndex + 2]
+
+  if (
+    sourceMutation?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT ||
+    partitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT ||
+    clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT ||
+    partitionMutation.sourceId !== sourceMutation.after.id ||
+    clipMutation.after.sourceId !== sourceMutation.after.id
+  ) {
+    return rejectCandidate(
+      'unsupported-mutation-type',
+      `Mutation ${String(sourceMutation?.type)} at index ${mutationIndex} does not begin a complete MIDI Clip insertion`,
+      { mutationIndex, mutationType: sourceMutation?.type },
+    )
+  }
+
+  const clip = clipMutation.after
+
+  return Object.freeze({
+    type: PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED,
+    clipId: clip.id,
+    sourceId: sourceMutation.after.id,
+    trackId: clip.trackId,
+    affected: createClipRange(clip),
+    after: createMidiClipPlacement(clip, sourceMutation.after, partitionMutation.after),
+  })
+}
+
+function mapRemovedMidiClip(
+  mutations: readonly ProjectMutation[],
+  mutationIndex: number,
+): MidiClipRemovedChange {
+  const clipMutation = mutations[mutationIndex]
+  const partitionMutation = mutations[mutationIndex + 1]
+  const sourceMutation = mutations[mutationIndex + 2]
+
+  if (
+    clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.REMOVE ||
+    partitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE ||
+    sourceMutation?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE ||
+    partitionMutation.sourceId !== sourceMutation.before.id ||
+    clipMutation.before.sourceId !== sourceMutation.before.id
+  ) {
+    return rejectCandidate(
+      'unsupported-mutation-type',
+      `Mutation ${String(clipMutation?.type)} at index ${mutationIndex} does not begin a complete MIDI Clip removal`,
+      { mutationIndex, mutationType: clipMutation?.type },
+    )
+  }
+
+  const clip = clipMutation.before
+
+  return Object.freeze({
+    type: PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED,
+    clipId: clip.id,
+    sourceId: sourceMutation.before.id,
+    trackId: clip.trackId,
+    affected: createClipRange(clip),
+    before: createMidiClipPlacement(clip, sourceMutation.before, partitionMutation.before),
+  })
+}
+
 function createProjectChanges(mutations: readonly ProjectMutation[]): readonly ProjectChange[] {
   const changes: ProjectChange[] = []
 
@@ -200,6 +284,16 @@ function createProjectChanges(mutations: readonly ProjectMutation[]): readonly P
         mutationIndex += 2
         break
 
+      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
+        changes.push(mapAddedMidiClip(mutations, mutationIndex))
+        mutationIndex += 2
+        break
+
+      case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
+        changes.push(mapRemovedMidiClip(mutations, mutationIndex))
+        mutationIndex += 2
+        break
+
       default:
         changes.push(mapNoteMutationToChange(mutation, mutationIndex))
         break
@@ -207,41 +301,6 @@ function createProjectChanges(mutations: readonly ProjectMutation[]): readonly P
   }
 
   return Object.freeze(changes)
-}
-
-function jsonValuesEqual(left: JsonValue, right: JsonValue): boolean {
-  if (left === right) return true
-
-  if (
-    left === null ||
-    right === null ||
-    typeof left !== 'object' ||
-    typeof right !== 'object'
-  ) {
-    return false
-  }
-
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return (
-      Array.isArray(left) &&
-      Array.isArray(right) &&
-      left.length === right.length &&
-      left.every((value, index) => jsonValuesEqual(value, right[index]!))
-    )
-  }
-
-  const leftEntries = Object.entries(left)
-  const rightObject = right as Readonly<Record<string, JsonValue>>
-  const rightEntries = Object.entries(rightObject)
-
-  return (
-    leftEntries.length === rightEntries.length &&
-    leftEntries.every(
-      ([key, value]) =>
-        Object.hasOwn(rightObject, key) &&
-        jsonValuesEqual(value, rightObject[key]!),
-    )
-  )
 }
 
 function matchesAddedInstrumentTrack(
@@ -262,58 +321,94 @@ function matchesAddedInstrumentTrack(
     return false
   }
 
-  const device = deviceMutation.after
-  const track = trackMutation.after
-
   return (
-    track.id === command.track.id &&
-    track.name === command.track.name &&
-    track.color === command.track.color &&
-    track.channel.gain === command.track.channel.gain &&
-    track.channel.pan === command.track.channel.pan &&
-    track.channel.muted === command.track.channel.muted &&
-    track.channel.soloed === command.track.channel.soloed &&
-    track.midiEffectIds.length === 0 &&
-    track.audioEffectIds.length === 0 &&
-    track.instrumentDeviceId === device.id &&
-    device.id === command.instrumentDevice.id &&
-    device.typeId === command.instrumentDevice.typeId &&
-    device.definitionVersion === command.instrumentDevice.definitionVersion &&
-    device.enabled === command.instrumentDevice.enabled &&
-    jsonValuesEqual(device.parameters, command.instrumentDevice.parameters) &&
-    jsonValuesEqual(device.opaqueState, command.instrumentDevice.opaqueState) &&
-    orderMutation.trackId === track.id &&
+    trackMutation.after === command.track &&
+    deviceMutation.after === command.instrumentDevice &&
+    trackMutation.after.instrumentDeviceId === deviceMutation.after.id &&
+    orderMutation.trackId === trackMutation.after.id &&
     orderMutation.index === command.insertAt
   )
 }
 
-function matchesAddedNote(command: AddNoteCommand, mutation: ProjectMutation): boolean {
+function matchesAddedMidiClip(
+  command: AddMidiClipCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  const sourceMutation = mutations[0]
+  const partitionMutation = mutations[1]
+  const clipMutation = mutations[2]
+
+  if (
+    mutations.length !== 3 ||
+    sourceMutation?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT ||
+    partitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT ||
+    clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT
+  ) {
+    return false
+  }
+
   return (
-    mutation.type === PROJECT_MUTATION_TYPE.NOTE.INSERT &&
-    mutation.sourceId === command.sourceId &&
-    mutation.after.id === command.noteId &&
-    mutation.after.startTick === command.startTick &&
-    mutation.after.durationTick === command.durationTick &&
-    mutation.after.pitch === command.pitch &&
-    mutation.after.velocity === command.velocity &&
-    mutation.after.channel === command.channel
+    sourceMutation.after === command.source &&
+    clipMutation.after === command.clip &&
+    partitionMutation.sourceId === sourceMutation.after.id &&
+    partitionMutation.after.length === 0 &&
+    clipMutation.after.sourceId === sourceMutation.after.id
   )
 }
 
-function matchesMovedNote(command: MoveNoteCommand, mutation: ProjectMutation): boolean {
+function recordsHaveSameOwnValues(left: object, right: object): boolean {
+  const leftKeys = Reflect.ownKeys(left)
+  const rightKeys = Reflect.ownKeys(right)
+
   return (
-    mutation.type === PROJECT_MUTATION_TYPE.NOTE.REPLACE &&
-    mutation.sourceId === command.sourceId &&
-    mutation.before.id === command.noteId &&
-    mutation.after.id === command.noteId &&
-    (mutation.before.startTick !== command.nextStartTick ||
-      mutation.before.pitch !== command.nextPitch) &&
-    mutation.after.startTick === command.nextStartTick &&
-    mutation.after.pitch === command.nextPitch &&
-    mutation.after.durationTick === mutation.before.durationTick &&
-    mutation.after.velocity === mutation.before.velocity &&
-    mutation.after.channel === mutation.before.channel
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key) =>
+        Object.hasOwn(right, key) &&
+        Object.is(Reflect.get(left, key), Reflect.get(right, key)),
+    )
   )
+}
+
+function matchesAddedNote(command: AddNoteCommand, mutation: ProjectMutation): boolean {
+  if (
+    mutation.type !== PROJECT_MUTATION_TYPE.NOTE.INSERT ||
+    mutation.sourceId !== command.sourceId
+  ) {
+    return false
+  }
+
+  const expectedNote = createMidiNoteRecord({
+    id: command.noteId,
+    startTick: command.startTick,
+    durationTick: command.durationTick,
+    pitch: command.pitch,
+    velocity: command.velocity,
+    channel: command.channel,
+  })
+
+  return recordsHaveSameOwnValues(mutation.after, expectedNote)
+}
+
+function matchesMovedNote(command: MoveNoteCommand, mutation: ProjectMutation): boolean {
+  if (
+    mutation.type !== PROJECT_MUTATION_TYPE.NOTE.REPLACE ||
+    mutation.sourceId !== command.sourceId ||
+    mutation.before.id !== command.noteId ||
+    mutation.after.id !== command.noteId ||
+    (mutation.before.startTick === command.nextStartTick &&
+      mutation.before.pitch === command.nextPitch)
+  ) {
+    return false
+  }
+
+  const expectedAfter = createMidiNoteRecord({
+    ...mutation.before,
+    startTick: command.nextStartTick,
+    pitch: command.nextPitch,
+  })
+
+  return recordsHaveSameOwnValues(mutation.after, expectedAfter)
 }
 
 function matchesRemovedNote(command: RemoveNoteCommand, mutation: ProjectMutation): boolean {
@@ -330,6 +425,8 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
 
   if (command.type === PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD) {
     matches = matchesAddedInstrumentTrack(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD) {
+    matches = matchesAddedMidiClip(command, plan.forward)
   } else if (plan.forward.length === 1 && mutation !== undefined) {
     switch (command.type) {
       case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
@@ -384,16 +481,15 @@ function createCandidate(
 }
 
 /**
- * Builds an immutable candidate before MutationApplier runs. A future Session
- * may publish it only after apply returns the same modelRevision.
+ * Builds an immutable candidate before MutationApplier runs. The Command must
+ * be the normalized instance returned beside this plan by prepareProjectCommand;
+ * aggregate Record references are part of their correspondence contract.
  */
 export function createProjectCommitCandidate(
-  command: ProjectCommand,
+  normalizedCommand: ProjectCommand,
   plan: MutationPlan,
 ): ProjectCommit {
   assertCreatedMutationPlan(plan)
-
-  const normalizedCommand = normalizeProjectCommand(command)
 
   if (normalizedCommand.baseRevision !== plan.baseRevision) {
     rejectCandidate(

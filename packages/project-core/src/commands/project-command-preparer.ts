@@ -3,9 +3,13 @@ import {
   PROJECT_COMMAND_TYPE,
   type ProjectCommand,
 } from '#internal/commands/project-command'
-import { ProjectCommandError } from '#internal/commands/project-command-error'
+import {
+  ProjectCommandError,
+  type ProjectCommandErrorDetails,
+} from '#internal/commands/project-command-error'
 import type { ProjectCommandPreparation } from '#internal/commands/project-command-preparation'
 import { prepareAddInstrumentTrackCommand } from '#internal/commands/instrument-track-command-handler'
+import { prepareAddMidiClipCommand } from '#internal/commands/midi-clip-command-handler'
 import {
   prepareAddNoteCommand,
   prepareMoveNoteCommand,
@@ -23,6 +27,31 @@ function rejectUnknownCommand(command: never): never {
   )
 }
 
+function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
+  switch (command.type) {
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
+      return {
+        deviceId: command.instrumentDevice.id,
+        trackId: command.track.id,
+      }
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
+      return {
+        clipId: command.clip.id,
+        sourceId: command.source.id,
+        trackId: command.clip.trackId,
+      }
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
+      return {
+        noteId: command.noteId,
+        sourceId: command.sourceId,
+      }
+    default:
+      return rejectUnknownCommand(command)
+  }
+}
+
 /**
  * Converts one complete product intent into a closed plan without acquiring write access.
  * The future ProjectSession will apply only the ready branch through MutationApplier.
@@ -34,17 +63,6 @@ export function prepareProjectCommand(
   const normalizedCommand = normalizeProjectCommand(command)
 
   if (normalizedCommand.baseRevision !== reader.modelRevision) {
-    const commandAddress =
-      normalizedCommand.type === PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD
-        ? {
-            deviceId: normalizedCommand.instrumentDevice.id,
-            trackId: normalizedCommand.track.id,
-          }
-        : {
-            noteId: normalizedCommand.noteId,
-            sourceId: normalizedCommand.sourceId,
-          }
-
     throw new ProjectCommandError(
       'base-revision-mismatch',
       `ProjectCommand revision ${normalizedCommand.baseRevision} does not match model revision ${reader.modelRevision}`,
@@ -52,7 +70,7 @@ export function prepareProjectCommand(
         baseRevision: normalizedCommand.baseRevision,
         commandType: normalizedCommand.type,
         currentRevision: reader.modelRevision,
-        ...commandAddress,
+        ...commandAddress(normalizedCommand),
       },
     )
   }
@@ -60,6 +78,8 @@ export function prepareProjectCommand(
   switch (normalizedCommand.type) {
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
       return prepareAddInstrumentTrackCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
+      return prepareAddMidiClipCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
       return prepareAddNoteCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:

@@ -1,5 +1,7 @@
 import {
   PROJECT_CHANGE_TYPE,
+  type MidiClipAddedChange,
+  type MidiClipRemovedChange,
   type MidiNoteAddedChange,
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
@@ -41,6 +43,7 @@ interface QueryIndexRoot {
 
 type QueryIndexTransitionState = 'prepared' | 'staged' | 'rolled-back'
 type MidiNoteChange = MidiNoteAddedChange | MidiNoteRemovedChange | MidiNoteUpdatedChange
+type MidiClipChange = MidiClipAddedChange | MidiClipRemovedChange
 
 export type QueryIndexErrorCode =
   | 'change-precondition-failed'
@@ -184,6 +187,18 @@ function rejectChangePrecondition(
   )
 }
 
+function rejectClipChangePrecondition(
+  change: MidiClipChange,
+  changeIndex: number,
+  detail: string,
+): never {
+  throw new QueryIndexError(
+    'change-precondition-failed',
+    `ProjectChange ${change.type} at index ${changeIndex} ${detail}`,
+    { changeIndex, sourceId: change.sourceId },
+  )
+}
+
 function applyAddedNote(
   notes: Map<NoteId, MidiNoteRecord>,
   change: MidiNoteAddedChange,
@@ -224,6 +239,81 @@ function applyUpdatedNote(
   notes.set(change.noteId, change.after)
 }
 
+function assertClipPlacementAddress(
+  change: MidiClipAddedChange | MidiClipRemovedChange,
+  placement: MidiClipAddedChange['after'] | MidiClipRemovedChange['before'],
+  changeIndex: number,
+): void {
+  if (
+    placement.clip.id !== change.clipId ||
+    placement.clip.trackId !== change.trackId ||
+    placement.clip.sourceId !== change.sourceId ||
+    placement.source.id !== change.sourceId
+  ) {
+    rejectClipChangePrecondition(
+      change,
+      changeIndex,
+      'does not match its MIDI Clip placement address',
+    )
+  }
+}
+
+function applyAddedMidiClip(
+  root: QueryIndexRoot,
+  workingPartitions: Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>,
+  removedPartitionIds: Set<MidiSourceId>,
+  change: MidiClipAddedChange,
+  changeIndex: number,
+): void {
+  assertClipPlacementAddress(change, change.after, changeIndex)
+
+  const sourceId = change.sourceId
+  const partitionExists =
+    !removedPartitionIds.has(sourceId) &&
+    (workingPartitions.has(sourceId) || root.partitions.has(sourceId))
+
+  if (partitionExists) {
+    rejectClipChangePrecondition(
+      change,
+      changeIndex,
+      `cannot add an existing MIDI Note partition for Source ${sourceId}`,
+    )
+  }
+
+  removedPartitionIds.delete(sourceId)
+  workingPartitions.set(sourceId, new Map(change.after.notes.map((note) => [note.id, note])))
+}
+
+function applyRemovedMidiClip(
+  root: QueryIndexRoot,
+  workingPartitions: Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>,
+  removedPartitionIds: Set<MidiSourceId>,
+  change: MidiClipRemovedChange,
+  changeIndex: number,
+): void {
+  assertClipPlacementAddress(change, change.before, changeIndex)
+
+  const sourceId = change.sourceId
+  const working = workingPartitions.get(sourceId)
+  const indexed = working ?? root.partitions.get(sourceId)?.byId
+
+  if (
+    removedPartitionIds.has(sourceId) ||
+    indexed === undefined ||
+    indexed.size !== change.before.notes.length ||
+    change.before.notes.some((note) => indexed.get(note.id) !== note)
+  ) {
+    rejectClipChangePrecondition(
+      change,
+      changeIndex,
+      `does not match the indexed MIDI Note partition for Source ${sourceId}`,
+    )
+  }
+
+  workingPartitions.delete(sourceId)
+  removedPartitionIds.add(sourceId)
+}
+
 function rejectUnsupportedChange(change: never, changeIndex: number): never {
   const type = (change as { readonly type?: unknown }).type
 
@@ -236,6 +326,7 @@ function rejectUnsupportedChange(change: never, changeIndex: number): never {
 
 function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): QueryIndexRoot {
   const workingPartitions = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>()
+  const removedPartitionIds = new Set<MidiSourceId>()
 
   const requireWorkingPartition = (
     change: MidiNoteChange,
@@ -244,6 +335,13 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
     const existing = workingPartitions.get(change.sourceId)
 
     if (existing !== undefined) return existing
+    if (removedPartitionIds.has(change.sourceId)) {
+      throw new QueryIndexError(
+        'partition-missing',
+        `MIDI Note QueryIndex has no partition for Source ${change.sourceId}`,
+        { changeIndex, sourceId: change.sourceId, noteId: change.noteId },
+      )
+    }
 
     const partition = root.partitions.get(change.sourceId)
 
@@ -266,6 +364,14 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
       case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
         break
 
+      case PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED:
+        applyAddedMidiClip(root, workingPartitions, removedPartitionIds, change, changeIndex)
+        break
+
+      case PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED:
+        applyRemovedMidiClip(root, workingPartitions, removedPartitionIds, change, changeIndex)
+        break
+
       case PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED:
         applyAddedNote(requireWorkingPartition(change, changeIndex), change, changeIndex)
         break
@@ -284,6 +390,8 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
   }
 
   const nextPartitions = new Map(root.partitions)
+
+  for (const sourceId of removedPartitionIds) nextPartitions.delete(sourceId)
 
   for (const [sourceId, notes] of workingPartitions) {
     nextPartitions.set(sourceId, createMidiNotePartitionIndex(notes.values()))

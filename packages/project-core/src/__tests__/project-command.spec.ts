@@ -17,6 +17,7 @@ import {
   parseTick,
   type AddNoteCommand,
   type AddInstrumentTrackCommand,
+  type AddMidiClipCommand,
   type ModelRevision,
   type MoveNoteCommand,
   type ProjectCommand,
@@ -135,7 +136,11 @@ describe('ProjectCommand public contract', () => {
     expectTypeOf(move).toEqualTypeOf<MoveNoteCommand>()
     expectTypeOf(remove).toEqualTypeOf<RemoveNoteCommand>()
     expectTypeOf<ProjectCommand>().toEqualTypeOf<
-      AddInstrumentTrackCommand | AddNoteCommand | MoveNoteCommand | RemoveNoteCommand
+      | AddInstrumentTrackCommand
+      | AddMidiClipCommand
+      | AddNoteCommand
+      | MoveNoteCommand
+      | RemoveNoteCommand
     >()
   })
 

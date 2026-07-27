@@ -69,6 +69,7 @@ export function prepareAddInstrumentTrackCommand(
 
   return {
     status: 'ready',
+    command,
     plan: createMutationPlan(command.baseRevision, [
       {
         type: PROJECT_MUTATION_TYPE.DEVICE.INSERT,

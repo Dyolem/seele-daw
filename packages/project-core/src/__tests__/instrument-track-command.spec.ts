@@ -172,7 +172,8 @@ describe('AddInstrumentTrackCommand preparation', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createCommand(store)
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const preparation = prepareProjectCommand(store, command)
+    const plan = requireReadyProjectCommandPlan(preparation)
 
     expect(plan.forward).toEqual([
       {
@@ -204,6 +205,38 @@ describe('AddInstrumentTrackCommand preparation', () => {
         before: command.instrumentDevice,
       },
     ])
+
+    if (
+      preparation.status !== 'ready' ||
+      preparation.command.type !== PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD ||
+      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.DEVICE.INSERT ||
+      plan.forward[1]?.type !== PROJECT_MUTATION_TYPE.TRACK.INSERT
+    ) {
+      throw new Error('Expected a ready Instrument Track graph insertion')
+    }
+
+    expect(preparation.command).not.toBe(command)
+    expect(plan.forward[0].after).toBe(preparation.command.instrumentDevice)
+    expect(plan.forward[1].after).toBe(preparation.command.track)
+  })
+
+  it('binds aggregate correspondence to the normalized Record references', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const preparation = prepareProjectCommand(store, createCommand(store))
+
+    if (preparation.status !== 'ready') {
+      throw new Error('Expected a ready Instrument Track command preparation')
+    }
+
+    const valueEqualCommand = createCommand(store)
+
+    expect(() =>
+      createProjectCommitCandidate(valueEqualCommand, preparation.plan),
+    ).toThrowError(expect.objectContaining({ code: 'command-plan-mismatch' }))
+    expect(() =>
+      createProjectCommitCandidate(preparation.command, preparation.plan),
+    ).not.toThrow()
   })
 
   it('rejects occupied Track and Device identities and an out-of-bounds position', () => {
@@ -342,8 +375,14 @@ describe('Instrument Track consumer compatibility', () => {
     })
     const before = index.execute(store, query)
     const command = createCommand(store)
-    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
-    const commit = createProjectCommitCandidate(command, plan)
+    const preparation = prepareProjectCommand(store, command)
+    const plan = requireReadyProjectCommandPlan(preparation)
+
+    if (preparation.status !== 'ready') {
+      throw new Error('Expected a ready Instrument Track command preparation')
+    }
+
+    const commit = createProjectCommitCandidate(preparation.command, plan)
     const transition = index.prepare(store, commit.delta)
 
     transition.stage()

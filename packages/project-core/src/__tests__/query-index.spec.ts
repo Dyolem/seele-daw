@@ -45,7 +45,7 @@ describe('QueryIndex lifecycle', () => {
       channel: parseMidiChannel(0),
     })
     const preparation = requireReady(command, store)
-    const commit = createProjectCommitCandidate(command, preparation.plan)
+    const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
     const transition = index.prepare(store, commit.delta)
 
     expect(index.modelRevision).toBe(0)
@@ -122,7 +122,7 @@ describe('QueryIndex lifecycle', () => {
       channel: parseMidiChannel(0),
     })
     const preparation = requireReady(command, store)
-    const commit = createProjectCommitCandidate(command, preparation.plan)
+    const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
     const transition = index.prepare(store, commit.delta)
 
     transition.stage()

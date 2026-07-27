@@ -1,6 +1,9 @@
 import {
+  parseClipId,
+  parsePositiveTick,
   parseProjectColor,
   parseProjectId,
+  parseTick,
   parseTrackId,
   type ProjectCommit,
 } from '@seele-daw/project-core'
@@ -9,8 +12,14 @@ import { createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
+import {
+  PROJECT_CLIP_CONTEXT_KEY,
+  type ProjectClipVueContext,
+} from '@/workbench/project/clip/vue/project-clip-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
   PROJECT_TRACK_CONTEXT_KEY,
@@ -20,6 +29,9 @@ import {
 const mountedWrappers: VueWrapper[] = []
 
 interface ArrangementFixture {
+  readonly addEmptyMidiClip: ReturnType<
+    typeof vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>
+  >
   readonly addInstrumentTrack: ReturnType<
     typeof vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>
   >
@@ -27,12 +39,25 @@ interface ArrangementFixture {
   readonly wrapper: VueWrapper
 }
 
-function mountArrangement(
-  tracks: InstanceType<typeof ProjectWorkbenchArrangement>['$props']['tracks'] = Object.freeze([]),
-): ArrangementFixture {
+interface MountArrangementOptions {
+  readonly clips?: readonly ProjectMidiClipPresentation[]
+  readonly createClipFailure?: Error
+  readonly tracks?: InstanceType<typeof ProjectWorkbenchArrangement>['$props']['tracks']
+}
+
+function mountArrangement(options: MountArrangementOptions = {}): ArrangementFixture {
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
   selection.activateProject(parseProjectId('arrangement-selection-project'))
+  const addEmptyMidiClip = vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) => {
+    if (options.createClipFailure !== undefined) throw options.createClipFailure
+
+    return Object.freeze({
+      clipId: parseClipId('clip-created-from-lane'),
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: input.trackId,
+    })
+  })
   const addInstrumentTrack = vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
     () =>
       Object.freeze({
@@ -43,11 +68,19 @@ function mountArrangement(
   const context: ProjectTrackVueContext = Object.freeze({
     projectTracks: Object.freeze({ addInstrumentTrack }),
   })
+  const clipContext: ProjectClipVueContext = Object.freeze({
+    projectClips: Object.freeze({ addEmptyMidiClip }),
+  })
   const wrapper = mount(ProjectWorkbenchArrangement, {
-    props: { tracks },
+    props: {
+      barSpanTick: parsePositiveTick(3_840),
+      clips: options.clips ?? Object.freeze([]),
+      tracks: options.tracks ?? Object.freeze([]),
+    },
     global: {
       plugins: [pinia],
       provide: {
+        [PROJECT_CLIP_CONTEXT_KEY as symbol]: clipContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: context,
       },
     },
@@ -55,6 +88,7 @@ function mountArrangement(
   mountedWrappers.push(wrapper)
 
   return {
+    addEmptyMidiClip,
     addInstrumentTrack,
     selection,
     wrapper,
@@ -122,8 +156,8 @@ describe('ProjectWorkbenchArrangement', () => {
   })
 
   it('renders ordered Track facts as aligned shell rows and Arrangement lanes', () => {
-    const { wrapper } = mountArrangement(
-      Object.freeze([
+    const { wrapper } = mountArrangement({
+      tracks: Object.freeze([
         Object.freeze({
           color: parseProjectColor('#4F8CFF'),
           id: parseTrackId('track-visible'),
@@ -131,7 +165,7 @@ describe('ProjectWorkbenchArrangement', () => {
           name: 'Instrument 1',
         }),
       ]),
-    )
+    })
 
     const row = wrapper.get('.project-track-row')
     expect(row.text()).toContain('Instrument 1')
@@ -155,20 +189,166 @@ describe('ProjectWorkbenchArrangement', () => {
         name: 'Instrument 2',
       }),
     ])
-    const { selection, wrapper } = mountArrangement(tracks)
+    const { selection, wrapper } = mountArrangement({ tracks })
     const rowButtons = wrapper.findAll('.project-track-row__select')
     const lanes = wrapper.findAll('.project-workbench__arrangement-lane')
+    const laneButtons = wrapper.findAll('.project-workbench__lane-grid button')
 
     await rowButtons[1]!.trigger('click')
 
     expect(selection.selectedTrackId).toBe('track-selection-second')
     expect(rowButtons[1]!.attributes('aria-pressed')).toBe('true')
-    expect(lanes[1]!.attributes('aria-pressed')).toBe('true')
+    expect(laneButtons[8]!.attributes('aria-pressed')).toBe('true')
 
-    await lanes[0]!.trigger('click')
+    await laneButtons[0]!.trigger('click')
 
     expect(selection.selectedTrackId).toBe('track-selection-first')
     expect(rowButtons[0]!.attributes('aria-pressed')).toBe('true')
     expect(lanes[0]!.classes()).toContain('project-workbench__arrangement-lane--selected')
+  })
+
+  it('positions visible MIDI Clips against the fixed eight-bar Arrangement', () => {
+    const trackId = parseTrackId('track-with-visible-clip')
+    const clipId = parseClipId('clip-visible-on-arrangement')
+    const { wrapper } = mountArrangement({
+      clips: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: clipId,
+          muted: false,
+          name: 'Keys',
+          spanTick: parsePositiveTick(3_840),
+          startTick: parseTick(3_840),
+          trackId,
+        }),
+      ]),
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: trackId,
+          kind: 'instrument',
+          name: 'Keys',
+        }),
+      ]),
+    })
+
+    const clip = wrapper.get('.project-midi-clip')
+    expect(clip.text()).toContain('Keys')
+    expect(clip.attributes('style')).toContain('--project-clip-offset: 12.5%')
+    expect(clip.attributes('style')).toContain('--project-clip-width: 12.5%')
+    expect(clip.attributes('style')).toContain('--project-clip-color: #4F8CFF')
+  })
+
+  it('creates and opens an empty MIDI Clip by double-clicking its target bar', async () => {
+    const trackId = parseTrackId('track-create-clip')
+    const { addEmptyMidiClip, selection, wrapper } = mountArrangement({
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#23B26D'),
+          id: trackId,
+          kind: 'instrument',
+          name: 'Instrument 1',
+        }),
+      ]),
+    })
+    const thirdBar = wrapper.findAll('.project-workbench__lane-grid button')[2]!
+
+    await thirdBar.trigger('dblclick')
+
+    expect(addEmptyMidiClip).toHaveBeenCalledExactlyOnceWith({
+      targetTick: parseTick(7_680),
+      trackId,
+    })
+    expect(selection.selectedTrackId).toBe(trackId)
+    expect(selection.selectedClipId).toBe('clip-created-from-lane')
+    expect(wrapper.emitted('openMidiClip')).toHaveLength(1)
+    expect(document.body.querySelector('.ui-toast')).toBeNull()
+  })
+
+  it('provides a keyboard path for creating a MIDI Clip on the focused bar', async () => {
+    const trackId = parseTrackId('track-create-clip-keyboard')
+    const { addEmptyMidiClip, wrapper } = mountArrangement({
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#16B8D4'),
+          id: trackId,
+          kind: 'instrument',
+          name: 'Instrument 1',
+        }),
+      ]),
+    })
+    const secondBar = wrapper.findAll('.project-workbench__lane-grid button')[1]!
+
+    await secondBar.trigger('keydown', { key: 'Enter' })
+
+    expect(addEmptyMidiClip).toHaveBeenCalledExactlyOnceWith({
+      targetTick: parseTick(3_840),
+      trackId,
+    })
+  })
+
+  it('keeps Clip creation failures atomic and visible', async () => {
+    const trackId = parseTrackId('track-rejected-clip')
+    const { selection, wrapper } = mountArrangement({
+      createClipFailure: new Error('The target Track no longer exists'),
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#F59E0B'),
+          id: trackId,
+          kind: 'instrument',
+          name: 'Instrument 1',
+        }),
+      ]),
+    })
+
+    await wrapper.get('.project-workbench__lane-grid button').trigger('dblclick')
+    await nextTick()
+
+    expect(selection.selectedClipId).toBeNull()
+    expect(wrapper.emitted('openMidiClip')).toBeUndefined()
+    expect(document.body.querySelector('.ui-toast')?.textContent).toContain(
+      'The target Track no longer exists',
+    )
+  })
+
+  it('selects and opens an existing Clip without creating another one', async () => {
+    const trackId = parseTrackId('track-existing-clip')
+    const clipId = parseClipId('clip-existing')
+    const { addEmptyMidiClip, selection, wrapper } = mountArrangement({
+      clips: Object.freeze([
+        Object.freeze({
+          color: null,
+          id: clipId,
+          muted: false,
+          name: 'Instrument 1',
+          spanTick: parsePositiveTick(3_840),
+          startTick: parseTick(0),
+          trackId,
+        }),
+      ]),
+      tracks: Object.freeze([
+        Object.freeze({
+          color: null,
+          id: trackId,
+          kind: 'instrument',
+          name: 'Instrument 1',
+        }),
+      ]),
+    })
+    const clip = wrapper.get('.project-midi-clip')
+
+    await clip.trigger('click')
+    expect(selection.selectedClipId).toBe(clipId)
+
+    await clip.trigger('dblclick')
+
+    expect(addEmptyMidiClip).not.toHaveBeenCalled()
+    expect(wrapper.emitted('openMidiClip')).toHaveLength(1)
+    expect(clip.attributes('aria-pressed')).toBe('true')
+
+    await clip.trigger('keydown', { key: 'Enter' })
+
+    expect(addEmptyMidiClip).not.toHaveBeenCalled()
+    expect(wrapper.emitted('openMidiClip')).toHaveLength(2)
   })
 })

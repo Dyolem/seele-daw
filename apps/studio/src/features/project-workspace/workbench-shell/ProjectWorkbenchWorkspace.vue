@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import type { Tick } from '@seele-daw/project-core'
 import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 
+import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
@@ -18,6 +20,8 @@ interface DockResizeInteraction {
 }
 
 const props = defineProps<{
+  readonly barSpanTick: Tick
+  readonly clips: readonly ProjectMidiClipPresentation[]
   readonly tracks: readonly ProjectTrackPresentation[]
 }>()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
@@ -36,6 +40,9 @@ const isContextEditorOpen = computed(() => dockMode.value !== PROJECT_WORKBENCH_
 const selectedTrack = computed(
   () =>
     props.tracks.find((track) => track.id === workbenchSelection.selectedTrackId) ?? null,
+)
+const selectedClip = computed(
+  () => props.clips.find((clip) => clip.id === workbenchSelection.selectedClipId) ?? null,
 )
 const workspaceStyle = computed(() => ({
   '--project-workbench-dock-height': `${dockHeight.value}px`,
@@ -215,7 +222,10 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
   >
     <ProjectWorkbenchArrangement
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN"
+      :bar-span-tick="props.barSpanTick"
+      :clips="props.clips"
       :tracks="props.tracks"
+      @open-midi-clip="openContextEditor"
     />
 
     <div
@@ -241,6 +251,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED"
       :dock-mode="dockMode"
       :is-maximized="isDockMaximized"
+      :selected-clip="selectedClip"
       :selected-track="selectedTrack"
       @close="closeDock"
       @minimize="minimizeDock"

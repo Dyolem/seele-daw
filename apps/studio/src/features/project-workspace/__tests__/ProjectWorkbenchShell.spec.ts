@@ -1,7 +1,11 @@
 import {
+  parseClipId,
+  parsePositiveTick,
   parseProjectColor,
   parseProjectId,
+  parseTick,
   parseTrackId,
+  type ClipId,
   type ProjectCommit,
   type TrackId,
 } from '@seele-daw/project-core'
@@ -10,6 +14,7 @@ import { createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
@@ -22,6 +27,11 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectSaveStatus,
 } from '@/workbench/project/active-project-state'
+import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
+import {
+  PROJECT_CLIP_CONTEXT_KEY,
+  type ProjectClipVueContext,
+} from '@/workbench/project/clip/vue/project-clip-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
   PROJECT_TRACK_CONTEXT_KEY,
@@ -29,9 +39,11 @@ import {
 } from '@/workbench/project/track/vue/project-track-context'
 
 interface MountShellOptions {
+  readonly clips?: readonly ProjectMidiClipPresentation[]
   readonly isDirty?: boolean
   readonly saveFailureMessage?: string | null
   readonly saveStatus?: ActiveProjectSaveStatus
+  readonly selectedClipId?: ClipId | null
   readonly selectedTrackId?: TrackId | null
   readonly tracks?: readonly ProjectTrackPresentation[]
 }
@@ -40,7 +52,20 @@ function mountShell(options: MountShellOptions = {}) {
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
   selection.activateProject(parseProjectId('workbench-shell-project'))
-  if (options.selectedTrackId) selection.selectTrack(options.selectedTrackId)
+  if (options.selectedTrackId && options.selectedClipId) {
+    selection.selectClip(options.selectedTrackId, options.selectedClipId)
+  } else if (options.selectedTrackId) {
+    selection.selectTrack(options.selectedTrackId)
+  }
+  const projectClips: ProjectClipCoordinator = Object.freeze({
+    addEmptyMidiClip: vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) =>
+      Object.freeze({
+        clipId: parseClipId('shell-created-clip'),
+        commit: Object.freeze({}) as ProjectCommit,
+        trackId: input.trackId,
+      }),
+    ),
+  })
   const projectTracks: ProjectTrackCoordinator = Object.freeze({
     addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
       () =>
@@ -50,12 +75,15 @@ function mountShell(options: MountShellOptions = {}) {
         }),
     ),
   })
+  const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
 
   return mount(ProjectWorkbenchShell, {
     props: {
+      barSpanTick: parsePositiveTick(3_840),
       canRedo: false,
       canUndo: true,
+      clips: options.clips ?? Object.freeze([]),
       isDirty: options.isDirty ?? false,
       projectId: 'workbench-shell-project',
       projectName: 'Midnight Study',
@@ -69,6 +97,7 @@ function mountShell(options: MountShellOptions = {}) {
     global: {
       plugins: [pinia],
       provide: {
+        [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
       },
     },
@@ -213,6 +242,41 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Instrument 1')
     expect(wrapper.get('.project-workbench__context-host').text()).toContain(
       'No MIDI clip selected',
+    )
+  })
+
+  it('projects the selected MIDI Clip into the open Context Editor', () => {
+    const selectedTrackId = parseTrackId('shell-clip-owner')
+    const selectedClipId = parseClipId('shell-selected-clip')
+    const wrapper = mountShell({
+      clips: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#8B5CF6'),
+          id: selectedClipId,
+          muted: false,
+          name: 'Midnight Keys',
+          spanTick: parsePositiveTick(3_840),
+          startTick: parseTick(0),
+          trackId: selectedTrackId,
+        }),
+      ]),
+      selectedClipId,
+      selectedTrackId,
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#8B5CF6'),
+          id: selectedTrackId,
+          kind: 'instrument',
+          name: 'Instrument 1',
+        }),
+      ]),
+    })
+
+    expect(wrapper.get('.project-workbench__inspector').text()).toContain('Clip inspector')
+    expect(wrapper.get('.project-workbench__inspector').text()).toContain('Midnight Keys')
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Midnight Keys')
+    expect(wrapper.get('.project-workbench__context-host').text()).toContain(
+      'ready for the Piano Roll editing slice',
     )
   })
 })

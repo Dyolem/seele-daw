@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { parseTick, type Tick, type TrackId } from '@seele-daw/project-core'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
-import { shallowRef, type StyleValue } from 'vue'
+import { computed, shallowRef, type StyleValue } from 'vue'
 
-import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
+import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
 import {
   PROJECT_ADD_TRACK_TYPE,
@@ -17,20 +20,45 @@ import {
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import UiToastRegion from '@/ui/components/UiToastRegion.vue'
-import {
-  UI_TOAST_TONE,
-  type UiToastMessage,
-} from '@/ui/components/ui-toast'
+import { UI_TOAST_TONE, type UiToastMessage } from '@/ui/components/ui-toast'
+import { useProjectClips } from '@/workbench/project/clip/vue/project-clip-context'
 import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
 
+const ARRANGEMENT_BAR_COUNT = 8
+const EMPTY_CLIPS: readonly ProjectMidiClipPresentation[] = Object.freeze([])
+
 const props = defineProps<{
+  readonly barSpanTick: Tick
+  readonly clips: readonly ProjectMidiClipPresentation[]
   readonly tracks: readonly ProjectTrackPresentation[]
 }>()
+const emit = defineEmits<{
+  openMidiClip: []
+}>()
 
+const { projectClips } = useProjectClips()
 const { projectTracks } = useProjectTracks()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const notification = shallowRef<UiToastMessage | null>(null)
 let notificationSequence = 0
+
+const timelineSpanTick = computed(() => props.barSpanTick * ARRANGEMENT_BAR_COUNT)
+const visibleClipsByTrack = computed(() => {
+  const clipsByTrack = new Map<TrackId, ProjectMidiClipPresentation[]>()
+
+  for (const clip of props.clips) {
+    if (clip.startTick >= timelineSpanTick.value) continue
+
+    const clips = clipsByTrack.get(clip.trackId)
+    if (clips === undefined) {
+      clipsByTrack.set(clip.trackId, [clip])
+    } else {
+      clips.push(clip)
+    }
+  }
+
+  return clipsByTrack
+})
 
 const UNAVAILABLE_TRACK_LABELS: Readonly<
   Record<Exclude<ProjectAddTrackType, 'instrument'>, string>
@@ -93,6 +121,40 @@ function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
 function selectTrack(track: ProjectTrackPresentation): void {
   workbenchSelection.selectTrack(track.id)
 }
+
+function clipsForTrack(trackId: TrackId): readonly ProjectMidiClipPresentation[] {
+  return visibleClipsByTrack.value.get(trackId) ?? EMPTY_CLIPS
+}
+
+function createBarStartTick(barIndex: number): Tick {
+  return parseTick(barIndex * props.barSpanTick)
+}
+
+function createEmptyMidiClip(
+  track: ProjectTrackPresentation,
+  barIndex: number,
+): void {
+  try {
+    const result = projectClips.addEmptyMidiClip({
+      targetTick: createBarStartTick(barIndex),
+      trackId: track.id,
+    })
+    workbenchSelection.selectClip(result.trackId, result.clipId)
+    emit('openMidiClip')
+  } catch (cause) {
+    showNotification(
+      UI_TOAST_TONE.DANGER,
+      'MIDI clip could not be added',
+      cause instanceof Error && cause.message.trim().length > 0
+        ? cause.message
+        : 'The Project rejected the Clip command. Please try again.',
+    )
+  }
+}
+
+function selectClip(clip: ProjectMidiClipPresentation): void {
+  workbenchSelection.selectClip(clip.trackId, clip.id)
+}
 </script>
 
 <template>
@@ -131,25 +193,25 @@ function selectTrack(track: ProjectTrackPresentation): void {
     <section class="project-workbench__arrangement" aria-label="Arrangement host">
       <header class="project-workbench__ruler">
         <ol aria-label="Timeline bars">
-          <li v-for="bar in 8" :key="bar">{{ bar }}</li>
+          <li v-for="bar in ARRANGEMENT_BAR_COUNT" :key="bar">{{ bar }}</li>
         </ol>
         <div class="project-workbench__arrangement-tools">
           <UiIconButton
             disabled
             :icon="GridIcon"
-            label="Grid settings — Arrangement is not available"
+            label="Grid settings — fixed bar grid is active"
             size="small"
           />
           <UiIconButton
             disabled
             :icon="ZoomOutIcon"
-            label="Zoom out — Arrangement is not available"
+            label="Zoom out — timeline zoom is in development"
             size="small"
           />
           <UiIconButton
             disabled
             :icon="ZoomInIcon"
-            label="Zoom in — Arrangement is not available"
+            label="Zoom in — timeline zoom is in development"
             size="small"
           />
         </div>
@@ -164,7 +226,7 @@ function selectTrack(track: ProjectTrackPresentation): void {
           <p>Add a Track to prepare the Arrangement surface.</p>
         </div>
         <div v-else class="project-workbench__arrangement-lanes">
-          <button
+          <div
             v-for="track in props.tracks"
             :key="track.id"
             class="project-workbench__arrangement-lane"
@@ -173,14 +235,35 @@ function selectTrack(track: ProjectTrackPresentation): void {
                 workbenchSelection.selectedTrackId === track.id,
             }"
             :style="createTrackStyle(track)"
-            type="button"
-            :aria-label="`Select ${track.name} lane`"
-            :aria-pressed="workbenchSelection.selectedTrackId === track.id"
-            @click="selectTrack(track)"
           >
-            <span aria-hidden="true"></span>
-            <p>Drop MIDI clips here</p>
-          </button>
+            <div class="project-workbench__lane-grid">
+              <button
+                v-for="bar in ARRANGEMENT_BAR_COUNT"
+                :key="bar"
+                type="button"
+                :aria-label="
+                  `Bar ${bar} on ${track.name}. Double-click or press Enter to add a MIDI clip.`
+                "
+                :aria-pressed="workbenchSelection.selectedTrackId === track.id"
+                @click="selectTrack(track)"
+                @dblclick="createEmptyMidiClip(track, bar - 1)"
+                @keydown.enter.prevent="createEmptyMidiClip(track, bar - 1)"
+              ></button>
+            </div>
+            <span class="project-workbench__lane-accent" aria-hidden="true"></span>
+            <p v-if="clipsForTrack(track.id).length === 0">
+              Double-click a bar to add a MIDI clip
+            </p>
+            <ProjectWorkbenchMidiClip
+              v-for="clip in clipsForTrack(track.id)"
+              :key="clip.id"
+              :clip="clip"
+              :selected="workbenchSelection.selectedClipId === clip.id"
+              :timeline-span-tick="timelineSpanTick"
+              @open="emit('openMidiClip')"
+              @select="selectClip(clip)"
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -345,17 +428,10 @@ function selectTrack(track: ProjectTrackPresentation): void {
 
 .project-workbench__arrangement-lane {
   position: relative;
-  display: grid;
   min-block-size: var(--project-workbench-track-row-height);
-  place-items: center;
   inline-size: 100%;
-  padding: 0;
-  border: 0;
   border-block-end: 1px solid var(--sd-color-border-subtle);
-  color: inherit;
   background: color-mix(in srgb, var(--project-track-color) 3%, transparent);
-  font: inherit;
-  cursor: pointer;
   transition:
     background var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
     box-shadow var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
@@ -371,13 +447,7 @@ function selectTrack(track: ProjectTrackPresentation): void {
     color-mix(in srgb, var(--project-track-color) 48%, transparent);
 }
 
-.project-workbench__arrangement-lane:focus-visible {
-  z-index: 1;
-  outline: 2px solid var(--sd-color-border-focus);
-  outline-offset: -2px;
-}
-
-.project-workbench__arrangement-lane > span {
+.project-workbench__lane-accent {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;
@@ -385,10 +455,40 @@ function selectTrack(track: ProjectTrackPresentation): void {
   background: color-mix(in srgb, var(--project-track-color) 72%, transparent);
 }
 
+.project-workbench__lane-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(5rem, 1fr));
+}
+
+.project-workbench__lane-grid button {
+  padding: 0;
+  border: 0;
+  border-inline-start: 1px solid transparent;
+  color: inherit;
+  background: transparent;
+  cursor: crosshair;
+}
+
+.project-workbench__lane-grid button:hover {
+  background: color-mix(in srgb, var(--project-track-color) 8%, transparent);
+}
+
+.project-workbench__lane-grid button:focus-visible {
+  outline: 2px solid var(--sd-color-border-focus);
+  outline-offset: -2px;
+}
+
 .project-workbench__arrangement-lane p {
+  position: absolute;
+  inset: 50% auto auto 50%;
   margin: 0;
   color: var(--sd-color-text-disabled);
   font-size: var(--sd-font-size-xs);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 
 .project-workbench__surface-empty {

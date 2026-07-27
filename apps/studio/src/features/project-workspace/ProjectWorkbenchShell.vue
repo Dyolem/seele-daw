@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { Tick } from '@seele-daw/project-core'
 import OptionsIcon from '~icons/fluent/options-20-regular'
 import { shallowRef } from 'vue'
 
+import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
@@ -12,8 +14,10 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import type { ActiveProjectSaveStatus } from '@/workbench/project/active-project-state'
 
 interface ProjectWorkbenchShellProps {
+  readonly barSpanTick: Tick
   readonly canRedo: boolean
   readonly canUndo: boolean
+  readonly clips: readonly ProjectMidiClipPresentation[]
   readonly isDirty: boolean
   readonly projectId: string
   readonly projectName: string
@@ -77,6 +81,8 @@ function openContextEditor(): void {
 
       <ProjectWorkbenchWorkspace
         ref="workspace"
+        :bar-span-tick="props.barSpanTick"
+        :clips="props.clips"
         :tracks="props.tracks"
         @context-editor-open-change="isContextEditorOpen = $event"
       />

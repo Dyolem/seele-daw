@@ -1,5 +1,6 @@
 import {
   createInitialProjectSession,
+  parseClipId,
   parseProjectId,
   parseTempoEventId,
   parseTick,
@@ -31,7 +32,14 @@ import {
   type ActiveProjectState,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
+import {
+  createProjectClipCoordinator,
+  type ProjectClipCoordinator,
+} from '@/workbench/project/clip/project-clip-coordinator'
+import {
+  PROJECT_CLIP_CONTEXT_KEY,
+  type ProjectClipVueContext,
+} from '@/workbench/project/clip/vue/project-clip-context'
 import {
   PROJECT_ENTRY_FAILURE_OPERATION,
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -138,6 +146,15 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   const pinia = createPinia()
   await router.push(createProjectWorkspaceLocation(projectId))
   await router.isReady()
+  const projectClips: ProjectClipCoordinator = Object.freeze({
+    addEmptyMidiClip: vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) =>
+      Object.freeze({
+        clipId: parseClipId('workspace-page-created-clip'),
+        commit: Object.freeze({}) as ProjectCommit,
+        trackId: input.trackId,
+      }),
+    ),
+  })
   const projectTracks: ProjectTrackCoordinator = Object.freeze({
     addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
       () =>
@@ -147,6 +164,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
         }),
     ),
   })
+  const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
   const wrapper = mount(ProjectWorkspacePage, {
     props: { projectId },
@@ -154,6 +172,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
       plugins: [pinia, router],
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
+        [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
       },

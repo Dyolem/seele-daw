@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import {
+  PROJECT_PPQ,
+  ZERO_TICK,
+  parsePositiveTick,
+  parseProjectId,
+  type ProjectId,
+  type Tick,
+} from '@seele-daw/project-core'
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
+import { createProjectMidiClipPresentations } from '@/features/project-workspace/project-clip-presentation'
 import {
   useProjectWorkbenchSelectionStore,
   type ProjectWorkbenchClipSelectionCandidate,
@@ -12,6 +20,7 @@ import { createProjectTrackPresentations } from '@/features/project-workspace/pr
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
+import { createProjectClipBarRange } from '@/workbench/project/clip/project-clip-bar-range'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   type FailedProjectEntryResolution,
@@ -24,6 +33,7 @@ const props = defineProps<{
 }>()
 
 interface ProjectPresentation {
+  readonly barSpanTick: Tick
   readonly projectId: ProjectId | null
   readonly projectName: string
   readonly tempo: number
@@ -39,6 +49,7 @@ const requestedProjectId = shallowRef<ProjectId | null>(null)
 const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
 const projectPresentation = shallowRef<ProjectPresentation>({
+  barSpanTick: parsePositiveTick(PROJECT_PPQ * 4),
   projectId: null,
   projectName: 'Untitled Project',
   tempo: 120,
@@ -60,13 +71,14 @@ const trackPresentations = computed(() => {
   const snapshot = projectSnapshot.value
   return snapshot === null ? Object.freeze([]) : createProjectTrackPresentations(snapshot)
 })
+const clipPresentations = computed(() => {
+  const snapshot = projectSnapshot.value
+  return snapshot === null ? Object.freeze([]) : createProjectMidiClipPresentations(snapshot)
+})
 const clipSelectionCandidates = computed(
   (): readonly ProjectWorkbenchClipSelectionCandidate[] => {
-    const snapshot = projectSnapshot.value
-    if (snapshot === null) return Object.freeze([])
-
     return Object.freeze(
-      snapshot.clips.map((clip) =>
+      clipPresentations.value.map((clip) =>
         Object.freeze({ clipId: clip.id, trackId: clip.trackId }),
       ),
     )
@@ -159,6 +171,7 @@ watch(
     const ready = readyProject.value
     if (projectId === null || ready === null) {
       projectPresentation.value = {
+        barSpanTick: parsePositiveTick(PROJECT_PPQ * 4),
         projectId: null,
         projectName: 'Untitled Project',
         tempo: 120,
@@ -172,6 +185,7 @@ watch(
     const tempo = snapshot.tempoEvents[0]
     const timeSignature = snapshot.timeSignatureEvents[0]
     projectPresentation.value = {
+      barSpanTick: createProjectClipBarRange(snapshot, ZERO_TICK).spanTick,
       projectId,
       projectName: snapshot.project.name,
       tempo: tempo?.bpm ?? 120,
@@ -211,8 +225,10 @@ onUnmounted(() => {
 <template>
   <ProjectWorkbenchShell
     v-if="readyProject"
+    :bar-span-tick="projectPresentation.barSpanTick"
     :can-redo="readyProject.session.canRedo"
     :can-undo="readyProject.session.canUndo"
+    :clips="clipPresentations"
     :is-dirty="readyProject.isDirty"
     :project-id="readyProject.projectId"
     :project-name="projectPresentation.projectName"

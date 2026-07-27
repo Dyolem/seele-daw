@@ -1,4 +1,5 @@
 import {
+  parseClipId,
   parseProjectId,
   parseTrackId,
   type ProjectCommit,
@@ -20,6 +21,11 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
+import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
+import {
+  PROJECT_CLIP_CONTEXT_KEY,
+  type ProjectClipVueContext,
+} from '@/workbench/project/clip/vue/project-clip-context'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   PROJECT_ENTRY_SELECTION_REASON,
@@ -104,6 +110,20 @@ function createProjectTrackContext(): ProjectTrackVueContext {
   })
 }
 
+function createProjectClipContext(): ProjectClipVueContext {
+  return Object.freeze({
+    projectClips: Object.freeze({
+      addEmptyMidiClip: vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) =>
+        Object.freeze({
+          clipId: parseClipId('app-created-clip'),
+          commit: Object.freeze({}) as ProjectCommit,
+          trackId: input.trackId,
+        }),
+      ),
+    }),
+  })
+}
+
 async function mountApp(state: ActiveProjectState, projectId: ProjectId | null = null) {
   const router = createStudioRouter(createMemoryHistory())
   await router.push(
@@ -118,6 +138,7 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
       plugins: [createPinia(), router],
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(state),
+        [PROJECT_CLIP_CONTEXT_KEY as symbol]: createProjectClipContext(),
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
           createProjectNavigationDecisionContext(),

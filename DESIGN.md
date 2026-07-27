@@ -3,7 +3,7 @@
 > Status: Normative Draft  
 > Scope: Seele Studio editor and workbench  
 > Default theme: Piano Black  
-> Last updated: 2026-07-23
+> Last updated: 2026-07-27
 
 本文档定义 Seele Studio 编辑器的产品界面、交互模型与视觉语言。它是产品设计、前端实现、Canvas 渲染、主题开发和设计评审共同遵循的基线。
 
@@ -894,6 +894,11 @@ SHOULD 使用 Canvas 的区域：
 
 Canvas 不是绕开可访问性和状态边界的理由。DOM 与 Canvas 必须读取同一 Editor state 和 Project Query，不得各自维护业务副本。
 
+首个固定 8 小节、少量 Clip、尚无 Zoom / Scroll / Drag / Playhead 的 Arrangement
+纵向切片 MAY 使用 DOM，以先验证真实创建、选择、打开和可访问交互。引入可变 Zoom、横向
+Scroll、大量 Clip、高频播放图层或拖动预览前，必须以性能数据和交互需求重新评估 Canvas /
+分层渲染；渲染技术迁移不得改变 Project Command、Presentation 与 Selection 的权威边界。
+
 ### 21.2 禁止项
 
 生产 Feature 组件不得：
@@ -980,6 +985,7 @@ Canvas 功能至少检查：
 8. 主题改变视觉表达，不改变布局、功能和交互语义。
 9. Theme、Density、UI Scale、Contrast、Motion 是独立设置。
 10. Workbench Shell 只提供编辑器骨架；真正的 Arrangement、Piano Roll 等业务界面按产品切片规划实现。
+11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM；进入 Zoom、Scroll、大量对象或高频交互前重新评估 Canvas。
 
 ## 24. 待后续切片决定
 

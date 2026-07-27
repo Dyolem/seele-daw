@@ -4,6 +4,8 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
+> 最近更新：2026-07-27，功能代码截至 `99d9001`
+>
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
 本文档记录 Seele DAW **现在能够做什么、用户如何操作、产品必须保持哪些行为，以及哪些界面仍只是占位**。它是功能开发、验收和回归测试的共同依据。
@@ -29,12 +31,13 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 
 1. 在 Project Entry 新建空项目，或打开最近保存的项目。
 2. 在 Workbench 创建 Instrument Track。
-3. 选择 Track，通过 Undo / Redo 撤销或恢复创建操作。
-4. 显式保存项目。
-5. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
-6. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
+3. 在 Instrument Track 的目标小节创建、选择并打开空 MIDI Clip。
+4. 通过 Undo / Redo 撤销或恢复 Track 与 MIDI Clip 创建操作。
+5. 显式保存项目。
+6. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
+7. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
-当前闭环还不包含 MIDI Clip、Piano Roll、音源、音频输出或播放。
+当前闭环还不包含 Piano Roll Note 编辑、音源、音频输出或播放。
 
 ### 2.1 功能总览
 
@@ -44,13 +47,13 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `PROJECT-LIFECYCLE` | 当前项目生命周期 | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。 |
 | `PROJECT-NAVIGATION` | dirty 导航确认 | **用户可用** | 应用内导航支持 Save / Discard / Cancel。 |
 | `WORKBENCH-SHELL` | DAW 工作台外壳 | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。 |
-| `PROJECT-HISTORY` | Undo / Redo | **用户可用** | 当前可撤销、重做 Instrument Track 创建。 |
+| `PROJECT-HISTORY` | Undo / Redo | **用户可用** | 当前可撤销、重做 Instrument Track 与空 MIDI Clip 创建。 |
 | `TRACK-CREATE` | 创建 Instrument Track | **用户可用** | 只创建空的 Instrument Slot Track。 |
 | `TRACK-SELECTION` | Track 选择 | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。 |
-| `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **内部就绪** | Core Command、Studio Coordinator 与 Clip Selection 已实现，等待 Arrangement UI 接入。 |
-| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局；MIDI Editor 内容仍为空状态。 |
+| `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。 |
+| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局并显示所选 Clip；Piano Roll 仍为空状态。 |
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
-| `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | Core Command 已实现，尚无 Clip 与 Piano Roll 产品入口。 |
+| `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | 已有空 MIDI Clip 入口，尚无 Piano Roll Note 编辑入口。 |
 | `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
 | `PIANO-ROLL` | 钢琴卷帘编辑器 | **尚未实现** | Dock 只是未来编辑器宿主。 |
 
@@ -195,7 +198,7 @@ Workbench 已建立真实项目状态驱动的布局：
 - 执行 Command 后可以 Undo；Undo 后可以 Redo。
 - 执行新的分叉 Command 会使旧 Redo 分支失效。
 - History 是 Session 本地状态，不保存到 Snapshot、Project File、Checkpoint 或 IndexedDB。
-- 当前 Studio 中可直接产生的历史操作只有 Instrument Track 创建；MIDI Note Command 尚无产品 UI。
+- 当前 Studio 中可直接产生的历史操作包括 Instrument Track 与空 MIDI Clip 创建；MIDI Note Command 尚无产品 UI。
 
 ### 5.3 `CONTEXT-EDITOR-DOCK` 编辑器 Dock
 
@@ -209,11 +212,13 @@ Dock 已支持：
 - 最大化到 Workbench 允许的 Dock 高度，再恢复之前高度。
 - 在 Workbench Workspace 内全屏显示，再恢复之前高度。
 - 根据当前 Track Selection 显示 Track 名称与类型。
+- 根据当前 Clip Selection 显示 Clip 名称与所属 Track，并在创建或双击 Clip 时重新打开 Dock。
 
-Dock 当前只显示：
+Dock 当前只显示上下文状态：
 
 - 未选择 Track 时的选择提示。
 - 已选择 Track、但没有 MIDI Clip 时的空状态。
+- 已选择 MIDI Clip 时的 Clip 摘要与 Piano Roll 待实现提示。
 
 它还不是 Piano Roll，也没有 Note 渲染、命中检测、工具、缩放、滚动或手势操作。
 
@@ -264,11 +269,12 @@ Dock 当前只显示：
 
 ### 6.2 `MIDI-CLIP-CREATE` 创建空 MIDI Clip
 
-**内部就绪，Arrangement UI 尚未接入**
+**用户可用**
 
-下一条编辑纵向切片是在 Instrument Track 的 Arrangement Lane 中创建空 MIDI Clip：
+在 Instrument Track 的 Arrangement Lane 中创建空 MIDI Clip：
 
-- 双击 Lane 的空白小节创建 MIDI Clip。
+- Arrangement 当前展示固定 8 小节，按项目起始拍号计算小节宽度。
+- 双击 Lane 的目标空白小节创建 MIDI Clip；键盘用户聚焦小节后按 Enter 执行同一动作。
 - Clip 起点吸附到双击位置所在小节的开头。
 - 默认长度为一个小节；当前阶段按项目起始拍号计算小节长度。
 - Clip 初始名称复制 Track 当前名称，但之后是独立 Project Fact，Track 改名不会隐式更新 Clip 名称。
@@ -277,18 +283,26 @@ Dock 当前只显示：
 - 同一事务创建等长的空 MidiSource 和空 Note Partition。
 - 每个 MidiClip 独占一个 MidiSource；不能产生孤立 Source 或共享 Source。
 - 创建成功后自动选择新 Clip，并保持其所属 Track 为当前 Track。
-- 双击已有 Clip 只选择并打开它，不创建重叠 Clip。
+- 双击已有 Clip，或聚焦 Clip 后按 Enter，只选择并打开它，不创建重叠 Clip。
 - 数据模型继续允许 MIDI Clip 重叠；本次只限制默认创建手势，避免误操作。
 - 创建行为必须进入 dirty、Undo / Redo、Checkpoint 和 Project File。
 - 创建失败不能留下部分 Clip 图，并应在 Studio 显示错误 Toast。
 
-Project Core 已建立 Add MIDI Clip Command、完整所有权图 MutationPlan、聚合 Delta、Undo / Redo 与 QueryIndex Partition 语义。Studio 已建立起始拍号小节吸附、产品默认值协调、身份分配、Composition Context 与 Clip Selection。完成 Arrangement 双击创建、Clip 视觉、已有 Clip 选择和错误 Toast 后，才把本功能标为“用户可用”。
+Project Core 已建立 Add MIDI Clip Command、完整所有权图 MutationPlan、聚合 Delta、Undo / Redo 与 QueryIndex Partition 语义。Studio 已接通起始拍号小节吸附、产品默认值协调、身份分配、Composition Context、Clip Selection、Arrangement 双击创建、Clip 视觉和错误 Toast，已形成用户可用闭环。
+
+当前 Arrangement Clip 视觉遵循 Piano Black：
+
+- Clip 使用 Track 色的低明度背景与明确标题；
+- Hover、Selected 和键盘 Focus 使用独立边界，Track 色不是唯一状态信号；
+- Muted 同时降低饱和度并显示文字语义；
+- Clip 超出当前固定 8 小节视窗的部分会被裁切，完全位于右侧的 Clip 暂不显示；
+- 当前以 DOM 提供可访问按钮与原生命中检测；可变 Zoom、Scroll、大量 Clip 或高频交互进入前必须重新评估 Canvas。
 
 ### 6.3 `TRACK-SELECTION` Track 选择
 
 **用户可用**
 
-- 点击 Track Header 或对应 Arrangement Lane 会选择该 Track。
+- 点击 Track Header 或对应 Arrangement Lane 小节会选择该 Track。
 - Track Header 与 Lane 共享选中高亮。
 - Track Inspector 和 MIDI Editor Dock 显示所选 Track 的名称和类型。
 - 新建 Instrument Track 后自动选择它。
@@ -349,7 +363,8 @@ Project Core 已实现：
 - Project Query、Query Index 和 Commit Subscription。
 - Immutable Snapshot。
 
-这些能力需要一个已经存在的 MIDI Clip 与 MIDI Source。当前 Studio 不能创建 MIDI Clip，因此用户还不能通过 UI 使用 Note Command。
+这些能力需要一个已经存在的 MIDI Clip 与 MIDI Source。当前 Studio 已能创建空 MIDI Clip，
+但还没有 Piano Roll 或其他 Note 编辑入口，因此用户仍不能通过 UI 使用 Note Command。
 
 ### 8.2 Project File 与 Checkpoint
 
@@ -369,7 +384,7 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track、空 MIDI Clip 应用协调与 Track / Clip Selection。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track、Arrangement 空 MIDI Clip 创建与 Track / Clip Selection。 |
 | `@seele-daw/editor` | 只有包边界与入口骨架，未提供 Piano Roll 或 Arrangement 编辑能力。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
@@ -381,7 +396,7 @@ Project Core 已具备：
 
 ### 编辑与编排
 
-- MIDI Clip 创建、选择、移动、复制、调整长度、拆分或删除。
+- MIDI Clip 移动、复制、调整长度、拆分、删除或多选；当前只支持创建、单选与打开上下文。
 - Piano Roll Note 渲染、选择、增加、移动、删除、调整长度或力度。
 - Arrangement 时间轴滚动、缩放、Grid 和 Snap。
 - Editor Tool、Drag Preview、框选、多选与键盘编辑。
@@ -461,16 +476,17 @@ Project Core 已具备：
 | 2026-07-27 | 文档基线 | 首次汇总当前产品功能、内部能力、限制与持续维护规则。 | `f2abf53` |
 | 2026-07-27 | `MIDI-CLIP-CREATE` | 确认创建交互与默认事实；Project Core 完成空 Clip 所有权图 Command、Delta、History 和 QueryIndex 语义。 | `6e6f6bb` |
 | 2026-07-27 | `MIDI-CLIP-CREATE` | Studio 完成小节吸附、产品默认值协调、Composition Context 与 Clip Selection。 | `2f43690` |
+| 2026-07-27 | `MIDI-CLIP-CREATE`、`CONTEXT-EDITOR-DOCK` | Arrangement 接入空 Clip 创建、视觉、选择、打开和错误反馈；Dock 显示 Clip 上下文。 | `99d9001` |
 
 ## 13. 当前验证基线
 
-功能代码截至 `2f43690` 已通过：
+功能代码截至 `99d9001` 已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- Studio：29 个测试文件，153 项测试。
+- Studio：30 个测试文件，160 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

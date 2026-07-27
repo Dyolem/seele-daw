@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-27，功能代码截至 `15edc39`
+> 最近更新：2026-07-27，功能代码截至 `f3778f0`
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -32,10 +32,11 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 1. 在 Project Entry 新建空项目，或打开最近保存的项目。
 2. 在 Workbench 创建 Instrument Track。
 3. 在 Instrument Track 的目标小节创建、选择并打开空 MIDI Clip。
-4. 通过 Undo / Redo 撤销或恢复 Track 与 MIDI Clip 创建操作。
-5. 显式保存项目。
-6. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
-7. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
+4. 在 Context Editor Dock 查看该 Clip 的只读 Piano Roll。
+5. 通过 Undo / Redo 撤销或恢复 Track 与 MIDI Clip 创建操作。
+6. 显式保存项目。
+7. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
+8. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
 当前闭环还不包含 Piano Roll Note 编辑、音源、音频输出或播放。
 
@@ -51,11 +52,11 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `TRACK-CREATE` | 创建 Instrument Track | **用户可用** | 只创建空的 Instrument Slot Track。 |
 | `TRACK-SELECTION` | Track 选择 | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。 |
 | `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。 |
-| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局并显示所选 Clip；Piano Roll 仍为空状态。 |
+| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局并显示所选 Clip 的只读 Piano Roll。 |
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
 | `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | 已有空 MIDI Clip 入口，尚无 Piano Roll Note 编辑入口。 |
 | `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
-| `PIANO-ROLL` | 钢琴卷帘编辑器 | **内部就绪** | Common Clip / Viewport / Note Read Model 已实现；尚无可见 Renderer。 |
+| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | 可见只读 Grid / Note Renderer；Tool 与 Note 编辑尚未接入。 |
 
 ## 3. 项目入口与生命周期
 
@@ -347,7 +348,7 @@ Vue 状态选择的完整规则见
 
 Toast 支持信息、成功、警告和危险语义，可自动关闭、手动关闭、使用 `F8` 聚焦通知区，并支持 Swipe dismiss。
 
-## 8. 已就绪但尚未接入 UI 的能力
+## 8. MIDI Note 与 Piano Roll 能力
 
 ### 8.1 `MIDI-NOTE-CORE`
 
@@ -366,9 +367,9 @@ Project Core 已实现：
 这些能力需要一个已经存在的 MIDI Clip 与 MIDI Source。当前 Studio 已能创建空 MIDI Clip，
 但还没有 Piano Roll 或其他 Note 编辑入口，因此用户仍不能通过 UI 使用 Note Command。
 
-### 8.2 `PIANO-ROLL` Common Foundation
+### 8.2 `PIANO-ROLL` 只读 Surface
 
-**内部就绪**
+**局部可用**
 
 `@seele-daw/editor/common` 已提供：
 
@@ -379,12 +380,22 @@ Project Core 已实现：
 - 基于 Project Query 与局部 Subscription 的可见 Note Read Model；
 - Commit 后重新 Query、Viewport 替换、Observer 隔离和 dispose 生命周期。
 
+`@seele-daw/editor/browser` 与 Studio 已提供：
+
+- DPR-aware Canvas Pitch / Grid Renderer；
+- Renderer-neutral Note Scene、当前 keyed DOM Note Renderer 与可替换 Canvas Adapter；
+- 小节、拍、1/16 细分三级网格，以及密集级别抑制；
+- DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note 摘要；
+- Clip / Track Color Note 和 muted 视觉；
+- Docked、Minimized、Maximized 与 Workspace Fullscreen 布局复用；
+- 选中 Clip、Project Query/Subscription、Design Tokens 与 Renderer 的显式组合。
+
 当前明确限制：
 
 - 不支持 looped Clip，不能把循环实例错误显示成非循环 Source；
-- 没有 Canvas / DOM Renderer、Hit Test、Selection、Tool 或 Note Command Port；
-- Studio Dock 尚未消费该 Common 模块；
-- 它是后续可见 Piano Roll 的内部基础，不代表用户已经能够编辑 Note。
+- 仍没有 Hit Test、Selection、Tool 或 Note Command Port；
+- 首批视图固定显示完整 Clip 和 MIDI 48–72，尚无 Zoom / Scroll；
+- 用户可以看到真实网格和已有 Note，但还不能通过 UI 创建或编辑 Note。
 
 ### 8.3 Project File 与 Checkpoint
 
@@ -404,8 +415,8 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track、Arrangement 空 MIDI Clip 创建与 Track / Clip Selection。 |
-| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / 可见 Note Read Model；Browser Renderer 与编辑手势尚未实现。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection 与只读 Piano Roll。 |
+| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Canvas Grid 与 DOM / Canvas Note Adapter；编辑手势尚未实现。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
 | `@seele-daw/type-utils` | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。 |
@@ -417,7 +428,7 @@ Project Core 已具备：
 ### 编辑与编排
 
 - MIDI Clip 移动、复制、调整长度、拆分、删除或多选；当前只支持创建、单选与打开上下文。
-- Piano Roll Note 渲染、选择、增加、移动、删除、调整长度或力度。
+- Piano Roll Note 选择、增加、移动、删除、调整长度或力度；当前只读渲染已接入。
 - Arrangement 时间轴滚动、缩放、Grid 和 Snap。
 - Editor Tool、Drag Preview、框选、多选与键盘编辑。
 - Track 重命名、改色、删除、复制、重排。
@@ -498,17 +509,19 @@ Project Core 已具备：
 | 2026-07-27 | `MIDI-CLIP-CREATE` | Studio 完成小节吸附、产品默认值协调、Composition Context 与 Clip Selection。 | `2f43690` |
 | 2026-07-27 | `MIDI-CLIP-CREATE`、`CONTEXT-EDITOR-DOCK` | Arrangement 接入空 Clip 创建、视觉、选择、打开和错误反馈；Dock 显示 Clip 上下文。 | `99d9001` |
 | 2026-07-27 | `PIANO-ROLL` | Editor Common 完成非循环 Clip Context、Viewport 坐标与 Query/Subscription Note Read Model。 | `15edc39` |
+| 2026-07-27 | `PIANO-ROLL` | Editor Browser 完成 Canvas Grid、Note Scene 与 DOM / Canvas Adapter。 | `b888a78` |
+| 2026-07-27 | `PIANO-ROLL`、`CONTEXT-EDITOR-DOCK` | Studio Dock 默认接入 keyed DOM Note 与真实 Project Query / Subscription。 | `f3778f0` |
 
 ## 13. 当前验证基线
 
-功能代码截至 `15edc39` 已通过：
+功能代码截至 `f3778f0` 已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：1 个测试文件，11 项测试。
-- Studio：30 个测试文件，160 项测试。
+- editor：2 个测试文件，20 项测试。
+- Studio：32 个测试文件，163 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

@@ -362,6 +362,15 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 默认工具为 Select，Pencil 模式单击空白网格创建 Note；
 - 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1。
 
+当前只读 Renderer 切片：
+
+- DOM 承载标尺、MIDI 48–72 钢琴键盘、焦点和可访问摘要；
+- 静态 Pitch / Grid 使用 Canvas；首批可见 Note 使用 keyed DOM；
+- Canvas bitmap 按设备像素比配置，DOM / Canvas Note Adapter 共享 CSS Pixel Scene；
+- Renderer 主题颜色只能来自宿主解析后的 Editor Rendering Tokens 与 Track Color；
+- Grid 级别密度小于可辨识 CSS Pixel 时可以省略，避免生成不可见的高频线；
+- Read Model、Renderer 和 ResizeObserver 必须随 Clip / Surface 生命周期释放。
+
 后续再引入力度编辑、Resize、Split、复制、Humanize、Quantize、Scale Assist 等能力；其产品边界必须在对应 Command 前讨论。
 
 视觉与操作规则：
@@ -994,9 +1003,10 @@ Canvas 功能至少检查：
 9. Theme、Density、UI Scale、Contrast、Motion 是独立设置。
 10. Workbench Shell 只提供编辑器骨架；真正的 Arrangement、Piano Roll 等业务界面按产品切片规划实现。
 11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM；进入 Zoom、Scroll、大量对象或高频交互前重新评估 Canvas。
-12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，网格与 Note 使用 Canvas。
+12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，Grid 使用 Canvas，Note 通过可替换 Renderer Port 输出。
 13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，横向初始显示完整 Clip。
 14. Piano Roll 初始 Grid 为 1/16；默认 Select，Pencil 单击创建长度为一格、Velocity 100、UI Channel 1 的 Note。
+15. Piano Roll 首批使用 DPR-aware Canvas Grid 与 keyed DOM Note；Canvas Note Adapter 消费同一 Scene，是否切换由真实基准决定。
 
 ## 24. 待后续切片决定
 

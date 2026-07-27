@@ -3,7 +3,8 @@
 `editor` 负责把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑会话状态，但不拥有 Track、Clip、Note 等项目事实。
 
 > 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model；
-> `browser` 仍只有公开入口骨架。
+> `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
+> Note Renderer，编辑手势尚未实现。
 
 ## 包定位
 
@@ -32,7 +33,7 @@ DOM / Pointer / Keyboard / MIDI
 | Preview       | Drag ghost、box selection、snap result，不写 ProjectModel             |
 | 命令解析      | 根据上下文把 EditorIntent 转成完整 ProjectCommand                     |
 | Read Model    | 面向可见范围的稳定查询结果，不复制完整项目                            |
-| Renderer      | Canvas 2D 分层、Display List、空间索引、dirty region、frame scheduler |
+| Renderer      | DOM / Canvas Adapter、Scene、空间索引、dirty region、frame scheduler |
 
 ## 状态所有权
 
@@ -58,8 +59,8 @@ src/
 │   ├── snap/         吸附候选和策略
 │   └── read-models/  面向编辑器的查询适配
 ├── browser/
-│   ├── input/        DOM 事件与 pointer capture
-│   └── renderer/     Canvas、viewport、hit test 与图层缓存
+│   ├── piano-roll/   已实现的 Canvas Grid、Note Scene 与 DOM / Canvas Adapter
+│   └── input/        未来的 DOM 事件与 pointer capture
 └── index.ts          唯一公开入口
 ```
 
@@ -93,6 +94,25 @@ src/
 完整边界见
 [Piano Roll Common Foundation 实施计划](./docs/piano-roll-common-foundation-plan.md)。
 
+## 已实现：Piano Roll Browser Renderer
+
+`browser/piano-roll` 在不依赖 Vue 的边界内公开提供：
+
+- 静态 Pitch / Grid 使用 Canvas，bitmap 按 `devicePixelRatio` 放大；
+- `PianoRollNoteScene` 统一投影可见 Note 的 CSS Pixel 几何；
+- keyed DOM Note Renderer 是 Studio 当前默认，不创建每 Note Vue Component；
+- Canvas Note Renderer 消费同一 Scene，作为可替换实现与性能基准；
+- 小节、拍、细分网格分级绘制，密度小于可辨识 CSS Pixel 时停止绘制该级；
+- 黑白键音高行、Track Color Note、Muted 内容透明度；
+- 由宿主传入的冻结主题快照，不在 Renderer 内读取 Studio CSS 或 `themeId`；
+- 显式 `clear` / `dispose` 生命周期和缺失 2D Context、无效 Grid / Theme 错误。
+
+Renderer 只消费 Common Viewport 与 Note Read Model，既不读取 ProjectSession，也不生成
+ProjectCommand。Studio 负责把选中 Clip、Project Query、主题令牌与所选 Adapter 组合起来。
+完整边界见
+[Piano Roll Browser Renderer 实施计划](./docs/piano-roll-browser-renderer-plan.md)与
+[Piano Roll Note Renderer 决策](./docs/piano-roll-note-renderer-decision.md)。
+
 ## 依赖边界
 
 - 只依赖 [`@seele-daw/project-core`](../project-core/README.md) 的公开 API。
@@ -106,7 +126,8 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 ## 分阶段计划
 
 1. **已完成**：Piano Roll Clip Context、Viewport、坐标链与可见范围 Read Model。
-2. 增加 Browser Canvas 分层 Renderer，并由 Studio 组合当前 Clip。
+2. **已完成**：Browser Canvas Grid、Note Scene 和 DOM / Canvas Note Adapter，并由
+   Studio 只读组合当前 Clip。
 3. 建立最小 EditorSession、Select / Pencil Tool、Note Selection 与统一 Browser Input。
 4. 实现 Add / Move / Remove Note 的单次提交手势；Resize 先补充产品与 Core Command。
 5. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。

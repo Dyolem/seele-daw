@@ -232,6 +232,9 @@ Vue 或 Pinia MAY 保存轻量、可重建的 UI 状态。它们 MUST NOT 接管
 - pending Promise resolver；
 - 大型 Project Model 或音频运行时对象。
 
+Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context 的具体选择规则，
+见 [Studio Vue 状态与依赖组合准则](./apps/studio/docs/vue-state-composition-guidelines.md)。
+
 ## 7. 核心 UX 操作
 
 ### 7.1 新建、打开与保存

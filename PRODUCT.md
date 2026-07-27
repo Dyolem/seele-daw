@@ -47,7 +47,7 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `PROJECT-HISTORY` | Undo / Redo | **用户可用** | 当前可撤销、重做 Instrument Track 创建。 |
 | `TRACK-CREATE` | 创建 Instrument Track | **用户可用** | 只创建空的 Instrument Slot Track。 |
 | `TRACK-SELECTION` | Track 选择 | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。 |
-| `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **内部就绪** | Core Command 已实现，等待 Studio Coordinator、Selection 与 UI 接入。 |
+| `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **内部就绪** | Core Command、Studio Coordinator 与 Clip Selection 已实现，等待 Arrangement UI 接入。 |
 | `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局；MIDI Editor 内容仍为空状态。 |
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
 | `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | Core Command 已实现，尚无 Clip 与 Piano Roll 产品入口。 |
@@ -264,7 +264,7 @@ Dock 当前只显示：
 
 ### 6.2 `MIDI-CLIP-CREATE` 创建空 MIDI Clip
 
-**内部就绪，Studio 尚未接入**
+**内部就绪，Arrangement UI 尚未接入**
 
 下一条编辑纵向切片是在 Instrument Track 的 Arrangement Lane 中创建空 MIDI Clip：
 
@@ -282,7 +282,7 @@ Dock 当前只显示：
 - 创建行为必须进入 dirty、Undo / Redo、Checkpoint 和 Project File。
 - 创建失败不能留下部分 Clip 图，并应在 Studio 显示错误 Toast。
 
-Project Core 已建立 Add MIDI Clip Command、完整所有权图 MutationPlan、聚合 Delta、Undo / Redo 与 QueryIndex Partition 语义。完成 Studio Coordinator、Selection 和 Arrangement UI 后，才把本功能标为“用户可用”。
+Project Core 已建立 Add MIDI Clip Command、完整所有权图 MutationPlan、聚合 Delta、Undo / Redo 与 QueryIndex Partition 语义。Studio 已建立起始拍号小节吸附、产品默认值协调、身份分配、Composition Context 与 Clip Selection。完成 Arrangement 双击创建、Clip 视觉、已有 Clip 选择和错误 Toast 后，才把本功能标为“用户可用”。
 
 ### 6.3 `TRACK-SELECTION` Track 选择
 
@@ -298,7 +298,9 @@ Project Core 已建立 Add MIDI Clip Command、完整所有权图 MutationPlan�
 
 Selection 是轻量、可重建的 Workbench UI 状态：
 
-- 只保存当前 Project ID 与 `selectedTrackId`。
+- 只保存当前 Project ID、`selectedTrackId` 与 `selectedClipId`。
+- 选择 Clip 会同时选择其所属 Track；直接选择 Track 会退出 Clip Selection。
+- Clip 被撤销或移除时清除 Clip 身份，并尽可能保留仍存在的所属 Track。
 - 不属于 Project Fact，不使项目变 dirty。
 - 不进入 Undo / Redo、Snapshot、Project File、Checkpoint 或 IndexedDB。
 - Project Track 的名称、颜色、类型等事实始终从当前 Session Snapshot 派生，不复制到 Pinia。
@@ -367,7 +369,7 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track 与 Track Selection。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track、空 MIDI Clip 应用协调与 Track / Clip Selection。 |
 | `@seele-daw/editor` | 只有包边界与入口骨架，未提供 Piano Roll 或 Arrangement 编辑能力。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
@@ -458,16 +460,17 @@ Project Core 已具备：
 | 2026-07-27 | `TRACK-SELECTION` | 完成项目作用域 Track Selection、新建自动选择及 Workbench 联动。 | `ea1f7f5` |
 | 2026-07-27 | 文档基线 | 首次汇总当前产品功能、内部能力、限制与持续维护规则。 | `f2abf53` |
 | 2026-07-27 | `MIDI-CLIP-CREATE` | 确认创建交互与默认事实；Project Core 完成空 Clip 所有权图 Command、Delta、History 和 QueryIndex 语义。 | `6e6f6bb` |
+| 2026-07-27 | `MIDI-CLIP-CREATE` | Studio 完成小节吸附、产品默认值协调、Composition Context 与 Clip Selection。 | `2f43690` |
 
 ## 13. 当前验证基线
 
-功能代码截至 `ea1f7f5` 已通过：
+功能代码截至 `2f43690` 已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- Studio：26 个测试文件，136 项测试。
+- Studio：29 个测试文件，153 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

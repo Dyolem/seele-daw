@@ -1,0 +1,449 @@
+# Seele DAW 产品功能手册
+
+> 状态：当前产品行为的权威记录
+>
+> 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
+>
+> 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
+
+本文档记录 Seele DAW **现在能够做什么、用户如何操作、产品必须保持哪些行为，以及哪些界面仍只是占位**。它是功能开发、验收和回归测试的共同依据。
+
+视觉语言由 [DESIGN.md](DESIGN.md) 约束；代码分层与依赖方向由架构文档约束。实现计划只解释某一阶段如何落地，不替代本文档描述的当前产品事实。
+
+## 1. 文档状态约定
+
+所有功能使用以下四种状态，避免把底层能力误认为已经交付的产品功能。
+
+| 状态 | 含义 |
+| --- | --- |
+| **用户可用** | 已有可见入口，主流程可以完成，并有相应自动化验证。 |
+| **局部可用** | 界面或流程已经存在，但仍有明确未接通的控制或子能力。 |
+| **内部就绪** | Core、应用服务或浏览器适配器已经实现并验证，但用户还不能从产品 UI 使用。 |
+| **尚未实现** | 只有产品方向、占位界面或未来需求，不得当作现有功能宣传或依赖。 |
+
+功能编号在后续迭代中保持稳定。功能扩展应更新原条目；只有形成独立用户意图时才新增编号。
+
+## 2. 当前产品范围
+
+Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器内的 Web DAW。现阶段已经形成以下闭环：
+
+1. 在 Project Entry 新建空项目，或打开最近保存的项目。
+2. 在 Workbench 创建 Instrument Track。
+3. 选择 Track，通过 Undo / Redo 撤销或恢复创建操作。
+4. 显式保存项目。
+5. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
+6. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
+
+当前闭环还不包含 MIDI Clip、Piano Roll、音源、音频输出或播放。
+
+### 2.1 功能总览
+
+| 编号 | 功能 | 状态 | 当前边界 |
+| --- | --- | --- | --- |
+| `PROJECT-ENTRY` | 项目入口与最近项目 | **用户可用** | 新建、最近项目列表、打开、失败重试。 |
+| `PROJECT-LIFECYCLE` | 当前项目生命周期 | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。 |
+| `PROJECT-NAVIGATION` | dirty 导航确认 | **用户可用** | 应用内导航支持 Save / Discard / Cancel。 |
+| `WORKBENCH-SHELL` | DAW 工作台外壳 | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。 |
+| `PROJECT-HISTORY` | Undo / Redo | **用户可用** | 当前可撤销、重做 Instrument Track 创建。 |
+| `TRACK-CREATE` | 创建 Instrument Track | **用户可用** | 只创建空的 Instrument Slot Track。 |
+| `TRACK-SELECTION` | Track 选择 | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。 |
+| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局；MIDI Editor 内容仍为空状态。 |
+| `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
+| `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | Core Command 已实现，尚无 Clip 与 Piano Roll 产品入口。 |
+| `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
+| `PIANO-ROLL` | 钢琴卷帘编辑器 | **尚未实现** | Dock 只是未来编辑器宿主。 |
+
+## 3. 项目入口与生命周期
+
+### 3.1 `PROJECT-ENTRY` 项目入口
+
+**用户可用**
+
+Project Entry 是当前启动页，提供：
+
+- `Create new project`：创建新的本地项目。
+- `Recent projects`：展示本浏览器中已有的项目，按最近一次成功保存时间倒序排列。
+- 最近项目卡片：显示项目名称和最近保存时间，点击后打开对应项目。
+- 加载、空列表、失败和重试状态。
+- 无效项目地址、已不存在项目的提示，并返回可继续操作的项目入口。
+
+当前产品规则：
+
+- 项目数据只存在于当前浏览器、当前站点来源的 IndexedDB 中。
+- 新建成功前必须先保存一个最小初始 Checkpoint。因此，只要完整完成一次新建流程，刷新后就应在 Recent projects 中看到该项目。
+- 最近项目不依赖 Track、Clip 或 Piano Roll。空项目同样是合法的最近项目。
+- 创建中的项目不可被重复创建；打开中的项目不可被重复打开。
+- 项目入口当前使用 Piano Black 外观，但它不是编辑器核心体验的最终设计承诺。
+
+### 3.2 `PROJECT-LIFECYCLE` 当前项目生命周期
+
+**用户可用**
+
+`ActiveProjectService` 是当前项目生命周期的唯一权威，负责：
+
+- `create()`：内部生成 Project ID，创建名为 `Untitled Project` 的最小 Session，并在成功前立即保存初始 Checkpoint。
+- `open(projectId)`：只打开已有项目，不把“找不到项目”解释为新建。
+- `save()`：把当前 Session 保存为 Checkpoint，并更新 Recent projects 元数据。
+- 管理 Idle、Creating、Opening、Ready 等阶段，以及保存中、保存失败等状态。
+- 从 `contentStateId` 与 `savedContentStateId` 的相等性派生 dirty；不使用简单递增的 revision 判断内容是否已保存。
+
+初始项目内容：
+
+- 名称：`Untitled Project`。
+- Tempo：120 BPM。
+- 拍号：4/4。
+- 不包含 Track、Clip、MIDI Source、Note 或 Device。
+
+Workbench 全局栏会显示：
+
+- 项目名称和 `Local project` 标识。
+- `Saved`、`Unsaved changes`、`Saving…` 或 `Couldn’t save`。
+- dirty 时可用的 Save 按钮。
+- 保存失败后的 `Retry save` 入口和失败信息。
+
+当前没有项目重命名、删除、复制、导入或导出 UI。
+
+### 3.3 本地保存与恢复
+
+**用户可用，浏览器适配层内部完成**
+
+浏览器存储使用 IndexedDB 数据库 `seele-daw`，当前 Schema 版本为 V1，包含：
+
+| Object Store | 用途 |
+| --- | --- |
+| `projectCheckpoints` | 保存不可变 Project Checkpoint。 |
+| `projectCheckpointHeads` | 记录每个项目的 active / previous Checkpoint 候选。 |
+| `projectCatalog` | 保存 Recent projects 所需的项目摘要与 `lastCheckpointSavedAt`。 |
+
+保存与恢复规则：
+
+- Checkpoint、active / previous 指针与最近项目元数据在同一事务中更新。
+- 每个项目保留 active 与 previous 两个恢复候选，淘汰更早的 previous。
+- 打开项目时优先恢复 active；候选损坏或不合法时，可继续验证 previous。
+- Core 会解码、校验完整模型不变量，再创建 Session；不能恢复的项目必须失败关闭，而不是加载部分损坏状态。
+- 清除站点数据、更换浏览器或使用不同浏览器配置文件后，项目不会自动出现。
+- 当前没有云同步、文件备份、自动保存、Journal 或多标签页冲突协调。
+
+## 4. 应用内导航
+
+### 4.1 `PROJECT-NAVIGATION` 路由
+
+**用户可用**
+
+当前稳定路由：
+
+| 地址 | 用途 |
+| --- | --- |
+| `/` | Project Entry。 |
+| `/projects/new` | 执行新建项目流程。 |
+| `/projects/:projectId` | 打开指定项目 Workbench。 |
+
+Route 只负责表达产品意图；Create、Open、Leave 的具体生命周期由应用层 Coordinator 处理。
+
+### 4.2 dirty 导航确认
+
+当用户通过应用内路由离开 dirty 项目、打开其他项目或创建新项目时，显示全局确认 Dialog：
+
+- **Save**：保存成功后允许本次导航；保存失败则继续停留在当前项目。
+- **Discard**：只授权本次导航，不提前把当前项目标记为 clean，也不清空 History。
+- **Cancel**：拒绝导航并停留在当前项目。
+
+并发与竞态规则：
+
+- 一次许可只对确认请求观察到的 `ProjectContentStateId` 有效。
+- 内容从 B 变为 C 后必须重新确认。
+- 内容从 B 变为 C，再 Undo 回 B 时，可以复用原先针对 B 的决定。
+- UI 同时只显示一个 pending request；新请求会 Cancel 旧请求。
+- Dialog 必须使用自己渲染的 pending capability resolve，陈旧 Dialog 不能解决新请求。
+
+当前仅保护应用内 Router 导航。关闭标签页、刷新页面和浏览器退出尚未接入 `beforeunload` 提示。
+
+## 5. Workbench
+
+### 5.1 `WORKBENCH-SHELL` 工作台外壳
+
+**局部可用**
+
+Workbench 已建立真实项目状态驱动的布局：
+
+- Global Bar：项目菜单、品牌、项目名称、保存状态与 Save。
+- Transport Bar：Undo / Redo、Tempo、拍号、播放区和 MIDI Editor 开关。
+- Arrangement：Track 控制区、时间标尺、Track Lane 和 Add Track。
+- Context Editor Dock：Track Inspector 与未来 MIDI Editor 宿主。
+
+项目菜单当前提供：
+
+- `Projects`：返回项目入口，dirty 时触发导航确认。
+- `Save` / `Retry save`：与全局 Save 使用同一保存能力。
+- `MIDI editor`：重新打开已关闭或最小化的 Context Editor Dock。
+
+桌面布局要求至少 900 px 宽。更窄的视口显示说明与 `Back to projects`，不展示编辑工作区。
+
+以下控件目前只是诚实占位，必须保持禁用或明确显示不可用：
+
+- Return to start、Play、Record、Loop。
+- 当前播放时间和输出电平只显示默认值，不代表真实运行状态。
+- Grid、Arrangement Zoom、Track options。
+- Track Mute、Solo 及其他通道控制。
+
+### 5.2 `PROJECT-HISTORY` Undo / Redo
+
+**用户可用**
+
+- Transport 中 Undo / Redo 的可用状态直接来自当前 `ProjectSession`。
+- 执行 Command 后可以 Undo；Undo 后可以 Redo。
+- 执行新的分叉 Command 会使旧 Redo 分支失效。
+- History 是 Session 本地状态，不保存到 Snapshot、Project File、Checkpoint 或 IndexedDB。
+- 当前 Studio 中可直接产生的历史操作只有 Instrument Track 创建；MIDI Note Command 尚无产品 UI。
+
+### 5.3 `CONTEXT-EDITOR-DOCK` 编辑器 Dock
+
+**局部可用**
+
+Dock 已支持：
+
+- 打开、关闭、最小化与恢复。
+- 在 Docked 模式下拖动水平 Splitter 调整高度。
+- 键盘 `Arrow Up` / `Arrow Down` 逐步调整，`Home` 到最小高度，`End` 到最大高度。
+- 最大化到 Workbench 允许的 Dock 高度，再恢复之前高度。
+- 在 Workbench Workspace 内全屏显示，再恢复之前高度。
+- 根据当前 Track Selection 显示 Track 名称与类型。
+
+Dock 当前只显示：
+
+- 未选择 Track 时的选择提示。
+- 已选择 Track、但没有 MIDI Clip 时的空状态。
+
+它还不是 Piano Roll，也没有 Note 渲染、命中检测、工具、缩放、滚动或手势操作。
+
+## 6. Track
+
+### 6.1 `TRACK-CREATE` Add Track
+
+**用户可用**
+
+点击 Arrangement 左侧的 `Add track` 会打开 New Track 菜单。菜单展示：
+
+| Track 类型 | 当前状态 | 点击结果 |
+| --- | --- | --- |
+| Voice / audio | 尚未实现 | 显示开发中 Toast。 |
+| Virtual instrument | 用户可用 | 创建 Instrument Track。 |
+| Drum machine | 尚未实现 | 显示开发中 Toast。 |
+| Sampler | 尚未实现 | 显示开发中 Toast。 |
+| Guitar | 尚未实现 | 显示开发中 Toast。 |
+| Bass | 尚未实现 | 显示开发中 Toast。 |
+
+创建 Instrument Track 的产品规则：
+
+- 追加到当前 Track 顺序末尾。
+- 自动命名为 `Instrument N`，其中 N 是当前 Instrument Track 数量加一。
+- 从固定八色 Palette 中随机选择颜色，并避免与相邻 Track 使用同一颜色。
+- Track 颜色以十六进制 Project Fact 保存，可随 Checkpoint 恢复。
+- 创建默认 unity gain、center pan、unmuted、unsoloed 的通道。
+- 创建一个启用的 `seele.instrument-slot` Device，占位等待未来音源选择。
+- Command 必须原子写入 Track、Device 与 Track Order；不能产生不完整 Track 图。
+- 成功创建后项目变为 dirty，并可 Undo / Redo。
+- 成功创建后自动选中新 Track。
+- 创建失败时不产生部分状态，并显示错误 Toast。
+
+固定 Track Palette：
+
+| 色彩 | Hex |
+| --- | --- |
+| Violet | `#8B5CF6` |
+| Blue | `#4F8CFF` |
+| Cyan | `#16B8D4` |
+| Green | `#23B26D` |
+| Gold | `#D6A43B` |
+| Orange | `#F27A3D` |
+| Rose | `#E85474` |
+| Magenta | `#C65AD9` |
+
+“Virtual instrument” 当前只表示一个 Instrument Track 与空 Instrument Slot，不代表已经选择 Basic Synth、采样音源或 JSON 合成器，也不会发声。
+
+### 6.2 `TRACK-SELECTION` Track 选择
+
+**用户可用**
+
+- 点击 Track Header 或对应 Arrangement Lane 会选择该 Track。
+- Track Header 与 Lane 共享选中高亮。
+- Track Inspector 和 MIDI Editor Dock 显示所选 Track 的名称和类型。
+- 新建 Instrument Track 后自动选择它。
+- 同一项目内，模型提交后只要所选 Track 仍存在，选择保持不变。
+- 所选 Track 不存在时自动清除选择。
+- 打开其他项目或离开当前项目时清除旧选择，不能把 Track ID 泄漏到另一个项目。
+
+Selection 是轻量、可重建的 Workbench UI 状态：
+
+- 只保存当前 Project ID 与 `selectedTrackId`。
+- 不属于 Project Fact，不使项目变 dirty。
+- 不进入 Undo / Redo、Snapshot、Project File、Checkpoint 或 IndexedDB。
+- Project Track 的名称、颜色、类型等事实始终从当前 Session Snapshot 派生，不复制到 Pinia。
+
+Vue 状态选择的完整规则见
+[Vue State Composition Guidelines](apps/studio/docs/vue-state-composition-guidelines.md)。
+
+## 7. UI 基础与设计语言
+
+### 7.1 `UI-FOUNDATION` Piano Black
+
+**用户可用**
+
+当前 Studio UI 遵循 [Piano Black 设计语言](DESIGN.md)：
+
+- 使用语义化 Design Tokens 表达 Surface、Text、Border、Control、State、Motion 与 Layer。
+- 深色黑钢琴表面是默认基调，Track 色彩用于音乐内容身份，不充当全局品牌强调色。
+- 图标统一从 Iconify 的 Fluent 图标集按需引入。
+- 常规交互基于 Headless Primitive 与项目专属外观组合，不引入后台管理系统视觉。
+- 核心产品模块继续保留应用语义，不把业务行为塞进通用 UI Primitive。
+
+当前通用 UI Primitive：
+
+- Button。
+- Icon。
+- Icon Button。
+- Alert Dialog。
+- Toast Region。
+- Reka UI 驱动的 Dropdown Menu、Dialog 与 Toast 行为。
+
+Toast 支持信息、成功、警告和危险语义，可自动关闭、手动关闭、使用 `F8` 聚焦通知区，并支持 Swipe dismiss。
+
+## 8. 已就绪但尚未接入 UI 的能力
+
+### 8.1 `MIDI-NOTE-CORE`
+
+**内部就绪**
+
+Project Core 已实现：
+
+- Add MIDI Note Command。
+- Move MIDI Note Command。
+- Remove MIDI Note Command。
+- Command validation、Mutation Plan、原子提交、Commit / Delta。
+- Undo / Redo 及稳定的 Session-local `ProjectContentStateId`。
+- Project Query、Query Index 和 Commit Subscription。
+- Immutable Snapshot。
+
+这些能力需要一个已经存在的 MIDI Clip 与 MIDI Source。当前 Studio 不能创建 MIDI Clip，因此用户还不能通过 UI 使用 Note Command。
+
+### 8.2 Project File 与 Checkpoint
+
+**内部就绪**
+
+Project Core 已具备：
+
+- Project File Format V1 的内存 Projection。
+- V1 Protocol 字段校准、Decoder、Validation 与 Session Loading。
+- Storage-neutral Project Checkpoint 保存与恢复协调。
+
+当前没有面向用户的 JSON 文件编解码、文件导入、文件导出或格式迁移 UI。
+
+### 8.3 Package 状态
+
+| Package | 当前能力 |
+| --- | --- |
+| `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
+| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track 与 Track Selection。 |
+| `@seele-daw/editor` | 只有包边界与入口骨架，未提供 Piano Roll 或 Arrangement 编辑能力。 |
+| `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
+| `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
+| `@seele-daw/type-utils` | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。 |
+
+## 9. 明确尚未提供的产品能力
+
+以下项目不得从现有占位 UI 或 Core 类型推断为已交付：
+
+### 编辑与编排
+
+- MIDI Clip 创建、选择、移动、复制、调整长度、拆分或删除。
+- Piano Roll Note 渲染、选择、增加、移动、删除、调整长度或力度。
+- Arrangement 时间轴滚动、缩放、Grid 和 Snap。
+- Editor Tool、Drag Preview、框选、多选与键盘编辑。
+- Track 重命名、改色、删除、复制、重排。
+- Track Mute、Solo、Gain、Pan 与更多 Channel 设置。
+
+### 音源与声音
+
+- `public/soundbanks` 中压缩资源的加载、解压、索引与音色选择。
+- WAV / M4A 采样播放。
+- JSON 合成器定义的解析与合成引擎。
+- Instrument Slot 的真实 Device UI。
+- Web Audio Graph、AudioWorklet、主输出与电平。
+- 播放、暂停、定位、循环、录音与监听。
+
+### 其他 Track 类型
+
+- Voice / Audio Track。
+- Drum Machine。
+- Sampler。
+- Guitar。
+- Bass。
+
+### 项目管理与可靠性
+
+- 项目重命名、删除、复制。
+- 文件导入、导出与用户可恢复备份。
+- 自动保存与 Journal。
+- `beforeunload` 刷新 / 关闭页面保护。
+- 多标签页写入冲突协调。
+- 云同步、分享与协作。
+
+## 10. 产品不变量
+
+后续功能实现不得破坏以下已经接受的规则：
+
+1. `ActiveProjectService` 是当前项目生命周期权威；Pinia 不接管 Session、History、dirty、IndexedDB 或 pending Promise resolver。
+2. Project Core 不知道“当前项目”、Vue、Router 或浏览器资源。
+3. `platform-browser` 只实现浏览器 Adapter，不决定产品流程。
+4. dirty 必须由内容身份与已保存内容身份比较派生。
+5. Discard 只授权一次导航，不伪造 Save，也不清空 History。
+6. `ProjectSession` 及其可变内部状态不进入 Vue 深代理。
+7. Selection 等 UI 状态只保存身份；Project Facts 始终从 Snapshot 派生。
+8. Track 颜色是持久化 Project Fact；随机选择只是创建时默认策略。
+9. 普通 Clip 复制的长期产品语义是创建独立 MIDI Source 与新 Note 身份。
+10. Move、Resize、Split 等编辑算法必须在对应 Command 实现前确定产品边界。
+11. 未接通的控制必须禁用或明确提示不可用，不能制造功能已存在的错觉。
+
+## 11. 功能交付与文档维护规则
+
+本手册是每个产品切片 Definition of Done 的一部分。以后每个独立功能通过审查、准备提交时，应同时完成以下检查：
+
+1. 更新“功能总览”中对应编号的状态与边界。
+2. 在所属章节记录用户入口、操作步骤、成功结果、失败反馈和关键产品规则。
+3. 如果功能接通了现有占位，必须从“尚未提供”清单移除或缩小对应限制。
+4. 如果引入新的持久化事实，说明是否影响 dirty、History、Checkpoint 与兼容性。
+5. 如果引入新的 UI 状态，说明它的所有者、生命周期、跨项目行为及是否持久化。
+6. 如果改变既有行为，先更新产品不变量或记录明确替代规则。
+7. 在“功能变更记录”追加日期、功能编号、状态变化和对应提交。
+8. 运行与变更风险相称的测试；产品切片合入前仍以 `pnpm lint` 和 `pnpm check` 为完整验证入口。
+
+记录原则：
+
+- 只把已经实现并验证的行为标为“用户可用”或“内部就绪”。
+- 未来设想放在“尚未实现”或独立规划文档，不混入当前操作说明。
+- 文档描述产品语义，不复制组件内部实现细节。
+- 用户审查后发生的产品决定，即使暂未开发，也要进入对应规划文档；实现完成后再迁入本手册。
+
+## 12. 功能变更记录
+
+| 日期 | 功能编号 | 变化 | 提交 |
+| --- | --- | --- | --- |
+| 2026-07-22 | `PROJECT-ENTRY`、`PROJECT-LIFECYCLE`、`PROJECT-NAVIGATION` | 完成 Active Project、IndexedDB Recent Projects、导航确认及 Composition Root 基础。 | `5ea1256` 阶段基线 |
+| 2026-07-23 | `PROJECT-ENTRY`、`WORKBENCH-SHELL`、`UI-FOUNDATION` | 接入真实路由、Piano Black Project Entry、导航 Dialog 与 Workbench Shell。 | `cae096b`、`f205333`、`a841205` |
+| 2026-07-24 | `TRACK-CREATE`、`UI-FOUNDATION` | 完成 Instrument Track Command、应用协调、Add Track 菜单与 Toast。 | `580884b`—`681880d` |
+| 2026-07-27 | `TRACK-SELECTION` | 完成项目作用域 Track Selection、新建自动选择及 Workbench 联动。 | `ea1f7f5` |
+| 2026-07-27 | 文档基线 | 首次汇总当前产品功能、内部能力、限制与持续维护规则。 | 本次文档提交 |
+
+## 13. 当前验证基线
+
+功能代码截至 `ea1f7f5` 已通过：
+
+- `pnpm lint`。
+- `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
+- Project Core：25 个测试文件，359 项测试。
+- platform-browser：2 个测试文件，18 项测试。
+- Studio：26 个测试文件，136 项测试。
+- type-utils：1 个测试文件，2 项测试。
+
+后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

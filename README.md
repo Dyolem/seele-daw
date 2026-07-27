@@ -2,6 +2,11 @@
 
 面向桌面浏览器的轻量 Web DAW，使用 Vue 3、TypeScript、Vite、Web Audio API 与 pnpm Workspace。
 
+## 产品文档
+
+- [产品功能手册](PRODUCT.md)
+- [Piano Black 设计语言](DESIGN.md)
+
 ## 工程结构
 
 ```text

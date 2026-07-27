@@ -47,6 +47,7 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `PROJECT-HISTORY` | Undo / Redo | **用户可用** | 当前可撤销、重做 Instrument Track 创建。 |
 | `TRACK-CREATE` | 创建 Instrument Track | **用户可用** | 只创建空的 Instrument Slot Track。 |
 | `TRACK-SELECTION` | Track 选择 | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。 |
+| `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **内部就绪** | Core Command 已实现，等待 Studio Coordinator、Selection 与 UI 接入。 |
 | `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局；MIDI Editor 内容仍为空状态。 |
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
 | `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | Core Command 已实现，尚无 Clip 与 Piano Roll 产品入口。 |
@@ -261,7 +262,29 @@ Dock 当前只显示：
 
 “Virtual instrument” 当前只表示一个 Instrument Track 与空 Instrument Slot，不代表已经选择 Basic Synth、采样音源或 JSON 合成器，也不会发声。
 
-### 6.2 `TRACK-SELECTION` Track 选择
+### 6.2 `MIDI-CLIP-CREATE` 创建空 MIDI Clip
+
+**内部就绪，Studio 尚未接入**
+
+下一条编辑纵向切片是在 Instrument Track 的 Arrangement Lane 中创建空 MIDI Clip：
+
+- 双击 Lane 的空白小节创建 MIDI Clip。
+- Clip 起点吸附到双击位置所在小节的开头。
+- 默认长度为一个小节；当前阶段按项目起始拍号计算小节长度。
+- Clip 初始名称复制 Track 当前名称，但之后是独立 Project Fact，Track 改名不会隐式更新 Clip 名称。
+- `color = null`，显示时继承 Track 颜色。
+- 默认非静音、非循环，`sourceOffsetTick = 0`。
+- 同一事务创建等长的空 MidiSource 和空 Note Partition。
+- 每个 MidiClip 独占一个 MidiSource；不能产生孤立 Source 或共享 Source。
+- 创建成功后自动选择新 Clip，并保持其所属 Track 为当前 Track。
+- 双击已有 Clip 只选择并打开它，不创建重叠 Clip。
+- 数据模型继续允许 MIDI Clip 重叠；本次只限制默认创建手势，避免误操作。
+- 创建行为必须进入 dirty、Undo / Redo、Checkpoint 和 Project File。
+- 创建失败不能留下部分 Clip 图，并应在 Studio 显示错误 Toast。
+
+Project Core 已建立 Add MIDI Clip Command、完整所有权图 MutationPlan、聚合 Delta、Undo / Redo 与 QueryIndex Partition 语义。完成 Studio Coordinator、Selection 和 Arrangement UI 后，才把本功能标为“用户可用”。
+
+### 6.3 `TRACK-SELECTION` Track 选择
 
 **用户可用**
 
@@ -433,7 +456,8 @@ Project Core 已具备：
 | 2026-07-23 | `PROJECT-ENTRY`、`WORKBENCH-SHELL`、`UI-FOUNDATION` | 接入真实路由、Piano Black Project Entry、导航 Dialog 与 Workbench Shell。 | `cae096b`、`f205333`、`a841205` |
 | 2026-07-24 | `TRACK-CREATE`、`UI-FOUNDATION` | 完成 Instrument Track Command、应用协调、Add Track 菜单与 Toast。 | `580884b`—`681880d` |
 | 2026-07-27 | `TRACK-SELECTION` | 完成项目作用域 Track Selection、新建自动选择及 Workbench 联动。 | `ea1f7f5` |
-| 2026-07-27 | 文档基线 | 首次汇总当前产品功能、内部能力、限制与持续维护规则。 | 本次文档提交 |
+| 2026-07-27 | 文档基线 | 首次汇总当前产品功能、内部能力、限制与持续维护规则。 | `f2abf53` |
+| 2026-07-27 | `MIDI-CLIP-CREATE` | 确认创建交互与默认事实；Project Core 完成空 Clip 所有权图 Command、Delta、History 和 QueryIndex 语义。 | `6e6f6bb` |
 
 ## 13. 当前验证基线
 
@@ -441,7 +465,7 @@ Project Core 已具备：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
-- Project Core：25 个测试文件，359 项测试。
+- Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
 - Studio：26 个测试文件，136 项测试。
 - type-utils：1 个测试文件，2 项测试。

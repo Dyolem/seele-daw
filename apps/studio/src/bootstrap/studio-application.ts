@@ -16,6 +16,8 @@ import {
   createBrowserActiveProjectRuntime,
   type BrowserActiveProjectRuntime,
 } from '@/workbench/project/browser-active-project-runtime'
+import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
+import { PROJECT_CLIP_CONTEXT_KEY } from '@/workbench/project/clip/vue/project-clip-context'
 import {
   createProjectEntryCoordinator,
   type ProjectEntryCoordinator,
@@ -170,6 +172,10 @@ export function composeStudioApplication(
       createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
       createRandomValue: composition.createRandomValue ?? Math.random,
     })
+    const projectClips = createProjectClipCoordinator({
+      activeProject: projectRuntime.activeProject,
+      createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
+    })
     projectNavigationGuardDispose = installProjectNavigationGuard(
       composition.router,
       projectNavigationConfirmation,
@@ -179,6 +185,7 @@ export function composeStudioApplication(
     vueApplication.provide(ACTIVE_PROJECT_CONTEXT_KEY, activeProjectBinding.context)
     vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
     vueApplication.provide(PROJECT_TRACK_CONTEXT_KEY, Object.freeze({ projectTracks }))
+    vueApplication.provide(PROJECT_CLIP_CONTEXT_KEY, Object.freeze({ projectClips }))
     vueApplication.provide(
       PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
       projectNavigationDecisionBinding.context,

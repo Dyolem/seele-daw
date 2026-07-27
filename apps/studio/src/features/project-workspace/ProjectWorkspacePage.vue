@@ -4,7 +4,10 @@ import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import {
+  useProjectWorkbenchSelectionStore,
+  type ProjectWorkbenchClipSelectionCandidate,
+} from '@/features/project-workspace/project-workbench-selection-store'
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
@@ -52,12 +55,23 @@ const readyProject = computed(() => {
     ? activeState
     : null
 })
+const projectSnapshot = computed(() => readyProject.value?.session.getSnapshot() ?? null)
 const trackPresentations = computed(() => {
-  const ready = readyProject.value
-  return ready === null
-    ? Object.freeze([])
-    : createProjectTrackPresentations(ready.session.getSnapshot())
+  const snapshot = projectSnapshot.value
+  return snapshot === null ? Object.freeze([]) : createProjectTrackPresentations(snapshot)
 })
+const clipSelectionCandidates = computed(
+  (): readonly ProjectWorkbenchClipSelectionCandidate[] => {
+    const snapshot = projectSnapshot.value
+    if (snapshot === null) return Object.freeze([])
+
+    return Object.freeze(
+      snapshot.clips.map((clip) =>
+        Object.freeze({ clipId: clip.id, trackId: clip.trackId }),
+      ),
+    )
+  },
+)
 
 function describeFailure(resolution: FailedProjectEntryResolution): string {
   const cause = resolution.failureCause
@@ -169,13 +183,18 @@ watch(
 )
 
 watch(
-  [() => readyProject.value?.projectId ?? null, trackPresentations],
-  ([projectId, tracks]) => {
+  [
+    () => readyProject.value?.projectId ?? null,
+    trackPresentations,
+    clipSelectionCandidates,
+  ],
+  ([projectId, tracks, clips]) => {
     if (projectId === null) return
 
     workbenchSelection.reconcileProject(
       projectId,
       tracks.map((track) => track.id),
+      clips,
     )
   },
   { immediate: true },

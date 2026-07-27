@@ -1,12 +1,17 @@
 import {
+  createInitialProjectSession,
   parseProjectId,
+  parseTempoEventId,
+  parseTick,
+  parseTimeSignatureEventId,
   parseTrackId,
   type ProjectCommit,
   type ProjectId,
+  type ProjectSession,
 } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { shallowReadonly, shallowRef, type ShallowRef } from 'vue'
+import { nextTick, shallowReadonly, shallowRef, type ShallowRef } from 'vue'
 import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -24,7 +29,9 @@ import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectState,
+  type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
+import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
 import {
   PROJECT_ENTRY_FAILURE_OPERATION,
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -41,6 +48,7 @@ import {
   type ActiveProjectVueContext,
 } from '@/workbench/project/vue/active-project-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
   PROJECT_TRACK_CONTEXT_KEY,
   type ProjectTrackVueContext,
@@ -74,8 +82,10 @@ function createDeferred<T>(): Deferred<T> {
   }
 }
 
-function createReadyState(projectId: ProjectId): ActiveProjectState {
-  const session = createTestSession(projectId)
+function createReadyState(
+  projectId: ProjectId,
+  session: ProjectSession = createTestSession(projectId),
+): ReadyActiveProjectState {
   return Object.freeze({
     phase: ACTIVE_PROJECT_PHASE.READY,
     projectId,
@@ -280,5 +290,52 @@ describe('ProjectWorkspacePage', () => {
     expect(
       router.currentRoute.value.query[PROJECT_ROUTE_QUERY.UNAVAILABLE_PROJECT_ID],
     ).toBeUndefined()
+  })
+
+  it('reconciles Clip Selection from the latest Project ownership facts', async () => {
+    const projectId = parseProjectId('project-workspace-page-clip-selection')
+    const session = createInitialProjectSession({
+      projectId,
+      projectName: 'Clip Selection',
+      tempoEventId: parseTempoEventId('tempo-workspace-clip-selection'),
+      timeSignatureEventId: parseTimeSignatureEventId('meter-workspace-clip-selection'),
+    })
+    const initialReadyState = createReadyState(projectId, session)
+    const track = createProjectTrackCoordinator({
+      activeProject: { state: initialReadyState },
+      createUniqueId: (() => {
+        const identities = ['track-workspace-clip', 'device-workspace-clip']
+        return () => identities.shift() ?? 'unused-workspace-track-id'
+      })(),
+      createRandomValue: () => 0,
+    }).addInstrumentTrack()
+    const clip = createProjectClipCoordinator({
+      activeProject: { state: initialReadyState },
+      createUniqueId: (() => {
+        const identities = ['clip-workspace-selection', 'source-workspace-selection']
+        return () => identities.shift() ?? 'unused-workspace-clip-id'
+      })(),
+    }).addEmptyMidiClip({
+      trackId: track.trackId,
+      targetTick: parseTick(0),
+    })
+    const fixture = createFixture(
+      async () =>
+        Object.freeze({
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId,
+        }),
+      createReadyState(projectId, session),
+    )
+    const { selection } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    selection.selectClip(track.trackId, clip.clipId)
+    session.undo()
+    fixture.state.value = createReadyState(projectId, session)
+    await nextTick()
+
+    expect(selection.selectedClipId).toBeNull()
+    expect(selection.selectedTrackId).toBe(track.trackId)
   })
 })

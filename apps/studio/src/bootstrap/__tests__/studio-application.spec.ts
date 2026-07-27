@@ -14,6 +14,10 @@ import {
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
 import type { BrowserActiveProjectRuntime } from '@/workbench/project/browser-active-project-runtime'
+import {
+  useProjectClips,
+  type ProjectClipVueContext,
+} from '@/workbench/project/clip/vue/project-clip-context'
 import { PROJECT_ENTRY_RESOLUTION_KIND } from '@/workbench/project/entry/project-entry-coordinator'
 import {
   useProjectEntry,
@@ -130,6 +134,13 @@ function requireProjectTrackContext(
   return context
 }
 
+function requireProjectClipContext(
+  context: ProjectClipVueContext | null,
+): ProjectClipVueContext {
+  if (context === null) throw new Error('Expected the Project Clip Context')
+  return context
+}
+
 describe('StudioApplication', () => {
   it('installs Pinia and Router while providing the owned Active Project Context', () => {
     const fixture = createRuntimeFixture()
@@ -138,11 +149,13 @@ describe('StudioApplication', () => {
       state: () => ({ label: 'pinia' }),
     })
     let projectEntryContext: ProjectEntryVueContext | null = null
+    let projectClipContext: ProjectClipVueContext | null = null
     let projectTrackContext: ProjectTrackVueContext | null = null
     const rootComponent = defineComponent({
       setup() {
         const activeProject = useActiveProject()
         projectEntryContext = useProjectEntry()
+        projectClipContext = useProjectClips()
         projectTrackContext = useProjectTracks()
         const projectNavigationDecision = useProjectNavigationDecision()
         const installedRouter = useRouter()
@@ -170,6 +183,7 @@ describe('StudioApplication', () => {
     expect(requireProjectEntryContext(projectEntryContext).projectEntry).toBe(
       application.projectEntry,
     )
+    expect(Object.isFrozen(requireProjectClipContext(projectClipContext).projectClips)).toBe(true)
     expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(true)
     application.dispose()
   })

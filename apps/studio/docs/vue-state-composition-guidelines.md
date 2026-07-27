@@ -68,6 +68,7 @@ Store 或 Context。
 | Active Project | Service + shallow Vue Binding | 权威在应用服务，Vue 只观察 |
 | Project Entry | Coordinator | 应用用例能力 |
 | Project Track | Coordinator | Project Command 能力 |
+| Project Clip | Coordinator | Project Command 能力 |
 | Navigation Decision | pending binding + resolver | 一次性异步决策 Port |
 
 Context 可以携带 `shallowRef`，但如果该对象开始拥有大量 UI 状态、派生值、协调动作、
@@ -83,18 +84,19 @@ Context 可以携带 `shallowRef`，但如果该对象开始拥有大量 UI 状�
 - 状态有明确的协调动作，例如 activate、select、reconcile、reset；
 - Devtools 中观察状态转换有实际调试价值。
 
-当前首个正式 Store 是 Project Workbench Track Selection。它只保存：
+当前首个正式 Store 是 Project Workbench Selection。它只保存：
 
 - 当前 Selection 所属的 `ProjectId`；
-- `selectedTrackId`。
+- `selectedTrackId`；
+- `selectedClipId`。
 
-它不保存 Track Record、Project Snapshot 或 Session。页面用最新 Snapshot 的
-`trackOrder` 协调 Selection；选中 Track 被 Undo 或后续 Remove Command 移除时，
-Store 清空失效 ID。切换或离开 Project 时也清空 Selection。
+它不保存 Track / Clip Record、Project Snapshot 或 Session。页面用最新 Snapshot 的
+`trackOrder` 与 Clip 所有权协调 Selection；选中实体被 Undo 或后续 Remove Command
+移除时，Store 清空失效 ID。切换或离开 Project 时也清空 Selection。
 
-## 3. 为什么 Track Selection 使用 Pinia
+## 3. 为什么 Workbench Selection 使用 Pinia
 
-Track Selection 是编辑会话状态，不是 Project fact：
+Track / Clip Selection 是编辑会话状态，不是 Project fact：
 
 - 选择 Track 不应产生 Project Commit；
 - 不应进入 Undo / Redo；
@@ -102,7 +104,7 @@ Track Selection 是编辑会话状态，不是 Project fact：
 - 不写入 Checkpoint；
 - 刷新后可以安全重建。
 
-它同时连接 Track Row、Arrangement Lane、Context Editor Dock 和 Project 页面生命周期。
+它同时连接 Track Row、Arrangement Lane、Clip、Context Editor Dock 和 Project 页面生命周期。
 这些消费者分布在不同组件分支，Selection 还需要处理 Project 切换和模型变化后的
 失效协调。因此使用 feature Store 比创建一个带 Ref 与 Actions 的自定义 Context 更
 清晰。
@@ -113,7 +115,11 @@ Track Selection 是编辑会话状态，不是 Project fact：
 - Store actions 明确表达状态机边界；
 - 不需要在 Composition Root 手动创建、provide 和 dispose 一个无外部资源的实例；
 - 测试可以为每个挂载创建独立 Pinia，隔离状态；
-- 后续 Selection 扩展到 Clip 时仍有一个明确归属，但不会污染 Project Model。
+- Track 与 Clip Selection 具有同一个明确归属，但不会污染 Project Model。
+
+Clip Selection 保持 `selectedClipId -> selectedTrackId` 所有权一致性：选择 Clip 同时选择
+所属 Track；直接选择 Track 会退出 Clip Selection；Clip 消失时只清除 Clip 身份并尽可能保留
+仍存在的 Track。
 
 ## 4. 禁止进入 Pinia 的内容
 

@@ -354,6 +354,14 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 显示播放头；
 - 通过 Inspector 或工具区编辑基础属性。
 
+首批默认编辑语义：
+
+- MIDI 60 显示为 `C4`，初始纵向视图以 C4 附近为中心；
+- 初次打开 Clip 时横向显示完整 Clip，Arrangement 与 Piano Roll 暂不强制同步 Zoom；
+- 初始 Grid 为 `1/16`；
+- 默认工具为 Select，Pencil 模式单击空白网格创建 Note；
+- 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1。
+
 后续再引入力度编辑、Resize、Split、复制、Humanize、Quantize、Scale Assist 等能力；其产品边界必须在对应 Command 前讨论。
 
 视觉与操作规则：
@@ -363,7 +371,7 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 小节、拍和细分网格有明确的三级强度。
 - 音符继承轨道颜色；Selected 使用高亮轮廓、控制点或亮度变化叠加表达。
 - Move Preview 是半透明或描边 Ghost，不隐藏原始基准位置。
-- 新建音符时长度使用当前 Grid 或最近使用值，具体规则在 Note Add 产品切片中固定。
+- 首批新建音符长度使用当前 Grid；“最近使用长度”留待后续产品切片决定。
 - 音高名称和时间读数应在拖动时可见，但避免常驻 Tooltip 遮挡附近音符。
 
 ### 7.10 异步、空状态与错误
@@ -986,6 +994,9 @@ Canvas 功能至少检查：
 9. Theme、Density、UI Scale、Contrast、Motion 是独立设置。
 10. Workbench Shell 只提供编辑器骨架；真正的 Arrangement、Piano Roll 等业务界面按产品切片规划实现。
 11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM；进入 Zoom、Scroll、大量对象或高频交互前重新评估 Canvas。
+12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，网格与 Note 使用 Canvas。
+13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，横向初始显示完整 Clip。
+14. Piano Roll 初始 Grid 为 1/16；默认 Select，Pencil 单击创建长度为一格、Velocity 100、UI Channel 1 的 Note。
 
 ## 24. 待后续切片决定
 
@@ -995,7 +1006,7 @@ Canvas 功能至少检查：
 - Global Bar 与 Transport 是一行合并还是两行布局；
 - Inspector 默认位于左下、右侧，还是根据编辑器切换；
 - Arrangement 与 Piano Roll 横向 Zoom 的默认同步规则；
-- Piano Roll Add、Resize、Split、Copy 的精确手势与边界；
+- Piano Roll Move、Resize、Split、Copy 的精确手势与边界；
 - Track Color 是固定 Palette ID，还是允许任意色值；
 - 首批内置主题除 Piano Black 外的数量和视觉方向；
 - Browser / Library 与 Mixer 的最终工作区模式；

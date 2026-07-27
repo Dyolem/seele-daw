@@ -2,7 +2,8 @@
 
 `editor` 负责把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑会话状态，但不拥有 Track、Clip、Note 等项目事实。
 
-> 当前状态：仅完成 `common`、`browser` 和公开入口骨架。
+> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model；
+> `browser` 仍只有公开入口骨架。
 
 ## 包定位
 
@@ -49,6 +50,7 @@ DOM / Pointer / Keyboard / MIDI
 ```text
 src/
 ├── common/
+│   ├── piano-roll/   已实现的 Clip Context、Viewport 与可见 Note Read Model
 │   ├── input/        EditorInput 与 EditorIntent
 │   ├── session/      Selection、focus、clipboard
 │   ├── surfaces/     Surface 契约与领域坐标
@@ -72,6 +74,25 @@ src/
 - Clipboard payload 不复用原项目 ID；Paste 生成新 ID 并通过一次事务提交。
 - Canvas 只能发出 intent/command，不能直接修改 ProjectModel。
 
+## 已实现：Piano Roll Common Foundation
+
+首个 common 切片由当前 Studio 的空 MIDI Clip 入口直接驱动，公开提供：
+
+- `PianoRollClipContext`：组合非循环 MIDI Clip 与其唯一 MidiSource，明确
+  Clip-local Tick 和 Source Tick 的 1:1 映射；
+- `PianoRollViewport`：描述 Clip-local 可见 Tick、Pitch 和 CSS Pixel 尺寸；
+- Tick / X 与 Pitch / Y 的双向确定性坐标换算；
+- `PianoRollNoteReadModel`：使用 Project Core 的可见范围 Query 和局部
+  Subscription，发布冻结的可见 Note 状态；
+- `PIANO_ROLL_DEFAULT_CENTER_PITCH = 60`，对应首批 UI 的 C4 中心语义。
+
+当前不支持 looped Clip。Loop 展开、重复实例选择和 Source 编辑语义尚未确定，不能错误套用
+非循环 1:1 映射。Read Model 只依赖 `ProjectSession.query` / `subscribe`，匹配 Commit 后
+重新读取权威结果，不从 Delta 维护第二份 Note 真相。
+
+完整边界见
+[Piano Roll Common Foundation 实施计划](./docs/piano-roll-common-foundation-plan.md)。
+
 ## 依赖边界
 
 - 只依赖 [`@seele-daw/project-core`](../project-core/README.md) 的公开 API。
@@ -84,12 +105,12 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 
 ## 分阶段计划
 
-1. 建立 EditorSession、Selection 和统一 EditorInput。
-2. 实现 Piano Roll Surface、坐标链、Hit Test 与可见范围 Read Model。
-3. 实现 Draw/Move/Resize/Delete Note 工具及单次提交手势。
-4. 增加 Canvas 分层 Renderer、空间索引和局部重绘。
-5. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
-6. profiling 证明有必要后，再评估 OffscreenCanvas、Worker Renderer 或独立渲染包。
+1. **已完成**：Piano Roll Clip Context、Viewport、坐标链与可见范围 Read Model。
+2. 增加 Browser Canvas 分层 Renderer，并由 Studio 组合当前 Clip。
+3. 建立最小 EditorSession、Select / Pencil Tool、Note Selection 与统一 Browser Input。
+4. 实现 Add / Move / Remove Note 的单次提交手势；Resize 先补充产品与 Core Command。
+5. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
+6. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 
 ## 测试与验收
 

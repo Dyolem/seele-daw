@@ -7,6 +7,7 @@ import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
 import { shallowRef, type StyleValue } from 'vue'
 
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
 import {
@@ -27,6 +28,7 @@ const props = defineProps<{
 }>()
 
 const { projectTracks } = useProjectTracks()
+const workbenchSelection = useProjectWorkbenchSelectionStore()
 const notification = shallowRef<UiToastMessage | null>(null)
 let notificationSequence = 0
 
@@ -65,7 +67,8 @@ function handleTrackTypeSelection(trackType: ProjectAddTrackType): void {
   }
 
   try {
-    projectTracks.addInstrumentTrack()
+    const result = projectTracks.addInstrumentTrack()
+    workbenchSelection.selectTrack(result.trackId)
   } catch (cause) {
     showNotification(
       UI_TOAST_TONE.DANGER,
@@ -85,6 +88,10 @@ function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
   return {
     '--project-track-color': track.color ?? 'var(--sd-color-border-focus)',
   }
+}
+
+function selectTrack(track: ProjectTrackPresentation): void {
+  workbenchSelection.selectTrack(track.id)
 }
 </script>
 
@@ -114,7 +121,9 @@ function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
         <ProjectWorkbenchTrackRow
           v-for="track in props.tracks"
           :key="track.id"
+          :selected="workbenchSelection.selectedTrackId === track.id"
           :track="track"
+          @select="selectTrack(track)"
         />
       </div>
     </aside>
@@ -155,15 +164,23 @@ function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
           <p>Add a Track to prepare the Arrangement surface.</p>
         </div>
         <div v-else class="project-workbench__arrangement-lanes">
-          <div
+          <button
             v-for="track in props.tracks"
             :key="track.id"
             class="project-workbench__arrangement-lane"
+            :class="{
+              'project-workbench__arrangement-lane--selected':
+                workbenchSelection.selectedTrackId === track.id,
+            }"
             :style="createTrackStyle(track)"
+            type="button"
+            :aria-label="`Select ${track.name} lane`"
+            :aria-pressed="workbenchSelection.selectedTrackId === track.id"
+            @click="selectTrack(track)"
           >
             <span aria-hidden="true"></span>
             <p>Drop MIDI clips here</p>
-          </div>
+          </button>
         </div>
       </div>
     </section>
@@ -331,8 +348,33 @@ function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
   display: grid;
   min-block-size: var(--project-workbench-track-row-height);
   place-items: center;
+  inline-size: 100%;
+  padding: 0;
+  border: 0;
   border-block-end: 1px solid var(--sd-color-border-subtle);
+  color: inherit;
   background: color-mix(in srgb, var(--project-track-color) 3%, transparent);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    box-shadow var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
+}
+
+.project-workbench__arrangement-lane:hover {
+  background: color-mix(in srgb, var(--project-track-color) 7%, transparent);
+}
+
+.project-workbench__arrangement-lane--selected {
+  background: color-mix(in srgb, var(--project-track-color) 11%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--project-track-color) 48%, transparent);
+}
+
+.project-workbench__arrangement-lane:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--sd-color-border-focus);
+  outline-offset: -2px;
 }
 
 .project-workbench__arrangement-lane > span {

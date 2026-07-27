@@ -4,6 +4,7 @@ import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
+import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
@@ -29,6 +30,7 @@ interface ProjectPresentation {
 
 const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
+const workbenchSelection = useProjectWorkbenchSelectionStore()
 const router = useRouter()
 const requestedProjectId = shallowRef<ProjectId | null>(null)
 const failure = shallowRef<FailedProjectEntryResolution | null>(null)
@@ -67,11 +69,13 @@ async function openRequestedProject(projectIdInput: string): Promise<void> {
   const generation = ++requestGeneration
   isOpening.value = true
   failure.value = null
+  requestedProjectId.value = null
 
   let projectId: ProjectId
   try {
     projectId = parseProjectId(projectIdInput)
   } catch {
+    workbenchSelection.reset()
     if (!isUnmounted && generation === requestGeneration) {
       await router.replace(
         createProjectEntryLocation({
@@ -83,6 +87,7 @@ async function openRequestedProject(projectIdInput: string): Promise<void> {
   }
 
   requestedProjectId.value = projectId
+  workbenchSelection.activateProject(projectId)
   const resolution = await projectEntry.resolve(projectId)
   if (isUnmounted || generation !== requestGeneration) return
 
@@ -163,9 +168,24 @@ watch(
   { immediate: true },
 )
 
+watch(
+  [() => readyProject.value?.projectId ?? null, trackPresentations],
+  ([projectId, tracks]) => {
+    if (projectId === null) return
+
+    workbenchSelection.reconcileProject(
+      projectId,
+      tracks.map((track) => track.id),
+    )
+  },
+  { immediate: true },
+)
+
 onUnmounted(() => {
   isUnmounted = true
   requestGeneration += 1
+  const projectId = requestedProjectId.value
+  if (projectId !== null) workbenchSelection.leaveProject(projectId)
 })
 </script>
 

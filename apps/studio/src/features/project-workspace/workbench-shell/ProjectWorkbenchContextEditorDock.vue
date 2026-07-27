@@ -7,6 +7,7 @@ import MidiIcon from '~icons/fluent/midi-24-regular'
 import OptionsIcon from '~icons/fluent/options-20-regular'
 import MinimizeIcon from '~icons/fluent/subtract-16-regular'
 
+import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import {
   PROJECT_WORKBENCH_DOCK_MODE,
   type ProjectWorkbenchDockMode,
@@ -17,6 +18,7 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
 interface ProjectWorkbenchContextEditorDockProps {
   readonly dockMode: ProjectWorkbenchDockMode
   readonly isMaximized: boolean
+  readonly selectedTrack: ProjectTrackPresentation | null
 }
 
 const props = defineProps<ProjectWorkbenchContextEditorDockProps>()
@@ -37,12 +39,16 @@ const emit = defineEmits<{
     <aside class="project-workbench__inspector">
       <header>
         <UiIcon :icon="OptionsIcon" :size="20" />
-        <strong>Editor tools</strong>
+        <strong>{{ props.selectedTrack ? 'Track inspector' : 'Editor tools' }}</strong>
       </header>
       <div v-if="props.dockMode !== PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED">
         <span><UiIcon :icon="MidiIcon" :size="24" /></span>
-        <strong>No clip selected</strong>
-        <p>Clip properties and tools will appear here.</p>
+        <strong>{{ props.selectedTrack?.name ?? 'No track selected' }}</strong>
+        <p v-if="props.selectedTrack">
+          {{ props.selectedTrack.kind === 'instrument' ? 'Instrument' : 'Audio' }} track selected.
+          Track properties will appear here as editing capabilities arrive.
+        </p>
+        <p v-else>Select a track to inspect its editing context.</p>
       </div>
     </aside>
 
@@ -51,7 +57,7 @@ const emit = defineEmits<{
         <div>
           <UiIcon :icon="MidiIcon" :size="20" />
           <strong>MIDI editor</strong>
-          <span>No selection</span>
+          <span>{{ props.selectedTrack?.name ?? 'No selection' }}</span>
         </div>
         <div class="project-workbench__dock-controls">
           <UiIconButton
@@ -100,8 +106,11 @@ const emit = defineEmits<{
       >
         <div class="project-workbench__surface-empty">
           <span><UiIcon :icon="MidiIcon" :size="24" /></span>
-          <strong>Select a MIDI clip to edit</strong>
-          <p>The Piano Roll will mount in this region without changing the Shell layout.</p>
+          <strong>{{ props.selectedTrack ? 'No MIDI clip selected' : 'Select a track' }}</strong>
+          <p v-if="props.selectedTrack">
+            Add or select a MIDI clip on {{ props.selectedTrack.name }} to open the Piano Roll.
+          </p>
+          <p v-else>Select an instrument track before creating a MIDI clip.</p>
         </div>
       </div>
     </section>

@@ -1,9 +1,11 @@
 import {
   parseProjectId,
+  parseTrackId,
   type ProjectCommit,
   type ProjectId,
 } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -92,7 +94,11 @@ function createProjectTrackContext(): ProjectTrackVueContext {
   return Object.freeze({
     projectTracks: Object.freeze({
       addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
-        () => Object.freeze({}) as ProjectCommit,
+        () =>
+          Object.freeze({
+            commit: Object.freeze({}) as ProjectCommit,
+            trackId: parseTrackId('app-created-track'),
+          }),
       ),
     }),
   })
@@ -109,7 +115,7 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
 
   const wrapper = mount(App, {
     global: {
-      plugins: [router],
+      plugins: [createPinia(), router],
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(state),
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
@@ -154,7 +160,7 @@ describe('App', () => {
     expect(wrapper.find('.project-workbench').exists()).toBe(true)
     expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
-    expect(wrapper.text()).toContain('Select a MIDI clip to edit')
+    expect(wrapper.text()).toContain('Select an instrument track before creating a MIDI clip')
     expect(wrapper.find('.project-entry').exists()).toBe(false)
   })
 })

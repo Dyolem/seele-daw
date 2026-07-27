@@ -83,18 +83,22 @@ describe('ProjectTrackCoordinator', () => {
     const coordinator = createProjectTrackCoordinator(
       createDependencies(session, ['track-defaults', 'device-defaults'], 0),
     )
-    const commit = coordinator.addInstrumentTrack()
+    const result = coordinator.addInstrumentTrack()
     const snapshot = session.getSnapshot()
     const track = snapshot.tracks[0]
     const device = snapshot.devices[0]
 
     expect(Object.isFrozen(coordinator)).toBe(true)
-    expect(commit.origin).toEqual({
+    expect(Object.isFrozen(result)).toBe(true)
+    expect(result.trackId).toBe('track-defaults')
+    expect(result.commit.origin).toEqual({
       kind: 'command',
       commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD,
     })
-    expect(commit.delta.changes).toHaveLength(1)
-    expect(commit.delta.changes[0]?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED)
+    expect(result.commit.delta.changes).toHaveLength(1)
+    expect(result.commit.delta.changes[0]?.type).toBe(
+      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED,
+    )
     expect(snapshot.trackOrder).toEqual(['track-defaults'])
     expect(track).toMatchObject({
       id: 'track-defaults',

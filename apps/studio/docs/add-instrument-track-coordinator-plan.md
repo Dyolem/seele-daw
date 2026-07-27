@@ -78,7 +78,9 @@ Palette 是 Project fact 的候选值集合，不是主题强调色集合。它�
 
 ## Coordinator 契约
 
-`ProjectTrackCoordinator.addInstrumentTrack()` 是同步操作并返回成功的 `ProjectCommit`。
+`ProjectTrackCoordinator.addInstrumentTrack()` 是同步操作并返回冻结的结果，其中包含成功
+的 `ProjectCommit` 与新建 `TrackId`。返回 Track 身份用于 Workbench 在创建成功后建立
+Selection，不要求 UI 解析 Commit Delta，也不把 Selection 写入 Project Model。
 
 执行顺序：
 
@@ -87,7 +89,7 @@ Palette 是 Project fact 的候选值集合，不是主题强调色集合。它�
 3. 计算名称、颜色和末尾插入位置；
 4. 从身份源分别分配 Track ID 与 Device ID；
 5. 创建并执行 `AddInstrumentTrackCommand`；
-6. 返回 committed Commit。
+6. 返回 committed Commit 与新 Track 身份。
 
 Coordinator 使用 `session.modelRevision` 创建 Command，不依赖可能滞后一轮异步通知的 Active Project state revision。
 

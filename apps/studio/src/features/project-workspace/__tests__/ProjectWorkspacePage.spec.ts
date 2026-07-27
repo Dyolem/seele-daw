@@ -1,14 +1,17 @@
 import {
   parseProjectId,
+  parseTrackId,
   type ProjectCommit,
   type ProjectId,
 } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { shallowReadonly, shallowRef, type ShallowRef } from 'vue'
 import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
+import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { createStudioRouter } from '@/router'
 import {
   createProjectWorkspaceLocation,
@@ -122,18 +125,23 @@ function createFixture(
 
 async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   const router = createStudioRouter(createMemoryHistory())
+  const pinia = createPinia()
   await router.push(createProjectWorkspaceLocation(projectId))
   await router.isReady()
   const projectTracks: ProjectTrackCoordinator = Object.freeze({
     addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
-      () => Object.freeze({}) as ProjectCommit,
+      () =>
+        Object.freeze({
+          commit: Object.freeze({}) as ProjectCommit,
+          trackId: parseTrackId('workspace-page-created-track'),
+        }),
     ),
   })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
   const wrapper = mount(ProjectWorkspacePage, {
     props: { projectId },
     global: {
-      plugins: [router],
+      plugins: [pinia, router],
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
@@ -142,7 +150,11 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
     },
   })
 
-  return { router, wrapper }
+  return {
+    router,
+    selection: useProjectWorkbenchSelectionStore(pinia),
+    wrapper,
+  }
 }
 
 describe('ProjectWorkspacePage', () => {
@@ -237,11 +249,14 @@ describe('ProjectWorkspacePage', () => {
     const fixture = createFixture((projectId) =>
       projectId === firstProjectId ? first.promise : second.promise,
     )
-    const { router, wrapper } = await mountPage(fixture, firstProjectId)
+    const { router, selection, wrapper } = await mountPage(fixture, firstProjectId)
     await vi.waitFor(() => expect(fixture.resolve).toHaveBeenCalledOnce())
+    selection.selectTrack(parseTrackId('workspace-selection-from-first-project'))
 
     await wrapper.setProps({ projectId: secondProjectId })
     await vi.waitFor(() => expect(fixture.resolve).toHaveBeenCalledTimes(2))
+    expect(selection.projectId).toBe(secondProjectId)
+    expect(selection.selectedTrackId).toBeNull()
     fixture.state.value = createReadyState(secondProjectId)
     second.resolve(
       Object.freeze({

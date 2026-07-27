@@ -10,6 +10,7 @@ import {
   type InstrumentTrackRecord,
   type ProjectCommit,
   type ProjectSnapshot,
+  type TrackId,
 } from '@seele-daw/project-core'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -28,7 +29,13 @@ export interface ProjectTrackCoordinatorDependencies {
 }
 
 export interface ProjectTrackCoordinator {
-  addInstrumentTrack(): ProjectCommit
+  addInstrumentTrack(): AddedInstrumentTrackResult
+}
+
+/** Identifies the committed Track so transient Workbench state can select it. */
+export interface AddedInstrumentTrackResult {
+  readonly commit: ProjectCommit
+  readonly trackId: TrackId
 }
 
 function orderedTracks(snapshot: ProjectSnapshot): readonly InstrumentTrackRecord[] {
@@ -50,7 +57,7 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
     this.#dependencies = dependencies
   }
 
-  addInstrumentTrack(): ProjectCommit {
+  addInstrumentTrack(): AddedInstrumentTrackResult {
     const activeState = this.#dependencies.activeProject.state
 
     if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
@@ -73,9 +80,10 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
       this.#dependencies.createRandomValue(),
       adjacentTrack?.color ?? null,
     )
+    const trackId = parseTrackId(this.#dependencies.createUniqueId())
     const command = createAddInstrumentTrackCommand({
       baseRevision: session.modelRevision,
-      trackId: parseTrackId(this.#dependencies.createUniqueId()),
+      trackId,
       name: `Instrument ${instrumentTracks.length + 1}`,
       color,
       channel: {
@@ -100,7 +108,10 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
       throw new Error('AddInstrumentTrackCommand unexpectedly produced no Project change')
     }
 
-    return result.commit
+    return Object.freeze({
+      commit: result.commit,
+      trackId,
+    })
   }
 }
 

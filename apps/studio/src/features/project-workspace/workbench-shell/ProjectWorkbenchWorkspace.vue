@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 
+import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
@@ -19,6 +20,7 @@ interface DockResizeInteraction {
 const props = defineProps<{
   readonly tracks: readonly ProjectTrackPresentation[]
 }>()
+const workbenchSelection = useProjectWorkbenchSelectionStore()
 const emit = defineEmits<{
   contextEditorOpenChange: [isOpen: boolean]
 }>()
@@ -31,6 +33,10 @@ const isDockMaximized = shallowRef(false)
 let resizeInteraction: DockResizeInteraction | null = null
 
 const isContextEditorOpen = computed(() => dockMode.value !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED)
+const selectedTrack = computed(
+  () =>
+    props.tracks.find((track) => track.id === workbenchSelection.selectedTrackId) ?? null,
+)
 const workspaceStyle = computed(() => ({
   '--project-workbench-dock-height': `${dockHeight.value}px`,
 }))
@@ -235,6 +241,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED"
       :dock-mode="dockMode"
       :is-maximized="isDockMaximized"
+      :selected-track="selectedTrack"
       @close="closeDock"
       @minimize="minimizeDock"
       @toggle-fullscreen="toggleDockFullscreen"

@@ -1,5 +1,12 @@
-import type { ProjectCommit } from '@seele-daw/project-core'
+import {
+  parseProjectColor,
+  parseProjectId,
+  parseTrackId,
+  type ProjectCommit,
+  type TrackId,
+} from '@seele-daw/project-core'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +16,8 @@ import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/work
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
 import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue'
+import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectSaveStatus,
@@ -23,12 +32,22 @@ interface MountShellOptions {
   readonly isDirty?: boolean
   readonly saveFailureMessage?: string | null
   readonly saveStatus?: ActiveProjectSaveStatus
+  readonly selectedTrackId?: TrackId | null
+  readonly tracks?: readonly ProjectTrackPresentation[]
 }
 
 function mountShell(options: MountShellOptions = {}) {
+  const pinia = createPinia()
+  const selection = useProjectWorkbenchSelectionStore(pinia)
+  selection.activateProject(parseProjectId('workbench-shell-project'))
+  if (options.selectedTrackId) selection.selectTrack(options.selectedTrackId)
   const projectTracks: ProjectTrackCoordinator = Object.freeze({
     addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
-      () => Object.freeze({}) as ProjectCommit,
+      () =>
+        Object.freeze({
+          commit: Object.freeze({}) as ProjectCommit,
+          trackId: parseTrackId('shell-created-track'),
+        }),
     ),
   })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
@@ -45,9 +64,10 @@ function mountShell(options: MountShellOptions = {}) {
       tempo: 120,
       timeSignatureDenominator: 4,
       timeSignatureNumerator: 4,
-      tracks: Object.freeze([]),
+      tracks: options.tracks ?? Object.freeze([]),
     },
     global: {
+      plugins: [pinia],
       provide: {
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
       },
@@ -173,5 +193,26 @@ describe('ProjectWorkbenchShell', () => {
 
     expect(splitter.attributes('aria-valuenow')).toBe('320')
     expect(splitter.attributes('aria-orientation')).toBe('horizontal')
+  })
+
+  it('projects the selected Track into the Context Editor Dock', () => {
+    const selectedTrackId = parseTrackId('shell-selected-track')
+    const wrapper = mountShell({
+      selectedTrackId,
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#8B5CF6'),
+          id: selectedTrackId,
+          kind: 'instrument',
+          name: 'Instrument 1',
+        }),
+      ]),
+    })
+
+    expect(wrapper.get('.project-workbench__inspector').text()).toContain('Instrument 1')
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Instrument 1')
+    expect(wrapper.get('.project-workbench__context-host').text()).toContain(
+      'No MIDI clip selected',
+    )
   })
 })

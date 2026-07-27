@@ -8,7 +8,11 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
 const props = defineProps<{
+  readonly selected: boolean
   readonly track: ProjectTrackPresentation
+}>()
+const emit = defineEmits<{
+  select: []
 }>()
 
 const trackStyle = computed<StyleValue>(() => ({
@@ -20,15 +24,27 @@ const trackKindLabel = computed(() =>
 </script>
 
 <template>
-  <article class="project-track-row" :style="trackStyle" :aria-label="props.track.name">
+  <article
+    class="project-track-row"
+    :class="{ 'project-track-row--selected': props.selected }"
+    :style="trackStyle"
+  >
     <span class="project-track-row__color" aria-hidden="true"></span>
-    <span class="project-track-row__icon" aria-hidden="true">
-      <UiIcon :icon="KeyboardIcon" :size="20" />
-    </span>
-    <span class="project-track-row__identity">
-      <strong>{{ props.track.name }}</strong>
-      <span>{{ trackKindLabel }}</span>
-    </span>
+    <button
+      class="project-track-row__select"
+      type="button"
+      :aria-label="`Select ${props.track.name}`"
+      :aria-pressed="props.selected"
+      @click="emit('select')"
+    >
+      <span class="project-track-row__icon" aria-hidden="true">
+        <UiIcon :icon="KeyboardIcon" :size="20" />
+      </span>
+      <span class="project-track-row__identity">
+        <strong>{{ props.track.name }}</strong>
+        <span>{{ trackKindLabel }}</span>
+      </span>
+    </button>
     <span class="project-track-row__controls">
       <button type="button" disabled aria-label="Mute — not available">M</button>
       <button type="button" disabled aria-label="Solo — not available">S</button>
@@ -54,6 +70,23 @@ const trackKindLabel = computed(() =>
   padding: var(--sd-space-3) var(--sd-space-2) var(--sd-space-3) var(--sd-space-3);
   border-block-end: 1px solid var(--sd-color-border-subtle);
   background: var(--sd-color-surface-panel);
+  transition:
+    background var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    box-shadow var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
+}
+
+.project-track-row:hover {
+  background: var(--sd-color-surface-raised);
+}
+
+.project-track-row--selected {
+  background: color-mix(
+    in srgb,
+    var(--project-track-color) 10%,
+    var(--sd-color-surface-panel)
+  );
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--project-track-color) 42%, transparent);
 }
 
 .project-track-row__color {
@@ -77,6 +110,28 @@ const trackKindLabel = computed(() =>
     var(--project-track-color) 14%,
     var(--sd-color-surface-sunken)
   );
+}
+
+.project-track-row__select {
+  display: grid;
+  min-inline-size: 0;
+  grid-column: 1 / 3;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sd-space-2);
+  align-items: center;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.project-track-row__select:focus-visible {
+  border-radius: var(--sd-radius-sm);
+  outline: 2px solid var(--sd-color-border-focus);
+  outline-offset: 2px;
 }
 
 .project-track-row__identity {

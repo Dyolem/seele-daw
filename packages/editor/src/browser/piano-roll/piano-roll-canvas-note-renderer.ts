@@ -53,6 +53,8 @@ class PianoRollCanvasNoteRenderer implements PianoRollNoteRenderer {
     for (const visual of scene.notes) {
       this.#layer.context.globalAlpha = visual.opacity
       this.#layer.context.fillStyle = visual.fillColor
+      this.#layer.context.shadowBlur = visual.selected ? 6 : 0
+      this.#layer.context.shadowColor = visual.glowColor ?? 'transparent'
       this.#layer.context.fillRect(
         visual.xCssPixel,
         visual.yCssPixel,
@@ -60,12 +62,12 @@ class PianoRollCanvasNoteRenderer implements PianoRollNoteRenderer {
         visual.heightCssPixel,
       )
       this.#layer.context.strokeStyle = visual.borderColor
-      this.#layer.context.lineWidth = 1
+      this.#layer.context.lineWidth = visual.selected ? 2 : 1
       this.#layer.context.strokeRect(
-        visual.xCssPixel + 0.5,
-        visual.yCssPixel + 0.5,
-        Math.max(0, visual.widthCssPixel - 1),
-        Math.max(0, visual.heightCssPixel - 1),
+        visual.xCssPixel + this.#layer.context.lineWidth / 2,
+        visual.yCssPixel + this.#layer.context.lineWidth / 2,
+        Math.max(0, visual.widthCssPixel - this.#layer.context.lineWidth),
+        Math.max(0, visual.heightCssPixel - this.#layer.context.lineWidth),
       )
     }
     this.#layer.context.restore()

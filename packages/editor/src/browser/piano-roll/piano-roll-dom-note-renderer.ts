@@ -21,7 +21,9 @@ function configureNoteElement(
   element: HTMLDivElement,
   visual: PianoRollNoteVisual,
 ): void {
-  element.className = 'sd-piano-roll-dom-note'
+  element.className = visual.selected
+    ? 'sd-piano-roll-dom-note sd-piano-roll-dom-note--selected'
+    : 'sd-piano-roll-dom-note'
   element.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
   element.style.position = 'absolute'
   element.style.boxSizing = 'border-box'
@@ -30,8 +32,13 @@ function configureNoteElement(
   element.style.transform = `translate3d(${visual.xCssPixel}px, ${visual.yCssPixel}px, 0)`
   element.style.border = `1px solid ${visual.borderColor}`
   element.style.background = visual.fillColor
+  element.style.boxShadow =
+    visual.glowColor === null
+      ? 'none'
+      : `0 0 0 1px ${visual.glowColor}, 0 0 8px ${visual.glowColor}`
   element.style.opacity = String(visual.opacity)
   element.style.pointerEvents = 'auto'
+  element.style.zIndex = visual.selected ? '1' : '0'
 }
 
 class PianoRollDomNoteRenderer implements PianoRollNoteRenderer {

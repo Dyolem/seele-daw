@@ -111,10 +111,12 @@ function createDomNoteFixture() {
       Object.freeze({
         borderColor: '#ffffff',
         fillColor: '#8b5cf6',
+        glowColor: null,
         heightCssPixel: 10,
         noteId,
         opacity: 1,
         pitch: parseMidiPitch(60),
+        selected: false,
         visibleEndTick: parseTick(480),
         visibleStartTick: parseTick(0),
         widthCssPixel: 100,

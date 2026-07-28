@@ -86,10 +86,13 @@ function createRendererFixture() {
   })
   const noteScene = createPianoRollNoteScene({
     notes: Object.freeze([visibleNote]),
+    selectedNoteIds: Object.freeze([]),
     style: {
       borderColor: '#f2eee5',
       fillColor: parseProjectColor('#8B5CF6'),
       opacity: 1,
+      selectedBorderColor: '#f4e7b9',
+      selectedGlowColor: 'rgb(232 217 168 / 58%)',
     },
     viewport,
   })
@@ -164,10 +167,12 @@ describe('Piano Roll Browser Renderers', () => {
     expect(visual).toEqual({
       borderColor: '#f2eee5',
       fillColor: '#8B5CF6',
+      glowColor: null,
       heightCssPixel: 8,
       noteId: 'renderer-note',
       opacity: 1,
       pitch: 60,
+      selected: false,
       visibleEndTick: 1_920,
       visibleStartTick: 960,
       widthCssPixel: 240,
@@ -199,6 +204,52 @@ describe('Piano Roll Browser Renderers', () => {
     expect(container.querySelector('.sd-piano-roll-dom-note')).toBeNull()
   })
 
+  it('carries selected state through the shared Scene into DOM and Canvas', () => {
+    const fixture = createRendererFixture()
+    const selectedScene = createPianoRollNoteScene({
+      notes: Object.freeze([fixture.visibleNote]),
+      selectedNoteIds: Object.freeze([fixture.visibleNote.note.id]),
+      style: {
+        borderColor: '#f2eee5',
+        fillColor: '#8B5CF6',
+        opacity: 1,
+        selectedBorderColor: '#f4e7b9',
+        selectedGlowColor: 'rgb(232 217 168 / 58%)',
+      },
+      viewport: fixture.viewport,
+    })
+    const container = document.createElement('div')
+    const domRenderer = createPianoRollDomNoteRenderer({ container })
+    domRenderer.render(selectedScene)
+
+    const selectedNote = container.querySelector<HTMLElement>(
+      '.sd-piano-roll-dom-note--selected',
+    )
+    expect(selectedScene.notes[0]).toEqual(
+      expect.objectContaining({
+        borderColor: '#f4e7b9',
+        glowColor: 'rgb(232 217 168 / 58%)',
+        selected: true,
+      }),
+    )
+    expect(selectedNote?.style.border).toBe('1px solid rgb(244, 231, 185)')
+    expect(selectedNote?.style.boxShadow).toContain('rgb(232 217 168 / 58%)')
+
+    const noteCanvas = createFakeCanvasFixture()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      noteCanvas.context,
+    )
+    const canvasContainer = document.createElement('div')
+    const canvasRenderer = createPianoRollCanvasNoteRenderer({
+      container: canvasContainer,
+    })
+    canvasRenderer.render(selectedScene)
+
+    expect(noteCanvas.context.lineWidth).toBe(2)
+    expect(noteCanvas.context.shadowBlur).toBe(6)
+    expect(noteCanvas.context.shadowColor).toBe('rgb(232 217 168 / 58%)')
+  })
+
   it('lets the Canvas Note adapter consume the same Note Scene', () => {
     const fixture = createRendererFixture()
     const noteCanvas = createFakeCanvasFixture()
@@ -228,10 +279,13 @@ describe('Piano Roll Browser Renderers', () => {
     const fixture = createRendererFixture()
     const mutedScene = createPianoRollNoteScene({
       notes: Object.freeze([fixture.visibleNote]),
+      selectedNoteIds: Object.freeze([]),
       style: {
         borderColor: '#f2eee5',
         fillColor: '#8B5CF6',
         opacity: 0.46,
+        selectedBorderColor: '#f4e7b9',
+        selectedGlowColor: 'rgb(232 217 168 / 58%)',
       },
       viewport: fixture.viewport,
     })

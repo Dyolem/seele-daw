@@ -30,6 +30,9 @@ export type {
   PianoRollPointerType,
 } from './piano-roll-input'
 
+export { applyPianoRollSelectInteraction } from './piano-roll-select-interaction'
+export type { PianoRollSelectionTarget } from './piano-roll-select-interaction'
+
 export { PianoRollError } from './piano-roll-error'
 export type { PianoRollErrorCode } from './piano-roll-error'
 

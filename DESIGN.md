@@ -536,7 +536,19 @@ CSS 自定义属性使用 `--sd-` 前缀：
 
 Record 红色只能表示录音、危险或停止性错误，不应成为普通品牌强调色。
 
-### 9.5 材质表达
+### 9.5 Editor selection rendering
+
+| Token                         | 基准值                     | 用途                              |
+| ----------------------------- | -------------------------- | --------------------------------- |
+| `editor-note-selected-border` | `#F4E7B9`                  | Selected Note 的高对比实体轮廓    |
+| `editor-note-selected-glow`   | `rgb(232 217 168 / 58%)`   | Selected Note 的辅助外发光        |
+
+Selected Border 是状态识别的主要信号；Glow 只用于从密集网格中提升层次，不能单独承担
+Selection 语义。DOM 与 Canvas Note Renderer 必须消费同一 Scene 中已经解析的 Border、Glow
+和 `selected` 状态，不得分别定义颜色或推断 Selection。键盘 Focus Ring 与 Note Selection
+必须保持可区分。
+
+### 9.6 材质表达
 
 - Global Bar 和大型浮层 MAY 使用非常轻微的纵向明度变化，表现钢琴烤漆的深度。
 - 禁止高强度玻璃拟态、彩虹描边和大面积背景模糊。
@@ -810,7 +822,7 @@ Save / Discard / Cancel 的推荐顺序由平台约定适配，但主动作、�
 | ------------ | ------------------------------------ |
 | Normal       | 轨道色 Solid / Surface 组合          |
 | Hover        | 轻微高光或边界                       |
-| Selected     | 高对比轮廓，必要时显示 Resize Handle |
+| Selected     | 高对比轮廓 + 克制 Glow，必要时显示 Resize Handle |
 | Muted        | 降低饱和度和不透明度，并保留形状     |
 | Preview      | Ghost 或描边，不覆盖原位置           |
 | Out of scale | 后续功能；不可只靠红色判错           |

@@ -1,6 +1,6 @@
 # Piano Roll Interaction 第三阶段计划
 
-> Status: In progress; Batches 1–2 accepted, Batch 3 baseline committed with Keymap refinement awaiting review
+> Status: In progress; Batches 1–3 accepted, Batch 4 implemented and awaiting review
 >
 > Date: 2026-07-28
 
@@ -134,6 +134,20 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
 - 接入 Pointer 选择、修饰键切换、空白清除与 `Escape`；
 - 可访问摘要报告当前 Selection 数量；
 - 不使用 Pinia：Note Selection 属于当前 Clip Editor lifetime，不是跨页面应用 UI 状态。
+
+当前实现遵循以下具体边界：
+
+- Common Select Interaction 只解释完成且未越过 Drag Threshold 的 Pointer Input；
+- 普通 Click 调用 `selectOnly`，Shift / Command / Control Click 调用
+  `toggleSelection`，空白 Grid Click 调用 `clearSelection`；
+- Studio 为当前 Clip 创建唯一 Editor Session，以 `shallowRef` 接收冻结 State identity；
+- Grid Surface 的 Pointer Begin 会把焦点交给 Piano Roll，但 Selection 只在 Pointer End 确认；
+- `Escape` 通过集中 Keymap 和 Piano Roll Scope 注册，只在当前 Surface 聚焦且有 Selection
+  时处理；
+- 切换 Clip Context 会释放 Read Model 与 Editor Session，并从空 Selection 重新组合；
+- Scene 显式携带 `selected`、解析后的 Border 和 Glow，DOM / Canvas Adapter 不自行推断
+  Selection；
+- 可访问摘要报告可见 Note 数量和当前 Selection 数量。
 
 ## 停止点
 

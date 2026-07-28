@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-28，功能代码截至 `cdf9577`
+> 最近更新：2026-07-28，功能代码截至 `1e278f6`
 >
-> 当前待审：Keyboard Binding 类型与默认 Keymap 优化
+> 当前待审：Batch 4 Studio Selection
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -34,13 +34,13 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 1. 在 Project Entry 新建空项目，或打开最近保存的项目。
 2. 在 Workbench 创建 Instrument Track。
 3. 在 Instrument Track 的目标小节创建、选择并打开空 MIDI Clip。
-4. 在 Context Editor Dock 查看该 Clip 的只读 Piano Roll。
+4. 在 Context Editor Dock 查看 Piano Roll，并选择、切换或清空已有 MIDI Note。
 5. 通过 Undo / Redo 撤销或恢复 Track 与 MIDI Clip 创建操作。
 6. 显式保存项目。
 7. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
 8. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
-当前闭环还不包含 Piano Roll Note 编辑、音源、音频输出或播放。
+当前闭环还不包含 Piano Roll Note 创建与内容修改、音源、音频输出或播放。
 
 ### 2.1 功能总览
 
@@ -54,12 +54,12 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `TRACK-CREATE` | 创建 Instrument Track | **用户可用** | 只创建空的 Instrument Slot Track。 |
 | `TRACK-SELECTION` | Track 选择 | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。 |
 | `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。 |
-| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局并显示所选 Clip 的只读 Piano Roll。 |
+| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局并显示所选 Clip 的 Piano Roll Selection Surface。 |
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
-| `KEYBOARD-SHORTCUTS` | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 已接入；Piano Roll Scope 等待 Selection UI。 |
+| `KEYBOARD-SHORTCUTS` | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 与 Piano Roll Escape 已接入。 |
 | `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | 已有空 MIDI Clip 入口，尚无 Piano Roll Note 编辑入口。 |
 | `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
-| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | 可见只读 Grid / Note Renderer；内部 Selection Session、DOM Hit 与 Pointer Input 已就绪，UI 尚未接入。 |
+| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | Grid / Note Renderer 与单选、修饰键切换、空白 / Escape 清除 Selection 已接入。 |
 
 ## 3. 项目入口与生命周期
 
@@ -223,10 +223,10 @@ Dock 当前根据上下文显示：
 
 - 未选择 Track 时的选择提示。
 - 已选择 Track、但没有 MIDI Clip 时的空状态。
-- 已选择 MIDI Clip 时的 Clip 摘要与只读 Piano Roll。
+- 已选择 MIDI Clip 时的 Clip 摘要与可选择 Piano Roll。
 
-Piano Roll 已能渲染真实 Grid 和 Note，但尚没有可见 Selection、工具、缩放、滚动或 Note
-编辑手势。
+Piano Roll 已能渲染真实 Grid 和 Note，并提供基础 Selection；尚没有工具切换、缩放、滚动
+或修改 Note 内容的手势。
 
 ### 5.4 `KEYBOARD-SHORTCUTS` Scoped Keyboard Shortcuts
 
@@ -238,6 +238,7 @@ Piano Roll 已能渲染真实 Grid 和 Note，但尚没有可见 Selection、工
 - `Mod+Z`：当前 Session 可以 Undo 时执行 Undo；
 - `Mod+Shift+Z`：当前 Session 可以 Redo 时执行 Redo；
 - `Control+Y`：兼容 Windows 常用 Redo Binding。
+- `Escape`：Piano Roll 聚焦且存在 Note Selection 时清空 Selection。
 
 产品规则：
 
@@ -250,9 +251,7 @@ Piano Roll 已能渲染真实 Grid 和 Note，但尚没有可见 Selection、工
 - 快捷键只调用现有 Save / History 权威，不保存 ProjectSession、dirty 或 History 副本。
 - Feature 根据 Action ID 读取集中式默认 Keymap，不在页面组件中散落 Binding 字符串。
 
-Piano Roll `Escape` 清空 Selection 的产品规则已经确定，但要等下一批真实
-`PianoRollEditorSession` 接入后才启用。当前没有用户 Keymap、Shortcut Settings、Sequence
-或 Command Palette。
+当前没有用户 Keymap、Shortcut Settings、Sequence 或 Command Palette。
 
 用户 Keymap 的输入验证边界已经就绪，但可见设置面板尚未实现。未来无效输入必须在字段旁
 显示错误并保留原 Binding；损坏或不兼容的持久化覆盖应回退默认值，不能让错误延迟到 Feature
@@ -400,9 +399,10 @@ Project Core 已实现：
 - Immutable Snapshot。
 
 这些能力需要一个已经存在的 MIDI Clip 与 MIDI Source。当前 Studio 已能创建空 MIDI Clip，
-但还没有 Piano Roll 或其他 Note 编辑入口，因此用户仍不能通过 UI 使用 Note Command。
+Studio 已有 Piano Roll Selection 入口，但仍没有调用这些 Note Command 的创建、移动或删除
+手势。
 
-### 8.2 `PIANO-ROLL` 只读 Surface
+### 8.2 `PIANO-ROLL` Selection Surface
 
 **局部可用**
 
@@ -413,7 +413,7 @@ Project Core 已实现：
 - 可见 Tick / Pitch / CSS Pixel Viewport；
 - 不提前 Snap 的连续 X → Tick 位置换算；
 - 基于 Project Query 与局部 Subscription 的可见 Note Read Model；
-- Commit 后重新 Query、Viewport 替换、Observer 隔离和 dispose 生命周期。
+- Commit 后重新 Query、Viewport 替换、Observer 隔离和 dispose 生命周期；
 - Clip-scoped `PianoRollEditorSession`、冻结的稀疏 `NoteId` Selection；
 - Selection 前的权威 Note Query，以及相关 Commit 后的存在性和 Clip 时间窗口校准。
 
@@ -421,20 +421,29 @@ Project Core 已实现：
 
 - DPR-aware Canvas Pitch / Grid Renderer；
 - Renderer-neutral Note Scene、当前 keyed DOM Note Renderer 与可替换 Canvas Adapter；
+- DOM / Canvas 共用的 selected Scene 事实，以及 Piano Black Selected Border / Glow；
 - Surface 级 DOM Hit 委托，以及 Renderer-neutral Primary Pointer Input；
 - Surface-local CSS Pixel、Pointer Capture、4 CSS Pixel Drag Threshold 和取消生命周期；
 - 小节、拍、1/16 细分三级网格，以及密集级别抑制；
-- DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note 摘要；
+- DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note / Selection 摘要；
 - Clip / Track Color Note 和 muted 视觉；
 - Docked、Minimized、Maximized 与 Workspace Fullscreen 布局复用；
-- 选中 Clip、Project Query/Subscription、Design Tokens 与 Renderer 的显式组合。
+- 选中 Clip、Project Query/Subscription、Design Tokens 与 Renderer 的显式组合；
+- 普通 Click 单选，Shift / Command / Control Click 切换，空白 Grid Click 清空；
+- 聚焦 Piano Roll 时使用 `Escape` 清空 Selection；
+- Click 只在 Pointer Up 且未越过 4 CSS Pixel Drag Threshold 时确认；
+- Clip 切换创建新的 Editor Session，不继承前一个 Clip 的 Selection。
+
+Selection 只保存稳定 `NoteId`，属于当前 Clip Editor lifetime；它不进入 Pinia、Project
+History、Snapshot、Checkpoint 或 IndexedDB。Note 移出当前可见 Viewport 时仍保持选中；
+Note 被删除或移出当前 Clip Source 时间窗口时由权威 Query 清理。
 
 当前明确限制：
 
 - 不支持 looped Clip，不能把循环实例错误显示成非循环 Source；
-- 仍没有可见 Selection 交互、Select Tool、Keyboard Binding 或 Note Command Port；
+- 仍没有可切换 Tool、Box Selection 或 Note Command Port；
 - 首批视图固定显示完整 Clip 和 MIDI 48–72，尚无 Zoom / Scroll；
-- 用户可以看到真实网格和已有 Note，但还不能通过 UI 创建或编辑 Note。
+- 用户可以选择已有 Note，但还不能通过 UI 创建、移动、调整长度或删除 Note。
 
 ### 8.3 Project File 与 Checkpoint
 
@@ -454,8 +463,8 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection 与只读 Piano Roll。 |
-| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Selection Session、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input；Select Interaction 尚未实现。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection 与 Piano Roll Note Selection。 |
+| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Selection Session、Select Interaction、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
 | `@seele-daw/type-utils` | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。 |
@@ -467,9 +476,9 @@ Project Core 已具备：
 ### 编辑与编排
 
 - MIDI Clip 移动、复制、调整长度、拆分、删除或多选；当前只支持创建、单选与打开上下文。
-- Piano Roll Note 选择、增加、移动、删除、调整长度或力度；当前只读渲染已接入。
+- Piano Roll Note 增加、移动、删除、调整长度或力度；当前只支持基础 Note Selection。
 - Arrangement 时间轴滚动、缩放、Grid 和 Snap。
-- Editor Tool、Drag Preview、框选、多选与键盘编辑。
+- Editor Tool 切换、Drag Preview、框选与键盘内容编辑。
 - Track 重命名、改色、删除、复制、重排。
 - Track Mute、Solo、Gain、Pan 与更多 Channel 设置。
 
@@ -553,17 +562,18 @@ Project Core 已具备：
 | 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Clip-scoped Note Selection Session、权威存在性校准与第三阶段交互计划。 | `054377d` |
 | 2026-07-28 | `PIANO-ROLL` | Editor Browser 完成 Surface 级 DOM Hit、Primary Pointer Capture、CSS Pixel Input 与 Drag Threshold。 | `007c24e` |
 | 2026-07-28 | `KEYBOARD-SHORTCUTS` | Studio 完成 Scoped Action Coordinator、TanStack Browser Adapter，以及 Workbench Save / Undo / Redo Binding。 | `cdf9577` |
-| 2026-07-28 | `KEYBOARD-SHORTCUTS` | 集中默认 Keymap、强类型 Binding 和动态输入 Validation；用户设置面板仍未实现。 | 本批待审 |
+| 2026-07-28 | `KEYBOARD-SHORTCUTS` | 集中默认 Keymap、强类型 Binding 和动态输入 Validation；用户设置面板仍未实现。 | `378c253`、`659b8c4` |
+| 2026-07-28 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | Studio 接入 Clip-scoped Note Selection、共享 selected Scene、Pointer Click 与 focused Escape。 | 本批待审 |
 
 ## 13. 当前验证基线
 
-功能代码截至 `cdf9577`；当前待审的 Keyboard Binding / Keymap 优化工作树已通过：
+功能代码截至 `1e278f6`；当前待审的 Batch 4 Studio Selection 工作树已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：4 个测试文件，35 项测试。
+- editor：5 个测试文件，45 项测试。
 - Studio：34 个测试文件，175 项测试。
 - type-utils：1 个测试文件，2 项测试。
 

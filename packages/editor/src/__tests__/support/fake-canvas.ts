@@ -29,6 +29,8 @@ export function createFakeCanvasFixture(): FakeCanvasFixture {
     restore: () => record('restore'),
     save: () => record('save'),
     setTransform: (...arguments_: number[]) => record('setTransform', ...arguments_),
+    shadowBlur: 0,
+    shadowColor: '',
     stroke: () => record('stroke'),
     strokeRect: (...arguments_: number[]) => record('strokeRect', ...arguments_),
     strokeStyle: '',

@@ -7,10 +7,12 @@ import type {
 export interface PianoRollNoteVisual {
   readonly borderColor: string
   readonly fillColor: string
+  readonly glowColor: string | null
   readonly heightCssPixel: number
   readonly noteId: NoteId
   readonly opacity: number
   readonly pitch: MidiPitch
+  readonly selected: boolean
   readonly visibleEndTick: Tick
   readonly visibleStartTick: Tick
   readonly widthCssPixel: number

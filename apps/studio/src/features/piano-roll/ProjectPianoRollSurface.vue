@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import {
+  PIANO_ROLL_POINTER_INPUT_PHASE,
+  applyPianoRollSelectInteraction,
+  createPianoRollEditorSession,
   createInitialPianoRollViewport,
   createPianoRollGrid,
   createPianoRollGridCanvasRenderer,
   createPianoRollNoteScene,
   createPianoRollNoteReadModel,
+  createPianoRollPointerInputAdapter,
+  type PianoRollEditorSession,
+  type PianoRollEditorSessionState,
   type PianoRollGridCanvasRenderer,
   type PianoRollGridCanvasTheme,
   type PianoRollNoteRenderer,
   type PianoRollNoteReadModel,
   type PianoRollNoteReadModelState,
+  type PianoRollPointerInputAdapter,
 } from '@seele-daw/editor'
 import {
   PROJECT_PPQ,
@@ -23,12 +30,18 @@ import {
   onMounted,
   onUnmounted,
   shallowRef,
+  useTemplateRef,
   watch,
   watchEffect,
 } from 'vue'
 
 import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
+import {
+  STUDIO_KEYBOARD_ACTION,
+  STUDIO_KEYBOARD_SCOPE,
+} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import { useStudioKeyboardShortcuts } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 
 interface ProjectPianoRollSurfaceProps {
   readonly barSpanTick: Tick
@@ -38,21 +51,28 @@ interface ProjectPianoRollSurfaceProps {
 }
 
 const props = defineProps<ProjectPianoRollSurfaceProps>()
+const { keyboardShortcuts } = useStudioKeyboardShortcuts()
 
 const INITIAL_MINIMUM_PITCH = parseMidiPitch(48)
 const INITIAL_MAXIMUM_PITCH = parseMidiPitch(72)
 const SIXTEENTH_NOTE_SPAN_TICK = parsePositiveTick(PROJECT_PPQ / 4)
 
-const canvasHost = shallowRef<HTMLElement | null>(null)
-const surfaceElement = shallowRef<HTMLElement | null>(null)
-const gridCanvas = shallowRef<HTMLCanvasElement | null>(null)
-const noteHost = shallowRef<HTMLElement | null>(null)
+const canvasHost = useTemplateRef<HTMLElement>('canvasHost')
+const surfaceElement = useTemplateRef<HTMLElement>('surfaceElement')
+const gridCanvas = useTemplateRef<HTMLCanvasElement>('gridCanvas')
+const noteHost = useTemplateRef<HTMLElement>('noteHost')
 const noteState = shallowRef<PianoRollNoteReadModelState | null>(null)
-const failureMessage = shallowRef<string | null>(null)
+const editorState = shallowRef<PianoRollEditorSessionState | null>(null)
+const interactionFailureMessage = shallowRef<string | null>(null)
+const readModelFailureMessage = shallowRef<string | null>(null)
+const renderFailureMessage = shallowRef<string | null>(null)
 const gridRenderer = shallowRef<PianoRollGridCanvasRenderer | null>(null)
 const noteRenderer = shallowRef<PianoRollNoteRenderer | null>(null)
+let editorSession: PianoRollEditorSession | null = null
+let unsubscribeEditorSession: (() => void) | null = null
 let readModel: PianoRollNoteReadModel | null = null
 let unsubscribeReadModel: (() => void) | null = null
+let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
 let resizeObserver: ResizeObserver | null = null
 
 const pianoKeys = Object.freeze(
@@ -79,12 +99,19 @@ const barLabels = computed(() => {
 const rulerStyle = computed(() => ({
   gridTemplateColumns: `repeat(${barLabels.value.length}, minmax(0, 1fr))`,
 }))
+const failureMessage = computed(
+  () =>
+    interactionFailureMessage.value ??
+    readModelFailureMessage.value ??
+    renderFailureMessage.value,
+)
 const accessibleStatus = computed(() => {
   if (failureMessage.value !== null) return failureMessage.value
   const noteCount = noteState.value?.notes.length ?? 0
+  const selectedNoteCount = editorState.value?.selectedNoteIds.length ?? 0
   return `${props.presentation.name}, ${noteCount} visible MIDI ${
     noteCount === 1 ? 'note' : 'notes'
-  }`
+  }, ${selectedNoteCount} selected`
 })
 
 function describeFailure(cause: unknown): string {
@@ -100,6 +127,8 @@ interface PianoRollSurfaceThemeSnapshot {
   readonly grid: PianoRollGridCanvasTheme
   readonly noteBorderColor: string
   readonly noteFillColor: string
+  readonly selectedNoteBorderColor: string
+  readonly selectedNoteGlowColor: string
 }
 
 function createThemeSnapshot(): PianoRollSurfaceThemeSnapshot {
@@ -121,6 +150,14 @@ function createThemeSnapshot(): PianoRollSurfaceThemeSnapshot {
     noteFillColor:
       props.presentation.color ??
       readThemeColor(style, '--sd-color-border-focus'),
+    selectedNoteBorderColor: readThemeColor(
+      style,
+      '--sd-editor-note-selected-border',
+    ),
+    selectedNoteGlowColor: readThemeColor(
+      style,
+      '--sd-editor-note-selected-glow',
+    ),
   })
 }
 
@@ -160,13 +197,49 @@ function render(): void {
           borderColor: theme.noteBorderColor,
           fillColor: theme.noteFillColor,
           opacity: props.presentation.muted ? 0.46 : 1,
+          selectedBorderColor: theme.selectedNoteBorderColor,
+          selectedGlowColor: theme.selectedNoteGlowColor,
         },
+        selectedNoteIds: editorState.value?.selectedNoteIds ?? [],
         viewport: state.viewport,
       }),
     )
-    failureMessage.value = null
+    renderFailureMessage.value = null
   } catch (cause) {
-    failureMessage.value = describeFailure(cause)
+    renderFailureMessage.value = describeFailure(cause)
+  }
+}
+
+function disposeEditorSession(): void {
+  unsubscribeEditorSession?.()
+  unsubscribeEditorSession = null
+  editorSession?.dispose()
+  editorSession = null
+  editorState.value = null
+}
+
+function composeEditorSession(): void {
+  disposeEditorSession()
+
+  try {
+    const nextEditorSession = createPianoRollEditorSession({
+      context: props.presentation.context,
+      session: props.session,
+    })
+    editorSession = nextEditorSession
+    editorState.value = nextEditorSession.state
+    unsubscribeEditorSession = nextEditorSession.subscribe({
+      onError: (failure) => {
+        interactionFailureMessage.value = describeFailure(failure.cause)
+      },
+      onStateChange: (state) => {
+        editorState.value = state
+        interactionFailureMessage.value = null
+      },
+    })
+    interactionFailureMessage.value = null
+  } catch (cause) {
+    interactionFailureMessage.value = describeFailure(cause)
   }
 }
 
@@ -192,6 +265,7 @@ function createOrResizeReadModel(): void {
 
     if (readModel !== null) {
       readModel.setViewport(viewport)
+      readModelFailureMessage.value = null
       return
     }
 
@@ -203,14 +277,16 @@ function createOrResizeReadModel(): void {
     noteState.value = readModel.state
     unsubscribeReadModel = readModel.subscribe({
       onError: (failure) => {
-        failureMessage.value = describeFailure(failure.cause)
+        readModelFailureMessage.value = describeFailure(failure.cause)
       },
       onStateChange: (state) => {
         noteState.value = state
+        readModelFailureMessage.value = null
       },
     })
+    readModelFailureMessage.value = null
   } catch (cause) {
-    failureMessage.value = describeFailure(cause)
+    readModelFailureMessage.value = describeFailure(cause)
   }
 }
 
@@ -223,6 +299,33 @@ function handleWindowResize(): void {
   createOrResizeReadModel()
 }
 
+function isPianoRollFocused(): boolean {
+  const element = surfaceElement.value
+  return (
+    element !== null &&
+    (element === element.ownerDocument.activeElement ||
+      element.contains(element.ownerDocument.activeElement))
+  )
+}
+
+const disposeKeyboardShortcut = keyboardShortcuts.register([
+  {
+    actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
+    bindings: keyboardShortcuts.bindingsFor(
+      STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
+    ),
+    description: 'Clear the Note selection in the focused Piano Roll.',
+    isEnabled: () =>
+      isPianoRollFocused() &&
+      (editorState.value?.selectedNoteIds.length ?? 0) > 0,
+    label: 'Clear Piano Roll selection',
+    run: () => editorSession?.clearSelection() ?? false,
+    scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
+  },
+])
+
+composeEditorSession()
+
 watch(
   () => [
     props.presentation.context.clipId,
@@ -231,7 +334,10 @@ watch(
     props.presentation.context.sourceStartTick,
     props.session,
   ],
-  recomposeReadModel,
+  () => {
+    recomposeReadModel()
+    composeEditorSession()
+  },
 )
 watchEffect(render)
 
@@ -239,7 +345,8 @@ onMounted(() => {
   const grid = gridCanvas.value
   const notes = noteHost.value
   const host = canvasHost.value
-  if (grid === null || notes === null || host === null) return
+  const surface = surfaceElement.value
+  if (grid === null || notes === null || host === null || surface === null) return
 
   try {
     gridRenderer.value = createPianoRollGridCanvasRenderer({
@@ -248,12 +355,32 @@ onMounted(() => {
     noteRenderer.value = createProjectPianoRollNoteRenderer({
       container: notes,
     })
+    pointerInputAdapter = createPianoRollPointerInputAdapter({
+      observer: {
+        onError: (failure) => {
+          interactionFailureMessage.value = describeFailure(failure.cause)
+        },
+        onInput: (input) => {
+          if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
+            surface.focus({ preventScroll: true })
+          }
+
+          const currentEditorSession = editorSession
+          if (currentEditorSession === null) return
+          applyPianoRollSelectInteraction(currentEditorSession, input)
+          interactionFailureMessage.value = null
+        },
+      },
+      surface: host,
+    })
   } catch (cause) {
+    pointerInputAdapter?.dispose()
+    pointerInputAdapter = null
     gridRenderer.value?.dispose()
     gridRenderer.value = null
     noteRenderer.value?.dispose()
     noteRenderer.value = null
-    failureMessage.value = describeFailure(cause)
+    renderFailureMessage.value = describeFailure(cause)
     return
   }
 
@@ -267,9 +394,13 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  disposeKeyboardShortcut()
   resizeObserver?.disconnect()
   resizeObserver = null
   window.removeEventListener('resize', handleWindowResize)
+  pointerInputAdapter?.dispose()
+  pointerInputAdapter = null
+  disposeEditorSession()
   disposeReadModel()
   gridRenderer.value?.dispose()
   gridRenderer.value = null
@@ -315,7 +446,11 @@ onUnmounted(() => {
       <li v-for="visibleNote in noteState.notes" :key="visibleNote.note.id">
         MIDI note {{ visibleNote.note.pitch }}, starts at
         {{ visibleNote.visibleStartTick }} ticks, duration
-        {{ visibleNote.note.durationTick }} ticks
+        {{ visibleNote.note.durationTick }} ticks{{
+          editorState?.selectedNoteIds.includes(visibleNote.note.id)
+            ? ', selected'
+            : ''
+        }}
       </li>
     </ul>
   </section>

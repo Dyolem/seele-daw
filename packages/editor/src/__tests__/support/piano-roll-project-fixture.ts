@@ -5,6 +5,8 @@ import {
   createAddMidiClipCommand,
   createAddNoteCommand,
   createInitialProjectSession,
+  createMoveNoteCommand,
+  createRemoveNoteCommand,
   parseBipolarValue,
   parseClipId,
   parseDeviceId,
@@ -118,6 +120,34 @@ export function createPianoRollProjectFixture() {
     )
   }
 
+  function moveNote(
+    noteId: NoteId,
+    nextStartTick: Tick,
+    nextPitch: MidiPitch,
+  ): void {
+    executeCommitted(
+      session,
+      createMoveNoteCommand({
+        baseRevision: session.modelRevision,
+        sourceId,
+        noteId,
+        nextStartTick,
+        nextPitch,
+      }),
+    )
+  }
+
+  function removeNote(noteId: NoteId): void {
+    executeCommitted(
+      session,
+      createRemoveNoteCommand({
+        baseRevision: session.modelRevision,
+        sourceId,
+        noteId,
+      }),
+    )
+  }
+
   addNote({
     noteId: parseNoteId('editor-note-leading'),
     startTick: parseTick(240),
@@ -154,6 +184,8 @@ export function createPianoRollProjectFixture() {
     addNote,
     clip,
     context: createPianoRollClipContext(clip, source),
+    moveNote,
+    removeNote,
     session,
     source,
   })

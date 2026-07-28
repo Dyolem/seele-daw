@@ -5,6 +5,17 @@ export {
 } from './piano-roll-clip-context'
 export type { PianoRollClipContext } from './piano-roll-clip-context'
 
+export { createPianoRollEditorSession } from './piano-roll-editor-session'
+export type {
+  CreatePianoRollEditorSessionInput,
+  PianoRollEditorSession,
+  PianoRollEditorSessionFailure,
+  PianoRollEditorSessionFailureOperation,
+  PianoRollEditorSessionObserver,
+  PianoRollEditorSessionState,
+  PianoRollEditorSessionUnsubscribe,
+} from './piano-roll-editor-session'
+
 export { PianoRollError } from './piano-roll-error'
 export type { PianoRollErrorCode } from './piano-roll-error'
 

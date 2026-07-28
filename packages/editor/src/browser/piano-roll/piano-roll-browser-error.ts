@@ -1,7 +1,6 @@
 export type PianoRollBrowserErrorCode =
   | 'canvas-context-unavailable'
   | 'invalid-device-pixel-ratio'
-  | 'invalid-grid'
   | 'invalid-pointer-input-configuration'
   | 'invalid-theme'
   | 'renderer-disposed'

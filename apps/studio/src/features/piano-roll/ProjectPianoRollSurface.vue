@@ -20,6 +20,7 @@ import {
 } from '@seele-daw/editor'
 import {
   PROJECT_PPQ,
+  ZERO_TICK,
   parseMidiPitch,
   parsePositiveTick,
   type ProjectSession,
@@ -167,6 +168,7 @@ function createDisplayGrid() {
     beatSpanTick: parsePositiveTick(
       props.barSpanTick / props.timeSignatureNumerator,
     ),
+    originTick: ZERO_TICK,
     subdivisionSpanTick: SIXTEENTH_NOTE_SPAN_TICK,
   })
 }

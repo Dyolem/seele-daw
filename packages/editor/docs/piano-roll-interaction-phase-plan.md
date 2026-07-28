@@ -1,6 +1,6 @@
 # Piano Roll Interaction 第三阶段计划
 
-> Status: In progress; Batches 1–3 accepted, Batch 4 implemented and awaiting review
+> Status: Implemented and accepted in `f9d7fe7`
 >
 > Date: 2026-07-28
 

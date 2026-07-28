@@ -3,6 +3,7 @@ export type PianoRollErrorCode =
   | 'clip-source-range-invalid'
   | 'coordinate-outside-viewport'
   | 'editor-session-disposed'
+  | 'invalid-grid'
   | 'invalid-viewport-dimension'
   | 'invalid-viewport-pitch-range'
   | 'looped-clip-unsupported'

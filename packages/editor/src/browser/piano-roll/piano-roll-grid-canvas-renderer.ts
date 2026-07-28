@@ -1,5 +1,4 @@
 import {
-  parsePositiveTick,
   parseTick,
   type Tick,
 } from '@seele-daw/project-core'
@@ -13,21 +12,11 @@ import {
 } from '#internal/browser/piano-roll/piano-roll-canvas-layer'
 import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import {
+  createPianoRollGrid,
   pianoRollClipTickToCssPixel,
+  type PianoRollGrid,
   type PianoRollViewport,
 } from '#internal/common/piano-roll/index'
-
-export interface PianoRollGrid {
-  readonly barSpanTick: Tick
-  readonly beatSpanTick: Tick
-  readonly subdivisionSpanTick: Tick
-}
-
-export interface CreatePianoRollGridInput {
-  readonly barSpanTick: Tick
-  readonly beatSpanTick: Tick
-  readonly subdivisionSpanTick: Tick
-}
 
 export interface PianoRollGridCanvasTheme {
   readonly background: string
@@ -57,29 +46,6 @@ export interface PianoRollGridCanvasRenderer {
 }
 
 const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10])
-
-function requireGridNesting(
-  larger: Tick,
-  smaller: Tick,
-  relationship: string,
-): void {
-  if (larger < smaller || larger % smaller !== 0) {
-    throw new PianoRollBrowserError(
-      'invalid-grid',
-      `Piano Roll ${relationship} must use evenly nested positive Tick spans`,
-    )
-  }
-}
-
-export function createPianoRollGrid(input: CreatePianoRollGridInput): PianoRollGrid {
-  const barSpanTick = parsePositiveTick(input.barSpanTick)
-  const beatSpanTick = parsePositiveTick(input.beatSpanTick)
-  const subdivisionSpanTick = parsePositiveTick(input.subdivisionSpanTick)
-
-  requireGridNesting(barSpanTick, beatSpanTick, 'bar and beat grid')
-
-  return Object.freeze({ barSpanTick, beatSpanTick, subdivisionSpanTick })
-}
 
 function requireTheme(theme: PianoRollGridCanvasTheme): PianoRollGridCanvasTheme {
   for (const [name, value] of Object.entries(theme)) {
@@ -132,8 +98,16 @@ function drawPitchRows(
   context.stroke()
 }
 
-function firstGridTick(visibleStartTick: Tick, spanTick: Tick): Tick {
-  return parseTick(Math.ceil(visibleStartTick / spanTick) * spanTick)
+function firstGridTick(
+  visibleStartTick: Tick,
+  originTick: Tick,
+  spanTick: Tick,
+): Tick {
+  if (visibleStartTick <= originTick) return originTick
+  return parseTick(
+    originTick +
+      Math.ceil((visibleStartTick - originTick) / spanTick) * spanTick,
+  )
 }
 
 function drawVerticalGrid(
@@ -173,7 +147,11 @@ function drawVerticalGrid(
     context.lineWidth = group.lineWidth
 
     for (
-      let tick: number = firstGridTick(viewport.visibleStartTick, group.spanTick);
+      let tick: number = firstGridTick(
+        viewport.visibleStartTick,
+        grid.originTick,
+        group.spanTick,
+      );
       tick <= viewport.visibleEndTick;
       tick += group.spanTick
     ) {

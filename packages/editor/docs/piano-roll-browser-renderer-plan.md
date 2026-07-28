@@ -22,15 +22,16 @@
 
 - `PianoRollClipContext`；
 - `PianoRollViewport` 和领域坐标换算；
-- `PianoRollNoteReadModel`。
+- `PianoRollNoteReadModel`；
+- 从 Browser 下沉的 `PianoRollGrid`，以及与其共享时间语义的 Timeline Grid Snap。
 
 Common 不依赖 DOM、Canvas、Vue 或 Studio。
 
 ### Editor Browser
 
-新增框架无关的浏览器 Renderer：
+新增浏览器 Renderer：
 
-- `PianoRollGrid` 定义 bar / beat / subdivision Tick Span；
+- `PianoRollGridCanvasRenderer` 消费 Common 定义的 bar / beat / subdivision Tick Grid；
 - `PianoRollGridCanvasTheme` 接收宿主已经解析的 Grid 语义颜色；
 - `PianoRollGridCanvasRenderer` 拥有静态 Grid Canvas；
 - `PianoRollNoteScene` 提供 Renderer-neutral CSS Pixel Note 几何；

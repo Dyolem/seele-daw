@@ -26,7 +26,7 @@ import {
   createPianoRollGridCanvasRenderer,
   createPianoRollNoteScene,
   createPianoRollViewport,
-  PianoRollBrowserError,
+  PianoRollError,
   type PianoRollGridCanvasTheme,
   type PianoRollVisibleNote,
 } from '#internal/index'
@@ -116,12 +116,14 @@ describe('Piano Roll Browser Renderers', () => {
     const grid = createPianoRollGrid({
       barSpanTick: parsePositiveTick(3_840),
       beatSpanTick: parsePositiveTick(960),
+      originTick: parseTick(0),
       subdivisionSpanTick: parsePositiveTick(240),
     })
 
     expect(grid).toEqual({
       barSpanTick: 3_840,
       beatSpanTick: 960,
+      originTick: 0,
       subdivisionSpanTick: 240,
     })
     expect(Object.isFrozen(grid)).toBe(true)
@@ -132,9 +134,21 @@ describe('Piano Roll Browser Renderers', () => {
       createPianoRollGrid({
         barSpanTick: parsePositiveTick(3_840),
         beatSpanTick: parsePositiveTick(1_000),
+        originTick: parseTick(0),
         subdivisionSpanTick: parsePositiveTick(250),
       }),
-    ).toThrow(PianoRollBrowserError)
+    ).toThrow(PianoRollError)
+  })
+
+  it('rejects display grids whose beat and subdivision divisions do not nest evenly', () => {
+    expect(() =>
+      createPianoRollGrid({
+        barSpanTick: parsePositiveTick(3_840),
+        beatSpanTick: parsePositiveTick(960),
+        originTick: parseTick(0),
+        subdivisionSpanTick: parsePositiveTick(250),
+      }),
+    ).toThrow(PianoRollError)
   })
 
   it('sizes the static Grid bitmap for DPR and suppresses invisible divisions', () => {
@@ -144,6 +158,7 @@ describe('Piano Roll Browser Renderers', () => {
       grid: createPianoRollGrid({
         barSpanTick: parsePositiveTick(3_840),
         beatSpanTick: parsePositiveTick(960),
+        originTick: parseTick(0),
         subdivisionSpanTick: parsePositiveTick(1),
       }),
       theme: gridTheme,
@@ -155,6 +170,30 @@ describe('Piano Roll Browser Renderers', () => {
     expect(fixture.gridCanvas.canvas.style.width).toBe('960px')
     expect(
       fixture.gridCanvas.operations.filter((operation) => operation.name === 'stroke'),
+    ).toHaveLength(3)
+  })
+
+  it('aligns visible Grid divisions to the shared Timeline origin', () => {
+    const fixture = createRendererFixture()
+
+    fixture.gridRenderer.render({
+      grid: createPianoRollGrid({
+        barSpanTick: parsePositiveTick(960),
+        beatSpanTick: parsePositiveTick(480),
+        originTick: parseTick(60),
+        subdivisionSpanTick: parsePositiveTick(240),
+      }),
+      theme: gridTheme,
+      viewport: fixture.viewport,
+    })
+
+    expect(
+      fixture.gridCanvas.operations.filter(
+        (operation) =>
+          operation.name === 'moveTo' &&
+          operation.arguments[0] === 15 &&
+          operation.arguments[1] === 0,
+      ),
     ).toHaveLength(3)
   })
 

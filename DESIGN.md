@@ -217,7 +217,8 @@ Workspace Fullscreen
 | Project facts         | 轨道、Clip、音符、轨道主题色        | Project Core                             | Project Checkpoint     |
 | Project lifecycle     | 当前项目、dirty、保存结果           | ActiveProjectService / application layer | 由项目服务协调         |
 | Workbench preferences | 主题、密度、面板高度、面板模式      | Workbench / preference store             | 本地用户偏好           |
-| Editor session        | Selection、Tool、Zoom、Scroll、Snap | 对应 Editor state                        | 默认不写入项目         |
+| Studio editor preferences | Tool、Snap、Grid Preset         | Studio preference store                  | 首批仅应用生命周期     |
+| Editor session        | 当前 Clip Selection、Zoom、Scroll   | 对应 Editor state                        | 默认不写入项目         |
 | Transient interaction | Hover、拖动预览、框选区域           | Surface interaction state                | 不持久化               |
 | Audio runtime         | 播放、调度、电平、设备状态          | Audio / playback runtime                 | 不进入 Project History |
 
@@ -377,9 +378,17 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 
 - MIDI 60 显示为 `C4`，初始纵向视图以 C4 附近为中心；
 - 初次打开 Clip 时横向显示完整 Clip，Arrangement 与 Piano Roll 暂不强制同步 Zoom；
-- 初始 Grid 为 `1/16`；
-- 默认工具为 Select，Pencil 模式单击空白网格创建 Note；
-- 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1。
+- 初始 Grid 为 `1/16`，Snap 默认开启；
+- 显式提供 Pencil 与 Cursor，默认工具为 Pencil；
+- Cursor 在首批只拥有 Note Selection，不能修改 Note；
+- Pencil Click 空白 Grid 创建 Note，Click 已有 Note 不创建也不改变 Selection；
+- 创建成功后只选中新 Note，并保持 Pencil 激活以支持连续 Click 输入；
+- 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1；
+- X 受 Timeline Grid Snap 影响；关闭 Snap 时保留 Pencil X 对应的最近整数 Tick；
+- Y 不进入 Timeline Snap，直接使用 Pointer 覆盖的离散 Pitch Row。
+
+Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
+[Piano Roll Note Creation 第四阶段计划](./packages/editor/docs/piano-roll-note-creation-phase-plan.md)。
 
 首批 Note Selection 语义：
 
@@ -1060,8 +1069,10 @@ Canvas 功能至少检查：
 11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM；进入 Zoom、Scroll、大量对象或高频交互前重新评估 Canvas。
 12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，Grid 使用 Canvas，Note 通过可替换 Renderer Port 输出。
 13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，横向初始显示完整 Clip。
-14. Piano Roll 初始 Grid 为 1/16；默认 Select，Pencil 单击创建长度为一格、Velocity 100、UI Channel 1 的 Note。
-15. Piano Roll 首批使用 DPR-aware Canvas Grid 与 keyed DOM Note；Canvas Note Adapter 消费同一 Scene，是否切换由真实基准决定。
+14. Piano Roll 显式提供 Pencil 与 Cursor，默认 Pencil；Cursor 首批只负责 Selection。
+15. Piano Roll 初始 Grid 为 1/16、Snap 默认开启；视觉 Grid 与交互 Snap 消费同一 Common Grid。
+16. Pencil Click 空白 Grid 创建长度为一格、Velocity 100、UI Channel 1 的 Note；成功后只选中新 Note并保持 Pencil。
+17. Piano Roll 首批使用 DPR-aware Canvas Grid 与 keyed DOM Note；Canvas Note Adapter 消费同一 Scene，是否切换由真实基准决定。
 
 ## 24. 待后续切片决定
 

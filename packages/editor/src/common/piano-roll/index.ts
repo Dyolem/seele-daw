@@ -36,6 +36,12 @@ export type { PianoRollSelectionTarget } from './piano-roll-select-interaction'
 export { PianoRollError } from './piano-roll-error'
 export type { PianoRollErrorCode } from './piano-roll-error'
 
+export { createPianoRollGrid } from './piano-roll-grid'
+export type {
+  CreatePianoRollGridInput,
+  PianoRollGrid,
+} from './piano-roll-grid'
+
 export { createPianoRollNoteReadModel } from './piano-roll-note-read-model'
 export type {
   CreatePianoRollNoteReadModelInput,

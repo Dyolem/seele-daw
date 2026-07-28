@@ -23,12 +23,17 @@
 
 - MIDI Note 60 显示为 `C4`，初始视图以 C4 附近为中心；
 - 横向初始显示完整 Clip；
-- 默认 Grid 为 `1/16`；
-- 默认工具为 Select，Pencil 单击创建 Note；
-- 新 Note 默认长度 `1/16`、Velocity 100、UI MIDI Channel 1。
+- 默认 Grid 为 `1/16`，Snap 默认开启；
+- 显式提供 Pencil 与 Cursor，默认 Pencil；
+- Cursor 首批只负责 Selection，Pencil Click 空白 Grid 创建 Note；
+- 新 Note 默认长度 `1/16`、Velocity 100、UI MIDI Channel 1；
+- 创建成功后只选中新 Note，并保持 Pencil 激活。
 
 Grid、Tool 和 Note 默认值会在对应产品切片进入 Command 前实现。本批只导出
 `C4 = MIDI 60` 的稳定中心音高常量，不提前实现 Snap 或 Tool 状态机。
+
+后续接受的完整规则见
+[Piano Roll Note Creation 第四阶段计划](./piano-roll-note-creation-phase-plan.md)。
 
 ## Clip 编辑上下文
 

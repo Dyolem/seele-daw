@@ -1,11 +1,6 @@
-export {
-  createPianoRollGridCanvasRenderer,
-  createPianoRollGrid,
-} from './piano-roll-grid-canvas-renderer'
+export { createPianoRollGridCanvasRenderer } from './piano-roll-grid-canvas-renderer'
 export type {
   CreatePianoRollGridCanvasRendererInput,
-  CreatePianoRollGridInput,
-  PianoRollGrid,
   PianoRollGridCanvasRenderer,
   PianoRollGridCanvasRenderInput,
   PianoRollGridCanvasTheme,

@@ -1,6 +1,6 @@
 # Piano Roll Interaction 第三阶段计划
 
-> Status: In progress; Batches 1–2 accepted, Batch 3 implemented and awaiting review
+> Status: In progress; Batches 1–2 accepted, Batch 3 baseline committed with Keymap refinement awaiting review
 >
 > Date: 2026-07-28
 
@@ -116,6 +116,8 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
 - IME composing 和已处理 Event 不进入 Action；
 - 只有 Handler 返回 true 才阻止浏览器默认行为；
 - Workbench 已接入 Save、Undo、Redo 及 Windows `Control+Y` 兼容 Binding；
+- 内置 Binding 由强类型默认 Keymap 提供，页面只按 Action ID 查询当前配置；
+- 动态用户字符串必须先通过非抛出的 Validation 边界，未来 Settings 负责行内提示和覆盖合并；
 - `piano-roll.selection.clear` 的 ID、Scope 与 `Escape` 产品规则已保留，但真实 Handler 随
   Batch 4 Editor Session 接入，不能提前注册空行为。
 

@@ -1,7 +1,12 @@
 import { HotkeyManager } from '@tanstack/hotkeys'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
+import {
+  createBrowserTanStackHotkeyRegistry,
+  parseStudioKeyboardBinding,
+  validateStudioKeyboardBinding,
+} from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
+import { defineStudioKeyboardBinding } from '@/workbench/keyboard/studio-keyboard-binding'
 
 afterEach(() => {
   HotkeyManager.resetInstance()
@@ -15,7 +20,8 @@ describe('BrowserTanStackHotkeyRegistry', () => {
       target: document,
     })
     const listener = vi.fn<(event: KeyboardEvent) => void>()
-    const dispose = registry.register('Mod+S', listener)
+    const saveBinding = defineStudioKeyboardBinding('Mod+S')
+    const dispose = registry.register(saveBinding, listener)
     const event = new KeyboardEvent('keydown', {
       bubbles: true,
       cancelable: true,
@@ -27,7 +33,7 @@ describe('BrowserTanStackHotkeyRegistry', () => {
 
     expect(listener).toHaveBeenCalledExactlyOnceWith(event)
     expect(event.defaultPrevented).toBe(false)
-    expect(registry.formatForDisplay('Mod+S')).toContain('S')
+    expect(registry.formatForDisplay(saveBinding)).toContain('S')
 
     dispose()
     document.body.dispatchEvent(
@@ -47,8 +53,14 @@ describe('BrowserTanStackHotkeyRegistry', () => {
     })
     const save = vi.fn<(event: KeyboardEvent) => void>()
     const escape = vi.fn<(event: KeyboardEvent) => void>()
-    const disposeSave = registry.register('Mod+S', save)
-    const disposeEscape = registry.register('Escape', escape)
+    const disposeSave = registry.register(
+      defineStudioKeyboardBinding('Mod+S'),
+      save,
+    )
+    const disposeEscape = registry.register(
+      defineStudioKeyboardBinding('Escape'),
+      escape,
+    )
     const input = document.createElement('input')
     document.body.append(input)
     input.focus()
@@ -73,14 +85,30 @@ describe('BrowserTanStackHotkeyRegistry', () => {
     disposeEscape()
   })
 
-  it('rejects invalid bindings before installing a listener', () => {
-    const registry = createBrowserTanStackHotkeyRegistry({
-      target: document,
-    })
+  it('validates dynamic Settings input before it becomes a Binding', () => {
+    const lowerCaseKey = validateStudioKeyboardBinding(' k ')
+    const invalid = validateStudioKeyboardBinding('Mod++S')
 
-    expect(() =>
-      registry.register('Mod++S', vi.fn<(event: KeyboardEvent) => void>()),
-    ).toThrow('Invalid hotkey')
+    expect(lowerCaseKey).toEqual({
+      binding: 'k',
+      errors: [],
+      input: ' k ',
+      valid: true,
+      warnings: [],
+    })
+    expect(Object.isFrozen(lowerCaseKey)).toBe(true)
+    expect(Object.isFrozen(lowerCaseKey.errors)).toBe(true)
+    expect(Object.isFrozen(lowerCaseKey.warnings)).toBe(true)
+    expect(invalid).toEqual({
+      binding: null,
+      errors: ['Invalid hotkey format: empty parts detected'],
+      input: 'Mod++S',
+      valid: false,
+      warnings: [],
+    })
+    expect(() => parseStudioKeyboardBinding('Mod++S')).toThrowError(
+      expect.objectContaining({ code: 'invalid-binding' }),
+    )
     expect(HotkeyManager.getInstance().getRegistrationCount()).toBe(0)
   })
 })

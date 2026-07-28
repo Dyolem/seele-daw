@@ -291,6 +291,8 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 普通可编辑元素和 IME composing 默认不触发编辑 Action；
 - 只有当前 Scope 中 enabled Action 真正处理按键时才阻止浏览器默认行为；
 - Action metadata 与 Binding 必须可被菜单、帮助面板和未来 Command Palette 复用；
+- 内置按键集中在强类型默认 Keymap；Feature 只按 Action ID 获取当前 Binding，不散落字符串；
+- 用户输入必须先验证，无效 Binding 在 Settings 字段旁提示且不得进入注册或持久化；
 - 首批 Workbench Binding 为 Save `Mod+S`、Undo `Mod+Z`、Redo `Mod+Shift+Z`，并兼容
   Windows `Control+Y`；
 - focused Piano Roll 的 `Escape` 清空 Selection，但只有 Editor Session 已接入且该表面

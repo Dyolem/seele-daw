@@ -2,6 +2,10 @@ import type {
   StudioKeyboardBindingRegistry,
   StudioKeyboardShortcutDispose,
 } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import type {
+  StudioKeyboardBinding,
+  StudioKeyboardBindingValidation,
+} from '@/workbench/keyboard/studio-keyboard-binding'
 
 export class TestStudioKeyboardBindingRegistry
   implements StudioKeyboardBindingRegistry
@@ -27,12 +31,12 @@ export class TestStudioKeyboardBindingRegistry
     return event
   }
 
-  formatForDisplay(binding: string): string {
+  formatForDisplay(binding: StudioKeyboardBinding): string {
     return `display:${binding}`
   }
 
   register(
-    binding: string,
+    binding: StudioKeyboardBinding,
     listener: (event: KeyboardEvent) => void,
   ): StudioKeyboardShortcutDispose {
     if (this.listeners.has(binding)) {
@@ -54,5 +58,17 @@ export class TestStudioKeyboardBindingRegistry
         (this.disposalCountByBinding.get(binding) ?? 0) + 1,
       )
     }
+  }
+
+  validate(input: string): StudioKeyboardBindingValidation {
+    const normalized = input.trim()
+    const valid = normalized.length > 0
+    return Object.freeze({
+      binding: valid ? (normalized as StudioKeyboardBinding) : null,
+      errors: Object.freeze(valid ? [] : ['Binding cannot be empty']),
+      input,
+      valid,
+      warnings: Object.freeze([]),
+    })
   }
 }

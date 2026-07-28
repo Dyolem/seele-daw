@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-28，功能代码截至 `007c24e`
+> 最近更新：2026-07-28，功能代码截至 `cdf9577`
 >
-> 当前待审：Studio Scoped Keyboard Shortcuts，提交号将在审核通过后回填
+> 当前待审：Keyboard Binding 类型与默认 Keymap 优化
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -248,10 +248,15 @@ Piano Roll 已能渲染真实 Grid 和 Note，但尚没有可见 Selection、工
 - 只有 enabled Action 实际处理时才阻止浏览器默认行为；
 - Feature 离开时卸载自己的 Action，应用释放时统一清理剩余 Listener；
 - 快捷键只调用现有 Save / History 权威，不保存 ProjectSession、dirty 或 History 副本。
+- Feature 根据 Action ID 读取集中式默认 Keymap，不在页面组件中散落 Binding 字符串。
 
 Piano Roll `Escape` 清空 Selection 的产品规则已经确定，但要等下一批真实
 `PianoRollEditorSession` 接入后才启用。当前没有用户 Keymap、Shortcut Settings、Sequence
 或 Command Palette。
+
+用户 Keymap 的输入验证边界已经就绪，但可见设置面板尚未实现。未来无效输入必须在字段旁
+显示错误并保留原 Binding；损坏或不兼容的持久化覆盖应回退默认值，不能让错误延迟到 Feature
+注册时才以应用启动失败暴露。
 
 ## 6. Track
 
@@ -547,18 +552,19 @@ Project Core 已具备：
 | 2026-07-27 | `PIANO-ROLL`、`CONTEXT-EDITOR-DOCK` | Studio Dock 默认接入 keyed DOM Note 与真实 Project Query / Subscription。 | `f3778f0` |
 | 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Clip-scoped Note Selection Session、权威存在性校准与第三阶段交互计划。 | `054377d` |
 | 2026-07-28 | `PIANO-ROLL` | Editor Browser 完成 Surface 级 DOM Hit、Primary Pointer Capture、CSS Pixel Input 与 Drag Threshold。 | `007c24e` |
-| 2026-07-28 | `KEYBOARD-SHORTCUTS` | Studio 完成 Scoped Action Coordinator、TanStack Browser Adapter，以及 Workbench Save / Undo / Redo Binding；等待本批审核。 | 待提交 |
+| 2026-07-28 | `KEYBOARD-SHORTCUTS` | Studio 完成 Scoped Action Coordinator、TanStack Browser Adapter，以及 Workbench Save / Undo / Redo Binding。 | `cdf9577` |
+| 2026-07-28 | `KEYBOARD-SHORTCUTS` | 集中默认 Keymap、强类型 Binding 和动态输入 Validation；用户设置面板仍未实现。 | 本批待审 |
 
 ## 13. 当前验证基线
 
-功能代码截至 `007c24e`；当前待审的 Scoped Keyboard Shortcuts 工作树已通过：
+功能代码截至 `cdf9577`；当前待审的 Keyboard Binding / Keymap 优化工作树已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
 - editor：4 个测试文件，35 项测试。
-- Studio：34 个测试文件，174 项测试。
+- Studio：34 个测试文件，175 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

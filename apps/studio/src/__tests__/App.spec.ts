@@ -16,6 +16,7 @@ import { createStudioRouter } from '@/router'
 import { createProjectWorkspaceLocation, PROJECT_ROUTE_NAME } from '@/router/project-routes'
 import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
 import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
 import {
   STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
   type StudioKeyboardShortcutVueContext,
@@ -134,6 +135,7 @@ function createKeyboardShortcutContext(): StudioKeyboardShortcutVueContext {
   return Object.freeze({
     keyboardShortcuts: createStudioKeyboardShortcutCoordinator({
       bindingRegistry: new TestStudioKeyboardBindingRegistry(),
+      keymap: STUDIO_DEFAULT_KEYMAP,
     }),
   })
 }

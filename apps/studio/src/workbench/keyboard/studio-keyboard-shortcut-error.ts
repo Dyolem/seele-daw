@@ -2,6 +2,7 @@ export type StudioKeyboardShortcutErrorCode =
   | 'action-already-registered'
   | 'coordinator-disposed'
   | 'invalid-action'
+  | 'invalid-binding'
   | 'scope-binding-conflict'
 
 export interface StudioKeyboardShortcutErrorDetails {

@@ -1,6 +1,6 @@
 # Studio Keyboard Shortcut Architecture
 
-> Status: Implemented; awaiting review
+> Status: Implemented; Binding and Keymap refinement awaiting review
 >
 > Date: 2026-07-28
 >
@@ -26,8 +26,8 @@ Studio 的快捷键系统需要统一解决：
 
 - 核心 `HotkeyManager` 已提供 `Mod`、按键解析、输入过滤、目标监听和显式 unregister；
 - Coordinator 由 Studio Composition Root 创建，不应绑定任意 Vue 组件的 composable 生命周期；
-- 当前库仍为 alpha，API 可能变化，所以生产代码只有
-  `browser-tanstack-hotkey-registry.ts` 可以导入它；
+- 当前库仍为 alpha，API 可能变化；生产代码只有 Browser Adapter 可以运行时导入它，
+  `studio-keyboard-binding.ts` 只导入其 `Hotkey` 类型约束内置配置；
 - `package.json` 使用精确版本，升级必须重新运行输入过滤、跨平台匹配、冲突和 cleanup 测试。
 
 官方依据：
@@ -51,6 +51,20 @@ KeyboardEvent
 Browser Registry 是第三方兼容层，不知道 Save、Undo、Piano Roll 或 Modal。Coordinator
 不知道 TanStack 类型，也不进入 Pinia；它作为应用级命令能力通过类型化 Vue Context 注入。
 
+Binding 配置链为：
+
+```text
+compile-time Hotkey literal
+  -> StudioKeyboardBinding
+  -> STUDIO_DEFAULT_KEYMAP
+  -> Composition Root
+  -> Coordinator.bindingsFor(actionId)
+  -> Feature registration
+```
+
+页面不保存默认按键字面量。Composition Root 当前注入完整默认 Keymap；未来加载用户偏好后，
+可以在同一边界传入合并后的冻结 Keymap，而不修改 Feature。
+
 ## 4. Action 契约
 
 每个注册 Action 必须定义：
@@ -68,6 +82,10 @@ Browser Registry 是第三方兼容层，不知道 Save、Undo、Piano Roll 或 
 
 Metadata 以冻结快照公开，包含平台格式化后的 Binding，可供菜单和未来帮助面板使用；不公开
 Handler。
+
+`StudioKeyboardBinding` 是项目自有的 branded string。内置配置必须通过
+`defineStudioKeyboardBinding()` 编写，其泛型受 TanStack `Hotkey` 类型约束，因此拼写错误在
+Type Check 阶段失败；Coordinator、Feature 和 Context 不接受任意 `string`。
 
 ## 5. Scope 与冲突
 
@@ -94,6 +112,19 @@ Action ID 在应用中唯一。Feature 注册返回幂等 disposer；最后一�
 - enabled check 或 Handler failure 不落到更低 Scope，也不逃逸进浏览器事件循环；
 - Composition Root dispose 必须释放 Coordinator；Feature unmount 必须调用自己的 disposer。
 
+### 6.1 动态用户输入
+
+未来 Settings 输入是运行时字符串，不能伪装成编译期 Binding：
+
+1. UI 调用 Coordinator 的 `validateBindingInput()`；
+2. Browser Adapter 返回项目自有的冻结 Validation，包括 errors、warnings 和可选 Binding；
+3. 无效输入在当前字段旁显示，不保存、不替换默认值，也不进入注册流程；
+4. 有效 Binding 才进入用户覆盖 Keymap；
+5. 加载到损坏或已不兼容的持久化覆盖时，回退对应默认 Binding，并在 Settings 中提示。
+
+注册阶段的内置 Keymap 错误属于开发配置错误，应由类型检查或启动失败尽早暴露，不使用 Toast
+掩盖；用户可修正的输入错误则必须在未来 Keymap Settings 面板内提供行内反馈。
+
 ## 7. 首批 Action
 
 | Action ID | Binding | Scope | 当前 enabled 条件 |
@@ -114,3 +145,6 @@ Piano Roll Action ID 和 Scope 已稳定，但本批不注册一个没有 Editor
 - Shortcut Settings 或 Command Palette；
 - 组件内直接使用 TanStack Vue composable；
 - 用 Pinia 保存注册表、Handler 或浏览器 Listener。
+
+当前已建立默认 Keymap、动态输入验证结果和注入边界，但尚未提供用户可见的 Keymap Settings
+面板或持久化覆盖。

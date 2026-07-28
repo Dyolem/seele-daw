@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
+import { defineStudioKeyboardBinding } from '@/workbench/keyboard/studio-keyboard-binding'
 import {
   STUDIO_KEYBOARD_ACTION,
   STUDIO_KEYBOARD_SCOPE,
@@ -8,13 +9,17 @@ import {
   type StudioKeyboardShortcutDefinition,
   type StudioKeyboardShortcutFailure,
 } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import {
+  STUDIO_DEFAULT_KEYMAP,
+  createStudioKeyboardKeymap,
+} from '@/workbench/keyboard/studio-default-keymap'
 
 function createDefinition(
   input: Partial<StudioKeyboardShortcutDefinition> = {},
 ): StudioKeyboardShortcutDefinition {
   return {
     actionId: STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
-    bindings: ['Mod+S'],
+    bindings: [defineStudioKeyboardBinding('Mod+S')],
     description: 'Save the active project.',
     label: 'Save project',
     run: () => true,
@@ -28,6 +33,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     const bindingRegistry = new TestStudioKeyboardBindingRegistry()
     const coordinator = createStudioKeyboardShortcutCoordinator({
       bindingRegistry,
+      keymap: STUDIO_DEFAULT_KEYMAP,
     })
     const disposeWorkbench = coordinator.register([createDefinition()])
     const disposeGlobal = coordinator.register([
@@ -40,10 +46,20 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     ])
 
     expect(bindingRegistry.registrationCountByBinding.get('Mod+S')).toBe(1)
+    expect(
+      coordinator.bindingsFor(STUDIO_KEYBOARD_ACTION.PROJECT_SAVE),
+    ).toBe(STUDIO_DEFAULT_KEYMAP[STUDIO_KEYBOARD_ACTION.PROJECT_SAVE])
+    expect(coordinator.validateBindingInput(' K ')).toEqual({
+      binding: 'K',
+      errors: [],
+      input: ' K ',
+      valid: true,
+      warnings: [],
+    })
     expect(coordinator.listShortcuts()).toEqual([
       {
         actionId: STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
-        bindings: ['Mod+S'],
+        bindings: [defineStudioKeyboardBinding('Mod+S')],
         description: 'Save the active project.',
         displayBindings: ['display:Mod+S'],
         label: 'Save project',
@@ -51,7 +67,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
       },
       {
         actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
-        bindings: ['Mod+S'],
+        bindings: [defineStudioKeyboardBinding('Mod+S')],
         description: 'A lower-priority test Action.',
         displayBindings: ['display:Mod+S'],
         label: 'Clear',
@@ -73,10 +89,43 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     coordinator.dispose()
   })
 
+  it('resolves Feature bindings from an injected Keymap override', () => {
+    const bindingRegistry = new TestStudioKeyboardBindingRegistry()
+    const customSaveBinding = defineStudioKeyboardBinding('K')
+    const keymap = createStudioKeyboardKeymap({
+      [STUDIO_KEYBOARD_ACTION.PROJECT_SAVE]: Object.freeze([
+        customSaveBinding,
+      ]),
+    })
+    const coordinator = createStudioKeyboardShortcutCoordinator({
+      bindingRegistry,
+      keymap,
+    })
+
+    const bindings = coordinator.bindingsFor(
+      STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
+    )
+    coordinator.register([
+      createDefinition({
+        bindings,
+      }),
+    ])
+
+    expect(Object.isFrozen(STUDIO_DEFAULT_KEYMAP)).toBe(true)
+    expect(
+      Object.values(STUDIO_DEFAULT_KEYMAP).every(Object.isFrozen),
+    ).toBe(true)
+    expect(bindings).toEqual(['K'])
+    expect(bindingRegistry.listeners.has('K')).toBe(true)
+    expect(bindingRegistry.listeners.has('Mod+S')).toBe(false)
+    coordinator.dispose()
+  })
+
   it('runs the highest enabled Scope and prevents only after an Action handles', () => {
     const bindingRegistry = new TestStudioKeyboardBindingRegistry()
     const coordinator = createStudioKeyboardShortcutCoordinator({
       bindingRegistry,
+      keymap: STUDIO_DEFAULT_KEYMAP,
     })
     const runWorkbench = vi.fn<() => boolean>(() => true)
     const runPianoRoll = vi.fn<() => boolean>(() => false)
@@ -115,6 +164,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     const bindingRegistry = new TestStudioKeyboardBindingRegistry()
     const coordinator = createStudioKeyboardShortcutCoordinator({
       bindingRegistry,
+      keymap: STUDIO_DEFAULT_KEYMAP,
     })
     const run = vi.fn<() => boolean>(() => true)
     coordinator.register([createDefinition({ run })])
@@ -136,6 +186,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     const failures: StudioKeyboardShortcutFailure[] = []
     const coordinator = createStudioKeyboardShortcutCoordinator({
       bindingRegistry,
+      keymap: STUDIO_DEFAULT_KEYMAP,
       onError: (failure) => failures.push(failure),
     })
     const runWorkbench = vi.fn<() => boolean>(() => true)
@@ -184,6 +235,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     const bindingRegistry = new TestStudioKeyboardBindingRegistry()
     const coordinator = createStudioKeyboardShortcutCoordinator({
       bindingRegistry,
+      keymap: STUDIO_DEFAULT_KEYMAP,
     })
     coordinator.register([createDefinition()])
 
@@ -194,7 +246,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
       coordinator.register([
         createDefinition({
           actionId: STUDIO_KEYBOARD_ACTION.HISTORY_UNDO,
-          bindings: ['Mod+S'],
+          bindings: [defineStudioKeyboardBinding('Mod+S')],
         }),
       ]),
     ).toThrowError(
@@ -223,13 +275,17 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     })
     const coordinator = createStudioKeyboardShortcutCoordinator({
       bindingRegistry,
+      keymap: STUDIO_DEFAULT_KEYMAP,
     })
 
     expect(() =>
       coordinator.register([
         createDefinition({
           actionId: STUDIO_KEYBOARD_ACTION.HISTORY_REDO,
-          bindings: ['Mod+Shift+Z', 'Control+Y'],
+          bindings: [
+            defineStudioKeyboardBinding('Mod+Shift+Z'),
+            defineStudioKeyboardBinding('Control+Y'),
+          ],
         }),
       ]),
     ).toThrow('Registry failed')

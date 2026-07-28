@@ -18,6 +18,7 @@ import {
   type StudioKeyboardBindingRegistry,
   type StudioKeyboardShortcutCoordinator,
 } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
 import { STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import {
   createBrowserActiveProjectRuntime,
@@ -196,6 +197,7 @@ export function composeStudioApplication(
       bindingRegistry:
         composition.keyboardBindingRegistry ??
         createBrowserTanStackHotkeyRegistry({ target: document }),
+      keymap: STUDIO_DEFAULT_KEYMAP,
     })
     projectNavigationGuardDispose = installProjectNavigationGuard(
       composition.router,

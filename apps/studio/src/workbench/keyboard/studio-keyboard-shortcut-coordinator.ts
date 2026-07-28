@@ -1,5 +1,11 @@
 import { StudioKeyboardShortcutError } from '@/workbench/keyboard/studio-keyboard-shortcut-error'
 
+import type {
+  StudioKeyboardBinding,
+  StudioKeyboardBindingValidation,
+  StudioKeyboardKeymap,
+} from '@/workbench/keyboard/studio-keyboard-binding'
+
 export const STUDIO_KEYBOARD_ACTION = {
   HISTORY_REDO: 'history.redo',
   HISTORY_UNDO: 'history.undo',
@@ -23,16 +29,17 @@ export type StudioKeyboardScope =
 export type StudioKeyboardShortcutDispose = () => void
 
 export interface StudioKeyboardBindingRegistry {
-  formatForDisplay(binding: string): string
+  formatForDisplay(binding: StudioKeyboardBinding): string
   register(
-    binding: string,
+    binding: StudioKeyboardBinding,
     listener: (event: KeyboardEvent) => void,
   ): StudioKeyboardShortcutDispose
+  validate(input: string): StudioKeyboardBindingValidation
 }
 
 export interface StudioKeyboardShortcutDefinition {
   readonly actionId: StudioKeyboardActionId
-  readonly bindings: readonly string[]
+  readonly bindings: readonly StudioKeyboardBinding[]
   readonly description: string
   readonly isEnabled?: () => boolean
   readonly label: string
@@ -42,7 +49,7 @@ export interface StudioKeyboardShortcutDefinition {
 
 export interface StudioKeyboardShortcutMetadata {
   readonly actionId: StudioKeyboardActionId
-  readonly bindings: readonly string[]
+  readonly bindings: readonly StudioKeyboardBinding[]
   readonly description: string
   readonly displayBindings: readonly string[]
   readonly label: string
@@ -61,14 +68,17 @@ export interface StudioKeyboardShortcutFailure {
 
 export interface StudioKeyboardShortcutCoordinatorDependencies {
   readonly bindingRegistry: StudioKeyboardBindingRegistry
+  readonly keymap: StudioKeyboardKeymap<StudioKeyboardActionId>
   readonly onError?: (failure: StudioKeyboardShortcutFailure) => void
 }
 
 export interface StudioKeyboardShortcutCoordinator {
+  bindingsFor(actionId: StudioKeyboardActionId): readonly StudioKeyboardBinding[]
   listShortcuts(): readonly StudioKeyboardShortcutMetadata[]
   register(
     definitions: readonly StudioKeyboardShortcutDefinition[],
   ): StudioKeyboardShortcutDispose
+  validateBindingInput(input: string): StudioKeyboardBindingValidation
   dispose(): void
 }
 
@@ -101,10 +111,12 @@ function normalizeDefinition(
   definition: StudioKeyboardShortcutDefinition,
 ): StudioKeyboardShortcutDefinition {
   const actionId = requireText(definition.actionId, 'Action ID', definition.actionId)
-  const uniqueBindings = new Set<string>()
+  const uniqueBindings = new Set<StudioKeyboardBinding>()
 
   for (const binding of definition.bindings) {
-    uniqueBindings.add(requireText(binding, 'binding', actionId))
+    uniqueBindings.add(
+      requireText(binding, 'binding', actionId) as StudioKeyboardBinding,
+    )
   }
   if (uniqueBindings.size === 0) {
     throw new StudioKeyboardShortcutError(
@@ -143,16 +155,28 @@ function createFailure(
 class StudioKeyboardShortcutCoordinatorImpl
   implements StudioKeyboardShortcutCoordinator
 {
-  readonly #actionsByBinding = new Map<string, RegisteredShortcut[]>()
+  readonly #actionsByBinding = new Map<
+    StudioKeyboardBinding,
+    RegisteredShortcut[]
+  >()
   readonly #actionsById = new Map<StudioKeyboardActionId, RegisteredShortcut>()
   readonly #bindingRegistry: StudioKeyboardBindingRegistry
+  readonly #keymap: StudioKeyboardKeymap<StudioKeyboardActionId>
   readonly #onError: ((failure: StudioKeyboardShortcutFailure) => void) | undefined
-  readonly #physicalBindings = new Map<string, PhysicalBinding>()
+  readonly #physicalBindings = new Map<StudioKeyboardBinding, PhysicalBinding>()
   #disposed = false
 
   constructor(dependencies: StudioKeyboardShortcutCoordinatorDependencies) {
     this.#bindingRegistry = dependencies.bindingRegistry
+    this.#keymap = dependencies.keymap
     this.#onError = dependencies.onError
+  }
+
+  bindingsFor(
+    actionId: StudioKeyboardActionId,
+  ): readonly StudioKeyboardBinding[] {
+    this.#requireActive()
+    return this.#keymap[actionId]
   }
 
   listShortcuts(): readonly StudioKeyboardShortcutMetadata[] {
@@ -188,7 +212,7 @@ class StudioKeyboardShortcutCoordinatorImpl
       })
       return Object.freeze({ definition, metadata })
     })
-    const createdPhysicalBindings: string[] = []
+    const createdPhysicalBindings: StudioKeyboardBinding[] = []
 
     try {
       for (const { definition } of preparedShortcuts) {
@@ -232,6 +256,11 @@ class StudioKeyboardShortcutCoordinatorImpl
       active = false
       this.#unregister(normalizedDefinitions)
     }
+  }
+
+  validateBindingInput(input: string): StudioKeyboardBindingValidation {
+    this.#requireActive()
+    return this.#bindingRegistry.validate(input)
   }
 
   dispose(): void {
@@ -286,7 +315,7 @@ class StudioKeyboardShortcutCoordinatorImpl
     definitions: readonly StudioKeyboardShortcutDefinition[],
   ): void {
     if (this.#disposed) return
-    const affectedBindings = new Set<string>()
+    const affectedBindings = new Set<StudioKeyboardBinding>()
 
     for (const definition of definitions) {
       this.#actionsById.delete(definition.actionId)
@@ -312,7 +341,7 @@ class StudioKeyboardShortcutCoordinatorImpl
     }
   }
 
-  #dispatch(binding: string, event: KeyboardEvent): void {
+  #dispatch(binding: StudioKeyboardBinding, event: KeyboardEvent): void {
     if (
       this.#disposed ||
       event.defaultPrevented ||

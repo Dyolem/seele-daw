@@ -192,7 +192,9 @@ function describeSaveFailure(saveFailure: unknown): string | null {
 const disposeKeyboardShortcuts = keyboardShortcuts.register([
   {
     actionId: STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
-    bindings: ['Mod+S'],
+    bindings: keyboardShortcuts.bindingsFor(
+      STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
+    ),
     description: 'Save the active local project.',
     isEnabled: canSaveProject,
     label: 'Save project',
@@ -205,7 +207,9 @@ const disposeKeyboardShortcuts = keyboardShortcuts.register([
   },
   {
     actionId: STUDIO_KEYBOARD_ACTION.HISTORY_UNDO,
-    bindings: ['Mod+Z'],
+    bindings: keyboardShortcuts.bindingsFor(
+      STUDIO_KEYBOARD_ACTION.HISTORY_UNDO,
+    ),
     description: 'Undo the latest committed project edit.',
     isEnabled: () => readyProject.value?.session.canUndo === true,
     label: 'Undo',
@@ -214,7 +218,9 @@ const disposeKeyboardShortcuts = keyboardShortcuts.register([
   },
   {
     actionId: STUDIO_KEYBOARD_ACTION.HISTORY_REDO,
-    bindings: ['Mod+Shift+Z', 'Control+Y'],
+    bindings: keyboardShortcuts.bindingsFor(
+      STUDIO_KEYBOARD_ACTION.HISTORY_REDO,
+    ),
     description: 'Redo the latest undone project edit.',
     isEnabled: () => readyProject.value?.session.canRedo === true,
     label: 'Redo',

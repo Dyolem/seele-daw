@@ -1,11 +1,17 @@
 import {
-  assertValidHotkey,
   formatForDisplay,
   getHotkeyManager,
+  validateHotkey,
   type Hotkey,
   type HotkeyManager,
 } from '@tanstack/hotkeys'
 
+import { StudioKeyboardShortcutError } from '@/workbench/keyboard/studio-keyboard-shortcut-error'
+
+import type {
+  StudioKeyboardBinding,
+  StudioKeyboardBindingValidation,
+} from '@/workbench/keyboard/studio-keyboard-binding'
 import type {
   StudioKeyboardBindingRegistry,
   StudioKeyboardShortcutDispose,
@@ -19,6 +25,37 @@ export interface CreateBrowserTanStackHotkeyRegistryInput {
   readonly target: Document
 }
 
+/** Validates dynamic Settings input without exposing TanStack result types to UI. */
+export function validateStudioKeyboardBinding(
+  input: string,
+): StudioKeyboardBindingValidation {
+  const normalizedInput = input.trim()
+  const validation = validateHotkey(normalizedInput)
+  const valid = validation.valid && normalizedInput.length > 0
+
+  return Object.freeze({
+    binding: valid ? (normalizedInput as StudioKeyboardBinding) : null,
+    errors: Object.freeze([...validation.errors]),
+    input,
+    valid,
+    warnings: Object.freeze([...validation.warnings]),
+  })
+}
+
+/** Parses dynamic input after a Settings UI has had a chance to show validation. */
+export function parseStudioKeyboardBinding(
+  input: string,
+): StudioKeyboardBinding {
+  const validation = validateStudioKeyboardBinding(input)
+  if (validation.binding !== null) return validation.binding
+
+  throw new StudioKeyboardShortcutError(
+    'invalid-binding',
+    `Invalid Studio keyboard binding: ${validation.errors.join(', ')}`,
+    { binding: input },
+  )
+}
+
 class BrowserTanStackHotkeyRegistry implements StudioKeyboardBindingRegistry {
   readonly #manager: Pick<HotkeyManager, 'register'>
   readonly #platform: StudioKeyboardPlatform | undefined
@@ -30,18 +67,16 @@ class BrowserTanStackHotkeyRegistry implements StudioKeyboardBindingRegistry {
     this.#target = input.target
   }
 
-  formatForDisplay(binding: string): string {
-    assertValidHotkey(binding)
+  formatForDisplay(binding: StudioKeyboardBinding): string {
     return formatForDisplay(binding as Hotkey, {
       platform: this.#platform,
     })
   }
 
   register(
-    binding: string,
+    binding: StudioKeyboardBinding,
     listener: (event: KeyboardEvent) => void,
   ): StudioKeyboardShortcutDispose {
-    assertValidHotkey(binding)
     const handle = this.#manager.register(
       binding as Hotkey,
       (event) => listener(event),
@@ -56,6 +91,10 @@ class BrowserTanStackHotkeyRegistry implements StudioKeyboardBindingRegistry {
       },
     )
     return () => handle.unregister()
+  }
+
+  validate(input: string): StudioKeyboardBindingValidation {
+    return validateStudioKeyboardBinding(input)
   }
 }
 

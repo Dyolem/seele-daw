@@ -27,6 +27,7 @@ import {
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
 import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
 import {
   STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
   type StudioKeyboardShortcutVueContext,
@@ -175,6 +176,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   const keyboardBindingRegistry = new TestStudioKeyboardBindingRegistry()
   const keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
     bindingRegistry: keyboardBindingRegistry,
+    keymap: STUDIO_DEFAULT_KEYMAP,
   })
   const keyboardShortcutContext: StudioKeyboardShortcutVueContext = Object.freeze({
     keyboardShortcuts,

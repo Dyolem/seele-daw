@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-27，功能代码截至 `f3778f0`
+> 最近更新：2026-07-28，功能代码截至 `054377d`
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -56,7 +56,7 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
 | `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | 已有空 MIDI Clip 入口，尚无 Piano Roll Note 编辑入口。 |
 | `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
-| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | 可见只读 Grid / Note Renderer；Tool 与 Note 编辑尚未接入。 |
+| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | 可见只读 Grid / Note Renderer；内部 Note Selection Session 已就绪，UI 尚未接入。 |
 
 ## 3. 项目入口与生命周期
 
@@ -379,6 +379,8 @@ Project Core 已实现：
 - 不提前 Snap 的连续 X → Tick 位置换算；
 - 基于 Project Query 与局部 Subscription 的可见 Note Read Model；
 - Commit 后重新 Query、Viewport 替换、Observer 隔离和 dispose 生命周期。
+- Clip-scoped `PianoRollEditorSession`、冻结的稀疏 `NoteId` Selection；
+- Selection 前的权威 Note Query，以及相关 Commit 后的存在性和 Clip 时间窗口校准。
 
 `@seele-daw/editor/browser` 与 Studio 已提供：
 
@@ -393,7 +395,7 @@ Project Core 已实现：
 当前明确限制：
 
 - 不支持 looped Clip，不能把循环实例错误显示成非循环 Source；
-- 仍没有 Hit Test、Selection、Tool 或 Note Command Port；
+- 仍没有 Hit Test、可见 Selection 交互、Tool 或 Note Command Port；
 - 首批视图固定显示完整 Clip 和 MIDI 48–72，尚无 Zoom / Scroll；
 - 用户可以看到真实网格和已有 Note，但还不能通过 UI 创建或编辑 Note。
 
@@ -416,7 +418,7 @@ Project Core 已具备：
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
 | `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection 与只读 Piano Roll。 |
-| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Canvas Grid 与 DOM / Canvas Note Adapter；编辑手势尚未实现。 |
+| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Clip-scoped Note Selection Session、Canvas Grid 与 DOM / Canvas Note Adapter；编辑手势尚未实现。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
 | `@seele-daw/type-utils` | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。 |
@@ -511,16 +513,17 @@ Project Core 已具备：
 | 2026-07-27 | `PIANO-ROLL` | Editor Common 完成非循环 Clip Context、Viewport 坐标与 Query/Subscription Note Read Model。 | `15edc39` |
 | 2026-07-27 | `PIANO-ROLL` | Editor Browser 完成 Canvas Grid、Note Scene 与 DOM / Canvas Adapter。 | `b888a78` |
 | 2026-07-27 | `PIANO-ROLL`、`CONTEXT-EDITOR-DOCK` | Studio Dock 默认接入 keyed DOM Note 与真实 Project Query / Subscription。 | `f3778f0` |
+| 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Clip-scoped Note Selection Session、权威存在性校准与第三阶段交互计划。 | `054377d` |
 
 ## 13. 当前验证基线
 
-功能代码截至 `f3778f0` 已通过：
+功能代码截至 `054377d` 已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：2 个测试文件，20 项测试。
+- editor：3 个测试文件，26 项测试。
 - Studio：32 个测试文件，163 项测试。
 - type-utils：1 个测试文件，2 项测试。
 

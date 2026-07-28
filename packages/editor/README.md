@@ -2,7 +2,8 @@
 
 `editor` 负责把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑会话状态，但不拥有 Track、Clip、Note 等项目事实。
 
-> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model；
+> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model，并已建立
+> Clip-scoped Note Selection Session；
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
 > Note Renderer，编辑手势尚未实现。
 
@@ -94,6 +95,21 @@ src/
 完整边界见
 [Piano Roll Common Foundation 实施计划](./docs/piano-roll-common-foundation-plan.md)。
 
+## 已实现：Piano Roll Editor Session
+
+首个 Editor Session 切片提供：
+
+- 随当前 Clip 创建和释放的 `PianoRollEditorSession`；
+- 只保存冻结 `NoteId` 列表的单选、追加切换与清空语义；
+- 新增 Selection 前按 `MidiSourceId + NoteId` 查询权威 Note；
+- 当前 Source 的 Note Commit 到达后重新校准已选 Note；
+- Note 移出可见 Viewport 时保留 Selection，移出 Clip Source 时间窗口或被删除时清理；
+- Observer、Project Query、Project Subscription failure isolation 与显式 dispose。
+
+它不保存 `MidiNoteRecord`，不依赖当前可见 Read Model，也不进入 Vue 或 Pinia。Pointer、
+DOM Hit、Keyboard Binding 和 selected Renderer 视觉在第三阶段后续 Batch 接入。完整计划见
+[Piano Roll Interaction 第三阶段计划](./docs/piano-roll-interaction-phase-plan.md)。
+
 ## 已实现：Piano Roll Browser Renderer
 
 `browser/piano-roll` 在不依赖 Vue 的边界内公开提供：
@@ -128,8 +144,10 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 1. **已完成**：Piano Roll Clip Context、Viewport、坐标链与可见范围 Read Model。
 2. **已完成**：Browser Canvas Grid、Note Scene 和 DOM / Canvas Note Adapter，并由
    Studio 只读组合当前 Clip。
-3. 建立最小 EditorSession、Select / Pencil Tool、Note Selection 与统一 Browser Input。
-4. 实现 Add / Move / Remove Note 的单次提交手势；Resize 先补充产品与 Core Command。
+3. **进行中**：建立 Clip-scoped EditorSession、Select Interaction、Note Selection、
+   统一 Browser Input 与 scoped keyboard shortcuts。
+4. 接入 Pencil Add、Move 与 Remove Note 的单次提交手势；Resize 先补充产品与 Core
+   Command。
 5. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
 6. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 

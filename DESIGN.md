@@ -362,6 +362,17 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 默认工具为 Select，Pencil 模式单击空白网格创建 Note；
 - 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1。
 
+首批 Note Selection 语义：
+
+- 普通单击 Note 只选择该 Note；
+- `Shift`、`Command` 或 `Control` 单击切换该 Note 的选中状态；
+- 单击空白 Grid 或在已聚焦 Piano Roll 中按 `Escape` 清空 Selection；
+- 右键不改变 Selection；
+- 切换 Clip 时不继承 Selection；
+- Note 移出可见 Viewport 时保留 Selection，被删除或移出当前 Clip Source 时间窗口时清理；
+- Undo / Redo 使 Note 消失后清理 Selection，Note 再次出现时不自动恢复；
+- Selection 只保存稳定 `NoteId`，不复制 `MidiNoteRecord` 或进入 Project History。
+
 当前只读 Renderer 切片：
 
 - DOM 承载标尺、MIDI 48–72 钢琴键盘、焦点和可访问摘要；

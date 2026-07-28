@@ -1,6 +1,6 @@
 # Piano Roll Note Creation 第四阶段计划
 
-> Status: In progress; explicit product rules accepted, Batch 1 implemented and awaiting review
+> Status: In progress; Batch 1 accepted, Batch 2 implemented and awaiting review
 >
 > Date: 2026-07-28
 
@@ -185,11 +185,17 @@ Project 权威或资源。Selection 继续留在 Editor Session，因为它与�
 ### Batch 2：Project MIDI Note Coordinator
 
 - Active Project / Clip / Source 校验；
+- 接收已经由交互层解析的 Clip-local 内部起点与期望 Duration；
+- Clip 尾部不足完整 Duration 时缩短到剩余正 Tick；
 - Note ID 生成；
 - Velocity 100 与 UI Channel 1 默认值；
 - Add Note Command 执行；
 - 返回 `noteId + commit`；
 - Composition Root 与 Typed Vue Context。
+
+Batch 2 对落在 Clip End 的输入失败关闭且不消耗 Note ID。Batch 4 的 Note Placement 必须先按
+第 3 节规则把吸附到 End 的候选限制到最后合法内部位置，再调用 Coordinator；不得把 UI
+边界选择偷偷固化为 Project Core 不变量。
 
 ### Batch 3：Studio Tool Preferences
 

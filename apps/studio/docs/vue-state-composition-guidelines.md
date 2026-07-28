@@ -69,6 +69,7 @@ Store 或 Context。
 | Project Entry | Coordinator | 应用用例能力 |
 | Project Track | Coordinator | Project Command 能力 |
 | Project Clip | Coordinator | Project Command 能力 |
+| Project MIDI Note | Coordinator | Clip 目标校验与 Project Command 能力 |
 | Navigation Decision | pending binding + resolver | 一次性异步决策 Port |
 
 Context 可以携带 `shallowRef`，但如果该对象开始拥有大量 UI 状态、派生值、协调动作、

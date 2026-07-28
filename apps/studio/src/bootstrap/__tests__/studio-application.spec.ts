@@ -28,6 +28,10 @@ import {
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'
 import {
+  useProjectMidiNotes,
+  type ProjectMidiNoteVueContext,
+} from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import {
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
   PROJECT_NAVIGATION_DECISION,
   PROJECT_NAVIGATION_INTENT_KIND,
@@ -145,6 +149,15 @@ function requireProjectClipContext(
   return context
 }
 
+function requireProjectMidiNoteContext(
+  context: ProjectMidiNoteVueContext | null,
+): ProjectMidiNoteVueContext {
+  if (context === null) {
+    throw new Error('Expected the Project MIDI Note Context')
+  }
+  return context
+}
+
 function requireKeyboardShortcutContext(
   context: StudioKeyboardShortcutVueContext | null,
 ): StudioKeyboardShortcutVueContext {
@@ -163,6 +176,7 @@ describe('StudioApplication', () => {
     })
     let projectEntryContext: ProjectEntryVueContext | null = null
     let projectClipContext: ProjectClipVueContext | null = null
+    let projectMidiNoteContext: ProjectMidiNoteVueContext | null = null
     let projectTrackContext: ProjectTrackVueContext | null = null
     let keyboardShortcutContext: StudioKeyboardShortcutVueContext | null = null
     const rootComponent = defineComponent({
@@ -170,6 +184,7 @@ describe('StudioApplication', () => {
         const activeProject = useActiveProject()
         projectEntryContext = useProjectEntry()
         projectClipContext = useProjectClips()
+        projectMidiNoteContext = useProjectMidiNotes()
         projectTrackContext = useProjectTracks()
         keyboardShortcutContext = useStudioKeyboardShortcuts()
         const projectNavigationDecision = useProjectNavigationDecision()
@@ -199,6 +214,11 @@ describe('StudioApplication', () => {
       application.projectEntry,
     )
     expect(Object.isFrozen(requireProjectClipContext(projectClipContext).projectClips)).toBe(true)
+    expect(
+      Object.isFrozen(
+        requireProjectMidiNoteContext(projectMidiNoteContext).projectMidiNotes,
+      ),
+    ).toBe(true)
     expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(true)
     expect(
       requireKeyboardShortcutContext(

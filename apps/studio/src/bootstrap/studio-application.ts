@@ -31,6 +31,8 @@ import {
   type ProjectEntryCoordinator,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { PROJECT_ENTRY_CONTEXT_KEY } from '@/workbench/project/entry/vue/project-entry-context'
+import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
+import { PROJECT_MIDI_NOTE_CONTEXT_KEY } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import {
   createProjectNavigationConfirmationCoordinator,
   type ProjectNavigationConfirmationCoordinator,
@@ -193,6 +195,10 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
     })
+    const projectMidiNotes = createProjectMidiNoteCoordinator({
+      activeProject: projectRuntime.activeProject,
+      createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
+    })
     keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
       bindingRegistry:
         composition.keyboardBindingRegistry ??
@@ -209,6 +215,10 @@ export function composeStudioApplication(
     vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
     vueApplication.provide(PROJECT_TRACK_CONTEXT_KEY, Object.freeze({ projectTracks }))
     vueApplication.provide(PROJECT_CLIP_CONTEXT_KEY, Object.freeze({ projectClips }))
+    vueApplication.provide(
+      PROJECT_MIDI_NOTE_CONTEXT_KEY,
+      Object.freeze({ projectMidiNotes }),
+    )
     vueApplication.provide(
       STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
       Object.freeze({ keyboardShortcuts }),

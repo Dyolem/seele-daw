@@ -119,6 +119,9 @@ importers:
       '@seele-daw/project-core':
         specifier: workspace:*
         version: link:../../packages/project-core
+      '@seele-daw/type-utils':
+        specifier: workspace:*
+        version: link:../../packages/type-utils
       '@tanstack/hotkeys':
         specifier: 0.8.0
         version: 0.8.0

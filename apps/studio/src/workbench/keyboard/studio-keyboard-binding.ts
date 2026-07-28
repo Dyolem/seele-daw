@@ -1,6 +1,5 @@
 import type { Hotkey } from '@tanstack/hotkeys'
-
-declare const studioKeyboardBindingBrand: unique symbol
+import type { Brand } from '@seele-daw/type-utils'
 
 /**
  * A Binding accepted by the Studio shortcut system.
@@ -8,9 +7,7 @@ declare const studioKeyboardBindingBrand: unique symbol
  * Built-in bindings use the compile-time authoring helper. Dynamic user input
  * must cross the runtime validation boundary in the browser adapter.
  */
-export type StudioKeyboardBinding = string & {
-  readonly [studioKeyboardBindingBrand]: 'StudioKeyboardBinding'
-}
+export type StudioKeyboardBinding = Brand<string, 'StudioKeyboardBinding'>
 
 export type StudioKeyboardKeymap<ActionId extends string = string> = Readonly<
   Record<ActionId, readonly StudioKeyboardBinding[]>
@@ -24,7 +21,12 @@ export interface StudioKeyboardBindingValidation {
   readonly warnings: readonly string[]
 }
 
-/** Gives built-in keymaps TanStack's compile-time Hotkey vocabulary. */
+/**
+ * Brands a built-in Binding after TanStack checks its literal at compile time.
+ *
+ * This is intentionally a zero-runtime-cost conversion. Dynamic strings must
+ * use the browser adapter's runtime validator instead.
+ */
 export function defineStudioKeyboardBinding<const Binding extends Hotkey>(
   binding: Binding,
 ): StudioKeyboardBinding {

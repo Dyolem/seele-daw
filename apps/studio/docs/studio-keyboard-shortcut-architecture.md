@@ -83,7 +83,8 @@ compile-time Hotkey literal
 Metadata 以冻结快照公开，包含平台格式化后的 Binding，可供菜单和未来帮助面板使用；不公开
 Handler。
 
-`StudioKeyboardBinding` 是项目自有的 branded string。内置配置必须通过
+`StudioKeyboardBinding` 使用共享 `Brand<string, 'StudioKeyboardBinding'>` 定义项目自有的
+nominal identity。内置配置必须通过
 `defineStudioKeyboardBinding()` 编写，其泛型受 TanStack `Hotkey` 类型约束，因此拼写错误在
 Type Check 阶段失败；Coordinator、Feature 和 Context 不接受任意 `string`。
 

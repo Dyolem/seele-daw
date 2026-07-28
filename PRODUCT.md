@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-28，功能代码截至 `cc3bbb5`
+> 最近更新：2026-07-28，功能代码截至 `df66936`
 >
-> 当前待审：Piano Roll Note Creation Batch 2 Project MIDI Note Coordinator
+> 当前待审：Piano Roll Note Creation Batch 3 Studio Tool Preferences
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -407,6 +407,11 @@ Velocity 100、UI Channel 1 执行 Add Note Command。Coordinator 返回 `NoteId
 这仍是**内部就绪**能力。Piano Roll 尚未提供 Pencil / Cursor / Snap UI，也没有把 Pointer
 手势连接到 Coordinator，因此用户仍不能从界面创建、移动或删除 Note。
 
+Studio 内部还提供应用生命周期级的 Piano Roll Preferences Store，当前保存默认 Pencil、
+Snap 开启和唯一已确认的 `1/16` Grid Preset。Canvas Grid 已消费该 Preset 的 Subdivision
+Tick；Tool 与 Snap 尚未门控 Pointer 行为。切换 Project、Clip 或 Dock 布局不会重置这些
+偏好，新应用实例恢复默认值。
+
 ### 8.2 `PIANO-ROLL` Selection Surface
 
 **局部可用**
@@ -447,7 +452,8 @@ Note 被删除或移出当前 Clip Source 时间窗口时由权威 Query 清理�
 当前明确限制：
 
 - 不支持 looped Clip，不能把循环实例错误显示成非循环 Source；
-- Timeline Grid Snap 只有内部 Common 能力，尚未提供 Tool、Snap 开关或 Grid Preset UI；
+- Timeline Grid Snap 与 Tool Preferences 只有内部能力，尚未提供 Tool、Snap 开关或 Grid
+  Preset UI；
 - Surface 尚未消费已组合的 Add Note Coordinator，也没有可切换 Tool 或 Box Selection；
 - 首批视图固定显示完整 Clip 和 MIDI 48–72，尚无 Zoom / Scroll；
 - 用户可以选择已有 Note，但还不能通过 UI 创建、移动、调整长度或删除 Note。
@@ -470,7 +476,7 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection、Piano Roll Note Selection，以及内部 Add Note Coordinator。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection、Piano Roll Note Selection、内部 Add Note Coordinator 与 Piano Roll Preferences。 |
 | `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Selection Session、Select Interaction、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
@@ -572,18 +578,19 @@ Project Core 已具备：
 | 2026-07-28 | `KEYBOARD-SHORTCUTS` | 集中默认 Keymap、强类型 Binding 和动态输入 Validation；用户设置面板仍未实现。 | `378c253`、`659b8c4` |
 | 2026-07-28 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | Studio 接入 Clip-scoped Note Selection、共享 selected Scene、Pointer Click 与 focused Escape。 | `f9d7fe7` |
 | 2026-07-28 | `PIANO-ROLL` | 第四阶段显式定义 Pencil / Cursor、Snap、Note 创建结果与失败规则；Editor Common 建立共享 Timeline Grid Snap。 | `cc3bbb5` |
-| 2026-07-28 | `PIANO-ROLL` | Studio 建立 Project MIDI Note Coordinator、默认 Note Facts、Clip / Source 校验与 Typed Vue Context；尚未接入可见创建手势。 | 本批待审 |
+| 2026-07-28 | `PIANO-ROLL` | Studio 建立 Project MIDI Note Coordinator、默认 Note Facts、Clip / Source 校验与 Typed Vue Context；尚未接入可见创建手势。 | `df66936` |
+| 2026-07-28 | `PIANO-ROLL` | Studio 建立应用生命周期级 Pencil / Cursor、Snap 与 `1/16` Grid Preference Store；Canvas Grid 已消费 Preset，尚无可见控制。 | 本批待审 |
 
 ## 13. 当前验证基线
 
-功能代码截至 `cc3bbb5`；当前待审的 Piano Roll Note Creation Batch 2 工作树已通过：
+功能代码截至 `df66936`；当前待审的 Piano Roll Note Creation Batch 3 工作树已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
 - editor：6 个测试文件，61 项测试。
-- Studio：36 个测试文件，183 项测试。
+- Studio：37 个测试文件，188 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

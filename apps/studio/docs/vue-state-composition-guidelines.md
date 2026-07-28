@@ -122,6 +122,16 @@ Clip Selection 保持 `selectedClipId -> selectedTrackId` 所有权一致性：�
 所属 Track；直接选择 Track 会退出 Clip Selection；Clip 消失时只清除 Clip 身份并尽可能保留
 仍存在的 Track。
 
+Piano Roll Preferences 是第二个 feature Store，只保存：
+
+- `activeTool`：`pencil` 或 `cursor`；
+- `snapEnabled`；
+- `gridPreset` 以及由 Preset 派生的 Subdivision Tick。
+
+这些偏好跨 Project、Clip 和 Dock 布局共享，不随编辑对象销毁；新的 Studio 应用 Pinia 实例
+恢复默认 Pencil、Snap 开启和 `1/16`。Store 不保存 Note、Selection、Pointer Gesture 或
+ProjectSession，也不因为当前只有一个已确认 Grid Preset 就预建未决定的产品选项。
+
 ## 4. 禁止进入 Pinia 的内容
 
 Pinia MUST NOT 持有：

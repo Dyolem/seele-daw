@@ -20,6 +20,7 @@ import {
   type ProjectSession,
 } from '@seele-daw/project-core'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -272,6 +273,7 @@ describe('ProjectPianoRollSurface', () => {
         timeSignatureNumerator: 4,
       },
       global: {
+        plugins: [createPinia()],
         provide: {
           [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
         },

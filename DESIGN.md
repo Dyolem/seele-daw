@@ -386,6 +386,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1；
 - X 受 Timeline Grid Snap 影响；关闭 Snap 时保留 Pencil X 对应的最近整数 Tick；
 - Y 不进入 Timeline Snap，直接使用 Pointer 覆盖的离散 Pitch Row。
+- Tool、Snap 与 Grid Preset 属于 Studio 应用生命周期偏好；切换 Project、Clip 或 Dock
+  布局不重置，页面刷新恢复默认值；
+- 首批只确认 `1/16` Grid Preset，其他直线、三连音或附点 Preset 必须由后续产品切片定义。
 
 Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 [Piano Roll Note Creation 第四阶段计划](./packages/editor/docs/piano-roll-note-creation-phase-plan.md)。

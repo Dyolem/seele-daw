@@ -9,8 +9,11 @@
 - DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note 摘要；
 - `@seele-daw/editor/browser` 提供的 Canvas Grid、Note Scene 与 keyed DOM Note
   Renderer；Canvas Note Adapter 保留为可替换实现；
+- Clip-scoped Note Selection、DOM Hit、Primary Pointer Click 与 focused Escape；
+- 应用生命周期级 Pencil / Cursor、Snap 与 `1/16` Grid Preference Store，Canvas Grid
+  消费其 Subdivision Tick；
 - looped Clip 的明确不支持状态。
 
-当前 Surface 只读。后续在这里组合 Select / Pencil Tool、Note Selection、Browser Input
-和 Project Command Port；DOM Event 必须先归一化为 Renderer-neutral Hit，不直接修改
-Project Model，也不把 ProjectSession 放入 Pinia。
+当前 Surface 仍不能修改 Project 内容。后续在这里用 Tool 门控 Cursor Selection 与 Pencil
+Add Note，并连接已经组合的 Project MIDI Note Coordinator；DOM Event 必须先归一化为
+Renderer-neutral Hit，不直接修改 Project Model，也不把 ProjectSession 放入 Pinia。

@@ -1,6 +1,6 @@
 # Piano Roll Note Creation 第四阶段计划
 
-> Status: In progress; Batch 1 accepted, Batch 2 implemented and awaiting review
+> Status: In progress; Batches 1–2 accepted, Batch 3 implemented and awaiting review
 >
 > Date: 2026-07-28
 
@@ -203,6 +203,11 @@ Batch 2 对落在 Clip End 的输入失败关闭且不消耗 Note ID。Batch 4 �
 - 默认 Pencil、Snap 开启、`1/16`；
 - 动态状态保持规则与测试；
 - 不提前显示无产品结果的控制。
+
+首批只定义已经确认的 `1/16` Grid Preset，不在缺少产品决定时预建 `1/8`、`1/32`、
+Triplet 或 Dotted 选项。Store 属于一次 Studio 应用生命周期：切换 Project、Clip 或 Dock
+布局不会重置；页面刷新产生新的 Pinia 实例并恢复默认值。Canvas Grid 已消费 Store 解析出的
+Subdivision Tick，但 Tool 与 Snap 在 Batch 4 可见闭环前不改变现有 Pointer 行为。
 
 ### Batch 4：可见 Add Note 闭环
 

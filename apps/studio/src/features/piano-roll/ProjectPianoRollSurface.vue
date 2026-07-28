@@ -19,7 +19,6 @@ import {
   type PianoRollPointerInputAdapter,
 } from '@seele-daw/editor'
 import {
-  PROJECT_PPQ,
   ZERO_TICK,
   parseMidiPitch,
   parsePositiveTick,
@@ -38,6 +37,7 @@ import {
 
 import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
+import { usePianoRollPreferencesStore } from '@/features/piano-roll/piano-roll-preferences-store'
 import {
   STUDIO_KEYBOARD_ACTION,
   STUDIO_KEYBOARD_SCOPE,
@@ -53,10 +53,10 @@ interface ProjectPianoRollSurfaceProps {
 
 const props = defineProps<ProjectPianoRollSurfaceProps>()
 const { keyboardShortcuts } = useStudioKeyboardShortcuts()
+const pianoRollPreferences = usePianoRollPreferencesStore()
 
 const INITIAL_MINIMUM_PITCH = parseMidiPitch(48)
 const INITIAL_MAXIMUM_PITCH = parseMidiPitch(72)
-const SIXTEENTH_NOTE_SPAN_TICK = parsePositiveTick(PROJECT_PPQ / 4)
 
 const canvasHost = useTemplateRef<HTMLElement>('canvasHost')
 const surfaceElement = useTemplateRef<HTMLElement>('surfaceElement')
@@ -169,7 +169,7 @@ function createDisplayGrid() {
       props.barSpanTick / props.timeSignatureNumerator,
     ),
     originTick: ZERO_TICK,
-    subdivisionSpanTick: SIXTEENTH_NOTE_SPAN_TICK,
+    subdivisionSpanTick: pianoRollPreferences.subdivisionSpanTick,
   })
 }
 

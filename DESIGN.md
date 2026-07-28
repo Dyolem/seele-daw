@@ -404,7 +404,7 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 - Undo / Redo 使 Note 消失后清理 Selection，Note 再次出现时不自动恢复；
 - Selection 只保存稳定 `NoteId`，不复制 `MidiNoteRecord` 或进入 Project History。
 
-当前只读 Renderer 切片：
+当前混合 Renderer 切片：
 
 - DOM 承载标尺、MIDI 48–72 钢琴键盘、焦点和可访问摘要；
 - 静态 Pitch / Grid 使用 Canvas；首批可见 Note 使用 keyed DOM；
@@ -430,6 +430,13 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 
 视觉与操作规则：
 
+- Piano Roll 顶部使用紧凑工具栏；Pencil / Cursor 作为一个持续单选组，Snap 与 Grid 值作为
+  相邻但独立的时间编辑组；
+- 当前 Tool 与 Snap 必须在 Pointer 离开后仍通过边界、背景和 `aria-pressed` 清晰表达，
+  不能只依赖 Tooltip 或图标颜色；
+- Pencil 激活时空白 Grid 使用 Crosshair Cursor；已有 Note 的可见命中仍由 Note 形状表达，
+  不增加误导性的 Resize Handle；
+- 创建失败使用全局 Error Toast，并让 Piano Roll 的可访问 Live Status 同步解释原因；
 - 左侧钢琴键盘固定，音符网格横向滚动。
 - 黑键行通过轻微明度差异识别，不使用高对比棋盘纹。
 - 小节、拍和细分网格有明确的三级强度。

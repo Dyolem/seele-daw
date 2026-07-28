@@ -9,22 +9,30 @@ import {
   createPianoRollNoteScene,
   createPianoRollNoteReadModel,
   createPianoRollPointerInputAdapter,
+  resolvePianoRollPencilNotePlacement,
   type PianoRollEditorSession,
   type PianoRollEditorSessionState,
+  type PianoRollGrid,
   type PianoRollGridCanvasRenderer,
   type PianoRollGridCanvasTheme,
   type PianoRollNoteRenderer,
   type PianoRollNoteReadModel,
   type PianoRollNoteReadModelState,
   type PianoRollPointerInputAdapter,
+  type PianoRollPointerInput,
+  type PianoRollViewport,
 } from '@seele-daw/editor'
 import {
   ZERO_TICK,
   parseMidiPitch,
   parsePositiveTick,
+  type NoteId,
   type ProjectSession,
   type Tick,
 } from '@seele-daw/project-core'
+import CursorIcon from '~icons/fluent/cursor-20-regular'
+import GridIcon from '~icons/fluent/grid-20-regular'
+import PenIcon from '~icons/fluent/pen-20-regular'
 import {
   computed,
   onMounted,
@@ -37,12 +45,20 @@ import {
 
 import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
-import { usePianoRollPreferencesStore } from '@/features/piano-roll/piano-roll-preferences-store'
+import {
+  PIANO_ROLL_TOOL,
+  usePianoRollPreferencesStore,
+  type PianoRollTool,
+} from '@/features/piano-roll/piano-roll-preferences-store'
+import UiIconButton from '@/ui/components/UiIconButton.vue'
+import UiToastRegion from '@/ui/components/UiToastRegion.vue'
+import { UI_TOAST_TONE, type UiToastMessage } from '@/ui/components/ui-toast'
 import {
   STUDIO_KEYBOARD_ACTION,
   STUDIO_KEYBOARD_SCOPE,
 } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
 import { useStudioKeyboardShortcuts } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 
 interface ProjectPianoRollSurfaceProps {
   readonly barSpanTick: Tick
@@ -53,6 +69,7 @@ interface ProjectPianoRollSurfaceProps {
 
 const props = defineProps<ProjectPianoRollSurfaceProps>()
 const { keyboardShortcuts } = useStudioKeyboardShortcuts()
+const { projectMidiNotes } = useProjectMidiNotes()
 const pianoRollPreferences = usePianoRollPreferencesStore()
 
 const INITIAL_MINIMUM_PITCH = parseMidiPitch(48)
@@ -67,14 +84,27 @@ const editorState = shallowRef<PianoRollEditorSessionState | null>(null)
 const interactionFailureMessage = shallowRef<string | null>(null)
 const readModelFailureMessage = shallowRef<string | null>(null)
 const renderFailureMessage = shallowRef<string | null>(null)
+const notification = shallowRef<UiToastMessage | null>(null)
 const gridRenderer = shallowRef<PianoRollGridCanvasRenderer | null>(null)
 const noteRenderer = shallowRef<PianoRollNoteRenderer | null>(null)
+let notificationSequence = 0
 let editorSession: PianoRollEditorSession | null = null
 let unsubscribeEditorSession: (() => void) | null = null
 let readModel: PianoRollNoteReadModel | null = null
 let unsubscribeReadModel: (() => void) | null = null
 let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
 let resizeObserver: ResizeObserver | null = null
+
+interface ActivePianoRollToolGesture {
+  readonly context: ReadyProjectPianoRollPresentation['context']
+  readonly grid: PianoRollGrid
+  readonly pointerId: number
+  readonly snapEnabled: boolean
+  readonly tool: PianoRollTool
+  readonly viewport: PianoRollViewport | null
+}
+
+let activeToolGesture: ActivePianoRollToolGesture | null = null
 
 const pianoKeys = Object.freeze(
   Array.from(
@@ -115,9 +145,31 @@ const accessibleStatus = computed(() => {
   }, ${selectedNoteCount} selected`
 })
 
-function describeFailure(cause: unknown): string {
+function describeCause(cause: unknown, fallback: string): string {
   if (cause instanceof Error && cause.message.trim().length > 0) return cause.message
-  return 'The Piano Roll could not be rendered.'
+  return fallback
+}
+
+function describeFailure(cause: unknown): string {
+  return describeCause(cause, 'The Piano Roll could not be rendered.')
+}
+
+function showNotification(
+  tone: UiToastMessage['tone'],
+  title: string,
+  description: string,
+): void {
+  notificationSequence += 1
+  notification.value = Object.freeze({
+    description,
+    id: notificationSequence,
+    title,
+    tone,
+  })
+}
+
+function dismissNotification(messageId: number): void {
+  if (notification.value?.id === messageId) notification.value = null
 }
 
 function readThemeColor(style: CSSStyleDeclaration, token: string): string {
@@ -171,6 +223,122 @@ function createDisplayGrid() {
     originTick: ZERO_TICK,
     subdivisionSpanTick: pianoRollPreferences.subdivisionSpanTick,
   })
+}
+
+function activateTool(tool: PianoRollTool): void {
+  pianoRollPreferences.activateTool(tool)
+}
+
+function reportCreatedNoteSelectionFailure(cause?: unknown): void {
+  const message = describeCause(
+    cause,
+    'The MIDI Note was added, but its selection could not be restored.',
+  )
+  interactionFailureMessage.value = message
+  showNotification(
+    UI_TOAST_TONE.WARNING,
+    'MIDI note was added but could not be selected',
+    message,
+  )
+}
+
+function handlePencilInput(
+  gesture: ActivePianoRollToolGesture,
+  input: PianoRollPointerInput,
+): void {
+  if (
+    input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.END ||
+    input.hasExceededDragThreshold ||
+    input.hit !== null
+  ) {
+    return
+  }
+
+  const currentEditorSession = editorSession
+  if (gesture.viewport === null || currentEditorSession === null) {
+    const message = 'The Piano Roll is not ready to place a MIDI Note.'
+    interactionFailureMessage.value = message
+    showNotification(UI_TOAST_TONE.DANGER, 'MIDI note could not be added', message)
+    return
+  }
+
+  let addedNoteId: NoteId
+  try {
+    const placement = resolvePianoRollPencilNotePlacement({
+      context: gesture.context,
+      grid: gesture.grid,
+      pointerInput: input,
+      snapEnabled: gesture.snapEnabled,
+      viewport: gesture.viewport,
+    })
+    if (placement === null) return
+
+    addedNoteId = projectMidiNotes.addMidiNote({
+      clipId: gesture.context.clipId,
+      clipStartTick: placement.clipStartTick,
+      pitch: placement.pitch,
+      requestedDurationTick: placement.requestedDurationTick,
+    }).noteId
+  } catch (cause) {
+    const message = describeCause(
+      cause,
+      'The Project rejected the MIDI Note command. Please try again.',
+    )
+    interactionFailureMessage.value = message
+    showNotification(UI_TOAST_TONE.DANGER, 'MIDI note could not be added', message)
+    return
+  }
+
+  try {
+    currentEditorSession.selectOnly(addedNoteId)
+    if (!currentEditorSession.state.selectedNoteIds.includes(addedNoteId)) {
+      reportCreatedNoteSelectionFailure()
+      return
+    }
+  } catch (cause) {
+    reportCreatedNoteSelectionFailure(cause)
+    return
+  }
+
+  interactionFailureMessage.value = null
+  notification.value = null
+}
+
+function handlePointerInput(input: PianoRollPointerInput): void {
+  if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
+    surfaceElement.value?.focus({ preventScroll: true })
+    activeToolGesture = Object.freeze({
+      context: props.presentation.context,
+      grid: createDisplayGrid(),
+      pointerId: input.pointerId,
+      snapEnabled: pianoRollPreferences.snapEnabled,
+      tool: pianoRollPreferences.activeTool,
+      viewport: noteState.value?.viewport ?? null,
+    })
+    return
+  }
+
+  const gesture = activeToolGesture
+  if (gesture === null || gesture.pointerId !== input.pointerId) return
+  if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE) return
+
+  activeToolGesture = null
+  if (
+    input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL ||
+    gesture.context.clipId !== props.presentation.context.clipId
+  ) {
+    return
+  }
+
+  if (gesture.tool === PIANO_ROLL_TOOL.CURSOR) {
+    const currentEditorSession = editorSession
+    if (currentEditorSession === null) return
+    applyPianoRollSelectInteraction(currentEditorSession, input)
+    interactionFailureMessage.value = null
+    return
+  }
+
+  handlePencilInput(gesture, input)
 }
 
 function render(): void {
@@ -337,6 +505,7 @@ watch(
     props.session,
   ],
   () => {
+    activeToolGesture = null
     recomposeReadModel()
     composeEditorSession()
   },
@@ -362,16 +531,7 @@ onMounted(() => {
         onError: (failure) => {
           interactionFailureMessage.value = describeFailure(failure.cause)
         },
-        onInput: (input) => {
-          if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
-            surface.focus({ preventScroll: true })
-          }
-
-          const currentEditorSession = editorSession
-          if (currentEditorSession === null) return
-          applyPianoRollSelectInteraction(currentEditorSession, input)
-          interactionFailureMessage.value = null
-        },
+        onInput: handlePointerInput,
       },
       surface: host,
     })
@@ -402,6 +562,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleWindowResize)
   pointerInputAdapter?.dispose()
   pointerInputAdapter = null
+  activeToolGesture = null
   disposeEditorSession()
   disposeReadModel()
   gridRenderer.value?.dispose()
@@ -417,8 +578,46 @@ onUnmounted(() => {
     class="project-piano-roll"
     role="region"
     :aria-label="`Piano Roll for ${props.presentation.name}`"
+    :data-snap-enabled="pianoRollPreferences.snapEnabled"
+    :data-tool="pianoRollPreferences.activeTool"
     tabindex="0"
   >
+    <header class="project-piano-roll__toolbar" aria-label="Piano Roll controls">
+      <div
+        class="project-piano-roll__tool-group"
+        role="group"
+        aria-label="Editing tool"
+      >
+        <UiIconButton
+          :icon="PenIcon"
+          label="Pencil tool"
+          :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.PENCIL"
+          size="small"
+          @click="activateTool(PIANO_ROLL_TOOL.PENCIL)"
+        />
+        <UiIconButton
+          :icon="CursorIcon"
+          label="Cursor tool"
+          :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.CURSOR"
+          size="small"
+          @click="activateTool(PIANO_ROLL_TOOL.CURSOR)"
+        />
+      </div>
+      <span class="project-piano-roll__toolbar-divider" aria-hidden="true"></span>
+      <div class="project-piano-roll__snap-control">
+        <UiIconButton
+          :icon="GridIcon"
+          :label="`Snap to ${pianoRollPreferences.gridPreset} grid — ${
+            pianoRollPreferences.snapEnabled ? 'on' : 'off'
+          }`"
+          :pressed="pianoRollPreferences.snapEnabled"
+          size="small"
+          @click="pianoRollPreferences.toggleSnap()"
+        />
+        <span aria-hidden="true">{{ pianoRollPreferences.gridPreset }}</span>
+      </div>
+    </header>
+
     <div class="project-piano-roll__ruler-corner" aria-hidden="true">PITCH</div>
     <div class="project-piano-roll__ruler" :style="rulerStyle" aria-hidden="true">
       <span v-for="bar in barLabels" :key="bar">{{ bar }}</span>
@@ -455,6 +654,7 @@ onUnmounted(() => {
         }}
       </li>
     </ul>
+    <UiToastRegion :message="notification" @dismiss="dismissNotification" />
   </section>
 </template>
 
@@ -462,15 +662,49 @@ onUnmounted(() => {
 .project-piano-roll {
   --project-piano-roll-keyboard-width: 4.5rem;
   --project-piano-roll-ruler-height: 1.625rem;
+  --project-piano-roll-toolbar-height: 2.25rem;
   display: grid;
   min-inline-size: 0;
   min-block-size: 0;
   block-size: 100%;
   grid-template-columns: var(--project-piano-roll-keyboard-width) minmax(0, 1fr);
-  grid-template-rows: var(--project-piano-roll-ruler-height) minmax(0, 1fr);
+  grid-template-rows:
+    var(--project-piano-roll-toolbar-height)
+    var(--project-piano-roll-ruler-height)
+    minmax(0, 1fr);
   overflow: hidden;
   color: var(--sd-color-text-secondary);
   background: var(--sd-color-surface-canvas);
+}
+
+.project-piano-roll__toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-inline-size: 0;
+  padding-inline: var(--sd-space-2);
+  border-bottom: 1px solid var(--sd-color-border-default);
+  background: var(--sd-color-surface-panel);
+}
+
+.project-piano-roll__tool-group,
+.project-piano-roll__snap-control {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-1);
+}
+
+.project-piano-roll__toolbar-divider {
+  inline-size: 1px;
+  block-size: 1rem;
+  background: var(--sd-color-border-default);
+}
+
+.project-piano-roll__snap-control > span {
+  color: var(--sd-color-text-muted);
+  font-family: var(--sd-font-family-numeric);
+  font-size: var(--sd-font-size-xs);
 }
 
 .project-piano-roll:focus-visible {
@@ -550,6 +784,10 @@ onUnmounted(() => {
   min-block-size: 0;
   overflow: hidden;
   background: var(--sd-color-surface-canvas);
+}
+
+.project-piano-roll[data-tool='pencil'] .project-piano-roll__canvas-host {
+  cursor: crosshair;
 }
 
 .project-piano-roll__canvas-host > canvas,

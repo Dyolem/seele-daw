@@ -2,11 +2,11 @@
 
 `editor` 负责把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑会话状态，但不拥有 Track、Clip、Note 等项目事实。
 
-> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model，并已建立
-> Clip-scoped Note Selection Session；
+> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model、
+> Clip-scoped Note Selection Session、Timeline Grid Snap 与 Pencil Note Placement；
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
-> Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；Select Interaction
-> 与可见 Selection 尚未接入。
+> Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；Studio 已接入
+> Select Interaction、可见 Selection 与 Pencil Add Note。
 
 ## 包定位
 
@@ -106,9 +106,23 @@ src/
 - Note 移出可见 Viewport 时保留 Selection，移出 Clip Source 时间窗口或被删除时清理；
 - Observer、Project Query、Project Subscription failure isolation 与显式 dispose。
 
-它不保存 `MidiNoteRecord`，不依赖当前可见 Read Model，也不进入 Vue 或 Pinia。Select
-Interaction、Keyboard Binding 和 selected Renderer 视觉在第三阶段后续 Batch 接入。完整
-计划见 [Piano Roll Interaction 第三阶段计划](./docs/piano-roll-interaction-phase-plan.md)。
+它不保存 `MidiNoteRecord`，不依赖当前可见 Read Model，也不进入 Vue 或 Pinia。Studio
+已经接入 Select Interaction、Keyboard Binding 和 selected Renderer 视觉。完整计划见
+[Piano Roll Interaction 第三阶段计划](./docs/piano-roll-interaction-phase-plan.md)。
+
+## 已实现：Timeline Grid Snap 与 Pencil Placement
+
+Editor Common 公开视觉和交互共用的 Timeline Grid，并提供：
+
+- Snap 开启时按最近 Subdivision Boundary 解析连续 Tick Position；
+- Snap 关闭时按最近整数 Tick 解析，不把连续位置写入 Project Fact；
+- Pencil 只把完成的空白 Click 解析为 Clip-local Start、Pitch 和期望 Duration；
+- X 消费 Timeline Grid，Y 直接映射离散 Pitch Row；
+- Clip End 候选限制到仍可创建正 Duration 的内部起点；
+- Drag、已有 Note Hit、Cancel 与不完整 Pointer 生命周期不产生 Placement。
+
+Placement 不读取 Vue、DOM 或 ProjectSession，也不执行 Command。Studio Coordinator 负责
+Active Project、ID、默认 Note Facts 与提交。
 
 ## 已实现：Piano Roll Browser Input
 
@@ -121,8 +135,9 @@ Interaction、Keyboard Binding 和 selected Renderer 视觉在第三阶段后续
 - 单 primary Pointer、Pointer Capture 与默认 4 CSS Pixel Drag Threshold；
 - Up、Cancel、lost capture、dispose 与失败隔离的完整生命周期。
 
-Browser Input 不读取 ProjectSession，也不直接修改 Selection。它只把浏览器事实交给后续
-Select Interaction；当前仍未接入 Keyboard、Tool 状态机或 Note Command。
+Browser Input 不读取 ProjectSession，也不直接修改 Selection。它只把浏览器事实交给
+Select Interaction 或 Pencil Placement；Keyboard、Tool Preference 与 Note Command 由
+Studio 组合。
 
 ## 已实现：Piano Roll Browser Renderer
 
@@ -158,10 +173,10 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 1. **已完成**：Piano Roll Clip Context、Viewport、坐标链与可见范围 Read Model。
 2. **已完成**：Browser Canvas Grid、Note Scene 和 DOM / Canvas Note Adapter，并由
    Studio 只读组合当前 Clip。
-3. **进行中**：建立 Clip-scoped EditorSession、Select Interaction、Note Selection、
+3. **已完成**：建立 Clip-scoped EditorSession、Select Interaction、Note Selection、
    统一 Browser Input 与 scoped keyboard shortcuts。
-4. 接入 Pencil Add、Move 与 Remove Note 的单次提交手势；Resize 先补充产品与 Core
-   Command。
+4. **进行中**：已接入 Pencil Add Note 单次提交手势；Move、Remove 与 Resize 必须按各自
+   产品切片继续实施。
 5. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
 6. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 

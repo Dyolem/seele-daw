@@ -42,6 +42,12 @@ export type {
   PianoRollGrid,
 } from './piano-roll-grid'
 
+export { resolvePianoRollPencilNotePlacement } from './piano-roll-pencil-interaction'
+export type {
+  PianoRollNotePlacement,
+  ResolvePianoRollPencilNotePlacementInput,
+} from './piano-roll-pencil-interaction'
+
 export { createPianoRollNoteReadModel } from './piano-roll-note-read-model'
 export type {
   CreatePianoRollNoteReadModelInput,

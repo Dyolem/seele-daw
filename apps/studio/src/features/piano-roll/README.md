@@ -12,8 +12,13 @@
 - Clip-scoped Note Selection、DOM Hit、Primary Pointer Click 与 focused Escape；
 - 应用生命周期级 Pencil / Cursor、Snap 与 `1/16` Grid Preference Store，Canvas Grid
   消费其 Subdivision Tick；
+- 可见 Pencil / Cursor 单选工具与 Snap Toggle；
+- Pencil 空白 Click 的 X / Tick、Y / Pitch Placement、Clip 尾部限制与 Add Note Command；
+- 创建成功后只选中新 Note 并保持 Pencil，创建失败时保留 Project 与 Selection 并显示
+  Toast；
+- Add Note 的 Undo / Redo 权威回读与失效 Selection 清理；
 - looped Clip 的明确不支持状态。
 
-当前 Surface 仍不能修改 Project 内容。后续在这里用 Tool 门控 Cursor Selection 与 Pencil
-Add Note，并连接已经组合的 Project MIDI Note Coordinator；DOM Event 必须先归一化为
-Renderer-neutral Hit，不直接修改 Project Model，也不把 ProjectSession 放入 Pinia。
+当前 Surface 已形成第一条 Project 内容写入闭环，但仍不能 Move、Resize、Delete 或编辑
+Velocity。DOM Event 必须继续先归一化为 Renderer-neutral Hit，不直接修改 Project Model，
+也不把 ProjectSession 放入 Pinia。

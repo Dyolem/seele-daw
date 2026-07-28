@@ -1,6 +1,6 @@
 # Piano Roll Note Creation 第四阶段计划
 
-> Status: In progress; Batches 1–2 accepted, Batch 3 implemented and awaiting review
+> Status: In progress; Batches 1–3 accepted, Batch 4 implemented and awaiting review
 >
 > Date: 2026-07-28
 
@@ -218,6 +218,12 @@ Subdivision Tick，但 Tool 与 Snap 在 Batch 4 可见闭环前不改变现有 
 - Command failure Toast；
 - Undo / Redo、Clip 切换、Dock 布局与可访问性测试；
 - DESIGN、PRODUCT 与验证基线更新。
+
+Batch 4 的实现冻结 Pointer Down 时的 Tool、Snap、Grid、Clip Context 与 Viewport，并只在
+匹配的 Pointer Up 处理结果。这样即使手势期间切换 Tool、调整 Snap 或切换 Clip，也不会把
+一次手势解释成混合语义。Pencil 成功提交后只通过权威 Query / Subscription 让 Note 重新进入
+Read Model，再使用返回的稳定 `NoteId` 建立 Selection；失败保留原 Selection 并显示可访问
+Toast。
 
 ## 停止点
 

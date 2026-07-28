@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-28，功能代码截至 `df66936`
+> 最近更新：2026-07-28，功能代码截至 `67509d8`
 >
-> 当前待审：Piano Roll Note Creation Batch 3 Studio Tool Preferences
+> 当前待审：Piano Roll Note Creation Batch 4 可见 Add Note 闭环
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -34,13 +34,14 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 1. 在 Project Entry 新建空项目，或打开最近保存的项目。
 2. 在 Workbench 创建 Instrument Track。
 3. 在 Instrument Track 的目标小节创建、选择并打开空 MIDI Clip。
-4. 在 Context Editor Dock 查看 Piano Roll，并选择、切换或清空已有 MIDI Note。
-5. 通过 Undo / Redo 撤销或恢复 Track 与 MIDI Clip 创建操作。
+4. 在 Context Editor Dock 使用 Pencil 创建 MIDI Note，或用 Cursor 选择、切换和清空
+   Note Selection。
+5. 通过 Undo / Redo 撤销或恢复 Track、MIDI Clip 与 MIDI Note 创建操作。
 6. 显式保存项目。
 7. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
 8. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
-当前闭环还不包含 Piano Roll Note 创建与内容修改、音源、音频输出或播放。
+当前闭环还不包含 Piano Roll Note Move / Resize / Delete、音源、音频输出或播放。
 
 ### 2.1 功能总览
 
@@ -59,7 +60,7 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `KEYBOARD-SHORTCUTS` | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 与 Piano Roll Escape 已接入。 |
 | `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | 已有空 MIDI Clip 入口，尚无 Piano Roll Note 编辑入口。 |
 | `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
-| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | Grid / Note Renderer 与单选、修饰键切换、空白 / Escape 清除 Selection 已接入。 |
+| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | Grid / Note Renderer、Pencil Add、Cursor Selection、Snap Toggle 与 Undo / Redo 已接入。 |
 
 ## 3. 项目入口与生命周期
 
@@ -202,7 +203,8 @@ Workbench 已建立真实项目状态驱动的布局：
 - 执行 Command 后可以 Undo；Undo 后可以 Redo。
 - 执行新的分叉 Command 会使旧 Redo 分支失效。
 - History 是 Session 本地状态，不保存到 Snapshot、Project File、Checkpoint 或 IndexedDB。
-- 当前 Studio 中可直接产生的历史操作包括 Instrument Track 与空 MIDI Clip 创建；MIDI Note Command 尚无产品 UI。
+- 当前 Studio 中可直接产生的历史操作包括 Instrument Track、空 MIDI Clip 与 Pencil Add
+  MIDI Note。
 - Workbench 可使用 `Mod+Z` Undo、`Mod+Shift+Z` Redo；Windows 兼容 `Control+Y`。
 
 ### 5.3 `CONTEXT-EDITOR-DOCK` 编辑器 Dock
@@ -225,8 +227,8 @@ Dock 当前根据上下文显示：
 - 已选择 Track、但没有 MIDI Clip 时的空状态。
 - 已选择 MIDI Clip 时的 Clip 摘要与可选择 Piano Roll。
 
-Piano Roll 已能渲染真实 Grid 和 Note，并提供基础 Selection；尚没有工具切换、缩放、滚动
-或修改 Note 内容的手势。
+Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与基础 Selection，并可
+使用 Pencil 创建 Note；尚没有缩放、滚动、Move、Resize、Delete 或 Velocity 编辑手势。
 
 ### 5.4 `KEYBOARD-SHORTCUTS` Scoped Keyboard Shortcuts
 
@@ -386,7 +388,7 @@ Toast 支持信息、成功、警告和危险语义，可自动关闭、手动�
 
 ### 8.1 `MIDI-NOTE-CORE`
 
-**内部就绪**
+**内部就绪；Add 已由用户界面使用**
 
 Project Core 已实现：
 
@@ -398,19 +400,14 @@ Project Core 已实现：
 - Project Query、Query Index 和 Commit Subscription。
 - Immutable Snapshot。
 
-这些能力需要一个已经存在的 MIDI Clip 与 MIDI Source。当前 Studio 已能创建空 MIDI Clip，
-并已在内部组合 `ProjectMidiNoteCoordinator`：它校验 Active Project、Clip、MidiSource 与
-Note Partition，把 Clip-local Tick 映射为 Source-local Tick，生成 Note ID，并使用
-Velocity 100、UI Channel 1 执行 Add Note Command。Coordinator 返回 `NoteId + Commit`，尾部
-剩余时间不足期望 Duration 时只创建剩余的正 Tick。
+这些能力需要一个已经存在的 MIDI Clip 与 MIDI Source。Studio 的
+`ProjectMidiNoteCoordinator` 校验 Active Project、Clip、MidiSource 与 Note Partition，把
+Clip-local Tick 映射为 Source-local Tick，生成 Note ID，并使用 Velocity 100、UI Channel 1
+执行 Add Note Command。Coordinator 返回 `NoteId + Commit`；尾部剩余时间不足期望 Duration
+时只创建剩余的正 Tick。
 
-这仍是**内部就绪**能力。Piano Roll 尚未提供 Pencil / Cursor / Snap UI，也没有把 Pointer
-手势连接到 Coordinator，因此用户仍不能从界面创建、移动或删除 Note。
-
-Studio 内部还提供应用生命周期级的 Piano Roll Preferences Store，当前保存默认 Pencil、
-Snap 开启和唯一已确认的 `1/16` Grid Preset。Canvas Grid 已消费该 Preset 的 Subdivision
-Tick；Tool 与 Snap 尚未门控 Pointer 行为。切换 Project、Clip 或 Dock 布局不会重置这些
-偏好，新应用实例恢复默认值。
+Add 已由 Piano Roll Pencil 接入用户界面。Move 与 Remove Command 仍只有内部能力，当前没有
+可见手势。
 
 ### 8.2 `PIANO-ROLL` Selection Surface
 
@@ -423,6 +420,7 @@ Tick；Tool 与 Snap 尚未门控 Pointer 行为。切换 Project、Clip 或 Doc
 - 可见 Tick / Pitch / CSS Pixel Viewport；
 - 不提前 Snap 的连续 X → Tick 位置换算；
 - 视觉与交互共用的 Timeline Grid，以及 Snap 开启/关闭时的连续 Position → Tick 解析；
+- 只接受完成空白 Click 的 Pencil Note Placement，以及 Clip End 的合法内部起点限制；
 - 基于 Project Query 与局部 Subscription 的可见 Note Read Model；
 - Commit 后重新 Query、Viewport 替换、Observer 隔离和 dispose 生命周期；
 - Clip-scoped `PianoRollEditorSession`、冻结的稀疏 `NoteId` Selection；
@@ -438,11 +436,17 @@ Tick；Tool 与 Snap 尚未门控 Pointer 行为。切换 Project、Clip 或 Doc
 - 小节、拍、1/16 细分三级网格，以及密集级别抑制；
 - DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note / Selection 摘要；
 - Clip / Track Color Note 和 muted 视觉；
+- 可见 Pencil / Cursor 单选工具、Snap Toggle 与当前 `1/16` Grid 标识；
 - Docked、Minimized、Maximized 与 Workspace Fullscreen 布局复用；
 - 选中 Clip、Project Query/Subscription、Design Tokens 与 Renderer 的显式组合；
 - 普通 Click 单选，Shift / Command / Control Click 切换，空白 Grid Click 清空；
 - 聚焦 Piano Roll 时使用 `Escape` 清空 Selection；
 - Click 只在 Pointer Up 且未越过 4 CSS Pixel Drag Threshold 时确认；
+- 默认 Pencil 在空白 Grid 创建 Note，X 按 Snap 解析、Y 直接映射 Pitch Row；
+- Pencil Click 已有 Note 与 Pencil Drag 不产生业务结果；
+- 创建成功只选中新 Note、保留 Pencil，并由权威 Query / Subscription 更新可见内容；
+- 创建失败保持原 Project、Tool 与 Selection，并显示可访问错误 Toast；
+- Add Note 可 Undo；Redo 恢复 Note Fact，但不恢复已失效的旧 Selection；
 - Clip 切换创建新的 Editor Session，不继承前一个 Clip 的 Selection。
 
 Selection 只保存稳定 `NoteId`，属于当前 Clip Editor lifetime；它不进入 Pinia、Project
@@ -452,11 +456,10 @@ Note 被删除或移出当前 Clip Source 时间窗口时由权威 Query 清理�
 当前明确限制：
 
 - 不支持 looped Clip，不能把循环实例错误显示成非循环 Source；
-- Timeline Grid Snap 与 Tool Preferences 只有内部能力，尚未提供 Tool、Snap 开关或 Grid
-  Preset UI；
-- Surface 尚未消费已组合的 Add Note Coordinator，也没有可切换 Tool 或 Box Selection；
+- Grid Preset UI 当前只显示已确认的 `1/16`，尚不能选择其他直线、三连音或附点值；
+- Cursor 仅提供基本 Selection，尚无 Box Selection 或编辑能力；
 - 首批视图固定显示完整 Clip 和 MIDI 48–72，尚无 Zoom / Scroll；
-- 用户可以选择已有 Note，但还不能通过 UI 创建、移动、调整长度或删除 Note。
+- 用户可以创建和选择 Note，但还不能通过 UI Move、Resize、Delete 或编辑 Velocity。
 
 ### 8.3 Project File 与 Checkpoint
 
@@ -476,8 +479,8 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection、Piano Roll Note Selection、内部 Add Note Coordinator 与 Piano Roll Preferences。 |
-| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Selection Session、Select Interaction、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection / Snap。 |
+| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select Interaction、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
 | `@seele-daw/type-utils` | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。 |
@@ -489,9 +492,10 @@ Project Core 已具备：
 ### 编辑与编排
 
 - MIDI Clip 移动、复制、调整长度、拆分、删除或多选；当前只支持创建、单选与打开上下文。
-- Piano Roll Note 增加、移动、删除、调整长度或力度；当前只支持基础 Note Selection。
+- Piano Roll Note Move、Delete、Resize 或 Velocity 编辑；当前支持 Pencil Add 与基础
+  Cursor Selection。
 - Arrangement 时间轴滚动、缩放、Grid 和 Snap。
-- Editor Tool 切换、Drag Preview、框选与键盘内容编辑。
+- Drag Preview、框选与键盘内容编辑；当前只提供 Pencil / Cursor 显式切换。
 - Track 重命名、改色、删除、复制、重排。
 - Track Mute、Solo、Gain、Pan 与更多 Channel 设置。
 
@@ -579,18 +583,20 @@ Project Core 已具备：
 | 2026-07-28 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | Studio 接入 Clip-scoped Note Selection、共享 selected Scene、Pointer Click 与 focused Escape。 | `f9d7fe7` |
 | 2026-07-28 | `PIANO-ROLL` | 第四阶段显式定义 Pencil / Cursor、Snap、Note 创建结果与失败规则；Editor Common 建立共享 Timeline Grid Snap。 | `cc3bbb5` |
 | 2026-07-28 | `PIANO-ROLL` | Studio 建立 Project MIDI Note Coordinator、默认 Note Facts、Clip / Source 校验与 Typed Vue Context；尚未接入可见创建手势。 | `df66936` |
-| 2026-07-28 | `PIANO-ROLL` | Studio 建立应用生命周期级 Pencil / Cursor、Snap 与 `1/16` Grid Preference Store；Canvas Grid 已消费 Preset，尚无可见控制。 | 本批待审 |
+| 2026-07-28 | `PIANO-ROLL` | Studio 建立应用生命周期级 Pencil / Cursor、Snap 与 `1/16` Grid Preference Store；Canvas Grid 消费同一 Preset。 | `67509d8` |
+| 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Pencil Note Placement；Studio 接入可见 Tool / Snap、Add Note、创建后 Selection、失败 Toast 与 History 回归。 | 本批待审 |
 
 ## 13. 当前验证基线
 
-功能代码截至 `df66936`；当前待审的 Piano Roll Note Creation Batch 3 工作树已通过：
+功能代码截至 `67509d8`；当前待审的 Piano Roll Note Creation Batch 4 工作树已通过：
 
 - `pnpm lint`。
-- `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
+- `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production
+  Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：6 个测试文件，61 项测试。
-- Studio：37 个测试文件，188 项测试。
+- editor：7 个测试文件，70 项测试。
+- Studio：37 个测试文件，191 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

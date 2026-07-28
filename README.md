@@ -7,6 +7,10 @@
 - [产品功能手册](PRODUCT.md)
 - [Piano Black 设计语言](DESIGN.md)
 
+## 工程文档
+
+- [工程代码准则](CODE_GUIDELINES.md)
+
 ## 工程结构
 
 ```text

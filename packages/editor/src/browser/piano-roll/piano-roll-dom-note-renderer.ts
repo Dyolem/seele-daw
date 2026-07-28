@@ -1,4 +1,5 @@
 import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
+import { PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE } from '#internal/browser/piano-roll/piano-roll-dom-note-hit'
 import type {
   CreatePianoRollNoteRendererInput,
   PianoRollNoteRenderer,
@@ -21,7 +22,7 @@ function configureNoteElement(
   visual: PianoRollNoteVisual,
 ): void {
   element.className = 'sd-piano-roll-dom-note'
-  element.dataset.pianoRollNoteId = visual.noteId
+  element.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
   element.style.position = 'absolute'
   element.style.boxSizing = 'border-box'
   element.style.width = `${visual.widthCssPixel}px`

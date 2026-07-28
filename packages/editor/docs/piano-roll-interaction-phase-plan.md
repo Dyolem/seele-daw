@@ -1,6 +1,6 @@
 # Piano Roll Interaction 第三阶段计划
 
-> Status: In progress; Batch 1 implemented and accepted
+> Status: In progress; Batches 1–2 implemented and accepted
 >
 > Date: 2026-07-28
 
@@ -55,7 +55,7 @@ Session 不依赖 Vue、Pinia、DOM、Renderer 或 Studio，也不拥有任何 P
 
 ## Batch 2：Browser Input 与 DOM Hit
 
-- Surface 注册一个 Pointer Listener，不为每个 Note 创建 Listener；
+- Surface 注册一组委托式 Pointer Listener，不为每个 Note 创建 Listener；
 - Browser Adapter 将事件坐标转换为 Surface CSS Pixel；
 - DOM Hit 只负责把浏览器命中的元素转换为
   `{ noteId, zone: 'body' | 'resize-start' | 'resize-end' }`；
@@ -67,6 +67,21 @@ Session 不依赖 Vue、Pinia、DOM、Renderer 或 Studio，也不拥有任何 P
 
 即使长期保留 DOM，Event → Hit 的小型转换边界仍保留；若不再需要替换 Adapter，可以缩减
 其注入形式，但不能让 Tool 依赖 DOM 结构。
+
+当前实现遵循以下具体边界：
+
+- Common 只定义冻结的 `PianoRollHit` 与 `PianoRollPointerInput` 事实，不引用浏览器类型；
+- DOM Adapter 通过 `composedPath()` 和稳定的 Note ID marker 解析 Note body；
+- 无效 marker、Surface 外事件和 Hit Resolver failure 均 fail closed；
+- 只接受 Primary Pointer 的主按钮，并且同一时间只捕获一个 Pointer；
+- Down 时冻结 origin Hit、修饰键和 Surface-local CSS Pixel 起点；
+- Move、Up、Cancel 在 Pointer Capture 下继续报告当前位置；
+- 默认 Drag Threshold 为 4 CSS Pixel，一旦跨越便在该手势内保持为 true；
+- `pointercancel`、`lostpointercapture` 与 active dispose 都输出 Cancel；
+- Observer、Hit Test 和 Pointer Capture failure 不逃逸到浏览器事件循环。
+
+本批只建立输入事实，不直接改变 Selection。Click / Toggle / Clear 规则仍由后续 Select
+Interaction 在 Pointer Up 且未跨越阈值时解释。
 
 ## Batch 3：Scoped Keyboard Shortcuts
 

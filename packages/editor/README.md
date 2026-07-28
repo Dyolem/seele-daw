@@ -5,7 +5,8 @@
 > 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model，并已建立
 > Clip-scoped Note Selection Session；
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
-> Note Renderer，编辑手势尚未实现。
+> Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；Select Interaction
+> 与可见 Selection 尚未接入。
 
 ## 包定位
 
@@ -60,8 +61,7 @@ src/
 │   ├── snap/         吸附候选和策略
 │   └── read-models/  面向编辑器的查询适配
 ├── browser/
-│   ├── piano-roll/   已实现的 Canvas Grid、Note Scene 与 DOM / Canvas Adapter
-│   └── input/        未来的 DOM 事件与 pointer capture
+│   └── piano-roll/   Canvas Grid、Note Adapter、DOM Hit 与 Pointer Input
 └── index.ts          唯一公开入口
 ```
 
@@ -106,9 +106,23 @@ src/
 - Note 移出可见 Viewport 时保留 Selection，移出 Clip Source 时间窗口或被删除时清理；
 - Observer、Project Query、Project Subscription failure isolation 与显式 dispose。
 
-它不保存 `MidiNoteRecord`，不依赖当前可见 Read Model，也不进入 Vue 或 Pinia。Pointer、
-DOM Hit、Keyboard Binding 和 selected Renderer 视觉在第三阶段后续 Batch 接入。完整计划见
-[Piano Roll Interaction 第三阶段计划](./docs/piano-roll-interaction-phase-plan.md)。
+它不保存 `MidiNoteRecord`，不依赖当前可见 Read Model，也不进入 Vue 或 Pinia。Select
+Interaction、Keyboard Binding 和 selected Renderer 视觉在第三阶段后续 Batch 接入。完整
+计划见 [Piano Roll Interaction 第三阶段计划](./docs/piano-roll-interaction-phase-plan.md)。
+
+## 已实现：Piano Roll Browser Input
+
+首个 Browser Input 切片提供：
+
+- Renderer-neutral `PianoRollHit` 和冻结的 `PianoRollPointerInput`；
+- DOM Surface 级事件委托，不在每个 Note 上安装 Listener；
+- DOM Event composed path 到稳定 `NoteId` / body zone 的小型 Hit Adapter；
+- Surface-local CSS Pixel 坐标、固定的 Down origin Hit 与修饰键；
+- 单 primary Pointer、Pointer Capture 与默认 4 CSS Pixel Drag Threshold；
+- Up、Cancel、lost capture、dispose 与失败隔离的完整生命周期。
+
+Browser Input 不读取 ProjectSession，也不直接修改 Selection。它只把浏览器事实交给后续
+Select Interaction；当前仍未接入 Keyboard、Tool 状态机或 Note Command。
 
 ## 已实现：Piano Roll Browser Renderer
 

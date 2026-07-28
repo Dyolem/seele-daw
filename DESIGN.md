@@ -382,6 +382,19 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - Grid 级别密度小于可辨识 CSS Pixel 时可以省略，避免生成不可见的高频线；
 - Read Model、Renderer 和 ResizeObserver 必须随 Clip / Surface 生命周期释放。
 
+首批 Pointer Input 语义：
+
+- Note 不安装独立事件监听器，Surface 使用事件委托把 DOM 命中标准化为稳定
+  `NoteId + Hit Zone`；
+- Tool 与 Selection Session 只能消费 Renderer-neutral Hit 和 Surface-local CSS Pixel，
+  不读取 DOM 元素、CSS class 或 Vue Event；
+- Pointer Down 冻结手势起点、命中目标与修饰键；Pointer Capture 后允许指针离开 Surface；
+- 同一 Surface 同时只接受一个 Primary Pointer 手势，右键不进入编辑手势；
+- Click 与 Drag 使用 4 CSS Pixel 阈值区分，Selection 只在 Pointer Up 且未跨越阈值时确认；
+- Cancel、lost pointer capture、Surface dispose 都必须显式取消手势，不能提交部分结果；
+- DOM 命中转换边界即使不迁移到 Canvas 也保留；只有真实性能数据要求时才增加 Canvas
+  Hit 或空间索引。
+
 后续再引入力度编辑、Resize、Split、复制、Humanize、Quantize、Scale Assist 等能力；其产品边界必须在对应 Command 前讨论。
 
 视觉与操作规则：

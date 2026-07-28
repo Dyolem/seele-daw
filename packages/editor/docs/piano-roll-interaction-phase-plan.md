@@ -1,6 +1,6 @@
 # Piano Roll Interaction 第三阶段计划
 
-> Status: In progress; Batches 1–2 implemented and accepted
+> Status: In progress; Batches 1–2 accepted, Batch 3 implemented and awaiting review
 >
 > Date: 2026-07-28
 
@@ -105,6 +105,22 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
 
 不提前实现用户 Keymap 持久化、Sequence、Recorder、Shortcut Settings 或 Command Palette，
 但 Action metadata 与 Binding 必须能被菜单和未来帮助面板复用。
+
+当前实现决定：
+
+- 固定使用 `@tanstack/hotkeys@0.8.0` core，由单一 Browser Registry 隔离 alpha API；
+- 不使用 Vue composable；Composition Root 创建并释放应用唯一 Coordinator；
+- Coordinator 拥有 Action ID、Scope、enabled、handled policy 与冻结 metadata；
+- TanStack 只拥有 `Mod`、解析、editable filtering、Listener 注册和 cleanup；
+- 同 Binding 按 Modal → focused Piano Roll → Workbench → Global 解析；
+- IME composing 和已处理 Event 不进入 Action；
+- 只有 Handler 返回 true 才阻止浏览器默认行为；
+- Workbench 已接入 Save、Undo、Redo 及 Windows `Control+Y` 兼容 Binding；
+- `piano-roll.selection.clear` 的 ID、Scope 与 `Escape` 产品规则已保留，但真实 Handler 随
+  Batch 4 Editor Session 接入，不能提前注册空行为。
+
+完整边界见
+[Studio Keyboard Shortcut Architecture](../../../apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
 
 ## Batch 4：Studio Selection
 

@@ -283,6 +283,23 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 
 快捷键显示使用当前平台习惯。不可用命令应显示 Disabled 原因或通过上下文避免出现，而不是点击后静默失败。
 
+快捷键系统遵循：
+
+- Stable Action ID、Scope、enabled policy 和 Handler 由 Seele Studio 拥有；
+- 作用域优先级固定为 Modal / Dialog → focused Piano Roll → Workbench → Global；
+- Feature 必须显式注册并返回 disposer，不在组件中散布第三方快捷键 composable；
+- 普通可编辑元素和 IME composing 默认不触发编辑 Action；
+- 只有当前 Scope 中 enabled Action 真正处理按键时才阻止浏览器默认行为；
+- Action metadata 与 Binding 必须可被菜单、帮助面板和未来 Command Palette 复用；
+- 首批 Workbench Binding 为 Save `Mod+S`、Undo `Mod+Z`、Redo `Mod+Shift+Z`，并兼容
+  Windows `Control+Y`；
+- focused Piano Roll 的 `Escape` 清空 Selection，但只有 Editor Session 已接入且该表面
+  获得焦点时才注册。
+
+当前按键解析与浏览器监听固定通过隔离的 `@tanstack/hotkeys@0.8.0` Adapter 完成；业务
+模块不得直接依赖其 alpha API。架构见
+[Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
+
 ### 7.4 选择模型
 
 所有编辑表面共享以下概念：
@@ -1044,7 +1061,7 @@ Canvas 功能至少检查：
 - Track Color 是固定 Palette ID，还是允许任意色值；
 - 首批内置主题除 Piano Black 外的数量和视觉方向；
 - Browser / Library 与 Mixer 的最终工作区模式；
-- 首批全局快捷键与平台冲突策略。
+- 用户 Keymap、Shortcut Settings 与平台冲突定制策略。
 
 每项应在对应纵向产品切片开始前，结合可操作原型单独确认。
 

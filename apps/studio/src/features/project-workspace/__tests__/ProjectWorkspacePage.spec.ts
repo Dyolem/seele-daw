@@ -25,6 +25,12 @@ import {
   PROJECT_ROUTE_QUERY,
 } from '@/router/project-routes'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
+import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
+import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import {
+  STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
+  type StudioKeyboardShortcutVueContext,
+} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
   ACTIVE_PROJECT_PHASE,
@@ -166,6 +172,13 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   })
   const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
+  const keyboardBindingRegistry = new TestStudioKeyboardBindingRegistry()
+  const keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
+    bindingRegistry: keyboardBindingRegistry,
+  })
+  const keyboardShortcutContext: StudioKeyboardShortcutVueContext = Object.freeze({
+    keyboardShortcuts,
+  })
   const wrapper = mount(ProjectWorkspacePage, {
     props: { projectId },
     global: {
@@ -175,12 +188,14 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
+        [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboardShortcutContext,
       },
     },
   })
 
   return {
     router,
+    keyboardBindingRegistry,
     selection: useProjectWorkbenchSelectionStore(pinia),
     wrapper,
   }
@@ -229,6 +244,85 @@ describe('ProjectWorkspacePage', () => {
     await flushPromises()
 
     expect(fixture.save).toHaveBeenCalledOnce()
+  })
+
+  it('handles Save through the Workbench shortcut only while saving is available', async () => {
+    const projectId = parseProjectId('project-workspace-page-save-shortcut')
+    const ready = createReadyState(projectId)
+    const fixture = createFixture(
+      async () =>
+        Object.freeze({
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId,
+        }),
+      Object.freeze({
+        ...ready,
+        isDirty: true,
+        savedRevision: null,
+        savedContentStateId: null,
+      }),
+    )
+    const { keyboardBindingRegistry, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    const handled = keyboardBindingRegistry.dispatch('Mod+S')
+    await flushPromises()
+
+    expect(handled.defaultPrevented).toBe(true)
+    expect(fixture.save).toHaveBeenCalledOnce()
+
+    fixture.state.value = createReadyState(projectId)
+    await nextTick()
+    const unhandled = keyboardBindingRegistry.dispatch('Mod+S')
+    expect(unhandled.defaultPrevented).toBe(false)
+    expect(fixture.save).toHaveBeenCalledOnce()
+
+    wrapper.unmount()
+    expect(keyboardBindingRegistry.listeners.size).toBe(0)
+  })
+
+  it('routes Undo and both Redo bindings to current Project History', async () => {
+    const projectId = parseProjectId('project-workspace-page-history-shortcuts')
+    const session = createInitialProjectSession({
+      projectId,
+      projectName: 'History Shortcuts',
+      tempoEventId: parseTempoEventId('tempo-history-shortcuts'),
+      timeSignatureEventId: parseTimeSignatureEventId(
+        'meter-history-shortcuts',
+      ),
+    })
+    const ready = createReadyState(projectId, session)
+    createProjectTrackCoordinator({
+      activeProject: { state: ready },
+      createUniqueId: (() => {
+        const identities = ['history-shortcut-track', 'history-shortcut-device']
+        return () => identities.shift() ?? 'unused-history-shortcut-id'
+      })(),
+      createRandomValue: () => 0,
+    }).addInstrumentTrack()
+    const fixture = createFixture(
+      async () =>
+        Object.freeze({
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId,
+        }),
+      ready,
+    )
+    const { keyboardBindingRegistry } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    const undo = keyboardBindingRegistry.dispatch('Mod+Z')
+    expect(undo.defaultPrevented).toBe(true)
+    expect(session.canUndo).toBe(false)
+    expect(session.canRedo).toBe(true)
+
+    const redo = keyboardBindingRegistry.dispatch('Control+Y')
+    expect(redo.defaultPrevented).toBe(true)
+    expect(session.canUndo).toBe(true)
+    expect(session.canRedo).toBe(false)
+
+    const unavailableRedo = keyboardBindingRegistry.dispatch('Mod+Shift+Z')
+    expect(unavailableRedo.defaultPrevented).toBe(false)
   })
 
   it('returns a missing requested Project to Entry with an exclusion notice', async () => {

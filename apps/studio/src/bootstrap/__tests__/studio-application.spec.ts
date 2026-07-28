@@ -6,6 +6,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import { composeStudioApplication } from '@/bootstrap/studio-application'
+import {
+  useStudioKeyboardShortcuts,
+  type StudioKeyboardShortcutVueContext,
+} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
@@ -141,6 +145,15 @@ function requireProjectClipContext(
   return context
 }
 
+function requireKeyboardShortcutContext(
+  context: StudioKeyboardShortcutVueContext | null,
+): StudioKeyboardShortcutVueContext {
+  if (context === null) {
+    throw new Error('Expected the Studio Keyboard Shortcut Context')
+  }
+  return context
+}
+
 describe('StudioApplication', () => {
   it('installs Pinia and Router while providing the owned Active Project Context', () => {
     const fixture = createRuntimeFixture()
@@ -151,12 +164,14 @@ describe('StudioApplication', () => {
     let projectEntryContext: ProjectEntryVueContext | null = null
     let projectClipContext: ProjectClipVueContext | null = null
     let projectTrackContext: ProjectTrackVueContext | null = null
+    let keyboardShortcutContext: StudioKeyboardShortcutVueContext | null = null
     const rootComponent = defineComponent({
       setup() {
         const activeProject = useActiveProject()
         projectEntryContext = useProjectEntry()
         projectClipContext = useProjectClips()
         projectTrackContext = useProjectTracks()
+        keyboardShortcutContext = useStudioKeyboardShortcuts()
         const projectNavigationDecision = useProjectNavigationDecision()
         const installedRouter = useRouter()
         const store = useCompositionStore()
@@ -185,6 +200,11 @@ describe('StudioApplication', () => {
     )
     expect(Object.isFrozen(requireProjectClipContext(projectClipContext).projectClips)).toBe(true)
     expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(true)
+    expect(
+      requireKeyboardShortcutContext(
+        keyboardShortcutContext,
+      ).keyboardShortcuts.listShortcuts(),
+    ).toEqual([])
     application.dispose()
   })
 

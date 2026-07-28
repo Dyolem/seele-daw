@@ -12,6 +12,13 @@ import {
   installProjectNavigationGuard,
   type ProjectNavigationGuardDispose,
 } from '@/router/project-navigation-guard'
+import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
+import {
+  createStudioKeyboardShortcutCoordinator,
+  type StudioKeyboardBindingRegistry,
+  type StudioKeyboardShortcutCoordinator,
+} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import { STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import {
   createBrowserActiveProjectRuntime,
   type BrowserActiveProjectRuntime,
@@ -52,6 +59,7 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
   readonly projectRuntime: BrowserActiveProjectRuntime
   readonly createProjectEntityId?: () => string
   readonly createRandomValue?: () => number
+  readonly keyboardBindingRegistry?: StudioKeyboardBindingRegistry
 }
 
 export interface StudioApplication {
@@ -69,6 +77,7 @@ class StudioApplicationImpl implements StudioApplication {
   readonly #activeProjectBinding: ActiveProjectVueBinding
   readonly #projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding
   readonly #projectNavigationGuardDispose: ProjectNavigationGuardDispose
+  readonly #keyboardShortcuts: StudioKeyboardShortcutCoordinator
   #mounted = false
   #disposed = false
   #resourcesReleased = false
@@ -79,6 +88,7 @@ class StudioApplicationImpl implements StudioApplication {
     activeProjectBinding: ActiveProjectVueBinding,
     projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding,
     projectNavigationGuardDispose: ProjectNavigationGuardDispose,
+    keyboardShortcuts: StudioKeyboardShortcutCoordinator,
     projectEntry: ProjectEntryCoordinator,
     projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator,
   ) {
@@ -87,6 +97,7 @@ class StudioApplicationImpl implements StudioApplication {
     this.#activeProjectBinding = activeProjectBinding
     this.#projectNavigationDecisionBinding = projectNavigationDecisionBinding
     this.#projectNavigationGuardDispose = projectNavigationGuardDispose
+    this.#keyboardShortcuts = keyboardShortcuts
     this.projectEntry = projectEntry
     this.projectNavigationConfirmation = projectNavigationConfirmation
   }
@@ -134,9 +145,13 @@ class StudioApplicationImpl implements StudioApplication {
         this.#projectNavigationDecisionBinding.dispose()
       } finally {
         try {
-          this.#activeProjectBinding.dispose()
+          this.#keyboardShortcuts.dispose()
         } finally {
-          this.#projectRuntime.dispose()
+          try {
+            this.#activeProjectBinding.dispose()
+          } finally {
+            this.#projectRuntime.dispose()
+          }
         }
       }
     }
@@ -155,6 +170,7 @@ export function composeStudioApplication(
   let activeProjectBinding: ActiveProjectVueBinding | null = null
   let projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding | null = null
   let projectNavigationGuardDispose: ProjectNavigationGuardDispose | null = null
+  let keyboardShortcuts: StudioKeyboardShortcutCoordinator | null = null
 
   try {
     activeProjectBinding = createActiveProjectVueBinding(projectRuntime.activeProject)
@@ -176,6 +192,11 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
     })
+    keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
+      bindingRegistry:
+        composition.keyboardBindingRegistry ??
+        createBrowserTanStackHotkeyRegistry({ target: document }),
+    })
     projectNavigationGuardDispose = installProjectNavigationGuard(
       composition.router,
       projectNavigationConfirmation,
@@ -186,6 +207,10 @@ export function composeStudioApplication(
     vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
     vueApplication.provide(PROJECT_TRACK_CONTEXT_KEY, Object.freeze({ projectTracks }))
     vueApplication.provide(PROJECT_CLIP_CONTEXT_KEY, Object.freeze({ projectClips }))
+    vueApplication.provide(
+      STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
+      Object.freeze({ keyboardShortcuts }),
+    )
     vueApplication.provide(
       PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
       projectNavigationDecisionBinding.context,
@@ -200,6 +225,7 @@ export function composeStudioApplication(
       activeProjectBinding,
       projectNavigationDecisionBinding,
       projectNavigationGuardDispose,
+      keyboardShortcuts,
       projectEntry,
       projectNavigationConfirmation,
     )
@@ -211,9 +237,13 @@ export function composeStudioApplication(
         projectNavigationDecisionBinding?.dispose()
       } finally {
         try {
-          activeProjectBinding?.dispose()
+          keyboardShortcuts?.dispose()
         } finally {
-          projectRuntime.dispose()
+          try {
+            activeProjectBinding?.dispose()
+          } finally {
+            projectRuntime.dispose()
+          }
         }
       }
     }

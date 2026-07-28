@@ -6,6 +6,8 @@
 >
 > 最近更新：2026-07-28，功能代码截至 `007c24e`
 >
+> 当前待审：Studio Scoped Keyboard Shortcuts，提交号将在审核通过后回填
+>
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
 本文档记录 Seele DAW **现在能够做什么、用户如何操作、产品必须保持哪些行为，以及哪些界面仍只是占位**。它是功能开发、验收和回归测试的共同依据。
@@ -54,6 +56,7 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。 |
 | `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局并显示所选 Clip 的只读 Piano Roll。 |
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
+| `KEYBOARD-SHORTCUTS` | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 已接入；Piano Roll Scope 等待 Selection UI。 |
 | `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **内部就绪** | 已有空 MIDI Clip 入口，尚无 Piano Roll Note 编辑入口。 |
 | `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
 | `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | 可见只读 Grid / Note Renderer；内部 Selection Session、DOM Hit 与 Pointer Input 已就绪，UI 尚未接入。 |
@@ -200,6 +203,7 @@ Workbench 已建立真实项目状态驱动的布局：
 - 执行新的分叉 Command 会使旧 Redo 分支失效。
 - History 是 Session 本地状态，不保存到 Snapshot、Project File、Checkpoint 或 IndexedDB。
 - 当前 Studio 中可直接产生的历史操作包括 Instrument Track 与空 MIDI Clip 创建；MIDI Note Command 尚无产品 UI。
+- Workbench 可使用 `Mod+Z` Undo、`Mod+Shift+Z` Redo；Windows 兼容 `Control+Y`。
 
 ### 5.3 `CONTEXT-EDITOR-DOCK` 编辑器 Dock
 
@@ -215,13 +219,39 @@ Dock 已支持：
 - 根据当前 Track Selection 显示 Track 名称与类型。
 - 根据当前 Clip Selection 显示 Clip 名称与所属 Track，并在创建或双击 Clip 时重新打开 Dock。
 
-Dock 当前只显示上下文状态：
+Dock 当前根据上下文显示：
 
 - 未选择 Track 时的选择提示。
 - 已选择 Track、但没有 MIDI Clip 时的空状态。
-- 已选择 MIDI Clip 时的 Clip 摘要与 Piano Roll 待实现提示。
+- 已选择 MIDI Clip 时的 Clip 摘要与只读 Piano Roll。
 
-它还不是 Piano Roll，也没有 Note 渲染、命中检测、工具、缩放、滚动或手势操作。
+Piano Roll 已能渲染真实 Grid 和 Note，但尚没有可见 Selection、工具、缩放、滚动或 Note
+编辑手势。
+
+### 5.4 `KEYBOARD-SHORTCUTS` Scoped Keyboard Shortcuts
+
+**局部可用**
+
+当前 Workbench 支持：
+
+- `Mod+S`：当前项目 dirty 且不在保存中时执行 Save；
+- `Mod+Z`：当前 Session 可以 Undo 时执行 Undo；
+- `Mod+Shift+Z`：当前 Session 可以 Redo 时执行 Redo；
+- `Control+Y`：兼容 Windows 常用 Redo Binding。
+
+产品规则：
+
+- `Mod` 在 macOS 对应 Command，在 Windows / Linux 对应 Control；
+- Action 不可用时不执行，也不伪造业务结果；
+- 普通 Input、Textarea、Select、Contenteditable 和 IME composing 默认不触发编辑快捷键；
+- Scope 优先级为 Modal / Dialog → focused Piano Roll → Workbench → Global；
+- 只有 enabled Action 实际处理时才阻止浏览器默认行为；
+- Feature 离开时卸载自己的 Action，应用释放时统一清理剩余 Listener；
+- 快捷键只调用现有 Save / History 权威，不保存 ProjectSession、dirty 或 History 副本。
+
+Piano Roll `Escape` 清空 Selection 的产品规则已经确定，但要等下一批真实
+`PianoRollEditorSession` 接入后才启用。当前没有用户 Keymap、Shortcut Settings、Sequence
+或 Command Palette。
 
 ## 6. Track
 
@@ -419,7 +449,7 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection 与只读 Piano Roll。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection 与只读 Piano Roll。 |
 | `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Selection Session、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input；Select Interaction 尚未实现。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
@@ -517,17 +547,18 @@ Project Core 已具备：
 | 2026-07-27 | `PIANO-ROLL`、`CONTEXT-EDITOR-DOCK` | Studio Dock 默认接入 keyed DOM Note 与真实 Project Query / Subscription。 | `f3778f0` |
 | 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Clip-scoped Note Selection Session、权威存在性校准与第三阶段交互计划。 | `054377d` |
 | 2026-07-28 | `PIANO-ROLL` | Editor Browser 完成 Surface 级 DOM Hit、Primary Pointer Capture、CSS Pixel Input 与 Drag Threshold。 | `007c24e` |
+| 2026-07-28 | `KEYBOARD-SHORTCUTS` | Studio 完成 Scoped Action Coordinator、TanStack Browser Adapter，以及 Workbench Save / Undo / Redo Binding；等待本批审核。 | 待提交 |
 
 ## 13. 当前验证基线
 
-功能代码截至 `007c24e` 已通过：
+功能代码截至 `007c24e`；当前待审的 Scoped Keyboard Shortcuts 工作树已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
 - editor：4 个测试文件，35 项测试。
-- Studio：32 个测试文件，163 项测试。
+- Studio：34 个测试文件，174 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

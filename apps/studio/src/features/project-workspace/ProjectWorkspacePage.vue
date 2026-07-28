@@ -20,7 +20,15 @@ import {
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
-import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
+import {
+  ACTIVE_PROJECT_PHASE,
+  ACTIVE_PROJECT_SAVE_STATUS,
+} from '@/workbench/project/active-project-state'
+import {
+  STUDIO_KEYBOARD_ACTION,
+  STUDIO_KEYBOARD_SCOPE,
+} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import { useStudioKeyboardShortcuts } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import { createProjectClipBarRange } from '@/workbench/project/clip/project-clip-bar-range'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -44,6 +52,7 @@ interface ProjectPresentation {
 
 const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
+const { keyboardShortcuts } = useStudioKeyboardShortcuts()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const router = useRouter()
 const requestedProjectId = shallowRef<ProjectId | null>(null)
@@ -152,12 +161,25 @@ async function saveProject(): Promise<void> {
   }
 }
 
-function undoProject(): void {
-  readyProject.value?.session.undo()
+function canSaveProject(): boolean {
+  const ready = readyProject.value
+  return (
+    ready !== null &&
+    ready.isDirty &&
+    ready.saveStatus !== ACTIVE_PROJECT_SAVE_STATUS.SAVING
+  )
 }
 
-function redoProject(): void {
-  readyProject.value?.session.redo()
+function undoProject(): boolean {
+  const ready = readyProject.value
+  if (ready === null || !ready.session.canUndo) return false
+  return ready.session.undo() !== null
+}
+
+function redoProject(): boolean {
+  const ready = readyProject.value
+  if (ready === null || !ready.session.canRedo) return false
+  return ready.session.redo() !== null
 }
 
 function describeSaveFailure(saveFailure: unknown): string | null {
@@ -166,6 +188,40 @@ function describeSaveFailure(saveFailure: unknown): string | null {
   }
   return saveFailure === null ? null : 'The project could not be saved.'
 }
+
+const disposeKeyboardShortcuts = keyboardShortcuts.register([
+  {
+    actionId: STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
+    bindings: ['Mod+S'],
+    description: 'Save the active local project.',
+    isEnabled: canSaveProject,
+    label: 'Save project',
+    run: () => {
+      if (!canSaveProject()) return false
+      void saveProject()
+      return true
+    },
+    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
+  },
+  {
+    actionId: STUDIO_KEYBOARD_ACTION.HISTORY_UNDO,
+    bindings: ['Mod+Z'],
+    description: 'Undo the latest committed project edit.',
+    isEnabled: () => readyProject.value?.session.canUndo === true,
+    label: 'Undo',
+    run: undoProject,
+    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
+  },
+  {
+    actionId: STUDIO_KEYBOARD_ACTION.HISTORY_REDO,
+    bindings: ['Mod+Shift+Z', 'Control+Y'],
+    description: 'Redo the latest undone project edit.',
+    isEnabled: () => readyProject.value?.session.canRedo === true,
+    label: 'Redo',
+    run: redoProject,
+    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
+  },
+])
 
 watch(
   () => props.projectId,
@@ -223,6 +279,7 @@ watch(
 )
 
 onUnmounted(() => {
+  disposeKeyboardShortcuts()
   isUnmounted = true
   requestGeneration += 1
   const projectId = requestedProjectId.value

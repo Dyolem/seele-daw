@@ -18,6 +18,7 @@
     "@seele-daw/platform-browser": "workspace:*",
     "@seele-daw/playback": "workspace:*",
     "@seele-daw/project-core": "workspace:*",
+    "@tanstack/hotkeys": "0.8.0",
     "pinia": "^3.0.4",
     "reka-ui": "2.10.1",
     "vue": "^3.5.38",

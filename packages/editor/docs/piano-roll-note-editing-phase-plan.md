@@ -92,9 +92,10 @@ Pixel 宽度在 Resize 批次结合实际界面审查确定。左右热区重叠
 
 Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 Snap：
 
-- 区分 Absolute Snap 与 Relative Delta Snap；
-- 已经落在 Grid 上的单 Note Move 使用目标 Grid；
-- 导入或手工形成的 Off-grid Note 默认使用相对 Delta Snap，避免首次拖动破坏原有 Timing；
+- Note Move 使用 Absolute Grid Coordinate Snap；
+- 无论 Note 原本是否落在 Grid 上，都以拖动后的目标时间坐标解析最近 Grid 坐标；
+- 开启 Snap 后，导入、关闭 Snap 移动或 Grid Resolution 变化形成的 Off-grid Note 会在
+  下一次拖动时进入当前 Grid，不保留旧 Resolution 或自由移动产生的 Timing Offset；
 - 多选 Move 以一个稳定 Anchor 解析 Delta，再把同一 Delta 应用于全部 Note；
 - 多选 Move 是一次 Selection 产品意图，不通过多次执行单 Note Command 实现；
 - Pitch 使用离散 Semitone Delta，不进入 Timeline Snap；
@@ -112,8 +113,9 @@ Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 
 - Pointer Down 冻结 Project `baseRevision`、Note Record、Selection、Viewport、Grid、
   Snap 和 Modifier；手势中途改变 Preference 不改变本次结果，Project revision 变化则
   Pointer Up 的 Command 作为 stale intent 整体拒绝；
-- Grid-aligned Anchor 吸附目标 Grid；Off-grid Anchor 吸附共享相对 Delta，从而保留原有
-  Timing Offset；
+- Anchor 的原始 Clip-local Tick 与 Pointer Delta 先形成绝对目标坐标，再由本次手势冻结的
+  Grid Origin 和 Grid Resolution 解析最近 Grid 坐标；Off-grid Anchor 不采用相对
+  Delta Snap；
 - `Alt` 在 Pointer Down 时只为本次手势临时绕过 Snap；Snap Preference 本身不改变；
 - Y 轴按 Pitch Row 解析共享 Semitone Delta，不使用 Timeline Grid；
 - Preview 使用冻结数据和同一共享 Delta，不写 Project；Snap 开启时显示 Anchor Guide；
@@ -164,7 +166,7 @@ Snap 只约束实时创建与拖动；Quantize 是修改既有 Note Timing 的 P
 
 1. Batch 1A：Project Core 多 Note 原子删除 Command、Commit、Delta 与 History。
 2. Batch 1B：Studio Coordinator、Delete / Backspace Action、Selection 校准与 Toast。
-3. Batch 2A：Relative Time Grid Snap、Move Intent 和纯逻辑边界。
+3. Batch 2A：Absolute Time Grid Coordinate Snap、Move Intent 和纯逻辑边界。
 4. Batch 2B：Cursor Move Hit、Preview、Pointer 生命周期与一次提交。
 5. Batch 3A：Resize Command 与左右边界算法。
 6. Batch 3B：Cursor / Pencil Edge Hit、Preview 与可见 Resize 闭环。

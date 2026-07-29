@@ -162,24 +162,18 @@ function resolveTickDelta(
   } else {
     const anchorClipStartTick =
       anchor.startTick - input.gesture.context.sourceStartTick
-    const gridRelativeAnchor = anchorClipStartTick - input.grid.originTick
-    const anchorIsGridAligned =
-      gridRelativeAnchor % input.grid.subdivisionSpanTick === 0
+    const rawTargetClipTick = anchorClipStartTick + rawDelta
+    const targetSubdivision = Math.round(
+      (rawTargetClipTick - input.grid.originTick) /
+        input.grid.subdivisionSpanTick,
+    )
 
-    if (anchorIsGridAligned) {
-      const targetSubdivision = Math.round(
-        (anchorClipStartTick + rawDelta - input.grid.originTick) /
-          input.grid.subdivisionSpanTick,
-      )
-      candidateDelta =
-        input.grid.originTick +
-        targetSubdivision * input.grid.subdivisionSpanTick -
-        anchorClipStartTick
-    } else {
-      candidateDelta =
-        Math.round(rawDelta / input.grid.subdivisionSpanTick) *
-        input.grid.subdivisionSpanTick
-    }
+    // Snap the absolute target coordinate so off-grid Notes join the active
+    // Grid instead of preserving an offset from an earlier Grid resolution.
+    candidateDelta =
+      input.grid.originTick +
+      targetSubdivision * input.grid.subdivisionSpanTick -
+      anchorClipStartTick
   }
 
   const minimumDelta = Math.max(...input.gesture.notes.map((note) => -note.startTick))

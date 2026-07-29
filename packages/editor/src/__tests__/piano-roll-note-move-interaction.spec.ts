@@ -115,7 +115,7 @@ describe('Piano Roll Note Move Interaction', () => {
     expect(Object.isFrozen(preview?.notes)).toBe(true)
   })
 
-  it('preserves an off-grid anchor offset and targets only an unselected hit Note', () => {
+  it('snaps an off-grid anchor to an absolute Grid coordinate and targets only the hit Note', () => {
     const fixture = createFixture()
     const noteId = parseNoteId('editor-note-off-grid')
     fixture.addNote({
@@ -152,9 +152,50 @@ describe('Piano Roll Note Move Interaction', () => {
 
     expect(gesture.selectOnlyOnCommit).toBe(true)
     expect(preview).toMatchObject({
-      deltaTick: 240,
+      deltaTick: 200,
       movedNoteIds: [noteId],
-      snapGuideTick: 760,
+      snapGuideTick: 720,
+    })
+  })
+
+  it('resolves an off-grid anchor against the active Grid subdivision', () => {
+    const fixture = createFixture()
+    const noteId = parseNoteId('editor-note-high')
+    const begin = createPointerInput({
+      hit: Object.freeze({ noteId, zone: PIANO_ROLL_HIT_ZONE.BODY }),
+      originPosition: Object.freeze({ xCssPixel: 260, yCssPixel: 32 }),
+      position: Object.freeze({ xCssPixel: 260, yCssPixel: 32 }),
+    })
+    const gesture = createPianoRollNoteMoveGesture({
+      context: fixture.context,
+      pointerInput: begin,
+      selectedNoteIds: [],
+      session: fixture.session,
+    })
+    if (gesture === null) throw new Error('Expected Note move gesture')
+
+    const preview = resolvePianoRollNoteMovePreview({
+      gesture,
+      grid: createPianoRollGrid({
+        barSpanTick: parsePositiveTick(960),
+        beatSpanTick: parsePositiveTick(480),
+        originTick: parseTick(0),
+        subdivisionSpanTick: parsePositiveTick(160),
+      }),
+      pointerInput: createPointerInput({
+        ...begin,
+        hasExceededDragThreshold: true,
+        phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+        position: Object.freeze({ xCssPixel: 390, yCssPixel: 32 }),
+      }),
+      snapEnabled: true,
+      viewport: fixture.viewport,
+    })
+
+    expect(preview).toMatchObject({
+      deltaTick: 280,
+      movedNoteIds: [noteId],
+      snapGuideTick: 800,
     })
   })
 

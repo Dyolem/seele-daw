@@ -448,8 +448,8 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
 - Commit 后重新 Query、Viewport 替换、Observer 隔离和 dispose 生命周期；
 - Clip-scoped `PianoRollEditorSession`、冻结的稀疏 `NoteId` Selection；
 - Selection 前的权威 Note Query，以及相关 Commit 后的存在性和 Clip 时间窗口校准。
-- 冻结的 Cursor Move Gesture，以及 Grid-aligned Absolute Snap、Off-grid Relative
-  Delta Snap、Pitch Semitone Delta 和 Selection 合法边界交集。
+- 冻结的 Cursor Move Gesture，以及基于 Grid Coordinate 的 Absolute Snap、Pitch
+  Semitone Delta 和 Selection 合法边界交集。
 
 `@seele-daw/editor/browser` 与 Studio 已提供：
 
@@ -483,8 +483,9 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
   Modifier；手势期间 Project revision 改变时，Pointer Up 的 stale intent 整体拒绝；
 - Pointer Move 只更新冻结 Preview；Snap 开启时显示 Anchor Guide，Pointer Up 的非零
   Delta 最多执行一个 `MoveNotesCommand`；
-- Grid-aligned Note 吸附目标 Grid；Off-grid Note 吸附相对 Delta 并保留原 Timing Offset；
-  `Alt` 只为 Pointer Down 时开始的本次手势临时绕过 Snap；
+- Snap 开启时，Note 无论原本是否对齐，都以拖动后的绝对目标时间解析当前 Grid
+  Coordinate；切换 Grid Resolution 后也不保留旧网格或自由移动产生的偏移；`Alt` 只为
+  Pointer Down 时开始的本次手势临时绕过 Snap；
 - 多 Note Move 使用共享 Tick / Pitch Delta 和全部 Note 合法边界的交集，不逐 Note Clamp；
 - Move 成功后等待权威 Read Model 到达对应 revision 再移除最终 Preview，避免短暂视觉
   回跳；
@@ -632,7 +633,8 @@ Project Core 已具备：
 | 2026-07-29 | `PIANO-ROLL`、`UI-FOUNDATION` | Pencil Snap 改为当前 Grid 单元左边界；Snap 沿用 Fluent Grid；Toast 改为应用级命令触发与单一声明式 Region。 | `1bc6dac` |
 | 2026-07-29 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | 明确 Cursor Move、Cursor / Pencil Resize 归属；接入多 Note 原子删除、Delete / Backspace、Selection 校准与失败 Toast。 | `52dc03c` |
 | 2026-07-29 | `MIDI-NOTE-CORE` | 单个与多个 Note 删除统一为数量无关的 `midi-note.remove` 集合协议，移除重叠的单 Note Command。 | `df4cdf3` |
-| 2026-07-29 | `MIDI-NOTE-CORE`、`PIANO-ROLL` | Batch 5.2 统一共享 Delta 的 `MoveNotesCommand`；接入 Cursor Selection Move、Absolute / Relative Snap、冻结 Preview、Guide、Escape Cancel 与单 Commit / History。 | `待提交` |
+| 2026-07-29 | `MIDI-NOTE-CORE`、`PIANO-ROLL` | Batch 5.2 统一共享 Delta 的 `MoveNotesCommand`；接入 Cursor Selection Move、Absolute / Relative Snap、冻结 Preview、Guide、Escape Cancel 与单 Commit / History。 | `2535db4` |
+| 2026-07-29 | `PIANO-ROLL` | Note Move Snap 统一改为由绝对目标时间解析当前 Grid Coordinate；Off-grid Note 不再保留旧 Resolution 或自由移动偏移。 | `待提交` |
 
 ## 13. 当前验证基线
 
@@ -643,7 +645,7 @@ Batch 5.2 审查候选已通过：
   Build。
 - Project Core：26 个测试文件，378 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：8 个测试文件，80 项测试。
+- editor：8 个测试文件，81 项测试。
 - Studio：38 个测试文件，203 项测试。
 - type-utils：1 个测试文件，2 项测试。
 

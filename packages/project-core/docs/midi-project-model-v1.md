@@ -317,7 +317,14 @@ note.channel 是整数 0..15
 - Selection、hover 和拖拽预览不进入 Note Record；
 - Release Velocity、CC、Pitch Bend、Aftertouch 和 MPE 等到真正实现时再设计对应事件表。
 
-Add Note 和同一 MidiSource 内的 Move Note 使用严格边界：新 Note 区间必须完整落在 Source 的半开区间内。越界 Command 必须拒绝，不执行 clamp、loop wrap 或 MidiSource / Clip 自动扩展。Move Note 使用同一 Source 内的绝对 `nextStartTick` 与 `nextPitch`，保持 Note ID、duration、velocity 和 channel；目标与当前值相同时返回 `no-change`，不形成空 MutationPlan。Snap、量化和像素坐标转换由 Editor 在创建 Command 前完成。详细执行边界见 [MIDI Note Command 层执行计划](./midi-note-command-layer-plan.md)。
+Add Note 和同一 MidiSource 内的 Move Notes 使用严格边界：每个 Note 区间必须完整落在
+Source 的半开区间内，Pitch 必须落在 0–127。越界 Command 必须整体拒绝，不执行 Core
+clamp、loop wrap 或 MidiSource / Clip 自动扩展。`MoveNotesCommand` 对非空、无重复的
+`noteIds` 应用共享 `deltaTick` 与 `deltaPitch`，保持 Note ID、相对位置、duration、
+velocity 和 channel；两个 Delta 同时为零时返回 `no-change`，不形成空 MutationPlan。
+Snap、量化、像素坐标转换与交互边界 Clamp 由 Editor 在创建 Command 前完成，Core 仍在
+提交时基于权威 Record 复核全部目标。详细执行边界见
+[MIDI Note Command 层执行计划](./midi-note-command-layer-plan.md)。
 
 运行时按 Source 分区存储 Note：
 

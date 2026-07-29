@@ -7,6 +7,7 @@ import {
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
@@ -17,11 +18,14 @@ import {
   type ClipId,
   type MidiClipRecord,
   type MidiPitch,
+  type MidiPitchDelta,
   type MidiSourceRecord,
+  type ModelRevision,
   type NoteId,
   type ProjectCommit,
   type ProjectSession,
   type Tick,
+  type TickDelta,
 } from '@seele-daw/project-core'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -61,8 +65,24 @@ export interface RemovedMidiNotesResult {
   readonly noteIds: readonly NoteId[]
 }
 
+export interface MoveMidiNotesInput {
+  readonly baseRevision: ModelRevision
+  readonly clipId: ClipId
+  readonly deltaPitch: MidiPitchDelta
+  readonly deltaTick: TickDelta
+  readonly noteIds: readonly NoteId[]
+}
+
+export interface MovedMidiNotesResult {
+  readonly commit: ProjectCommit
+  readonly deltaPitch: MidiPitchDelta
+  readonly deltaTick: TickDelta
+  readonly noteIds: readonly NoteId[]
+}
+
 export interface ProjectMidiNoteCoordinator {
   addMidiNote(input: AddMidiNoteInput): AddedMidiNoteResult
+  moveMidiNotes(input: MoveMidiNotesInput): MovedMidiNotesResult | null
   removeMidiNotes(input: RemoveMidiNotesInput): RemovedMidiNotesResult
 }
 
@@ -228,6 +248,30 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
 
     return Object.freeze({
       commit: result.commit,
+      noteIds: command.noteIds,
+    })
+  }
+
+  moveMidiNotes(input: MoveMidiNotesInput): MovedMidiNotesResult | null {
+    const { context, session } = requireEditableMidiNoteTarget(
+      this.#dependencies,
+      input.clipId,
+    )
+    const command = createMoveNotesCommand({
+      baseRevision: input.baseRevision,
+      sourceId: context.sourceId,
+      noteIds: input.noteIds,
+      deltaTick: input.deltaTick,
+      deltaPitch: input.deltaPitch,
+    })
+    const result = session.execute(command)
+
+    if (result.status === PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE) return null
+
+    return Object.freeze({
+      commit: result.commit,
+      deltaPitch: command.deltaPitch,
+      deltaTick: command.deltaTick,
       noteIds: command.noteIds,
     })
   }

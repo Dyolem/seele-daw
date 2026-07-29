@@ -5,7 +5,8 @@ import {
   createAddMidiClipCommand,
   createAddNoteCommand,
   createInitialProjectSession,
-  createMoveNoteCommand,
+  createMidiNoteByIdQuery,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseBipolarValue,
   parseClipId,
@@ -14,12 +15,14 @@ import {
   parseLinearGain,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiSourceId,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
   parseTempoEventId,
   parseTick,
+  parseTickDelta,
   parseTimeSignatureEventId,
   parseTrackId,
   type MidiChannel,
@@ -125,14 +128,19 @@ export function createPianoRollProjectFixture() {
     nextStartTick: Tick,
     nextPitch: MidiPitch,
   ): void {
+    const before = session.query(
+      createMidiNoteByIdQuery({ sourceId, noteId }),
+    ).note
+    if (before === undefined) throw new Error(`Expected MIDI Note ${noteId}`)
+
     executeCommitted(
       session,
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId,
-        noteId,
-        nextStartTick,
-        nextPitch,
+        noteIds: [noteId],
+        deltaTick: parseTickDelta(nextStartTick - before.startTick),
+        deltaPitch: parseMidiPitchDelta(nextPitch - before.pitch),
       }),
     )
   }

@@ -1,9 +1,12 @@
 import {
   parseClipId,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseNoteId,
   parsePositiveTick,
   parseTick,
+  parseTickDelta,
+  type ModelRevision,
 } from '@seele-daw/project-core'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
@@ -19,10 +22,15 @@ import { ProjectMidiNoteVueError } from '@/workbench/project/midi-note/vue/proje
 describe('ProjectMidiNoteVueContext', () => {
   it('resolves the provided Coordinator and fails clearly without composition', () => {
     const addMidiNote = vi.fn<ProjectMidiNoteCoordinator['addMidiNote']>()
+    const moveMidiNotes = vi.fn<ProjectMidiNoteCoordinator['moveMidiNotes']>()
     const removeMidiNotes =
       vi.fn<ProjectMidiNoteCoordinator['removeMidiNotes']>()
     const context: ProjectMidiNoteVueContext = Object.freeze({
-      projectMidiNotes: Object.freeze({ addMidiNote, removeMidiNotes }),
+      projectMidiNotes: Object.freeze({
+        addMidiNote,
+        moveMidiNotes,
+        removeMidiNotes,
+      }),
     })
     const providedApp = createApp({ render: () => null })
     const missingApp = createApp({ render: () => null })
@@ -49,6 +57,17 @@ describe('ProjectMidiNoteVueContext', () => {
       }),
     )
     expect(addMidiNote).toHaveBeenCalledOnce()
+
+    providedApp.runWithContext(() =>
+      useProjectMidiNotes().projectMidiNotes.moveMidiNotes({
+        baseRevision: 0 as ModelRevision,
+        clipId: parseClipId('context-midi-note-clip'),
+        deltaPitch: parseMidiPitchDelta(1),
+        deltaTick: parseTickDelta(240),
+        noteIds: [parseNoteId('context-midi-note')],
+      }),
+    )
+    expect(moveMidiNotes).toHaveBeenCalledOnce()
 
     providedApp.runWithContext(() =>
       useProjectMidiNotes().projectMidiNotes.removeMidiNotes({

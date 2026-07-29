@@ -477,7 +477,7 @@ MidiClip
 Note
 ProjectSession
 AddNoteCommand
-MoveNoteCommand
+MoveNotesCommand
 RemoveNotesCommand
 Undo / Redo
 ~~~
@@ -510,7 +510,7 @@ Project Model
 -> Canvas Renderer
 ~~~
 
-拖拽时只更新 Preview，pointerup 才提交 MoveNoteCommand。
+拖拽时只更新 Preview，pointerup 才提交一个共享 Delta 的 `MoveNotesCommand`。
 
 ### 第五步：Playback
 

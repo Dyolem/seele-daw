@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest'
 import {
   createAddNoteCommand,
   createMidiNoteByIdQuery,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
+  parseTickDelta,
   type ProjectCommand,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
@@ -67,12 +69,12 @@ describe('QueryIndex lifecycle', () => {
     const index = new QueryIndex(store)
     const applier = new MutationApplier(store)
     const before = fixture.records.nonLoopNote
-    const command = createMoveNoteCommand({
+    const command = createMoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: before.id,
-      nextStartTick: parseTick(960),
-      nextPitch: parseMidiPitch(67),
+      noteIds: [before.id],
+      deltaTick: parseTickDelta(720),
+      deltaPitch: parseMidiPitchDelta(7),
     })
     const preparation = requireReady(command, store)
     const query = createMidiNoteByIdQuery({

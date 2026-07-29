@@ -2,6 +2,7 @@ import type { Brand } from '@seele-daw/type-utils'
 import { rejectDomainValue } from '#internal/model/domain-value-error'
 
 export type Tick = Brand<number, 'Tick'>
+export type TickDelta = Brand<number, 'TickDelta'>
 
 export const PROJECT_PPQ = 960 as const
 export const ZERO_TICK = 0 as Tick
@@ -20,6 +21,14 @@ export function parsePositiveTick(value: unknown): Tick {
   }
 
   return value as Tick
+}
+
+export function parseTickDelta(value: unknown): TickDelta {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
+    rejectDomainValue('TickDelta', 'a safe integer')
+  }
+
+  return value as TickDelta
 }
 
 /** Adds two non-negative Tick values and rejects unsafe integer overflow. */

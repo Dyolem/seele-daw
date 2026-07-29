@@ -34,15 +34,15 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 1. 在 Project Entry 新建空项目，或打开最近保存的项目。
 2. 在 Workbench 创建 Instrument Track。
 3. 在 Instrument Track 的目标小节创建、选择并打开空 MIDI Clip。
-4. 在 Context Editor Dock 使用 Pencil 创建 MIDI Note，或用 Cursor 选择、切换和清空
-   Note Selection。
+4. 在 Context Editor Dock 使用 Pencil 创建 MIDI Note，或用 Cursor 选择、切换、拖动和
+   清空 Note Selection。
 5. 在 Piano Roll 聚焦时使用 `Delete` / `Backspace` 原子删除完整 Note Selection。
-6. 通过 Undo / Redo 撤销或恢复 Track、MIDI Clip 与 MIDI Note 创建、删除操作。
+6. 通过 Undo / Redo 撤销或恢复 Track、MIDI Clip 与 MIDI Note 创建、移动、删除操作。
 7. 显式保存项目。
 8. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
 9. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
-当前闭环还不包含 Piano Roll Note Move / Resize、音源、音频输出或播放。
+当前闭环还不包含 Piano Roll Note Resize、音源、音频输出或播放。
 
 ### 2.1 功能总览
 
@@ -52,16 +52,16 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `PROJECT-LIFECYCLE` | 当前项目生命周期 | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。 |
 | `PROJECT-NAVIGATION` | dirty 导航确认 | **用户可用** | 应用内导航支持 Save / Discard / Cancel。 |
 | `WORKBENCH-SHELL` | DAW 工作台外壳 | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。 |
-| `PROJECT-HISTORY` | Undo / Redo | **用户可用** | 当前覆盖 Instrument Track、空 MIDI Clip 与 MIDI Note 创建 / 删除。 |
+| `PROJECT-HISTORY` | Undo / Redo | **用户可用** | 当前覆盖 Instrument Track、空 MIDI Clip 与 MIDI Note 创建 / 移动 / 删除。 |
 | `TRACK-CREATE` | 创建 Instrument Track | **用户可用** | 只创建空的 Instrument Slot Track。 |
 | `TRACK-SELECTION` | Track 选择 | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。 |
 | `MIDI-CLIP-CREATE` | 创建空 MIDI Clip | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。 |
 | `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock | **局部可用** | 可调整布局并显示所选 Clip 的 Piano Roll Selection Surface。 |
 | `UI-FOUNDATION` | Piano Black UI 基础 | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。 |
 | `KEYBOARD-SHORTCUTS` | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 与 Piano Roll Escape / Delete / Backspace 已接入。 |
-| `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **局部可用** | Add 与原子多 Note Remove 已接入 Piano Roll；Move 仍只有内部 Command。 |
+| `MIDI-NOTE-CORE` | MIDI Note 增删移动 | **用户可用** | Add、共享 Delta 的原子多 Note Move 与原子多 Note Remove 已接入 Piano Roll。 |
 | `PLAYBACK` | 播放与 Transport 执行 | **尚未实现** | 控件仅展示且明确禁用。 |
-| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | Grid / Note Renderer、Pencil Add、Cursor Selection、多选 Delete、Snap Toggle 与 Undo / Redo 已接入。 |
+| `PIANO-ROLL` | 钢琴卷帘编辑器 | **局部可用** | Grid / Note Renderer、Pencil Add、Cursor Selection / Move、多选 Delete、Snap 与 Undo / Redo 已接入。 |
 
 ## 3. 项目入口与生命周期
 
@@ -229,8 +229,8 @@ Dock 当前根据上下文显示：
 - 已选择 MIDI Clip 时的 Clip 摘要与可选择 Piano Roll。
 
 Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与基础 Selection，可
-使用 Pencil 创建 Note，并用 `Delete` / `Backspace` 删除 Selection；尚没有缩放、滚动、
-Move、Resize 或 Velocity 编辑手势。
+使用 Pencil 创建 Note、用 Cursor 拖动 Selection，并用 `Delete` / `Backspace` 删除
+Selection；尚没有缩放、滚动、Resize 或 Velocity 编辑手势。
 
 ### 5.4 `KEYBOARD-SHORTCUTS` Scoped Keyboard Shortcuts
 
@@ -242,7 +242,8 @@ Move、Resize 或 Velocity 编辑手势。
 - `Mod+Z`：当前 Session 可以 Undo 时执行 Undo；
 - `Mod+Shift+Z`：当前 Session 可以 Redo 时执行 Redo；
 - `Control+Y`：兼容 Windows 常用 Redo Binding。
-- `Escape`：Piano Roll 聚焦且存在 Note Selection 时清空 Selection。
+- `Escape`：Piano Roll 正在拖动 Note 时取消本次 Move；否则在存在 Note Selection 时清空
+  Selection。
 - `Delete` / `Backspace`：Piano Roll 聚焦且存在 Note Selection 时原子删除完整
   Selection。
 
@@ -396,12 +397,13 @@ Swipe dismiss。业务 Feature 通过应用级 Pinia Toast Store 的命令式
 
 ### 8.1 `MIDI-NOTE-CORE`
 
-**局部可用；Add 与多 Note Remove 已由用户界面使用**
+**用户可用；Add、多 Note Move 与多 Note Remove 已由用户界面使用**
 
 Project Core 已实现：
 
 - Add MIDI Note Command。
-- Move MIDI Note Command。
+- Move MIDI Notes Command；一元素列表用于单 Note Move，多元素列表用于原子
+  Selection Move。
 - Remove MIDI Notes Command；一元素列表用于单 Note 删除，多元素列表用于原子多选删除。
 - Command validation、Mutation Plan、原子提交、Commit / Delta。
 - Undo / Redo 及稳定的 Session-local `ProjectContentStateId`。
@@ -412,14 +414,15 @@ Project Core 已实现：
 `ProjectMidiNoteCoordinator` 校验 Active Project、Clip、MidiSource 与 Note Partition，把
 Clip-local Tick 映射为 Source-local Tick，生成 Note ID，并使用 Velocity 100、UI Channel 1
 执行 Add Note Command。Coordinator 返回 `NoteId + Commit`；尾部剩余时间不足期望 Duration
-时只创建剩余的正 Tick。删除时 Coordinator 对当前 Clip 的同一 MidiSource 执行一个
-`RemoveNotesCommand`，全部目标在建立 MutationPlan 前完成验证。
+时只创建剩余的正 Tick。移动和删除时 Coordinator 对当前 Clip 的同一 MidiSource 分别执行
+一个 `MoveNotesCommand` / `RemoveNotesCommand`，全部目标在建立 MutationPlan 前完成
+验证。
 
-Add 已由 Piano Roll Pencil 接入用户界面，多 Note Remove 已由聚焦键盘 Action 接入。
-Move Command 仍只有内部能力，当前没有可见拖动手势。
+Add 已由 Piano Roll Pencil 接入，多 Note Move 已由 Cursor Body Drag 接入，多 Note
+Remove 已由聚焦键盘 Action 接入。
 
-当前的“批量”能力仅指同一 MidiSource 内专用的原子多 Note 删除：它不是通用 Batch /
-Composite Command 系统，也不包含多 Note Move、Resize、混合 Command 或跨 MidiSource
+当前的“批量”能力仅指同一 MidiSource 内专用的原子多 Note Move / Remove：它不是通用
+Batch / Composite Command 系统，也不包含多 Note Resize、混合 Command 或跨 MidiSource
 批处理。这些语义必须由后续真实产品交互分别驱动。
 
 Project Command 表达一次完整产品意图，最小事实变化由 Project Mutation 表达。需要一个
@@ -445,6 +448,8 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
 - Commit 后重新 Query、Viewport 替换、Observer 隔离和 dispose 生命周期；
 - Clip-scoped `PianoRollEditorSession`、冻结的稀疏 `NoteId` Selection；
 - Selection 前的权威 Note Query，以及相关 Commit 后的存在性和 Clip 时间窗口校准。
+- 冻结的 Cursor Move Gesture，以及 Grid-aligned Absolute Snap、Off-grid Relative
+  Delta Snap、Pitch Semitone Delta 和 Selection 合法边界交集。
 
 `@seele-daw/editor/browser` 与 Studio 已提供：
 
@@ -472,6 +477,20 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
 - Add Note 可 Undo；Redo 恢复 Note Fact，但不恢复已失效的旧 Selection；
 - 多 Note Delete 只产生一个 Commit 和一个 History 步骤；Undo 恢复完整集合但不恢复旧
   Selection；
+- Cursor 拖动已选 Note 时移动完整 Selection；拖动未选 Note 时只移动该 Note，并在成功
+  后把它设为唯一 Selection；
+- Pointer Down 冻结 Project revision、Note Facts、Selection、Viewport、Grid、Snap 与
+  Modifier；手势期间 Project revision 改变时，Pointer Up 的 stale intent 整体拒绝；
+- Pointer Move 只更新冻结 Preview；Snap 开启时显示 Anchor Guide，Pointer Up 的非零
+  Delta 最多执行一个 `MoveNotesCommand`；
+- Grid-aligned Note 吸附目标 Grid；Off-grid Note 吸附相对 Delta 并保留原 Timing Offset；
+  `Alt` 只为 Pointer Down 时开始的本次手势临时绕过 Snap；
+- 多 Note Move 使用共享 Tick / Pitch Delta 和全部 Note 合法边界的交集，不逐 Note Clamp；
+- Move 成功后等待权威 Read Model 到达对应 revision 再移除最终 Preview，避免短暂视觉
+  回跳；
+- Pointer Cancel、Clip 切换、释放或 `Escape` 取消 Move，不写 Project；失败清理 Preview、
+  保留原 Project / History 并显示 Toast；
+- Move 只产生一个 Commit 和一个 History 步骤；Undo / Redo 原子恢复或重放完整 Selection；
 - Clip 切换创建新的 Editor Session，不继承前一个 Clip 的 Selection。
 
 Selection 只保存稳定 `NoteId`，属于当前 Clip Editor lifetime；它不进入 Pinia、Project
@@ -482,10 +501,8 @@ Note 被删除或移出当前 Clip Source 时间窗口时由权威 Query 清理�
 
 - 不支持 looped Clip，不能把循环实例错误显示成非循环 Source；
 - Grid Preset UI 当前只显示已确认的 `1/16`，尚不能选择其他直线、三连音或附点值；
-- Cursor 当前提供基本 Selection；已经确定由 Cursor 负责未来 Note Body Move，但拖动尚未
-  实现；
 - 首批视图固定显示完整 Clip 和 MIDI 48–72，尚无 Zoom / Scroll；
-- 用户可以创建、选择和删除 Note，但还不能通过 UI Move、Resize 或编辑 Velocity；
+- 用户可以创建、选择、移动和删除 Note，但还不能通过 UI Resize 或编辑 Velocity；
 - Cursor 与 Pencil 都将在 Note 左右 Edge Hit 上支持 Resize，当前尚未实现。
 
 ### 8.3 Project File 与 Checkpoint
@@ -506,8 +523,8 @@ Project Core 已具备：
 | --- | --- |
 | `@seele-daw/project-core` | 项目模型、Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。 |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。 |
-| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection / 多选 Delete / Snap。 |
-| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select Interaction、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input。 |
+| `apps/studio` | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection Move / 多选 Delete / Snap。 |
+| `@seele-daw/editor` | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move Interaction、Move Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Hit 与 Pointer Input。 |
 | `@seele-daw/playback` | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。 |
 | `@seele-daw/audio-web` | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。 |
 | `@seele-daw/type-utils` | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。 |
@@ -519,10 +536,10 @@ Project Core 已具备：
 ### 编辑与编排
 
 - MIDI Clip 移动、复制、调整长度、拆分、删除或多选；当前只支持创建、单选与打开上下文。
-- Piano Roll Note Move、Resize 或 Velocity 编辑；当前支持 Pencil Add、基础 Cursor
-  Selection 与多选 Delete。
+- Piano Roll Note Resize 或 Velocity 编辑；当前支持 Pencil Add、Cursor Selection /
+  Move 与多选 Delete。
 - Arrangement 时间轴滚动、缩放、Grid 和 Snap。
-- Drag Preview 与框选；当前键盘内容编辑只提供 Note Selection 的 Delete / Backspace。
+- 框选与 Resize Preview；当前 Drag Preview 只覆盖 Cursor Note Move。
 - Track 重命名、改色、删除、复制、重排。
 - Track Mute、Solo、Gain、Pan 与更多 Channel 设置。
 
@@ -615,18 +632,19 @@ Project Core 已具备：
 | 2026-07-29 | `PIANO-ROLL`、`UI-FOUNDATION` | Pencil Snap 改为当前 Grid 单元左边界；Snap 沿用 Fluent Grid；Toast 改为应用级命令触发与单一声明式 Region。 | `1bc6dac` |
 | 2026-07-29 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | 明确 Cursor Move、Cursor / Pencil Resize 归属；接入多 Note 原子删除、Delete / Backspace、Selection 校准与失败 Toast。 | `52dc03c` |
 | 2026-07-29 | `MIDI-NOTE-CORE` | 单个与多个 Note 删除统一为数量无关的 `midi-note.remove` 集合协议，移除重叠的单 Note Command。 | `df4cdf3` |
+| 2026-07-29 | `MIDI-NOTE-CORE`、`PIANO-ROLL` | Batch 5.2 统一共享 Delta 的 `MoveNotesCommand`；接入 Cursor Selection Move、Absolute / Relative Snap、冻结 Preview、Guide、Escape Cancel 与单 Commit / History。 | `待提交` |
 
 ## 13. 当前验证基线
 
-功能代码截至 `df4cdf3` 已通过：
+Batch 5.2 审查候选已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production
   Build。
-- Project Core：26 个测试文件，374 项测试。
+- Project Core：26 个测试文件，378 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：7 个测试文件，75 项测试。
-- Studio：38 个测试文件，198 项测试。
+- editor：8 个测试文件，80 项测试。
+- Studio：38 个测试文件，203 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

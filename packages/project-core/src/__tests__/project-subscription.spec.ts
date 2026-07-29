@@ -12,13 +12,15 @@ import {
   createAddNoteCommand,
   createAllProjectCommitsSubscription,
   createMidiNoteChangesSubscription,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
+  parseTickDelta,
   type MidiSourceId,
   type ModelRevision,
   type NoteId,
@@ -204,12 +206,12 @@ describe('ProjectSession commit publication', () => {
     expect(session.undo()).toBeNull()
     expect(session.redo()).toBeNull()
     session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId: fixture.records.nonLoopNote.id,
-        nextStartTick: fixture.records.nonLoopNote.startTick,
-        nextPitch: fixture.records.nonLoopNote.pitch,
+        noteIds: [fixture.records.nonLoopNote.id],
+        deltaTick: parseTickDelta(0),
+        deltaPitch: parseMidiPitchDelta(0),
       }),
     )
     expect(() =>

@@ -61,6 +61,18 @@ export type {
 } from './piano-roll-note-read-model'
 
 export {
+  createPianoRollNoteMoveGesture,
+  resolvePianoRollNoteMovePreview,
+} from './piano-roll-note-move-interaction'
+export type {
+  CreatePianoRollNoteMoveGestureInput,
+  PianoRollNoteMoveGesture,
+  PianoRollNoteMovePreview,
+  PianoRollNoteMovePreviewNote,
+  ResolvePianoRollNoteMovePreviewInput,
+} from './piano-roll-note-move-interaction'
+
+export {
   PIANO_ROLL_DEFAULT_CENTER_PITCH,
   createInitialPianoRollViewport,
   createPianoRollViewport,

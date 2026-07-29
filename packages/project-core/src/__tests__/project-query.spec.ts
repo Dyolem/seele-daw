@@ -9,14 +9,16 @@ import {
   createAddNoteCommand,
   createMidiNoteByIdQuery,
   createMidiNotesIntersectingRangeQuery,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiSourceId,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
+  parseTickDelta,
   type MidiNoteByIdQueryResult,
   type MidiNotesIntersectingRangeQueryResult,
   type ProjectQuery,
@@ -271,12 +273,12 @@ describe('ProjectSession MIDI Note queries', () => {
     assertEquivalent()
 
     session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId,
-        noteId,
-        nextStartTick: parseTick(1_440),
-        nextPitch: parseMidiPitch(74),
+        noteIds: [noteId],
+        deltaTick: parseTickDelta(240),
+        deltaPitch: parseMidiPitchDelta(2),
       }),
     )
     assertEquivalent()
@@ -305,12 +307,12 @@ describe('ProjectSession MIDI Note queries', () => {
     const before = fixture.records.nonLoopNote
 
     session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId: before.id,
-        nextStartTick: before.startTick,
-        nextPitch: before.pitch,
+        noteIds: [before.id],
+        deltaTick: parseTickDelta(0),
+        deltaPitch: parseMidiPitchDelta(0),
       }),
     )
 

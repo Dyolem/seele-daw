@@ -4,12 +4,16 @@
 >
 > 日期：2026-07-17
 >
-> 范围：`AddNoteCommand`、`MoveNoteCommand`、`RemoveNotesCommand`
+> 范围：`AddNoteCommand`、`MoveNotesCommand`、`RemoveNotesCommand`
 >
 > 2026-07-29 校准：单个与多个 Note 删除统一使用 `RemoveNotesCommand`；一元素
 > `noteIds` 是单 Note 删除的规范表达，不再维护平行的单 Note 公共 Command。跨 Command
 > 的数量与事务设计遵循
 > [Project Command 集合与事务语义](./project-command-collection-semantics.md)。
+>
+> 2026-07-29 Batch 5.2 校准：单 Note 与 Selection Move 统一使用共享 Tick / Pitch
+> Delta 的 `MoveNotesCommand`；一元素 `noteIds` 是单 Note Move 的规范表达，旧的绝对
+> 目标 `MoveNoteCommand` 已移除。
 
 ## 文档目的
 
@@ -131,24 +135,31 @@ interface AddNoteCommand {
 
 调用方必须提供完整 Note 值。Project Core 不猜测默认 velocity、channel 或 duration。
 
-### MoveNoteCommand
+### MoveNotesCommand
 
 ```ts
-interface MoveNoteCommand {
+interface MoveNotesCommand {
   readonly type: 'midi-note.move'
   readonly baseRevision: ModelRevision
   readonly sourceId: MidiSourceId
-  readonly noteId: NoteId
-  readonly nextStartTick: Tick
-  readonly nextPitch: MidiPitch
+  readonly noteIds: readonly NoteId[]
+  readonly deltaTick: TickDelta
+  readonly deltaPitch: MidiPitchDelta
 }
 ```
 
-Move 使用绝对目标而不是 delta：
+Move 表达一个数量无关的 Selection 产品意图：
 
-- Snap、量化和像素到 Tick/Pitch 的转换由 Editor 完成；
-- handler 不依赖拖拽起点或选择状态；
+- `noteIds` 必须非空、无重复且属于同一 MidiSource；
+- 单 Note Move 使用一元素集合，多 Note Move 使用稳定 Selection 顺序；
+- 所有目标共用同一个 Tick / Pitch Delta，保持相对 Timing 与音程；
+- Snap、量化、像素转换、Selection Anchor 与交互 Clamp 由 Editor 完成；
+- handler 不依赖拖拽起点、像素或选择状态，并按权威 Record 重新验证全部结果；
+- 任一目标缺失、越过 Source 或越过 MIDI Pitch 0–127 时整体拒绝；
+- Delta 同时为零时返回 `no-change`，不创建空 MutationPlan；
 - Note ID、MidiSource、duration、velocity 和 channel 保持不变；
+- 每个目标建立一个 `NOTE.REPLACE` Mutation，整个集合只产生一个 Commit、revision 与
+  History 步骤；
 - 跨 Source 移动不属于本 Command，未来应以独立产品语义讨论身份、所有权和历史规则。
 
 ### RemoveNotesCommand
@@ -168,7 +179,7 @@ Preparer 在建立计划前验证全部目标，任一目标缺失时不发生�
 MidiSource，不改变 Clip，也不清理空 Source。
 
 这是一个由多选删除产品意图驱动的专用事务 Command，不代表 Project Core 已提供通用批量
-Command、混合类型 Composite Command、跨 MidiSource 批处理，或多 Note Move / Resize。
+Command、混合类型 Composite Command、跨 MidiSource 批处理或多 Note Resize。
 内部仍由每个目标对应的单 Note Remove Mutation 表达最小事实变化。
 
 ## 准备结果

@@ -3,7 +3,7 @@ import {
   type AddInstrumentTrackCommand,
   type AddMidiClipCommand,
   type AddNoteCommand,
-  type MoveNoteCommand,
+  type MoveNotesCommand,
   type ProjectCommand,
   type ProjectCommandType,
   type RemoveNotesCommand,
@@ -36,13 +36,18 @@ import {
 import type { ProjectDelta } from '#internal/commit/project-delta'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiClipRecord } from '#internal/model/midi-clip'
+import {
+  MIDI_PITCH_MAX,
+  MIDI_PITCH_MIN,
+  parseMidiPitch,
+} from '#internal/model/scalars'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import { nextModelRevision } from '#internal/model/model-revision'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import { assertCreatedMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
-import { addTicks } from '#internal/time/tick'
+import { addTicks, parseTick } from '#internal/time/tick'
 
 function rejectCandidate(
   code: ProjectCommitCandidateError['code'],
@@ -390,25 +395,48 @@ function matchesAddedNote(command: AddNoteCommand, mutation: ProjectMutation): b
   return recordsHaveSameOwnValues(mutation.after, expectedNote)
 }
 
-function matchesMovedNote(command: MoveNoteCommand, mutation: ProjectMutation): boolean {
+function matchesMovedNotes(
+  command: MoveNotesCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
   if (
-    mutation.type !== PROJECT_MUTATION_TYPE.NOTE.REPLACE ||
-    mutation.sourceId !== command.sourceId ||
-    mutation.before.id !== command.noteId ||
-    mutation.after.id !== command.noteId ||
-    (mutation.before.startTick === command.nextStartTick &&
-      mutation.before.pitch === command.nextPitch)
+    mutations.length !== command.noteIds.length ||
+    (command.deltaTick === 0 && command.deltaPitch === 0)
   ) {
     return false
   }
 
-  const expectedAfter = createMidiNoteRecord({
-    ...mutation.before,
-    startTick: command.nextStartTick,
-    pitch: command.nextPitch,
-  })
+  return mutations.every((mutation, index) => {
+    const noteId = command.noteIds[index]
+    if (
+      noteId === undefined ||
+      mutation.type !== PROJECT_MUTATION_TYPE.NOTE.REPLACE ||
+      mutation.sourceId !== command.sourceId ||
+      mutation.before.id !== noteId ||
+      mutation.after.id !== noteId
+    ) {
+      return false
+    }
 
-  return recordsHaveSameOwnValues(mutation.after, expectedAfter)
+    const nextStartTick = mutation.before.startTick + command.deltaTick
+    const nextPitch = mutation.before.pitch + command.deltaPitch
+    if (
+      !Number.isSafeInteger(nextStartTick) ||
+      nextStartTick < 0 ||
+      nextPitch < MIDI_PITCH_MIN ||
+      nextPitch > MIDI_PITCH_MAX
+    ) {
+      return false
+    }
+
+    const expectedAfter = createMidiNoteRecord({
+      ...mutation.before,
+      startTick: parseTick(nextStartTick),
+      pitch: parseMidiPitch(nextPitch),
+    })
+
+    return recordsHaveSameOwnValues(mutation.after, expectedAfter)
+  })
 }
 
 function matchesRemovedNotes(
@@ -439,13 +467,12 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
     matches = matchesAddedMidiClip(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE) {
     matches = matchesRemovedNotes(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE) {
+    matches = matchesMovedNotes(command, plan.forward)
   } else if (plan.forward.length === 1 && mutation !== undefined) {
     switch (command.type) {
       case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
         matches = matchesAddedNote(command, mutation)
-        break
-      case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
-        matches = matchesMovedNote(command, mutation)
         break
     }
   }

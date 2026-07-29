@@ -19,6 +19,7 @@ export type ProjectCommandErrorCode =
   | 'midi-source-not-found'
   | 'note-id-already-exists'
   | 'note-out-of-source-range'
+  | 'note-pitch-out-of-range'
   | 'track-id-already-exists'
   | 'track-not-found'
   | 'track-order-index-out-of-bounds'
@@ -33,6 +34,8 @@ export interface ProjectCommandErrorDetails {
   readonly insertAt?: number
   readonly noteEndTick?: Tick
   readonly noteId?: NoteId
+  readonly notePitch?: number
+  readonly noteStartTick?: number
   readonly sourceId?: MidiSourceId
   readonly sourceLengthTick?: Tick
   readonly sourceReadEndTick?: Tick
@@ -52,6 +55,8 @@ export class ProjectCommandError extends Error {
   readonly insertAt: number | null
   readonly noteEndTick: Tick | null
   readonly noteId: NoteId | null
+  readonly notePitch: number | null
+  readonly noteStartTick: number | null
   readonly sourceId: MidiSourceId | null
   readonly sourceLengthTick: Tick | null
   readonly sourceReadEndTick: Tick | null
@@ -75,6 +80,8 @@ export class ProjectCommandError extends Error {
     this.insertAt = details.insertAt ?? null
     this.noteEndTick = details.noteEndTick ?? null
     this.noteId = details.noteId ?? null
+    this.notePitch = details.notePitch ?? null
+    this.noteStartTick = details.noteStartTick ?? null
     this.sourceId = details.sourceId ?? null
     this.sourceLengthTick = details.sourceLengthTick ?? null
     this.sourceReadEndTick = details.sourceReadEndTick ?? null

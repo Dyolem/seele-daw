@@ -4,6 +4,7 @@ export type PianoRollErrorCode =
   | 'coordinate-outside-viewport'
   | 'editor-session-disposed'
   | 'invalid-grid'
+  | 'invalid-move-gesture'
   | 'invalid-viewport-dimension'
   | 'invalid-viewport-pitch-range'
   | 'looped-clip-unsupported'

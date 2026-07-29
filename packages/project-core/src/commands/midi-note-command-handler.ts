@@ -1,7 +1,7 @@
 import { ProjectCommandError } from '#internal/commands/project-command-error'
 import {
   type AddNoteCommand,
-  type MoveNoteCommand,
+  type MoveNotesCommand,
   type RemoveNotesCommand,
 } from '#internal/commands/project-command'
 import type {
@@ -10,16 +10,21 @@ import type {
 } from '#internal/commands/project-command-preparation'
 import type { NoteId } from '#internal/model/ids'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
+import {
+  MIDI_PITCH_MAX,
+  MIDI_PITCH_MIN,
+  parseMidiPitch,
+} from '#internal/model/scalars'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
-import { addTicks } from '#internal/time/tick'
+import { addTicks, parseTick } from '#internal/time/tick'
 
 type MidiNoteCommand =
   | AddNoteCommand
-  | MoveNoteCommand
+  | MoveNotesCommand
   | RemoveNotesCommand
 
 function requireMidiSource(reader: ModelStoreReader, command: MidiNoteCommand): MidiSourceRecord {
@@ -58,7 +63,7 @@ function assertNotePartitionExists(reader: ModelStoreReader, command: MidiNoteCo
 
 function requireMidiNote(
   reader: ModelStoreReader,
-  command: MoveNoteCommand | RemoveNotesCommand,
+  command: MoveNotesCommand | RemoveNotesCommand,
   noteId: NoteId,
 ): MidiNoteRecord {
   const note = reader.getMidiNote(command.sourceId, noteId)
@@ -103,7 +108,7 @@ function assertNoteIdAvailable(reader: ModelStoreReader, command: AddNoteCommand
 }
 
 function assertNoteWithinSource(
-  command: AddNoteCommand | MoveNoteCommand,
+  command: AddNoteCommand | MoveNotesCommand,
   source: MidiSourceRecord,
   note: MidiNoteRecord,
 ): void {
@@ -180,15 +185,53 @@ export function prepareRemoveNotesCommand(
   return ready(command, mutations)
 }
 
-export function prepareMoveNoteCommand(
+function createMovedNote(command: MoveNotesCommand, before: MidiNoteRecord): MidiNoteRecord {
+  const nextStartTick = before.startTick + command.deltaTick
+  if (!Number.isSafeInteger(nextStartTick) || nextStartTick < 0) {
+    throw new ProjectCommandError(
+      'note-out-of-source-range',
+      `MIDI Note ${before.id} cannot move to Tick ${nextStartTick}`,
+      {
+        baseRevision: command.baseRevision,
+        commandType: command.type,
+        noteId: before.id,
+        noteStartTick: nextStartTick,
+        sourceId: command.sourceId,
+      },
+    )
+  }
+
+  const nextPitch = before.pitch + command.deltaPitch
+  if (nextPitch < MIDI_PITCH_MIN || nextPitch > MIDI_PITCH_MAX) {
+    throw new ProjectCommandError(
+      'note-pitch-out-of-range',
+      `MIDI Note ${before.id} cannot move to MIDI Pitch ${nextPitch}`,
+      {
+        baseRevision: command.baseRevision,
+        commandType: command.type,
+        noteId: before.id,
+        notePitch: nextPitch,
+        sourceId: command.sourceId,
+      },
+    )
+  }
+
+  return createMidiNoteRecord({
+    ...before,
+    startTick: parseTick(nextStartTick),
+    pitch: parseMidiPitch(nextPitch),
+  })
+}
+
+export function prepareMoveNotesCommand(
   reader: ModelStoreReader,
-  command: MoveNoteCommand,
+  command: MoveNotesCommand,
 ): ReadyProjectCommandPreparation | NoChangeProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
   assertNotePartitionExists(reader, command)
-  const before = requireMidiNote(reader, command, command.noteId)
+  const notes = command.noteIds.map((noteId) => requireMidiNote(reader, command, noteId))
 
-  if (before.startTick === command.nextStartTick && before.pitch === command.nextPitch) {
+  if (command.deltaTick === 0 && command.deltaPitch === 0) {
     return {
       status: 'no-change',
       reason: 'already-at-target',
@@ -196,20 +239,17 @@ export function prepareMoveNoteCommand(
     }
   }
 
-  const after = createMidiNoteRecord({
-    ...before,
-    startTick: command.nextStartTick,
-    pitch: command.nextPitch,
-  })
+  const mutations = notes.map<ProjectMutation>((before) => {
+    const after = createMovedNote(command, before)
+    assertNoteWithinSource(command, source, after)
 
-  assertNoteWithinSource(command, source, after)
-
-  return ready(command, [
-    {
+    return {
       type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
       sourceId: command.sourceId,
       before,
       after,
-    },
-  ])
+    }
+  })
+
+  return ready(command, mutations)
 }

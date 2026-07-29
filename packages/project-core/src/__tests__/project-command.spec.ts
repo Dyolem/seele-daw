@@ -7,19 +7,21 @@ import {
   ProjectCommandError,
   ZERO_TICK,
   createAddNoteCommand,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiSourceId,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
+  parseTickDelta,
   type AddNoteCommand,
   type AddInstrumentTrackCommand,
   type AddMidiClipCommand,
   type ModelRevision,
-  type MoveNoteCommand,
+  type MoveNotesCommand,
   type ProjectCommand,
   type RemoveNotesCommand,
 } from '#internal/index'
@@ -71,14 +73,14 @@ function createMoveCommand(
   store: ModelStore,
   sourceId: ReturnType<typeof parseMidiSourceId>,
   noteId: ReturnType<typeof parseNoteId>,
-  overrides: Partial<Parameters<typeof createMoveNoteCommand>[0]> = {},
-): MoveNoteCommand {
-  return createMoveNoteCommand({
+  overrides: Partial<Parameters<typeof createMoveNotesCommand>[0]> = {},
+): MoveNotesCommand {
+  return createMoveNotesCommand({
     baseRevision: store.modelRevision,
     sourceId,
-    noteId,
-    nextStartTick: parseTick(960),
-    nextPitch: parseMidiPitch(65),
+    noteIds: [noteId],
+    deltaTick: parseTickDelta(720),
+    deltaPitch: parseMidiPitchDelta(5),
     ...overrides,
   })
 }
@@ -134,6 +136,7 @@ describe('ProjectCommand public contract', () => {
       channel: parseMidiChannel(2),
     })
     expect(move.type).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE)
+    expect(Object.isFrozen(move.noteIds)).toBe(true)
     expect(remove).toEqual({
       type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
       baseRevision: store.modelRevision,
@@ -145,18 +148,18 @@ describe('ProjectCommand public contract', () => {
     })
     expect(Object.isFrozen(remove.noteIds)).toBe(true)
     expectTypeOf(add).toEqualTypeOf<AddNoteCommand>()
-    expectTypeOf(move).toEqualTypeOf<MoveNoteCommand>()
+    expectTypeOf(move).toEqualTypeOf<MoveNotesCommand>()
     expectTypeOf(remove).toEqualTypeOf<RemoveNotesCommand>()
     expectTypeOf<ProjectCommand>().toEqualTypeOf<
       | AddInstrumentTrackCommand
       | AddMidiClipCommand
       | AddNoteCommand
-      | MoveNoteCommand
+      | MoveNotesCommand
       | RemoveNotesCommand
     >()
   })
 
-  it('rejects empty or duplicate multi-Note removal targets', () => {
+  it('rejects empty or duplicate MIDI Note collection targets', () => {
     const fixture = createCompleteProjectFixture()
     const input = {
       baseRevision: 0 as ModelRevision,
@@ -185,6 +188,19 @@ describe('ProjectCommand public contract', () => {
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'duplicate-note-id',
         noteId: fixture.records.nonLoopNote.id,
+      }),
+    )
+
+    expect(() =>
+      createMoveNotesCommand({
+        ...input,
+        noteIds: [],
+        deltaTick: parseTickDelta(0),
+        deltaPitch: parseMidiPitchDelta(1),
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        code: 'empty-note-id-list',
       }),
     )
   })
@@ -242,8 +258,8 @@ describe('ProjectCommand preparation boundary', () => {
       fixture.records.nonLoopNote.id,
       {
         baseRevision: staleRevision,
-        nextStartTick: fixture.records.nonLoopNote.startTick,
-        nextPitch: fixture.records.nonLoopNote.pitch,
+        deltaTick: parseTickDelta(0),
+        deltaPitch: parseMidiPitchDelta(0),
       },
     )
     const error = captureCommandError(() => prepareProjectCommand(store, command))
@@ -418,7 +434,7 @@ describe('RemoveNotesCommand', () => {
   })
 })
 
-describe('MoveNoteCommand', () => {
+describe('MoveNotesCommand', () => {
   it('prepares one NOTE.REPLACE while preserving identity and non-move fields', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
@@ -427,8 +443,8 @@ describe('MoveNoteCommand', () => {
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
       {
-        nextStartTick: parseTick(1_200),
-        nextPitch: parseMidiPitch(74),
+        deltaTick: parseTickDelta(960),
+        deltaPitch: parseMidiPitchDelta(14),
       },
     )
     const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
@@ -442,9 +458,74 @@ describe('MoveNoteCommand', () => {
     expect(mutation.after).not.toBe(mutation.before)
     expect(mutation.after).toEqual({
       ...fixture.records.nonLoopNote,
-      startTick: command.nextStartTick,
-      pitch: command.nextPitch,
+      startTick: parseTick(fixture.records.nonLoopNote.startTick + command.deltaTick),
+      pitch: parseMidiPitch(fixture.records.nonLoopNote.pitch + command.deltaPitch),
     })
+  })
+
+  it('prepares one ordered replacement per Note with a shared delta', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createMoveNotesCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteIds: [
+        fixture.records.nonLoopNote.id,
+        fixture.records.nonLoopHarmonyNote.id,
+      ],
+      deltaTick: parseTickDelta(240),
+      deltaPitch: parseMidiPitchDelta(2),
+    })
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+
+    expect(plan.forward).toHaveLength(2)
+    expect(plan.forward).toEqual([
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        sourceId: command.sourceId,
+        before: fixture.records.nonLoopNote,
+        after: {
+          ...fixture.records.nonLoopNote,
+          startTick: parseTick(480),
+          pitch: parseMidiPitch(62),
+        },
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        sourceId: command.sourceId,
+        before: fixture.records.nonLoopHarmonyNote,
+        after: {
+          ...fixture.records.nonLoopHarmonyNote,
+          startTick: parseTick(960),
+          pitch: parseMidiPitch(66),
+        },
+      },
+    ])
+  })
+
+  it('rejects the whole Selection when one moved Note crosses the Source boundary', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createMoveNotesCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteIds: [
+        fixture.records.nonLoopNote.id,
+        fixture.records.nonLoopHarmonyNote.id,
+      ],
+      deltaTick: parseTickDelta(961),
+      deltaPitch: parseMidiPitchDelta(0),
+    })
+    const error = captureCommandError(() => prepareProjectCommand(store, command))
+
+    expect(error.code).toBe('note-out-of-source-range')
+    expect(error.noteId).toBe(fixture.records.nonLoopHarmonyNote.id)
+    expect(store.getMidiNote(command.sourceId, fixture.records.nonLoopNote.id)).toBe(
+      fixture.records.nonLoopNote,
+    )
+    expect(store.getMidiNote(command.sourceId, fixture.records.nonLoopHarmonyNote.id)).toBe(
+      fixture.records.nonLoopHarmonyNote,
+    )
   })
 
   it('returns no-change for an unchanged absolute target without creating a plan', () => {
@@ -455,8 +536,8 @@ describe('MoveNoteCommand', () => {
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
       {
-        nextStartTick: fixture.records.nonLoopNote.startTick,
-        nextPitch: fixture.records.nonLoopNote.pitch,
+        deltaTick: parseTickDelta(0),
+        deltaPitch: parseMidiPitchDelta(0),
       },
     )
     const preparation = prepareProjectCommand(store, command)
@@ -477,13 +558,29 @@ describe('MoveNoteCommand', () => {
       store,
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
-      { nextStartTick: parseTick(1_441) },
+      { deltaTick: parseTickDelta(1_201) },
     )
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('note-out-of-source-range')
     expect(error.noteEndTick).toBe(1_921)
     expect(error.sourceLengthTick).toBe(fixture.records.nonLoopSource.lengthTick)
+  })
+
+  it('rejects a shared Pitch delta that moves any Note outside MIDI 0–127', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createMoveCommand(
+      store,
+      fixture.records.nonLoopSource.id,
+      fixture.records.nonLoopNote.id,
+      { deltaPitch: parseMidiPitchDelta(68) },
+    )
+    const error = captureCommandError(() => prepareProjectCommand(store, command))
+
+    expect(error.code).toBe('note-pitch-out-of-range')
+    expect(error.noteId).toBe(fixture.records.nonLoopNote.id)
+    expect(error.notePitch).toBe(128)
   })
 
   it('applies the replacement and inverses it with the original Record reference', () => {
@@ -499,6 +596,8 @@ describe('MoveNoteCommand', () => {
     applyAndInverse(store, plan)
 
     expect(store.modelRevision).toBe(2)
-    expect(store.getMidiNote(command.sourceId, command.noteId)).toBe(fixture.records.nonLoopNote)
+    expect(store.getMidiNote(command.sourceId, command.noteIds[0]!)).toBe(
+      fixture.records.nonLoopNote,
+    )
   })
 })

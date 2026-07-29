@@ -88,7 +88,7 @@ Pixel 宽度在 Resize 批次结合实际界面审查确定。左右热区重叠
 - 删除失败时 Project、History、dirty 和 Selection 保持不变；
 - 失败通过应用级命令式 Toast 显示，不能只输出 Console。
 
-## 3. Batch 2：Time Grid Snap V1 与 Cursor Move
+## 3. Batch 2：Time Grid Snap V1 与 Cursor Move（已实现）
 
 Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 Snap：
 
@@ -103,13 +103,35 @@ Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 
 - Pointer Up 只提交一次 Move Intent，Cancel / Escape 恢复原始视觉；
 - Move 越界时采用整体 Selection 的合法 Delta 范围，不逐 Note Clamp。
 
-Batch 2 在生产实现前单独审查 `MoveNotesCommand` 的 Delta、No-change、边界与 Change
-协议。当前 `MoveNoteCommand` 在集合协议完成并迁移消费者前继续保留；是否由一元素
-`MoveNotesCommand` 覆盖，必须以最终语义等价为依据。通用准则见
+最终产品规则：
+
+- Cursor 在 Note Body 上越过 4 CSS Pixel Threshold 后进入 Move；未越过时仍按普通
+  Click / Modifier Click 处理 Selection；
+- 拖动已选 Note 移动完整 Selection；拖动未选 Note 只预览该 Note，提交成功后才把它设为
+  唯一 Selection，取消或失败不提前改写 Selection；
+- Pointer Down 冻结 Project `baseRevision`、Note Record、Selection、Viewport、Grid、
+  Snap 和 Modifier；手势中途改变 Preference 不改变本次结果，Project revision 变化则
+  Pointer Up 的 Command 作为 stale intent 整体拒绝；
+- Grid-aligned Anchor 吸附目标 Grid；Off-grid Anchor 吸附共享相对 Delta，从而保留原有
+  Timing Offset；
+- `Alt` 在 Pointer Down 时只为本次手势临时绕过 Snap；Snap Preference 本身不改变；
+- Y 轴按 Pitch Row 解析共享 Semitone Delta，不使用 Timeline Grid；
+- Preview 使用冻结数据和同一共享 Delta，不写 Project；Snap 开启时显示 Anchor Guide；
+- Tick 边界是全部 Note 在 MidiSource 内合法区间的交集，Pitch 边界是全部 Note 在
+  0–127 内合法区间的交集；到达边界时整体 Clamp，不允许部分 Note 停留；
+- Pointer Up 的非零结果执行一个 `MoveNotesCommand`；零 Delta 不产生 Commit；
+- `pointercancel`、lost pointer capture、Clip 切换、组件释放或聚焦 Piano Roll 的
+  `Escape` 都清理 Preview，且不写 Project；
+- 提交失败清理 Preview、保留原 Project / History，并通过命令式 Toast 提示；
+- 成功提交后继续显示最终 Preview，直到权威 Note Read Model 到达对应 revision，避免短暂
+  回跳；随后重新读取 Project Facts。
+
+Batch 2 已审查并实现 `MoveNotesCommand` 的 Delta、No-change、边界与 Change 协议。
+一元素集合与旧单 Note 行为语义等价，因此集合协议已经取代旧的绝对目标
+`MoveNoteCommand`。通用准则见
 [Project Command 集合与事务语义](../../project-core/docs/project-command-collection-semantics.md)。
 
-临时绕过按键、Snap Guide 和 Preview 视觉在本批一起定义；对象边缘、Marker、播放头和 Loop
-边界仍不是 Snap Target。
+对象边缘、Marker、播放头和 Loop 边界仍不是 Snap Target。
 
 ## 4. Batch 3：Cursor / Pencil Resize
 

@@ -5,15 +5,17 @@ import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddNoteCommand,
   createInitialProjectSession,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
   parseTempoEventId,
   parseTick,
+  parseTickDelta,
   parseTimeSignatureEventId,
   type MidiNotePartitionSnapshot,
   type MidiSourceId,
@@ -217,12 +219,12 @@ describe('ProjectSnapshot revision isolation', () => {
     expect(findNote(afterAdd, sourceId, noteId)).toMatchObject({ startTick: 1_200, pitch: 72 })
 
     session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId,
-        noteId,
-        nextStartTick: parseTick(1_440),
-        nextPitch: parseMidiPitch(74),
+        noteIds: [noteId],
+        deltaTick: parseTickDelta(240),
+        deltaPitch: parseMidiPitchDelta(2),
       }),
     )
     const afterMove = session.getSnapshot()
@@ -258,12 +260,12 @@ describe('ProjectSnapshot revision isolation', () => {
     const originalNote = findNote(beforeMove, sourceId, noteId)
 
     session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId,
-        noteId,
-        nextStartTick: parseTick(480),
-        nextPitch: parseMidiPitch(62),
+        noteIds: [noteId],
+        deltaTick: parseTickDelta(240),
+        deltaPitch: parseMidiPitchDelta(2),
       }),
     )
     const afterMove = session.getSnapshot()

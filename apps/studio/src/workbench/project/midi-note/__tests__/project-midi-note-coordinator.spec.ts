@@ -7,12 +7,14 @@ import {
   createInitialProjectSession,
   parseClipId,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiSourceId,
   parseNoteId,
   parsePositiveTick,
   parseProjectId,
   parseTempoEventId,
   parseTick,
+  parseTickDelta,
   parseTimeSignatureEventId,
   type ClipId,
   type ProjectSession,
@@ -193,6 +195,172 @@ describe('ProjectMidiNoteCoordinator', () => {
       startTick: 1_380,
       durationTick: 60,
     })
+  })
+
+  it('moves selected Notes in one Commit with a shared Tick and Pitch delta', () => {
+    const fixture = createMidiClipFixture('move-many')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: createIdentitySource(
+        'note-midi-note-move-many-1',
+        'note-midi-note-move-many-2',
+      ),
+    })
+    const noteIds = [
+      coordinator.addMidiNote({
+        clipId: fixture.clipId,
+        clipStartTick: parseTick(120),
+        requestedDurationTick: parsePositiveTick(240),
+        pitch: parseMidiPitch(60),
+      }).noteId,
+      coordinator.addMidiNote({
+        clipId: fixture.clipId,
+        clipStartTick: parseTick(480),
+        requestedDurationTick: parsePositiveTick(240),
+        pitch: parseMidiPitch(64),
+      }).noteId,
+    ]
+    const revisionBeforeMove = fixture.session.modelRevision
+    const result = coordinator.moveMidiNotes({
+      baseRevision: revisionBeforeMove,
+      clipId: fixture.clipId,
+      deltaPitch: parseMidiPitchDelta(2),
+      deltaTick: parseTickDelta(120),
+      noteIds,
+    })
+
+    expect(result).not.toBeNull()
+    expect(result?.commit.baseRevision).toBe(revisionBeforeMove)
+    expect(result?.commit.modelRevision).toBe(revisionBeforeMove + 1)
+    expect(result?.commit.origin).toEqual({
+      kind: 'command',
+      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE,
+    })
+    expect(result?.commit.delta.changes).toEqual([
+      expect.objectContaining({
+        type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
+        noteId: noteIds[0],
+      }),
+      expect.objectContaining({
+        type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
+        noteId: noteIds[1],
+      }),
+    ])
+    expect(noteRecords(fixture.session)).toEqual([
+      expect.objectContaining({ id: noteIds[0], pitch: 62, startTick: 720 }),
+      expect.objectContaining({ id: noteIds[1], pitch: 66, startTick: 1_080 }),
+    ])
+
+    fixture.session.undo()
+    expect(noteRecords(fixture.session)).toEqual([
+      expect.objectContaining({ id: noteIds[0], pitch: 60, startTick: 600 }),
+      expect.objectContaining({ id: noteIds[1], pitch: 64, startTick: 960 }),
+    ])
+  })
+
+  it('rejects a Move gesture captured against a stale Project revision', () => {
+    const fixture = createMidiClipFixture('move-stale')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: createIdentitySource(
+        'note-midi-note-move-stale-1',
+        'note-midi-note-move-stale-2',
+      ),
+    })
+    const noteId = coordinator.addMidiNote({
+      clipId: fixture.clipId,
+      clipStartTick: parseTick(120),
+      requestedDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(60),
+    }).noteId
+    const gestureRevision = fixture.session.modelRevision
+
+    coordinator.addMidiNote({
+      clipId: fixture.clipId,
+      clipStartTick: parseTick(480),
+      requestedDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(64),
+    })
+    const revisionBeforeRejectedMove = fixture.session.modelRevision
+
+    expect(() =>
+      coordinator.moveMidiNotes({
+        baseRevision: gestureRevision,
+        clipId: fixture.clipId,
+        deltaPitch: parseMidiPitchDelta(1),
+        deltaTick: parseTickDelta(120),
+        noteIds: [noteId],
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        code: 'base-revision-mismatch',
+        baseRevision: gestureRevision,
+        currentRevision: revisionBeforeRejectedMove,
+      }),
+    )
+    expect(fixture.session.modelRevision).toBe(revisionBeforeRejectedMove)
+    expect(noteRecords(fixture.session)[0]).toMatchObject({
+      id: noteId,
+      pitch: 60,
+      startTick: 600,
+    })
+  })
+
+  it('returns no change for zero movement and rejects an invalid Selection atomically', () => {
+    const fixture = createMidiClipFixture('move-rejected')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: createIdentitySource(
+        'note-midi-note-move-rejected-1',
+        'note-midi-note-move-rejected-2',
+      ),
+    })
+    const noteIds = [
+      coordinator.addMidiNote({
+        clipId: fixture.clipId,
+        clipStartTick: parseTick(120),
+        requestedDurationTick: parsePositiveTick(240),
+        pitch: parseMidiPitch(60),
+      }).noteId,
+      coordinator.addMidiNote({
+        clipId: fixture.clipId,
+        clipStartTick: parseTick(480),
+        requestedDurationTick: parsePositiveTick(240),
+        pitch: parseMidiPitch(64),
+      }).noteId,
+    ]
+    const revisionBeforeMove = fixture.session.modelRevision
+
+    expect(
+      coordinator.moveMidiNotes({
+        baseRevision: revisionBeforeMove,
+        clipId: fixture.clipId,
+        deltaPitch: parseMidiPitchDelta(0),
+        deltaTick: parseTickDelta(0),
+        noteIds,
+      }),
+    ).toBeNull()
+    expect(fixture.session.modelRevision).toBe(revisionBeforeMove)
+
+    expect(() =>
+      coordinator.moveMidiNotes({
+        baseRevision: revisionBeforeMove,
+        clipId: fixture.clipId,
+        deltaPitch: parseMidiPitchDelta(0),
+        deltaTick: parseTickDelta(300),
+        noteIds,
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        code: 'note-out-of-source-range',
+        noteId: noteIds[1],
+      }),
+    )
+    expect(fixture.session.modelRevision).toBe(revisionBeforeMove)
+    expect(noteRecords(fixture.session)).toEqual([
+      expect.objectContaining({ id: noteIds[0], startTick: 600 }),
+      expect.objectContaining({ id: noteIds[1], startTick: 960 }),
+    ])
   })
 
   it('removes selected Notes in one Commit and one reversible History step', () => {

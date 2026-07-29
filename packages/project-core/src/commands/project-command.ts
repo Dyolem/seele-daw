@@ -21,11 +21,12 @@ import {
 } from '#internal/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'
 import {
-  parseMidiPitch,
   type ProjectColor,
   type MidiChannel,
   type MidiPitch,
+  type MidiPitchDelta,
   type MidiVelocity,
+  parseMidiPitchDelta,
 } from '#internal/model/scalars'
 import { createInstrumentTrackRecord, type InstrumentTrackRecord } from '#internal/model/track'
 import {
@@ -35,7 +36,7 @@ import {
 } from '#internal/model/midi-clip'
 import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
 import type { CreateChannelStripDescriptorInput } from '#internal/model/channel'
-import { parseTick, type Tick } from '#internal/time/tick'
+import { parseTickDelta, type Tick, type TickDelta } from '#internal/time/tick'
 
 /** Canonical runtime discriminants for product-level project commands. */
 export const PROJECT_COMMAND_TYPE = {
@@ -66,6 +67,12 @@ interface MidiNoteCommandBase<Type extends ProjectCommandType> extends ProjectCo
   readonly noteId: NoteId
 }
 
+interface MidiNoteCollectionCommandBase<Type extends ProjectCommandType>
+  extends ProjectCommandBase<Type> {
+  readonly sourceId: MidiSourceId
+  readonly noteIds: readonly NoteId[]
+}
+
 export interface AddInstrumentTrackCommand extends ProjectCommandBase<
   typeof PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD
 > {
@@ -91,25 +98,22 @@ export interface AddNoteCommand extends MidiNoteCommandBase<
   readonly channel: MidiChannel
 }
 
-export interface MoveNoteCommand extends MidiNoteCommandBase<
+export interface MoveNotesCommand extends MidiNoteCollectionCommandBase<
   typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE
 > {
-  readonly nextStartTick: Tick
-  readonly nextPitch: MidiPitch
+  readonly deltaTick: TickDelta
+  readonly deltaPitch: MidiPitchDelta
 }
 
-export interface RemoveNotesCommand extends ProjectCommandBase<
+export type RemoveNotesCommand = MidiNoteCollectionCommandBase<
   typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE
-> {
-  readonly sourceId: MidiSourceId
-  readonly noteIds: readonly NoteId[]
-}
+>
 
 export type ProjectCommand =
   | AddInstrumentTrackCommand
   | AddMidiClipCommand
   | AddNoteCommand
-  | MoveNoteCommand
+  | MoveNotesCommand
   | RemoveNotesCommand
 
 export interface CreateAddInstrumentTrackCommandInput {
@@ -151,16 +155,18 @@ export interface CreateAddNoteCommandInput extends CreateNoteCommandInputBase {
   readonly channel: MidiChannel
 }
 
-export interface CreateMoveNoteCommandInput extends CreateNoteCommandInputBase {
-  readonly nextStartTick: Tick
-  readonly nextPitch: MidiPitch
-}
-
-export interface CreateRemoveNotesCommandInput {
+interface CreateNoteCollectionCommandInputBase {
   readonly baseRevision: ModelRevision
   readonly sourceId: MidiSourceId
   readonly noteIds: readonly NoteId[]
 }
+
+export interface CreateMoveNotesCommandInput extends CreateNoteCollectionCommandInputBase {
+  readonly deltaTick: TickDelta
+  readonly deltaPitch: MidiPitchDelta
+}
+
+export type CreateRemoveNotesCommandInput = CreateNoteCollectionCommandInputBase
 
 function parseCommandBaseRevision(value: ModelRevision): ModelRevision {
   try {
@@ -260,22 +266,14 @@ export function createAddNoteCommand(input: CreateAddNoteCommandInput): AddNoteC
   }
 }
 
-export function createMoveNoteCommand(input: CreateMoveNoteCommandInput): MoveNoteCommand {
-  return {
-    type: PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE,
-    baseRevision: parseCommandBaseRevision(input.baseRevision),
-    sourceId: parseMidiSourceId(input.sourceId),
-    noteId: parseNoteId(input.noteId),
-    nextStartTick: parseTick(input.nextStartTick),
-    nextPitch: parseMidiPitch(input.nextPitch),
-  }
-}
-
-function parseDistinctNoteIds(noteIds: readonly NoteId[]): readonly NoteId[] {
+function parseDistinctNoteIds(
+  noteIds: readonly NoteId[],
+  commandName: 'MoveNotesCommand' | 'RemoveNotesCommand',
+): readonly NoteId[] {
   if (noteIds.length === 0) {
     throw new ProjectCommandError(
       'empty-note-id-list',
-      'RemoveNotesCommand.noteIds must contain at least one MIDI Note ID',
+      `${commandName}.noteIds must contain at least one MIDI Note ID`,
     )
   }
 
@@ -285,7 +283,7 @@ function parseDistinctNoteIds(noteIds: readonly NoteId[]): readonly NoteId[] {
     if (uniqueNoteIds.has(noteId)) {
       throw new ProjectCommandError(
         'duplicate-note-id',
-        `RemoveNotesCommand.noteIds contains duplicate MIDI Note ID ${noteId}`,
+        `${commandName}.noteIds contains duplicate MIDI Note ID ${noteId}`,
         { noteId },
       )
     }
@@ -295,6 +293,17 @@ function parseDistinctNoteIds(noteIds: readonly NoteId[]): readonly NoteId[] {
   return Object.freeze(parsedNoteIds)
 }
 
+export function createMoveNotesCommand(input: CreateMoveNotesCommandInput): MoveNotesCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    sourceId: parseMidiSourceId(input.sourceId),
+    noteIds: parseDistinctNoteIds(input.noteIds, 'MoveNotesCommand'),
+    deltaTick: parseTickDelta(input.deltaTick),
+    deltaPitch: parseMidiPitchDelta(input.deltaPitch),
+  }
+}
+
 export function createRemoveNotesCommand(
   input: CreateRemoveNotesCommandInput,
 ): RemoveNotesCommand {
@@ -302,7 +311,7 @@ export function createRemoveNotesCommand(
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
     baseRevision: parseCommandBaseRevision(input.baseRevision),
     sourceId: parseMidiSourceId(input.sourceId),
-    noteIds: parseDistinctNoteIds(input.noteIds),
+    noteIds: parseDistinctNoteIds(input.noteIds, 'RemoveNotesCommand'),
   }
 }
 
@@ -347,7 +356,7 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
       return createAddNoteCommand(command)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
-      return createMoveNoteCommand(command)
+      return createMoveNotesCommand(command)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
       return createRemoveNotesCommand(command)
     default:

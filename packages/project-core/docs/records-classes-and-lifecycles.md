@@ -127,37 +127,26 @@ interface MidiNoteRecord {
 
 这里的“协作者”是指：为了完成某项职责，需要在多次方法调用之间保存内部状态，或管理依赖、资源和协议顺序的对象。
 
-### 交互 Session
+### 交互 Gesture
 
 ```ts
-class NoteDragSession {
-  readonly noteId: NoteId
-  readonly originStartTick: Tick
-
-  private previewStartTick: Tick
-  private state: 'active' | 'committed' | 'cancelled'
-
-  updatePointer(pointerX: number): void {
-    // 更新 Editor Preview，不修改 ProjectModel
-  }
-
-  createCommand(): MoveNoteCommand {
-    // 根据最终 Preview 创建一次正式命令
-  }
-
-  cancel(): void {
-    // 清理 Pointer Capture、Preview 和其他临时资源
-  }
+interface NoteMoveGesture {
+  readonly anchorNoteId: NoteId
+  readonly noteIds: readonly NoteId[]
+  readonly notes: readonly MidiNoteRecord[]
+  readonly originPosition: PianoRollCssPoint
 }
+
+function resolveNoteMovePreview(
+  gesture: NoteMoveGesture,
+  pointerInput: PianoRollPointerInput,
+): PianoRollNoteMovePreview
 ```
 
-这里使用 Class 是自然的，因为：
-
-- Session 有明确的 active、committed、cancelled 状态；
-- Pointer Event 会多次调用同一个实例；
-- 内部状态不应被任意外部代码改写；
-- commit 和 cancel 之后不应继续 update；
-- 实例负责清理本次手势拥有的资源。
+当前 Piano Roll Move 使用冻结 Gesture Record 和纯 Preview Resolver。Pointer Capture 与
+active / cancel 生命周期已经由 Browser Input Adapter 和 Studio Surface 拥有，没有必要再
+建立一个重复状态机 Class。只有当 Gesture 自己开始持有定时器、订阅或其他必须成对释放的
+资源时，才应升级为独立 Session Class。
 
 ### ModelStore
 
@@ -185,8 +174,8 @@ AudioNode、Worklet 端口、Scheduler token 和 dispose 协议都是真实资�
 flowchart LR
   R["MidiNoteRecord<br/>项目事实"] --> Q["Editor Query"]
   Q --> P["NoteRenderPrimitive<br/>本帧绘制数据"]
-  P --> D["NoteDragSession<br/>手势预览状态"]
-  D --> C["MoveNoteCommand"]
+  P --> D["NoteMoveGesture<br/>冻结手势事实"]
+  D --> C["MoveNotesCommand"]
   C --> V["Validate + MutationPlan"]
   V --> M["ModelStore Commit"]
   M --> N["新的 MidiNoteRecord"]
@@ -197,22 +186,23 @@ flowchart LR
 
 ```text
 pointerdown
--> 创建 NoteDragSession
+-> 冻结 NoteMoveGesture
 
 pointermove
--> 更新 Editor Preview
+-> 纯函数解析共享 Delta 与 Editor Preview
 -> 重绘预览
 -> 不写 ProjectModel
 
 pointerup
--> Session 生成 MoveNoteCommand
--> project-core 验证本地与跨实体不变量
--> 一次事务替换 MidiNoteRecord
+-> Studio 生成一个 MoveNotesCommand
+-> project-core 权威复核全部 Note 与共享 Delta
+-> 一次事务替换一个或多个 MidiNoteRecord
 -> 产生一个 ProjectCommit 和一个 History Entry
--> 销毁 NoteDragSession
+-> 清理 Gesture；权威 Read Model 到达 Commit revision 后清理最终 Preview
 ```
 
-这个流程同时使用 Record、纯函数和 Class。它们并不互相排斥，而是分别承担事实、变换和生命周期。
+这个流程同时使用 Record、纯函数和已有生命周期对象。它们并不互相排斥，而是分别承担
+事实、变换和资源所有权。
 
 ## “创建”和“销毁”需要先问是哪一层
 

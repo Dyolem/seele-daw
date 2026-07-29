@@ -15,6 +15,7 @@ export interface PianoRollClipContext {
   readonly clipSpanTick: Tick
   readonly sourceEndTick: Tick
   readonly sourceId: MidiSourceId
+  readonly sourceLengthTick: Tick
   readonly sourceStartTick: Tick
 }
 
@@ -50,6 +51,7 @@ export function createPianoRollClipContext(
     clipSpanTick: clip.spanTick,
     sourceEndTick,
     sourceId: source.id,
+    sourceLengthTick: source.lengthTick,
     sourceStartTick: clip.sourceOffsetTick,
   })
 }

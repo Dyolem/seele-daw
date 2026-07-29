@@ -8,15 +8,17 @@ import {
   ProjectCommandError,
   createAddNoteCommand,
   createInitialProjectSession,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
   parseTempoEventId,
   parseTick,
+  parseTickDelta,
   parseTimeSignatureEventId,
   type CommittedProjectCommandExecution,
   type ModelRevision,
@@ -91,12 +93,12 @@ describe('ProjectSession command execution', () => {
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, noteId)).toBeDefined()
 
     const moveResult = session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId,
-        nextStartTick: parseTick(1_200),
-        nextPitch: parseMidiPitch(74),
+        noteIds: [noteId],
+        deltaTick: parseTickDelta(240),
+        deltaPitch: parseMidiPitchDelta(2),
       }),
     )
 
@@ -131,6 +133,48 @@ describe('ProjectSession command execution', () => {
     })
     expect(session.modelRevision).toBe(3)
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, noteId)).toBeUndefined()
+  })
+
+  it('moves multiple Notes in one Commit and one reversible History step', () => {
+    const { fixture, store, session } = createFixtureProjectSession()
+    const first = fixture.records.nonLoopNote
+    const second = fixture.records.nonLoopHarmonyNote
+    const result = session.execute(
+      createMoveNotesCommand({
+        baseRevision: session.modelRevision,
+        sourceId: fixture.records.nonLoopSource.id,
+        noteIds: [first.id, second.id],
+        deltaTick: parseTickDelta(240),
+        deltaPitch: parseMidiPitchDelta(2),
+      }),
+    )
+
+    expect(result).toMatchObject({
+      status: PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED,
+      commit: {
+        baseRevision: 0,
+        modelRevision: 1,
+        delta: {
+          changes: [
+            { type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED, noteId: first.id },
+            { type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED, noteId: second.id },
+          ],
+        },
+      },
+    })
+    expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toMatchObject({
+      startTick: 480,
+      pitch: 62,
+    })
+    expect(store.getMidiNote(fixture.records.nonLoopSource.id, second.id)).toMatchObject({
+      startTick: 960,
+      pitch: 66,
+    })
+
+    session.undo()
+
+    expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toBe(first)
+    expect(store.getMidiNote(fixture.records.nonLoopSource.id, second.id)).toBe(second)
   })
 
   it('returns a fully frozen committed result after successful application', () => {
@@ -241,12 +285,12 @@ describe('ProjectSession command execution', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const before = fixture.records.nonLoopNote
     const result = session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId: before.id,
-        nextStartTick: before.startTick,
-        nextPitch: before.pitch,
+        noteIds: [before.id],
+        deltaTick: parseTickDelta(0),
+        deltaPitch: parseMidiPitchDelta(0),
       }),
     )
 
@@ -279,12 +323,12 @@ describe('ProjectSession command execution', () => {
   it('propagates range rejection before any authoritative write', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const before = fixture.records.nonLoopNote
-    const command = createMoveNoteCommand({
+    const command = createMoveNotesCommand({
       baseRevision: session.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: before.id,
-      nextStartTick: parseTick(1_680),
-      nextPitch: before.pitch,
+      noteIds: [before.id],
+      deltaTick: parseTickDelta(1_440),
+      deltaPitch: parseMidiPitchDelta(0),
     })
 
     expect(() => session.execute(command)).toThrowError(

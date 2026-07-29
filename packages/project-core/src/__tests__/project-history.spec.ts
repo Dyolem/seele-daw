@@ -9,13 +9,16 @@ import {
   PROJECT_HISTORY_DIRECTION,
   ProjectCommandError,
   createAddNoteCommand,
-  createMoveNoteCommand,
+  createMidiNoteByIdQuery,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
+  parseTickDelta,
   type ProjectCommandExecutionResult,
   type ProjectCommit,
   type ProjectSession,
@@ -36,19 +39,22 @@ function requireCommitted(result: ProjectCommandExecutionResult): ProjectCommit 
 
 function executeMove(
   session: ProjectSession,
-  sourceId: Parameters<typeof createMoveNoteCommand>[0]['sourceId'],
-  noteId: Parameters<typeof createMoveNoteCommand>[0]['noteId'],
-  nextStartTick: Parameters<typeof createMoveNoteCommand>[0]['nextStartTick'],
-  nextPitch: Parameters<typeof createMoveNoteCommand>[0]['nextPitch'],
+  sourceId: Parameters<typeof createMoveNotesCommand>[0]['sourceId'],
+  noteId: Parameters<typeof createMoveNotesCommand>[0]['noteIds'][number],
+  nextStartTick: ReturnType<typeof parseTick>,
+  nextPitch: ReturnType<typeof parseMidiPitch>,
 ): ProjectCommit {
+  const before = session.query(createMidiNoteByIdQuery({ sourceId, noteId })).note
+  if (before === undefined) throw new Error(`Expected MIDI Note ${noteId}`)
+
   return requireCommitted(
     session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId,
-        noteId,
-        nextStartTick,
-        nextPitch,
+        noteIds: [noteId],
+        deltaTick: parseTickDelta(nextStartTick - before.startTick),
+        deltaPitch: parseMidiPitchDelta(nextPitch - before.pitch),
       }),
     ),
   )
@@ -334,12 +340,12 @@ describe('ProjectSession Undo / Redo', () => {
     const contentStateId = session.contentStateId
 
     const noChange = session.execute(
-      createMoveNoteCommand({
+      createMoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId: before.id,
-        nextStartTick: before.startTick,
-        nextPitch: before.pitch,
+        noteIds: [before.id],
+        deltaTick: parseTickDelta(0),
+        deltaPitch: parseMidiPitchDelta(0),
       }),
     )
 
@@ -349,12 +355,12 @@ describe('ProjectSession Undo / Redo', () => {
 
     expect(() =>
       session.execute(
-        createMoveNoteCommand({
+        createMoveNotesCommand({
           baseRevision: session.modelRevision,
           sourceId: fixture.records.nonLoopSource.id,
-          noteId: before.id,
-          nextStartTick: parseTick(1_680),
-          nextPitch: before.pitch,
+          noteIds: [before.id],
+          deltaTick: parseTickDelta(1_440),
+          deltaPitch: parseMidiPitchDelta(0),
         }),
       ),
     ).toThrowError(

@@ -142,12 +142,29 @@ interface RemoveNotesCommand {
 Chord、Paste、Duplicate 或 MIDI Import。这些行为涉及不同的身份分配、相对 Timing、
 所有权和 Source 扩展规则，不能在真实需求出现前统一为一个泛化 `AddNotesCommand`。
 
-### 5.3 Move Note 与未来 Selection Move
+### 5.3 Move Notes
 
-当前 `MoveNoteCommand` 使用一个 Note 的绝对 `nextStartTick` 和 `nextPitch`。它在未来
-Selection Move 协议确定前继续保留。
+Batch 5.2 已将单 Note 与 Selection Move 统一为数量无关的 `MoveNotesCommand`：
 
-多选 Move 不是多次独立 Move：
+```ts
+interface MoveNotesCommand {
+  readonly type: 'midi-note.move'
+  readonly baseRevision: ModelRevision
+  readonly sourceId: MidiSourceId
+  readonly noteIds: readonly NoteId[]
+  readonly deltaTick: TickDelta
+  readonly deltaPitch: MidiPitchDelta
+}
+```
+
+- `noteIds` 必须非空且无重复；
+- 一元素集合表示单 Note Move，多元素集合表示同一 MidiSource 内的 Selection Move；
+- 所有 Note 使用同一个 Tick / Pitch Delta；
+- Delta 同时为零时返回 `no-change`，不建立空 MutationPlan；
+- 任一 Note 缺失、越过 Source 边界或越过 MIDI Pitch 0–127 时整次拒绝；
+- 不再保留语义被一元素集合完全覆盖的绝对 `MoveNoteCommand` 公共协议。
+
+Selection Move 不是多次独立 Move：
 
 - 所有 Note 必须使用同一个 Tick / Pitch Delta；
 - 所有 Note 必须保持相对间隔；
@@ -166,9 +183,8 @@ Selection：
 ```
 
 Editor 使用该范围产生一致 Preview；Project Core 在提交时仍需基于 `baseRevision` 重新读取
-全部 Note 并验证最终结果。Batch 2 应先审查 `MoveNotesCommand` 的 Delta、No-change、边界和
-Delta Change 协议；只有实现并迁移所有消费者后，才能判断它是否完全覆盖并取代
-`MoveNoteCommand`。
+全部 Note 并验证最终结果。一个合法命令建立按 `noteIds` 顺序排列的多个
+`NOTE.REPLACE` Mutation，但只产生一个 Commit、一次 revision 推进和一个 History 步骤。
 
 ### 5.4 Resize、Track 与 Clip
 

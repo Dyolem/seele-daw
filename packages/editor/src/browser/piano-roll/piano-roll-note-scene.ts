@@ -1,4 +1,7 @@
-import type { PianoRollNoteReadModelState } from '#internal/common/piano-roll/index'
+import type {
+  PianoRollNoteMovePreview,
+  PianoRollNoteReadModelState,
+} from '#internal/common/piano-roll/index'
 import {
   pianoRollClipTickToCssPixel,
   pianoRollMidiPitchToCssPixel,
@@ -9,7 +12,12 @@ import type {
   PianoRollNoteScene,
   PianoRollNoteVisual,
 } from '#internal/browser/piano-roll/piano-roll-note-renderer'
-import type { NoteId } from '@seele-daw/project-core'
+import {
+  parseTick,
+  type MidiPitch,
+  type NoteId,
+  type Tick,
+} from '@seele-daw/project-core'
 
 export interface PianoRollNoteSceneStyle {
   readonly borderColor: string
@@ -20,10 +28,18 @@ export interface PianoRollNoteSceneStyle {
 }
 
 export interface CreatePianoRollNoteSceneInput {
+  readonly movePreview?: PianoRollNoteMovePreview | null
   readonly notes: PianoRollNoteReadModelState['notes']
   readonly selectedNoteIds: readonly NoteId[]
   readonly style: PianoRollNoteSceneStyle
   readonly viewport: PianoRollViewport
+}
+
+interface SceneNote {
+  readonly noteId: NoteId
+  readonly pitch: MidiPitch
+  readonly visibleEndTick: Tick
+  readonly visibleStartTick: Tick
 }
 
 function requireColor(value: string, field: string): string {
@@ -53,6 +69,42 @@ function pitchRowHeight(viewport: PianoRollViewport): number {
   )
 }
 
+function createSceneNotes(input: CreatePianoRollNoteSceneInput): readonly SceneNote[] {
+  const movedNoteIds = new Set(input.movePreview?.movedNoteIds ?? [])
+  const notes: SceneNote[] = input.notes
+    .filter((visibleNote) => !movedNoteIds.has(visibleNote.note.id))
+    .map((visibleNote) => ({
+      noteId: visibleNote.note.id,
+      pitch: visibleNote.note.pitch,
+      visibleEndTick: visibleNote.visibleEndTick,
+      visibleStartTick: visibleNote.visibleStartTick,
+    }))
+
+  for (const previewNote of input.movePreview?.notes ?? []) {
+    if (
+      previewNote.pitch < input.viewport.minimumPitch ||
+      previewNote.pitch > input.viewport.maximumPitch ||
+      previewNote.visibleEndTick <= input.viewport.visibleStartTick ||
+      previewNote.visibleStartTick >= input.viewport.visibleEndTick
+    ) {
+      continue
+    }
+
+    notes.push({
+      noteId: previewNote.noteId,
+      pitch: previewNote.pitch,
+      visibleEndTick: parseTick(
+        Math.min(previewNote.visibleEndTick, input.viewport.visibleEndTick),
+      ),
+      visibleStartTick: parseTick(
+        Math.max(previewNote.visibleStartTick, input.viewport.visibleStartTick),
+      ),
+    })
+  }
+
+  return notes
+}
+
 /** Projects read-model Notes into renderer-neutral CSS Pixel geometry. */
 export function createPianoRollNoteScene(
   input: CreatePianoRollNoteSceneInput,
@@ -68,18 +120,21 @@ export function createPianoRollNoteScene(
     'selectedGlowColor',
   )
   const opacity = requireOpacity(input.style.opacity)
-  const selectedNoteIds = new Set(input.selectedNoteIds)
+  const selectedNoteIds = new Set([
+    ...input.selectedNoteIds,
+    ...(input.movePreview?.movedNoteIds ?? []),
+  ])
   const rowHeight = pitchRowHeight(input.viewport)
   const inset = Math.min(1, rowHeight / 5)
-  const notes = input.notes.map((visibleNote): PianoRollNoteVisual => {
-    const selected = selectedNoteIds.has(visibleNote.note.id)
+  const notes = createSceneNotes(input).map((note): PianoRollNoteVisual => {
+    const selected = selectedNoteIds.has(note.noteId)
     const xCssPixel = pianoRollClipTickToCssPixel(
       input.viewport,
-      visibleNote.visibleStartTick,
+      note.visibleStartTick,
     )
     const endXCssPixel = pianoRollClipTickToCssPixel(
       input.viewport,
-      visibleNote.visibleEndTick,
+      note.visibleEndTick,
     )
 
     return Object.freeze({
@@ -87,17 +142,16 @@ export function createPianoRollNoteScene(
       fillColor,
       glowColor: selected ? selectedGlowColor : null,
       heightCssPixel: Math.max(1, rowHeight - inset * 2),
-      noteId: visibleNote.note.id,
+      noteId: note.noteId,
       opacity,
-      pitch: visibleNote.note.pitch,
+      pitch: note.pitch,
       selected,
-      visibleEndTick: visibleNote.visibleEndTick,
-      visibleStartTick: visibleNote.visibleStartTick,
+      visibleEndTick: note.visibleEndTick,
+      visibleStartTick: note.visibleStartTick,
       widthCssPixel: Math.max(1, endXCssPixel - xCssPixel),
       xCssPixel,
       yCssPixel:
-        pianoRollMidiPitchToCssPixel(input.viewport, visibleNote.note.pitch) +
-        inset,
+        pianoRollMidiPitchToCssPixel(input.viewport, note.pitch) + inset,
     })
   })
 

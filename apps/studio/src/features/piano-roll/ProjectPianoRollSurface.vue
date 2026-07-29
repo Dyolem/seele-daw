@@ -6,16 +6,21 @@ import {
   createInitialPianoRollViewport,
   createPianoRollGrid,
   createPianoRollGridCanvasRenderer,
+  createPianoRollNoteMoveGesture,
   createPianoRollNoteScene,
   createPianoRollNoteReadModel,
   createPianoRollPointerInputAdapter,
+  pianoRollClipTickToCssPixel,
   resolvePianoRollPencilNotePlacement,
+  resolvePianoRollNoteMovePreview,
   type PianoRollEditorSession,
   type PianoRollEditorSessionState,
   type PianoRollGrid,
   type PianoRollGridCanvasRenderer,
   type PianoRollGridCanvasTheme,
   type PianoRollNoteRenderer,
+  type PianoRollNoteMoveGesture,
+  type PianoRollNoteMovePreview,
   type PianoRollNoteReadModel,
   type PianoRollNoteReadModelState,
   type PianoRollPointerInputAdapter,
@@ -27,6 +32,7 @@ import {
   parseMidiPitch,
   parsePositiveTick,
   type NoteId,
+  type ModelRevision,
   type ProjectSession,
   type Tick,
 } from '@seele-daw/project-core'
@@ -81,6 +87,7 @@ const gridCanvas = useTemplateRef<HTMLCanvasElement>('gridCanvas')
 const noteHost = useTemplateRef<HTMLElement>('noteHost')
 const noteState = shallowRef<PianoRollNoteReadModelState | null>(null)
 const editorState = shallowRef<PianoRollEditorSessionState | null>(null)
+const movePreview = shallowRef<PianoRollNoteMovePreview | null>(null)
 const interactionFailureMessage = shallowRef<string | null>(null)
 const readModelFailureMessage = shallowRef<string | null>(null)
 const renderFailureMessage = shallowRef<string | null>(null)
@@ -100,9 +107,11 @@ interface ActivePianoRollToolGesture {
   readonly snapEnabled: boolean
   readonly tool: PianoRollTool
   readonly viewport: PianoRollViewport | null
+  readonly moveGesture: PianoRollNoteMoveGesture | null
 }
 
 let activeToolGesture: ActivePianoRollToolGesture | null = null
+let movePreviewCommitRevision: ModelRevision | null = null
 
 const pianoKeys = Object.freeze(
   Array.from(
@@ -128,6 +137,24 @@ const barLabels = computed(() => {
 const rulerStyle = computed(() => ({
   gridTemplateColumns: `repeat(${barLabels.value.length}, minmax(0, 1fr))`,
 }))
+const moveSnapGuideStyle = computed(() => {
+  const snapGuideTick = movePreview.value?.snapGuideTick
+  const viewport = noteState.value?.viewport
+  if (snapGuideTick === null || snapGuideTick === undefined || viewport === undefined) {
+    return null
+  }
+
+  try {
+    return Object.freeze({
+      transform: `translateX(${pianoRollClipTickToCssPixel(
+        viewport,
+        snapGuideTick,
+      )}px)`,
+    })
+  } catch {
+    return null
+  }
+})
 const failureMessage = computed(
   () =>
     interactionFailureMessage.value ??
@@ -282,15 +309,109 @@ function handlePencilInput(
   interactionFailureMessage.value = null
 }
 
+function clearMovePreview(): void {
+  movePreview.value = null
+  movePreviewCommitRevision = null
+}
+
+function resolveMovePreview(
+  gesture: ActivePianoRollToolGesture,
+  input: PianoRollPointerInput,
+): PianoRollNoteMovePreview | null {
+  if (gesture.moveGesture === null || gesture.viewport === null) return null
+
+  return resolvePianoRollNoteMovePreview({
+    gesture: gesture.moveGesture,
+    grid: gesture.grid,
+    pointerInput: input,
+    snapEnabled: gesture.snapEnabled,
+    viewport: gesture.viewport,
+  })
+}
+
+function handleCursorInput(
+  gesture: ActivePianoRollToolGesture,
+  input: PianoRollPointerInput,
+): void {
+  const currentEditorSession = editorSession
+  if (currentEditorSession === null) return
+
+  if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE) {
+    try {
+      const preview = resolveMovePreview(gesture, input)
+      if (preview !== null) movePreview.value = preview
+    } catch (cause) {
+      movePreview.value = null
+      interactionFailureMessage.value = describeFailure(cause)
+    }
+    return
+  }
+
+  if (!input.hasExceededDragThreshold || gesture.moveGesture === null) {
+    clearMovePreview()
+    applyPianoRollSelectInteraction(currentEditorSession, input)
+    interactionFailureMessage.value = null
+    return
+  }
+
+  let finalPreview: PianoRollNoteMovePreview | null
+  try {
+    finalPreview = resolveMovePreview(gesture, input)
+    if (finalPreview === null) {
+      clearMovePreview()
+      return
+    }
+    movePreview.value = finalPreview
+
+    const result =
+      finalPreview.deltaTick === 0 && finalPreview.deltaPitch === 0
+        ? null
+        : projectMidiNotes.moveMidiNotes({
+            baseRevision: gesture.moveGesture.baseRevision,
+            clipId: gesture.context.clipId,
+            deltaPitch: finalPreview.deltaPitch,
+            deltaTick: finalPreview.deltaTick,
+            noteIds: finalPreview.movedNoteIds,
+          })
+    movePreviewCommitRevision = result?.commit.modelRevision ?? null
+
+    if (gesture.moveGesture.selectOnlyOnCommit) {
+      currentEditorSession.selectOnly(gesture.moveGesture.anchorNoteId)
+    }
+    if (result === null) clearMovePreview()
+    interactionFailureMessage.value = null
+  } catch (cause) {
+    clearMovePreview()
+    const message = describeCause(
+      cause,
+      'The Project rejected the MIDI Note move. Please try again.',
+    )
+    interactionFailureMessage.value = message
+    toasts.danger('MIDI notes could not be moved', message)
+  }
+}
+
 function handlePointerInput(input: PianoRollPointerInput): void {
   if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
     surfaceElement.value?.focus({ preventScroll: true })
+    const context = props.presentation.context
+    const tool = pianoRollPreferences.activeTool
+    const moveGesture =
+      tool === PIANO_ROLL_TOOL.CURSOR && editorSession !== null
+        ? createPianoRollNoteMoveGesture({
+            context,
+            pointerInput: input,
+            selectedNoteIds: editorSession.state.selectedNoteIds,
+            session: props.session,
+          })
+        : null
     activeToolGesture = Object.freeze({
-      context: props.presentation.context,
+      context,
       grid: createDisplayGrid(),
+      moveGesture,
       pointerId: input.pointerId,
       snapEnabled: pianoRollPreferences.snapEnabled,
-      tool: pianoRollPreferences.activeTool,
+      tool,
       viewport: noteState.value?.viewport ?? null,
     })
     return
@@ -298,24 +419,25 @@ function handlePointerInput(input: PianoRollPointerInput): void {
 
   const gesture = activeToolGesture
   if (gesture === null || gesture.pointerId !== input.pointerId) return
-  if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE) return
-
-  activeToolGesture = null
   if (
     input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL ||
     gesture.context.clipId !== props.presentation.context.clipId
   ) {
+    activeToolGesture = null
+    clearMovePreview()
     return
   }
 
   if (gesture.tool === PIANO_ROLL_TOOL.CURSOR) {
-    const currentEditorSession = editorSession
-    if (currentEditorSession === null) return
-    applyPianoRollSelectInteraction(currentEditorSession, input)
-    interactionFailureMessage.value = null
+    handleCursorInput(gesture, input)
+    if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.END) {
+      activeToolGesture = null
+    }
     return
   }
 
+  if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE) return
+  activeToolGesture = null
   handlePencilInput(gesture, input)
 }
 
@@ -340,6 +462,7 @@ function render(): void {
     })
     currentNoteRenderer.render(
       createPianoRollNoteScene({
+        movePreview: movePreview.value,
         notes: state.notes,
         style: {
           borderColor: theme.noteBorderColor,
@@ -429,6 +552,12 @@ function createOrResizeReadModel(): void {
       },
       onStateChange: (state) => {
         noteState.value = state
+        if (
+          movePreviewCommitRevision !== null &&
+          state.modelRevision >= movePreviewCommitRevision
+        ) {
+          clearMovePreview()
+        }
         readModelFailureMessage.value = null
       },
     })
@@ -480,6 +609,21 @@ function removeSelectedNotes(): boolean {
   return true
 }
 
+function clearSelectionOrCancelMove(): boolean {
+  if (hasActiveNoteMoveGesture()) {
+    activeToolGesture = null
+    clearMovePreview()
+    interactionFailureMessage.value = null
+    return true
+  }
+
+  return editorSession?.clearSelection() ?? false
+}
+
+function hasActiveNoteMoveGesture(): boolean {
+  return activeToolGesture !== null && activeToolGesture.moveGesture !== null
+}
+
 const disposeKeyboardShortcut = keyboardShortcuts.register([
   {
     actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE,
@@ -502,9 +646,10 @@ const disposeKeyboardShortcut = keyboardShortcuts.register([
     description: 'Clear the Note selection in the focused Piano Roll.',
     isEnabled: () =>
       isPianoRollFocused() &&
-      (editorState.value?.selectedNoteIds.length ?? 0) > 0,
+      (hasActiveNoteMoveGesture() ||
+        (editorState.value?.selectedNoteIds.length ?? 0) > 0),
     label: 'Clear Piano Roll selection',
-    run: () => editorSession?.clearSelection() ?? false,
+    run: clearSelectionOrCancelMove,
     scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
   },
 ])
@@ -521,6 +666,7 @@ watch(
   ],
   () => {
     activeToolGesture = null
+    clearMovePreview()
     recomposeReadModel()
     composeEditorSession()
   },
@@ -578,6 +724,7 @@ onUnmounted(() => {
   pointerInputAdapter?.dispose()
   pointerInputAdapter = null
   activeToolGesture = null
+  clearMovePreview()
   disposeEditorSession()
   disposeReadModel()
   gridRenderer.value?.dispose()
@@ -593,6 +740,7 @@ onUnmounted(() => {
     class="project-piano-roll"
     role="region"
     :aria-label="`Piano Roll for ${props.presentation.name}`"
+    :data-moving-notes="movePreview !== null"
     :data-snap-enabled="pianoRollPreferences.snapEnabled"
     :data-tool="pianoRollPreferences.activeTool"
     tabindex="0"
@@ -652,6 +800,12 @@ onUnmounted(() => {
 
     <div ref="canvasHost" class="project-piano-roll__canvas-host">
       <canvas ref="gridCanvas" aria-hidden="true"></canvas>
+      <div
+        v-if="moveSnapGuideStyle"
+        class="project-piano-roll__move-snap-guide"
+        :style="moveSnapGuideStyle"
+        aria-hidden="true"
+      ></div>
       <div ref="noteHost" class="project-piano-roll__note-host"></div>
     </div>
 
@@ -804,6 +958,18 @@ onUnmounted(() => {
   cursor: crosshair;
 }
 
+.project-piano-roll[data-tool='cursor']
+  .project-piano-roll__note-host
+  :deep(.sd-piano-roll-dom-note) {
+  cursor: grab;
+}
+
+.project-piano-roll[data-moving-notes='true']
+  .project-piano-roll__note-host
+  :deep(.sd-piano-roll-dom-note--selected) {
+  cursor: grabbing;
+}
+
 .project-piano-roll__canvas-host > canvas,
 .project-piano-roll__note-host {
   position: absolute;
@@ -818,6 +984,17 @@ onUnmounted(() => {
 
 .project-piano-roll__note-host {
   overflow: hidden;
+}
+
+.project-piano-roll__move-snap-guide {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 1;
+  inline-size: 1px;
+  pointer-events: none;
+  background: var(--sd-color-border-focus);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--sd-color-border-focus) 55%, transparent);
 }
 
 .project-piano-roll__note-host :deep(.sd-piano-roll-dom-note) {

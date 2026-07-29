@@ -2,6 +2,7 @@ import type { Brand } from '@seele-daw/type-utils'
 import { rejectDomainValue, requireFiniteNumber } from './domain-value-error'
 
 export type MidiPitch = Brand<number, 'MidiPitch'>
+export type MidiPitchDelta = Brand<number, 'MidiPitchDelta'>
 export type MidiVelocity = Brand<number, 'MidiVelocity'>
 export type MidiChannel = Brand<number, 'MidiChannel'>
 export type LinearGain = Brand<number, 'LinearGain'>
@@ -56,6 +57,15 @@ function parseFiniteNumberInRange<Value extends number>(
 
 export function parseMidiPitch(value: unknown): MidiPitch {
   return parseIntegerInRange<MidiPitch>(value, 'MidiPitch', MIDI_PITCH_MIN, MIDI_PITCH_MAX)
+}
+
+export function parseMidiPitchDelta(value: unknown): MidiPitchDelta {
+  return parseIntegerInRange<MidiPitchDelta>(
+    value,
+    'MidiPitchDelta',
+    MIDI_PITCH_MIN - MIDI_PITCH_MAX,
+    MIDI_PITCH_MAX - MIDI_PITCH_MIN,
+  )
 }
 
 export function parseMidiVelocity(value: unknown): MidiVelocity {

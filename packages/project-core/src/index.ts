@@ -4,7 +4,7 @@ export {
   createAddInstrumentTrackCommand,
   createAddMidiClipCommand,
   createAddNoteCommand,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
 } from './commands/project-command'
 export type {
@@ -14,9 +14,9 @@ export type {
   CreateAddInstrumentTrackCommandInput,
   CreateAddMidiClipCommandInput,
   CreateAddNoteCommandInput,
-  CreateMoveNoteCommandInput,
+  CreateMoveNotesCommandInput,
   CreateRemoveNotesCommandInput,
-  MoveNoteCommand,
+  MoveNotesCommand,
   ProjectCommand,
   ProjectCommandType,
   RemoveNotesCommand,
@@ -271,6 +271,7 @@ export {
   parseLinearGain,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiVelocity,
   parseProjectColor,
 } from './model/scalars'
@@ -279,12 +280,20 @@ export type {
   LinearGain,
   MidiChannel,
   MidiPitch,
+  MidiPitchDelta,
   MidiVelocity,
   ProjectColor,
 } from './model/scalars'
 
-export { PROJECT_PPQ, ZERO_TICK, addTicks, parsePositiveTick, parseTick } from './time/tick'
-export type { Tick } from './time/tick'
+export {
+  PROJECT_PPQ,
+  ZERO_TICK,
+  addTicks,
+  parsePositiveTick,
+  parseTick,
+  parseTickDelta,
+} from './time/tick'
+export type { Tick, TickDelta } from './time/tick'
 
 export {
   TEMPO_BPM_MAX,

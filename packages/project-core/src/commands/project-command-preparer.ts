@@ -12,7 +12,7 @@ import { prepareAddInstrumentTrackCommand } from '#internal/commands/instrument-
 import { prepareAddMidiClipCommand } from '#internal/commands/midi-clip-command-handler'
 import {
   prepareAddNoteCommand,
-  prepareMoveNoteCommand,
+  prepareMoveNotesCommand,
   prepareRemoveNotesCommand,
 } from '#internal/commands/midi-note-command-handler'
 import type { ModelStoreReader } from '#internal/model/model-store'
@@ -41,11 +41,11 @@ function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
         trackId: command.clip.trackId,
       }
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
-    case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
       return {
         noteId: command.noteId,
         sourceId: command.sourceId,
       }
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
       return {
         sourceId: command.sourceId,
@@ -86,7 +86,7 @@ export function prepareProjectCommand(
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
       return prepareAddNoteCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
-      return prepareMoveNoteCommand(reader, normalizedCommand)
+      return prepareMoveNotesCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
       return prepareRemoveNotesCommand(reader, normalizedCommand)
     default:

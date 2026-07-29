@@ -7,13 +7,15 @@ import {
   PROJECT_COMMIT_ORIGIN_KIND,
   createAddNoteCommand,
   createMidiNoteRecord,
-  createMoveNoteCommand,
+  createMoveNotesCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiPitchDelta,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
+  parseTickDelta,
   type AddNoteCommand,
   type ModelRevision,
   type ProjectChange,
@@ -207,12 +209,12 @@ describe('ProjectDelta Note semantics', () => {
   it('uses the conservative union of old and new intervals for MoveNote', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createMoveNoteCommand({
+    const command = createMoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
-      nextStartTick: parseTick(1_200),
-      nextPitch: parseMidiPitch(67),
+      noteIds: [fixture.records.nonLoopNote.id],
+      deltaTick: parseTickDelta(960),
+      deltaPitch: parseMidiPitchDelta(7),
     })
     const preparation = requireReadyProjectCommandPreparation(
       prepareProjectCommand(store, command),
@@ -234,12 +236,12 @@ describe('ProjectDelta Note semantics', () => {
   it('keeps the same interval when only Note pitch changes', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createMoveNoteCommand({
+    const command = createMoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
-      nextStartTick: fixture.records.nonLoopNote.startTick,
-      nextPitch: parseMidiPitch(61),
+      noteIds: [fixture.records.nonLoopNote.id],
+      deltaTick: parseTickDelta(0),
+      deltaPitch: parseMidiPitchDelta(1),
     })
     const preparation = requireReadyProjectCommandPreparation(
       prepareProjectCommand(store, command),
@@ -462,12 +464,12 @@ describe('ProjectCommit candidate boundary', () => {
   it('rejects Plans that change extra fields or bypass MoveNote no-change semantics', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createMoveNoteCommand({
+    const command = createMoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
-      nextStartTick: parseTick(960),
-      nextPitch: parseMidiPitch(65),
+      noteIds: [fixture.records.nonLoopNote.id],
+      deltaTick: parseTickDelta(720),
+      deltaPitch: parseMidiPitchDelta(5),
     })
     const plan = createMutationPlan(store.modelRevision, [
       {
@@ -476,8 +478,12 @@ describe('ProjectCommit candidate boundary', () => {
         before: fixture.records.nonLoopNote,
         after: createMidiNoteRecord({
           ...fixture.records.nonLoopNote,
-          startTick: command.nextStartTick,
-          pitch: command.nextPitch,
+          startTick: parseTick(
+            fixture.records.nonLoopNote.startTick + command.deltaTick,
+          ),
+          pitch: parseMidiPitch(
+            fixture.records.nonLoopNote.pitch + command.deltaPitch,
+          ),
           velocity: parseMidiVelocity(1),
         }),
       },
@@ -486,12 +492,12 @@ describe('ProjectCommit candidate boundary', () => {
       () => createProjectCommitCandidate(command, plan),
       'command-plan-mismatch',
     )
-    const noChangeCommand = createMoveNoteCommand({
+    const noChangeCommand = createMoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
-      nextStartTick: fixture.records.nonLoopNote.startTick,
-      nextPitch: fixture.records.nonLoopNote.pitch,
+      noteIds: [fixture.records.nonLoopNote.id],
+      deltaTick: parseTickDelta(0),
+      deltaPitch: parseMidiPitchDelta(0),
     })
     const noChangePlan = createMutationPlan(store.modelRevision, [
       {

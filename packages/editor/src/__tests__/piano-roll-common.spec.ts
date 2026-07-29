@@ -79,6 +79,7 @@ describe('PianoRollClipContext', () => {
       clipSpanTick: parseTick(960),
       sourceEndTick: parseTick(1_440),
       sourceId: source.id,
+      sourceLengthTick: parseTick(1_920),
       sourceStartTick: parseTick(480),
     })
     expect(pianoRollClipTickToSourceTick(context, parseTick(240))).toBe(720)

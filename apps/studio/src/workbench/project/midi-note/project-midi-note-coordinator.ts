@@ -7,6 +7,7 @@ import {
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiVelocity,
@@ -19,6 +20,7 @@ import {
   type MidiSourceRecord,
   type NoteId,
   type ProjectCommit,
+  type ProjectSession,
   type Tick,
 } from '@seele-daw/project-core'
 
@@ -49,8 +51,19 @@ export interface AddedMidiNoteResult {
   readonly noteId: NoteId
 }
 
+export interface RemoveMidiNotesInput {
+  readonly clipId: ClipId
+  readonly noteIds: readonly NoteId[]
+}
+
+export interface RemovedMidiNotesResult {
+  readonly commit: ProjectCommit
+  readonly noteIds: readonly NoteId[]
+}
+
 export interface ProjectMidiNoteCoordinator {
   addMidiNote(input: AddMidiNoteInput): AddedMidiNoteResult
+  removeMidiNotes(input: RemoveMidiNotesInput): RemovedMidiNotesResult
 }
 
 function createEditableClipContext(
@@ -65,7 +78,7 @@ function createEditableClipContext(
     if (cause.code === 'looped-clip-unsupported') {
       throw new ProjectMidiNoteError(
         'target-clip-looped',
-        `Cannot add a MIDI Note because Clip ${clip.id} is looped`,
+        `Cannot edit MIDI Notes because Clip ${clip.id} is looped`,
         { clipId: clip.id, sourceId: source.id },
       )
     }
@@ -78,6 +91,63 @@ function createEditableClipContext(
   }
 }
 
+interface EditableMidiNoteTarget {
+  readonly context: PianoRollClipContext
+  readonly session: ProjectSession
+}
+
+function requireEditableMidiNoteTarget(
+  dependencies: ProjectMidiNoteCoordinatorDependencies,
+  clipId: ClipId,
+): EditableMidiNoteTarget {
+  const activeState = dependencies.activeProject.state
+  if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
+    throw new ProjectMidiNoteError(
+      'active-project-not-ready',
+      `Cannot edit MIDI Notes while the Active Project is ${activeState.phase}`,
+      { phase: activeState.phase },
+    )
+  }
+
+  const session = activeState.session
+  const snapshot = session.getSnapshot()
+  const clip = snapshot.clips.find((candidate) => candidate.id === clipId)
+  if (clip === undefined) {
+    throw new ProjectMidiNoteError(
+      'target-clip-not-found',
+      `Cannot edit MIDI Notes because Clip ${clipId} does not exist`,
+      { clipId },
+    )
+  }
+
+  const source = snapshot.midiSources.find(
+    (candidate) => candidate.id === clip.sourceId,
+  )
+  if (source === undefined) {
+    throw new ProjectMidiNoteError(
+      'target-midi-source-not-found',
+      `Cannot edit MIDI Notes because MidiSource ${clip.sourceId} does not exist`,
+      { clipId: clip.id, sourceId: clip.sourceId },
+    )
+  }
+
+  const hasPartition = snapshot.midiNotePartitions.some(
+    (candidate) => candidate.sourceId === source.id,
+  )
+  if (!hasPartition) {
+    throw new ProjectMidiNoteError(
+      'target-midi-note-partition-not-found',
+      `Cannot edit MIDI Notes because MidiSource ${source.id} has no Note partition`,
+      { clipId: clip.id, sourceId: source.id },
+    )
+  }
+
+  return {
+    context: createEditableClipContext(clip, source),
+    session,
+  }
+}
+
 class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   readonly #dependencies: ProjectMidiNoteCoordinatorDependencies
 
@@ -86,61 +156,20 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   addMidiNote(input: AddMidiNoteInput): AddedMidiNoteResult {
-    const activeState = this.#dependencies.activeProject.state
-
-    if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
-      throw new ProjectMidiNoteError(
-        'active-project-not-ready',
-        `Cannot add a MIDI Note while the Active Project is ${activeState.phase}`,
-        { phase: activeState.phase },
-      )
-    }
-
-    const session = activeState.session
-    const snapshot = session.getSnapshot()
-    const clip = snapshot.clips.find((candidate) => candidate.id === input.clipId)
-
-    if (clip === undefined) {
-      throw new ProjectMidiNoteError(
-        'target-clip-not-found',
-        `Cannot add a MIDI Note because Clip ${input.clipId} does not exist`,
-        { clipId: input.clipId },
-      )
-    }
-
-    const source = snapshot.midiSources.find(
-      (candidate) => candidate.id === clip.sourceId,
+    const { context, session } = requireEditableMidiNoteTarget(
+      this.#dependencies,
+      input.clipId,
     )
-    if (source === undefined) {
-      throw new ProjectMidiNoteError(
-        'target-midi-source-not-found',
-        `Cannot add a MIDI Note because MidiSource ${clip.sourceId} does not exist`,
-        { clipId: clip.id, sourceId: clip.sourceId },
-      )
-    }
-
-    const hasPartition = snapshot.midiNotePartitions.some(
-      (candidate) => candidate.sourceId === source.id,
-    )
-    if (!hasPartition) {
-      throw new ProjectMidiNoteError(
-        'target-midi-note-partition-not-found',
-        `Cannot add a MIDI Note because MidiSource ${source.id} has no Note partition`,
-        { clipId: clip.id, sourceId: source.id },
-      )
-    }
-
-    const context = createEditableClipContext(clip, source)
     const clipStartTick = parseTick(input.clipStartTick)
     if (clipStartTick >= context.clipSpanTick) {
       throw new ProjectMidiNoteError(
         'note-start-outside-clip',
-        `Cannot add a MIDI Note at Clip-local Tick ${clipStartTick} in Clip ${clip.id}`,
+        `Cannot add a MIDI Note at Clip-local Tick ${clipStartTick} in Clip ${context.clipId}`,
         {
-          clipId: clip.id,
+          clipId: context.clipId,
           clipSpanTick: context.clipSpanTick,
           clipStartTick,
-          sourceId: source.id,
+          sourceId: context.sourceId,
         },
       )
     }
@@ -178,6 +207,28 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
     return Object.freeze({
       commit: result.commit,
       noteId,
+    })
+  }
+
+  removeMidiNotes(input: RemoveMidiNotesInput): RemovedMidiNotesResult {
+    const { context, session } = requireEditableMidiNoteTarget(
+      this.#dependencies,
+      input.clipId,
+    )
+    const command = createRemoveNotesCommand({
+      baseRevision: session.modelRevision,
+      sourceId: context.sourceId,
+      noteIds: input.noteIds,
+    })
+    const result = session.execute(command)
+
+    if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      throw new Error('RemoveNotesCommand unexpectedly produced no Project change')
+    }
+
+    return Object.freeze({
+      commit: result.commit,
+      noteIds: command.noteIds,
     })
   }
 }

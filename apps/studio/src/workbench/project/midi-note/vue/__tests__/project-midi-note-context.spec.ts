@@ -1,6 +1,7 @@
 import {
   parseClipId,
   parseMidiPitch,
+  parseNoteId,
   parsePositiveTick,
   parseTick,
 } from '@seele-daw/project-core'
@@ -18,8 +19,10 @@ import { ProjectMidiNoteVueError } from '@/workbench/project/midi-note/vue/proje
 describe('ProjectMidiNoteVueContext', () => {
   it('resolves the provided Coordinator and fails clearly without composition', () => {
     const addMidiNote = vi.fn<ProjectMidiNoteCoordinator['addMidiNote']>()
+    const removeMidiNotes =
+      vi.fn<ProjectMidiNoteCoordinator['removeMidiNotes']>()
     const context: ProjectMidiNoteVueContext = Object.freeze({
-      projectMidiNotes: Object.freeze({ addMidiNote }),
+      projectMidiNotes: Object.freeze({ addMidiNote, removeMidiNotes }),
     })
     const providedApp = createApp({ render: () => null })
     const missingApp = createApp({ render: () => null })
@@ -46,5 +49,13 @@ describe('ProjectMidiNoteVueContext', () => {
       }),
     )
     expect(addMidiNote).toHaveBeenCalledOnce()
+
+    providedApp.runWithContext(() =>
+      useProjectMidiNotes().projectMidiNotes.removeMidiNotes({
+        clipId: parseClipId('context-midi-note-clip'),
+        noteIds: [parseNoteId('context-midi-note')],
+      }),
+    )
+    expect(removeMidiNotes).toHaveBeenCalledOnce()
   })
 })

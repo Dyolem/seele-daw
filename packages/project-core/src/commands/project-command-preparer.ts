@@ -14,6 +14,7 @@ import {
   prepareAddNoteCommand,
   prepareMoveNoteCommand,
   prepareRemoveNoteCommand,
+  prepareRemoveNotesCommand,
 } from '#internal/commands/midi-note-command-handler'
 import type { ModelStoreReader } from '#internal/model/model-store'
 
@@ -45,6 +46,10 @@ function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
       return {
         noteId: command.noteId,
+        sourceId: command.sourceId,
+      }
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY:
+      return {
         sourceId: command.sourceId,
       }
     default:
@@ -86,6 +91,8 @@ export function prepareProjectCommand(
       return prepareMoveNoteCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
       return prepareRemoveNoteCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY:
+      return prepareRemoveNotesCommand(reader, normalizedCommand)
     default:
       return rejectUnknownCommand(normalizedCommand)
   }

@@ -6,6 +6,8 @@ export type ProjectCommandErrorCode =
   | 'base-revision-mismatch'
   | 'clip-id-already-exists'
   | 'device-id-already-exists'
+  | 'duplicate-note-id'
+  | 'empty-note-id-list'
   | 'invalid-base-revision'
   | 'invalid-track-order-index'
   | 'midi-note-not-found'

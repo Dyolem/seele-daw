@@ -7,6 +7,7 @@ import {
   type ProjectCommand,
   type ProjectCommandType,
   type RemoveNoteCommand,
+  type RemoveNotesCommand,
 } from '#internal/commands/project-command'
 import {
   PROJECT_CHANGE_TYPE,
@@ -419,6 +420,24 @@ function matchesRemovedNote(command: RemoveNoteCommand, mutation: ProjectMutatio
   )
 }
 
+function matchesRemovedNotes(
+  command: RemoveNotesCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  return (
+    mutations.length === command.noteIds.length &&
+    mutations.every((mutation, index) => {
+      const noteId = command.noteIds[index]
+      return (
+        noteId !== undefined &&
+        mutation.type === PROJECT_MUTATION_TYPE.NOTE.REMOVE &&
+        mutation.sourceId === command.sourceId &&
+        mutation.before.id === noteId
+      )
+    })
+  )
+}
+
 function assertCommandPlanCorrespondence(command: ProjectCommand, plan: MutationPlan): void {
   const mutation = plan.forward[0]
   let matches = false
@@ -427,6 +446,8 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
     matches = matchesAddedInstrumentTrack(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD) {
     matches = matchesAddedMidiClip(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY) {
+    matches = matchesRemovedNotes(command, plan.forward)
   } else if (plan.forward.length === 1 && mutation !== undefined) {
     switch (command.type) {
       case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:

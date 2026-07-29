@@ -17,6 +17,10 @@ const DEFAULT_KEYMAP = {
   [STUDIO_KEYBOARD_ACTION.HISTORY_UNDO]: Object.freeze([
     defineStudioKeyboardBinding('Mod+Z'),
   ]),
+  [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE]: Object.freeze([
+    defineStudioKeyboardBinding('Backspace'),
+    defineStudioKeyboardBinding('Delete'),
+  ]),
   [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR]: Object.freeze([
     defineStudioKeyboardBinding('Escape'),
   ]),
@@ -41,6 +45,10 @@ export function createStudioKeyboardKeymap(
     [STUDIO_KEYBOARD_ACTION.HISTORY_UNDO]: Object.freeze([
       ...(overrides[STUDIO_KEYBOARD_ACTION.HISTORY_UNDO] ??
         DEFAULT_KEYMAP[STUDIO_KEYBOARD_ACTION.HISTORY_UNDO]),
+    ]),
+    [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE]: Object.freeze([
+      ...(overrides[STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE] ??
+        DEFAULT_KEYMAP[STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE]),
     ]),
     [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR]: Object.freeze([
       ...(overrides[STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR] ??

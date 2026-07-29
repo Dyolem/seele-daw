@@ -20,6 +20,10 @@ Pencil / Cursor Tool 与 Timeline Grid Snap 的稳定边界。
 本阶段不实现 Delete、Move、Resize、Velocity 编辑、Box Selection、拖动连续绘制、
 Hover Ghost、Zoom / Scroll 或 Playback。
 
+第五阶段已经进一步确认 Cursor 负责 Note Body Move，Cursor 与 Pencil 都可通过 Note
+左右 Edge Hit Resize；第四阶段的“Cursor 不能修改 Note”只描述当时已交付能力。后续规则见
+[Piano Roll Note Editing 第五阶段计划](./piano-roll-note-editing-phase-plan.md)。
+
 ## 1. Tool 产品规则
 
 ### 1.1 显式 Tool

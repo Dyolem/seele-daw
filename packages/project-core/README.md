@@ -213,7 +213,14 @@ History、MIDI Note QueryIndex 与 ChangePublisher 已接入同一提交边界�
 
 ### MIDI Note Command 纵向切片
 
-当前已经实现 `AddNoteCommand`、`MoveNoteCommand` 和 `RemoveNoteCommand`。公开 Command 使用稳定判别字段、完整领域参数和 `baseRevision`；包内 preparer 重新验证 Command、拒绝陈旧 revision，并通过无状态 handler 读取 `ModelStoreReader`、创建 MidiNoteRecord 和一条 Note mutation，最终形成 MutationPlan。
+当前已经实现 `AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand` 和面向同一
+MidiSource 的 `RemoveNotesCommand`。公开 Command 使用稳定判别字段、完整领域参数和
+`baseRevision`；包内 preparer 重新验证 Command、拒绝陈旧 revision，并通过无状态
+handler 读取 `ModelStoreReader`、创建一条或多条 Note mutation，最终形成 MutationPlan。
+
+`RemoveNotesCommand` 拒绝空列表与重复 ID，并在建立计划前验证全部目标；任一 Note 缺失时
+不会产生部分删除。多个 Remove Mutation 仍只形成一个 Commit、一次 revision 推进和一个
+History 步骤，Undo / Redo 原子恢复或移除完整集合。
 
 Add 和同一 MidiSource 内的 Move 使用严格 Source 边界，不 clamp、wrap 或自动扩展 Source / Clip。Move 使用绝对 `nextStartTick` 与 `nextPitch`，目标未变化时返回包内 `no-change`，不创建空 MutationPlan。Command preparer 与 handler 不从 package root 导出；ProjectSession 是正式执行入口。完整规则和实现边界见 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
 
@@ -479,7 +486,8 @@ src/
 1. 建立 ModelStore、opaque ID、Tick 和只读实体记录约定。
 2. 按 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 定义 Project、Instrument Track、MidiClip、MidiSource、Note、Timeline 和最小 Device Descriptor。
 3. 实现 MutationPlan、MutationApplier 和原子提交骨架。
-4. 实现 `AddMidiClipCommand`、`AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand`。
+4. 实现 `AddMidiClipCommand`、`AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand`
+   与多 Note 原子 `RemoveNotesCommand`。
 5. 建立 Note 级 ProjectCommit、ProjectDelta 与写前准备边界。
 6. 实现 ProjectSession 最小执行门面和提交发布时机。
 7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。

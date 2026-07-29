@@ -456,7 +456,44 @@ function isPianoRollFocused(): boolean {
   )
 }
 
+function removeSelectedNotes(): boolean {
+  const selectedNoteIds = editorState.value?.selectedNoteIds ?? []
+  if (selectedNoteIds.length === 0) return false
+
+  try {
+    projectMidiNotes.removeMidiNotes({
+      clipId: props.presentation.context.clipId,
+      noteIds: selectedNoteIds,
+    })
+    interactionFailureMessage.value = null
+  } catch (cause) {
+    const message = describeCause(
+      cause,
+      'The Project rejected the MIDI Note removal. Please try again.',
+    )
+    interactionFailureMessage.value = message
+    toasts.danger('MIDI notes could not be removed', message)
+  }
+
+  // Once an enabled editor Action claims Delete/Backspace, browser defaults stay suppressed
+  // even when the Project rejects the command.
+  return true
+}
+
 const disposeKeyboardShortcut = keyboardShortcuts.register([
+  {
+    actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE,
+    bindings: keyboardShortcuts.bindingsFor(
+      STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE,
+    ),
+    description: 'Remove the selected Notes from the focused Piano Roll.',
+    isEnabled: () =>
+      isPianoRollFocused() &&
+      (editorState.value?.selectedNoteIds.length ?? 0) > 0,
+    label: 'Remove selected Piano Roll notes',
+    run: removeSelectedNotes,
+    scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
+  },
   {
     actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
     bindings: keyboardShortcuts.bindingsFor(

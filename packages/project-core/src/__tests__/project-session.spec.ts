@@ -3,12 +3,14 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import * as projectCore from '#internal/index'
 import {
   PROJECT_CHANGE_TYPE,
+  PROJECT_COMMAND_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   ProjectCommandError,
   createAddNoteCommand,
   createInitialProjectSession,
   createMoveNoteCommand,
   createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiVelocity,
@@ -152,6 +154,88 @@ describe('ProjectSession command execution', () => {
     expect(Object.isFrozen(result.commit)).toBe(true)
     expect(Object.isFrozen(result.commit.delta)).toBe(true)
     expect(Object.isFrozen(result.commit.delta.changes)).toBe(true)
+  })
+
+  it('removes multiple Notes in one Commit and one reversible History step', () => {
+    const { fixture, store, session } = createFixtureProjectSession()
+    const sourceId = fixture.records.nonLoopSource.id
+    const noteIds = [
+      fixture.records.nonLoopNote.id,
+      fixture.records.nonLoopHarmonyNote.id,
+    ]
+    const result = session.execute(
+      createRemoveNotesCommand({
+        baseRevision: session.modelRevision,
+        sourceId,
+        noteIds,
+      }),
+    )
+
+    expect(result).toMatchObject({
+      status: PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED,
+      commit: {
+        baseRevision: 0,
+        modelRevision: 1,
+        origin: {
+          commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+          kind: 'command',
+        },
+        delta: {
+          changes: [
+            {
+              type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+              noteId: noteIds[0],
+            },
+            {
+              type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+              noteId: noteIds[1],
+            },
+          ],
+        },
+      },
+    })
+    expect(session.modelRevision).toBe(1)
+    expect(noteIds.every((noteId) => store.getMidiNote(sourceId, noteId) === undefined)).toBe(
+      true,
+    )
+
+    session.undo()
+    expect(session.modelRevision).toBe(2)
+    expect(noteIds.every((noteId) => store.getMidiNote(sourceId, noteId) !== undefined)).toBe(
+      true,
+    )
+
+    session.redo()
+    expect(session.modelRevision).toBe(3)
+    expect(noteIds.every((noteId) => store.getMidiNote(sourceId, noteId) === undefined)).toBe(
+      true,
+    )
+  })
+
+  it('rejects a missing multi-Note target before removing any Note', () => {
+    const { fixture, store, session } = createFixtureProjectSession()
+    const sourceId = fixture.records.nonLoopSource.id
+    const existingNoteId = fixture.records.nonLoopNote.id
+    const missingNoteId = parseNoteId('note-session-remove-many-missing')
+
+    expect(() =>
+      session.execute(
+        createRemoveNotesCommand({
+          baseRevision: session.modelRevision,
+          sourceId,
+          noteIds: [existingNoteId, missingNoteId],
+        }),
+      ),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        code: 'midi-note-not-found',
+        noteId: missingNoteId,
+      }),
+    )
+    expect(session.modelRevision).toBe(0)
+    expect(store.getMidiNote(sourceId, existingNoteId)).toBe(
+      fixture.records.nonLoopNote,
+    )
   })
 
   it('returns a frozen no-change result without writing or advancing revision', () => {

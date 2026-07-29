@@ -49,6 +49,7 @@ export const PROJECT_COMMAND_TYPE = {
     ADD: 'midi-note.add',
     MOVE: 'midi-note.move',
     REMOVE: 'midi-note.remove',
+    REMOVE_MANY: 'midi-note.remove-many',
   },
 } as const
 
@@ -100,12 +101,20 @@ export interface MoveNoteCommand extends MidiNoteCommandBase<
 
 export type RemoveNoteCommand = MidiNoteCommandBase<typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE>
 
+export interface RemoveNotesCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY
+> {
+  readonly sourceId: MidiSourceId
+  readonly noteIds: readonly NoteId[]
+}
+
 export type ProjectCommand =
   | AddInstrumentTrackCommand
   | AddMidiClipCommand
   | AddNoteCommand
   | MoveNoteCommand
   | RemoveNoteCommand
+  | RemoveNotesCommand
 
 export interface CreateAddInstrumentTrackCommandInput {
   readonly baseRevision: ModelRevision
@@ -152,6 +161,12 @@ export interface CreateMoveNoteCommandInput extends CreateNoteCommandInputBase {
 }
 
 export type CreateRemoveNoteCommandInput = CreateNoteCommandInputBase
+
+export interface CreateRemoveNotesCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly sourceId: MidiSourceId
+  readonly noteIds: readonly NoteId[]
+}
 
 function parseCommandBaseRevision(value: ModelRevision): ModelRevision {
   try {
@@ -271,6 +286,41 @@ export function createRemoveNoteCommand(input: CreateRemoveNoteCommandInput): Re
   }
 }
 
+function parseDistinctNoteIds(noteIds: readonly NoteId[]): readonly NoteId[] {
+  if (noteIds.length === 0) {
+    throw new ProjectCommandError(
+      'empty-note-id-list',
+      'RemoveNotesCommand.noteIds must contain at least one MIDI Note ID',
+    )
+  }
+
+  const parsedNoteIds = noteIds.map(parseNoteId)
+  const uniqueNoteIds = new Set<NoteId>()
+  for (const noteId of parsedNoteIds) {
+    if (uniqueNoteIds.has(noteId)) {
+      throw new ProjectCommandError(
+        'duplicate-note-id',
+        `RemoveNotesCommand.noteIds contains duplicate MIDI Note ID ${noteId}`,
+        { noteId },
+      )
+    }
+    uniqueNoteIds.add(noteId)
+  }
+
+  return Object.freeze(parsedNoteIds)
+}
+
+export function createRemoveNotesCommand(
+  input: CreateRemoveNotesCommandInput,
+): RemoveNotesCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    sourceId: parseMidiSourceId(input.sourceId),
+    noteIds: parseDistinctNoteIds(input.noteIds),
+  }
+}
+
 function rejectUnknownCommand(command: never): never {
   const type = (command as { readonly type?: unknown }).type
 
@@ -315,6 +365,8 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
       return createMoveNoteCommand(command)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
       return createRemoveNoteCommand(command)
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY:
+      return createRemoveNotesCommand(command)
     default:
       return rejectUnknownCommand(command)
   }

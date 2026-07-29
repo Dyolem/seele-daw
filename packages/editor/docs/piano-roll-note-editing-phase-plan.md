@@ -1,0 +1,142 @@
+# Piano Roll Note Editing 第五阶段计划
+
+> Status: In progress; Batch 1 implementation under review
+>
+> Date: 2026-07-29
+
+## 阶段目标
+
+第五阶段把 Piano Roll 从“创建与选择 Note”推进到可删除、移动和调整长度的基础编辑器。
+本阶段沿用现有 Project Command、Clip-scoped Selection、Renderer-neutral Hit、Primary
+Pointer Input、Scoped Keyboard Action 和 Timeline Grid，不把 Drag Preview 或
+ProjectSession 放入 Vue 深响应状态。
+
+阶段完成时：
+
+- Cursor 可以选择和移动 Note；
+- Cursor 与 Pencil 都可以从 Note 左右边缘 Resize；
+- Pencil 仍只在空白 Grid 创建 Note，不从 Note Body 发起 Move；
+- `Delete` 和 `Backspace` 可以原子删除当前 Selection；
+- Move / Resize 的 Pointer Move 只更新 Preview，Pointer Up 最多提交一次 Command；
+- Note Move、Resize 与未来 Clip Move 使用同一套 Time Grid Snap 基础语义。
+
+Velocity、Box Selection、Copy / Paste、Quantize Command、Looped Clip、Playback 和对象间
+磁性 Snap 不属于本阶段。
+
+## 1. Tool 与 Hit 优先级
+
+### 1.1 Cursor
+
+- 普通 Click Note Body：只选择该 Note；
+- Shift、Command 或 Control + Click Note Body：切换该 Note 的 Selection；
+- Drag Note Body：发起 Move；未选中的目标先成为唯一 Selection，再移动它；
+- Drag 已选中的 Note：移动完整 Selection，所有 Note 保持相对 Tick 与 Pitch 间隔；
+- Drag 空白区域在 Box Selection 实现前不产生框选或 Project 修改；
+- Cursor 不在空白 Grid 创建 Note。
+
+### 1.2 Pencil
+
+- Click 空白 Grid：继续按第四阶段规则创建 Note；
+- Click 或 Drag Note Body：不发起 Move，也不创建重叠 Note；
+- Note Edge Hit 是 Pencil 的明确例外：左右边缘均可发起 Resize；
+- Pencil Resize 完成后保持 Pencil 激活，便于继续输入；
+- Pencil 不因 Resize 自动切换成 Cursor。
+
+### 1.3 Hit 优先级
+
+同一 Pointer 位置最多解析为一个编辑意图，优先级固定为：
+
+1. Note Left Resize Edge；
+2. Note Right Resize Edge；
+3. Note Body；
+4. 空白 Grid。
+
+Resize Edge 必须属于 Note DOM / Renderer-neutral Hit 结果，而不是 Studio 组件临时读取
+`event.target` 后直接修改 Project。边缘热区需要在视觉宽度很小时保持可操作，但精确 CSS
+Pixel 宽度在 Resize 批次结合实际界面审查确定。左右热区重叠时不得同时激活两个方向。
+
+## 2. Batch 1：Selection 删除
+
+### 2.1 键盘行为
+
+- Piano Roll 聚焦且 Selection 非空时，`Delete` 与 `Backspace` 都执行删除；
+- 删除属于 Selection Action，不受当前 Pencil / Cursor Tool 限制；
+- Piano Roll 未聚焦或 Selection 为空时不处理按键，不阻止其他有效快捷键作用域；
+- Input、Textarea、Select 或 Contenteditable 获得输入焦点时不得触发；
+- 一次按键只请求一次删除，不按 Note 数量重复分发 Action；
+- Action 已启用后，即使 Project 拒绝 Command，也要阻止浏览器默认行为并显示错误 Toast。
+
+### 2.2 原子 Project 语义
+
+- 一个 Selection 使用一个 `RemoveNotesCommand`；
+- Command 只接受同一个 MidiSource 中非空、无重复的 `NoteId` 集合；
+- Preparer 在建立 MutationPlan 前验证全部 Note；任一 Note 缺失则整个 Command 失败；
+- N 个 Note 产生 N 条 Note Remove Mutation 和 N 条 Delta Change，但只推进一次
+  ModelRevision；
+- 整个删除只形成一个 Commit、一个 dirty 内容状态和一个 Undo History 步骤；
+- 不允许 Studio 循环执行 N 个单 Note Command 来模拟多选删除。
+
+### 2.3 Selection、History 与失败
+
+- Commit 发布后，Editor Session 通过权威 Query 清理已不存在的 Selection；
+- UI 不在 Command 成功前预先清空 Selection，也不伪造 Note 消失；
+- Undo 一次恢复完整 Note 集合，但不恢复已失效的旧 Selection；
+- Redo 一次再次删除完整集合；
+- 删除失败时 Project、History、dirty 和 Selection 保持不变；
+- 失败通过应用级命令式 Toast 显示，不能只输出 Console。
+
+## 3. Batch 2：Time Grid Snap V1 与 Cursor Move
+
+Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 Snap：
+
+- 区分 Absolute Snap 与 Relative Delta Snap；
+- 已经落在 Grid 上的单 Note Move 使用目标 Grid；
+- 导入或手工形成的 Off-grid Note 默认使用相对 Delta Snap，避免首次拖动破坏原有 Timing；
+- 多选 Move 以一个稳定 Anchor 解析 Delta，再把同一 Delta 应用于全部 Note；
+- Pitch 使用离散 Semitone Delta，不进入 Timeline Snap；
+- Snap Off 使用整数 Tick Delta；
+- Pointer Update 只更新冻结 Preview，不执行 Project Command；
+- Pointer Up 只提交一次 Move Intent，Cancel / Escape 恢复原始视觉；
+- Move 越界时采用整体 Selection 的合法 Delta 范围，不逐 Note Clamp。
+
+临时绕过按键、Snap Guide 和 Preview 视觉在本批一起定义；对象边缘、Marker、播放头和 Loop
+边界仍不是 Snap Target。
+
+## 4. Batch 3：Cursor / Pencil Resize
+
+- 左边缘 Resize 改变 Start 与 Duration，右边缘只改变 Duration；
+- 两种 Tool 使用相同 Resize Intent、Preview、Command 和 Snap 规则；
+- Resize 不改变 Pitch、Velocity、Channel 或 Note ID；
+- 最终 Duration 必须为正 Tick，不能产生零长或负长 Note；
+- 多选 Resize 是否按比例缩放不在首批范围；首批只 Resize 一个明确命中的 Note；
+- Pointer Update 不提交，Pointer Up 最多提交一次；
+- 左右边缘分别选择自己的 Snap Anchor，不能隐式继承 Pencil Create 的 `floor`；
+- Resize 失败保留原 Note、Selection 和当前 Tool。
+
+Project Core 目前没有 Resize Command；精确边界算法、No-change 规则和 Delta 语义必须在本批
+生产实现前单独审查。
+
+## 5. Snap 完成时机
+
+当前 `floor` 与 `nearest` 是交互内部策略，不是用户可选模式。用户界面继续只暴露 Snap
+开关和 Grid Resolution。
+
+Time Grid Snap V1 在 Batch 2 随 Note Move 实现；在 Note Move、Note Resize 和 Clip Move
+三个真实消费者都完成后，再整理和封版跨 Surface 的 Interactive Snap V1。吸附到 Note /
+Clip 边缘、播放头、Marker、Loop 或 Guide 的 Advanced Snap，必须等对应对象和交互真实存在
+后再设计优先级、阈值与视觉反馈。
+
+Snap 只约束实时创建与拖动；Quantize 是修改既有 Note Timing 的 Project Command，二者不能
+混为同一个系统。
+
+## 6. 实施与验收顺序
+
+1. Batch 1A：Project Core 多 Note 原子删除 Command、Commit、Delta 与 History。
+2. Batch 1B：Studio Coordinator、Delete / Backspace Action、Selection 校准与 Toast。
+3. Batch 2A：Relative Time Grid Snap、Move Intent 和纯逻辑边界。
+4. Batch 2B：Cursor Move Hit、Preview、Pointer 生命周期与一次提交。
+5. Batch 3A：Resize Command 与左右边界算法。
+6. Batch 3B：Cursor / Pencil Edge Hit、Preview 与可见 Resize 闭环。
+
+每个独立批次完成测试和用户审查后再进入下一批。性能优化继续由真实 DOM Note 基准驱动，
+不因 Move / Resize 提前迁移到 Canvas Note Renderer。

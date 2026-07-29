@@ -49,6 +49,7 @@ import {
 import type {
   AddMidiNoteInput,
   ProjectMidiNoteCoordinator,
+  RemoveMidiNotesInput,
 } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import {
@@ -358,8 +359,13 @@ describe('ProjectPianoRollSurface', () => {
     const addMidiNote = vi.fn<ProjectMidiNoteCoordinator['addMidiNote']>(() => {
       throw new Error('The Cursor test must not add a MIDI Note')
     })
+    const removeMidiNotes = vi.fn<
+      ProjectMidiNoteCoordinator['removeMidiNotes']
+    >(() => {
+      throw new Error('The selection-only Cursor test must not remove MIDI Notes')
+    })
     const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
-      projectMidiNotes: Object.freeze({ addMidiNote }),
+      projectMidiNotes: Object.freeze({ addMidiNote, removeMidiNotes }),
     })
     const pinia = createPinia()
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
@@ -473,6 +479,7 @@ describe('ProjectPianoRollSurface', () => {
       .toBe(true)
     expect(keyboard.bindingRegistry.listeners.has('Escape')).toBe(false)
     expect(addMidiNote).not.toHaveBeenCalled()
+    expect(removeMidiNotes).not.toHaveBeenCalled()
     keyboard.keyboardShortcuts.dispose()
   })
 
@@ -620,6 +627,171 @@ describe('ProjectPianoRollSurface', () => {
     keyboard.keyboardShortcuts.dispose()
   })
 
+  it('removes a multi-Note selection as one focused keyboard Action and History step', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-remove')
+    const noteIds = [
+      fixture.projectMidiNotes.addMidiNote({
+        clipId: fixture.presentation.clipId,
+        clipStartTick: parseTick(960),
+        pitch: parseMidiPitch(60),
+        requestedDurationTick: parsePositiveTick(240),
+      }).noteId,
+      fixture.projectMidiNotes.addMidiNote({
+        clipId: fixture.presentation.clipId,
+        clipStartTick: parseTick(1_200),
+        pitch: parseMidiPitch(64),
+        requestedDurationTick: parsePositiveTick(240),
+      }).noteId,
+    ]
+    const keyboard = createKeyboardFixture()
+    const pinia = createPinia()
+    usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation: fixture.presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [pinia],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: fixture.projectMidiNotes,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const firstNote = wrapper.get(`[data-piano-roll-note-id="${noteIds[0]}"]`)
+    const secondNote = wrapper.get(`[data-piano-roll-note-id="${noteIds[1]}"]`)
+    dispatchPointer(firstNote.element, 'pointerdown', { pointerId: 31 })
+    dispatchPointer(firstNote.element, 'pointerup', { pointerId: 31 })
+    dispatchPointer(secondNote.element, 'pointerdown', {
+      pointerId: 32,
+      shiftKey: true,
+    })
+    dispatchPointer(secondNote.element, 'pointerup', {
+      pointerId: 32,
+      shiftKey: true,
+    })
+    await nextTick()
+    expect(wrapper.text()).toContain('2 selected')
+
+    const revisionBeforeRemove = fixture.session.modelRevision
+    const removeEvent = keyboard.bindingRegistry.dispatch('Backspace')
+    await Promise.resolve()
+    await nextTick()
+
+    expect(removeEvent.defaultPrevented).toBe(true)
+    expect(fixture.session.modelRevision).toBe(revisionBeforeRemove + 1)
+    expect(
+      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes),
+    ).toEqual([])
+    expect(wrapper.text()).toContain('0 selected')
+    expect(wrapper.find(`[data-piano-roll-note-id="${noteIds[0]}"]`).exists()).toBe(
+      false,
+    )
+    expect(wrapper.find(`[data-piano-roll-note-id="${noteIds[1]}"]`).exists()).toBe(
+      false,
+    )
+
+    fixture.session.undo()
+    await Promise.resolve()
+    await nextTick()
+    expect(
+      fixture.session
+        .getSnapshot()
+        .midiNotePartitions.flatMap(({ notes }) => notes)
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual([...noteIds].sort())
+    expect(wrapper.text()).toContain('0 selected')
+
+    fixture.session.redo()
+    await Promise.resolve()
+    await nextTick()
+    expect(
+      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes),
+    ).toEqual([])
+
+    wrapper.unmount()
+    expect(keyboard.bindingRegistry.listeners.has('Backspace')).toBe(false)
+    expect(keyboard.bindingRegistry.listeners.has('Delete')).toBe(false)
+    keyboard.keyboardShortcuts.dispose()
+  })
+
+  it('keeps the selection and reports a handled failure when Note removal is rejected', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-remove-failure')
+    fixture.projectMidiNotes.addMidiNote({
+      clipId: fixture.presentation.clipId,
+      clipStartTick: parseTick(960),
+      pitch: parseMidiPitch(60),
+      requestedDurationTick: parsePositiveTick(240),
+    })
+    const keyboard = createKeyboardFixture()
+    const pinia = createPinia()
+    const toasts = useUiToastStore(pinia)
+    usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
+    const rejectedCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
+      addMidiNote: (input: AddMidiNoteInput) =>
+        fixture.projectMidiNotes.addMidiNote(input),
+      removeMidiNotes: () => {
+        throw new Error('Test Project rejected the Note removal')
+      },
+    })
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation: fixture.presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [pinia],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: rejectedCoordinator,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const note = wrapper.get(
+      '[data-piano-roll-note-id="surface-remove-failure-note-1"]',
+    )
+    dispatchPointer(note.element, 'pointerdown', { pointerId: 41 })
+    dispatchPointer(note.element, 'pointerup', { pointerId: 41 })
+    await nextTick()
+    const revisionBeforeRemove = fixture.session.modelRevision
+    const removeEvent = keyboard.bindingRegistry.dispatch('Delete')
+    await nextTick()
+
+    expect(removeEvent.defaultPrevented).toBe(true)
+    expect(fixture.session.modelRevision).toBe(revisionBeforeRemove)
+    expect(
+      wrapper
+        .get('[data-piano-roll-note-id="surface-remove-failure-note-1"]')
+        .classes(),
+    ).toContain('sd-piano-roll-dom-note--selected')
+    expect(toasts.message).toMatchObject({
+      description: 'Test Project rejected the Note removal',
+      title: 'MIDI notes could not be removed',
+      tone: 'danger',
+    })
+
+    wrapper.unmount()
+    keyboard.keyboardShortcuts.dispose()
+  })
+
   it('keeps selection and reports a visible failure when Pencil creation is rejected', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-failure')
@@ -637,6 +809,8 @@ describe('ProjectPianoRollSurface', () => {
       addMidiNote: () => {
         throw new Error('Test Project rejected the Note')
       },
+      removeMidiNotes: (input: RemoveMidiNotesInput) =>
+        fixture.projectMidiNotes.removeMidiNotes(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
@@ -712,6 +886,8 @@ describe('ProjectPianoRollSurface', () => {
           noteId: parseNoteId('surface-selection-failure-missing-note'),
         })
       },
+      removeMidiNotes: (input: RemoveMidiNotesInput) =>
+        fixture.projectMidiNotes.removeMidiNotes(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,

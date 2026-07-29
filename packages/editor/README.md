@@ -176,10 +176,13 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
    Studio 只读组合当前 Clip。
 3. **已完成**：建立 Clip-scoped EditorSession、Select Interaction、Note Selection、
    统一 Browser Input 与 scoped keyboard shortcuts。
-4. **进行中**：已接入 Pencil Add Note 单次提交手势；Move、Remove 与 Resize 必须按各自
-   产品切片继续实施。
-5. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
-6. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
+4. **已完成**：接入 Pencil Add Note 单次提交手势。
+5. **进行中**：多 Note Remove 由 Project Core / Studio 原子执行；Cursor Move 与 Cursor /
+   Pencil Resize 按
+   [Piano Roll Note Editing 第五阶段计划](./docs/piano-roll-note-editing-phase-plan.md)
+   继续实施。
+6. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
+7. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 
 ## 测试与验收
 

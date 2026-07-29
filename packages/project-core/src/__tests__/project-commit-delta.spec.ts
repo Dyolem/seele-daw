@@ -9,6 +9,7 @@ import {
   createMidiNoteRecord,
   createMoveNoteCommand,
   createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiVelocity,
@@ -149,6 +150,59 @@ describe('ProjectDelta Note semantics', () => {
       before: fixture.records.nonLoopNote,
       affected: { startTick: parseTick(240), endTick: parseTick(720) },
     })
+  })
+
+  it('maps ordered multi-Note removal and rejects a reordered Command plan', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createRemoveNotesCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteIds: [
+        fixture.records.nonLoopNote.id,
+        fixture.records.nonLoopHarmonyNote.id,
+      ],
+    })
+    const preparation = requireReadyProjectCommandPreparation(
+      prepareProjectCommand(store, command),
+    )
+    const commit = createProjectCommitCandidate(
+      preparation.command,
+      preparation.plan,
+    )
+
+    expect(commit.delta.changes).toEqual([
+      expect.objectContaining({
+        type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+        noteId: fixture.records.nonLoopNote.id,
+        before: fixture.records.nonLoopNote,
+      }),
+      expect.objectContaining({
+        type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+        noteId: fixture.records.nonLoopHarmonyNote.id,
+        before: fixture.records.nonLoopHarmonyNote,
+      }),
+    ])
+
+    const reorderedPlan = createMutationPlan(store.modelRevision, [
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+        sourceId: command.sourceId,
+        before: fixture.records.nonLoopHarmonyNote,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+        sourceId: command.sourceId,
+        before: fixture.records.nonLoopNote,
+      },
+    ])
+    const error = captureCandidateError(
+      () => createProjectCommitCandidate(command, reorderedPlan),
+      'command-plan-mismatch',
+    )
+
+    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY)
+    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REMOVE)
   })
 
   it('uses the conservative union of old and new intervals for MoveNote', () => {

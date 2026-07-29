@@ -6,6 +6,7 @@ export {
   createAddNoteCommand,
   createMoveNoteCommand,
   createRemoveNoteCommand,
+  createRemoveNotesCommand,
 } from './commands/project-command'
 export type {
   AddInstrumentTrackCommand,
@@ -16,10 +17,12 @@ export type {
   CreateAddNoteCommandInput,
   CreateMoveNoteCommandInput,
   CreateRemoveNoteCommandInput,
+  CreateRemoveNotesCommandInput,
   MoveNoteCommand,
   ProjectCommand,
   ProjectCommandType,
   RemoveNoteCommand,
+  RemoveNotesCommand,
 } from './commands/project-command'
 export { ProjectCommandError } from './commands/project-command-error'
 export type {

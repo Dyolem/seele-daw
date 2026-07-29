@@ -2,11 +2,13 @@ import {
   PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
+  ProjectCommandError,
   createAddMidiClipCommand,
   createInitialProjectSession,
   parseClipId,
   parseMidiPitch,
   parseMidiSourceId,
+  parseNoteId,
   parsePositiveTick,
   parseProjectId,
   parseTempoEventId,
@@ -191,6 +193,96 @@ describe('ProjectMidiNoteCoordinator', () => {
       startTick: 1_380,
       durationTick: 60,
     })
+  })
+
+  it('removes selected Notes in one Commit and one reversible History step', () => {
+    const fixture = createMidiClipFixture('remove-many')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: createIdentitySource(
+        'note-midi-note-remove-many-1',
+        'note-midi-note-remove-many-2',
+      ),
+    })
+    const noteIds = [
+      coordinator.addMidiNote({
+        clipId: fixture.clipId,
+        clipStartTick: parseTick(120),
+        requestedDurationTick: parsePositiveTick(240),
+        pitch: parseMidiPitch(60),
+      }).noteId,
+      coordinator.addMidiNote({
+        clipId: fixture.clipId,
+        clipStartTick: parseTick(480),
+        requestedDurationTick: parsePositiveTick(240),
+        pitch: parseMidiPitch(64),
+      }).noteId,
+    ]
+    const revisionBeforeRemove = fixture.session.modelRevision
+    const result = coordinator.removeMidiNotes({
+      clipId: fixture.clipId,
+      noteIds,
+    })
+
+    expect(Object.isFrozen(result)).toBe(true)
+    expect(Object.isFrozen(result.noteIds)).toBe(true)
+    expect(result.noteIds).toEqual(noteIds)
+    expect(result.commit.baseRevision).toBe(revisionBeforeRemove)
+    expect(result.commit.modelRevision).toBe(revisionBeforeRemove + 1)
+    expect(result.commit.origin).toEqual({
+      kind: 'command',
+      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+    })
+    expect(result.commit.delta.changes).toEqual([
+      expect.objectContaining({
+        type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+        noteId: noteIds[0],
+      }),
+      expect.objectContaining({
+        type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+        noteId: noteIds[1],
+      }),
+    ])
+    expect(noteRecords(fixture.session)).toEqual([])
+
+    fixture.session.undo()
+    expect(noteRecords(fixture.session).map(({ id }) => id).sort()).toEqual(
+      [...noteIds].sort(),
+    )
+    fixture.session.redo()
+    expect(noteRecords(fixture.session)).toEqual([])
+  })
+
+  it('does not partially remove a selection containing a missing Note', () => {
+    const fixture = createMidiClipFixture('remove-many-rejected')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: () => 'note-midi-note-remove-many-existing',
+    })
+    const existingNoteId = coordinator.addMidiNote({
+      clipId: fixture.clipId,
+      clipStartTick: parseTick(120),
+      requestedDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(60),
+    }).noteId
+    const revisionBeforeRemove = fixture.session.modelRevision
+    const missingNoteId = parseNoteId('note-midi-note-remove-many-missing')
+
+    expect(() =>
+      coordinator.removeMidiNotes({
+        clipId: fixture.clipId,
+        noteIds: [existingNoteId, missingNoteId],
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        code: 'midi-note-not-found',
+        noteId: missingNoteId,
+      }),
+    )
+    expect(fixture.session.modelRevision).toBe(revisionBeforeRemove)
+    expect(noteRecords(fixture.session).map(({ id }) => id)).toEqual([
+      existingNoteId,
+    ])
   })
 
   it('uses the live Session revision for consecutive overlapping Notes', () => {

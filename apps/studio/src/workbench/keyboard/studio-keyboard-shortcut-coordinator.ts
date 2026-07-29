@@ -9,6 +9,7 @@ import type {
 export const STUDIO_KEYBOARD_ACTION = {
   HISTORY_REDO: 'history.redo',
   HISTORY_UNDO: 'history.undo',
+  PIANO_ROLL_NOTES_REMOVE: 'piano-roll.notes.remove',
   PIANO_ROLL_SELECTION_CLEAR: 'piano-roll.selection.clear',
   PROJECT_SAVE: 'project.save',
 } as const

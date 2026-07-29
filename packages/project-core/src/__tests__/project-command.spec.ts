@@ -9,6 +9,7 @@ import {
   createAddNoteCommand,
   createMoveNoteCommand,
   createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiSourceId,
@@ -22,6 +23,7 @@ import {
   type MoveNoteCommand,
   type ProjectCommand,
   type RemoveNoteCommand,
+  type RemoveNotesCommand,
 } from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
@@ -118,6 +120,14 @@ describe('ProjectCommand public contract', () => {
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
     )
+    const removeMany = createRemoveNotesCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteIds: [
+        fixture.records.nonLoopNote.id,
+        fixture.records.nonLoopHarmonyNote.id,
+      ],
+    })
 
     expect(add).toEqual({
       type: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
@@ -132,16 +142,61 @@ describe('ProjectCommand public contract', () => {
     })
     expect(move.type).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE)
     expect(remove.type).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE)
+    expect(removeMany).toEqual({
+      type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteIds: [
+        fixture.records.nonLoopNote.id,
+        fixture.records.nonLoopHarmonyNote.id,
+      ],
+    })
+    expect(Object.isFrozen(removeMany.noteIds)).toBe(true)
     expectTypeOf(add).toEqualTypeOf<AddNoteCommand>()
     expectTypeOf(move).toEqualTypeOf<MoveNoteCommand>()
     expectTypeOf(remove).toEqualTypeOf<RemoveNoteCommand>()
+    expectTypeOf(removeMany).toEqualTypeOf<RemoveNotesCommand>()
     expectTypeOf<ProjectCommand>().toEqualTypeOf<
       | AddInstrumentTrackCommand
       | AddMidiClipCommand
       | AddNoteCommand
       | MoveNoteCommand
       | RemoveNoteCommand
+      | RemoveNotesCommand
     >()
+  })
+
+  it('rejects empty or duplicate multi-Note removal targets', () => {
+    const fixture = createCompleteProjectFixture()
+    const input = {
+      baseRevision: 0 as ModelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+    }
+
+    expect(() =>
+      createRemoveNotesCommand({
+        ...input,
+        noteIds: [],
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        code: 'empty-note-id-list',
+      }),
+    )
+    expect(() =>
+      createRemoveNotesCommand({
+        ...input,
+        noteIds: [
+          fixture.records.nonLoopNote.id,
+          fixture.records.nonLoopNote.id,
+        ],
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        code: 'duplicate-note-id',
+        noteId: fixture.records.nonLoopNote.id,
+      }),
+    )
   })
 
   it('keeps planning and write capabilities out of the package root', () => {

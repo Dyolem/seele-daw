@@ -380,8 +380,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 初次打开 Clip 时横向显示完整 Clip，Arrangement 与 Piano Roll 暂不强制同步 Zoom；
 - 初始 Grid 为 `1/16`，Snap 默认开启；
 - 显式提供 Pencil 与 Cursor，默认工具为 Pencil；
-- Cursor 在首批只拥有 Note Selection，不能修改 Note；
+- Cursor 负责 Note Selection 与 Note Body Move，不在空白 Grid 创建 Note；
 - Pencil Click 空白 Grid 创建 Note，Click 已有 Note 不创建也不改变 Selection；
+- Note 左右 Edge Hit 的 Resize 同时对 Cursor 与 Pencil 开放，Edge Hit 优先于 Note Body；
 - 创建成功后只选中新 Note，并保持 Pencil 激活以支持连续 Click 输入；
 - 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1；
 - X 受 Timeline Grid Snap 影响；开启 Snap 时使用 Pointer 所在 Grid 单元的左边界，关闭
@@ -435,8 +436,9 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
   相邻但独立的时间编辑组；
 - 当前 Tool 与 Snap 必须在 Pointer 离开后仍通过边界、背景和 `aria-pressed` 清晰表达，
   不能只依赖 Tooltip 或图标颜色；
-- Pencil 激活时空白 Grid 使用 Crosshair Cursor；已有 Note 的可见命中仍由 Note 形状表达，
-  不增加误导性的 Resize Handle；
+- Pencil 激活时空白 Grid 使用 Crosshair Cursor；Note Body 按 Tool 表达 Move / Pencil
+  语义，左右 Edge Hit 使用水平 Resize Cursor；Resize Handle 只在 Hover、Focus 或
+  Selected 等可操作状态出现，不常驻干扰密集 Note；
 - 创建失败使用全局 Error Toast，并让 Piano Roll 的可访问 Live Status 同步解释原因；
 - 左侧钢琴键盘固定，音符网格横向滚动。
 - 黑键行通过轻微明度差异识别，不使用高对比棋盘纹。
@@ -1080,10 +1082,12 @@ Canvas 功能至少检查：
 11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM；进入 Zoom、Scroll、大量对象或高频交互前重新评估 Canvas。
 12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，Grid 使用 Canvas，Note 通过可替换 Renderer Port 输出。
 13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，横向初始显示完整 Clip。
-14. Piano Roll 显式提供 Pencil 与 Cursor，默认 Pencil；Cursor 首批只负责 Selection。
+14. Piano Roll 显式提供 Pencil 与 Cursor，默认 Pencil；Cursor 负责 Selection 与 Note
+    Body Move，Pencil 不发起 Move。
 15. Piano Roll 初始 Grid 为 1/16、Snap 默认开启；视觉 Grid 与交互 Snap 消费同一 Common Grid。
 16. Pencil Click 空白 Grid 创建长度为一格、Velocity 100、UI Channel 1 的 Note；成功后只选中新 Note并保持 Pencil。
-17. Piano Roll 首批使用 DPR-aware Canvas Grid 与 keyed DOM Note；Canvas Note Adapter 消费同一 Scene，是否切换由真实基准决定。
+17. Note 左右边缘 Resize 对 Cursor 与 Pencil 同时开放；一次 Drag 只产生一次提交。
+18. Piano Roll 首批使用 DPR-aware Canvas Grid 与 keyed DOM Note；Canvas Note Adapter 消费同一 Scene，是否切换由真实基准决定。
 
 ## 24. 待后续切片决定
 

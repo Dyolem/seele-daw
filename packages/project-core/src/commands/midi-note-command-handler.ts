@@ -3,6 +3,7 @@ import {
   type AddNoteCommand,
   type MoveNoteCommand,
   type RemoveNoteCommand,
+  type RemoveNotesCommand,
 } from '#internal/commands/project-command'
 import type {
   NoChangeProjectCommandPreparation,
@@ -17,7 +18,11 @@ import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
 import { addTicks } from '#internal/time/tick'
 
-type MidiNoteCommand = AddNoteCommand | MoveNoteCommand | RemoveNoteCommand
+type MidiNoteCommand =
+  | AddNoteCommand
+  | MoveNoteCommand
+  | RemoveNoteCommand
+  | RemoveNotesCommand
 
 function requireMidiSource(reader: ModelStoreReader, command: MidiNoteCommand): MidiSourceRecord {
   const source = reader.getMidiSource(command.sourceId)
@@ -29,8 +34,8 @@ function requireMidiSource(reader: ModelStoreReader, command: MidiNoteCommand): 
       {
         baseRevision: command.baseRevision,
         commandType: command.type,
-        noteId: command.noteId,
         sourceId: command.sourceId,
+        ...('noteId' in command ? { noteId: command.noteId } : {}),
       },
     )
   }
@@ -46,8 +51,8 @@ function assertNotePartitionExists(reader: ModelStoreReader, command: MidiNoteCo
       {
         baseRevision: command.baseRevision,
         commandType: command.type,
-        noteId: command.noteId,
         sourceId: command.sourceId,
+        ...('noteId' in command ? { noteId: command.noteId } : {}),
       },
     )
   }
@@ -55,18 +60,19 @@ function assertNotePartitionExists(reader: ModelStoreReader, command: MidiNoteCo
 
 function requireMidiNote(
   reader: ModelStoreReader,
-  command: MoveNoteCommand | RemoveNoteCommand,
+  command: MoveNoteCommand | RemoveNoteCommand | RemoveNotesCommand,
+  noteId: NoteId,
 ): MidiNoteRecord {
-  const note = reader.getMidiNote(command.sourceId, command.noteId)
+  const note = reader.getMidiNote(command.sourceId, noteId)
 
   if (note === undefined) {
     throw new ProjectCommandError(
       'midi-note-not-found',
-      `MIDI Note ${command.noteId} does not exist in MidiSource ${command.sourceId}`,
+      `MIDI Note ${noteId} does not exist in MidiSource ${command.sourceId}`,
       {
         baseRevision: command.baseRevision,
         commandType: command.type,
-        noteId: command.noteId,
+        noteId,
         sourceId: command.sourceId,
       },
     )
@@ -123,12 +129,12 @@ function assertNoteWithinSource(
 
 function ready(
   command: MidiNoteCommand,
-  mutation: ProjectMutation,
+  mutations: readonly ProjectMutation[],
 ): ReadyProjectCommandPreparation {
   return {
     status: 'ready',
     command,
-    plan: createMutationPlan(command.baseRevision, [mutation]),
+    plan: createMutationPlan(command.baseRevision, mutations),
   }
 }
 
@@ -151,11 +157,13 @@ export function prepareAddNoteCommand(
 
   assertNoteWithinSource(command, source, note)
 
-  return ready(command, {
-    type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
-    sourceId: command.sourceId,
-    after: note,
-  })
+  return ready(command, [
+    {
+      type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+      sourceId: command.sourceId,
+      after: note,
+    },
+  ])
 }
 
 export function prepareRemoveNoteCommand(
@@ -164,13 +172,31 @@ export function prepareRemoveNoteCommand(
 ): ReadyProjectCommandPreparation {
   requireMidiSource(reader, command)
   assertNotePartitionExists(reader, command)
-  const note = requireMidiNote(reader, command)
+  const note = requireMidiNote(reader, command, command.noteId)
 
-  return ready(command, {
+  return ready(command, [
+    {
+      type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+      sourceId: command.sourceId,
+      before: note,
+    },
+  ])
+}
+
+export function prepareRemoveNotesCommand(
+  reader: ModelStoreReader,
+  command: RemoveNotesCommand,
+): ReadyProjectCommandPreparation {
+  requireMidiSource(reader, command)
+  assertNotePartitionExists(reader, command)
+
+  const mutations = command.noteIds.map<ProjectMutation>((noteId) => ({
     type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
     sourceId: command.sourceId,
-    before: note,
-  })
+    before: requireMidiNote(reader, command, noteId),
+  }))
+
+  return ready(command, mutations)
 }
 
 export function prepareMoveNoteCommand(
@@ -179,7 +205,7 @@ export function prepareMoveNoteCommand(
 ): ReadyProjectCommandPreparation | NoChangeProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
   assertNotePartitionExists(reader, command)
-  const before = requireMidiNote(reader, command)
+  const before = requireMidiNote(reader, command, command.noteId)
 
   if (before.startTick === command.nextStartTick && before.pitch === command.nextPitch) {
     return {
@@ -197,10 +223,12 @@ export function prepareMoveNoteCommand(
 
   assertNoteWithinSource(command, source, after)
 
-  return ready(command, {
-    type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-    sourceId: command.sourceId,
-    before,
-    after,
-  })
+  return ready(command, [
+    {
+      type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+      sourceId: command.sourceId,
+      before,
+      after,
+    },
+  ])
 }

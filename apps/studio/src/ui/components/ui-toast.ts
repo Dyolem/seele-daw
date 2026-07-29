@@ -13,3 +13,5 @@ export interface UiToastMessage {
   readonly title: string
   readonly tone: UiToastTone
 }
+
+export type ShowUiToastInput = Omit<UiToastMessage, 'id'>

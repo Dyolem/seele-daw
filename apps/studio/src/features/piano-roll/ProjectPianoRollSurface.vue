@@ -51,8 +51,7 @@ import {
   type PianoRollTool,
 } from '@/features/piano-roll/piano-roll-preferences-store'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
-import UiToastRegion from '@/ui/components/UiToastRegion.vue'
-import { UI_TOAST_TONE, type UiToastMessage } from '@/ui/components/ui-toast'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   STUDIO_KEYBOARD_ACTION,
   STUDIO_KEYBOARD_SCOPE,
@@ -71,6 +70,7 @@ const props = defineProps<ProjectPianoRollSurfaceProps>()
 const { keyboardShortcuts } = useStudioKeyboardShortcuts()
 const { projectMidiNotes } = useProjectMidiNotes()
 const pianoRollPreferences = usePianoRollPreferencesStore()
+const toasts = useUiToastStore()
 
 const INITIAL_MINIMUM_PITCH = parseMidiPitch(48)
 const INITIAL_MAXIMUM_PITCH = parseMidiPitch(72)
@@ -84,10 +84,8 @@ const editorState = shallowRef<PianoRollEditorSessionState | null>(null)
 const interactionFailureMessage = shallowRef<string | null>(null)
 const readModelFailureMessage = shallowRef<string | null>(null)
 const renderFailureMessage = shallowRef<string | null>(null)
-const notification = shallowRef<UiToastMessage | null>(null)
 const gridRenderer = shallowRef<PianoRollGridCanvasRenderer | null>(null)
 const noteRenderer = shallowRef<PianoRollNoteRenderer | null>(null)
-let notificationSequence = 0
 let editorSession: PianoRollEditorSession | null = null
 let unsubscribeEditorSession: (() => void) | null = null
 let readModel: PianoRollNoteReadModel | null = null
@@ -154,24 +152,6 @@ function describeFailure(cause: unknown): string {
   return describeCause(cause, 'The Piano Roll could not be rendered.')
 }
 
-function showNotification(
-  tone: UiToastMessage['tone'],
-  title: string,
-  description: string,
-): void {
-  notificationSequence += 1
-  notification.value = Object.freeze({
-    description,
-    id: notificationSequence,
-    title,
-    tone,
-  })
-}
-
-function dismissNotification(messageId: number): void {
-  if (notification.value?.id === messageId) notification.value = null
-}
-
 function readThemeColor(style: CSSStyleDeclaration, token: string): string {
   return style.getPropertyValue(token).trim()
 }
@@ -235,8 +215,7 @@ function reportCreatedNoteSelectionFailure(cause?: unknown): void {
     'The MIDI Note was added, but its selection could not be restored.',
   )
   interactionFailureMessage.value = message
-  showNotification(
-    UI_TOAST_TONE.WARNING,
+  toasts.warning(
     'MIDI note was added but could not be selected',
     message,
   )
@@ -258,7 +237,7 @@ function handlePencilInput(
   if (gesture.viewport === null || currentEditorSession === null) {
     const message = 'The Piano Roll is not ready to place a MIDI Note.'
     interactionFailureMessage.value = message
-    showNotification(UI_TOAST_TONE.DANGER, 'MIDI note could not be added', message)
+    toasts.danger('MIDI note could not be added', message)
     return
   }
 
@@ -285,7 +264,7 @@ function handlePencilInput(
       'The Project rejected the MIDI Note command. Please try again.',
     )
     interactionFailureMessage.value = message
-    showNotification(UI_TOAST_TONE.DANGER, 'MIDI note could not be added', message)
+    toasts.danger('MIDI note could not be added', message)
     return
   }
 
@@ -301,7 +280,6 @@ function handlePencilInput(
   }
 
   interactionFailureMessage.value = null
-  notification.value = null
 }
 
 function handlePointerInput(input: PianoRollPointerInput): void {
@@ -654,7 +632,6 @@ onUnmounted(() => {
         }}
       </li>
     </ul>
-    <UiToastRegion :message="notification" @dismiss="dismissNotification" />
   </section>
 </template>
 

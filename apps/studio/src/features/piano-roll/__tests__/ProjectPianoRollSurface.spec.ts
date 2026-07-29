@@ -38,6 +38,7 @@ import {
   createProjectPianoRollPresentation,
   type ReadyProjectPianoRollPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
 import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
 import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
@@ -514,12 +515,12 @@ describe('ProjectPianoRollSurface', () => {
 
     const canvasHost = wrapper.get('.project-piano-roll__canvas-host')
     dispatchPointer(canvasHost.element, 'pointerdown', {
-      clientX: 300,
+      clientX: 345,
       clientY: 125,
       pointerId: 11,
     })
     dispatchPointer(canvasHost.element, 'pointerup', {
-      clientX: 300,
+      clientX: 345,
       clientY: 125,
       pointerId: 11,
     })
@@ -630,6 +631,7 @@ describe('ProjectPianoRollSurface', () => {
     })
     const keyboard = createKeyboardFixture()
     const pinia = createPinia()
+    const toasts = useUiToastStore(pinia)
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
     const rejectedCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
       addMidiNote: () => {
@@ -683,8 +685,11 @@ describe('ProjectPianoRollSurface', () => {
         .get('[data-piano-roll-note-id="surface-failure-note-1"]')
         .classes(),
     ).toContain('sd-piano-roll-dom-note--selected')
-    expect(document.body.textContent).toContain('MIDI note could not be added')
-    expect(document.body.textContent).toContain('Test Project rejected the Note')
+    expect(toasts.message).toMatchObject({
+      description: 'Test Project rejected the Note',
+      title: 'MIDI note could not be added',
+      tone: 'danger',
+    })
     expect(
       fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes),
     ).toHaveLength(1)
@@ -698,6 +703,7 @@ describe('ProjectPianoRollSurface', () => {
     const fixture = createInteractiveFixture('surface-selection-failure')
     const keyboard = createKeyboardFixture()
     const pinia = createPinia()
+    const toasts = useUiToastStore(pinia)
     const selectionFailureCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
       addMidiNote: (input: AddMidiNoteInput) => {
         const result = fixture.projectMidiNotes.addMidiNote(input)
@@ -745,10 +751,10 @@ describe('ProjectPianoRollSurface', () => {
       fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes),
     ).toHaveLength(1)
     expect(wrapper.text()).not.toContain('1 selected')
-    expect(document.body.textContent).toContain(
-      'MIDI note was added but could not be selected',
-    )
-    expect(document.body.textContent).not.toContain('MIDI note could not be added')
+    expect(toasts.message).toMatchObject({
+      title: 'MIDI note was added but could not be selected',
+      tone: 'warning',
+    })
 
     wrapper.unmount()
     keyboard.keyboardShortcuts.dispose()

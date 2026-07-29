@@ -14,6 +14,7 @@
   消费其 Subdivision Tick；
 - 可见 Pencil / Cursor 单选工具与 Snap Toggle；
 - Pencil 空白 Click 的 X / Tick、Y / Pitch Placement、Clip 尾部限制与 Add Note Command；
+  Snap 开启时 X 固定落在 Pointer 所在 Grid 单元的左边界；
 - 创建成功后只选中新 Note 并保持 Pencil，创建失败时保留 Project 与 Selection 并显示
   Toast；
 - Add Note 的 Undo / Redo 权威回读与失效 Selection 清理；

@@ -5,6 +5,7 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import {
+  TIMELINE_GRID_SNAP_MODE,
   createTimelineGrid,
   resolveTimelineGridTick,
 } from '#internal/index'
@@ -67,6 +68,29 @@ describe('Timeline Grid', () => {
       }),
     ).toBe(180)
   })
+
+  it.each([
+    { expected: 0, position: 0 },
+    { expected: 0, position: 120 },
+    { expected: 0, position: 239.999 },
+    { expected: 240, position: 240 },
+    { expected: 240, position: 479.999 },
+  ])(
+    'floors Tick position $position to its current Grid start $expected',
+    ({ expected, position }) => {
+      expect(
+        resolveTimelineGridTick({
+          grid: createTimelineGrid({
+            originTick: parseTick(0),
+            subdivisionSpanTick: parsePositiveTick(240),
+          }),
+          snapEnabled: true,
+          snapMode: TIMELINE_GRID_SNAP_MODE.FLOOR,
+          tickPosition: position,
+        }),
+      ).toBe(expected)
+    },
+  )
 
   it('rounds to the nearest integer Tick without applying subdivisions when Snap is disabled', () => {
     const grid = createTimelineGrid({

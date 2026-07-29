@@ -16,9 +16,18 @@ export interface CreateTimelineGridInput {
   readonly subdivisionSpanTick: Tick
 }
 
+export const TIMELINE_GRID_SNAP_MODE = {
+  FLOOR: 'floor',
+  NEAREST: 'nearest',
+} as const
+
+export type TimelineGridSnapMode =
+  (typeof TIMELINE_GRID_SNAP_MODE)[keyof typeof TIMELINE_GRID_SNAP_MODE]
+
 export interface ResolveTimelineGridTickInput {
   readonly grid: TimelineGrid
   readonly snapEnabled: boolean
+  readonly snapMode?: TimelineGridSnapMode
   readonly tickPosition: number
 }
 
@@ -59,8 +68,10 @@ export function createTimelineGrid(
 /**
  * Resolves a continuous Timeline position to an integer Tick.
  *
- * Enabled Snap chooses the nearest subdivision, with exact midpoints moving
- * forward. Disabled Snap preserves the position to the nearest integer Tick.
+ * Enabled Snap applies the requested subdivision policy. The default chooses
+ * the nearest subdivision, with exact midpoints moving forward. Floor chooses
+ * the current subdivision's start. Disabled Snap preserves the position to the
+ * nearest integer Tick.
  */
 export function resolveTimelineGridTick(
   input: ResolveTimelineGridTickInput,
@@ -79,9 +90,12 @@ export function resolveTimelineGridTick(
     return parseResolvedTick(Math.round(tickPosition))
   }
 
-  const subdivisionIndex = Math.round(
-    (tickPosition - grid.originTick) / grid.subdivisionSpanTick,
-  )
+  const snapPosition =
+    (tickPosition - grid.originTick) / grid.subdivisionSpanTick
+  const subdivisionIndex =
+    input.snapMode === TIMELINE_GRID_SNAP_MODE.FLOOR
+      ? Math.floor(snapPosition)
+      : Math.round(snapPosition)
   return parseResolvedTick(
     grid.originTick + subdivisionIndex * grid.subdivisionSpanTick,
   )

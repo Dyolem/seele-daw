@@ -2,7 +2,7 @@
 
 > Status: Normative
 > Scope: `apps/studio` Vue application layer
-> Last updated: 2026-07-24
+> Last updated: 2026-07-28
 
 本文档规定 Seele Studio 如何在组件本地状态、Props / Emits、Pinia 与
 `provide / inject` 之间选择。它补充根目录 `DESIGN.md` 的状态所有权约束，不改变
@@ -31,7 +31,7 @@ Project Core、Active Project 或浏览器 Runtime 的权威边界。
 典型示例：
 
 - 菜单是否打开；
-- 当前 Toast；
+- 只属于当前子树的内联反馈；
 - Pointer Drag Preview；
 - Splitter 正在进行的拖动交互。
 
@@ -132,6 +132,16 @@ Piano Roll Preferences 是第二个 feature Store，只保存：
 恢复默认 Pencil、Snap 开启和 `1/16`。Store 不保存 Note、Selection、Pointer Gesture 或
 ProjectSession，也不因为当前只有一个已确认 Grid Preset 就预建未决定的产品选项。
 
+UI Toast 是第三个 Store。通知会由 Arrangement、Piano Roll 和后续远距离 Feature 触发，
+但全应用只应存在一个 Portal / Region，因此它保存一个轻量、latest-message-wins 的当前
+`UiToastMessage`，并提供 `info / success / warning / danger / dismiss` 命令：
+
+- Feature 只触发语义命令，不各自维护消息序列或挂载 Toast Region；
+- 根 `App` 声明式渲染唯一 `UiToastRegion`；
+- Dismiss 必须匹配当前消息 ID，陈旧关闭事件不能关闭更新的消息；
+- Toast 不保存业务失败权威，只保存可丢弃的反馈投影；
+- 新 Studio Pinia 实例从空通知开始，消息不进入 Project、History 或持久化。
+
 ## 4. 禁止进入 Pinia 的内容
 
 Pinia MUST NOT 持有：
@@ -168,6 +178,7 @@ UI Store 的协调不得反向修改 Project facts。若用户操作需要修改
 | 明确父子数据与意图 | Props / Emits |
 | 应用服务、Coordinator、Port、Runtime Binding | Typed Context |
 | 跨分支、轻量、可重建的 UI 会话状态 | Pinia |
+| 应用级 Toast 命令与单一渲染槽 | Pinia |
 | Track、Clip、Note、dirty、History | 对应领域或应用权威，不进入上述 UI Store |
 
 当两个方案都可实现时，优先选择能最准确表达权威和生命周期的方案，而不是代码最少或

@@ -5,7 +5,7 @@ import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
-import { computed, shallowRef, type StyleValue } from 'vue'
+import { computed, type StyleValue } from 'vue'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
@@ -19,8 +19,7 @@ import {
 } from '@/features/project-workspace/workbench-shell/project-add-track-option'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
-import UiToastRegion from '@/ui/components/UiToastRegion.vue'
-import { UI_TOAST_TONE, type UiToastMessage } from '@/ui/components/ui-toast'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { useProjectClips } from '@/workbench/project/clip/vue/project-clip-context'
 import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
 
@@ -39,8 +38,7 @@ const emit = defineEmits<{
 const { projectClips } = useProjectClips()
 const { projectTracks } = useProjectTracks()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
-const notification = shallowRef<UiToastMessage | null>(null)
-let notificationSequence = 0
+const toasts = useUiToastStore()
 
 const timelineSpanTick = computed(() => props.barSpanTick * ARRANGEMENT_BAR_COUNT)
 const visibleClipsByTrack = computed(() => {
@@ -70,24 +68,9 @@ const UNAVAILABLE_TRACK_LABELS: Readonly<
   [PROJECT_ADD_TRACK_TYPE.SAMPLER]: 'Sampler',
 })
 
-function showNotification(
-  tone: UiToastMessage['tone'],
-  title: string,
-  description: string,
-): void {
-  notificationSequence += 1
-  notification.value = Object.freeze({
-    description,
-    id: notificationSequence,
-    title,
-    tone,
-  })
-}
-
 function handleTrackTypeSelection(trackType: ProjectAddTrackType): void {
   if (trackType !== PROJECT_ADD_TRACK_TYPE.INSTRUMENT) {
-    showNotification(
-      UI_TOAST_TONE.INFO,
+    toasts.info(
       `${UNAVAILABLE_TRACK_LABELS[trackType]} is in development`,
       'This track type will become available in a later product slice.',
     )
@@ -98,18 +81,13 @@ function handleTrackTypeSelection(trackType: ProjectAddTrackType): void {
     const result = projectTracks.addInstrumentTrack()
     workbenchSelection.selectTrack(result.trackId)
   } catch (cause) {
-    showNotification(
-      UI_TOAST_TONE.DANGER,
+    toasts.danger(
       'Instrument track could not be added',
       cause instanceof Error && cause.message.trim().length > 0
         ? cause.message
         : 'The Project rejected the Track command. Please try again.',
     )
   }
-}
-
-function dismissNotification(messageId: number): void {
-  if (notification.value?.id === messageId) notification.value = null
 }
 
 function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
@@ -142,8 +120,7 @@ function createEmptyMidiClip(
     workbenchSelection.selectClip(result.trackId, result.clipId)
     emit('openMidiClip')
   } catch (cause) {
-    showNotification(
-      UI_TOAST_TONE.DANGER,
+    toasts.danger(
       'MIDI clip could not be added',
       cause instanceof Error && cause.message.trim().length > 0
         ? cause.message
@@ -268,7 +245,6 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
       </div>
     </section>
 
-    <UiToastRegion :message="notification" @dismiss="dismissNotification" />
   </div>
 </template>
 

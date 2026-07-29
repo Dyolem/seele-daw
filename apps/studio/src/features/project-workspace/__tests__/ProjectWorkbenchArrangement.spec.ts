@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
 import {
   PROJECT_CLIP_CONTEXT_KEY,
@@ -36,6 +37,7 @@ interface ArrangementFixture {
     typeof vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>
   >
   readonly selection: ReturnType<typeof useProjectWorkbenchSelectionStore>
+  readonly toasts: ReturnType<typeof useUiToastStore>
   readonly wrapper: VueWrapper
 }
 
@@ -48,6 +50,7 @@ interface MountArrangementOptions {
 function mountArrangement(options: MountArrangementOptions = {}): ArrangementFixture {
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
+  const toasts = useUiToastStore(pinia)
   selection.activateProject(parseProjectId('arrangement-selection-project'))
   const addEmptyMidiClip = vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) => {
     if (options.createClipFailure !== undefined) throw options.createClipFailure
@@ -91,6 +94,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     addEmptyMidiClip,
     addInstrumentTrack,
     selection,
+    toasts,
     wrapper,
   }
 }
@@ -127,7 +131,7 @@ describe('ProjectWorkbenchArrangement', () => {
   })
 
   it('runs the real Instrument Track capability from the implemented menu option', async () => {
-    const { addInstrumentTrack, selection, wrapper } = mountArrangement()
+    const { addInstrumentTrack, selection, toasts, wrapper } = mountArrangement()
     const options = await openAddTrackMenu(wrapper)
     const instrument = options.find((option) => option.textContent?.includes('Virtual instrument'))
     if (instrument === undefined) throw new Error('Expected the Virtual instrument option')
@@ -137,11 +141,11 @@ describe('ProjectWorkbenchArrangement', () => {
 
     expect(addInstrumentTrack).toHaveBeenCalledOnce()
     expect(selection.selectedTrackId).toBe('track-created-from-menu')
-    expect(document.body.querySelector('.ui-toast')).toBeNull()
+    expect(toasts.message).toBeNull()
   })
 
   it('keeps future Track types discoverable and explains their current state', async () => {
-    const { addInstrumentTrack, wrapper } = mountArrangement()
+    const { addInstrumentTrack, toasts, wrapper } = mountArrangement()
     const options = await openAddTrackMenu(wrapper)
     const sampler = options.find((option) => option.textContent?.includes('Sampler'))
     if (sampler === undefined) throw new Error('Expected the Sampler option')
@@ -150,9 +154,7 @@ describe('ProjectWorkbenchArrangement', () => {
     await nextTick()
 
     expect(addInstrumentTrack).not.toHaveBeenCalled()
-    expect(document.body.querySelector('.ui-toast')?.textContent).toContain(
-      'Sampler is in development',
-    )
+    expect(toasts.message?.title).toBe('Sampler is in development')
   })
 
   it('renders ordered Track facts as aligned shell rows and Arrangement lanes', () => {
@@ -241,7 +243,7 @@ describe('ProjectWorkbenchArrangement', () => {
 
   it('creates and opens an empty MIDI Clip by double-clicking its target bar', async () => {
     const trackId = parseTrackId('track-create-clip')
-    const { addEmptyMidiClip, selection, wrapper } = mountArrangement({
+    const { addEmptyMidiClip, selection, toasts, wrapper } = mountArrangement({
       tracks: Object.freeze([
         Object.freeze({
           color: parseProjectColor('#23B26D'),
@@ -262,7 +264,7 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(selection.selectedTrackId).toBe(trackId)
     expect(selection.selectedClipId).toBe('clip-created-from-lane')
     expect(wrapper.emitted('openMidiClip')).toHaveLength(1)
-    expect(document.body.querySelector('.ui-toast')).toBeNull()
+    expect(toasts.message).toBeNull()
   })
 
   it('provides a keyboard path for creating a MIDI Clip on the focused bar', async () => {
@@ -289,7 +291,7 @@ describe('ProjectWorkbenchArrangement', () => {
 
   it('keeps Clip creation failures atomic and visible', async () => {
     const trackId = parseTrackId('track-rejected-clip')
-    const { selection, wrapper } = mountArrangement({
+    const { selection, toasts, wrapper } = mountArrangement({
       createClipFailure: new Error('The target Track no longer exists'),
       tracks: Object.freeze([
         Object.freeze({
@@ -306,9 +308,7 @@ describe('ProjectWorkbenchArrangement', () => {
 
     expect(selection.selectedClipId).toBeNull()
     expect(wrapper.emitted('openMidiClip')).toBeUndefined()
-    expect(document.body.querySelector('.ui-toast')?.textContent).toContain(
-      'The target Track no longer exists',
-    )
+    expect(toasts.message?.description).toBe('The target Track no longer exists')
   })
 
   it('selects and opens an existing Clip without creating another one', async () => {

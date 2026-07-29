@@ -114,7 +114,8 @@ src/
 
 Editor Common 公开视觉和交互共用的 Timeline Grid，并提供：
 
-- Snap 开启时按最近 Subdivision Boundary 解析连续 Tick Position；
+- Snap 开启时支持显式 `nearest` 与 `floor` Subdivision 策略；Pencil 创建使用 `floor`，
+  始终落在 Pointer 所在 Grid 单元的左边界；
 - Snap 关闭时按最近整数 Tick 解析，不把连续位置写入 Project Fact；
 - Pencil 只把完成的空白 Click 解析为 Clip-local Start、Pitch 和期望 Duration；
 - X 消费 Timeline Grid，Y 直接映射离散 Pitch Row；

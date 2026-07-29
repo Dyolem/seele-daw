@@ -1,9 +1,11 @@
 import { mount, type VueWrapper } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { createPinia } from 'pinia'
+import { defineComponent, nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import UiToastRegion from '@/ui/components/UiToastRegion.vue'
 import { UI_TOAST_TONE } from '@/ui/components/ui-toast'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 
 const mountedWrappers: VueWrapper[] = []
 
@@ -56,5 +58,29 @@ describe('UiToastRegion', () => {
     await nextTick()
 
     expect(wrapper.emitted('dismiss')).toEqual([[47]])
+  })
+
+  it('renders a notification triggered through the imperative application Store', async () => {
+    const pinia = createPinia()
+    const toasts = useUiToastStore(pinia)
+    const host = defineComponent({
+      components: { UiToastRegion },
+      setup: () => ({ toasts }),
+      template:
+        '<UiToastRegion :message="toasts.message" @dismiss="toasts.dismiss" />',
+    })
+    const wrapper = mount(host, {
+      global: {
+        plugins: [pinia],
+      },
+    })
+    mountedWrappers.push(wrapper)
+
+    toasts.warning('MIDI note was added but could not be selected')
+    await nextTick()
+
+    expect(document.body.querySelector('.ui-toast--warning')?.textContent).toContain(
+      'MIDI note was added but could not be selected',
+    )
   })
 })

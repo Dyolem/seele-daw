@@ -384,7 +384,8 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - Pencil Click 空白 Grid 创建 Note，Click 已有 Note 不创建也不改变 Selection；
 - 创建成功后只选中新 Note，并保持 Pencil 激活以支持连续 Click 输入；
 - 新 Note 初始长度为一个当前 Grid 单元、Velocity 100、UI MIDI Channel 1；
-- X 受 Timeline Grid Snap 影响；关闭 Snap 时保留 Pencil X 对应的最近整数 Tick；
+- X 受 Timeline Grid Snap 影响；开启 Snap 时使用 Pointer 所在 Grid 单元的左边界，关闭
+  Snap 时保留 Pencil X 对应的最近整数 Tick；
 - Y 不进入 Timeline Snap，直接使用 Pointer 覆盖的离散 Pitch Row。
 - Tool、Snap 与 Grid Preset 属于 Studio 应用生命周期偏好；切换 Project、Clip 或 Dock
   布局不重置，页面刷新恢复默认值；

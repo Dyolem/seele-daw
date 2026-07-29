@@ -4,8 +4,11 @@ import {
   type Tick,
 } from '@seele-daw/project-core'
 
-import type { TimelineGrid } from '../timeline-grid'
-import { resolveTimelineGridTick } from '../timeline-grid'
+import {
+  TIMELINE_GRID_SNAP_MODE,
+  resolveTimelineGridTick,
+  type TimelineGrid,
+} from '../timeline-grid'
 import type { PianoRollClipContext } from './piano-roll-clip-context'
 import { PianoRollError } from './piano-roll-error'
 import {
@@ -89,6 +92,7 @@ export function resolvePianoRollPencilNotePlacement(
   const candidateTick = resolveTimelineGridTick({
     grid: input.grid,
     snapEnabled: input.snapEnabled,
+    snapMode: TIMELINE_GRID_SNAP_MODE.FLOOR,
     tickPosition,
   })
 

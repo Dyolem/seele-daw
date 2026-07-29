@@ -81,7 +81,7 @@ function createPointerInput(
 }
 
 describe('Piano Roll Pencil Interaction', () => {
-  it('snaps X to the nearest Grid boundary while Y maps directly to its Pitch row', () => {
+  it('floors X to the current Grid start while Y maps directly to its Pitch row', () => {
     const fixture = createFixture()
 
     expect(
@@ -91,7 +91,7 @@ describe('Piano Roll Pencil Interaction', () => {
         snapEnabled: true,
       }),
     ).toEqual({
-      clipStartTick: 240,
+      clipStartTick: 0,
       pitch: 67,
       requestedDurationTick: 240,
     })

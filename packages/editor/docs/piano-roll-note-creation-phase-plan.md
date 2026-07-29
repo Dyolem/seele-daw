@@ -1,6 +1,6 @@
 # Piano Roll Note Creation 第四阶段计划
 
-> Status: In progress; Batches 1–3 accepted, Batch 4 implemented and awaiting review
+> Status: Completed; Batches 1–4 and post-review refinements accepted
 >
 > Date: 2026-07-28
 
@@ -89,8 +89,11 @@ Pencil 在本阶段只创建 Note：
 
 - Snap 默认开启；
 - Pointer X 首先转换为连续的 Clip-local Tick Position；
-- 连续 Position 吸附到距离最近的 Subdivision Grid Boundary；
-- 正好位于两个 Boundary 中点时，选择时间上更晚的 Boundary；
+- Pencil 创建把连续 Position 向下取整到其当前所在 Subdivision 的起点；
+- 在一个 Grid 单元内点击任何位置都必须创建在该单元左边界；只有点击到下一个 Boundary
+  本身才进入下一个单元；
+- Timeline Grid Common 同时保留 `nearest` 与 `floor` 两种显式策略；Pencil 创建必须传入
+  `floor`，其他交互不得隐式继承该产品选择；
 - Snap 运算只解析 Timeline Tick，不读取 DOM、CSS Pixel、Vue Event 或 ProjectSession；
 - Grid Common 只返回候选 Tick，不负责 Clip / Source 上界裁剪；
 - Note Create、Note Move、Clip Move 等调用者分别负责自己的合法范围和边界产品规则；

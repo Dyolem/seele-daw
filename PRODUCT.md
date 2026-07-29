@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-28，功能代码截至 `67509d8`
+> 最近更新：2026-07-29，功能代码截至 `6cba7d2`
 >
-> 当前待审：Piano Roll Note Creation Batch 4 可见 Add Note 闭环
+> 当前交付：Pencil Floor Snap、Fluent Grid 与命令式 Toast
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -382,7 +382,11 @@ Vue 状态选择的完整规则见
 - Toast Region。
 - Reka UI 驱动的 Dropdown Menu、Dialog 与 Toast 行为。
 
-Toast 支持信息、成功、警告和危险语义，可自动关闭、手动关闭、使用 `F8` 聚焦通知区，并支持 Swipe dismiss。
+Toast 支持信息、成功、警告和危险语义，可自动关闭、手动关闭、使用 `F8` 聚焦通知区，并支持
+Swipe dismiss。业务 Feature 通过应用级 Pinia Toast Store 的命令式
+`info / success / warning / danger` 触发通知；根 `App` 只挂载一个声明式
+`UiToastRegion`。通知通道采用 latest-message-wins 单槽语义，Dismiss 必须携带当前渲染消息
+的 ID，陈旧 Dismiss 不能关闭新消息。
 
 ## 8. MIDI Note 与 Piano Roll 能力
 
@@ -442,7 +446,8 @@ Add 已由 Piano Roll Pencil 接入用户界面。Move 与 Remove Command 仍只
 - 普通 Click 单选，Shift / Command / Control Click 切换，空白 Grid Click 清空；
 - 聚焦 Piano Roll 时使用 `Escape` 清空 Selection；
 - Click 只在 Pointer Up 且未越过 4 CSS Pixel Drag Threshold 时确认；
-- 默认 Pencil 在空白 Grid 创建 Note，X 按 Snap 解析、Y 直接映射 Pitch Row；
+- 默认 Pencil 在空白 Grid 创建 Note；Snap 开启时 X 使用 Pointer 当前所在 Grid 单元的
+  左边界，关闭时使用最近整数 Tick，Y 直接映射 Pitch Row；
 - Pencil Click 已有 Note 与 Pencil Drag 不产生业务结果；
 - 创建成功只选中新 Note、保留 Pencil，并由权威 Query / Subscription 更新可见内容；
 - 创建失败保持原 Project、Tool 与 Selection，并显示可访问错误 Toast；
@@ -584,19 +589,20 @@ Project Core 已具备：
 | 2026-07-28 | `PIANO-ROLL` | 第四阶段显式定义 Pencil / Cursor、Snap、Note 创建结果与失败规则；Editor Common 建立共享 Timeline Grid Snap。 | `cc3bbb5` |
 | 2026-07-28 | `PIANO-ROLL` | Studio 建立 Project MIDI Note Coordinator、默认 Note Facts、Clip / Source 校验与 Typed Vue Context；尚未接入可见创建手势。 | `df66936` |
 | 2026-07-28 | `PIANO-ROLL` | Studio 建立应用生命周期级 Pencil / Cursor、Snap 与 `1/16` Grid Preference Store；Canvas Grid 消费同一 Preset。 | `67509d8` |
-| 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Pencil Note Placement；Studio 接入可见 Tool / Snap、Add Note、创建后 Selection、失败 Toast 与 History 回归。 | 本批待审 |
+| 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Pencil Note Placement；Studio 接入可见 Tool / Snap、Add Note、创建后 Selection、失败 Toast 与 History 回归。 | `6cba7d2` |
+| 2026-07-29 | `PIANO-ROLL`、`UI-FOUNDATION` | Pencil Snap 改为当前 Grid 单元左边界；Snap 沿用 Fluent Grid；Toast 改为应用级命令触发与单一声明式 Region。 | 本批提交 |
 
 ## 13. 当前验证基线
 
-功能代码截至 `67509d8`；当前待审的 Piano Roll Note Creation Batch 4 工作树已通过：
+功能代码截至 `6cba7d2`；当前批次已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production
   Build。
 - Project Core：26 个测试文件，370 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：7 个测试文件，70 项测试。
-- Studio：37 个测试文件，191 项测试。
+- editor：7 个测试文件，75 项测试。
+- Studio：38 个测试文件，194 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

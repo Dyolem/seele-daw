@@ -2027,6 +2027,7 @@ Worklet 解析项目 JSON 或接收大对象
 把 Tone.js 类型或参数路径写进项目格式
 没有 Offline 能力声明就允许设备进入导出链
 为未来协作提前污染单机模型
+用多次 ProjectSession.execute 或 Promise.all 模拟一次集合事务
 ```
 
 ---
@@ -2052,6 +2053,9 @@ PointerDown / Move
 -> Worklet / Web Audio 接收新事件
 -> Runtime ACK
 ```
+
+单实体、Selection 集合与事务 Command 的正式判断标准见
+[Project Command 集合与事务语义](../../packages/project-core/docs/project-command-collection-semantics.md)。
 
 ## 73. 一个 Audio 文件的完整路径
 

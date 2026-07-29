@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-07-29，功能代码截至 `1bc6dac`
+> 最近更新：2026-07-29，功能代码截至 `df4cdf3`
 >
-> 当前待审：Piano Roll 多 Note 原子删除与 Delete / Backspace 闭环
+> 当前待审：无
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -402,8 +402,7 @@ Project Core 已实现：
 
 - Add MIDI Note Command。
 - Move MIDI Note Command。
-- Remove MIDI Note Command。
-- Remove Multiple MIDI Notes Command。
+- Remove MIDI Notes Command；一元素列表用于单 Note 删除，多元素列表用于原子多选删除。
 - Command validation、Mutation Plan、原子提交、Commit / Delta。
 - Undo / Redo 及稳定的 Session-local `ProjectContentStateId`。
 - Project Query、Query Index 和 Commit Subscription。
@@ -418,6 +417,17 @@ Clip-local Tick 映射为 Source-local Tick，生成 Note ID，并使用 Velocit
 
 Add 已由 Piano Roll Pencil 接入用户界面，多 Note Remove 已由聚焦键盘 Action 接入。
 Move Command 仍只有内部能力，当前没有可见拖动手势。
+
+当前的“批量”能力仅指同一 MidiSource 内专用的原子多 Note 删除：它不是通用 Batch /
+Composite Command 系统，也不包含多 Note Move、Resize、混合 Command 或跨 MidiSource
+批处理。这些语义必须由后续真实产品交互分别驱动。
+
+Project Command 表达一次完整产品意图，最小事实变化由 Project Mutation 表达。需要一个
+Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Studio 多次执行单实体 Command
+或使用 `Promise.all` 模拟事务。未来命令不会统一采用“批量包含单次”：只有当一元素集合与
+单实体的验证、结果、失败、Delta 和 History 严格等价时，集合协议才可以取代单实体公共
+协议。完整决定见
+[Project Command 集合与事务语义](packages/project-core/docs/project-command-collection-semantics.md)。
 
 ### 8.2 `PIANO-ROLL` Selection Surface
 
@@ -603,11 +613,12 @@ Project Core 已具备：
 | 2026-07-28 | `PIANO-ROLL` | Studio 建立应用生命周期级 Pencil / Cursor、Snap 与 `1/16` Grid Preference Store；Canvas Grid 消费同一 Preset。 | `67509d8` |
 | 2026-07-28 | `PIANO-ROLL` | Editor Common 完成 Pencil Note Placement；Studio 接入可见 Tool / Snap、Add Note、创建后 Selection、失败 Toast 与 History 回归。 | `6cba7d2` |
 | 2026-07-29 | `PIANO-ROLL`、`UI-FOUNDATION` | Pencil Snap 改为当前 Grid 单元左边界；Snap 沿用 Fluent Grid；Toast 改为应用级命令触发与单一声明式 Region。 | `1bc6dac` |
-| 2026-07-29 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | 明确 Cursor Move、Cursor / Pencil Resize 归属；接入多 Note 原子删除、Delete / Backspace、Selection 校准与失败 Toast。 | 本批待审 |
+| 2026-07-29 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | 明确 Cursor Move、Cursor / Pencil Resize 归属；接入多 Note 原子删除、Delete / Backspace、Selection 校准与失败 Toast。 | `52dc03c` |
+| 2026-07-29 | `MIDI-NOTE-CORE` | 单个与多个 Note 删除统一为数量无关的 `midi-note.remove` 集合协议，移除重叠的单 Note Command。 | `df4cdf3` |
 
 ## 13. 当前验证基线
 
-功能代码截至 `1bc6dac`；当前待审工作树已通过：
+功能代码截至 `df4cdf3` 已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production

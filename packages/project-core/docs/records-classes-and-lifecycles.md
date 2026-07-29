@@ -227,7 +227,7 @@ pointerup
 
 用户说“销毁一个音符”时，也可能表示完全不同的事情：
 
-- RemoveNoteCommand 删除项目实体；
+- RemoveNotesCommand 删除一个或多个项目 Note 实体；
 - 音符离开 Viewport，Renderer 丢弃绘制数据；
 - 用户按 Escape，Editor 取消 Drag Session；
 - Stop 被触发，Runtime 结束 Voice；

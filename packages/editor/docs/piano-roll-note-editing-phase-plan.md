@@ -70,11 +70,14 @@ Pixel 宽度在 Resize 批次结合实际界面审查确定。左右热区重叠
 
 - 一个 Selection 使用一个 `RemoveNotesCommand`；
 - Command 只接受同一个 MidiSource 中非空、无重复的 `NoteId` 集合；
+- 单个 Note 删除使用一元素 `noteIds`，不另设语义重叠的单 Note Command；
 - Preparer 在建立 MutationPlan 前验证全部 Note；任一 Note 缺失则整个 Command 失败；
 - N 个 Note 产生 N 条 Note Remove Mutation 和 N 条 Delta Change，但只推进一次
   ModelRevision；
 - 整个删除只形成一个 Commit、一个 dirty 内容状态和一个 Undo History 步骤；
 - 不允许 Studio 循环执行 N 个单 Note Command 来模拟多选删除。
+- 本批只建立专用的原子多 Note 删除，不建立通用 Batch / Composite Command，也不提前定义
+  多 Note Move、Resize 或跨 MidiSource 批处理。
 
 ### 2.3 Selection、History 与失败
 
@@ -93,11 +96,17 @@ Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 
 - 已经落在 Grid 上的单 Note Move 使用目标 Grid；
 - 导入或手工形成的 Off-grid Note 默认使用相对 Delta Snap，避免首次拖动破坏原有 Timing；
 - 多选 Move 以一个稳定 Anchor 解析 Delta，再把同一 Delta 应用于全部 Note；
+- 多选 Move 是一次 Selection 产品意图，不通过多次执行单 Note Command 实现；
 - Pitch 使用离散 Semitone Delta，不进入 Timeline Snap；
 - Snap Off 使用整数 Tick Delta；
 - Pointer Update 只更新冻结 Preview，不执行 Project Command；
 - Pointer Up 只提交一次 Move Intent，Cancel / Escape 恢复原始视觉；
 - Move 越界时采用整体 Selection 的合法 Delta 范围，不逐 Note Clamp。
+
+Batch 2 在生产实现前单独审查 `MoveNotesCommand` 的 Delta、No-change、边界与 Change
+协议。当前 `MoveNoteCommand` 在集合协议完成并迁移消费者前继续保留；是否由一元素
+`MoveNotesCommand` 覆盖，必须以最终语义等价为依据。通用准则见
+[Project Command 集合与事务语义](../../project-core/docs/project-command-collection-semantics.md)。
 
 临时绕过按键、Snap Guide 和 Preview 视觉在本批一起定义；对象边缘、Marker、播放头和 Loop
 边界仍不是 Snap Target。

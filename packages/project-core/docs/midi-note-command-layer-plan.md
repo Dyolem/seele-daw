@@ -1,10 +1,15 @@
 # MIDI Note Command 层执行计划
 
-> 状态：实现完成，等待阶段审阅
+> 状态：实现完成
 >
 > 日期：2026-07-17
 >
-> 范围：`AddNoteCommand`、`MoveNoteCommand`、`RemoveNoteCommand`
+> 范围：`AddNoteCommand`、`MoveNoteCommand`、`RemoveNotesCommand`
+>
+> 2026-07-29 校准：单个与多个 Note 删除统一使用 `RemoveNotesCommand`；一元素
+> `noteIds` 是单 Note 删除的规范表达，不再维护平行的单 Note 公共 Command。跨 Command
+> 的数量与事务设计遵循
+> [Project Command 集合与事务语义](./project-command-collection-semantics.md)。
 
 ## 文档目的
 
@@ -55,7 +60,8 @@ Move 的绝对目标与当前 Note 的 `startTick`、`pitch` 都相同时，Comm
 
 即使目标看起来没有变化，也必须先验证 Command 并检查 `baseRevision`，避免静默吞掉基于陈旧模型的编辑意图。
 
-Add 的重复 Note ID 和 Remove 的目标不存在不是 `no-change`，而是调用方状态与当前模型不一致的类型化拒绝。
+Add 的重复 Note ID，以及 RemoveNotes 的任一目标不存在，都不是 `no-change`，而是调用方
+状态与当前模型不一致的类型化拒绝。
 
 ## 模块归属
 
@@ -89,7 +95,7 @@ packages/project-core/src/commands/
 - `project-command-error.ts`：稳定的产品语义拒绝错误；
 - `project-command-preparation.ts`：包内 `ready` / `no-change` 准备结果；
 - `project-command-preparer.ts`：共享校验、revision 检查和穷尽分派；
-- `midi-note-command-handler.ts`：Add、Move、Remove 的无状态计划生成算法。
+- `midi-note-command-handler.ts`：Add、Move、RemoveNotes 的无状态计划生成算法。
 
 不放入 `model/`，因为 Command 不是可保存的项目事实；不放入 `mutation/`，因为 Command 表达产品意图，而 Mutation 只表达规范化存储变化。handler 当前没有跨调用状态、资源或生命周期，因此使用模块函数，不创建只有静态方法的 Class。
 
@@ -145,18 +151,25 @@ Move 使用绝对目标而不是 delta：
 - Note ID、MidiSource、duration、velocity 和 channel 保持不变；
 - 跨 Source 移动不属于本 Command，未来应以独立产品语义讨论身份、所有权和历史规则。
 
-### RemoveNoteCommand
+### RemoveNotesCommand
 
 ```ts
-interface RemoveNoteCommand {
+interface RemoveNotesCommand {
   readonly type: 'midi-note.remove'
   readonly baseRevision: ModelRevision
   readonly sourceId: MidiSourceId
-  readonly noteId: NoteId
+  readonly noteIds: readonly NoteId[]
 }
 ```
 
-Remove 只删除指定 Note，不缩短 MidiSource，不改变 Clip，也不清理空 Source。
+RemoveNotes 接受同一 MidiSource 中非空、无重复的 Note ID 集合。单个 Note 删除使用
+`noteIds: [noteId]`；它与多 Note 删除共享同一验证、Commit、Delta 和 History 语义。
+Preparer 在建立计划前验证全部目标，任一目标缺失时不发生部分删除。Command 不缩短
+MidiSource，不改变 Clip，也不清理空 Source。
+
+这是一个由多选删除产品意图驱动的专用事务 Command，不代表 Project Core 已提供通用批量
+Command、混合类型 Composite Command、跨 MidiSource 批处理，或多 Note Move / Resize。
+内部仍由每个目标对应的单 Note Remove Mutation 表达最小事实变化。
 
 ## 准备结果
 

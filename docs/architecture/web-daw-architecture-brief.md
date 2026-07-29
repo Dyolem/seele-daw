@@ -478,7 +478,7 @@ Note
 ProjectSession
 AddNoteCommand
 MoveNoteCommand
-RemoveNoteCommand
+RemoveNotesCommand
 Undo / Redo
 ~~~
 

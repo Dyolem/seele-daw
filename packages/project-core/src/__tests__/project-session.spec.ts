@@ -9,7 +9,6 @@ import {
   createAddNoteCommand,
   createInitialProjectSession,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
@@ -115,10 +114,10 @@ describe('ProjectSession command execution', () => {
     })
 
     const removeResult = session.execute(
-      createRemoveNoteCommand({
+      createRemoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId,
+        noteIds: [noteId],
       }),
     )
 
@@ -137,10 +136,10 @@ describe('ProjectSession command execution', () => {
   it('returns a fully frozen committed result after successful application', () => {
     const { fixture, session } = createFixtureProjectSession()
     const result = session.execute(
-      createRemoveNoteCommand({
+      createRemoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId: fixture.records.nonLoopNote.id,
+        noteIds: [fixture.records.nonLoopNote.id],
       }),
     )
 
@@ -177,7 +176,7 @@ describe('ProjectSession command execution', () => {
         baseRevision: 0,
         modelRevision: 1,
         origin: {
-          commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+          commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
           kind: 'command',
         },
         delta: {
@@ -264,10 +263,10 @@ describe('ProjectSession command execution', () => {
   it('propagates stale Command errors without changing model state', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const before = fixture.records.nonLoopNote
-    const command = createRemoveNoteCommand({
+    const command = createRemoveNotesCommand({
       baseRevision: 1 as ModelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: before.id,
+      noteIds: [before.id],
     })
 
     expect(() => session.execute(command)).toThrowError(

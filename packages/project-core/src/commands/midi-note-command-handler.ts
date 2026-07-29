@@ -2,7 +2,6 @@ import { ProjectCommandError } from '#internal/commands/project-command-error'
 import {
   type AddNoteCommand,
   type MoveNoteCommand,
-  type RemoveNoteCommand,
   type RemoveNotesCommand,
 } from '#internal/commands/project-command'
 import type {
@@ -21,7 +20,6 @@ import { addTicks } from '#internal/time/tick'
 type MidiNoteCommand =
   | AddNoteCommand
   | MoveNoteCommand
-  | RemoveNoteCommand
   | RemoveNotesCommand
 
 function requireMidiSource(reader: ModelStoreReader, command: MidiNoteCommand): MidiSourceRecord {
@@ -60,7 +58,7 @@ function assertNotePartitionExists(reader: ModelStoreReader, command: MidiNoteCo
 
 function requireMidiNote(
   reader: ModelStoreReader,
-  command: MoveNoteCommand | RemoveNoteCommand | RemoveNotesCommand,
+  command: MoveNoteCommand | RemoveNotesCommand,
   noteId: NoteId,
 ): MidiNoteRecord {
   const note = reader.getMidiNote(command.sourceId, noteId)
@@ -162,23 +160,6 @@ export function prepareAddNoteCommand(
       type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
       sourceId: command.sourceId,
       after: note,
-    },
-  ])
-}
-
-export function prepareRemoveNoteCommand(
-  reader: ModelStoreReader,
-  command: RemoveNoteCommand,
-): ReadyProjectCommandPreparation {
-  requireMidiSource(reader, command)
-  assertNotePartitionExists(reader, command)
-  const note = requireMidiNote(reader, command, command.noteId)
-
-  return ready(command, [
-    {
-      type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-      sourceId: command.sourceId,
-      before: note,
     },
   ])
 }

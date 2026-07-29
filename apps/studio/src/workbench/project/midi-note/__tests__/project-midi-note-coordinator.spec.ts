@@ -231,7 +231,7 @@ describe('ProjectMidiNoteCoordinator', () => {
     expect(result.commit.modelRevision).toBe(revisionBeforeRemove + 1)
     expect(result.commit.origin).toEqual({
       kind: 'command',
-      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
     })
     expect(result.commit.delta.changes).toEqual([
       expect.objectContaining({

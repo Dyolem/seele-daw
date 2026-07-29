@@ -6,7 +6,7 @@ import {
   createAddNoteCommand,
   createInitialProjectSession,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiVelocity,
@@ -232,7 +232,11 @@ describe('ProjectSnapshot revision isolation', () => {
     expect(findNote(afterMove, sourceId, noteId)).not.toBe(findNote(afterAdd, sourceId, noteId))
 
     session.execute(
-      createRemoveNoteCommand({ baseRevision: session.modelRevision, sourceId, noteId }),
+      createRemoveNotesCommand({
+        baseRevision: session.modelRevision,
+        sourceId,
+        noteIds: [noteId],
+      }),
     )
     const afterRemove = session.getSnapshot()
 

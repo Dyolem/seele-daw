@@ -8,7 +8,6 @@ import {
   createAddNoteCommand,
   createMidiNoteRecord,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
@@ -129,13 +128,13 @@ describe('ProjectDelta Note semantics', () => {
     expect(change.after).toBe(mutation.after)
   })
 
-  it('maps RemoveNote to a removed change with the old Note interval', () => {
+  it('maps a one-Note RemoveNotes command to a removed change with the old interval', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createRemoveNoteCommand({
+    const command = createRemoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      noteIds: [fixture.records.nonLoopNote.id],
     })
     const preparation = requireReadyProjectCommandPreparation(
       prepareProjectCommand(store, command),
@@ -201,7 +200,7 @@ describe('ProjectDelta Note semantics', () => {
       'command-plan-mismatch',
     )
 
-    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY)
+    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE)
     expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REMOVE)
   })
 
@@ -326,10 +325,10 @@ describe('ProjectCommit candidate boundary', () => {
       inverse: [],
     } as MutationPlan
 
-    const command = createRemoveNoteCommand({
+    const command = createRemoveNotesCommand({
       baseRevision: fakePlan.baseRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      noteIds: [fixture.records.nonLoopNote.id],
     })
 
     expect(() => createProjectCommitCandidate(command, fakePlan)).toThrowError(
@@ -340,10 +339,10 @@ describe('ProjectCommit candidate boundary', () => {
   it('rejects revision exhaustion before a candidate can be produced', () => {
     const fixture = createCompleteProjectFixture()
     const baseRevision = Number.MAX_SAFE_INTEGER as ModelRevision
-    const command = createRemoveNoteCommand({
+    const command = createRemoveNotesCommand({
       baseRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      noteIds: [fixture.records.nonLoopNote.id],
     })
     const plan = createMutationPlan(baseRevision, [
       {
@@ -361,10 +360,10 @@ describe('ProjectCommit candidate boundary', () => {
   it('rejects an unsupported mutation instead of emitting a partial Delta', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createRemoveNoteCommand({
+    const command = createRemoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      noteIds: [fixture.records.nonLoopNote.id],
     })
     const plan = createMutationPlan(store.modelRevision, [
       {
@@ -436,13 +435,13 @@ describe('ProjectCommit candidate boundary', () => {
     expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.INSERT)
   })
 
-  it('rejects a RemoveNote Plan for a different Note address', () => {
+  it('rejects a RemoveNotes Plan for a different Note address', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createRemoveNoteCommand({
+    const command = createRemoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      noteIds: [fixture.records.nonLoopNote.id],
     })
     const plan = createMutationPlan(store.modelRevision, [
       {

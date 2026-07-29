@@ -5,7 +5,6 @@ export {
   createAddMidiClipCommand,
   createAddNoteCommand,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
   createRemoveNotesCommand,
 } from './commands/project-command'
 export type {
@@ -16,12 +15,10 @@ export type {
   CreateAddMidiClipCommandInput,
   CreateAddNoteCommandInput,
   CreateMoveNoteCommandInput,
-  CreateRemoveNoteCommandInput,
   CreateRemoveNotesCommandInput,
   MoveNoteCommand,
   ProjectCommand,
   ProjectCommandType,
-  RemoveNoteCommand,
   RemoveNotesCommand,
 } from './commands/project-command'
 export { ProjectCommandError } from './commands/project-command-error'

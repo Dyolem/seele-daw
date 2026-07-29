@@ -13,7 +13,7 @@ import {
   createAllProjectCommitsSubscription,
   createMidiNoteChangesSubscription,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiVelocity,
@@ -214,10 +214,10 @@ describe('ProjectSession commit publication', () => {
     )
     expect(() =>
       session.execute(
-        createRemoveNoteCommand({
+        createRemoveNotesCommand({
           baseRevision: 1 as ModelRevision,
           sourceId: fixture.records.nonLoopSource.id,
-          noteId: fixture.records.nonLoopNote.id,
+          noteIds: [fixture.records.nonLoopNote.id],
         }),
       ),
     ).toThrowError(

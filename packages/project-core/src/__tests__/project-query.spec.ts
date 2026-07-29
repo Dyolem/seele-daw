@@ -10,7 +10,7 @@ import {
   createMidiNoteByIdQuery,
   createMidiNotesIntersectingRangeQuery,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiSourceId,
@@ -282,7 +282,11 @@ describe('ProjectSession MIDI Note queries', () => {
     assertEquivalent()
 
     session.execute(
-      createRemoveNoteCommand({ baseRevision: session.modelRevision, sourceId, noteId }),
+      createRemoveNotesCommand({
+        baseRevision: session.modelRevision,
+        sourceId,
+        noteIds: [noteId],
+      }),
     )
     assertEquivalent()
 

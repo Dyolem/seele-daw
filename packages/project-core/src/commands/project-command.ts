@@ -49,7 +49,6 @@ export const PROJECT_COMMAND_TYPE = {
     ADD: 'midi-note.add',
     MOVE: 'midi-note.move',
     REMOVE: 'midi-note.remove',
-    REMOVE_MANY: 'midi-note.remove-many',
   },
 } as const
 
@@ -99,10 +98,8 @@ export interface MoveNoteCommand extends MidiNoteCommandBase<
   readonly nextPitch: MidiPitch
 }
 
-export type RemoveNoteCommand = MidiNoteCommandBase<typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE>
-
 export interface RemoveNotesCommand extends ProjectCommandBase<
-  typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY
+  typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE
 > {
   readonly sourceId: MidiSourceId
   readonly noteIds: readonly NoteId[]
@@ -113,7 +110,6 @@ export type ProjectCommand =
   | AddMidiClipCommand
   | AddNoteCommand
   | MoveNoteCommand
-  | RemoveNoteCommand
   | RemoveNotesCommand
 
 export interface CreateAddInstrumentTrackCommandInput {
@@ -159,8 +155,6 @@ export interface CreateMoveNoteCommandInput extends CreateNoteCommandInputBase {
   readonly nextStartTick: Tick
   readonly nextPitch: MidiPitch
 }
-
-export type CreateRemoveNoteCommandInput = CreateNoteCommandInputBase
 
 export interface CreateRemoveNotesCommandInput {
   readonly baseRevision: ModelRevision
@@ -277,15 +271,6 @@ export function createMoveNoteCommand(input: CreateMoveNoteCommandInput): MoveNo
   }
 }
 
-export function createRemoveNoteCommand(input: CreateRemoveNoteCommandInput): RemoveNoteCommand {
-  return {
-    type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
-    baseRevision: parseCommandBaseRevision(input.baseRevision),
-    sourceId: parseMidiSourceId(input.sourceId),
-    noteId: parseNoteId(input.noteId),
-  }
-}
-
 function parseDistinctNoteIds(noteIds: readonly NoteId[]): readonly NoteId[] {
   if (noteIds.length === 0) {
     throw new ProjectCommandError(
@@ -314,7 +299,7 @@ export function createRemoveNotesCommand(
   input: CreateRemoveNotesCommandInput,
 ): RemoveNotesCommand {
   return {
-    type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+    type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
     baseRevision: parseCommandBaseRevision(input.baseRevision),
     sourceId: parseMidiSourceId(input.sourceId),
     noteIds: parseDistinctNoteIds(input.noteIds),
@@ -364,8 +349,6 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
       return createMoveNoteCommand(command)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
-      return createRemoveNoteCommand(command)
-    case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY:
       return createRemoveNotesCommand(command)
     default:
       return rejectUnknownCommand(command)

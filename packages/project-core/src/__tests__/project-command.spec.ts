@@ -8,7 +8,6 @@ import {
   ZERO_TICK,
   createAddNoteCommand,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
@@ -22,7 +21,6 @@ import {
   type ModelRevision,
   type MoveNoteCommand,
   type ProjectCommand,
-  type RemoveNoteCommand,
   type RemoveNotesCommand,
 } from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
@@ -85,15 +83,15 @@ function createMoveCommand(
   })
 }
 
-function createRemoveCommand(
+function createSingleRemoveCommand(
   store: ModelStore,
   sourceId: ReturnType<typeof parseMidiSourceId>,
   noteId: ReturnType<typeof parseNoteId>,
-): RemoveNoteCommand {
-  return createRemoveNoteCommand({
+): RemoveNotesCommand {
+  return createRemoveNotesCommand({
     baseRevision: store.modelRevision,
     sourceId,
-    noteId,
+    noteIds: [noteId],
   })
 }
 
@@ -115,12 +113,7 @@ describe('ProjectCommand public contract', () => {
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
     )
-    const remove = createRemoveCommand(
-      store,
-      fixture.records.nonLoopSource.id,
-      fixture.records.nonLoopNote.id,
-    )
-    const removeMany = createRemoveNotesCommand({
+    const remove = createRemoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
       noteIds: [
@@ -141,9 +134,8 @@ describe('ProjectCommand public contract', () => {
       channel: parseMidiChannel(2),
     })
     expect(move.type).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE)
-    expect(remove.type).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE)
-    expect(removeMany).toEqual({
-      type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE_MANY,
+    expect(remove).toEqual({
+      type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
       noteIds: [
@@ -151,17 +143,15 @@ describe('ProjectCommand public contract', () => {
         fixture.records.nonLoopHarmonyNote.id,
       ],
     })
-    expect(Object.isFrozen(removeMany.noteIds)).toBe(true)
+    expect(Object.isFrozen(remove.noteIds)).toBe(true)
     expectTypeOf(add).toEqualTypeOf<AddNoteCommand>()
     expectTypeOf(move).toEqualTypeOf<MoveNoteCommand>()
-    expectTypeOf(remove).toEqualTypeOf<RemoveNoteCommand>()
-    expectTypeOf(removeMany).toEqualTypeOf<RemoveNotesCommand>()
+    expectTypeOf(remove).toEqualTypeOf<RemoveNotesCommand>()
     expectTypeOf<ProjectCommand>().toEqualTypeOf<
       | AddInstrumentTrackCommand
       | AddMidiClipCommand
       | AddNoteCommand
       | MoveNoteCommand
-      | RemoveNoteCommand
       | RemoveNotesCommand
     >()
   })
@@ -211,10 +201,10 @@ describe('ProjectCommand public contract', () => {
     (revision) => {
       const fixture = createCompleteProjectFixture()
       const error = captureCommandError(() =>
-        createRemoveNoteCommand({
+        createRemoveNotesCommand({
           baseRevision: revision as ModelRevision,
           sourceId: fixture.records.nonLoopSource.id,
-          noteId: fixture.records.nonLoopNote.id,
+          noteIds: [fixture.records.nonLoopNote.id],
         }),
       )
 
@@ -376,11 +366,11 @@ describe('AddNoteCommand', () => {
   })
 })
 
-describe('RemoveNoteCommand', () => {
+describe('RemoveNotesCommand', () => {
   it('prepares one NOTE.REMOVE with the current Record reference', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createRemoveCommand(
+    const command = createSingleRemoveCommand(
       store,
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
@@ -398,7 +388,7 @@ describe('RemoveNoteCommand', () => {
   it('rejects a missing Note instead of treating removal as idempotent', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createRemoveCommand(
+    const command = createSingleRemoveCommand(
       store,
       fixture.records.nonLoopSource.id,
       parseNoteId('note-command-missing'),
@@ -406,13 +396,13 @@ describe('RemoveNoteCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('midi-note-not-found')
-    expect(error.noteId).toBe(command.noteId)
+    expect(error.noteId).toBe(command.noteIds[0])
   })
 
   it('applies the removal and inverses it with the original Record reference', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const command = createRemoveCommand(
+    const command = createSingleRemoveCommand(
       store,
       fixture.records.nonLoopSource.id,
       fixture.records.nonLoopNote.id,
@@ -422,7 +412,9 @@ describe('RemoveNoteCommand', () => {
     applyAndInverse(store, plan)
 
     expect(store.modelRevision).toBe(2)
-    expect(store.getMidiNote(command.sourceId, command.noteId)).toBe(fixture.records.nonLoopNote)
+    expect(
+      store.getMidiNote(command.sourceId, fixture.records.nonLoopNote.id),
+    ).toBe(fixture.records.nonLoopNote)
   })
 })
 

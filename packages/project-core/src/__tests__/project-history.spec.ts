@@ -10,7 +10,7 @@ import {
   ProjectCommandError,
   createAddNoteCommand,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiVelocity,
@@ -210,10 +210,10 @@ describe('ProjectSession Undo / Redo', () => {
 
     requireCommitted(
       session.execute(
-        createRemoveNoteCommand({
+        createRemoveNotesCommand({
           baseRevision: session.modelRevision,
           sourceId: fixture.records.nonLoopSource.id,
-          noteId: before.id,
+          noteIds: [before.id],
         }),
       ),
     )

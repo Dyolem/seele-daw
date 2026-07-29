@@ -6,7 +6,7 @@ import {
   createAddNoteCommand,
   createInitialProjectSession,
   createMoveNoteCommand,
-  createRemoveNoteCommand,
+  createRemoveNotesCommand,
   parseBipolarValue,
   parseClipId,
   parseDeviceId,
@@ -140,10 +140,10 @@ export function createPianoRollProjectFixture() {
   function removeNote(noteId: NoteId): void {
     executeCommitted(
       session,
-      createRemoveNoteCommand({
+      createRemoveNotesCommand({
         baseRevision: session.modelRevision,
         sourceId,
-        noteId,
+        noteIds: [noteId],
       }),
     )
   }

@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Add MIDI Clip 与 Add / Move / Remove MIDI Note Command、Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Add MIDI Clip 与 Add / Move / Remove / Resize MIDI Note Command、Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -69,16 +69,16 @@ nextNotes.set(noteId, changedNote)
 
 ## 状态分层
 
-| 层级            | 是否权威                 | 是否可变       | 说明                                       |
-| --------------- | ------------------------ | -------------- | ------------------------------------------ |
-| ModelStore      | 是                       | 仅内核受控可变 | 保存实体表、有序关系和当前 `modelRevision` |
-| Entity Record   | 是                       | 否             | 只读值对象；修改时创建新记录并替换表项     |
-| QueryIndex      | 否                       | 受控可变       | 从 ModelStore 派生，失败后可以全量重建     |
-| ProjectSnapshot | 某一 revision 的稳定视图 | 否             | 用于首次编译、保存、Worker 和诊断          |
-| ProjectCommit   | 否                       | 否             | 一次提交的结果、版本和元数据               |
-| ProjectDelta    | 否                       | 否             | 告知消费者哪些语义范围失效                 |
+| 层级            | 是否权威                 | 是否可变       | 说明                                           |
+| --------------- | ------------------------ | -------------- | ---------------------------------------------- |
+| ModelStore      | 是                       | 仅内核受控可变 | 保存实体表、有序关系和当前 `modelRevision`     |
+| Entity Record   | 是                       | 否             | 只读值对象；修改时创建新记录并替换表项         |
+| QueryIndex      | 否                       | 受控可变       | 从 ModelStore 派生，失败后可以全量重建         |
+| ProjectSnapshot | 某一 revision 的稳定视图 | 否             | 用于首次编译、保存、Worker 和诊断              |
+| ProjectCommit   | 否                       | 否             | 一次提交的结果、版本和元数据                   |
+| ProjectDelta    | 否                       | 否             | 告知消费者哪些语义范围失效                     |
 | History         | 否                       | 受控维护       | 保存可逆 mutation 与内容状态身份，不是项目文件 |
-| Journal         | 否                       | 外部持久化     | 用于崩溃恢复，不等于 Undo History          |
+| Journal         | 否                       | 外部持久化     | 用于崩溃恢复，不等于 Undo History              |
 
 只有 ModelStore 中的项目实体是当前创作事实。Snapshot 是某一 revision 的固定观察结果，QueryIndex 和 Delta 都可以丢弃并重新生成。
 
@@ -115,7 +115,7 @@ ModelStore 构造器只取得存储容器所有权并注册内部 write lease，
 - Track 到 Clip 的反向查询由可重建索引提供；
 - V1 中一个 MidiClip 独占一个 MidiSource，普通复制会深复制 Source 和 Note；
 - Note 按 MidiSource 分区存储，不在每个 Note 中重复保存 `sourceId`；
-- Add Note 与同一 MidiSource 内 Move Note 的严格边界已经确定；Clip Move、跨 Source Note Move、Resize 与 Split 留到对应命令实现前单独讨论。
+- Add / Resize Note 与同一 MidiSource 内 Move Note 的严格边界已经确定；Clip Move、跨 Source Note Move 与 Split 留到对应命令实现前单独讨论。
 
 必须遵守：
 
@@ -213,9 +213,9 @@ History、MIDI Note QueryIndex 与 ChangePublisher 已接入同一提交边界�
 
 ### MIDI Note Command 纵向切片
 
-当前已经实现 `AddNoteCommand`，以及面向同一 MidiSource 的 `MoveNotesCommand` 和
-`RemoveNotesCommand`。单 Note Move / Remove 同样使用仅含一个 `NoteId` 的集合 Command，
-不维护语义完全被覆盖的平行单 Note API。公开 Command 使用稳定判别
+当前已经实现 `AddNoteCommand`、`ResizeNoteCommand`，以及面向同一 MidiSource 的
+`MoveNotesCommand` 和 `RemoveNotesCommand`。单 Note Move / Remove 同样使用仅含一个
+`NoteId` 的集合 Command，不维护语义完全被覆盖的平行单 Note API。公开 Command 使用稳定判别
 字段、完整领域参数和 `baseRevision`；包内 preparer 重新验证 Command、拒绝陈旧
 revision，并通过无状态 handler 读取 `ModelStoreReader`、创建一条或多条 Note mutation，
 最终形成 MutationPlan。
@@ -226,16 +226,21 @@ Move 结果越界时不会产生部分写入。`MoveNotesCommand` 使用共享�
 Replace / Remove Mutation 仍只形成一个 Commit、一次 revision 推进和一个 History 步骤，
 Undo / Redo 原子恢复或重放完整集合。
 
-Add 和同一 MidiSource 内的 Move 使用严格 Source 与 MIDI Pitch 边界，不由 Core clamp、
-wrap 或自动扩展 Source / Clip。Editor 可以在 Preview 阶段约束 Delta，Core 仍基于提交时
-的权威 Record 完整复核。Command preparer 与 handler 不从 package root 导出；
+`ResizeNoteCommand` 只表达一个明确 Note 的最终 `startTick` 与 `durationTick`，不编码左边缘、
+右边缘、Pointer 或 Snap。目标几何必须保持正 Duration 且完全位于 Source 内；几何未变化时
+返回 `no-change`，合法变化只替换 Start / Duration，并保留 Note ID、Pitch、Velocity 与
+Channel。多 Note Resize 的共享 Anchor 或比例语义尚未定义，因此不提前泛化为集合协议。
+
+Add、Resize 和同一 MidiSource 内的 Move 使用严格 Source 与 MIDI Pitch 边界，不由 Core
+clamp、wrap 或自动扩展 Source / Clip。Editor 可以在 Preview 阶段约束几何或 Delta，Core
+仍基于提交时的权威 Record 完整复核。Command preparer 与 handler 不从 package root 导出；
 ProjectSession 是正式执行入口。完整规则和实现边界见
 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
 
 Command 的单数或复数不由 Mutation 数量决定：Command 表达一次完整产品意图，Mutation
 表达最小项目事实变化，MutationPlan / Commit 提供全有或全无的事务边界。不得用多次
 `ProjectSession.execute()` 或 `Promise.all` 模拟一个集合事务。具体判断标准、当前
-Remove / Add / Move 决定及未来迁移条件见
+Remove / Add / Move / Resize 决定及未来迁移条件见
 [Project Command 集合与事务语义](./docs/project-command-collection-semantics.md)。
 
 ### Add Instrument Track 纵向切片
@@ -252,7 +257,7 @@ Project Core 验证目标 Instrument Track、Clip / Source / Partition 身份和
 
 ### ProjectCommit / ProjectDelta 基础层
 
-当前公开契约能够表达 Instrument Track Add / Remove、MIDI Clip Add / Remove 与 MIDI Note Add / Remove / Update。Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip change 聚合 Clip、Source 与 Note Partition，并携带时间线受影响范围；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
+当前公开契约能够表达 Instrument Track Add / Remove、MIDI Clip Add / Remove 与 MIDI Note Add / Remove / Update。Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip change 聚合 Clip、Source 与 Note Partition，并携带时间线受影响范围；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 与 Resize 都使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
 
 包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
@@ -500,8 +505,8 @@ src/
 1. 建立 ModelStore、opaque ID、Tick 和只读实体记录约定。
 2. 按 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 定义 Project、Instrument Track、MidiClip、MidiSource、Note、Timeline 和最小 Device Descriptor。
 3. 实现 MutationPlan、MutationApplier 和原子提交骨架。
-4. 实现 `AddMidiClipCommand`、`AddNoteCommand`，以及支持单个或多个 Note 原子操作的
-   `MoveNotesCommand` / `RemoveNotesCommand`。
+4. 实现 `AddMidiClipCommand`、`AddNoteCommand`、`ResizeNoteCommand`，以及支持单个或多个
+   Note 原子操作的 `MoveNotesCommand` / `RemoveNotesCommand`。
 5. 建立 Note 级 ProjectCommit、ProjectDelta 与写前准备边界。
 6. 实现 ProjectSession 最小执行门面和提交发布时机。
 7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。

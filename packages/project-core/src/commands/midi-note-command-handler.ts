@@ -3,6 +3,7 @@ import {
   type AddNoteCommand,
   type MoveNotesCommand,
   type RemoveNotesCommand,
+  type ResizeNoteCommand,
 } from '#internal/commands/project-command'
 import type {
   NoChangeProjectCommandPreparation,
@@ -10,11 +11,7 @@ import type {
 } from '#internal/commands/project-command-preparation'
 import type { NoteId } from '#internal/model/ids'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
-import {
-  MIDI_PITCH_MAX,
-  MIDI_PITCH_MIN,
-  parseMidiPitch,
-} from '#internal/model/scalars'
+import { MIDI_PITCH_MAX, MIDI_PITCH_MIN, parseMidiPitch } from '#internal/model/scalars'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
@@ -22,10 +19,7 @@ import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
 import { addTicks, parseTick } from '#internal/time/tick'
 
-type MidiNoteCommand =
-  | AddNoteCommand
-  | MoveNotesCommand
-  | RemoveNotesCommand
+type MidiNoteCommand = AddNoteCommand | MoveNotesCommand | RemoveNotesCommand | ResizeNoteCommand
 
 function requireMidiSource(reader: ModelStoreReader, command: MidiNoteCommand): MidiSourceRecord {
   const source = reader.getMidiSource(command.sourceId)
@@ -63,7 +57,7 @@ function assertNotePartitionExists(reader: ModelStoreReader, command: MidiNoteCo
 
 function requireMidiNote(
   reader: ModelStoreReader,
-  command: MoveNotesCommand | RemoveNotesCommand,
+  command: MoveNotesCommand | RemoveNotesCommand | ResizeNoteCommand,
   noteId: NoteId,
 ): MidiNoteRecord {
   const note = reader.getMidiNote(command.sourceId, noteId)
@@ -108,7 +102,7 @@ function assertNoteIdAvailable(reader: ModelStoreReader, command: AddNoteCommand
 }
 
 function assertNoteWithinSource(
-  command: AddNoteCommand | MoveNotesCommand,
+  command: AddNoteCommand | MoveNotesCommand | ResizeNoteCommand,
   source: MidiSourceRecord,
   note: MidiNoteRecord,
 ): void {
@@ -252,4 +246,37 @@ export function prepareMoveNotesCommand(
   })
 
   return ready(command, mutations)
+}
+
+export function prepareResizeNoteCommand(
+  reader: ModelStoreReader,
+  command: ResizeNoteCommand,
+): ReadyProjectCommandPreparation | NoChangeProjectCommandPreparation {
+  const source = requireMidiSource(reader, command)
+  assertNotePartitionExists(reader, command)
+  const before = requireMidiNote(reader, command, command.noteId)
+
+  if (command.startTick === before.startTick && command.durationTick === before.durationTick) {
+    return {
+      status: 'no-change',
+      reason: 'already-at-target',
+      baseRevision: command.baseRevision,
+    }
+  }
+
+  const after = createMidiNoteRecord({
+    ...before,
+    startTick: command.startTick,
+    durationTick: command.durationTick,
+  })
+  assertNoteWithinSource(command, source, after)
+
+  return ready(command, [
+    {
+      type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+      sourceId: command.sourceId,
+      before,
+      after,
+    },
+  ])
 }

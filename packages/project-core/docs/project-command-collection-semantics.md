@@ -32,14 +32,14 @@ Editor / Studio interaction policy
 
 各层职责如下：
 
-| 层级 | 职责 | 不负责 |
-| --- | --- | --- |
-| Editor / Studio | Selection、Pointer、Snap、Preview、面向用户的 Clamp 或拒绝策略 | 直接修改 Project Facts |
-| Project Command | 描述一次完整产品意图及调用方观察到的 `baseRevision` | UI 状态、异步 I/O、逐步提交 |
-| Command Preparer | 从权威模型重新读取目标、验证全部前置条件并建立封闭计划 | 获得写权限、发布 Commit |
-| Project Mutation | 描述一个最小规范化存储变化，例如插入、替换或删除一个 Note | 独立 History、产品交互策略 |
-| MutationPlan / Applier | 预投影完整结果、全有或全无应用、失败回滚、只推进一次 revision | 猜测用户意图 |
-| Project Commit | 记录一次已经成功的产品事务及其 Delta | 表示尚未提交的 Preview |
+| 层级                   | 职责                                                           | 不负责                      |
+| ---------------------- | -------------------------------------------------------------- | --------------------------- |
+| Editor / Studio        | Selection、Pointer、Snap、Preview、面向用户的 Clamp 或拒绝策略 | 直接修改 Project Facts      |
+| Project Command        | 描述一次完整产品意图及调用方观察到的 `baseRevision`            | UI 状态、异步 I/O、逐步提交 |
+| Command Preparer       | 从权威模型重新读取目标、验证全部前置条件并建立封闭计划         | 获得写权限、发布 Commit     |
+| Project Mutation       | 描述一个最小规范化存储变化，例如插入、替换或删除一个 Note      | 独立 History、产品交互策略  |
+| MutationPlan / Applier | 预投影完整结果、全有或全无应用、失败回滚、只推进一次 revision  | 猜测用户意图                |
+| Project Commit         | 记录一次已经成功的产品事务及其 Delta                           | 表示尚未提交的 Preview      |
 
 “单 Note 删除”可以是一条 `NOTE.REMOVE` Mutation；“删除当前 Selection”则可以是一个包含
 N 条 `NOTE.REMOVE` Mutation 的 Command。后者仍然是原子的，因为任何目标失败都不会产生
@@ -72,12 +72,12 @@ Promise.all(
 
 设计新 Command 时使用以下判断：
 
-| 条件 | 推荐 |
-| --- | --- |
-| 单个与多个具有完全相同的产品语义，一元素集合没有歧义 | 使用一个集合 Command，允许一元素集合 |
-| 多个对象之间存在共同 Delta、Anchor、顺序或范围交集 | 设计专用集合 Command，并显式表达共同约束 |
-| 所谓“批量”实际是 Paste、Import、Duplicate、Chord 等另一种用户意图 | 使用产品语义命名的独立 Command |
-| 当前没有真实集合入口，边界算法也未确定 | 保留现有单实体 Command，不提前泛化 |
+| 条件                                                              | 推荐                                     |
+| ----------------------------------------------------------------- | ---------------------------------------- |
+| 单个与多个具有完全相同的产品语义，一元素集合没有歧义              | 使用一个集合 Command，允许一元素集合     |
+| 多个对象之间存在共同 Delta、Anchor、顺序或范围交集                | 设计专用集合 Command，并显式表达共同约束 |
+| 所谓“批量”实际是 Paste、Import、Duplicate、Chord 等另一种用户意图 | 使用产品语义命名的独立 Command           |
+| 当前没有真实集合入口，边界算法也未确定                            | 保留现有单实体 Command，不提前泛化       |
 
 不得把“以后可能批量操作”作为所有新 Command 默认使用数组 Payload 的理由。默认规则不是
 “优先单数”或“优先复数”，而是“准确表达当前完整产品意图”。
@@ -186,9 +186,31 @@ Editor 使用该范围产生一致 Preview；Project Core 在提交时仍需基�
 全部 Note 并验证最终结果。一个合法命令建立按 `noteIds` 顺序排列的多个
 `NOTE.REPLACE` Mutation，但只产生一个 Commit、一次 revision 推进和一个 History 步骤。
 
-### 5.4 Resize、Track 与 Clip
+### 5.4 Resize Note
 
-- 首批 Note Resize 只操作明确命中的一个 Note；多选比例缩放或共享 Anchor 是未来独立语义；
+首批 `ResizeNoteCommand` 保持单实体协议：
+
+```ts
+interface ResizeNoteCommand {
+  readonly type: 'midi-note.resize'
+  readonly baseRevision: ModelRevision
+  readonly sourceId: MidiSourceId
+  readonly noteId: NoteId
+  readonly startTick: Tick
+  readonly durationTick: Tick
+}
+```
+
+- Command 表达最终 Start / Duration，不编码 Pointer 命中的左边缘或右边缘；
+- Duration 必须为正 Tick，Note 结束位置不能超过 MidiSource 长度；
+- 目标几何与权威 Note 相同时返回 `no-change`；
+- 成功时只替换 Start / Duration，保留 ID、Pitch、Velocity 与 Channel；
+- 首批产品交互只调整明确命中的一个 Note；
+- 多选比例缩放、共享固定边缘、共同 Delta 或逐 Note Clamp 都尚无确定产品语义，因此当前不
+  接受 `noteIds` 集合，也不提供泛化的多 Note Resize。
+
+### 5.5 Track 与 Clip
+
 - Track 模板、批量导入与多轨创建不等于重复执行当前 Add Instrument Track；
 - Clip Paste、Duplicate、Split 或 Import 具有独立身份和 Source 所有权规则；
 - 在这些真实产品入口出现前，现有单实体 Command 不因“未来可能批量”而调整。

@@ -18,11 +18,13 @@
 - 创建成功后只选中新 Note 并保持 Pencil，创建失败时保留 Project 与 Selection 并显示
   Toast；
 - Add Note 的 Undo / Redo 权威回读与失效 Selection 清理；
+- Cursor Note Body Drag 的单 Note / Selection Move、Absolute Grid Coordinate Snap、Preview
+  Guide、Escape / blur 取消与权威 revision 交接；
 - 聚焦 Piano Roll 时使用 `Delete` / `Backspace` 原子删除完整 Note Selection；成功后由
   权威 Subscription 清理 Selection，失败保留 Project 与 Selection 并显示 Toast；
 - looped Clip 的明确不支持状态。
 
-当前 Surface 已形成 Add 与多选 Delete 写入闭环，但仍不能 Move、Resize 或编辑 Velocity。
-Cursor 将负责 Note Body Move；Cursor 与 Pencil 都将通过左右 Edge Hit Resize。DOM Event
-必须继续先归一化为 Renderer-neutral Hit，不直接修改 Project Model，也不把 ProjectSession
-放入 Pinia。
+当前 Surface 已形成 Add、Cursor Move 与多选 Delete 写入闭环，但仍不能 Resize 或编辑
+Velocity。Project Core 已具备单 Note Resize Command，Editor / Browser / Studio 尚未接入；
+Cursor 与 Pencil 都将通过左右 Edge Hit Resize。DOM Event 必须继续先归一化为
+Renderer-neutral Hit，不直接修改 Project Model，也不把 ProjectSession 放入 Pinia。

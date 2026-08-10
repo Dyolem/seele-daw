@@ -12,6 +12,7 @@ import {
   createMidiNoteByIdQuery,
   createMoveNotesCommand,
   createRemoveNotesCommand,
+  createResizeNoteCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiPitchDelta,
@@ -208,6 +209,45 @@ describe('ProjectSession Undo / Redo', () => {
 
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
     expect(redoCommit?.delta.changes[0]).toMatchObject({ before, after })
+  })
+
+  it('restores exact before and after Record references across ResizeNote Undo / Redo', () => {
+    const { fixture, store, session } = createFixtureProjectSession()
+    const before = fixture.records.nonLoopNote
+    const resizeCommit = requireCommitted(
+      session.execute(
+        createResizeNoteCommand({
+          baseRevision: session.modelRevision,
+          sourceId: fixture.records.nonLoopSource.id,
+          noteId: before.id,
+          startTick: parseTick(120),
+          durationTick: parseTick(600),
+        }),
+      ),
+    )
+    const resizeChange = resizeCommit.delta.changes[0]
+
+    expect(resizeChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
+    if (resizeChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
+      throw new Error('Expected ResizeNote to produce an updated Note change')
+    }
+
+    const after = resizeChange.after
+    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
+
+    expect(session.undo()?.origin).toEqual({
+      kind: PROJECT_COMMIT_ORIGIN_KIND.HISTORY,
+      direction: PROJECT_HISTORY_DIRECTION.UNDO,
+      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
+    })
+    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+
+    expect(session.redo()?.origin).toEqual({
+      kind: PROJECT_COMMIT_ORIGIN_KIND.HISTORY,
+      direction: PROJECT_HISTORY_DIRECTION.REDO,
+      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
+    })
+    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
   })
 
   it('restores a removed Note by its original Record reference', () => {

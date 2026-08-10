@@ -166,8 +166,14 @@ Surface-scoped Interaction Session：
 - 左右边缘分别选择自己的 Snap Anchor，不能隐式继承 Pencil Create 的 `floor`；
 - Resize 失败保留原 Note、Selection 和当前 Tool。
 
-Project Core 目前没有 Resize Command；精确边界算法、No-change 规则和 Delta 语义必须在本批
-生产实现前单独审查。
+Batch 3A 已在 Project Core 建立单 Note `ResizeNoteCommand`：Command 使用最终 Start /
+Duration，不携带 Edge 方向；正 Duration、Source 边界、No-change、单条 Note Update Delta
+及 Undo / Redo 已形成权威协议。它仍只是内部就绪能力，尚无 Editor Intent 或 Studio 入口。
+
+Batch 3B 负责 Editor Common 的左右边界纯算法、Resize Preview、Snap Anchor 与 Interaction
+Session 分支；Batch 3C 再接入 Browser Edge Hit、Pointer 生命周期、Studio Coordinator、
+Toast 和可见闭环。该拆分避免 Core 知道左右 Edge，也避免在命中热区确定前把浏览器细节写入
+领域协议。
 
 ## 6. Snap 完成时机
 
@@ -189,8 +195,9 @@ Snap 只约束实时创建与拖动；Quantize 是修改既有 Note Timing 的 P
 3. Batch 2A：Absolute Time Grid Coordinate Snap、Move Intent 和纯逻辑边界。
 4. Batch 2B：Cursor Move Hit、Preview、Pointer 生命周期与一次提交。
 5. 独立批次：Pointer Interaction State Machine Foundation。
-6. Batch 3A：Resize Command 与左右边界算法。
-7. Batch 3B：Cursor / Pencil Edge Hit、Preview 与可见 Resize 闭环。
+6. Batch 3A：Project Core 单 Note Resize Command、Delta 与 History。
+7. Batch 3B：Editor Common 左右边界算法、Preview、Snap 与 Interaction Session 分支。
+8. Batch 3C：Browser Edge Hit 与 Studio 可见 Resize 闭环。
 
 每个独立批次完成测试和用户审查后再进入下一批。性能优化继续由真实 DOM Note 基准驱动，
 不因 Move / Resize 提前迁移到 Canvas Note Renderer。

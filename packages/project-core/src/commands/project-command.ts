@@ -36,7 +36,14 @@ import {
 } from '#internal/model/midi-clip'
 import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
 import type { CreateChannelStripDescriptorInput } from '#internal/model/channel'
-import { parseTickDelta, type Tick, type TickDelta } from '#internal/time/tick'
+import {
+  addTicks,
+  parsePositiveTick,
+  parseTick,
+  parseTickDelta,
+  type Tick,
+  type TickDelta,
+} from '#internal/time/tick'
 
 /** Canonical runtime discriminants for product-level project commands. */
 export const PROJECT_COMMAND_TYPE = {
@@ -50,6 +57,7 @@ export const PROJECT_COMMAND_TYPE = {
     ADD: 'midi-note.add',
     MOVE: 'midi-note.move',
     REMOVE: 'midi-note.remove',
+    RESIZE: 'midi-note.resize',
   },
 } as const
 
@@ -67,8 +75,9 @@ interface MidiNoteCommandBase<Type extends ProjectCommandType> extends ProjectCo
   readonly noteId: NoteId
 }
 
-interface MidiNoteCollectionCommandBase<Type extends ProjectCommandType>
-  extends ProjectCommandBase<Type> {
+interface MidiNoteCollectionCommandBase<
+  Type extends ProjectCommandType,
+> extends ProjectCommandBase<Type> {
   readonly sourceId: MidiSourceId
   readonly noteIds: readonly NoteId[]
 }
@@ -109,12 +118,20 @@ export type RemoveNotesCommand = MidiNoteCollectionCommandBase<
   typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE
 >
 
+export interface ResizeNoteCommand extends MidiNoteCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE
+> {
+  readonly startTick: Tick
+  readonly durationTick: Tick
+}
+
 export type ProjectCommand =
   | AddInstrumentTrackCommand
   | AddMidiClipCommand
   | AddNoteCommand
   | MoveNotesCommand
   | RemoveNotesCommand
+  | ResizeNoteCommand
 
 export interface CreateAddInstrumentTrackCommandInput {
   readonly baseRevision: ModelRevision
@@ -167,6 +184,11 @@ export interface CreateMoveNotesCommandInput extends CreateNoteCollectionCommand
 }
 
 export type CreateRemoveNotesCommandInput = CreateNoteCollectionCommandInputBase
+
+export interface CreateResizeNoteCommandInput extends CreateNoteCommandInputBase {
+  readonly startTick: Tick
+  readonly durationTick: Tick
+}
 
 function parseCommandBaseRevision(value: ModelRevision): ModelRevision {
   try {
@@ -304,14 +326,27 @@ export function createMoveNotesCommand(input: CreateMoveNotesCommandInput): Move
   }
 }
 
-export function createRemoveNotesCommand(
-  input: CreateRemoveNotesCommandInput,
-): RemoveNotesCommand {
+export function createRemoveNotesCommand(input: CreateRemoveNotesCommandInput): RemoveNotesCommand {
   return {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
     baseRevision: parseCommandBaseRevision(input.baseRevision),
     sourceId: parseMidiSourceId(input.sourceId),
     noteIds: parseDistinctNoteIds(input.noteIds, 'RemoveNotesCommand'),
+  }
+}
+
+export function createResizeNoteCommand(input: CreateResizeNoteCommandInput): ResizeNoteCommand {
+  const startTick = parseTick(input.startTick)
+  const durationTick = parsePositiveTick(input.durationTick)
+  addTicks(startTick, durationTick)
+
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    sourceId: parseMidiSourceId(input.sourceId),
+    noteId: parseNoteId(input.noteId),
+    startTick,
+    durationTick,
   }
 }
 
@@ -359,6 +394,8 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
       return createMoveNotesCommand(command)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
       return createRemoveNotesCommand(command)
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
+      return createResizeNoteCommand(command)
     default:
       return rejectUnknownCommand(command)
   }

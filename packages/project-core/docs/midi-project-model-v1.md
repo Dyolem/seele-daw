@@ -4,7 +4,7 @@
 
 它是当前实现阶段的数据模型基线。字段或规则发生变化时，应先更新本文档；涉及不可逆文件格式或跨模块产品语义的决定，再补充 ADR。
 
-本文档不定义 Command handler 的具体实现。Add Note 和同一 MidiSource 内的 Move Note 已确定采用严格 Source 边界；Clip Move、跨 Source Note Move、Resize 与 Split 的算法仍暂缓。
+本文档不定义 Command handler 的具体实现。Add / Resize Note 和同一 MidiSource 内的 Move Note 已确定采用严格 Source 边界；Clip Move / Resize、跨 Source Note Move 与 Split 的算法仍暂缓。
 
 ## 目标与范围
 
@@ -38,7 +38,7 @@ V1 数据模型需要支持以下闭环：
 - Recording、Asset 和媒体垃圾回收；
 - Linked Clip、Take Lane、Comping；
 - Group、Return、Send 和任意路由图；
-- Clip Move、跨 Source Note Move、Resize、Split 的边界算法；
+- Clip Move / Resize、跨 Source Note Move、Split 的边界算法；
 - Loop 边界事件排序。
 
 这些能力不提前创建空表或占位抽象，在对应产品语义确定后通过新字段、联合类型分支和 schema migration 加入。
@@ -378,7 +378,7 @@ sourceStartTick
   < sourceStartTick + sourceSpanTick
 ```
 
-Clip Move、跨 Source Note Move、Resize、Split 如何改变这些字段，以及 Loop 边界的事件排序，留到相应命令和 Playback 实现前单独讨论。
+Clip Move / Resize、跨 Source Note Move 与 Split 如何改变这些字段，以及 Loop 边界的事件排序，留到相应命令和 Playback 实现前单独讨论。单 Note Resize 只改变 Note 自身的 Start / Duration，不改变 Clip 或 Source 字段。
 
 ## Timeline、Tempo 与 Time Signature
 
@@ -655,7 +655,7 @@ Loop 边界 Note Off / Note On 的排序仍需在 Playback Compiler 实现前确
 以下内容将在对应命令或模块开始实现前单独讨论并形成测试：
 
 - Move Clip、跨 Source Note Move 的边界与目标兼容性算法；
-- Resize Clip / Note 的最小长度、裁剪和扩展算法；
+- Resize Clip 的最小长度、裁剪和扩展算法；
 - Split Clip 对 Source 复制、窗口和 Note 的具体处理；
 - Loop 边界事件排序；
 - Snap、量化与舍入策略；

@@ -9,6 +9,7 @@ import {
   createMidiNoteRecord,
   createMoveNotesCommand,
   createRemoveNotesCommand,
+  createResizeNoteCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiPitchDelta,
@@ -93,9 +94,7 @@ describe('ProjectDelta Note semantics', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const preparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, command),
-    )
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
     const plan = preparation.plan
     const commit = createProjectCommitCandidate(preparation.command, plan)
     const mutation = plan.forward[0]
@@ -138,9 +137,7 @@ describe('ProjectDelta Note semantics', () => {
       sourceId: fixture.records.nonLoopSource.id,
       noteIds: [fixture.records.nonLoopNote.id],
     })
-    const preparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, command),
-    )
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
     const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
     const change = commit.delta.changes[0]
 
@@ -159,18 +156,10 @@ describe('ProjectDelta Note semantics', () => {
     const command = createRemoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [
-        fixture.records.nonLoopNote.id,
-        fixture.records.nonLoopHarmonyNote.id,
-      ],
+      noteIds: [fixture.records.nonLoopNote.id, fixture.records.nonLoopHarmonyNote.id],
     })
-    const preparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, command),
-    )
-    const commit = createProjectCommitCandidate(
-      preparation.command,
-      preparation.plan,
-    )
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
+    const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
 
     expect(commit.delta.changes).toEqual([
       expect.objectContaining({
@@ -216,13 +205,9 @@ describe('ProjectDelta Note semantics', () => {
       deltaTick: parseTickDelta(960),
       deltaPitch: parseMidiPitchDelta(7),
     })
-    const preparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, command),
-    )
-    const change = createProjectCommitCandidate(
-      preparation.command,
-      preparation.plan,
-    ).delta.changes[0]
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
+    const change = createProjectCommitCandidate(preparation.command, preparation.plan).delta
+      .changes[0]
 
     expect(change).toMatchObject({
       type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
@@ -243,19 +228,43 @@ describe('ProjectDelta Note semantics', () => {
       deltaTick: parseTickDelta(0),
       deltaPitch: parseMidiPitchDelta(1),
     })
-    const preparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, command),
-    )
-    const change = createProjectCommitCandidate(
-      preparation.command,
-      preparation.plan,
-    ).delta.changes[0]
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
+    const change = createProjectCommitCandidate(preparation.command, preparation.plan).delta
+      .changes[0]
 
     expect(change?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
     if (change?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
       throw new Error('Expected an updated Note change')
     }
     expect(change.affected).toEqual({ startTick: parseTick(240), endTick: parseTick(720) })
+  })
+
+  it('uses the conservative union of old and new intervals for ResizeNote', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createResizeNoteCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteId: fixture.records.nonLoopNote.id,
+      startTick: parseTick(120),
+      durationTick: parseTick(840),
+    })
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
+    const change = createProjectCommitCandidate(preparation.command, preparation.plan).delta
+      .changes[0]
+
+    expect(change).toMatchObject({
+      type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
+      sourceId: command.sourceId,
+      noteId: command.noteId,
+      before: fixture.records.nonLoopNote,
+      after: {
+        ...fixture.records.nonLoopNote,
+        startTick: command.startTick,
+        durationTick: command.durationTick,
+      },
+      affected: { startTick: parseTick(120), endTick: parseTick(960) },
+    })
   })
 })
 
@@ -264,9 +273,7 @@ describe('ProjectCommit candidate boundary', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const preparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, command),
-    )
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
     const plan = preparation.plan
     const commit = createProjectCommitCandidate(preparation.command, plan)
     const change = commit.delta.changes[0]
@@ -293,9 +300,7 @@ describe('ProjectCommit candidate boundary', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store)
-    const preparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, command),
-    )
+    const preparation = requireReadyProjectCommandPreparation(prepareProjectCommand(store, command))
     const plan = preparation.plan
     const commit = createProjectCommitCandidate(preparation.command, plan)
 
@@ -478,12 +483,8 @@ describe('ProjectCommit candidate boundary', () => {
         before: fixture.records.nonLoopNote,
         after: createMidiNoteRecord({
           ...fixture.records.nonLoopNote,
-          startTick: parseTick(
-            fixture.records.nonLoopNote.startTick + command.deltaTick,
-          ),
-          pitch: parseMidiPitch(
-            fixture.records.nonLoopNote.pitch + command.deltaPitch,
-          ),
+          startTick: parseTick(fixture.records.nonLoopNote.startTick + command.deltaTick),
+          pitch: parseMidiPitch(fixture.records.nonLoopNote.pitch + command.deltaPitch),
           velocity: parseMidiVelocity(1),
         }),
       },
@@ -515,6 +516,39 @@ describe('ProjectCommit candidate boundary', () => {
       () => createProjectCommitCandidate(noChangeCommand, noChangePlan),
       'command-plan-mismatch',
     )
+    expect(store.modelRevision).toBe(0)
+  })
+
+  it('rejects a ResizeNote Plan that changes facts outside target geometry', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createResizeNoteCommand({
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteId: fixture.records.nonLoopNote.id,
+      startTick: parseTick(120),
+      durationTick: parseTick(600),
+    })
+    const plan = createMutationPlan(store.modelRevision, [
+      {
+        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        sourceId: command.sourceId,
+        before: fixture.records.nonLoopNote,
+        after: createMidiNoteRecord({
+          ...fixture.records.nonLoopNote,
+          startTick: command.startTick,
+          durationTick: command.durationTick,
+          velocity: parseMidiVelocity(1),
+        }),
+      },
+    ])
+    const error = captureCandidateError(
+      () => createProjectCommitCandidate(command, plan),
+      'command-plan-mismatch',
+    )
+
+    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE)
+    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
     expect(store.modelRevision).toBe(0)
   })
 })

@@ -7,6 +7,7 @@ import {
   type ProjectCommand,
   type ProjectCommandType,
   type RemoveNotesCommand,
+  type ResizeNoteCommand,
 } from '#internal/commands/project-command'
 import {
   PROJECT_CHANGE_TYPE,
@@ -36,11 +37,7 @@ import {
 import type { ProjectDelta } from '#internal/commit/project-delta'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiClipRecord } from '#internal/model/midi-clip'
-import {
-  MIDI_PITCH_MAX,
-  MIDI_PITCH_MIN,
-  parseMidiPitch,
-} from '#internal/model/scalars'
+import { MIDI_PITCH_MAX, MIDI_PITCH_MIN, parseMidiPitch } from '#internal/model/scalars'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import { nextModelRevision } from '#internal/model/model-revision'
 import type { InstrumentTrackRecord } from '#internal/model/track'
@@ -369,8 +366,7 @@ function recordsHaveSameOwnValues(left: object, right: object): boolean {
     leftKeys.length === rightKeys.length &&
     leftKeys.every(
       (key) =>
-        Object.hasOwn(right, key) &&
-        Object.is(Reflect.get(left, key), Reflect.get(right, key)),
+        Object.hasOwn(right, key) && Object.is(Reflect.get(left, key), Reflect.get(right, key)),
     )
   )
 }
@@ -457,6 +453,27 @@ function matchesRemovedNotes(
   )
 }
 
+function matchesResizedNote(command: ResizeNoteCommand, mutation: ProjectMutation): boolean {
+  if (
+    mutation.type !== PROJECT_MUTATION_TYPE.NOTE.REPLACE ||
+    mutation.sourceId !== command.sourceId ||
+    mutation.before.id !== command.noteId ||
+    mutation.after.id !== command.noteId ||
+    (mutation.before.startTick === command.startTick &&
+      mutation.before.durationTick === command.durationTick)
+  ) {
+    return false
+  }
+
+  const expectedAfter = createMidiNoteRecord({
+    ...mutation.before,
+    startTick: command.startTick,
+    durationTick: command.durationTick,
+  })
+
+  return recordsHaveSameOwnValues(mutation.after, expectedAfter)
+}
+
 function assertCommandPlanCorrespondence(command: ProjectCommand, plan: MutationPlan): void {
   const mutation = plan.forward[0]
   let matches = false
@@ -473,6 +490,9 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
     switch (command.type) {
       case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
         matches = matchesAddedNote(command, mutation)
+        break
+      case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
+        matches = matchesResizedNote(command, mutation)
         break
     }
   }

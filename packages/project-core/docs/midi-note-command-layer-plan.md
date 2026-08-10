@@ -4,7 +4,7 @@
 >
 > 日期：2026-07-17
 >
-> 范围：`AddNoteCommand`、`MoveNotesCommand`、`RemoveNotesCommand`
+> 范围：`AddNoteCommand`、`MoveNotesCommand`、`RemoveNotesCommand`、`ResizeNoteCommand`
 >
 > 2026-07-29 校准：单个与多个 Note 删除统一使用 `RemoveNotesCommand`；一元素
 > `noteIds` 是单 Note 删除的规范表达，不再维护平行的单 Note 公共 Command。跨 Command
@@ -14,6 +14,10 @@
 > 2026-07-29 Batch 5.2 校准：单 Note 与 Selection Move 统一使用共享 Tick / Pitch
 > Delta 的 `MoveNotesCommand`；一元素 `noteIds` 是单 Note Move 的规范表达，旧的绝对
 > 目标 `MoveNoteCommand` 已移除。
+>
+> 2026-08-10 Batch 3A 校准：新增单 Note `ResizeNoteCommand`，以最终 Start / Duration
+> 表达结果；Edge、Pointer、Snap 与 Preview 仍属于 Editor / Studio。多 Note Resize
+> 语义尚未确定，不提前改成集合协议。
 
 ## 文档目的
 
@@ -35,7 +39,7 @@ ProjectCommand
 
 ### Note 越界严格拒绝
 
-Add 和同一 MidiSource 内的 Move 必须满足：
+Add、Resize 和同一 MidiSource 内的 Move 必须满足：
 
 ```text
 note.startTick >= 0
@@ -55,7 +59,8 @@ note.startTick + note.durationTick <= midiSource.lengthTick
 
 ### 无变化动作返回 `no-change`
 
-Move 的绝对目标与当前 Note 的 `startTick`、`pitch` 都相同时，Command 准备结果为 `no-change`：
+Move 的 Delta 均为零，或 Resize 的最终 `startTick`、`durationTick` 与当前 Note 相同时，
+Command 准备结果为 `no-change`：
 
 - 不创建空 MutationPlan；
 - 不调用 MutationApplier；
@@ -99,7 +104,7 @@ packages/project-core/src/commands/
 - `project-command-error.ts`：稳定的产品语义拒绝错误；
 - `project-command-preparation.ts`：包内 `ready` / `no-change` 准备结果；
 - `project-command-preparer.ts`：共享校验、revision 检查和穷尽分派；
-- `midi-note-command-handler.ts`：Add、Move、RemoveNotes 的无状态计划生成算法。
+- `midi-note-command-handler.ts`：Add、Move、RemoveNotes、Resize 的无状态计划生成算法。
 
 不放入 `model/`，因为 Command 不是可保存的项目事实；不放入 `mutation/`，因为 Command 表达产品意图，而 Mutation 只表达规范化存储变化。handler 当前没有跨调用状态、资源或生命周期，因此使用模块函数，不创建只有静态方法的 Class。
 
@@ -181,6 +186,14 @@ MidiSource，不改变 Clip，也不清理空 Source。
 这是一个由多选删除产品意图驱动的专用事务 Command，不代表 Project Core 已提供通用批量
 Command、混合类型 Composite Command、跨 MidiSource 批处理或多 Note Resize。
 内部仍由每个目标对应的单 Note Remove Mutation 表达最小事实变化。
+
+### ResizeNoteCommand
+
+`ResizeNoteCommand` 携带一个 Note 的最终 `startTick` 与正 `durationTick`。Preparer 从权威
+Store 读取当前 Record，验证 Note 存在、目标完全位于 Source 内，并只替换 Start /
+Duration；ID、Pitch、Velocity 与 Channel 保持不变。Command 不携带左 / 右 Edge，不执行
+Snap 或 Pointer Clamp。完整数量语义见
+[Project Command 集合与事务语义](./project-command-collection-semantics.md)。
 
 ## 准备结果
 
@@ -277,8 +290,8 @@ ID、Tick、duration、pitch、velocity 和 channel 的本地值域继续由已�
 计划从 package root 公开：
 
 - `PROJECT_COMMAND_TYPE`；
-- Add、Move、Remove Command 类型；
-- 三个 Command 构造函数及其输入类型；
+- Add、Move、Remove、Resize Command 类型；
+- 四个 Command 构造函数及其输入类型；
 - `ProjectCommand` 联合类型；
 - `ProjectCommandError` 及其 code 类型；
 - Command 所需的 `ModelRevision` 类型。

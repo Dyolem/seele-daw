@@ -9,6 +9,7 @@ import {
   createAddNoteCommand,
   createMoveNotesCommand,
   createRemoveNotesCommand,
+  createResizeNoteCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiPitchDelta,
@@ -24,6 +25,7 @@ import {
   type MoveNotesCommand,
   type ProjectCommand,
   type RemoveNotesCommand,
+  type ResizeNoteCommand,
 } from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
@@ -97,6 +99,22 @@ function createSingleRemoveCommand(
   })
 }
 
+function createResizeCommand(
+  store: ModelStore,
+  sourceId: ReturnType<typeof parseMidiSourceId>,
+  noteId: ReturnType<typeof parseNoteId>,
+  overrides: Partial<Parameters<typeof createResizeNoteCommand>[0]> = {},
+): ResizeNoteCommand {
+  return createResizeNoteCommand({
+    baseRevision: store.modelRevision,
+    sourceId,
+    noteId,
+    startTick: parseTick(120),
+    durationTick: parseTick(600),
+    ...overrides,
+  })
+}
+
 function applyAndInverse(store: ModelStore, plan: MutationPlan): void {
   const applier = new MutationApplier(store)
   const committedRevision = applier.apply(plan)
@@ -118,11 +136,13 @@ describe('ProjectCommand public contract', () => {
     const remove = createRemoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [
-        fixture.records.nonLoopNote.id,
-        fixture.records.nonLoopHarmonyNote.id,
-      ],
+      noteIds: [fixture.records.nonLoopNote.id, fixture.records.nonLoopHarmonyNote.id],
     })
+    const resize = createResizeCommand(
+      store,
+      fixture.records.nonLoopSource.id,
+      fixture.records.nonLoopNote.id,
+    )
 
     expect(add).toEqual({
       type: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
@@ -141,21 +161,28 @@ describe('ProjectCommand public contract', () => {
       type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [
-        fixture.records.nonLoopNote.id,
-        fixture.records.nonLoopHarmonyNote.id,
-      ],
+      noteIds: [fixture.records.nonLoopNote.id, fixture.records.nonLoopHarmonyNote.id],
     })
     expect(Object.isFrozen(remove.noteIds)).toBe(true)
+    expect(resize).toEqual({
+      type: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
+      baseRevision: store.modelRevision,
+      sourceId: fixture.records.nonLoopSource.id,
+      noteId: fixture.records.nonLoopNote.id,
+      startTick: parseTick(120),
+      durationTick: parseTick(600),
+    })
     expectTypeOf(add).toEqualTypeOf<AddNoteCommand>()
     expectTypeOf(move).toEqualTypeOf<MoveNotesCommand>()
     expectTypeOf(remove).toEqualTypeOf<RemoveNotesCommand>()
+    expectTypeOf(resize).toEqualTypeOf<ResizeNoteCommand>()
     expectTypeOf<ProjectCommand>().toEqualTypeOf<
       | AddInstrumentTrackCommand
       | AddMidiClipCommand
       | AddNoteCommand
       | MoveNotesCommand
       | RemoveNotesCommand
+      | ResizeNoteCommand
     >()
   })
 
@@ -179,10 +206,7 @@ describe('ProjectCommand public contract', () => {
     expect(() =>
       createRemoveNotesCommand({
         ...input,
-        noteIds: [
-          fixture.records.nonLoopNote.id,
-          fixture.records.nonLoopNote.id,
-        ],
+        noteIds: [fixture.records.nonLoopNote.id, fixture.records.nonLoopNote.id],
       }),
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
@@ -242,6 +266,16 @@ describe('ProjectCommand public contract', () => {
         pitch: parseMidiPitch(60),
         velocity: parseMidiVelocity(100),
         channel: parseMidiChannel(0),
+      }),
+    ).toThrow(DomainValueError)
+
+    expect(() =>
+      createResizeNoteCommand({
+        baseRevision: 0 as ModelRevision,
+        sourceId: fixture.records.nonLoopSource.id,
+        noteId: fixture.records.nonLoopNote.id,
+        startTick: ZERO_TICK,
+        durationTick: ZERO_TICK,
       }),
     ).toThrow(DomainValueError)
   })
@@ -428,9 +462,9 @@ describe('RemoveNotesCommand', () => {
     applyAndInverse(store, plan)
 
     expect(store.modelRevision).toBe(2)
-    expect(
-      store.getMidiNote(command.sourceId, fixture.records.nonLoopNote.id),
-    ).toBe(fixture.records.nonLoopNote)
+    expect(store.getMidiNote(command.sourceId, fixture.records.nonLoopNote.id)).toBe(
+      fixture.records.nonLoopNote,
+    )
   })
 })
 
@@ -469,10 +503,7 @@ describe('MoveNotesCommand', () => {
     const command = createMoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [
-        fixture.records.nonLoopNote.id,
-        fixture.records.nonLoopHarmonyNote.id,
-      ],
+      noteIds: [fixture.records.nonLoopNote.id, fixture.records.nonLoopHarmonyNote.id],
       deltaTick: parseTickDelta(240),
       deltaPitch: parseMidiPitchDelta(2),
     })
@@ -509,10 +540,7 @@ describe('MoveNotesCommand', () => {
     const command = createMoveNotesCommand({
       baseRevision: store.modelRevision,
       sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [
-        fixture.records.nonLoopNote.id,
-        fixture.records.nonLoopHarmonyNote.id,
-      ],
+      noteIds: [fixture.records.nonLoopNote.id, fixture.records.nonLoopHarmonyNote.id],
       deltaTick: parseTickDelta(961),
       deltaPitch: parseMidiPitchDelta(0),
     })
@@ -599,5 +627,120 @@ describe('MoveNotesCommand', () => {
     expect(store.getMidiNote(command.sourceId, command.noteIds[0]!)).toBe(
       fixture.records.nonLoopNote,
     )
+  })
+})
+
+describe('ResizeNoteCommand', () => {
+  it('prepares one NOTE.REPLACE while preserving identity and non-resize fields', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createResizeCommand(
+      store,
+      fixture.records.nonLoopSource.id,
+      fixture.records.nonLoopNote.id,
+    )
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+    const mutation = plan.forward[0]
+
+    expect(mutation?.type).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
+    if (mutation?.type !== PROJECT_MUTATION_TYPE.NOTE.REPLACE) {
+      throw new Error('Expected NOTE.REPLACE')
+    }
+    expect(mutation.before).toBe(fixture.records.nonLoopNote)
+    expect(mutation.after).toEqual({
+      ...fixture.records.nonLoopNote,
+      startTick: command.startTick,
+      durationTick: command.durationTick,
+    })
+    expect(plan.inverse[0]).toEqual({
+      type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+      sourceId: command.sourceId,
+      before: mutation.after,
+      after: mutation.before,
+    })
+  })
+
+  it('returns no-change when both target geometry facts already match', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const before = fixture.records.nonLoopNote
+    const command = createResizeCommand(store, fixture.records.nonLoopSource.id, before.id, {
+      startTick: before.startTick,
+      durationTick: before.durationTick,
+    })
+
+    expect(prepareProjectCommand(store, command)).toEqual({
+      status: 'no-change',
+      reason: 'already-at-target',
+      baseRevision: store.modelRevision,
+    })
+    expect(store.modelRevision).toBe(0)
+  })
+
+  it('rejects a stale unchanged target before returning no-change', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const before = fixture.records.nonLoopNote
+    const command = createResizeCommand(store, fixture.records.nonLoopSource.id, before.id, {
+      baseRevision: 1 as ModelRevision,
+      startTick: before.startTick,
+      durationTick: before.durationTick,
+    })
+    const error = captureCommandError(() => prepareProjectCommand(store, command))
+
+    expect(error.code).toBe('base-revision-mismatch')
+    expect(error.baseRevision).toBe(command.baseRevision)
+    expect(error.currentRevision).toBe(store.modelRevision)
+    expect(error.noteId).toBe(command.noteId)
+  })
+
+  it('rejects missing targets and a target geometry beyond the Source boundary', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const missingNoteId = parseNoteId('note-resize-missing')
+    const missingCommand = createResizeCommand(
+      store,
+      fixture.records.nonLoopSource.id,
+      missingNoteId,
+    )
+    const missingError = captureCommandError(() => prepareProjectCommand(store, missingCommand))
+
+    expect(missingError.code).toBe('midi-note-not-found')
+    expect(missingError.noteId).toBe(missingNoteId)
+
+    const outOfRangeCommand = createResizeCommand(
+      store,
+      fixture.records.nonLoopSource.id,
+      fixture.records.nonLoopNote.id,
+      {
+        startTick: parseTick(1_680),
+        durationTick: parseTick(241),
+      },
+    )
+    const rangeError = captureCommandError(() => prepareProjectCommand(store, outOfRangeCommand))
+
+    expect(rangeError.code).toBe('note-out-of-source-range')
+    expect(rangeError.noteEndTick).toBe(1_921)
+    expect(rangeError.sourceLengthTick).toBe(fixture.records.nonLoopSource.lengthTick)
+  })
+
+  it('applies the replacement and inverses it with the original Record reference', () => {
+    const fixture = createCompleteProjectFixture()
+    const store = new ModelStore(fixture.seed)
+    const command = createResizeCommand(
+      store,
+      fixture.records.nonLoopSource.id,
+      fixture.records.nonLoopNote.id,
+      {
+        startTick: parseTick(1_680),
+        durationTick: parseTick(240),
+      },
+    )
+    const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
+
+    applyAndInverse(store, plan)
+
+    expect(store.modelRevision).toBe(2)
+    expect(store.getMidiNote(command.sourceId, command.noteId)).toBe(fixture.records.nonLoopNote)
   })
 })

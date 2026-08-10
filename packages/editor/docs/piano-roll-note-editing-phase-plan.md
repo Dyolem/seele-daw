@@ -1,7 +1,7 @@
 # Piano Roll Note Editing 第五阶段计划
 
-> Status: Batch 1, Batch 2, interaction state machine foundation, Batch 3A and Batch 3B
-> implemented and reviewed; Batch 3C implemented and pending review
+> Status: Complete; Batch 1, Batch 2, interaction state machine foundation and Batch 3
+> implemented and reviewed
 >
 > Date: 2026-08-10
 
@@ -218,6 +218,8 @@ Batch 3C 已完成用户可见闭环：
   Toast；Commit 成功但 Selection 恢复失败时保留已提交事实并显示警告 Toast；
 - Studio 将 Editor Intent 应用协调拆入独立 Feature Handler，Surface 继续只组合 Vue
   生命周期、Browser Input、Renderer 与可重建状态。
+
+对应提交为 `b7772b1`。
 
 该拆分避免 Core 知道左右 Edge，也避免浏览器细节进入领域协议。
 

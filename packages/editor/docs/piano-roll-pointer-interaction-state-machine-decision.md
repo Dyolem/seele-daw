@@ -29,6 +29,7 @@ idle
   └─ Pointer Begin ─→ pressing
                         ├─ Pointer End（未过阈值）─→ Click / Add intent ─→ idle
                         ├─ Pointer Move（过阈值且命中 Note Body）─→ movingNote
+                        ├─ Pointer Move（过阈值且命中 Note Edge）─→ resizingNote
                         └─ Cancel ─→ idle
 
 movingNote
@@ -37,6 +38,17 @@ movingNote
   └─ Cancel ─→ idle
 
 committingNoteMove
+  ├─ 无变化或执行失败 ─→ idle
+  └─ Commit 成功
+       ├─ Read Model 已到达 revision ─→ idle
+       └─ Read Model 尚未到达 ─→ awaitingAuthority ─→ idle
+
+resizingNote
+  ├─ Pointer Update ─→ 更新 Resize Preview
+  ├─ Pointer End ─→ committingNoteResize
+  └─ Cancel ─→ idle
+
+committingNoteResize
   ├─ 无变化或执行失败 ─→ idle
   └─ Commit 成功
        ├─ Read Model 已到达 revision ─→ idle
@@ -55,6 +67,7 @@ common/piano-roll/
     piano-roll-interaction-session.ts
   operations/
     piano-roll-note-move-interaction.ts
+    piano-roll-note-resize-interaction.ts
     piano-roll-pencil-interaction.ts
     piano-roll-select-interaction.ts
 ```
@@ -91,7 +104,7 @@ Browser Adapter 不解释 Pencil、Cursor、Selection、Snap 或 Project Command
 
 ### Interaction Session 拥有
 
-- `idle / pressing / moving / committing / awaiting-authority` 的合法转换；
+- `idle / pressing / moving / resizing / committing / awaiting-authority` 的合法转换；
 - Pointer Down 时冻结本次 Gesture 所需配置；
 - 调用纯 Resolver 生成 Preview；
 - Pointer Up 最多产生一个产品 Intent；
@@ -106,8 +119,8 @@ Preference。
 
 - 把当前 Clip Context、Viewport、Grid、Tool、Snap Preference 和 Selection 组合为 Begin
   Configuration；
-- 消费 Selection、Add Note、Move Notes Intent；
-- 每个 Move Intent 最多调用一次 `ProjectMidiNoteCoordinator`；
+- 消费 Selection、Add Note、Move Notes Intent，以及接入后续可见闭环的 Resize Note Intent；
+- 每个 Move / Resize Intent 最多调用一次 `ProjectMidiNoteCoordinator`；
 - 把 Commit revision 或失败结果回告 Session；
 - 把用户可见失败转换为命令式 Toast；
 - 以 `shallowRef` 接收公开 State，不让 XState actor 进入 Vue 深响应。
@@ -134,10 +147,11 @@ Preference。
 - 当前 Pointer position；
 - 当前 `Alt / Shift / Command / Control` 状态。
 
-当前真实消费者只有 Note Move 的 `Alt` 临时绕过 Snap：拖动中按下 Alt 会立即切到自由移动，
-松开 Alt 会立即重新按冻结 Grid 的绝对坐标吸附。它不修改持久 Snap Preference。Click 的
-Selection Toggle 仍使用 origin modifiers，避免在 Pointer Up 前松开 Shift 导致 Click 语义
-漂移。未来复制拖拽或轴向约束必须逐项明确使用 origin 还是 current modifiers。
+当前真实消费者是 Note Move 与 Note Resize 的 `Alt` 临时绕过 Snap：拖动中按下 Alt 会立即
+切到自由移动，松开 Alt 会立即重新按冻结 Grid 的绝对坐标吸附。它不修改持久 Snap
+Preference。Click 的 Selection Toggle 仍使用 origin modifiers，避免在 Pointer Up 前松开
+Shift 导致 Click 语义漂移。未来复制拖拽或轴向约束必须逐项明确使用 origin 还是 current
+modifiers。
 
 Window 的 `keydown / keyup` 只在存在活动 Pointer 时合成同位置的 Pointer Update；修饰键未
 变化时不发布重复 Update。
@@ -177,7 +191,7 @@ Capture 与 Resolver failure 都 fail closed，不能逃逸成浏览器事件循
 
 ## 扩展规则
 
-- Note Resize 复用 shared lifecycle，但使用独立 Resize Gesture / Preview / Intent；
+- Note Resize 已复用 shared lifecycle，并使用独立 Resize Gesture / Preview / Intent；
 - 空白 Cursor Drag 在 Box Selection 实现前仍无业务结果；实现时使用独立 Marquee Gesture；
 - Timeline Clip Drag、Playhead Scrub 和 Fade Handle 可以复用相同输入协议与生命周期思想，
   但不强制共享 Piano Roll machine；
@@ -188,7 +202,8 @@ Capture 与 Resolver failure 都 fail closed，不能逃逸成浏览器事件循
 
 ## 验收要求
 
-- Click、Pencil Add、Move Preview、一次 Move Intent 与 authority handoff 有 Common 测试；
+- Click、Pencil Add、Move / Resize Preview、一次 Move / Resize Intent 与 authority handoff
+  有 Common 测试；
 - 动态 Alt 在不移动 Pointer 时也能更新 Preview；
 - Pointer cancel、lost capture、Window blur、Escape、显式 cancel 与 dispose 都不会提交；
 - 取消后的迟到 Pointer Up 被忽略；

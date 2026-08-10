@@ -50,8 +50,10 @@ export type {
   PianoRollInteractionStatus,
   PianoRollInteractionTool,
   PianoRollMoveNotesIntent,
+  PianoRollResizeNoteIntent,
   PianoRollResolveSelectionIntent,
   ResolvePianoRollMoveCommitInput,
+  ResolvePianoRollResizeCommitInput,
 } from './state-machine/piano-roll-interaction-session'
 
 export { PianoRollError } from './piano-roll-error'
@@ -92,6 +94,19 @@ export type {
   PianoRollNoteMovePreviewNote,
   ResolvePianoRollNoteMovePreviewInput,
 } from './operations/piano-roll-note-move-interaction'
+
+export {
+  createPianoRollNoteResizeGesture,
+  resolvePianoRollNoteResizePreview,
+} from './operations/piano-roll-note-resize-interaction'
+export type {
+  CreatePianoRollNoteResizeGestureInput,
+  PianoRollNoteResizeEdge,
+  PianoRollNoteResizeGesture,
+  PianoRollNoteResizePreview,
+  PianoRollNoteResizePreviewNote,
+  ResolvePianoRollNoteResizePreviewInput,
+} from './operations/piano-roll-note-resize-interaction'
 
 export {
   PIANO_ROLL_DEFAULT_CENTER_PITCH,

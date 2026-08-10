@@ -1,6 +1,7 @@
 # Piano Roll Note Editing 第五阶段计划
 
-> Status: In progress; Batch 1, Batch 2 and interaction state machine foundation implemented
+> Status: In progress; Batch 1, Batch 2, interaction state machine foundation and Batch 3A
+> implemented; Batch 3B implemented and pending review
 >
 > Date: 2026-08-10
 
@@ -166,14 +167,41 @@ Surface-scoped Interaction Session：
 - 左右边缘分别选择自己的 Snap Anchor，不能隐式继承 Pencil Create 的 `floor`；
 - Resize 失败保留原 Note、Selection 和当前 Tool。
 
+首批 Editor Resize 的完整产品规则如下：
+
+- Pointer Down 必须明确命中 `resize-start` 或 `resize-end`；Edge Hit 优先于 Note Body，
+  Cursor 与 Pencil 共享同一 Resize Gesture；
+- Pointer 未越过 4 CSS Pixel Drag Threshold 时不进入 Resize。Cursor 的 Edge Click 仍按普通
+  Note Click 解析 Selection；Pencil 的 Edge Click 不创建 Note，也不改变 Project；
+- 左边缘固定原始 End，改变最终 Start / Duration；右边缘固定原始 Start，只改变最终
+  Duration；两者都不改变 Note ID、Pitch、Velocity 或 Channel；
+- Snap 开启时，正在拖动的 Edge 使用当前冻结 Grid 的 `nearest` 绝对坐标，不使用 Pencil
+  Create 的 `floor`，也不保留 Off-grid Edge 的旧偏移；
+- 手势期间按下 `Alt` 会动态临时绕过 Snap，使用最近整数 Tick；松开后立即恢复冻结 Grid 的
+  绝对坐标吸附；
+- Resize 以整个 MidiSource 的 `0 ... sourceLengthTick` 为事实边界，并 Clamp 到至少 1 Tick；
+  当前 Clip 只是编辑窗口，Preview 会按 Clip 可见区裁剪，不把 Clip 边缘误当成 Source 边界；
+- 即使 Resize 后的 Note 完全离开当前 Clip，Preview 仍保留 `resizedNoteId` 和最终
+  Start / Duration，供 Pointer Up 形成确定 Intent，只是可见 Note 投影为 `null`；
+- Pointer Down 冻结 Project `baseRevision`、命中的权威 Note、Edge、Selection、Viewport、
+  Grid 与 Snap Preference；Pointer Update 只计算冻结 Preview，不写 Project；
+- Resize 未选中的 Note 时，成功提交后才把它设为唯一 Selection；Resize 已选中的 Note 时
+  保留现有 Selection。取消、No-change 或失败均不提前改变 Selection；
+- Pointer Up 最多产生一个单 Note Resize Intent；Project Commit、No-change、失败和权威
+  revision 交接由 Studio 在 Batch 3C 接通；
+- `pointercancel`、lost capture、Window blur、Escape、Clip 切换与 dispose 都沿用共享
+  Interaction Session 的取消语义，清理 Preview 且不提交。
+
 Batch 3A 已在 Project Core 建立单 Note `ResizeNoteCommand`：Command 使用最终 Start /
 Duration，不携带 Edge 方向；正 Duration、Source 边界、No-change、单条 Note Update Delta
-及 Undo / Redo 已形成权威协议。它仍只是内部就绪能力，尚无 Editor Intent 或 Studio 入口。
+及 Undo / Redo 已形成权威协议，对应提交为 `0564669`。它仍只是内部就绪能力，尚无 Studio
+入口。
 
-Batch 3B 负责 Editor Common 的左右边界纯算法、Resize Preview、Snap Anchor 与 Interaction
-Session 分支；Batch 3C 再接入 Browser Edge Hit、Pointer 生命周期、Studio Coordinator、
-Toast 和可见闭环。该拆分避免 Core 知道左右 Edge，也避免在命中热区确定前把浏览器细节写入
-领域协议。
+Batch 3B 已在 Editor Common 实现左右边界纯算法、Resize Preview、Snap Anchor、Resize
+Intent，以及 `resizing-note / committing-note-resize` Interaction Session 分支。它只消费
+Renderer-neutral Edge Hit，当前仍没有 Browser Edge Hit 或用户可见入口。Batch 3C 再接入
+Browser Edge Hit、Pointer 生命周期、Studio Coordinator、Toast 和可见闭环。该拆分避免
+Core 知道左右 Edge，也避免在命中热区确定前把浏览器细节写入领域协议。
 
 ## 6. Snap 完成时机
 

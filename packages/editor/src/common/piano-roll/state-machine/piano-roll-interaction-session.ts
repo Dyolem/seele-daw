@@ -19,6 +19,12 @@ import {
   type PianoRollNoteMovePreview,
 } from '#internal/common/piano-roll/operations/piano-roll-note-move-interaction'
 import {
+  createPianoRollNoteResizeGesture,
+  resolvePianoRollNoteResizePreview,
+  type PianoRollNoteResizeGesture,
+  type PianoRollNoteResizePreview,
+} from '#internal/common/piano-roll/operations/piano-roll-note-resize-interaction'
+import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   type PianoRollPointerInput,
 } from '#internal/common/piano-roll/piano-roll-input'
@@ -39,9 +45,11 @@ export type PianoRollInteractionTool =
 export const PIANO_ROLL_INTERACTION_STATUS = {
   AWAITING_AUTHORITY: 'awaiting-authority',
   COMMITTING_NOTE_MOVE: 'committing-note-move',
+  COMMITTING_NOTE_RESIZE: 'committing-note-resize',
   IDLE: 'idle',
   MOVING_NOTE: 'moving-note',
   PRESSING: 'pressing',
+  RESIZING_NOTE: 'resizing-note',
 } as const
 
 export type PianoRollInteractionStatus =
@@ -50,6 +58,7 @@ export type PianoRollInteractionStatus =
 export const PIANO_ROLL_INTERACTION_INTENT = {
   ADD_NOTE: 'note.add',
   MOVE_NOTES: 'notes.move',
+  RESIZE_NOTE: 'note.resize',
   RESOLVE_SELECTION: 'selection.resolve',
 } as const
 
@@ -69,9 +78,16 @@ export interface PianoRollMoveNotesIntent {
   readonly type: typeof PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES
 }
 
+export interface PianoRollResizeNoteIntent {
+  readonly gesture: PianoRollNoteResizeGesture
+  readonly preview: PianoRollNoteResizePreview
+  readonly type: typeof PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE
+}
+
 export type PianoRollInteractionIntent =
   | PianoRollAddNoteIntent
   | PianoRollMoveNotesIntent
+  | PianoRollResizeNoteIntent
   | PianoRollResolveSelectionIntent
 
 export interface PianoRollInteractionConfiguration {
@@ -90,9 +106,10 @@ export interface PianoRollInteractionOutcome {
 }
 
 export interface PianoRollInteractionState {
-  readonly activeGesture: 'note-move' | null
+  readonly activeGesture: 'note-move' | 'note-resize' | null
   readonly movePreview: PianoRollNoteMovePreview | null
   readonly pointerId: number | null
+  readonly resizePreview: PianoRollNoteResizePreview | null
   readonly status: PianoRollInteractionStatus
 }
 
@@ -101,6 +118,11 @@ export interface PianoRollInteractionSessionObserver {
 }
 
 export interface ResolvePianoRollMoveCommitInput {
+  readonly authorityRevision: ModelRevision
+  readonly commitRevision: ModelRevision
+}
+
+export interface ResolvePianoRollResizeCommitInput {
   readonly authorityRevision: ModelRevision
   readonly commitRevision: ModelRevision
 }
@@ -116,7 +138,9 @@ export interface PianoRollInteractionSession {
   ): PianoRollInteractionOutcome
   notifyAuthorityRevision(revision: ModelRevision): void
   resolveMoveCommit(input: ResolvePianoRollMoveCommitInput): void
+  resolveResizeCommit(input: ResolvePianoRollResizeCommitInput): void
   skipMoveCommit(): void
+  skipResizeCommit(): void
   subscribe(observer: PianoRollInteractionSessionObserver): () => void
 }
 
@@ -124,6 +148,7 @@ interface ActiveInteraction {
   readonly configuration: PianoRollInteractionConfiguration
   readonly moveGesture: PianoRollNoteMoveGesture | null
   readonly pointerId: number
+  readonly resizeGesture: PianoRollNoteResizeGesture | null
 }
 
 interface InteractionMachineContext {
@@ -132,6 +157,7 @@ interface InteractionMachineContext {
   readonly intent: PianoRollInteractionIntent | null
   readonly movePreview: PianoRollNoteMovePreview | null
   readonly pendingCommitRevision: ModelRevision | null
+  readonly resizePreview: PianoRollNoteResizePreview | null
 }
 
 type InteractionMachineEvent =
@@ -160,6 +186,12 @@ type InteractionMachineEvent =
     }
   | { readonly type: 'move.commit.skipped' }
   | {
+      readonly authorityRevision: ModelRevision
+      readonly commitRevision: ModelRevision
+      readonly type: 'resize.commit.accepted'
+    }
+  | { readonly type: 'resize.commit.skipped' }
+  | {
       readonly revision: ModelRevision
       readonly type: 'authority.updated'
     }
@@ -168,6 +200,7 @@ interface InteractionResolution {
   readonly failure: unknown | null
   readonly intent: PianoRollInteractionIntent | null
   readonly movePreview: PianoRollNoteMovePreview | null
+  readonly resizePreview: PianoRollNoteResizePreview | null
 }
 
 const EMPTY_OUTCOME: PianoRollInteractionOutcome = Object.freeze({
@@ -179,6 +212,7 @@ const EMPTY_RESOLUTION: InteractionResolution = Object.freeze({
   failure: null,
   intent: null,
   movePreview: null,
+  resizePreview: null,
 })
 
 function createEmptyInteractionContext(): InteractionMachineContext {
@@ -188,6 +222,7 @@ function createEmptyInteractionContext(): InteractionMachineContext {
     intent: null,
     movePreview: null,
     pendingCommitRevision: null,
+    resizePreview: null,
   }
 }
 
@@ -207,7 +242,14 @@ function createActiveInteraction(
   const configuration = freezeConfiguration(configurationInput)
 
   try {
+    const resizeGesture = createPianoRollNoteResizeGesture({
+      context: configuration.context,
+      pointerInput: input,
+      selectedNoteIds: configuration.selectedNoteIds,
+      session: configuration.session,
+    })
     const moveGesture =
+      resizeGesture === null &&
       configuration.tool === PIANO_ROLL_INTERACTION_TOOL.CURSOR
         ? createPianoRollNoteMoveGesture({
             context: configuration.context,
@@ -222,6 +264,7 @@ function createActiveInteraction(
         configuration,
         moveGesture,
         pointerId: input.pointerId,
+        resizeGesture,
       }),
       failure: null,
     })
@@ -231,6 +274,7 @@ function createActiveInteraction(
         configuration,
         moveGesture: null,
         pointerId: input.pointerId,
+        resizeGesture: null,
       }),
       failure,
     })
@@ -266,6 +310,20 @@ function canActivateNoteMove(
     active.pointerId === input.pointerId &&
     input.hasExceededDragThreshold &&
     active.moveGesture !== null &&
+    active.configuration.viewport !== null
+  )
+}
+
+function canActivateNoteResize(
+  context: InteractionMachineContext,
+  input: PianoRollPointerInput,
+): boolean {
+  const active = context.active
+  return (
+    active !== null &&
+    active.pointerId === input.pointerId &&
+    input.hasExceededDragThreshold &&
+    active.resizeGesture !== null &&
     active.configuration.viewport !== null
   )
 }
@@ -306,9 +364,63 @@ function resolveMove(
           })
         : null,
       movePreview,
+      resizePreview: null,
     })
   } catch (failure) {
-    return Object.freeze({ failure, intent: null, movePreview: null })
+    return Object.freeze({
+      failure,
+      intent: null,
+      movePreview: null,
+      resizePreview: null,
+    })
+  }
+}
+
+function resolveResize(
+  context: InteractionMachineContext,
+  input: PianoRollPointerInput,
+  createIntent: boolean,
+): InteractionResolution {
+  const active = context.active
+  if (
+    active === null ||
+    active.resizeGesture === null ||
+    active.configuration.viewport === null
+  ) {
+    return EMPTY_RESOLUTION
+  }
+  const gesture = active.resizeGesture
+  const viewport = active.configuration.viewport
+
+  try {
+    const resizePreview = resolvePianoRollNoteResizePreview({
+      gesture,
+      grid: active.configuration.grid,
+      pointerInput: input,
+      snapEnabled: active.configuration.snapEnabled,
+      viewport,
+    })
+    if (resizePreview === null) return EMPTY_RESOLUTION
+
+    return Object.freeze({
+      failure: null,
+      intent: createIntent
+        ? Object.freeze({
+            gesture,
+            preview: resizePreview,
+            type: PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE,
+          })
+        : null,
+      movePreview: null,
+      resizePreview,
+    })
+  } catch (failure) {
+    return Object.freeze({
+      failure,
+      intent: null,
+      movePreview: null,
+      resizePreview: null,
+    })
   }
 }
 
@@ -331,6 +443,7 @@ function resolveCompletedPress(
         type: PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION,
       }),
       movePreview: null,
+      resizePreview: null,
     })
   }
 
@@ -339,6 +452,7 @@ function resolveCompletedPress(
       failure: new Error('The Piano Roll is not ready to place a MIDI Note.'),
       intent: null,
       movePreview: null,
+      resizePreview: null,
     })
   }
 
@@ -361,9 +475,15 @@ function resolveCompletedPress(
               type: PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE,
             }),
       movePreview: null,
+      resizePreview: null,
     })
   } catch (failure) {
-    return Object.freeze({ failure, intent: null, movePreview: null })
+    return Object.freeze({
+      failure,
+      intent: null,
+      movePreview: null,
+      resizePreview: null,
+    })
   }
 }
 
@@ -372,6 +492,7 @@ function assignResolution(resolution: InteractionResolution) {
     failure: resolution.failure,
     intent: resolution.intent,
     movePreview: resolution.movePreview,
+    resizePreview: resolution.resizePreview,
   }
 }
 
@@ -399,6 +520,14 @@ const interactionMachine = createMachine({
         'pointer.update': [
           {
             guard: ({ context, event }) =>
+              canActivateNoteResize(context, event.input),
+            actions: assign(({ context, event }) =>
+              assignResolution(resolveResize(context, event.input, false)),
+            ),
+            target: 'resizingNote',
+          },
+          {
+            guard: ({ context, event }) =>
               canActivateNoteMove(context, event.input),
             actions: assign(({ context, event }) =>
               assignResolution(resolveMove(context, event.input, false)),
@@ -412,6 +541,14 @@ const interactionMachine = createMachine({
           },
         ],
         'pointer.end': [
+          {
+            guard: ({ context, event }) =>
+              canActivateNoteResize(context, event.input),
+            actions: assign(({ context, event }) =>
+              assignResolution(resolveResize(context, event.input, true)),
+            ),
+            target: 'committingNoteResize',
+          },
           {
             guard: ({ context, event }) =>
               canActivateNoteMove(context, event.input),
@@ -474,6 +611,35 @@ const interactionMachine = createMachine({
         },
       },
     },
+    resizingNote: {
+      on: {
+        'pointer.update': {
+          guard: ({ context, event }) =>
+            isMatchingPointer(context, event.input),
+          actions: assign(({ context, event }) =>
+            assignResolution(resolveResize(context, event.input, false)),
+          ),
+        },
+        'pointer.end': {
+          guard: ({ context, event }) =>
+            isMatchingPointer(context, event.input),
+          actions: assign(({ context, event }) =>
+            assignResolution(resolveResize(context, event.input, true)),
+          ),
+          target: 'committingNoteResize',
+        },
+        'pointer.cancel': {
+          guard: ({ context, event }) =>
+            isMatchingPointer(context, event.input),
+          actions: assign(createEmptyInteractionContext),
+          target: 'idle',
+        },
+        'cancel.requested': {
+          actions: assign(createEmptyInteractionContext),
+          target: 'idle',
+        },
+      },
+    },
     committingNoteMove: {
       on: {
         'move.commit.accepted': [
@@ -494,6 +660,35 @@ const interactionMachine = createMachine({
           },
         ],
         'move.commit.skipped': {
+          actions: assign(createEmptyInteractionContext),
+          target: 'idle',
+        },
+        'cancel.requested': {
+          actions: assign(createEmptyInteractionContext),
+          target: 'idle',
+        },
+      },
+    },
+    committingNoteResize: {
+      on: {
+        'resize.commit.accepted': [
+          {
+            guard: ({ event }) =>
+              event.authorityRevision >= event.commitRevision,
+            actions: assign(createEmptyInteractionContext),
+            target: 'idle',
+          },
+          {
+            actions: assign({
+              active: null,
+              failure: null,
+              intent: null,
+              pendingCommitRevision: ({ event }) => event.commitRevision,
+            }),
+            target: 'awaitingAuthority',
+          },
+        ],
+        'resize.commit.skipped': {
           actions: assign(createEmptyInteractionContext),
           target: 'idle',
         },
@@ -534,8 +729,14 @@ function mapStatus(snapshot: InteractionMachineSnapshot): PianoRollInteractionSt
   if (snapshot.matches('movingNote')) {
     return PIANO_ROLL_INTERACTION_STATUS.MOVING_NOTE
   }
+  if (snapshot.matches('resizingNote')) {
+    return PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE
+  }
   if (snapshot.matches('committingNoteMove')) {
     return PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE
+  }
+  if (snapshot.matches('committingNoteResize')) {
+    return PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE
   }
   if (snapshot.matches('awaitingAuthority')) {
     return PIANO_ROLL_INTERACTION_STATUS.AWAITING_AUTHORITY
@@ -547,10 +748,19 @@ function createPublicState(
   snapshot: InteractionMachineSnapshot,
 ): PianoRollInteractionState {
   const moveGesture = snapshot.context.active?.moveGesture ?? null
+  const resizeGesture = snapshot.context.active?.resizeGesture ?? null
+  let activeGesture: PianoRollInteractionState['activeGesture'] = null
+  if (resizeGesture !== null) {
+    activeGesture = 'note-resize'
+  } else if (moveGesture !== null) {
+    activeGesture = 'note-move'
+  }
+
   return Object.freeze({
-    activeGesture: moveGesture === null ? null : 'note-move',
+    activeGesture,
     movePreview: snapshot.context.movePreview,
     pointerId: snapshot.context.active?.pointerId ?? null,
+    resizePreview: snapshot.context.resizePreview,
     status: mapStatus(snapshot),
   })
 }
@@ -660,9 +870,23 @@ class PianoRollInteractionSessionImpl implements PianoRollInteractionSession {
     })
   }
 
+  resolveResizeCommit(input: ResolvePianoRollResizeCommitInput): void {
+    if (this.#disposed) return
+    this.#actor.send({
+      authorityRevision: input.authorityRevision,
+      commitRevision: input.commitRevision,
+      type: 'resize.commit.accepted',
+    })
+  }
+
   skipMoveCommit(): void {
     if (this.#disposed) return
     this.#actor.send({ type: 'move.commit.skipped' })
+  }
+
+  skipResizeCommit(): void {
+    if (this.#disposed) return
+    this.#actor.send({ type: 'resize.commit.skipped' })
   }
 
   subscribe(observer: PianoRollInteractionSessionObserver): () => void {

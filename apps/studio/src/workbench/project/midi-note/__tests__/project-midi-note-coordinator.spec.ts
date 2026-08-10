@@ -363,6 +363,126 @@ describe('ProjectMidiNoteCoordinator', () => {
     ])
   })
 
+  it('resizes one Note with final MidiSource geometry and one History step', () => {
+    const fixture = createMidiClipFixture('resize')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: () => 'note-midi-note-resize',
+    })
+    const noteId = coordinator.addMidiNote({
+      clipId: fixture.clipId,
+      clipStartTick: parseTick(120),
+      requestedDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(60),
+    }).noteId
+    const revisionBeforeResize = fixture.session.modelRevision
+
+    const result = coordinator.resizeMidiNote({
+      baseRevision: revisionBeforeResize,
+      clipId: fixture.clipId,
+      durationTick: parsePositiveTick(360),
+      noteId,
+      sourceStartTick: parseTick(480),
+    })
+
+    expect(Object.isFrozen(result)).toBe(true)
+    expect(result).toMatchObject({
+      durationTick: 360,
+      noteId,
+      sourceStartTick: 480,
+    })
+    expect(result?.commit.baseRevision).toBe(revisionBeforeResize)
+    expect(result?.commit.modelRevision).toBe(revisionBeforeResize + 1)
+    expect(result?.commit.origin).toEqual({
+      kind: 'command',
+      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
+    })
+    expect(result?.commit.delta.changes).toEqual([
+      expect.objectContaining({
+        noteId,
+        type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
+      }),
+    ])
+    expect(noteRecords(fixture.session)[0]).toMatchObject({
+      durationTick: 360,
+      id: noteId,
+      pitch: 60,
+      startTick: 480,
+    })
+
+    fixture.session.undo()
+    expect(noteRecords(fixture.session)[0]).toMatchObject({
+      durationTick: 240,
+      id: noteId,
+      startTick: 600,
+    })
+    fixture.session.redo()
+    expect(noteRecords(fixture.session)[0]).toMatchObject({
+      durationTick: 360,
+      id: noteId,
+      startTick: 480,
+    })
+  })
+
+  it('returns no change for identical Resize geometry and rejects a stale gesture', () => {
+    const fixture = createMidiClipFixture('resize-stale')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: createIdentitySource(
+        'note-midi-note-resize-stale-1',
+        'note-midi-note-resize-stale-2',
+      ),
+    })
+    const noteId = coordinator.addMidiNote({
+      clipId: fixture.clipId,
+      clipStartTick: parseTick(120),
+      requestedDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(60),
+    }).noteId
+    const gestureRevision = fixture.session.modelRevision
+
+    expect(
+      coordinator.resizeMidiNote({
+        baseRevision: gestureRevision,
+        clipId: fixture.clipId,
+        durationTick: parsePositiveTick(240),
+        noteId,
+        sourceStartTick: parseTick(600),
+      }),
+    ).toBeNull()
+    expect(fixture.session.modelRevision).toBe(gestureRevision)
+
+    coordinator.addMidiNote({
+      clipId: fixture.clipId,
+      clipStartTick: parseTick(480),
+      requestedDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(64),
+    })
+    const revisionBeforeRejectedResize = fixture.session.modelRevision
+
+    expect(() =>
+      coordinator.resizeMidiNote({
+        baseRevision: gestureRevision,
+        clipId: fixture.clipId,
+        durationTick: parsePositiveTick(480),
+        noteId,
+        sourceStartTick: parseTick(600),
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectCommandError>>({
+        baseRevision: gestureRevision,
+        code: 'base-revision-mismatch',
+        currentRevision: revisionBeforeRejectedResize,
+      }),
+    )
+    expect(fixture.session.modelRevision).toBe(revisionBeforeRejectedResize)
+    expect(noteRecords(fixture.session)[0]).toMatchObject({
+      durationTick: 240,
+      id: noteId,
+      startTick: 600,
+    })
+  })
+
   it('removes selected Notes in one Commit and one reversible History step', () => {
     const fixture = createMidiClipFixture('remove-many')
     const coordinator = createProjectMidiNoteCoordinator({

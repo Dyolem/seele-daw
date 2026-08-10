@@ -19,6 +19,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createFakeCanvasFixture } from '#internal/__tests__/support/fake-canvas'
 import {
+  PIANO_ROLL_HIT_ZONE,
   createPianoRollCanvasNoteRenderer,
   createPianoRollClipContext,
   createPianoRollDomNoteRenderer,
@@ -230,9 +231,23 @@ describe('Piano Roll Browser Renderers', () => {
     const firstElement = container.querySelector<HTMLElement>(
       '[data-piano-roll-note-id="renderer-note"]',
     )
+    const startHandle = firstElement?.querySelector<HTMLElement>(
+      '.sd-piano-roll-dom-note__resize-handle--start',
+    )
+    const endHandle = firstElement?.querySelector<HTMLElement>(
+      '.sd-piano-roll-dom-note__resize-handle--end',
+    )
 
     expect(firstElement?.style.transform).toBe('translate3d(240px, 121px, 0)')
     expect(firstElement?.style.width).toBe('240px')
+    expect(startHandle?.getAttribute('data-piano-roll-note-zone')).toBe(
+      PIANO_ROLL_HIT_ZONE.RESIZE_START,
+    )
+    expect(endHandle?.getAttribute('data-piano-roll-note-zone')).toBe(
+      PIANO_ROLL_HIT_ZONE.RESIZE_END,
+    )
+    expect(startHandle?.style.inlineSize).toBe('6px')
+    expect(endHandle?.style.inlineSize).toBe('6px')
 
     renderer.render(fixture.noteScene)
 
@@ -241,6 +256,46 @@ describe('Piano Roll Browser Renderers', () => {
     ).toBe(firstElement)
     renderer.clear()
     expect(container.querySelector('.sd-piano-roll-dom-note')).toBeNull()
+  })
+
+  it('replaces the authoritative Note with one selected Resize Preview', () => {
+    const fixture = createRendererFixture()
+    const previewScene = createPianoRollNoteScene({
+      notes: Object.freeze([fixture.visibleNote]),
+      resizePreview: Object.freeze({
+        durationTick: parsePositiveTick(1_200),
+        edge: PIANO_ROLL_HIT_ZONE.RESIZE_START,
+        note: Object.freeze({
+          noteId: fixture.visibleNote.note.id,
+          pitch: fixture.visibleNote.note.pitch,
+          visibleEndTick: parseTick(1_920),
+          visibleStartTick: parseTick(720),
+        }),
+        resizedNoteId: fixture.visibleNote.note.id,
+        snapGuideTick: parseTick(720),
+        sourceStartTick: parseTick(720),
+      }),
+      selectedNoteIds: Object.freeze([]),
+      style: {
+        borderColor: '#f2eee5',
+        fillColor: '#8B5CF6',
+        opacity: 1,
+        selectedBorderColor: '#f4e7b9',
+        selectedGlowColor: 'rgb(232 217 168 / 58%)',
+      },
+      viewport: fixture.viewport,
+    })
+
+    expect(previewScene.notes).toEqual([
+      expect.objectContaining({
+        noteId: fixture.visibleNote.note.id,
+        selected: true,
+        visibleEndTick: 1_920,
+        visibleStartTick: 720,
+        widthCssPixel: 300,
+        xCssPixel: 180,
+      }),
+    ])
   })
 
   it('carries selected state through the shared Scene into DOM and Canvas', () => {

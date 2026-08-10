@@ -9,6 +9,7 @@ import {
   createAddNoteCommand,
   createMoveNotesCommand,
   createRemoveNotesCommand,
+  createResizeNoteCommand,
   parseMidiChannel,
   parseMidiPitch,
   parseMidiVelocity,
@@ -80,10 +81,27 @@ export interface MovedMidiNotesResult {
   readonly noteIds: readonly NoteId[]
 }
 
+export interface ResizeMidiNoteInput {
+  readonly baseRevision: ModelRevision
+  readonly clipId: ClipId
+  readonly durationTick: Tick
+  readonly noteId: NoteId
+  /** Final MidiSource-local start resolved by the Editor interaction. */
+  readonly sourceStartTick: Tick
+}
+
+export interface ResizedMidiNoteResult {
+  readonly commit: ProjectCommit
+  readonly durationTick: Tick
+  readonly noteId: NoteId
+  readonly sourceStartTick: Tick
+}
+
 export interface ProjectMidiNoteCoordinator {
   addMidiNote(input: AddMidiNoteInput): AddedMidiNoteResult
   moveMidiNotes(input: MoveMidiNotesInput): MovedMidiNotesResult | null
   removeMidiNotes(input: RemoveMidiNotesInput): RemovedMidiNotesResult
+  resizeMidiNote(input: ResizeMidiNoteInput): ResizedMidiNoteResult | null
 }
 
 function createEditableClipContext(
@@ -273,6 +291,30 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
       deltaPitch: command.deltaPitch,
       deltaTick: command.deltaTick,
       noteIds: command.noteIds,
+    })
+  }
+
+  resizeMidiNote(input: ResizeMidiNoteInput): ResizedMidiNoteResult | null {
+    const { context, session } = requireEditableMidiNoteTarget(
+      this.#dependencies,
+      input.clipId,
+    )
+    const command = createResizeNoteCommand({
+      baseRevision: input.baseRevision,
+      sourceId: context.sourceId,
+      noteId: input.noteId,
+      startTick: input.sourceStartTick,
+      durationTick: input.durationTick,
+    })
+    const result = session.execute(command)
+
+    if (result.status === PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE) return null
+
+    return Object.freeze({
+      commit: result.commit,
+      durationTick: command.durationTick,
+      noteId: command.noteId,
+      sourceStartTick: command.startTick,
     })
   }
 }

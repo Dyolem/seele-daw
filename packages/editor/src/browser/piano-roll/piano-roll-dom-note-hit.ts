@@ -1,10 +1,24 @@
 import {
   PIANO_ROLL_HIT_ZONE,
   type PianoRollHit,
+  type PianoRollHitZone,
 } from '#internal/common/piano-roll/index'
 import { parseNoteId } from '@seele-daw/project-core'
 
 export const PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE = 'data-piano-roll-note-id'
+export const PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE = 'data-piano-roll-note-zone'
+
+function resolveHitZone(value: string | null): PianoRollHitZone | null {
+  if (value === null) return PIANO_ROLL_HIT_ZONE.BODY
+
+  switch (value) {
+    case PIANO_ROLL_HIT_ZONE.RESIZE_END:
+    case PIANO_ROLL_HIT_ZONE.RESIZE_START:
+      return value
+    default:
+      return null
+  }
+}
 
 function isElement(
   target: EventTarget,
@@ -33,11 +47,15 @@ export function resolvePianoRollDomNoteHit(
 
     const noteIdValue = target.getAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE)
     if (noteIdValue === null) continue
+    const zone = resolveHitZone(
+      target.getAttribute(PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE),
+    )
+    if (zone === null) return null
 
     try {
       return Object.freeze({
         noteId: parseNoteId(noteIdValue),
-        zone: PIANO_ROLL_HIT_ZONE.BODY,
+        zone,
       })
     } catch {
       return null

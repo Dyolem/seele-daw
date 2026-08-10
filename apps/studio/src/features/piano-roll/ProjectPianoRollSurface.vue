@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import {
-  PIANO_ROLL_INTERACTION_INTENT,
   PIANO_ROLL_INTERACTION_STATUS,
   PIANO_ROLL_INTERACTION_TOOL,
   PIANO_ROLL_POINTER_INPUT_PHASE,
-  applyPianoRollSelectInteraction,
   createPianoRollInteractionSession,
   createPianoRollEditorSession,
   createInitialPianoRollViewport,
@@ -18,7 +16,6 @@ import {
   type PianoRollEditorSessionState,
   type PianoRollGridCanvasRenderer,
   type PianoRollGridCanvasTheme,
-  type PianoRollInteractionIntent,
   type PianoRollInteractionState,
   type PianoRollInteractionTool,
   type PianoRollNoteRenderer,
@@ -31,7 +28,6 @@ import {
   ZERO_TICK,
   parseMidiPitch,
   parsePositiveTick,
-  type NoteId,
   type ProjectSession,
   type Tick,
 } from '@seele-daw/project-core'
@@ -49,6 +45,7 @@ import {
 } from 'vue'
 
 import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
+import { createProjectPianoRollIntentHandler } from '@/features/piano-roll/project-piano-roll-intent-handler'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
 import {
   PIANO_ROLL_TOOL,
@@ -101,12 +98,25 @@ let readModel: PianoRollNoteReadModel | null = null
 let unsubscribeReadModel: (() => void) | null = null
 let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
 let resizeObserver: ResizeObserver | null = null
+const handleInteractionIntent = createProjectPianoRollIntentHandler({
+  getAuthorityRevision: () => noteState.value?.modelRevision ?? null,
+  getClipId: () => props.presentation.context.clipId,
+  getEditorSession: () => editorSession,
+  interactionSession,
+  projectMidiNotes,
+  reportDanger: (title, description) => toasts.danger(title, description),
+  reportWarning: (title, description) => toasts.warning(title, description),
+  setFailureMessage: (message) => {
+    interactionFailureMessage.value = message
+  },
+})
 const unsubscribeInteractionSession = interactionSession.subscribe({
   onStateChange: (state) => {
     interactionState.value = state
   },
 })
 const movePreview = computed(() => interactionState.value.movePreview)
+const resizePreview = computed(() => interactionState.value.resizePreview)
 
 const pianoKeys = Object.freeze(
   Array.from(
@@ -132,8 +142,9 @@ const barLabels = computed(() => {
 const rulerStyle = computed(() => ({
   gridTemplateColumns: `repeat(${barLabels.value.length}, minmax(0, 1fr))`,
 }))
-const moveSnapGuideStyle = computed(() => {
-  const snapGuideTick = movePreview.value?.snapGuideTick
+const snapGuideStyle = computed(() => {
+  const snapGuideTick =
+    resizePreview.value?.snapGuideTick ?? movePreview.value?.snapGuideTick
   const viewport = noteState.value?.viewport
   if (snapGuideTick === null || snapGuideTick === undefined || viewport === undefined) {
     return null
@@ -231,127 +242,12 @@ function activateTool(tool: PianoRollTool): void {
   pianoRollPreferences.activateTool(tool)
 }
 
-function reportCreatedNoteSelectionFailure(cause?: unknown): void {
-  const message = describeCause(
-    cause,
-    'The MIDI Note was added, but its selection could not be restored.',
-  )
-  interactionFailureMessage.value = message
-  toasts.warning(
-    'MIDI note was added but could not be selected',
-    message,
-  )
-}
-
 function resolveInteractionTool(tool: PianoRollTool): PianoRollInteractionTool {
   switch (tool) {
     case PIANO_ROLL_TOOL.CURSOR:
       return PIANO_ROLL_INTERACTION_TOOL.CURSOR
     case PIANO_ROLL_TOOL.PENCIL:
       return PIANO_ROLL_INTERACTION_TOOL.PENCIL
-  }
-}
-
-function handleInteractionIntent(intent: PianoRollInteractionIntent): void {
-  const currentEditorSession = editorSession
-
-  switch (intent.type) {
-    case PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION:
-      if (currentEditorSession === null) return
-      try {
-        applyPianoRollSelectInteraction(
-          currentEditorSession,
-          intent.pointerInput,
-        )
-        interactionFailureMessage.value = null
-      } catch (cause) {
-        interactionFailureMessage.value = describeFailure(cause)
-      }
-      return
-
-    case PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE: {
-      if (currentEditorSession === null) {
-        const message = 'The Piano Roll is not ready to place a MIDI Note.'
-        interactionFailureMessage.value = message
-        toasts.danger('MIDI note could not be added', message)
-        return
-      }
-
-      let addedNoteId: NoteId
-      try {
-        addedNoteId = projectMidiNotes.addMidiNote({
-          clipId: props.presentation.context.clipId,
-          clipStartTick: intent.placement.clipStartTick,
-          pitch: intent.placement.pitch,
-          requestedDurationTick: intent.placement.requestedDurationTick,
-        }).noteId
-      } catch (cause) {
-        const message = describeCause(
-          cause,
-          'The Project rejected the MIDI Note command. Please try again.',
-        )
-        interactionFailureMessage.value = message
-        toasts.danger('MIDI note could not be added', message)
-        return
-      }
-
-      try {
-        currentEditorSession.selectOnly(addedNoteId)
-        if (!currentEditorSession.state.selectedNoteIds.includes(addedNoteId)) {
-          reportCreatedNoteSelectionFailure()
-          return
-        }
-      } catch (cause) {
-        reportCreatedNoteSelectionFailure(cause)
-        return
-      }
-
-      interactionFailureMessage.value = null
-      return
-    }
-
-    case PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES: {
-      if (currentEditorSession === null) {
-        interactionSession.skipMoveCommit()
-        return
-      }
-
-      try {
-        const preview = intent.preview
-        const result =
-          preview.deltaTick === 0 && preview.deltaPitch === 0
-            ? null
-            : projectMidiNotes.moveMidiNotes({
-                baseRevision: intent.gesture.baseRevision,
-                clipId: intent.gesture.context.clipId,
-                deltaPitch: preview.deltaPitch,
-                deltaTick: preview.deltaTick,
-                noteIds: preview.movedNoteIds,
-              })
-
-        if (intent.gesture.selectOnlyOnCommit) {
-          currentEditorSession.selectOnly(intent.gesture.anchorNoteId)
-        }
-        if (result === null) {
-          interactionSession.skipMoveCommit()
-        } else {
-          interactionSession.resolveMoveCommit({
-            authorityRevision:
-              noteState.value?.modelRevision ?? intent.gesture.baseRevision,
-            commitRevision: result.commit.modelRevision,
-          })
-        }
-        interactionFailureMessage.value = null
-      } catch (cause) {
-        interactionSession.skipMoveCommit()
-        const message = describeCause(
-          cause,
-          'The Project rejected the MIDI Note move. Please try again.',
-        )
-        interactionFailureMessage.value = message
-        toasts.danger('MIDI notes could not be moved', message)
-      }
-    }
   }
 }
 
@@ -381,6 +277,11 @@ function handlePointerInput(input: PianoRollPointerInput): void {
       PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE
     ) {
       interactionSession.skipMoveCommit()
+    } else if (
+      interactionState.value.status ===
+      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE
+    ) {
+      interactionSession.skipResizeCommit()
     }
     const message = describeFailure(outcome.failure)
     interactionFailureMessage.value = message
@@ -416,6 +317,7 @@ function render(): void {
       createPianoRollNoteScene({
         movePreview: movePreview.value,
         notes: state.notes,
+        resizePreview: resizePreview.value,
         style: {
           borderColor: theme.noteBorderColor,
           fillColor: theme.noteFillColor,
@@ -690,6 +592,7 @@ onUnmounted(() => {
     role="region"
     :aria-label="`Piano Roll for ${props.presentation.name}`"
     :data-moving-notes="movePreview !== null"
+    :data-resizing-note="resizePreview !== null"
     :data-snap-enabled="pianoRollPreferences.snapEnabled"
     :data-tool="pianoRollPreferences.activeTool"
     tabindex="0"
@@ -750,9 +653,9 @@ onUnmounted(() => {
     <div ref="canvasHost" class="project-piano-roll__canvas-host">
       <canvas ref="gridCanvas" aria-hidden="true"></canvas>
       <div
-        v-if="moveSnapGuideStyle"
-        class="project-piano-roll__move-snap-guide"
-        :style="moveSnapGuideStyle"
+        v-if="snapGuideStyle"
+        class="project-piano-roll__snap-guide"
+        :style="snapGuideStyle"
         aria-hidden="true"
       ></div>
       <div ref="noteHost" class="project-piano-roll__note-host"></div>
@@ -935,7 +838,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.project-piano-roll__move-snap-guide {
+.project-piano-roll__snap-guide {
   position: absolute;
   inset-block: 0;
   inset-inline-start: 0;

@@ -51,6 +51,7 @@ import type {
   MoveMidiNotesInput,
   ProjectMidiNoteCoordinator,
   RemoveMidiNotesInput,
+  ResizeMidiNoteInput,
 } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import {
@@ -372,11 +373,17 @@ describe('ProjectPianoRollSurface', () => {
     >(() => {
       throw new Error('The selection-only Cursor test must not move MIDI Notes')
     })
+    const resizeMidiNote = vi.fn<
+      ProjectMidiNoteCoordinator['resizeMidiNote']
+    >(() => {
+      throw new Error('The selection-only Cursor test must not resize a MIDI Note')
+    })
     const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
       projectMidiNotes: Object.freeze({
         addMidiNote,
         moveMidiNotes,
         removeMidiNotes,
+        resizeMidiNote,
       }),
     })
     const pinia = createPinia()
@@ -580,7 +587,7 @@ describe('ProjectPianoRollSurface', () => {
     expect(wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe(
       'true',
     )
-    expect(wrapper.find('.project-piano-roll__move-snap-guide').exists()).toBe(
+    expect(wrapper.find('.project-piano-roll__snap-guide').exists()).toBe(
       true,
     )
     expect(
@@ -753,7 +760,7 @@ describe('ProjectPianoRollSurface', () => {
     await nextTick()
 
     const snappedTransform = note.attributes('style')
-    expect(wrapper.find('.project-piano-roll__move-snap-guide').exists()).toBe(
+    expect(wrapper.find('.project-piano-roll__snap-guide').exists()).toBe(
       true,
     )
 
@@ -761,14 +768,14 @@ describe('ProjectPianoRollSurface', () => {
       new KeyboardEvent('keydown', { altKey: true, key: 'Alt' }),
     )
     await nextTick()
-    expect(wrapper.find('.project-piano-roll__move-snap-guide').exists()).toBe(
+    expect(wrapper.find('.project-piano-roll__snap-guide').exists()).toBe(
       false,
     )
     expect(note.attributes('style')).not.toBe(snappedTransform)
 
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }))
     await nextTick()
-    expect(wrapper.find('.project-piano-roll__move-snap-guide').exists()).toBe(
+    expect(wrapper.find('.project-piano-roll__snap-guide').exists()).toBe(
       true,
     )
     expect(note.attributes('style')).toBe(snappedTransform)
@@ -842,6 +849,227 @@ describe('ProjectPianoRollSurface', () => {
     expect(wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe(
       'false',
     )
+
+    wrapper.unmount()
+    keyboard.keyboardShortcuts.dispose()
+  })
+
+  it('previews and commits a Pencil right-edge Resize as one Project revision', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-resize-pencil')
+    const noteId = fixture.projectMidiNotes.addMidiNote({
+      clipId: fixture.presentation.clipId,
+      clipStartTick: parseTick(960),
+      pitch: parseMidiPitch(60),
+      requestedDurationTick: parsePositiveTick(240),
+    }).noteId
+    const keyboard = createKeyboardFixture()
+    const pinia = createPinia()
+    const preferences = usePianoRollPreferencesStore(pinia)
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation: fixture.presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [pinia],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: fixture.projectMidiNotes,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const note = wrapper.get(`[data-piano-roll-note-id="${noteId}"]`)
+    const endHandle = note.get(
+      '.sd-piano-roll-dom-note__resize-handle--end',
+    )
+    const canvasHost = wrapper.get('.project-piano-roll__canvas-host')
+    const dragDistanceCssPixel =
+      (preferences.subdivisionSpanTick /
+        fixture.presentation.context.clipSpanTick) *
+      960
+    const originalEndCssPixel =
+      ((960 + 240) / fixture.presentation.context.clipSpanTick) * 960
+    const originalStyle = note.attributes('style')
+    const revisionBeforeResize = fixture.session.modelRevision
+
+    dispatchPointer(endHandle.element, 'pointerdown', {
+      clientX: originalEndCssPixel,
+      clientY: 120,
+      pointerId: 57,
+    })
+    dispatchPointer(canvasHost.element, 'pointermove', {
+      clientX: originalEndCssPixel + dragDistanceCssPixel,
+      clientY: 120,
+      pointerId: 57,
+    })
+    await nextTick()
+
+    expect(fixture.session.modelRevision).toBe(revisionBeforeResize)
+    expect(wrapper.get('.project-piano-roll').attributes('data-resizing-note')).toBe(
+      'true',
+    )
+    expect(wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe(
+      'false',
+    )
+    expect(wrapper.find('.project-piano-roll__snap-guide').exists()).toBe(true)
+    expect(note.attributes('style')).not.toBe(originalStyle)
+
+    dispatchPointer(canvasHost.element, 'pointerup', {
+      clientX: originalEndCssPixel + dragDistanceCssPixel,
+      clientY: 120,
+      pointerId: 57,
+    })
+    await Promise.resolve()
+    await nextTick()
+
+    expect(fixture.session.modelRevision).toBe(revisionBeforeResize + 1)
+    expect(
+      fixture.session
+        .getSnapshot()
+        .midiNotePartitions.flatMap(({ notes }) => notes)[0],
+    ).toMatchObject({
+      durationTick: 480,
+      id: noteId,
+      startTick: 960,
+    })
+    expect(wrapper.get('.project-piano-roll').attributes('data-resizing-note')).toBe(
+      'false',
+    )
+    expect(
+      wrapper.get(`[data-piano-roll-note-id="${noteId}"]`).classes(),
+    ).toContain('sd-piano-roll-dom-note--selected')
+    expect(
+      wrapper.get('button[aria-label="Pencil tool"]').attributes('aria-pressed'),
+    ).toBe('true')
+
+    fixture.session.undo()
+    expect(
+      fixture.session
+        .getSnapshot()
+        .midiNotePartitions.flatMap(({ notes }) => notes)[0],
+    ).toMatchObject({ durationTick: 240, startTick: 960 })
+
+    wrapper.unmount()
+    keyboard.keyboardShortcuts.dispose()
+  })
+
+  it('preserves Project, Selection and Cursor when a left-edge Resize is rejected', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-resize-failure')
+    const noteId = fixture.projectMidiNotes.addMidiNote({
+      clipId: fixture.presentation.clipId,
+      clipStartTick: parseTick(960),
+      pitch: parseMidiPitch(60),
+      requestedDurationTick: parsePositiveTick(240),
+    }).noteId
+    const keyboard = createKeyboardFixture()
+    const pinia = createPinia()
+    const preferences = usePianoRollPreferencesStore(pinia)
+    const toasts = useUiToastStore(pinia)
+    preferences.activateTool(PIANO_ROLL_TOOL.CURSOR)
+    const rejectedCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
+      addMidiNote: (input: AddMidiNoteInput) =>
+        fixture.projectMidiNotes.addMidiNote(input),
+      moveMidiNotes: (input: MoveMidiNotesInput) =>
+        fixture.projectMidiNotes.moveMidiNotes(input),
+      removeMidiNotes: (input: RemoveMidiNotesInput) =>
+        fixture.projectMidiNotes.removeMidiNotes(input),
+      resizeMidiNote: () => {
+        throw new Error('Test Project rejected the Note resize')
+      },
+    })
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation: fixture.presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [pinia],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: rejectedCoordinator,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const note = wrapper.get(`[data-piano-roll-note-id="${noteId}"]`)
+    dispatchPointer(note.element, 'pointerdown', { pointerId: 58 })
+    dispatchPointer(note.element, 'pointerup', { pointerId: 58 })
+    await nextTick()
+    expect(wrapper.text()).toContain('1 selected')
+
+    const startHandle = note.get(
+      '.sd-piano-roll-dom-note__resize-handle--start',
+    )
+    const canvasHost = wrapper.get('.project-piano-roll__canvas-host')
+    const dragDistanceCssPixel =
+      (preferences.subdivisionSpanTick /
+        fixture.presentation.context.clipSpanTick) *
+      960
+    const originalStartCssPixel =
+      (960 / fixture.presentation.context.clipSpanTick) * 960
+    const revisionBeforeResize = fixture.session.modelRevision
+
+    dispatchPointer(startHandle.element, 'pointerdown', {
+      clientX: originalStartCssPixel,
+      clientY: 120,
+      pointerId: 59,
+    })
+    dispatchPointer(canvasHost.element, 'pointermove', {
+      clientX: originalStartCssPixel - dragDistanceCssPixel,
+      clientY: 120,
+      pointerId: 59,
+    })
+    await nextTick()
+    expect(wrapper.get('.project-piano-roll').attributes('data-resizing-note')).toBe(
+      'true',
+    )
+
+    dispatchPointer(canvasHost.element, 'pointerup', {
+      clientX: originalStartCssPixel - dragDistanceCssPixel,
+      clientY: 120,
+      pointerId: 59,
+    })
+    await nextTick()
+
+    expect(fixture.session.modelRevision).toBe(revisionBeforeResize)
+    expect(
+      fixture.session
+        .getSnapshot()
+        .midiNotePartitions.flatMap(({ notes }) => notes)[0],
+    ).toMatchObject({
+      durationTick: 240,
+      id: noteId,
+      startTick: 960,
+    })
+    expect(wrapper.get('.project-piano-roll').attributes('data-resizing-note')).toBe(
+      'false',
+    )
+    expect(
+      wrapper.get(`[data-piano-roll-note-id="${noteId}"]`).classes(),
+    ).toContain('sd-piano-roll-dom-note--selected')
+    expect(
+      wrapper.get('button[aria-label="Cursor tool"]').attributes('aria-pressed'),
+    ).toBe('true')
+    expect(toasts.message).toMatchObject({
+      description: 'Test Project rejected the Note resize',
+      title: 'MIDI note could not be resized',
+      tone: 'danger',
+    })
 
     wrapper.unmount()
     keyboard.keyboardShortcuts.dispose()
@@ -1110,6 +1338,8 @@ describe('ProjectPianoRollSurface', () => {
       removeMidiNotes: () => {
         throw new Error('Test Project rejected the Note removal')
       },
+      resizeMidiNote: (input: ResizeMidiNoteInput) =>
+        fixture.projectMidiNotes.resizeMidiNote(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
@@ -1179,6 +1409,8 @@ describe('ProjectPianoRollSurface', () => {
         fixture.projectMidiNotes.moveMidiNotes(input),
       removeMidiNotes: (input: RemoveMidiNotesInput) =>
         fixture.projectMidiNotes.removeMidiNotes(input),
+      resizeMidiNote: (input: ResizeMidiNoteInput) =>
+        fixture.projectMidiNotes.resizeMidiNote(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
@@ -1258,6 +1490,8 @@ describe('ProjectPianoRollSurface', () => {
         fixture.projectMidiNotes.moveMidiNotes(input),
       removeMidiNotes: (input: RemoveMidiNotesInput) =>
         fixture.projectMidiNotes.removeMidiNotes(input),
+      resizeMidiNote: (input: ResizeMidiNoteInput) =>
+        fixture.projectMidiNotes.resizeMidiNote(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,

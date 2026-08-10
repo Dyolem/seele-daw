@@ -25,11 +25,14 @@ describe('ProjectMidiNoteVueContext', () => {
     const moveMidiNotes = vi.fn<ProjectMidiNoteCoordinator['moveMidiNotes']>()
     const removeMidiNotes =
       vi.fn<ProjectMidiNoteCoordinator['removeMidiNotes']>()
+    const resizeMidiNote =
+      vi.fn<ProjectMidiNoteCoordinator['resizeMidiNote']>()
     const context: ProjectMidiNoteVueContext = Object.freeze({
       projectMidiNotes: Object.freeze({
         addMidiNote,
         moveMidiNotes,
         removeMidiNotes,
+        resizeMidiNote,
       }),
     })
     const providedApp = createApp({ render: () => null })
@@ -76,5 +79,16 @@ describe('ProjectMidiNoteVueContext', () => {
       }),
     )
     expect(removeMidiNotes).toHaveBeenCalledOnce()
+
+    providedApp.runWithContext(() =>
+      useProjectMidiNotes().projectMidiNotes.resizeMidiNote({
+        baseRevision: 0 as ModelRevision,
+        clipId: parseClipId('context-midi-note-clip'),
+        durationTick: parsePositiveTick(480),
+        noteId: parseNoteId('context-midi-note'),
+        sourceStartTick: parseTick(240),
+      }),
+    )
+    expect(resizeMidiNote).toHaveBeenCalledOnce()
   })
 })

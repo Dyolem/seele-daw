@@ -119,7 +119,7 @@ Preference。
 
 - 把当前 Clip Context、Viewport、Grid、Tool、Snap Preference 和 Selection 组合为 Begin
   Configuration；
-- 消费 Selection、Add Note、Move Notes Intent，以及接入后续可见闭环的 Resize Note Intent；
+- 消费 Selection、Add Note、Move Notes 与 Resize Note Intent；
 - 每个 Move / Resize Intent 最多调用一次 `ProjectMidiNoteCoordinator`；
 - 把 Commit revision 或失败结果回告 Session；
 - 把用户可见失败转换为命令式 Toast；

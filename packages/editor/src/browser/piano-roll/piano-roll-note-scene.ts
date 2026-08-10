@@ -1,6 +1,7 @@
 import type {
   PianoRollNoteMovePreview,
   PianoRollNoteReadModelState,
+  PianoRollNoteResizePreview,
 } from '#internal/common/piano-roll/index'
 import {
   pianoRollClipTickToCssPixel,
@@ -30,6 +31,7 @@ export interface PianoRollNoteSceneStyle {
 export interface CreatePianoRollNoteSceneInput {
   readonly movePreview?: PianoRollNoteMovePreview | null
   readonly notes: PianoRollNoteReadModelState['notes']
+  readonly resizePreview?: PianoRollNoteResizePreview | null
   readonly selectedNoteIds: readonly NoteId[]
   readonly style: PianoRollNoteSceneStyle
   readonly viewport: PianoRollViewport
@@ -70,9 +72,12 @@ function pitchRowHeight(viewport: PianoRollViewport): number {
 }
 
 function createSceneNotes(input: CreatePianoRollNoteSceneInput): readonly SceneNote[] {
-  const movedNoteIds = new Set(input.movePreview?.movedNoteIds ?? [])
+  const previewNoteIds = new Set(input.movePreview?.movedNoteIds ?? [])
+  if (input.resizePreview !== null && input.resizePreview !== undefined) {
+    previewNoteIds.add(input.resizePreview.resizedNoteId)
+  }
   const notes: SceneNote[] = input.notes
-    .filter((visibleNote) => !movedNoteIds.has(visibleNote.note.id))
+    .filter((visibleNote) => !previewNoteIds.has(visibleNote.note.id))
     .map((visibleNote) => ({
       noteId: visibleNote.note.id,
       pitch: visibleNote.note.pitch,
@@ -102,6 +107,27 @@ function createSceneNotes(input: CreatePianoRollNoteSceneInput): readonly SceneN
     })
   }
 
+  const resizedNote = input.resizePreview?.note
+  if (
+    resizedNote !== null &&
+    resizedNote !== undefined &&
+    resizedNote.pitch >= input.viewport.minimumPitch &&
+    resizedNote.pitch <= input.viewport.maximumPitch &&
+    resizedNote.visibleEndTick > input.viewport.visibleStartTick &&
+    resizedNote.visibleStartTick < input.viewport.visibleEndTick
+  ) {
+    notes.push({
+      noteId: resizedNote.noteId,
+      pitch: resizedNote.pitch,
+      visibleEndTick: parseTick(
+        Math.min(resizedNote.visibleEndTick, input.viewport.visibleEndTick),
+      ),
+      visibleStartTick: parseTick(
+        Math.max(resizedNote.visibleStartTick, input.viewport.visibleStartTick),
+      ),
+    })
+  }
+
   return notes
 }
 
@@ -124,6 +150,9 @@ export function createPianoRollNoteScene(
     ...input.selectedNoteIds,
     ...(input.movePreview?.movedNoteIds ?? []),
   ])
+  if (input.resizePreview !== null && input.resizePreview !== undefined) {
+    selectedNoteIds.add(input.resizePreview.resizedNoteId)
+  }
   const rowHeight = pitchRowHeight(input.viewport)
   const inset = Math.min(1, rowHeight / 5)
   const notes = createSceneNotes(input).map((note): PianoRollNoteVisual => {

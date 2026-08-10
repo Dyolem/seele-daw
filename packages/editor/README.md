@@ -5,11 +5,11 @@
 > 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model、
 > Clip-scoped Note Selection Session、Timeline Grid Snap 与 Pencil Note Placement；
 > Cursor Move 与 Cursor / Pencil 单 Note Resize Gesture、Preview 和 Interaction Session
-> 分支已经内部就绪；
+> 分支已经就绪；
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
 > Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；Studio 已接入
-> Select Interaction、可见 Selection、Pencil Add Note 与 Cursor Move。Resize 尚未接入
-> Browser Edge Hit 或 Studio 可见闭环。
+> Select Interaction、可见 Selection、Pencil Add Note、Cursor Move，以及 DOM Edge Hit
+> 驱动的 Cursor / Pencil Resize 可见闭环。
 
 ## 包定位
 
@@ -180,10 +180,9 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 3. **已完成**：建立 Clip-scoped EditorSession、Select Interaction、Note Selection、
    统一 Browser Input 与 scoped keyboard shortcuts。
 4. **已完成**：接入 Pencil Add Note 单次提交手势。
-5. **进行中**：多 Note Remove 与 Cursor Move 已接入 Studio；Cursor / Pencil Resize 的
-   Project Core 与 Editor Common 已内部就绪，Browser / Studio 可见闭环按
-   [Piano Roll Note Editing 第五阶段计划](./docs/piano-roll-note-editing-phase-plan.md)
-   继续实施。
+5. **已完成**：多 Note Remove、Cursor Move 与 Cursor / Pencil 单 Note Resize 已接入
+   Studio，完整边界见
+   [Piano Roll Note Editing 第五阶段计划](./docs/piano-roll-note-editing-phase-plan.md)。
 6. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
 7. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 

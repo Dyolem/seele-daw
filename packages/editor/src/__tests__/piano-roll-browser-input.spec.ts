@@ -130,10 +130,28 @@ function createDomNoteFixture() {
   renderer.render(scene)
   const note = surface.querySelector<HTMLElement>('.sd-piano-roll-dom-note')
   if (note === null) throw new Error('Expected rendered DOM Note')
+  const startHandle = note.querySelector<HTMLElement>(
+    '.sd-piano-roll-dom-note__resize-handle--start',
+  )
+  const endHandle = note.querySelector<HTMLElement>(
+    '.sd-piano-roll-dom-note__resize-handle--end',
+  )
+  if (startHandle === null || endHandle === null) {
+    throw new Error('Expected rendered DOM Note resize handles')
+  }
   const noteChild = document.createElement('span')
   note.append(noteChild)
 
-  return { capture, note, noteChild, noteId, renderer, surface }
+  return {
+    capture,
+    endHandle,
+    note,
+    noteChild,
+    noteId,
+    renderer,
+    startHandle,
+    surface,
+  }
 }
 
 afterEach(() => {
@@ -156,6 +174,29 @@ describe('Piano Roll DOM Note Hit', () => {
       zone: PIANO_ROLL_HIT_ZONE.BODY,
     })
     expect(Object.isFrozen(resolvedHit)).toBe(true)
+    fixture.renderer.dispose()
+  })
+
+  it('resolves the rendered left and right handles into one semantic Edge hit', () => {
+    const fixture = createDomNoteFixture()
+    const resolvedHits: unknown[] = []
+    fixture.surface.addEventListener('pointerdown', (event) => {
+      resolvedHits.push(resolvePianoRollDomNoteHit(event, fixture.surface))
+    })
+
+    dispatchPointer(fixture.startHandle, 'pointerdown')
+    dispatchPointer(fixture.endHandle, 'pointerdown')
+
+    expect(resolvedHits).toEqual([
+      {
+        noteId: fixture.noteId,
+        zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
+      },
+      {
+        noteId: fixture.noteId,
+        zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
+      },
+    ])
     fixture.renderer.dispose()
   })
 
@@ -287,6 +328,42 @@ describe('Piano Roll Pointer Input Adapter', () => {
     expect(
       onInput.mock.calls.map(([input]) => input.originModifiers.alt),
     ).toEqual([false, false, false, false])
+
+    adapter.dispose()
+    fixture.renderer.dispose()
+  })
+
+  it('latches an Edge hit for the complete captured gesture', () => {
+    const fixture = createDomNoteFixture()
+    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
+    const adapter = createPianoRollPointerInputAdapter({
+      observer: {
+        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
+        onInput,
+      },
+      surface: fixture.surface,
+    })
+
+    dispatchPointer(fixture.endHandle, 'pointerdown', {
+      clientX: 200,
+      pointerId: 13,
+    })
+    dispatchPointer(fixture.surface, 'pointermove', {
+      clientX: 220,
+      pointerId: 13,
+    })
+    dispatchPointer(fixture.surface, 'pointerup', {
+      clientX: 240,
+      pointerId: 13,
+    })
+
+    expect(onInput).toHaveBeenCalledTimes(3)
+    for (const [input] of onInput.mock.calls) {
+      expect(input.hit).toEqual({
+        noteId: fixture.noteId,
+        zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
+      })
+    }
 
     adapter.dispose()
     fixture.renderer.dispose()

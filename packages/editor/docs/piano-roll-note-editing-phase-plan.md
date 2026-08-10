@@ -1,7 +1,7 @@
 # Piano Roll Note Editing 第五阶段计划
 
-> Status: In progress; Batch 1, Batch 2, interaction state machine foundation and Batch 3A
-> implemented; Batch 3B implemented and pending review
+> Status: Batch 1, Batch 2, interaction state machine foundation, Batch 3A and Batch 3B
+> implemented and reviewed; Batch 3C implemented and pending review
 >
 > Date: 2026-08-10
 
@@ -188,7 +188,7 @@ Surface-scoped Interaction Session：
 - Resize 未选中的 Note 时，成功提交后才把它设为唯一 Selection；Resize 已选中的 Note 时
   保留现有 Selection。取消、No-change 或失败均不提前改变 Selection；
 - Pointer Up 最多产生一个单 Note Resize Intent；Project Commit、No-change、失败和权威
-  revision 交接由 Studio 在 Batch 3C 接通；
+  revision 交接已由 Studio Batch 3C 接通；
 - `pointercancel`、lost capture、Window blur、Escape、Clip 切换与 dispose 都沿用共享
   Interaction Session 的取消语义，清理 Preview 且不提交。
 
@@ -198,10 +198,28 @@ Duration，不携带 Edge 方向；正 Duration、Source 边界、No-change、�
 入口。
 
 Batch 3B 已在 Editor Common 实现左右边界纯算法、Resize Preview、Snap Anchor、Resize
-Intent，以及 `resizing-note / committing-note-resize` Interaction Session 分支。它只消费
-Renderer-neutral Edge Hit，当前仍没有 Browser Edge Hit 或用户可见入口。Batch 3C 再接入
-Browser Edge Hit、Pointer 生命周期、Studio Coordinator、Toast 和可见闭环。该拆分避免
-Core 知道左右 Edge，也避免在命中热区确定前把浏览器细节写入领域协议。
+Intent，以及 `resizing-note / committing-note-resize` Interaction Session 分支，对应提交为
+`aac0b20`。
+
+Batch 3C 已完成用户可见闭环：
+
+- 默认 DOM Note Renderer 为每个 Note 建立左右 Edge 热区，每侧宽度上限为 6 CSS Pixel，
+  Note 较窄时各自最多占一半，因此两个方向不会重叠或同时激活；
+- Edge 元素携带稳定 Note ID 与 Renderer-neutral Hit Zone，DOM Hit Resolver 在 Pointer Down
+  解析后由既有 Pointer Adapter 锁定整个捕获手势；
+- DOM Handle 使用 `ew-resize` Cursor。Canvas Note Adapter 可以消费同一 Resize Scene，
+  当前没有 Canvas Hit，实现替换前必须另行提供空间命中；
+- Note Scene 用 Resize Preview 替换对应权威 Note 投影；Snap 开启时复用单根时间 Guide；
+- Studio Coordinator 把最终 Source-local Start / Duration 转交一个 `ResizeNoteCommand`，
+  No-change 不产生 Commit，成功只产生一个 revision 与一个 History 步骤；
+- Resize 未选中 Note 时只在成功 Commit 后设为唯一 Selection；Resize 已选中 Note 时保留
+  原 Selection；
+- Command 拒绝时清理 Preview，保留 Project、Selection 与当前 Tool，并显示命令式危险
+  Toast；Commit 成功但 Selection 恢复失败时保留已提交事实并显示警告 Toast；
+- Studio 将 Editor Intent 应用协调拆入独立 Feature Handler，Surface 继续只组合 Vue
+  生命周期、Browser Input、Renderer 与可重建状态。
+
+该拆分避免 Core 知道左右 Edge，也避免浏览器细节进入领域协议。
 
 ## 6. Snap 完成时机
 

@@ -450,6 +450,8 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
 - Selection 前的权威 Note Query，以及相关 Commit 后的存在性和 Clip 时间窗口校准。
 - 冻结的 Cursor Move Gesture，以及基于 Grid Coordinate 的 Absolute Snap、Pitch
   Semitone Delta 和 Selection 合法边界交集。
+- Surface-scoped Pointer Interaction Session，统一 Click、Add、Move 的 pressing、Preview、
+  cancel、单次 Intent 与权威 revision 交接；XState 只作为内部实现。
 
 `@seele-daw/editor/browser` 与 Studio 已提供：
 
@@ -458,6 +460,7 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
 - DOM / Canvas 共用的 selected Scene 事实，以及 Piano Black Selected Border / Glow；
 - Surface 级 DOM Hit 委托，以及 Renderer-neutral Primary Pointer Input；
 - Surface-local CSS Pixel、Pointer Capture、4 CSS Pixel Drag Threshold 和取消生命周期；
+- origin / current Modifier 分离、活动拖动中的动态 Alt、Window blur 与显式取消；
 - 小节、拍、1/16 细分三级网格，以及密集级别抑制；
 - DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note / Selection 摘要；
 - Clip / Track Color Note 和 muted 视觉；
@@ -479,18 +482,19 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
   Selection；
 - Cursor 拖动已选 Note 时移动完整 Selection；拖动未选 Note 时只移动该 Note，并在成功
   后把它设为唯一 Selection；
-- Pointer Down 冻结 Project revision、Note Facts、Selection、Viewport、Grid、Snap 与
-  Modifier；手势期间 Project revision 改变时，Pointer Up 的 stale intent 整体拒绝；
+- Pointer Down 冻结 Project revision、Note Facts、Selection、Viewport、Grid、Snap
+  Preference、Hit 与 origin Modifier；手势期间 Project revision 改变时，Pointer Up 的
+  stale intent 整体拒绝；
 - Pointer Move 只更新冻结 Preview；Snap 开启时显示 Anchor Guide，Pointer Up 的非零
   Delta 最多执行一个 `MoveNotesCommand`；
 - Snap 开启时，Note 无论原本是否对齐，都以拖动后的绝对目标时间解析当前 Grid
-  Coordinate；切换 Grid Resolution 后也不保留旧网格或自由移动产生的偏移；`Alt` 只为
-  Pointer Down 时开始的本次手势临时绕过 Snap；
+  Coordinate；切换 Grid Resolution 后也不保留旧网格或自由移动产生的偏移；拖动中按下
+  `Alt` 会实时临时绕过 Snap，松开后实时恢复本次冻结 Grid 的绝对坐标吸附；
 - 多 Note Move 使用共享 Tick / Pitch Delta 和全部 Note 合法边界的交集，不逐 Note Clamp；
 - Move 成功后等待权威 Read Model 到达对应 revision 再移除最终 Preview，避免短暂视觉
   回跳；
-- Pointer Cancel、Clip 切换、释放或 `Escape` 取消 Move，不写 Project；失败清理 Preview、
-  保留原 Project / History 并显示 Toast；
+- Pointer Cancel、Window blur、Clip 切换、释放或 `Escape` 取消未提交 Move，不写 Project；
+  失败清理 Preview、保留原 Project / History 并显示 Toast；
 - Move 只产生一个 Commit 和一个 History 步骤；Undo / Redo 原子恢复或重放完整 Selection；
 - Clip 切换创建新的 Editor Session，不继承前一个 Clip 的 Selection。
 
@@ -634,19 +638,20 @@ Project Core 已具备：
 | 2026-07-29 | `PIANO-ROLL`、`KEYBOARD-SHORTCUTS` | 明确 Cursor Move、Cursor / Pencil Resize 归属；接入多 Note 原子删除、Delete / Backspace、Selection 校准与失败 Toast。 | `52dc03c` |
 | 2026-07-29 | `MIDI-NOTE-CORE` | 单个与多个 Note 删除统一为数量无关的 `midi-note.remove` 集合协议，移除重叠的单 Note Command。 | `df4cdf3` |
 | 2026-07-29 | `MIDI-NOTE-CORE`、`PIANO-ROLL` | Batch 5.2 统一共享 Delta 的 `MoveNotesCommand`；接入 Cursor Selection Move、Absolute / Relative Snap、冻结 Preview、Guide、Escape Cancel 与单 Commit / History。 | `2535db4` |
-| 2026-07-29 | `PIANO-ROLL` | Note Move Snap 统一改为由绝对目标时间解析当前 Grid Coordinate；Off-grid Note 不再保留旧 Resolution 或自由移动偏移。 | `待提交` |
+| 2026-07-29 | `PIANO-ROLL` | Note Move Snap 统一改为由绝对目标时间解析当前 Grid Coordinate；Off-grid Note 不再保留旧 Resolution 或自由移动偏移。 | `494b9de` |
+| 2026-08-10 | `PIANO-ROLL` | 引入框架无关 Pointer Interaction Session，统一 Click / Add / Move 状态生命周期、动态 Alt、Window blur、显式取消与权威 revision 交接。 | `待提交` |
 
 ## 13. 当前验证基线
 
-Batch 5.2 审查候选已通过：
+Piano Roll Pointer Interaction State Machine Foundation 已通过：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production
   Build。
 - Project Core：26 个测试文件，378 项测试。
 - platform-browser：2 个测试文件，18 项测试。
-- editor：8 个测试文件，81 项测试。
-- Studio：38 个测试文件，203 项测试。
+- editor：9 个测试文件，88 项测试。
+- Studio：38 个测试文件，205 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

@@ -28,6 +28,7 @@ export interface PianoRollPointerInputAdapterObserver {
 }
 
 export interface PianoRollPointerInputAdapter {
+  cancel(): boolean
   dispose(): void
 }
 
@@ -44,8 +45,9 @@ export interface CreatePianoRollPointerInputAdapterInput {
 }
 
 interface ActivePointer {
+  currentModifiers: PianoRollInputModifiers
   readonly hit: PianoRollHit | null
-  readonly modifiers: PianoRollInputModifiers
+  readonly originModifiers: PianoRollInputModifiers
   readonly originPosition: PianoRollCssPoint
   readonly pointerId: number
   readonly pointerType: PianoRollPointerType
@@ -74,13 +76,30 @@ function normalizePointerType(pointerType: string): PianoRollPointerType {
   }
 }
 
-function createModifiers(event: PointerEvent): PianoRollInputModifiers {
+function createModifiers(
+  event: Pick<
+    KeyboardEvent | PointerEvent,
+    'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'
+  >,
+): PianoRollInputModifiers {
   return Object.freeze({
     alt: event.altKey,
     control: event.ctrlKey,
     meta: event.metaKey,
     shift: event.shiftKey,
   })
+}
+
+function modifiersEqual(
+  left: PianoRollInputModifiers,
+  right: PianoRollInputModifiers,
+): boolean {
+  return (
+    left.alt === right.alt &&
+    left.control === right.control &&
+    left.meta === right.meta &&
+    left.shift === right.shift
+  )
 }
 
 function copyHit(hit: PianoRollHit | null): PianoRollHit | null {
@@ -115,6 +134,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
   readonly #observer: PianoRollPointerInputAdapterObserver
   readonly #resolveHit: PianoRollBrowserHitResolver
   readonly #surface: HTMLElement
+  readonly #window: Window | null
   #activePointer: ActivePointer | null = null
   #disposed = false
 
@@ -129,6 +149,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
       input.resolveHit ??
       ((event, surface) => resolvePianoRollDomNoteHit(event, surface))
     this.#surface = input.surface
+    this.#window = input.surface.ownerDocument.defaultView
 
     input.surface.addEventListener('pointerdown', this.#handlePointerDown)
     input.surface.addEventListener('pointermove', this.#handlePointerMove)
@@ -138,6 +159,25 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
       'lostpointercapture',
       this.#handleLostPointerCapture,
     )
+    this.#window?.addEventListener('blur', this.#handleWindowBlur)
+    this.#window?.addEventListener('keydown', this.#handleModifierChange)
+    this.#window?.addEventListener('keyup', this.#handleModifierChange)
+  }
+
+  cancel(): boolean {
+    const activePointer = this.#activePointer
+    if (this.#disposed || activePointer === null) return false
+
+    this.#activePointer = null
+    this.#deliverInput(
+      this.#createInput(
+        activePointer,
+        PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL,
+        activePointer.lastPosition,
+      ),
+    )
+    this.#releasePointerCapture(activePointer.pointerId)
+    return true
   }
 
   dispose(): void {
@@ -152,6 +192,9 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
       'lostpointercapture',
       this.#handleLostPointerCapture,
     )
+    this.#window?.removeEventListener('blur', this.#handleWindowBlur)
+    this.#window?.removeEventListener('keydown', this.#handleModifierChange)
+    this.#window?.removeEventListener('keyup', this.#handleModifierChange)
 
     const activePointer = this.#activePointer
     this.#activePointer = null
@@ -188,9 +231,11 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
 
     if (!this.#capturePointer(event.pointerId)) return
     const position = createPoint(event, this.#surface)
+    const originModifiers = createModifiers(event)
     const activePointer: ActivePointer = {
+      currentModifiers: originModifiers,
       hit,
-      modifiers: createModifiers(event),
+      originModifiers,
       originPosition: position,
       pointerId: event.pointerId,
       pointerType: normalizePointerType(event.pointerType),
@@ -212,7 +257,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     if (activePointer === null) return
 
     const position = createPoint(event, this.#surface)
-    this.#updateActivePointer(activePointer, position)
+    this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#deliverInput(
       this.#createInput(
         activePointer,
@@ -227,7 +272,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     if (activePointer === null) return
 
     const position = createPoint(event, this.#surface)
-    this.#updateActivePointer(activePointer, position)
+    this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#activePointer = null
     this.#releasePointerCapture(activePointer.pointerId)
     this.#deliverInput(
@@ -244,7 +289,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     if (activePointer === null) return
 
     const position = createPoint(event, this.#surface)
-    this.#updateActivePointer(activePointer, position)
+    this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#activePointer = null
     this.#releasePointerCapture(activePointer.pointerId)
     this.#deliverInput(
@@ -270,6 +315,27 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     )
   }
 
+  readonly #handleModifierChange = (event: KeyboardEvent): void => {
+    const activePointer = this.#activePointer
+    if (this.#disposed || activePointer === null) return
+
+    const modifiers = createModifiers(event)
+    if (modifiersEqual(activePointer.currentModifiers, modifiers)) return
+
+    activePointer.currentModifiers = modifiers
+    this.#deliverInput(
+      this.#createInput(
+        activePointer,
+        PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+        activePointer.lastPosition,
+      ),
+    )
+  }
+
+  readonly #handleWindowBlur = (): void => {
+    this.cancel()
+  }
+
   #requireActivePointer(pointerId: number): ActivePointer | null {
     if (this.#disposed || this.#activePointer?.pointerId !== pointerId) return null
     return this.#activePointer
@@ -278,8 +344,10 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
   #updateActivePointer(
     activePointer: ActivePointer,
     position: PianoRollCssPoint,
+    modifiers: PianoRollInputModifiers,
   ): void {
     activePointer.lastPosition = position
+    activePointer.currentModifiers = modifiers
     if (activePointer.hasExceededDragThreshold) return
 
     const deltaX = position.xCssPixel - activePointer.originPosition.xCssPixel
@@ -296,7 +364,8 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     return Object.freeze({
       hasExceededDragThreshold: activePointer.hasExceededDragThreshold,
       hit: activePointer.hit,
-      modifiers: activePointer.modifiers,
+      modifiers: activePointer.currentModifiers,
+      originModifiers: activePointer.originModifiers,
       originPosition: activePointer.originPosition,
       phase,
       pointerId: activePointer.pointerId,

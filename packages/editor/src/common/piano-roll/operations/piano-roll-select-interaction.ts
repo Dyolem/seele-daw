@@ -1,8 +1,8 @@
-import type { PianoRollEditorSession } from './piano-roll-editor-session'
+import type { PianoRollEditorSession } from '#internal/common/piano-roll/piano-roll-editor-session'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   type PianoRollPointerInput,
-} from './piano-roll-input'
+} from '#internal/common/piano-roll/piano-roll-input'
 
 export type PianoRollSelectionTarget = Pick<
   PianoRollEditorSession,
@@ -11,9 +11,9 @@ export type PianoRollSelectionTarget = Pick<
 
 function requestsSelectionToggle(input: PianoRollPointerInput): boolean {
   return (
-    input.modifiers.control ||
-    input.modifiers.meta ||
-    input.modifiers.shift
+    input.originModifiers.control ||
+    input.originModifiers.meta ||
+    input.originModifiers.shift
   )
 }
 

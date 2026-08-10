@@ -41,13 +41,14 @@ export interface PianoRollInputModifiers {
 /**
  * Framework-neutral facts for one captured primary-pointer gesture.
  *
- * `hit`, `modifiers`, and `originPosition` are fixed at Pointer Down. The
- * current `position` may leave the Surface after capture.
+ * Hit, origin modifiers, and origin position are fixed at Pointer Down.
+ * Current modifiers and position may change while the Pointer is captured.
  */
 export interface PianoRollPointerInput {
   readonly hasExceededDragThreshold: boolean
   readonly hit: PianoRollHit | null
   readonly modifiers: PianoRollInputModifiers
+  readonly originModifiers: PianoRollInputModifiers
   readonly originPosition: PianoRollCssPoint
   readonly phase: PianoRollPointerInputPhase
   readonly pointerId: number

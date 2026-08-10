@@ -1,8 +1,8 @@
 # Piano Roll Note Editing 第五阶段计划
 
-> Status: In progress; Batch 1 implementation under review
+> Status: In progress; Batch 1, Batch 2 and interaction state machine foundation implemented
 >
-> Date: 2026-07-29
+> Date: 2026-08-10
 
 ## 阶段目标
 
@@ -111,19 +111,21 @@ Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 
 - 拖动已选 Note 移动完整 Selection；拖动未选 Note 只预览该 Note，提交成功后才把它设为
   唯一 Selection，取消或失败不提前改写 Selection；
 - Pointer Down 冻结 Project `baseRevision`、Note Record、Selection、Viewport、Grid、
-  Snap 和 Modifier；手势中途改变 Preference 不改变本次结果，Project revision 变化则
+  Snap Preference、Hit 与 origin modifiers；手势中途改变 Preference 不改变本次结果，
+  Project revision 变化则
   Pointer Up 的 Command 作为 stale intent 整体拒绝；
 - Anchor 的原始 Clip-local Tick 与 Pointer Delta 先形成绝对目标坐标，再由本次手势冻结的
   Grid Origin 和 Grid Resolution 解析最近 Grid 坐标；Off-grid Anchor 不采用相对
   Delta Snap；
-- `Alt` 在 Pointer Down 时只为本次手势临时绕过 Snap；Snap Preference 本身不改变；
+- 当前 modifiers 在捕获期间保持动态；拖动中按下 `Alt` 会立即临时绕过 Snap，松开后立即
+  恢复按本次冻结 Grid 的绝对坐标吸附；Snap Preference 本身不改变；
 - Y 轴按 Pitch Row 解析共享 Semitone Delta，不使用 Timeline Grid；
 - Preview 使用冻结数据和同一共享 Delta，不写 Project；Snap 开启时显示 Anchor Guide；
 - Tick 边界是全部 Note 在 MidiSource 内合法区间的交集，Pitch 边界是全部 Note 在
   0–127 内合法区间的交集；到达边界时整体 Clamp，不允许部分 Note 停留；
 - Pointer Up 的非零结果执行一个 `MoveNotesCommand`；零 Delta 不产生 Commit；
 - `pointercancel`、lost pointer capture、Clip 切换、组件释放或聚焦 Piano Roll 的
-  `Escape` 都清理 Preview，且不写 Project；
+  `Escape`，以及 Window blur 都清理未提交 Preview，且不写 Project；
 - 提交失败清理 Preview、保留原 Project / History，并通过命令式 Toast 提示；
 - 成功提交后继续显示最终 Preview，直到权威 Note Read Model 到达对应 revision，避免短暂
   回跳；随后重新读取 Project Facts。
@@ -135,7 +137,25 @@ Batch 2 已审查并实现 `MoveNotesCommand` 的 Delta、No-change、边界与 
 
 对象边缘、Marker、播放头和 Loop 边界仍不是 Snap Target。
 
-## 4. Batch 3：Cursor / Pencil Resize
+## 4. 独立批次：Pointer Interaction State Machine Foundation
+
+在 Resize 增加更多 hit zone 与分支前，先把现有 Click、Pencil Add 和 Note Move 接入同一个
+Surface-scoped Interaction Session：
+
+- 使用精确版本 `xstate@5.32.5` core 表达 pressing、moving、committing、
+  awaiting-authority 与 cancel；
+- XState 只作为 `@seele-daw/editor/common` 内部实现，Studio 只消费 Seele DAW 自有 State、
+  Input 和 Intent；
+- Browser Adapter 继续拥有 DOM Event、Pointer Capture、Window blur 与动态 Modifier
+  transport；
+- 具体 Select、Placement 与 Move 算法继续是独立纯函数，不合并成万能 machine；
+- Pointer Up 最多产生一个业务 Intent，Project Command 仍由 Studio Coordinator 执行；
+- Commit 成功后保留 Preview 到权威 Read Model revision，取消后的迟到 Pointer Up 无效。
+
+完整决定见
+[Piano Roll Pointer Interaction 状态机决策](./piano-roll-pointer-interaction-state-machine-decision.md)。
+
+## 5. Batch 3：Cursor / Pencil Resize
 
 - 左边缘 Resize 改变 Start 与 Duration，右边缘只改变 Duration；
 - 两种 Tool 使用相同 Resize Intent、Preview、Command 和 Snap 规则；
@@ -149,7 +169,7 @@ Batch 2 已审查并实现 `MoveNotesCommand` 的 Delta、No-change、边界与 
 Project Core 目前没有 Resize Command；精确边界算法、No-change 规则和 Delta 语义必须在本批
 生产实现前单独审查。
 
-## 5. Snap 完成时机
+## 6. Snap 完成时机
 
 当前 `floor` 与 `nearest` 是交互内部策略，不是用户可选模式。用户界面继续只暴露 Snap
 开关和 Grid Resolution。
@@ -162,14 +182,15 @@ Clip 边缘、播放头、Marker、Loop 或 Guide 的 Advanced Snap，必须等�
 Snap 只约束实时创建与拖动；Quantize 是修改既有 Note Timing 的 Project Command，二者不能
 混为同一个系统。
 
-## 6. 实施与验收顺序
+## 7. 实施与验收顺序
 
 1. Batch 1A：Project Core 多 Note 原子删除 Command、Commit、Delta 与 History。
 2. Batch 1B：Studio Coordinator、Delete / Backspace Action、Selection 校准与 Toast。
 3. Batch 2A：Absolute Time Grid Coordinate Snap、Move Intent 和纯逻辑边界。
 4. Batch 2B：Cursor Move Hit、Preview、Pointer 生命周期与一次提交。
-5. Batch 3A：Resize Command 与左右边界算法。
-6. Batch 3B：Cursor / Pencil Edge Hit、Preview 与可见 Resize 闭环。
+5. 独立批次：Pointer Interaction State Machine Foundation。
+6. Batch 3A：Resize Command 与左右边界算法。
+7. Batch 3B：Cursor / Pencil Edge Hit、Preview 与可见 Resize 闭环。
 
 每个独立批次完成测试和用户审查后再进入下一批。性能优化继续由真实 DOM Note 基准驱动，
 不因 Move / Resize 提前迁移到 Canvas Note Renderer。

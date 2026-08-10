@@ -1,38 +1,37 @@
 <script setup lang="ts">
 import {
+  PIANO_ROLL_INTERACTION_INTENT,
+  PIANO_ROLL_INTERACTION_STATUS,
+  PIANO_ROLL_INTERACTION_TOOL,
   PIANO_ROLL_POINTER_INPUT_PHASE,
   applyPianoRollSelectInteraction,
+  createPianoRollInteractionSession,
   createPianoRollEditorSession,
   createInitialPianoRollViewport,
   createPianoRollGrid,
   createPianoRollGridCanvasRenderer,
-  createPianoRollNoteMoveGesture,
   createPianoRollNoteScene,
   createPianoRollNoteReadModel,
   createPianoRollPointerInputAdapter,
   pianoRollClipTickToCssPixel,
-  resolvePianoRollPencilNotePlacement,
-  resolvePianoRollNoteMovePreview,
   type PianoRollEditorSession,
   type PianoRollEditorSessionState,
-  type PianoRollGrid,
   type PianoRollGridCanvasRenderer,
   type PianoRollGridCanvasTheme,
+  type PianoRollInteractionIntent,
+  type PianoRollInteractionState,
+  type PianoRollInteractionTool,
   type PianoRollNoteRenderer,
-  type PianoRollNoteMoveGesture,
-  type PianoRollNoteMovePreview,
   type PianoRollNoteReadModel,
   type PianoRollNoteReadModelState,
   type PianoRollPointerInputAdapter,
   type PianoRollPointerInput,
-  type PianoRollViewport,
 } from '@seele-daw/editor'
 import {
   ZERO_TICK,
   parseMidiPitch,
   parsePositiveTick,
   type NoteId,
-  type ModelRevision,
   type ProjectSession,
   type Tick,
 } from '@seele-daw/project-core'
@@ -87,7 +86,10 @@ const gridCanvas = useTemplateRef<HTMLCanvasElement>('gridCanvas')
 const noteHost = useTemplateRef<HTMLElement>('noteHost')
 const noteState = shallowRef<PianoRollNoteReadModelState | null>(null)
 const editorState = shallowRef<PianoRollEditorSessionState | null>(null)
-const movePreview = shallowRef<PianoRollNoteMovePreview | null>(null)
+const interactionSession = createPianoRollInteractionSession()
+const interactionState = shallowRef<PianoRollInteractionState>(
+  interactionSession.state,
+)
 const interactionFailureMessage = shallowRef<string | null>(null)
 const readModelFailureMessage = shallowRef<string | null>(null)
 const renderFailureMessage = shallowRef<string | null>(null)
@@ -99,19 +101,12 @@ let readModel: PianoRollNoteReadModel | null = null
 let unsubscribeReadModel: (() => void) | null = null
 let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
 let resizeObserver: ResizeObserver | null = null
-
-interface ActivePianoRollToolGesture {
-  readonly context: ReadyProjectPianoRollPresentation['context']
-  readonly grid: PianoRollGrid
-  readonly pointerId: number
-  readonly snapEnabled: boolean
-  readonly tool: PianoRollTool
-  readonly viewport: PianoRollViewport | null
-  readonly moveGesture: PianoRollNoteMoveGesture | null
-}
-
-let activeToolGesture: ActivePianoRollToolGesture | null = null
-let movePreviewCommitRevision: ModelRevision | null = null
+const unsubscribeInteractionSession = interactionSession.subscribe({
+  onStateChange: (state) => {
+    interactionState.value = state
+  },
+})
+const movePreview = computed(() => interactionState.value.movePreview)
 
 const pianoKeys = Object.freeze(
   Array.from(
@@ -248,197 +243,154 @@ function reportCreatedNoteSelectionFailure(cause?: unknown): void {
   )
 }
 
-function handlePencilInput(
-  gesture: ActivePianoRollToolGesture,
-  input: PianoRollPointerInput,
-): void {
-  if (
-    input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.END ||
-    input.hasExceededDragThreshold ||
-    input.hit !== null
-  ) {
-    return
+function resolveInteractionTool(tool: PianoRollTool): PianoRollInteractionTool {
+  switch (tool) {
+    case PIANO_ROLL_TOOL.CURSOR:
+      return PIANO_ROLL_INTERACTION_TOOL.CURSOR
+    case PIANO_ROLL_TOOL.PENCIL:
+      return PIANO_ROLL_INTERACTION_TOOL.PENCIL
   }
+}
 
+function handleInteractionIntent(intent: PianoRollInteractionIntent): void {
   const currentEditorSession = editorSession
-  if (gesture.viewport === null || currentEditorSession === null) {
-    const message = 'The Piano Roll is not ready to place a MIDI Note.'
-    interactionFailureMessage.value = message
-    toasts.danger('MIDI note could not be added', message)
-    return
-  }
 
-  let addedNoteId: NoteId
-  try {
-    const placement = resolvePianoRollPencilNotePlacement({
-      context: gesture.context,
-      grid: gesture.grid,
-      pointerInput: input,
-      snapEnabled: gesture.snapEnabled,
-      viewport: gesture.viewport,
-    })
-    if (placement === null) return
+  switch (intent.type) {
+    case PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION:
+      if (currentEditorSession === null) return
+      try {
+        applyPianoRollSelectInteraction(
+          currentEditorSession,
+          intent.pointerInput,
+        )
+        interactionFailureMessage.value = null
+      } catch (cause) {
+        interactionFailureMessage.value = describeFailure(cause)
+      }
+      return
 
-    addedNoteId = projectMidiNotes.addMidiNote({
-      clipId: gesture.context.clipId,
-      clipStartTick: placement.clipStartTick,
-      pitch: placement.pitch,
-      requestedDurationTick: placement.requestedDurationTick,
-    }).noteId
-  } catch (cause) {
-    const message = describeCause(
-      cause,
-      'The Project rejected the MIDI Note command. Please try again.',
-    )
-    interactionFailureMessage.value = message
-    toasts.danger('MIDI note could not be added', message)
-    return
-  }
+    case PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE: {
+      if (currentEditorSession === null) {
+        const message = 'The Piano Roll is not ready to place a MIDI Note.'
+        interactionFailureMessage.value = message
+        toasts.danger('MIDI note could not be added', message)
+        return
+      }
 
-  try {
-    currentEditorSession.selectOnly(addedNoteId)
-    if (!currentEditorSession.state.selectedNoteIds.includes(addedNoteId)) {
-      reportCreatedNoteSelectionFailure()
+      let addedNoteId: NoteId
+      try {
+        addedNoteId = projectMidiNotes.addMidiNote({
+          clipId: props.presentation.context.clipId,
+          clipStartTick: intent.placement.clipStartTick,
+          pitch: intent.placement.pitch,
+          requestedDurationTick: intent.placement.requestedDurationTick,
+        }).noteId
+      } catch (cause) {
+        const message = describeCause(
+          cause,
+          'The Project rejected the MIDI Note command. Please try again.',
+        )
+        interactionFailureMessage.value = message
+        toasts.danger('MIDI note could not be added', message)
+        return
+      }
+
+      try {
+        currentEditorSession.selectOnly(addedNoteId)
+        if (!currentEditorSession.state.selectedNoteIds.includes(addedNoteId)) {
+          reportCreatedNoteSelectionFailure()
+          return
+        }
+      } catch (cause) {
+        reportCreatedNoteSelectionFailure(cause)
+        return
+      }
+
+      interactionFailureMessage.value = null
       return
     }
-  } catch (cause) {
-    reportCreatedNoteSelectionFailure(cause)
-    return
-  }
 
-  interactionFailureMessage.value = null
-}
+    case PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES: {
+      if (currentEditorSession === null) {
+        interactionSession.skipMoveCommit()
+        return
+      }
 
-function clearMovePreview(): void {
-  movePreview.value = null
-  movePreviewCommitRevision = null
-}
+      try {
+        const preview = intent.preview
+        const result =
+          preview.deltaTick === 0 && preview.deltaPitch === 0
+            ? null
+            : projectMidiNotes.moveMidiNotes({
+                baseRevision: intent.gesture.baseRevision,
+                clipId: intent.gesture.context.clipId,
+                deltaPitch: preview.deltaPitch,
+                deltaTick: preview.deltaTick,
+                noteIds: preview.movedNoteIds,
+              })
 
-function resolveMovePreview(
-  gesture: ActivePianoRollToolGesture,
-  input: PianoRollPointerInput,
-): PianoRollNoteMovePreview | null {
-  if (gesture.moveGesture === null || gesture.viewport === null) return null
-
-  return resolvePianoRollNoteMovePreview({
-    gesture: gesture.moveGesture,
-    grid: gesture.grid,
-    pointerInput: input,
-    snapEnabled: gesture.snapEnabled,
-    viewport: gesture.viewport,
-  })
-}
-
-function handleCursorInput(
-  gesture: ActivePianoRollToolGesture,
-  input: PianoRollPointerInput,
-): void {
-  const currentEditorSession = editorSession
-  if (currentEditorSession === null) return
-
-  if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE) {
-    try {
-      const preview = resolveMovePreview(gesture, input)
-      if (preview !== null) movePreview.value = preview
-    } catch (cause) {
-      movePreview.value = null
-      interactionFailureMessage.value = describeFailure(cause)
-    }
-    return
-  }
-
-  if (!input.hasExceededDragThreshold || gesture.moveGesture === null) {
-    clearMovePreview()
-    applyPianoRollSelectInteraction(currentEditorSession, input)
-    interactionFailureMessage.value = null
-    return
-  }
-
-  let finalPreview: PianoRollNoteMovePreview | null
-  try {
-    finalPreview = resolveMovePreview(gesture, input)
-    if (finalPreview === null) {
-      clearMovePreview()
-      return
-    }
-    movePreview.value = finalPreview
-
-    const result =
-      finalPreview.deltaTick === 0 && finalPreview.deltaPitch === 0
-        ? null
-        : projectMidiNotes.moveMidiNotes({
-            baseRevision: gesture.moveGesture.baseRevision,
-            clipId: gesture.context.clipId,
-            deltaPitch: finalPreview.deltaPitch,
-            deltaTick: finalPreview.deltaTick,
-            noteIds: finalPreview.movedNoteIds,
+        if (intent.gesture.selectOnlyOnCommit) {
+          currentEditorSession.selectOnly(intent.gesture.anchorNoteId)
+        }
+        if (result === null) {
+          interactionSession.skipMoveCommit()
+        } else {
+          interactionSession.resolveMoveCommit({
+            authorityRevision:
+              noteState.value?.modelRevision ?? intent.gesture.baseRevision,
+            commitRevision: result.commit.modelRevision,
           })
-    movePreviewCommitRevision = result?.commit.modelRevision ?? null
-
-    if (gesture.moveGesture.selectOnlyOnCommit) {
-      currentEditorSession.selectOnly(gesture.moveGesture.anchorNoteId)
+        }
+        interactionFailureMessage.value = null
+      } catch (cause) {
+        interactionSession.skipMoveCommit()
+        const message = describeCause(
+          cause,
+          'The Project rejected the MIDI Note move. Please try again.',
+        )
+        interactionFailureMessage.value = message
+        toasts.danger('MIDI notes could not be moved', message)
+      }
     }
-    if (result === null) clearMovePreview()
-    interactionFailureMessage.value = null
-  } catch (cause) {
-    clearMovePreview()
-    const message = describeCause(
-      cause,
-      'The Project rejected the MIDI Note move. Please try again.',
-    )
-    interactionFailureMessage.value = message
-    toasts.danger('MIDI notes could not be moved', message)
   }
 }
 
 function handlePointerInput(input: PianoRollPointerInput): void {
   if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
     surfaceElement.value?.focus({ preventScroll: true })
-    const context = props.presentation.context
-    const tool = pianoRollPreferences.activeTool
-    const moveGesture =
-      tool === PIANO_ROLL_TOOL.CURSOR && editorSession !== null
-        ? createPianoRollNoteMoveGesture({
-            context,
-            pointerInput: input,
-            selectedNoteIds: editorSession.state.selectedNoteIds,
-            session: props.session,
-          })
-        : null
-    activeToolGesture = Object.freeze({
-      context,
-      grid: createDisplayGrid(),
-      moveGesture,
-      pointerId: input.pointerId,
-      snapEnabled: pianoRollPreferences.snapEnabled,
-      tool,
-      viewport: noteState.value?.viewport ?? null,
-    })
-    return
   }
 
-  const gesture = activeToolGesture
-  if (gesture === null || gesture.pointerId !== input.pointerId) return
-  if (
-    input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL ||
-    gesture.context.clipId !== props.presentation.context.clipId
-  ) {
-    activeToolGesture = null
-    clearMovePreview()
-    return
-  }
+  const outcome = interactionSession.handlePointerInput(
+    input,
+    input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN
+      ? {
+          context: props.presentation.context,
+          grid: createDisplayGrid(),
+          selectedNoteIds: editorSession?.state.selectedNoteIds ?? [],
+          session: props.session,
+          snapEnabled: pianoRollPreferences.snapEnabled,
+          tool: resolveInteractionTool(pianoRollPreferences.activeTool),
+          viewport: noteState.value?.viewport ?? null,
+        }
+      : undefined,
+  )
 
-  if (gesture.tool === PIANO_ROLL_TOOL.CURSOR) {
-    handleCursorInput(gesture, input)
+  if (outcome.failure !== null) {
+    if (
+      interactionState.value.status ===
+      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE
+    ) {
+      interactionSession.skipMoveCommit()
+    }
+    const message = describeFailure(outcome.failure)
+    interactionFailureMessage.value = message
     if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.END) {
-      activeToolGesture = null
+      toasts.danger('Piano Roll interaction could not complete', message)
     }
     return
   }
 
-  if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE) return
-  activeToolGesture = null
-  handlePencilInput(gesture, input)
+  if (outcome.intent !== null) handleInteractionIntent(outcome.intent)
 }
 
 function render(): void {
@@ -552,12 +504,7 @@ function createOrResizeReadModel(): void {
       },
       onStateChange: (state) => {
         noteState.value = state
-        if (
-          movePreviewCommitRevision !== null &&
-          state.modelRevision >= movePreviewCommitRevision
-        ) {
-          clearMovePreview()
-        }
+        interactionSession.notifyAuthorityRevision(state.modelRevision)
         readModelFailureMessage.value = null
       },
     })
@@ -609,10 +556,11 @@ function removeSelectedNotes(): boolean {
   return true
 }
 
-function clearSelectionOrCancelMove(): boolean {
-  if (hasActiveNoteMoveGesture()) {
-    activeToolGesture = null
-    clearMovePreview()
+function clearSelectionOrCancelInteraction(): boolean {
+  if (hasCancellablePointerInteraction()) {
+    if (!(pointerInputAdapter?.cancel() ?? false)) {
+      interactionSession.cancel()
+    }
     interactionFailureMessage.value = null
     return true
   }
@@ -620,8 +568,8 @@ function clearSelectionOrCancelMove(): boolean {
   return editorSession?.clearSelection() ?? false
 }
 
-function hasActiveNoteMoveGesture(): boolean {
-  return activeToolGesture !== null && activeToolGesture.moveGesture !== null
+function hasCancellablePointerInteraction(): boolean {
+  return interactionState.value.pointerId !== null
 }
 
 const disposeKeyboardShortcut = keyboardShortcuts.register([
@@ -643,13 +591,13 @@ const disposeKeyboardShortcut = keyboardShortcuts.register([
     bindings: keyboardShortcuts.bindingsFor(
       STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
     ),
-    description: 'Clear the Note selection in the focused Piano Roll.',
+    description: 'Cancel the active interaction or clear the Note selection.',
     isEnabled: () =>
       isPianoRollFocused() &&
-      (hasActiveNoteMoveGesture() ||
+      (hasCancellablePointerInteraction() ||
         (editorState.value?.selectedNoteIds.length ?? 0) > 0),
     label: 'Clear Piano Roll selection',
-    run: clearSelectionOrCancelMove,
+    run: clearSelectionOrCancelInteraction,
     scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
   },
 ])
@@ -665,8 +613,9 @@ watch(
     props.session,
   ],
   () => {
-    activeToolGesture = null
-    clearMovePreview()
+    if (!(pointerInputAdapter?.cancel() ?? false)) {
+      interactionSession.cancel()
+    }
     recomposeReadModel()
     composeEditorSession()
   },
@@ -723,8 +672,8 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleWindowResize)
   pointerInputAdapter?.dispose()
   pointerInputAdapter = null
-  activeToolGesture = null
-  clearMovePreview()
+  unsubscribeInteractionSession()
+  interactionSession.dispose()
   disposeEditorSession()
   disposeReadModel()
   gridRenderer.value?.dispose()

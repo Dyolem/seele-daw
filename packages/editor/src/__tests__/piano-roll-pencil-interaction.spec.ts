@@ -71,6 +71,12 @@ function createPointerInput(
       meta: false,
       shift: false,
     }),
+    originModifiers: Object.freeze({
+      alt: false,
+      control: false,
+      meta: false,
+      shift: false,
+    }),
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
     pointerId: 1,

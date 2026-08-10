@@ -8,18 +8,18 @@ import {
   TIMELINE_GRID_SNAP_MODE,
   resolveTimelineGridTick,
   type TimelineGrid,
-} from '../timeline-grid'
-import type { PianoRollClipContext } from './piano-roll-clip-context'
-import { PianoRollError } from './piano-roll-error'
+} from '#internal/common/timeline-grid'
+import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
+import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   type PianoRollPointerInput,
-} from './piano-roll-input'
+} from '#internal/common/piano-roll/piano-roll-input'
 import {
   pianoRollCssPixelToClipTickPosition,
   pianoRollCssPixelToMidiPitch,
   type PianoRollViewport,
-} from './piano-roll-viewport'
+} from '#internal/common/piano-roll/piano-roll-viewport'
 
 export interface PianoRollNotePlacement {
   readonly clipStartTick: Tick

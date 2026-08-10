@@ -705,6 +705,148 @@ describe('ProjectPianoRollSurface', () => {
     keyboard.keyboardShortcuts.dispose()
   })
 
+  it('updates the Note move Snap preview when Alt changes during the gesture', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-move-live-alt')
+    const noteId = fixture.projectMidiNotes.addMidiNote({
+      clipId: fixture.presentation.clipId,
+      clipStartTick: parseTick(960),
+      pitch: parseMidiPitch(60),
+      requestedDurationTick: parsePositiveTick(240),
+    }).noteId
+    const keyboard = createKeyboardFixture()
+    const pinia = createPinia()
+    usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation: fixture.presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [pinia],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: fixture.projectMidiNotes,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const note = wrapper.get(`[data-piano-roll-note-id="${noteId}"]`)
+    const canvasHost = wrapper.get('.project-piano-roll__canvas-host')
+    const revisionBeforeMove = fixture.session.modelRevision
+    dispatchPointer(note.element, 'pointerdown', {
+      clientX: 200,
+      clientY: 120,
+      pointerId: 55,
+    })
+    dispatchPointer(canvasHost.element, 'pointermove', {
+      clientX: 265,
+      clientY: 120,
+      pointerId: 55,
+    })
+    await nextTick()
+
+    const snappedTransform = note.attributes('style')
+    expect(wrapper.find('.project-piano-roll__move-snap-guide').exists()).toBe(
+      true,
+    )
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { altKey: true, key: 'Alt' }),
+    )
+    await nextTick()
+    expect(wrapper.find('.project-piano-roll__move-snap-guide').exists()).toBe(
+      false,
+    )
+    expect(note.attributes('style')).not.toBe(snappedTransform)
+
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }))
+    await nextTick()
+    expect(wrapper.find('.project-piano-roll__move-snap-guide').exists()).toBe(
+      true,
+    )
+    expect(note.attributes('style')).toBe(snappedTransform)
+
+    keyboard.bindingRegistry.dispatch('Escape')
+    expect(fixture.session.modelRevision).toBe(revisionBeforeMove)
+
+    wrapper.unmount()
+    keyboard.keyboardShortcuts.dispose()
+  })
+
+  it('cancels an active Note move on Window blur without committing Pointer Up', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-move-window-blur')
+    const noteId = fixture.projectMidiNotes.addMidiNote({
+      clipId: fixture.presentation.clipId,
+      clipStartTick: parseTick(960),
+      pitch: parseMidiPitch(60),
+      requestedDurationTick: parsePositiveTick(240),
+    }).noteId
+    const keyboard = createKeyboardFixture()
+    const pinia = createPinia()
+    usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation: fixture.presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [pinia],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: fixture.projectMidiNotes,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const note = wrapper.get(`[data-piano-roll-note-id="${noteId}"]`)
+    const canvasHost = wrapper.get('.project-piano-roll__canvas-host')
+    const revisionBeforeMove = fixture.session.modelRevision
+    dispatchPointer(note.element, 'pointerdown', {
+      clientX: 200,
+      clientY: 120,
+      pointerId: 56,
+    })
+    dispatchPointer(canvasHost.element, 'pointermove', {
+      clientX: 260,
+      clientY: 110,
+      pointerId: 56,
+    })
+    await nextTick()
+    expect(wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe(
+      'true',
+    )
+
+    window.dispatchEvent(new Event('blur'))
+    dispatchPointer(canvasHost.element, 'pointerup', {
+      clientX: 260,
+      clientY: 110,
+      pointerId: 56,
+    })
+    await nextTick()
+
+    expect(fixture.session.modelRevision).toBe(revisionBeforeMove)
+    expect(wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe(
+      'false',
+    )
+
+    wrapper.unmount()
+    keyboard.keyboardShortcuts.dispose()
+  })
+
   it('adds one snapped Note with Pencil, selects it and follows Project history', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-pencil')

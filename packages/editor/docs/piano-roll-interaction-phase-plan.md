@@ -74,14 +74,20 @@ Session 不依赖 Vue、Pinia、DOM、Renderer 或 Studio，也不拥有任何 P
 - DOM Adapter 通过 `composedPath()` 和稳定的 Note ID marker 解析 Note body；
 - 无效 marker、Surface 外事件和 Hit Resolver failure 均 fail closed；
 - 只接受 Primary Pointer 的主按钮，并且同一时间只捕获一个 Pointer；
-- Down 时冻结 origin Hit、修饰键和 Surface-local CSS Pixel 起点；
-- Move、Up、Cancel 在 Pointer Capture 下继续报告当前位置；
+- Down 时冻结 origin Hit、origin modifiers 和 Surface-local CSS Pixel 起点；
+- Move、Up、Cancel 在 Pointer Capture 下继续报告当前位置与 current modifiers；
+- 活动 Pointer 期间的 Window `keydown` / `keyup` 会在修饰键真实变化时发布同位置 Update；
+- Window blur 与显式 Adapter cancel 和其他取消来源一样输出 Cancel 并释放 Pointer Capture；
 - 默认 Drag Threshold 为 4 CSS Pixel，一旦跨越便在该手势内保持为 true；
 - `pointercancel`、`lostpointercapture` 与 active dispose 都输出 Cancel；
 - Observer、Hit Test 和 Pointer Capture failure 不逃逸到浏览器事件循环。
 
 本批只建立输入事实，不直接改变 Selection。Click / Toggle / Clear 规则仍由后续 Select
 Interaction 在 Pointer Up 且未跨越阈值时解释。
+
+第五阶段进一步用 Surface-scoped Interaction Session 统一 pressing、drag、commit、cancel
+与 authority handoff。完整决定见
+[Piano Roll Pointer Interaction 状态机决策](./piano-roll-pointer-interaction-state-machine-decision.md)。
 
 ## Batch 3：Scoped Keyboard Shortcuts
 
@@ -138,7 +144,7 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
 当前实现遵循以下具体边界：
 
 - Common Select Interaction 只解释完成且未越过 Drag Threshold 的 Pointer Input；
-- 普通 Click 调用 `selectOnly`，Shift / Command / Control Click 调用
+- 普通 Click 调用 `selectOnly`，Pointer Down 时的 Shift / Command / Control Click 调用
   `toggleSelection`，空白 Grid Click 调用 `clearSelection`；
 - Studio 为当前 Clip 创建唯一 Editor Session，以 `shallowRef` 接收冻结 State identity；
 - Grid Surface 的 Pointer Begin 会把焦点交给 Piano Roll，但 Selection 只在 Pointer End 确认；

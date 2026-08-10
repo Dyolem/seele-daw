@@ -217,6 +217,11 @@ describe('Piano Roll Pointer Input Adapter', () => {
       { xCssPixel: 14, yCssPixel: 20 },
       { xCssPixel: 15, yCssPixel: 18 },
     ])
+    expect(onInput.mock.calls.map(([input]) => input.modifiers.shift)).toEqual([
+      true,
+      false,
+      false,
+    ])
     for (const [input] of onInput.mock.calls) {
       expect(input.hit).toEqual({
         noteId: fixture.noteId,
@@ -226,7 +231,7 @@ describe('Piano Roll Pointer Input Adapter', () => {
         xCssPixel: 12,
         yCssPixel: 18,
       })
-      expect(input.modifiers).toEqual({
+      expect(input.originModifiers).toEqual({
         alt: false,
         control: false,
         meta: false,
@@ -238,11 +243,50 @@ describe('Piano Roll Pointer Input Adapter', () => {
       expect(Object.isFrozen(input)).toBe(true)
       expect(Object.isFrozen(input.hit)).toBe(true)
       expect(Object.isFrozen(input.modifiers)).toBe(true)
+      expect(Object.isFrozen(input.originModifiers)).toBe(true)
       expect(Object.isFrozen(input.originPosition)).toBe(true)
       expect(Object.isFrozen(input.position)).toBe(true)
     }
     expect(fixture.capture.setPointerCapture).toHaveBeenCalledWith(7)
     expect(fixture.capture.releasePointerCapture).toHaveBeenCalledWith(7)
+
+    adapter.dispose()
+    fixture.renderer.dispose()
+  })
+
+  it('emits current Modifier changes without replacing Pointer Down modifiers', () => {
+    const fixture = createDomNoteFixture()
+    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
+    const adapter = createPianoRollPointerInputAdapter({
+      observer: {
+        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
+        onInput,
+      },
+      surface: fixture.surface,
+    })
+
+    dispatchPointer(fixture.note, 'pointerdown', { pointerId: 12 })
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { altKey: true, key: 'Alt' }),
+    )
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }))
+    dispatchPointer(fixture.surface, 'pointerup', { pointerId: 12 })
+
+    expect(onInput.mock.calls.map(([input]) => input.phase)).toEqual([
+      PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
+      PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+      PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+      PIANO_ROLL_POINTER_INPUT_PHASE.END,
+    ])
+    expect(onInput.mock.calls.map(([input]) => input.modifiers.alt)).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ])
+    expect(
+      onInput.mock.calls.map(([input]) => input.originModifiers.alt),
+    ).toEqual([false, false, false, false])
 
     adapter.dispose()
     fixture.renderer.dispose()
@@ -342,6 +386,35 @@ describe('Piano Roll Pointer Input Adapter', () => {
     expect(onInput.mock.calls.map(([input]) => input.pointerId)).toEqual([
       5, 5, 6, 6,
     ])
+
+    adapter.dispose()
+    fixture.renderer.dispose()
+  })
+
+  it('releases capture and cancels on Window blur or an explicit request', () => {
+    const fixture = createDomNoteFixture()
+    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
+    const adapter = createPianoRollPointerInputAdapter({
+      observer: {
+        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
+        onInput,
+      },
+      surface: fixture.surface,
+    })
+
+    dispatchPointer(fixture.note, 'pointerdown', { pointerId: 13 })
+    window.dispatchEvent(new Event('blur'))
+    dispatchPointer(fixture.note, 'pointerdown', { pointerId: 14 })
+
+    expect(adapter.cancel()).toBe(true)
+    expect(adapter.cancel()).toBe(false)
+    expect(onInput.mock.calls.map(([input]) => input.phase)).toEqual([
+      PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
+      PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL,
+      PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
+      PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL,
+    ])
+    expect(fixture.capture.releasePointerCapture).toHaveBeenCalledTimes(2)
 
     adapter.dispose()
     fixture.renderer.dispose()

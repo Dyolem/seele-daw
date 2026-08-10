@@ -40,6 +40,12 @@ function createPointerInput(
       meta: false,
       shift: false,
     }),
+    originModifiers: Object.freeze({
+      alt: false,
+      control: false,
+      meta: false,
+      shift: false,
+    }),
     originPosition: ZERO_POINT,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
     pointerId: 1,
@@ -69,7 +75,7 @@ describe('Piano Roll Select Interaction', () => {
       applyPianoRollSelectInteraction(
         target,
         createPointerInput({
-          modifiers: Object.freeze({
+          originModifiers: Object.freeze({
             alt: false,
             control: false,
             meta: false,

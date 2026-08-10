@@ -30,8 +30,29 @@ export type {
   PianoRollPointerType,
 } from './piano-roll-input'
 
-export { applyPianoRollSelectInteraction } from './piano-roll-select-interaction'
-export type { PianoRollSelectionTarget } from './piano-roll-select-interaction'
+export { applyPianoRollSelectInteraction } from './operations/piano-roll-select-interaction'
+export type { PianoRollSelectionTarget } from './operations/piano-roll-select-interaction'
+
+export {
+  PIANO_ROLL_INTERACTION_INTENT,
+  PIANO_ROLL_INTERACTION_STATUS,
+  PIANO_ROLL_INTERACTION_TOOL,
+  createPianoRollInteractionSession,
+} from './state-machine/piano-roll-interaction-session'
+export type {
+  PianoRollAddNoteIntent,
+  PianoRollInteractionConfiguration,
+  PianoRollInteractionIntent,
+  PianoRollInteractionOutcome,
+  PianoRollInteractionSession,
+  PianoRollInteractionSessionObserver,
+  PianoRollInteractionState,
+  PianoRollInteractionStatus,
+  PianoRollInteractionTool,
+  PianoRollMoveNotesIntent,
+  PianoRollResolveSelectionIntent,
+  ResolvePianoRollMoveCommitInput,
+} from './state-machine/piano-roll-interaction-session'
 
 export { PianoRollError } from './piano-roll-error'
 export type { PianoRollErrorCode } from './piano-roll-error'
@@ -42,11 +63,11 @@ export type {
   PianoRollGrid,
 } from './piano-roll-grid'
 
-export { resolvePianoRollPencilNotePlacement } from './piano-roll-pencil-interaction'
+export { resolvePianoRollPencilNotePlacement } from './operations/piano-roll-pencil-interaction'
 export type {
   PianoRollNotePlacement,
   ResolvePianoRollPencilNotePlacementInput,
-} from './piano-roll-pencil-interaction'
+} from './operations/piano-roll-pencil-interaction'
 
 export { createPianoRollNoteReadModel } from './piano-roll-note-read-model'
 export type {
@@ -63,14 +84,14 @@ export type {
 export {
   createPianoRollNoteMoveGesture,
   resolvePianoRollNoteMovePreview,
-} from './piano-roll-note-move-interaction'
+} from './operations/piano-roll-note-move-interaction'
 export type {
   CreatePianoRollNoteMoveGestureInput,
   PianoRollNoteMoveGesture,
   PianoRollNoteMovePreview,
   PianoRollNoteMovePreviewNote,
   ResolvePianoRollNoteMovePreviewInput,
-} from './piano-roll-note-move-interaction'
+} from './operations/piano-roll-note-move-interaction'
 
 export {
   PIANO_ROLL_DEFAULT_CENTER_PITCH,

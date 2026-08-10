@@ -37,6 +37,12 @@ function createPointerInput(
       meta: false,
       shift: false,
     }),
+    originModifiers: Object.freeze({
+      alt: false,
+      control: false,
+      meta: false,
+      shift: false,
+    }),
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
     pointerId: 1,
@@ -199,16 +205,9 @@ describe('Piano Roll Note Move Interaction', () => {
     })
   })
 
-  it('uses Alt as a gesture-scoped Snap bypass', () => {
+  it('updates the Snap bypass when Alt changes during the active gesture', () => {
     const fixture = createFixture()
-    const begin = createPointerInput({
-      modifiers: Object.freeze({
-        alt: true,
-        control: false,
-        meta: false,
-        shift: false,
-      }),
-    })
+    const begin = createPointerInput()
     const gesture = createPianoRollNoteMoveGesture({
       context: fixture.context,
       pointerInput: begin,
@@ -223,6 +222,12 @@ describe('Piano Roll Note Move Interaction', () => {
       pointerInput: createPointerInput({
         ...begin,
         hasExceededDragThreshold: true,
+        modifiers: Object.freeze({
+          alt: true,
+          control: false,
+          meta: false,
+          shift: false,
+        }),
         phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
         position: Object.freeze({ xCssPixel: 370, yCssPixel: 64 }),
       }),
@@ -233,6 +238,23 @@ describe('Piano Roll Note Move Interaction', () => {
     expect(preview).toMatchObject({
       deltaTick: 260,
       snapGuideTick: null,
+    })
+
+    const snappedPreview = resolvePianoRollNoteMovePreview({
+      gesture,
+      grid: fixture.grid,
+      pointerInput: createPointerInput({
+        ...begin,
+        hasExceededDragThreshold: true,
+        phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+        position: Object.freeze({ xCssPixel: 370, yCssPixel: 64 }),
+      }),
+      snapEnabled: true,
+      viewport: fixture.viewport,
+    })
+    expect(snappedPreview).toMatchObject({
+      deltaTick: 240,
+      snapGuideTick: 720,
     })
   })
 

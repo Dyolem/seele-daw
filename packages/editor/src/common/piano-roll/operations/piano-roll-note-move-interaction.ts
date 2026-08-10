@@ -17,16 +17,16 @@ import {
   type TickDelta,
 } from '@seele-daw/project-core'
 
-import type { TimelineGrid } from '../timeline-grid'
-import type { PianoRollClipContext } from './piano-roll-clip-context'
-import { PianoRollError } from './piano-roll-error'
+import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
+import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_HIT_ZONE,
   PIANO_ROLL_POINTER_INPUT_PHASE,
   type PianoRollCssPoint,
   type PianoRollPointerInput,
-} from './piano-roll-input'
-import type { PianoRollViewport } from './piano-roll-viewport'
+} from '#internal/common/piano-roll/piano-roll-input'
+import type { PianoRollViewport } from '#internal/common/piano-roll/piano-roll-viewport'
+import type { TimelineGrid } from '#internal/common/timeline-grid'
 
 export interface PianoRollNoteMoveGesture {
   readonly anchorNoteId: NoteId
@@ -37,7 +37,6 @@ export interface PianoRollNoteMoveGesture {
   readonly originPosition: PianoRollCssPoint
   readonly pointerId: number
   readonly selectOnlyOnCommit: boolean
-  readonly snapBypassed: boolean
 }
 
 export interface PianoRollNoteMovePreviewNote {
@@ -131,7 +130,6 @@ export function createPianoRollNoteMoveGesture(
     originPosition: pointerInput.originPosition,
     pointerId: pointerInput.pointerId,
     selectOnlyOnCommit: !hitIsSelected,
-    snapBypassed: pointerInput.modifiers.alt,
   })
 }
 
@@ -157,7 +155,7 @@ function resolveTickDelta(
   }
 
   let candidateDelta: number
-  if (!input.snapEnabled || input.gesture.snapBypassed) {
+  if (!input.snapEnabled || input.pointerInput.modifiers.alt) {
     candidateDelta = Math.round(rawDelta)
   } else {
     const anchorClipStartTick =
@@ -280,7 +278,7 @@ export function resolvePianoRollNoteMovePreview(
   const anchorTargetSourceTick = anchor.startTick + deltaTick
   const snapGuideTick =
     input.snapEnabled &&
-    !input.gesture.snapBypassed &&
+    !input.pointerInput.modifiers.alt &&
     anchorTargetSourceTick >= input.gesture.context.sourceStartTick &&
     anchorTargetSourceTick <= input.gesture.context.sourceEndTick
       ? parseTick(anchorTargetSourceTick - input.gesture.context.sourceStartTick)

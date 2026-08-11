@@ -585,7 +585,7 @@ Project Core 已具备：
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                           |
 | `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、默认 Studio Grand Add Track、旧 Slot 显式选择、Instrument 状态、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection Move / Cursor / Pencil Resize / 多选 Delete / Snap。 |
 | `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                             |
-| `@seele-daw/playback`         | 浏览器无关的 Studio Grand Device Definition、Descriptor factory 与严格 state decoder；尚未提供 TempoMap、Transport、Compiler 或 Scheduler。                                                                                                                                                         |
+| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap 与具体 MIDI Plan Compiler；尚未提供 Transport、Scheduler 或音频运行时。                                                                                                                      |
 | `@seele-daw/audio-web`        | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。                                                                                                                                                                                                                              |
 | `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                    |
 
@@ -606,7 +606,8 @@ Project Core 已具备：
 
 ### 音源与声音
 
-- `public/soundbanks` 中压缩资源的加载、解压、索引与音色选择。
+- 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的生产 Manifest、加载、解压、
+  运行时索引与音色选择。
 - WAV / M4A 采样播放。
 - JSON 合成器定义的解析与合成引擎。
 - 完整 Instrument Browser、Preset Library、第三方 Device UI 与任意 Instrument 替换；当前只有旧空
@@ -704,11 +705,13 @@ Project Core 已具备：
 | 2026-08-10 | `PIANO-ROLL`                                               | Batch 3B 建立 Cursor / Pencil 单 Note Resize Gesture、左右 Edge 几何、Absolute Grid Snap、Source 边界、Preview、Intent 与 Interaction Session 分支。             | `aac0b20`                       |
 | 2026-08-10 | `MIDI-NOTE-CORE`、`PIANO-ROLL`                             | Batch 3C 接入 DOM 左右 Edge Hit、Resize Scene / Guide、Studio 单次 Command、Selection、Toast、权威 revision 交接与 Undo。                                        | `b7772b1`                       |
 | 2026-08-11 | `INSTRUMENT-SELECTION`                                     | Project Core 建立 Instrument Device Replace、No-change、Delta、History、QueryIndex 与持久化回归。                                                                | `6b172d9`                       |
-| 2026-08-11 | `TRACK-CREATE`、`INSTRUMENT-SELECTION`                     | Playback 建立 Studio Grand Definition；新 Track 默认持久化选择，旧空 Slot 可从持续可见的 Inspector 显式选择，并显示 Missing 与失败反馈。                         | 本次 Batch 1B 提交              |
+| 2026-08-11 | `TRACK-CREATE`、`INSTRUMENT-SELECTION`                     | Playback 建立 Studio Grand Definition；新 Track 默认持久化选择，旧空 Slot 可从持续可见的 Inspector 显式选择，并显示 Missing 与失败反馈。                         | `88ce879`                       |
+| 2026-08-11 | Playback TempoMap                                          | 建立浏览器无关的多 Tempo Segment、Tick / Project Second 双向换算与严格时间错误边界。                                                                             | `b077dba`                       |
+| 2026-08-11 | Audible MIDI Compiler                                      | 建立通用 MIDISampleSynth Device schema、冻结 Track / Note Span 计划、稳定 occurrence key、unsupported content policy 与中性 Arrangement 范围。                   | Batch 2B，待审阅                |
 
 ## 13. 当前验证基线
 
-Audible MIDI Playback V1 Batch 1A 与 Batch 1B 已通过本地验证：
+Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A 与当前待审阅的 Batch 2B 工作树已通过本地验证：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production
@@ -716,7 +719,7 @@ Audible MIDI Playback V1 Batch 1A 与 Batch 1B 已通过本地验证：
 - Project Core：27 个测试文件，399 项测试。
 - platform-browser：2 个测试文件，18 项测试。
 - editor：10 个测试文件，104 项测试。
-- playback：1 个测试文件，4 项测试。
+- playback：4 个测试文件，43 项测试。
 - Studio：40 个测试文件，218 项测试。
 - type-utils：1 个测试文件，2 项测试。
 

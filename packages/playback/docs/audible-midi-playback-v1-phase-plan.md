@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 2A reviewed and complete; Batch 2B has not started
+> Status: Batch 2B implemented and validated; awaiting review before Batch 3A
 >
 > Date: 2026-08-10
 >
@@ -83,25 +83,28 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
 - 两个编辑表面的 Playhead 作为独立可选批次，不阻塞首次可听闭环；
 - 内置采样的来源与分发权限、规范化 Manifest、首播加载预算和浏览器验收范围是进入 Audio
   Runtime 前的明确门槛。
-- 本阶段继续只实现 Studio Grand `MIDISampleSynth` 纵向切片；完整采集快照中的
-  `FMSynth` 与 `VASynth` 需要各自的 Device / Compiler / Runtime 产品切片，不能伪装成
-  Sample Instrument，也不在本阶段决定使用 Web Audio 原生节点、AudioWorklet 还是 WASM。
-- 本地完整 Soundbank 采集结果只作为只读设计证据；其中 Catalog、Indexes 与 Mapping 可以
-  驱动后续开发期规范化工具，但外部目录、远程 URL 和上游 schema 都不能成为生产运行时或
-  构建的隐式依赖。
+- Compiler 支持整个 `MIDISampleSynth` 家族：每个符合 V1 schema 的
+  `seele.sample-instrument` 都按其 `soundbankId` 生成 Sample Instrument Plan，不把 Studio
+  Grand 名称作为白名单；Studio Grand 仍只是新 Track 默认音源与首个 Audio Runtime 验收资产。
+- 完整资源集合中的 `FMSynth` 与 `VASynth` 需要各自的 Device / Compiler / Runtime 产品切片，
+  不能伪装成 Sample Instrument，也不在本阶段决定使用 Web Audio 原生节点、AudioWorklet
+  还是 WASM。
+- Catalog、Indexes 与各 Soundbank Mapping 已迁入 Studio 的本地忽略资源树，供后续开发期
+  规范化工具使用；远程 URL、绝对路径和未经审阅的上游 schema 仍不能成为生产运行时或构建的
+  隐式依赖。
 
 ### 1.4 尚待逐批确认的 Decision Gate
 
 Gate A 已于 2026-08-11 关闭：Studio Grand 的 Device Definition 与 Project Core Replace
-Command 形状按第 2 节确认。以下 Gate B / C 内容仍不得因为出现在计划中就当作已批准产品
-行为：
+Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content 有关的规则已随 Batch
+2B 关闭；以下 Transport / Runtime Gate B 与 Gate C 内容仍不得因为出现在计划中就当作已批准
+产品行为：
 
 1. Play / Pause / Return to Start、Space、自然结束、Playhead 起点和项目结尾的完整行为；
-2. Looped Clip、未知 Effect、Missing Instrument、加载失败和“没有任何可发声事件”时，是阻止
-   全局播放、跳过 Track，还是带诊断继续；
+2. Runtime 加载失败、部分 Sample Zone 缺失或计划最终为空时，Transport 与 UI 如何反馈；
 3. 自然结束后是否允许 Sample release tail 继续，以及 Transport 何时进入 Stopped；
 4. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
-5. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵。
+5. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
 6. Sample 短于 Note 时是否自然结束，Sample 长于 Note 时采用何种 Note Off、包络和尾音策略；
 7. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
    行为，哪些明确延期；
@@ -110,11 +113,30 @@ Command 形状按第 2 节确认。以下 Gate B / C 内容仍不得因为出现
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
+### 1.5 Batch 2B 已关闭的 Compiler Gate
+
+以下规则已经确认并由 Compiler 实现：
+
+- 所有符合 V1 schema 的 `seele.sample-instrument` 都编译为
+  `SampleInstrumentPlan(soundbankId)`，与具体 Soundbank 名称无关；
+- `FMSynth`、`VASynth`、空 Slot、Disabled 或没有已知 Compiler route 的 Instrument 只跳过
+  对应 Track，其他有效 Track 继续；
+- Looped MIDI Clip 只跳过该 Clip，不把它误当作普通非循环 Clip，也不阻止其他 Clip；
+- Disabled Effect 被忽略；Enabled Track MIDI / Audio Effect 跳过对应 Track；Enabled Master
+  Effect 产生 blocking diagnostic，并清空整个计划的可执行 Note Span；
+- 没有可听 Note Span 返回带 diagnostic 的合法 Empty Plan，不抛 Compiler 异常；
+- `arrangementEndTick` 是所有 Clip 原始 `startTick + spanTick` 的中性最大值，Muted、Unsupported
+  或无法发声的内容仍参与；Transport 是否把它当自然结束点留给 Batch 3A；
+- 所有 Track 的 Solo Fact 都参与全局派生，包括当前无法播放的 Audio Track；
+- Compiler 不读取 Catalog、Indexes、Mapping 或采样资源；资源不存在属于后续准备 / Runtime
+  诊断，不能由 Compiler 按 Soundbank 名称预判。
+
 ## 2. Project Instrument Fact 与 Command 边界
 
-### 2.1 已确认的 Studio Grand Device Definition
+### 2.1 已确认的 Sample Instrument schema 与 Studio Grand 默认值
 
-Gate A 已确认使用以下稳定定义：
+Gate A 已确认 MIDISampleSynth 使用以下稳定 V1 schema；Studio Grand 是该 schema 的首个产品
+实例：
 
 ```text
 id: 保持目标 Instrument Track 既有 instrumentDeviceId
@@ -131,10 +153,14 @@ Soundbank Manifest 解析，不能写入 Project File。
 现有 `DeviceDescriptor` 已能保存 `typeId`、`definitionVersion`、`parameters` 与
 `opaqueState`，因此这项事实不要求伪造 Project File V2。旧项目保持合法且不自动迁移。
 
-浏览器无关的内置 Device Definition 由 `@seele-daw/playback` 单点拥有，包括稳定 ID、
-版本、状态 decoder 和编译规则。Studio 只决定“新 Track 默认选择 Studio Grand”，并复用
-该定义创建 Descriptor；Project Core 继续只验证通用 Device 外壳。Audio Web 只接收已编译
-的 Studio Grand Instrument Plan 与 `soundbankId`，不再次解释 Project Descriptor。
+浏览器无关的 Sample Instrument Definition 由 `@seele-daw/playback` 单点拥有，包括稳定
+Engine ID、版本、严格 state decoder 和编译规则。Decoder 接受任意合法 `soundbankId`，不
+查询资源集合。Studio 只决定“新 Track 默认选择 Studio Grand”，并复用 generic factory 创建
+Descriptor；Project Core 继续只验证通用 Device 外壳。Audio Web 只接收已编译的 Sample
+Instrument Plan 与 `soundbankId`，不再次解释 Project Descriptor。
+
+Batch 2B 内部只用 `seele.fm-synth` 与 `seele.va-synth` 识别两类明确尚未实现的 Engine 并产生
+unsupported-engine diagnostic；这不等于已经定义它们的 Parameters、State 或 Runtime 契约。
 
 ### 2.2 新 Track
 
@@ -218,8 +244,9 @@ Playback 边界失败关闭。
 
 Batch 2A 已按以上边界建立包内 `time/` 实现：输入数组与 Record 会先复制并重新验证；Segment
 累计起始秒只预计算一次，正向和反向查询使用二分查找；结果超出安全 number 范围或失去单调
-可表示性时抛出带稳定 code 的 Playback 错误。该实现尚无跨包消费者，因此不从 package root
-导出，也不提前加入 Snapshot、Time Signature、Transport、Scheduler 或 AudioContext。
+可表示性时抛出带稳定 code 的 Playback 错误。Batch 2B Compiler 现已消费其冻结 Segment DTO；
+该实现仍无跨包消费者，因此不从 package root 导出，也不提前加入 Time Signature、Transport、
+Scheduler 或 AudioContext。
 
 ### 3.3 Transport Mapping
 
@@ -233,7 +260,7 @@ engineGeneration
 playheadTickPosition
 anchorProjectSecond
 anchorPlaybackClockSecond
-projectEndTick
+arrangementEndTick
 ```
 
 时间域固定为：
@@ -279,8 +306,9 @@ Compiler 接收一次稳定 `ProjectSnapshot`，输出浏览器无关的冻结�
 
 ```text
 AudibleMidiProjectPlan
+├── status: blocked | empty | partial | playable
 ├── modelRevision
-├── projectEndTick
+├── arrangementEndTick
 ├── tempoSegments[]
 ├── masterChannelPlan
 ├── trackPlaybackPlans[]
@@ -297,10 +325,10 @@ V1 的 Track Plan 只包含当前真实消费者需要的事实：
 ```text
 trackId
 instrumentDeviceId
-StudioGrandInstrumentPlan(soundbankId)
+SampleInstrumentPlan(soundbankId)
 gain
 pan
-muted / derived audible state
+muted / soloed / derived audible state
 ```
 
 Master Plan 只包含 gain 与 mute。MIDI Channel 随 Note Span 保留，但 Studio Grand V1 不据此
@@ -322,9 +350,11 @@ Note 处理规则：
 3. 否则 Project Start 为
    `clip.startTick + (note.startTick - clip.sourceOffsetTick)`；
 4. Project End 为 Note 自身映射 End 与 Clip End 的较小者；
-5. End 必须严格大于 Start，否则不产生事件并记录 invariant diagnostic；
+5. End 必须严格大于 Start；合法 Project Fact 不会产生零长 Span，伪造的不一致 Snapshot 失败
+   关闭；
 6. Clip Muted 或所属 Track 不可听时不产生 Note Span；
-7. 同一 Source 即使未来被多个 Clip 使用，也必须按 Clip 分别投影并生成不同 occurrence key。
+7. occurrence 身份始终包含 Clip ID，未来 Project Core 若允许同一 Source 被多个 Clip 引用，
+   仍会按 Clip 分别投影而不发生 key 冲突。
 
 ### 4.3 稳定 Note occurrence 身份
 
@@ -354,10 +384,10 @@ V1 无 Clip Loop，因此不定义 Loop occurrence index；未来 Loop 必须扩
 
 ### 4.4 具体 Route 与未支持拓扑
 
-V1 只实现一条固定 Route：
+V1 Compiler 只实现一类固定 Route：
 
 ```text
-StudioGrand Sample Instrument
+MIDISampleSynth Sample Instrument(soundbankId)
 -> Track Gain
 -> Track Stereo Pan
 -> Master Gain / Mute
@@ -366,17 +396,18 @@ StudioGrand Sample Instrument
 
 - Track Gain、Pan、Mute / Solo 和 Master Gain / Mute 是已有 Project Fact，必须进入具体
   Track / Master Plan，不能因为当前 UI 尚不能修改就忽略；
-- Sample Instrument Plan 只携带 `soundbankId`，不携带资源路径；
+- Sample Instrument Plan 只携带 `soundbankId`，不携带资源路径；Studio Grand 与其他
+  MIDISampleSynth 没有不同的编译策略；
 - Track / Master Effect Chain 不在 V1 构图，也不建立 Graph Operation / Reconciler；
-- Compiler 对已保存的 Effect 产生结构化 diagnostic，但“阻止、跳过 Track 或明确 bypass”
-  必须在 Compiler Batch 前通过 Decision Gate，不能由 Runtime 自行猜测；
-- Looped MIDI Clip 同样必须产生 unsupported diagnostic，且不能当作普通非循环 Clip 编译；
-- 空 Slot、Missing / Disabled Instrument、unsupported pitch 与最终零 Note Span 的产品反馈和
-  Partial Playback 规则在同一 Gate 确认。
-
-Gate B 的当前候选策略为：空 Slot、Missing / Disabled Instrument 只跳过对应 Track，其他
-有效 Track 继续；Looped Clip 因时间语义未实现而阻止整次播放；未知 Effect 显示降级警告并
-bypass。该组合仍需确认，尤其不能把“播放干声”和“忠实执行已保存拓扑”视为同一结果。
+- Disabled Effect 被忽略；Enabled Track MIDI / Audio Effect 产生 diagnostic 并跳过对应
+  Track，不能以播放干声伪装为忠实执行；Enabled Master Effect 阻止整个可执行计划；
+- Looped MIDI Clip 产生 unsupported diagnostic 并只跳过该 Clip，不能当作普通非循环 Clip
+  编译；
+- 空 Slot、Missing / Disabled Instrument 及 FM / VA 或未知 Engine 产生结构化 diagnostic 并
+  只跳过对应 Track；
+- 最终零 Note Span 返回 Empty Plan；Compiler status 与 diagnostics 为后续 Transport / UI
+  提供明确输入，但不替它们决定按钮和提示文案；
+- `arrangementEndTick` 保留全部 Clip 的原始编排范围，不因 Mute 或 unsupported content 收缩。
 
 AudioContext 创建 / Resume、资源读取、解码或调度失败始终属于 Runtime Failure，不改变
 Project Fact。失败必须通过 Transport 邻近状态或 Toast 可访问呈现，同一次失败去重；用户
@@ -448,8 +479,19 @@ Gate：
 
 ### 6.1 首批资产边界
 
-仓库中的 `public/soundbanks` 是大型原始资源集合，包含成百上千个 ZIP 和多种格式。本阶段
-不扫描整个目录，也不把全部资源构建成运行时 Catalog。
+本地 `apps/studio/public/soundbanks` 现已替换为下载器整理后的完整开发资源镜像：
+
+```text
+public/soundbanks/
+├── catalog/       2 files
+├── indexes/       2 files
+└── soundbanks/    1,756 files grouped by MIDISampleSynth / FMSynth / VASynth
+```
+
+整棵资源树约 2.2 GB，已排除 `.DS_Store` 与 downloader reports，并通过 checksum dry-run 与
+外部下载器源逐文件核对。旧的扁平资源树已删除，外部下载器源保持不变。该路径继续由
+`.gitignore` 排除，只是本机开发证据与 Batch 4A 输入；本阶段不在应用启动时扫描整个目录，也
+不把全部资源构建成运行时 Catalog。
 
 2026-08-11 对完整本地采集快照的只读核验记录了 439 个 Soundbank：289 个
 `MIDISampleSynth`、11 个 `FMSynth` 和 139 个 `VASynth`。三类数据不能共享同一种执行策略：
@@ -460,30 +502,35 @@ Gate：
 - `VASynth` 的 Mapping 是 oscillator、filter、envelope、LFO、legato 与可选 metaparameter 等
   合成参数，同样没有采样资源。
 
-因此当前 `seele.sample-instrument` 只覆盖 Studio Grand 仍然正确。FM / VA 后续必须先定义声音
-忠实度目标，再以独立纵向切片评估 Web Audio 平台能力、AudioWorklet 与 WASM 的实现边界；
-本阶段不能为了复用 Runtime 把合成器参数转换成假的 Sample Zone。
+因此 `seele.sample-instrument` 覆盖全部 MIDISampleSynth，而不是只覆盖 Studio Grand。Compiler
+已经按任意合法 `soundbankId` 生成 Sample Instrument Plan；Studio Grand 只限定首个 Audio
+Runtime 验收范围。FM / VA 后续必须先定义声音忠实度目标，再以独立纵向切片评估 Web Audio
+平台能力、AudioWorklet 与 WASM 的实现边界；本阶段不能为了复用 Runtime 把合成器参数转换成
+假的 Sample Zone。
 
 采集快照中 `catalog/selected-soundbanks.json` 与 `catalog/soundbanks.raw.json` 提供发现、展示、
 engine 分类和 General MIDI 对应证据；`indexes/soundbank-map.json` 提供 slug 到 engine、目录、
 Catalog、Mapping、Archive 与 General MIDI 信息的反向索引，`indexes/by-general-midi-program.json`
 提供 Program 到候选及 canonical Soundbank 的映射。单个 Soundbank 的 Mapping 才提供上游播放
 语义证据。Batch 4A 应由开发期规范化工具组合这些信息，输出经过审阅的 Seele Manifest；
-外部采集目录、绝对路径、远程 URL 和原始上游 JSON 均不进入产品依赖。
+上游绝对路径、远程 URL 和原始 JSON schema 均不进入生产运行时契约。
 
-当前 `studio-grand` 目录的只读核验结果为：30 个已解压 WAV，均为 44.1 kHz、16-bit、
-stereo；目录连同 M4A ZIP 约 34 MB。ZIP 内的上游 JSON 含 BandLab 静态资源 URL，但仓库中
-未发现随资产保存的授权或可分发来源说明。因此，以下两项是进入 Audio Runtime 生产批次前
-的阻断条件：
+Project 中稳定的 `soundbankId = studio-grand` 当前对应上游资源 slug
+`studio-grand-v2-v4`，该映射必须由 Seele 自有 Manifest 明确记录，不能靠字符串猜测。迁移后
+该目录包含 Catalog、Mapping、WAV ZIP 与 M4A ZIP 共 4 个文件，约 23 MB；Mapping 有 30 个
+Sample Zone，WAV ZIP 内含 30 个 WAV 与一份上游 JSON，目前没有已解压 WAV。上游 JSON 含
+BandLab 静态资源 URL，但资源树中未发现随资产保存的授权或可分发来源说明。因此，以下两项是
+进入 Audio Runtime 生产批次前的阻断条件：
 
 1. 核实并记录资产来源、授权与项目可分发范围；
 2. 若现有资产不能合法随产品分发，先更换为可分发的 Studio Grand 资产，再确认 Manifest
    与声音验收，不能仅改 URL 或名称继续使用。
 
-若 Gate C 确认现有资产可以随产品分发，V1 只使用当前 `studio-grand`；若必须更换资产，
-以下规则适用于保持同一 stable soundbank ID 的替代 Studio Grand 资产：
+若 Gate C 确认现有资产可以随产品分发，Batch 4A 只为稳定 ID `studio-grand` 规范化当前
+`studio-grand-v2-v4`；若必须更换资产，以下规则同样适用于保持该 stable soundbank ID 的替代
+Studio Grand 资产：
 
-- 使用已经解压、同源可访问的 WAV 文件；
+- 由开发期工具从选定的 WAV archive 提取、验证并放入明确的可分发资源路径；
 - 使用一份经过规范化并提交到仓库的小型 Studio Grand Manifest；
 - Manifest 记录 stable soundbank ID、显示名、`releaseSeconds`、Sample Zone、root MIDI
   pitch、min / max range、`tuneCents` 和本地相对资源 key；
@@ -495,8 +542,9 @@ stereo；目录连同 M4A ZIP 约 34 MB。ZIP 内的上游 JSON 含 BandLab 静�
 - Manifest 生成或校验可以使用开发期脚本，但 Studio 启动时不解析任意 ZIP，也不执行目录
   扫描。
 
-选择 WAV 是 V1 的兼容性和可诊断性决策，不代表完整 Soundbank 系统放弃压缩格式。M4A / WAV
-ZIP 选择、运行时解压、完整 Catalog 和缓存策略留到多音源产品切片。
+选择 WAV 是 V1 的兼容性和可诊断性候选，仍须结合实际体积、解码和授权在 Gate C 确认，不
+代表完整 Soundbank 系统放弃压缩格式。运行时 ZIP 扫描 / 任意解压、M4A / WAV 自动协商、完整
+Catalog 和多音源缓存策略留到后续产品切片。
 
 ### 6.2 Sample 解析
 
@@ -646,7 +694,7 @@ Plan。只有 Pointer Up 成功提交后才更新播放。Preview Audition 属�
         |
         v
 @seele-daw/playback
-  built-in device definition + TempoMap + Transport + concrete track/note-span/scheduler plans
+  sample-instrument schema + Studio Grand default + TempoMap + concrete track/note-span plans
         |
         v
 @seele-daw/audio-web
@@ -689,10 +737,12 @@ packages/audio-web/src/
 
 ## 10. 实施批次
 
-Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序关闭其余 Gate：
+Gate A 已随 Batch 1A 关闭，Gate B 的 Compiler 部分已随 Batch 2B 关闭；开始后续对应生产批次前
+仍需按顺序关闭其余 Gate：
 
 - Gate A（2026-08-11 已关闭）：确认 Studio Grand Device Definition 与 Replace Command 形状；
-- Gate B：确认 Transport、Project End、release tail、unsupported content 与零 Note Span 行为；
+- Gate B（Compiler 部分已关闭）：按第 1.5 节处理 unsupported content 与零 Note Span；Batch
+  3A 仍须确认 Transport、自然结束与 release tail；
 - Gate C：确认采样来源 / 分发权限、Manifest、Note / Sample 长度与 release / 钢琴真实性边界、
   加载预算和浏览器验收矩阵。
 
@@ -736,11 +786,15 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 
 ### Batch 2B：具体 MIDI Plan Compiler
 
-- Gate B 中与 unsupported content 相关的规则关闭；
+> Implementation status: implemented and awaiting review. Playback type-check and 4 test files /
+> 43 tests pass; repository `pnpm lint` and `pnpm check` pass.
+
+- Gate B 中与 Compiler unsupported content 相关的规则已按第 1.5 节关闭；
 - Snapshot → Track Playback Plan / MIDI Note Span Plan；
-- Clip Window、Mute / Solo、Gain / Pan、Clip End Note Off；
-- NoteOccurrenceKey、稳定排序与结构化 diagnostics；
-- property / fixture / performance baseline；
+- 所有 MIDISampleSynth 共用 Sample Instrument Plan；Studio Grand 不构成 Soundbank 白名单；
+- Clip Window、Mute / Solo、Gain / Pan、Clip End Note Off 与中性 `arrangementEndTick`；
+- NoteOccurrenceKey、输入顺序无关的稳定排序与结构化 diagnostics；
+- fixture / failure / policy tests 与 10,000 Note performance baseline；
 - 不创建 AudioNode、GraphPlan 或 RuntimeDelta，完成后停止审阅。
 
 ### Batch 3A：Transport Mapping
@@ -761,8 +815,10 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 ### Batch 4A：资产与 Manifest Gate
 
 - Gate C 的资产来源与可分发权限得到书面记录，否则本批停止；
-- 以 Catalog / Indexes 反向定位资源与 General MIDI 语义，以 Mapping 提取播放字段，经开发期
-  工具生成并校验 Seele 自有 Manifest；外部采集目录不进入运行时；
+- 以已迁入本地忽略资源树的 Catalog / Indexes 反向定位资源与 General MIDI 语义，以 Mapping
+  提取播放字段，经开发期工具生成并校验 Seele 自有 Manifest；原始镜像不进入生产运行时；
+- 明确 stable `studio-grand` 到上游 `studio-grand-v2-v4` 的开发期映射，并从选定 archive
+  提取经过授权与校验的 V1 资源；
 - 明确 21–108 裁剪、字段单位、文件列表与 checksum policy；
 - 用真实 Studio Grand 资产听觉审阅 Sample 短于 / 长于 Note、Note Off、release tail、
   velocity 表现与 V1 钢琴真实性边界；
@@ -815,7 +871,7 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 - Clip Source Offset、Clip End 裁剪和无 Note Chase；
 - 同 Pitch 重叠 Note 拥有不同 NoteOccurrenceKey / Voice Token；
 - Muted / Solo / Disabled / Missing Instrument；
-- Looped Clip、未知 Effect、零 Note Span 按 Gate 结果失败或降级；
+- Looped Clip、Effect、Missing / Unsupported Instrument 与零 Note Span 按第 1.5 节策略编译；
 - Scheduler window 连续、无重复、无漏发；
 - Pause、Return、generation invalidation 和 project end；
 - stale load / stale plan / revision gap。

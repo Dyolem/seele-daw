@@ -35,7 +35,7 @@ export class TempoMapError extends Error {
   }
 }
 
-interface TempoSegment {
+export interface TempoSegmentPlan {
   readonly bpm: TempoBpm
   readonly secondsPerTick: number
   readonly startProjectSecond: ProjectSecond
@@ -44,10 +44,11 @@ interface TempoSegment {
 
 interface LocatedTempoSegment {
   readonly index: number
-  readonly segment: TempoSegment
+  readonly segment: TempoSegmentPlan
 }
 
 export interface TempoMap {
+  readonly segments: readonly TempoSegmentPlan[]
   projectSecondAtTick(tick: Tick): ProjectSecond
   tickPositionAtProjectSecond(projectSecond: ProjectSecond): ContinuousTickPosition
   durationBetweenTicks(startTick: Tick, endTick: Tick): ProjectDurationSecond
@@ -137,9 +138,11 @@ function parseCalculatedDuration(value: number, context: string): ProjectDuratio
   }
 }
 
-function createTempoSegments(tempoEvents: readonly TempoEventRecord[]): readonly TempoSegment[] {
-  const segments: TempoSegment[] = []
-  let previousSegment: TempoSegment | null = null
+function createTempoSegments(
+  tempoEvents: readonly TempoEventRecord[],
+): readonly TempoSegmentPlan[] {
+  const segments: TempoSegmentPlan[] = []
+  let previousSegment: TempoSegmentPlan | null = null
 
   for (const tempoEvent of tempoEvents) {
     let startProjectSecond = parseProjectSecond(0)
@@ -161,7 +164,7 @@ function createTempoSegments(tempoEvents: readonly TempoEventRecord[]): readonly
       }
     }
 
-    const segment = Object.freeze<TempoSegment>({
+    const segment = Object.freeze<TempoSegmentPlan>({
       bpm: tempoEvent.bpm,
       secondsPerTick: 60 / (tempoEvent.bpm * PROJECT_PPQ),
       startProjectSecond,
@@ -175,9 +178,9 @@ function createTempoSegments(tempoEvents: readonly TempoEventRecord[]): readonly
 }
 
 function findSegmentAtOrBefore(
-  segments: readonly TempoSegment[],
+  segments: readonly TempoSegmentPlan[],
   target: number,
-  positionOf: (segment: TempoSegment) => number,
+  positionOf: (segment: TempoSegmentPlan) => number,
 ): LocatedTempoSegment {
   const firstSegment = segments[0]
   if (firstSegment === undefined) {
@@ -306,6 +309,7 @@ export function createTempoMap(input: readonly TempoEventRecord[]): TempoMap {
   return Object.freeze({
     durationBetweenTicks,
     projectSecondAtTick,
+    segments,
     tickPositionAtProjectSecond,
   })
 }

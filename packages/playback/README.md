@@ -4,8 +4,9 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 2A 已审阅完成浏览器无关的内部 TempoMap；尚未实现 Transport、
-> Compiler、Scheduler 或任何音频运行时。长期架构中的名称 `playback-core` 对应当前包。
+> 当前状态：Batch 2B 已实现并等待审阅。包内已有通用 Sample Instrument schema、TempoMap 与
+> 具体 MIDI Plan Compiler；尚未实现 Transport、Scheduler 或任何音频运行时。长期架构中的
+> 名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
 [Audible MIDI Playback V1 第六阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
@@ -13,12 +14,12 @@ AudioNode。当前首个可听切片只输出阶段计划定义的具体播放�
 这里的 `V1` 指第一版可听 MIDI 产品纵向切片，不是长期架构文档版本。经 2026-08-10 范围
 审阅，首版只建立具体的内置 Device Definition、Track Playback Plan、MIDI Note Span、
 Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect Graph、RuntimeDelta、
-跨线程 ACK 或 Loop / Seek 协议。Transport 行为、unsupported content、资产加载与浏览器矩阵
-仍按阶段计划中的 Decision Gate 逐批确认。
+跨线程 ACK 或 Loop / Seek 协议。Compiler unsupported content 已在 Batch 2B 收敛；Transport
+行为、资产加载与浏览器矩阵仍按阶段计划中的 Decision Gate 逐批确认。
 
 ## 当前已实现
 
-包根当前只公开首个真实消费者需要的 Studio Grand 边界：
+包根继续只公开首个真实消费者需要的 Studio Grand 产品边界：
 
 - `STUDIO_GRAND_DEVICE_DEFINITION` 固定 `typeId = seele.sample-instrument`、
   `definitionVersion = 1` 与显示名称 `Studio Grand`；
@@ -29,7 +30,16 @@ Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect
   Descriptor；
 - Definition、factory 和 decoder 均不依赖 Vue、DOM、Web Audio、Soundbank URL 或浏览器资源。
 
-这一实现只定义 Project Instrument Fact 的播放侧身份，不代表 Studio Grand 已经能加载或发声。
+包内同时建立了整个 MIDISampleSynth 家族共用的 V1 schema：
+
+- `SAMPLE_INSTRUMENT_DEVICE_DEFINITION` 固定 `typeId = seele.sample-instrument` 与版本 `1`；
+- `opaqueState` 只包含稳定、非空的 `soundbankId`，不包含 URL、路径或 Catalog Record；
+- generic decoder 接受任意符合 schema 的 Soundbank ID，不把 `studio-grand` 当编译白名单；
+- Studio Grand factory 与严格 decoder 是上述 schema 的默认产品选择和精确特化，不是单独的
+  Engine 类型。
+
+这部分仍是包内契约，因为当前跨包消费者只需要 Studio Grand factory。它只定义 Project
+Instrument Fact 的播放侧身份，不代表任一 Soundbank 已经能加载或发声。
 
 Batch 2A 还在包内建立了 `time/` 边界：
 
@@ -44,8 +54,29 @@ Batch 2A 还在包内建立了 `time/` 边界：
 - TempoMap 不保留调用方数组或 Record，也不依赖 Snapshot、Time Signature、Transport、
   AudioContext 或浏览器。
 
-这组时间能力目前只供包内后续 Compiler / Transport 真实消费者使用，尚未从 package root
-导出。公开 API 继续只有 Studio Grand Device 边界，避免在消费者出现前冻结时间契约。
+TempoMap 现在由具体 MIDI Compiler 消费，并把冻结的 Segment DTO 放入计划；它仍未从 package
+root 导出，后续 Transport 会继续复用同一时间边界。
+
+Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
+
+- `compileAudibleMidiProject(snapshot)` 把一次稳定 Snapshot 编译为冻结的
+  `AudibleMidiProjectPlan`，包含 `modelRevision`、中性的 `arrangementEndTick`、Tempo Segments、
+  Master / Track Plans、排序后的 Note Spans 和结构化 diagnostics；
+- 每个精确 V1 `seele.sample-instrument` Descriptor 都生成 `SampleInstrumentPlan(soundbankId)`；
+  因此 Studio Grand 与其他 MIDISampleSynth 使用同一编译路径；
+- FM / VA、空 Slot、Disabled 或没有已知 Compiler route 的 Instrument 只跳过对应 Track，
+  其他有效 Track 继续；Compiler 不读取 Catalog、Indexes、Mapping、ZIP 或采样文件；
+- Looped MIDI Clip 只跳过该 Clip；Disabled Effect 被忽略，Enabled Track MIDI / Audio Effect
+  跳过对应 Track，Enabled Master Effect 阻止整个可执行计划；
+- Clip Source Window 使用半开区间，不执行 Note Chase，并把 Note End 裁剪到 Clip End；
+- occurrence key 使用 `[trackId, clipId, sourceId, noteId]` 的无歧义结构化编码；输入集合顺序不
+  影响最终计划排序；
+- 没有可听 Note Span 是带 diagnostic 的合法 Empty Plan，不是编译异常；伪造或引用不一致的
+  Snapshot 则失败关闭。
+
+Compiler 计划同样暂不从 package root 导出：Batch 3A Transport 是首个包内消费者，Audio Web
+接入前再由真实跨包消费者验证并收敛公开表面。资源准备失败属于后续 Manifest / Audio Runtime
+边界，不能倒逼 Compiler 按 Soundbank 名称静默丢弃 Track。
 
 ## 长期包定位
 
@@ -115,7 +146,7 @@ src/
 1. 已建立内置 Studio Grand Device Definition、Descriptor factory 与严格 decoder。
 2. 已建立固定 PPQ 的内部 TempoMap 与 Tick/second 转换；按阶段计划先由具体 MIDI Compiler
    消费，再按 Gate B 实现 Transport。
-3. 编译 MIDI Note 事件，并建立确定性的 EventKey。
+3. 已编译具体 Track / MIDI Note Span 计划，并建立确定性的 NoteOccurrenceKey。
 4. 实现规划层 look-ahead scheduler 和 generation 失效。
 5. 支持播放中移动/删除 Note、Seek、Loop 和 Tempo change。
 6. 由后续真实消费者驱动 Track/Device GraphPlan、Audio Clip、Automation、Recording

@@ -11,13 +11,20 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   ProjectTimeError,
   parseContinuousTickPosition,
+  parsePlaybackClockSecond,
   parseProjectDurationSecond,
   parseProjectSecond,
   type ContinuousTickPosition,
+  type PlaybackClockSecond,
   type ProjectDurationSecond,
   type ProjectSecond,
 } from '#internal/time/project-time'
-import { TempoMapError, createTempoMap } from '#internal/time/tempo-map'
+import {
+  TempoMapError,
+  createTempoMap,
+  createTempoMapFromSegments,
+  type TempoSegmentPlan,
+} from '#internal/time/tempo-map'
 
 function tempoEvent(id: string, tick: number, bpm: number): TempoEventRecord {
   return createTempoEventRecord({
@@ -42,14 +49,17 @@ describe('Project time values', () => {
     const projectSecond = parseProjectSecond(0.125)
     const projectDuration = parseProjectDurationSecond(1.75)
     const tickPosition = parseContinuousTickPosition(960.5)
+    const playbackClockSecond = parsePlaybackClockSecond(20.25)
 
     expect(projectSecond).toBe(0.125)
     expect(projectDuration).toBe(1.75)
     expect(tickPosition).toBe(960.5)
+    expect(playbackClockSecond).toBe(20.25)
     expect(parseProjectSecond(-0)).toBe(0)
     expectTypeOf(projectSecond).toEqualTypeOf<ProjectSecond>()
     expectTypeOf(projectDuration).toEqualTypeOf<ProjectDurationSecond>()
     expectTypeOf(tickPosition).toEqualTypeOf<ContinuousTickPosition>()
+    expectTypeOf(playbackClockSecond).toEqualTypeOf<PlaybackClockSecond>()
   })
 
   it.each([
@@ -60,6 +70,7 @@ describe('Project time values', () => {
       () => parseContinuousTickPosition(Number.POSITIVE_INFINITY),
     ],
     ['invalid-project-second', () => parseProjectSecond(Number.MAX_SAFE_INTEGER + 1)],
+    ['invalid-playback-clock-second', () => parsePlaybackClockSecond(-0.001)],
   ] as const)('rejects invalid values with stable code %s', (code, action) => {
     const error = captureError(action)
 
@@ -109,6 +120,48 @@ describe('TempoMap', () => {
 
     expect(tempoMap.projectSecondAtTick(parseTick(1_920))).toBe(1)
     expect(tempoMap.projectSecondAtTick(parseTick(2_880))).toBe(2)
+  })
+
+  it('rehydrates and isolates the serializable Tempo Segment plan produced by the Compiler', () => {
+    const original = createTempoMap([
+      tempoEvent('tempo-segment-plan-initial', 0, 120),
+      tempoEvent('tempo-segment-plan-later', 960, 60),
+    ])
+    const mutableSegments = original.segments.map((segment) => ({ ...segment }))
+    const rehydrated = createTempoMapFromSegments(mutableSegments)
+
+    Object.assign(mutableSegments[0]!, {
+      bpm: parseTempoBpm(240),
+      secondsPerTick: 60 / (240 * 960),
+    })
+
+    expect(rehydrated.projectSecondAtTick(parseTick(960))).toBe(0.5)
+    expect(rehydrated.projectSecondAtTick(parseTick(1_920))).toBe(1.5)
+    expect(rehydrated.tickPositionAtProjectSecond(parseProjectSecond(1))).toBe(1_440)
+    expect(Object.isFrozen(rehydrated.segments)).toBe(true)
+    expect(Object.isFrozen(rehydrated.segments[0])).toBe(true)
+  })
+
+  it.each([
+    ['invalid-tempo-segment-list', []],
+    [
+      'inconsistent-tempo-segment',
+      [{ bpm: 120, secondsPerTick: 0.5, startProjectSecond: 0, startTick: 0 }],
+    ],
+    [
+      'inconsistent-tempo-segment',
+      [
+        { bpm: 120, secondsPerTick: 60 / (120 * 960), startProjectSecond: 0, startTick: 0 },
+        { bpm: 60, secondsPerTick: 60 / (60 * 960), startProjectSecond: 1, startTick: 960 },
+      ],
+    ],
+  ] as const)('rejects invalid compiled Tempo Segments with code %s', (code, segments) => {
+    const error = captureError(() =>
+      createTempoMapFromSegments(segments as unknown as readonly TempoSegmentPlan[]),
+    )
+
+    expect(error).toBeInstanceOf(TempoMapError)
+    expect(error).toMatchObject({ code })
   })
 
   it('round-trips continuous positions across Tempo Segment boundaries', () => {

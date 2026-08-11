@@ -1,6 +1,7 @@
 import {
   PROJECT_PPQ,
   createTempoEventRecord,
+  parseTempoBpm,
   parseTick,
   type TempoBpm,
   type TempoEventRecord,
@@ -21,6 +22,9 @@ export type TempoMapErrorCode =
   | 'invalid-initial-tempo-event-count'
   | 'invalid-tempo-event'
   | 'invalid-tempo-event-list'
+  | 'invalid-tempo-segment'
+  | 'invalid-tempo-segment-list'
+  | 'inconsistent-tempo-segment'
   | 'numeric-result-out-of-range'
   | 'reversed-tick-range'
 
@@ -177,6 +181,88 @@ function createTempoSegments(
   return Object.freeze(segments)
 }
 
+function normalizeTempoSegments(input: readonly TempoSegmentPlan[]): readonly TempoSegmentPlan[] {
+  // Preserve the static element type because Array.isArray narrows readonly arrays to any[].
+  const tempoSegmentRecords: readonly TempoSegmentPlan[] = input
+
+  if (!Array.isArray(input)) {
+    throw new TempoMapError('invalid-tempo-segment-list', 'TempoMap requires a Tempo Segment array')
+  }
+  if (tempoSegmentRecords.length === 0) {
+    throw new TempoMapError(
+      'invalid-tempo-segment-list',
+      'TempoMap requires at least one Tempo Segment',
+    )
+  }
+
+  const segments = tempoSegmentRecords.map((segment, segmentIndex) => {
+    try {
+      const bpm = parseTempoBpm(segment.bpm)
+      const startTick = parseTick(segment.startTick)
+      const startProjectSecond = parseProjectSecond(segment.startProjectSecond)
+      const expectedSecondsPerTick = 60 / (bpm * PROJECT_PPQ)
+
+      if (segment.secondsPerTick !== expectedSecondsPerTick) {
+        throw new TempoMapError(
+          'inconsistent-tempo-segment',
+          `Tempo Segment at input index ${segmentIndex} has inconsistent secondsPerTick`,
+        )
+      }
+
+      return Object.freeze<TempoSegmentPlan>({
+        bpm,
+        secondsPerTick: expectedSecondsPerTick,
+        startProjectSecond,
+        startTick,
+      })
+    } catch (cause) {
+      if (cause instanceof TempoMapError) throw cause
+      throw new TempoMapError(
+        'invalid-tempo-segment',
+        `Tempo Segment at input index ${segmentIndex} is invalid: ${describeCause(cause)}`,
+      )
+    }
+  })
+
+  const initialSegment = segments[0]
+  if (
+    initialSegment === undefined ||
+    initialSegment.startTick !== 0 ||
+    initialSegment.startProjectSecond !== 0
+  ) {
+    throw new TempoMapError(
+      'inconsistent-tempo-segment',
+      'TempoMap requires its first Tempo Segment to start at Tick 0 and ProjectSecond 0',
+    )
+  }
+
+  for (let index = 1; index < segments.length; index += 1) {
+    const previous = segments[index - 1]
+    const current = segments[index]
+    if (previous === undefined || current === undefined) continue
+    if (current.startTick <= previous.startTick) {
+      throw new TempoMapError(
+        'inconsistent-tempo-segment',
+        'TempoMap Tempo Segment startTicks must be strictly increasing',
+      )
+    }
+
+    const elapsedTick = current.startTick - previous.startTick
+    const expectedStartProjectSecond = parseCalculatedProjectSecond(
+      previous.startProjectSecond + elapsedTick * previous.secondsPerTick,
+      `Tempo Segment at Tick ${current.startTick}`,
+    )
+    if (current.startProjectSecond !== expectedStartProjectSecond) {
+      throw new TempoMapError(
+        'inconsistent-tempo-segment',
+        `Tempo Segment at Tick ${current.startTick} has an inconsistent Project time boundary`,
+      )
+    }
+  }
+
+  return Object.freeze(segments)
+}
+
 function findSegmentAtOrBefore(
   segments: readonly TempoSegmentPlan[],
   target: number,
@@ -212,11 +298,7 @@ function findSegmentAtOrBefore(
   return { index: selectedIndex, segment: selectedSegment }
 }
 
-/** Creates an immutable multi-segment TempoMap without retaining the caller's event array. */
-export function createTempoMap(input: readonly TempoEventRecord[]): TempoMap {
-  const tempoEvents = normalizeTempoEvents(input)
-  const segments = createTempoSegments(tempoEvents)
-
+function createTempoMapFromNormalizedSegments(segments: readonly TempoSegmentPlan[]): TempoMap {
   function projectSecondAtTick(tick: Tick): ProjectSecond {
     const parsedTick = parseTick(tick)
     const { segment } = findSegmentAtOrBefore(segments, parsedTick, ({ startTick }) => startTick)
@@ -312,4 +394,14 @@ export function createTempoMap(input: readonly TempoEventRecord[]): TempoMap {
     segments,
     tickPositionAtProjectSecond,
   })
+}
+
+/** Creates an immutable multi-segment TempoMap without retaining the caller's event array. */
+export function createTempoMap(input: readonly TempoEventRecord[]): TempoMap {
+  return createTempoMapFromNormalizedSegments(createTempoSegments(normalizeTempoEvents(input)))
+}
+
+/** Rehydrates a TempoMap from a compiled, serializable Segment plan. */
+export function createTempoMapFromSegments(input: readonly TempoSegmentPlan[]): TempoMap {
+  return createTempoMapFromNormalizedSegments(normalizeTempoSegments(input))
 }

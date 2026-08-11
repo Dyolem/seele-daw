@@ -3,9 +3,11 @@ import type { Brand } from '@seele-daw/type-utils'
 export type ProjectSecond = Brand<number, 'ProjectSecond'>
 export type ProjectDurationSecond = Brand<number, 'ProjectDurationSecond'>
 export type ContinuousTickPosition = Brand<number, 'ContinuousTickPosition'>
+export type PlaybackClockSecond = Brand<number, 'PlaybackClockSecond'>
 
 export type ProjectTimeErrorCode =
   | 'invalid-continuous-tick-position'
+  | 'invalid-playback-clock-second'
   | 'invalid-project-duration-second'
   | 'invalid-project-second'
 
@@ -55,6 +57,15 @@ export function parseProjectDurationSecond(value: unknown): ProjectDurationSecon
     'invalid-project-duration-second',
     'ProjectDurationSecond',
   ) as ProjectDurationSecond
+}
+
+/** Parses a monotonic runtime clock value without treating it as Project time. */
+export function parsePlaybackClockSecond(value: unknown): PlaybackClockSecond {
+  return requireNonNegativeSafeNumber(
+    value,
+    'invalid-playback-clock-second',
+    'PlaybackClockSecond',
+  ) as PlaybackClockSecond
 }
 
 /** Parses a non-integer musical position without promoting it to a Project Tick fact. */

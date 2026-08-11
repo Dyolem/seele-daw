@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 2B reviewed and complete; Batch 3A has not started
+> Status: Batch 3A Transport Mapping implemented and validated; awaiting review before Batch 3B
 >
 > Date: 2026-08-10
 >
@@ -97,18 +97,16 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
 
 Gate A 已于 2026-08-11 关闭：Studio Grand 的 Device Definition 与 Project Core Replace
 Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content 有关的规则已随 Batch
-2B 关闭；以下 Transport / Runtime Gate B 与 Gate C 内容仍不得因为出现在计划中就当作已批准
-产品行为：
+2B 关闭，Transport Mapping 规则已在 Batch 3A 开始前确认；以下 Runtime Gate 与 Gate C 内容
+仍不得因为出现在计划中就当作已批准产品行为：
 
-1. Play / Pause / Return to Start、Space、自然结束、Playhead 起点和项目结尾的完整行为；
-2. Runtime 加载失败、部分 Sample Zone 缺失或计划最终为空时，Transport 与 UI 如何反馈；
-3. 自然结束后是否允许 Sample release tail 继续，以及 Transport 何时进入 Stopped；
-4. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
-5. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
-6. Sample 短于 Note 时是否自然结束，Sample 长于 Note 时采用何种 Note Off、包络和尾音策略；
-7. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
+1. Runtime 加载失败、部分 Sample Zone 缺失时，Transport 与 UI 如何反馈；
+2. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
+3. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
+4. Sample 短于 Note 时是否自然结束，Sample 长于 Note 时采用何种 Note Off、包络和尾音策略；
+5. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
    行为，哪些明确延期；
-8. Catalog / Indexes / Mapping 的哪些字段进入 Seele 自有 Manifest，以及如何记录来源、单位、
+6. Catalog / Indexes / Mapping 的哪些字段进入 Seele 自有 Manifest，以及如何记录来源、单位、
    校验和和授权证据。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
@@ -126,7 +124,7 @@ Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content �
   Effect 产生 blocking diagnostic，并清空整个计划的可执行 Note Span；
 - 没有可听 Note Span 返回带 diagnostic 的合法 Empty Plan，不抛 Compiler 异常；
 - `arrangementEndTick` 是所有 Clip 原始 `startTick + spanTick` 的中性最大值，Muted、Unsupported
-  或无法发声的内容仍参与；Transport 是否把它当自然结束点留给 Batch 3A；
+  或无法发声的内容仍参与；Batch 3A Transport 已确认并使用它作为自然结束点；
 - 所有 Track 的 Solo Fact 都参与全局派生，包括当前无法播放的 Audio Track；
 - Compiler 不读取 Catalog、Indexes、Mapping 或采样资源；资源不存在属于后续准备 / Runtime
   诊断，不能由 Compiler 按 Soundbank 名称预判。
@@ -250,9 +248,8 @@ Scheduler 或 AudioContext。
 
 ### 3.3 Transport Mapping
 
-Transport 的产品行为仍属于 Decision Gate；无论最终按钮语义如何，Playback Core 都必须保存
-浏览器无关、可由虚拟时钟验证的映射状态。以下字段只是当前候选内部模型，不是已批准公共
-API：
+Transport 的产品行为已在 Batch 3A 开始前确认。Playback Core 保存浏览器无关、可由虚拟时钟
+验证的映射状态；以下字段已经落为包内模型，但还不是批准的公共 API：
 
 ```text
 state: stopped | playing | paused
@@ -283,19 +280,24 @@ arrangementEndTick
 V1 不因未来 Seek 或 Transport Loop 预建公共协议；Paused 位置已经要求从非零 Tick 继续的
 内部能力，但是否暴露 Ruler Seek 留到对应产品切片。
 
-### 3.4 Transport 产品契约候选
+### 3.4 已确认的 Transport 产品契约
 
-以下候选保留给 Gate B 审阅，不是当前已确认行为：
+以下规则已在 Batch 3A 开始前确认：
 
-- 接通 `Play / Pause` 单按钮、`Return to Start`、当前时间与 `Space`；
+- Batch 3A 只建立 `Play / Pause`、`Return to Start` 与当前时间所需的浏览器无关逻辑；Studio
+  按钮、`Space` 和可见时间留到 Batch 5A；
 - Record 与 Loop 保持禁用，V1 不增加独立 Stop 按钮；
-- 初次打开位于 Tick `0`，Stopped 从当前位置 Play，Pause 保留位置，Resume 从暂停位置继续；
-- Return to Start 使旧 generation 失效、执行 `allNotesOff` 并回到 Tick `0`；
-- 自然结束后保留 End 位置，再次 Play 时从 Tick `0` 开始；
-- 候选 Project End 为所有 Clip 的最大 `startTick + spanTick`，Muted Clip 仍参与 Arrangement
-  长度；
-- 没有 Clip、没有可播放 Route 或最终没有 Note Span 时是否禁用 Play，连同 release tail 一起
-  由 Gate B 决定；
+- 初始状态为 Stopped / Tick `0`；Pause 保留连续位置，Resume 从该位置继续；
+- `blocked` 或 `empty` Plan 拒绝 Play，Transport state 与 generation 不变；`partial` 与
+  `playable` Plan 可以 Play；
+- Return to Start 使当前 generation 失效并回到 Stopped / Tick `0`；已在该状态时是幂等
+  No-change；实际 `allNotesOff` 由后续 Scheduler / Audio Runtime 执行；
+- 自然结束采用 Compiler 的中性 `arrangementEndTick`，因此 Muted 或 Unsupported Clip 仍可延长
+  编排；到达末尾后进入 Stopped 并保留 End 位置，再次 Play 从 Tick `0` 开始；
+- 有效 Play / Resume、Pause 与 Return to Start 分别更新 generation；被拒绝或重复的 No-change
+  操作不更新；自然结束关闭当前播放但不额外更新，下一次 Play 再建立新 generation；
+- Transport 到达逻辑末尾时不等待 Sample release tail。真实尾音能否继续、如何结束及再次 Play
+  时如何处理，留给 Gate C 的真实音频审阅；
 - Transport 操作不改变 Project、dirty、History 或保存内容身份。
 
 ## 4. MIDI Timeline Compiler
@@ -462,8 +464,7 @@ Late policy 仍属于 Scheduler Batch 的 Decision Gate。当前建议基线为�
 
 ### 5.3 Play、Pause 与 Return to Start
 
-本节保留候选行为所需的技术约束，但按钮语义和自然结束仍必须先通过 Transport Decision
-Gate：
+本节保留已确认行为所需的技术约束：
 
 - Play 前计划与必要采样必须对应同一 `modelRevision`；加载期间 Project 改变则丢弃旧
   request 并重新准备；
@@ -471,8 +472,8 @@ Gate：
   长 Note；
 - Return to Start 增加 generation、取消全部 future event、执行 `allNotesOff` 并把
   Playhead 归零；
-- 到达 Project End 时停止 planner；Transport 何时进入 Stopped、是否保留 End 位置以及
-  release tail 是否继续，按 Gate 最终结果实现；
+- 到达 `arrangementEndTick` 时停止 planner，Transport 进入 Stopped 并保留 End 位置；真实
+  release tail 不延长 Transport 时间，具体声音行为仍由 Gate C 决定；
 - 内部停止、Return 与 dispose 必须幂等。
 
 ## 6. Studio Grand Sample Runtime
@@ -618,7 +619,7 @@ Playback Coordinator，并通过类型化 Vue Context 提供命令能力与 shal
 
 ### 7.2 Transport UI
 
-以下是候选 UI 契约，必须随 Transport Decision Gate 一起审阅：
+以下是 Batch 5A 的候选 UI 契约，必须在接入 Studio 前单独审阅：
 
 - Play 按钮在 Playing 时切换为 Pause 图标和可访问名称；
 - Loading 时按钮显示 Busy 并阻止重复请求；
@@ -737,12 +738,12 @@ packages/audio-web/src/
 
 ## 10. 实施批次
 
-Gate A 已随 Batch 1A 关闭，Gate B 的 Compiler 部分已随 Batch 2B 关闭；开始后续对应生产批次前
-仍需按顺序关闭其余 Gate：
+Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别随 Batch 2B 和 Batch 3A
+关闭。开始后续对应生产批次前仍需按顺序关闭其余 Gate：
 
 - Gate A（2026-08-11 已关闭）：确认 Studio Grand Device Definition 与 Replace Command 形状；
-- Gate B（Compiler 部分已关闭）：按第 1.5 节处理 unsupported content 与零 Note Span；Batch
-  3A 仍须确认 Transport、自然结束与 release tail；
+- Gate B（2026-08-11 已关闭）：按第 1.5 节处理 unsupported content 与零 Note Span，并按第
+  3.4 节处理 Transport、自然结束和逻辑 release-tail 边界；真实声音的 release 行为仍属 Gate C；
 - Gate C：确认采样来源 / 分发权限、Manifest、Note / Sample 长度与 release / 钢琴真实性边界、
   加载预算和浏览器验收矩阵。
 
@@ -799,9 +800,12 @@ Gate A 已随 Batch 1A 关闭，Gate B 的 Compiler 部分已随 Batch 2B 关闭
 
 ### Batch 3A：Transport Mapping
 
-- Gate B 中 Transport / Project End / release tail 规则关闭；
+> Implementation status: implemented and awaiting review. Playback type-check and 5 test files /
+> 61 tests pass; repository `pnpm lint` and `pnpm check` pass.
+
+- Gate B 中 Transport / Arrangement End / logical release-tail boundary 规则关闭；
 - Project Second / Playback Clock Second 边界；
-- stopped / playing / paused 候选状态按确认结果落地；
+- stopped / playing / paused 状态按确认结果落地；
 - engineGeneration、注入时钟与虚拟时钟测试；
 - 不接 AudioContext，不接 Studio，完成后停止审阅。
 

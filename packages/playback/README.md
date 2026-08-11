@@ -4,9 +4,9 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 2B 已审阅完成。包内已有通用 Sample Instrument schema、TempoMap 与
-> 具体 MIDI Plan Compiler；尚未实现 Transport、Scheduler 或任何音频运行时。长期架构中的
-> 名称 `playback-core` 对应当前包。
+> 当前状态：Batch 3A 已实现并等待审阅。包内已有通用 Sample Instrument schema、TempoMap、
+> 具体 MIDI Plan Compiler 与 Transport Mapping；尚未实现 Scheduler 或任何音频运行时。长期
+> 架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
 [Audible MIDI Playback V1 第六阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
@@ -14,8 +14,9 @@ AudioNode。当前首个可听切片只输出阶段计划定义的具体播放�
 这里的 `V1` 指第一版可听 MIDI 产品纵向切片，不是长期架构文档版本。经 2026-08-10 范围
 审阅，首版只建立具体的内置 Device Definition、Track Playback Plan、MIDI Note Span、
 Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect Graph、RuntimeDelta、
-跨线程 ACK 或 Loop / Seek 协议。Compiler unsupported content 已在 Batch 2B 收敛；Transport
-行为、资产加载与浏览器矩阵仍按阶段计划中的 Decision Gate 逐批确认。
+跨线程 ACK 或 Loop / Seek 协议。Compiler unsupported content 已在 Batch 2B 收敛，Transport
+Mapping 已在 Batch 3A 按确认规则实现；资产加载与浏览器矩阵仍按阶段计划中的 Decision Gate
+逐批确认。
 
 ## 当前已实现
 
@@ -54,8 +55,8 @@ Batch 2A 还在包内建立了 `time/` 边界：
 - TempoMap 不保留调用方数组或 Record，也不依赖 Snapshot、Time Signature、Transport、
   AudioContext 或浏览器。
 
-TempoMap 现在由具体 MIDI Compiler 消费，并把冻结的 Segment DTO 放入计划；它仍未从 package
-root 导出，后续 Transport 会继续复用同一时间边界。
+TempoMap 现在由具体 MIDI Compiler 消费，并把冻结的 Segment DTO 放入计划；Transport 从这些
+DTO 严格重建同一时间边界。两者仍未从 package root 导出。
 
 Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
 
@@ -74,9 +75,28 @@ Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
 - 没有可听 Note Span 是带 diagnostic 的合法 Empty Plan，不是编译异常；伪造或引用不一致的
   Snapshot 则失败关闭。
 
-Compiler 计划同样暂不从 package root 导出：Batch 3A Transport 是首个包内消费者，Audio Web
-接入前再由真实跨包消费者验证并收敛公开表面。资源准备失败属于后续 Manifest / Audio Runtime
-边界，不能倒逼 Compiler 按 Soundbank 名称静默丢弃 Track。
+Compiler 与 Transport 计划暂不从 package root 导出：Batch 3B Scheduler 是下一个包内消费者，
+Audio Web 接入前再由真实跨包消费者验证并收敛公开表面。资源准备失败属于后续 Manifest /
+Audio Runtime 边界，不能倒逼 Compiler 按 Soundbank 名称静默丢弃 Track。
+
+Batch 3A 进一步建立了浏览器无关的 Transport Mapping：
+
+- `PlaybackClockSecond` 与 `ProjectSecond` 是不同品牌；注入的 `PlaybackClock` 可以由测试虚拟
+  时钟或未来 `AudioContext.currentTime` 实现，Transport 不读取 wall clock；
+- `createTempoMapFromSegments()` 严格重建 Compiler 输出的序列化 Tempo Segments，并重新验证
+  BPM、累计 Project time 与 Segment 顺序；
+- `createAudibleMidiTransport(plan, clock)` 拥有 stopped / playing / paused、连续 Project / Tick
+  位置、映射 anchors 与独立 `engineGeneration`；
+- Play / Resume、Pause 与 Return to Start 按已确认规则更新 generation；重复 No-change、Blocked
+  或 Empty Plan 拒绝不更新；
+- Partial 与 Playable Plan 可播放；自然结束采用中性的 `arrangementEndTick`，进入 Stopped、
+  保留 End，下一次 Play 从 Tick `0` 开始；
+- Transport 集中提供 Tick → PlaybackClockSecond 与 PlaybackClockSecond → continuous Tick
+  position，并对时钟倒退、无活动映射、越界目标和未知 Plan status 失败关闭；
+- 逻辑自然结束不等待 Sample release tail。真实尾音仍由后续 Gate C 与 Audio Runtime 决定。
+
+Transport 当前仍是包内能力：Batch 3B Scheduler 是下一个真实消费者；Studio 控件、快捷键、
+当前时间、AudioContext 和发声都尚未接入。
 
 ## 长期包定位
 
@@ -144,12 +164,12 @@ src/
 ## 长期演进顺序
 
 1. 已建立内置 Studio Grand Device Definition、Descriptor factory 与严格 decoder。
-2. 已建立固定 PPQ 的内部 TempoMap 与 Tick/second 转换；按阶段计划先由具体 MIDI Compiler
-   消费，再按 Gate B 实现 Transport。
+2. 已建立固定 PPQ 的内部 TempoMap、可序列化 Segment 重建与 Tick/second 转换。
 3. 已编译具体 Track / MIDI Note Span 计划，并建立确定性的 NoteOccurrenceKey。
-4. 实现规划层 look-ahead scheduler 和 generation 失效。
-5. 支持播放中移动/删除 Note、Seek、Loop 和 Tempo change。
-6. 由后续真实消费者驱动 Track/Device GraphPlan、Audio Clip、Automation、Recording
+4. 已建立注入时钟的 stopped / playing / paused Transport Mapping 与 generation 失效。
+5. 实现规划层 look-ahead scheduler 和 occurrence 去重。
+6. 支持播放中移动/删除 Note、Seek、Loop 和 Tempo change。
+7. 由后续真实消费者驱动 Track/Device GraphPlan、Audio Clip、Automation、Recording
    monitoring 和 frozen-revision export 计划。
 
 ## 长期测试方向

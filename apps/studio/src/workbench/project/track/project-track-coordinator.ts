@@ -1,7 +1,7 @@
 import {
-  DEVICE_DEFINITION_VERSION_MIN,
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddInstrumentTrackCommand,
+  createReplaceInstrumentDeviceCommand,
   parseBipolarValue,
   parseDeviceId,
   parseDeviceTypeId,
@@ -9,16 +9,16 @@ import {
   parseTrackId,
   type InstrumentTrackRecord,
   type ProjectCommit,
+  type ProjectCommandExecutionResult,
   type ProjectSnapshot,
   type TrackId,
 } from '@seele-daw/project-core'
+import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
 import { ProjectTrackError } from '@/workbench/project/track/project-track-error'
-import {
-  selectProjectTrackColor,
-} from '@/workbench/project/track/project-track-palette'
+import { selectProjectTrackColor } from '@/workbench/project/track/project-track-palette'
 
 export const INSTRUMENT_SLOT_DEVICE_TYPE_ID = parseDeviceTypeId('seele.instrument-slot')
 
@@ -30,6 +30,7 @@ export interface ProjectTrackCoordinatorDependencies {
 
 export interface ProjectTrackCoordinator {
   addInstrumentTrack(): AddedInstrumentTrackResult
+  useStudioGrand(trackId: TrackId): ProjectCommandExecutionResult
 }
 
 /** Identifies the committed Track so transient Workbench state can select it. */
@@ -92,14 +93,9 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
         muted: false,
         soloed: false,
       },
-      instrumentDevice: {
-        id: parseDeviceId(this.#dependencies.createUniqueId()),
-        typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
-        definitionVersion: DEVICE_DEFINITION_VERSION_MIN,
-        enabled: true,
-        parameters: {},
-        opaqueState: null,
-      },
+      instrumentDevice: createStudioGrandDeviceDescriptor(
+        parseDeviceId(this.#dependencies.createUniqueId()),
+      ),
       insertAt: snapshot.trackOrder.length,
     })
     const result = session.execute(command)
@@ -112,6 +108,46 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
       commit: result.commit,
       trackId,
     })
+  }
+
+  useStudioGrand(trackId: TrackId): ProjectCommandExecutionResult {
+    const activeState = this.#dependencies.activeProject.state
+
+    if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
+      throw new ProjectTrackError(
+        'active-project-not-ready',
+        `Cannot select Studio Grand while the Active Project is ${activeState.phase}`,
+        { phase: activeState.phase },
+      )
+    }
+
+    const track = activeState.session
+      .getSnapshot()
+      .tracks.find((candidate) => candidate.id === trackId)
+
+    if (track === undefined) {
+      throw new ProjectTrackError(
+        'track-not-found',
+        `Cannot select Studio Grand because Track ${trackId} does not exist`,
+        { trackId },
+      )
+    }
+
+    if (track.kind !== 'instrument') {
+      throw new ProjectTrackError(
+        'instrument-track-kind-mismatch',
+        `Cannot select Studio Grand for ${track.kind} Track ${trackId}`,
+        { trackId, trackKind: track.kind },
+      )
+    }
+
+    return activeState.session.execute(
+      createReplaceInstrumentDeviceCommand({
+        baseRevision: activeState.session.modelRevision,
+        trackId: track.id,
+        instrumentDevice: createStudioGrandDeviceDescriptor(track.instrumentDeviceId),
+      }),
+    )
   }
 }
 

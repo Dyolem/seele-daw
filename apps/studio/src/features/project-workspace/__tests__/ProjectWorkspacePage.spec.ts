@@ -163,13 +163,13 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
     ),
   })
   const projectTracks: ProjectTrackCoordinator = Object.freeze({
-    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
-      () =>
-        Object.freeze({
-          commit: Object.freeze({}) as ProjectCommit,
-          trackId: parseTrackId('workspace-page-created-track'),
-        }),
+    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
+      Object.freeze({
+        commit: Object.freeze({}) as ProjectCommit,
+        trackId: parseTrackId('workspace-page-created-track'),
+      }),
     ),
+    useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
   })
   const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
@@ -289,9 +289,7 @@ describe('ProjectWorkspacePage', () => {
       projectId,
       projectName: 'History Shortcuts',
       tempoEventId: parseTempoEventId('tempo-history-shortcuts'),
-      timeSignatureEventId: parseTimeSignatureEventId(
-        'meter-history-shortcuts',
-      ),
+      timeSignatureEventId: parseTimeSignatureEventId('meter-history-shortcuts'),
     })
     const ready = createReadyState(projectId, session)
     createProjectTrackCoordinator({

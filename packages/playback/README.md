@@ -4,7 +4,9 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：仅完成 package 骨架和公开入口。长期架构中的名称 `playback-core` 对应当前包。
+> 当前状态：Batch 1B 已实现浏览器无关的 Studio Grand Device Definition；尚未实现
+> TempoMap、Transport、Compiler、Scheduler 或任何音频运行时。长期架构中的名称
+> `playback-core` 对应当前包。
 
 当前阶段实施计划见
 [Audible MIDI Playback V1 第六阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
@@ -14,6 +16,21 @@ AudioNode。当前首个可听切片只输出阶段计划定义的具体播放�
 Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect Graph、RuntimeDelta、
 跨线程 ACK 或 Loop / Seek 协议。Transport 行为、unsupported content、资产加载与浏览器矩阵
 仍按阶段计划中的 Decision Gate 逐批确认。
+
+## 当前已实现
+
+包根当前只公开首个真实消费者需要的 Studio Grand 边界：
+
+- `STUDIO_GRAND_DEVICE_DEFINITION` 固定 `typeId = seele.sample-instrument`、
+  `definitionVersion = 1` 与显示名称 `Studio Grand`；
+- `createStudioGrandDeviceDescriptor(deviceId)` 创建唯一的持久化 V1 形状，其中
+  `opaqueState = { soundbankId: "studio-grand" }`；
+- `decodeStudioGrandDeviceState(device)` 只接受该 Definition 的精确 V1 schema；未知类型、未来
+  版本、Parameters 或不兼容 State 返回 `null`，调用方据此显示 Missing，同时保留原始
+  Descriptor；
+- Definition、factory 和 decoder 均不依赖 Vue、DOM、Web Audio、Soundbank URL 或浏览器资源。
+
+这一实现只定义 Project Instrument Fact 的播放侧身份，不代表 Studio Grand 已经能加载或发声。
 
 ## 长期包定位
 
@@ -79,12 +96,13 @@ src/
 
 ## 长期演进顺序
 
-1. 实现固定 PPQ 的 TempoMap、Transport 和 Tick/second 转换。
-2. 编译 MIDI Note 事件，并建立确定性的 EventKey。
-3. 实现规划层 look-ahead scheduler 和 generation 失效。
-4. 支持播放中移动/删除 Note、Seek、Loop 和 Tempo change。
-5. 增加 Track/Device GraphPlan、参数计划和增量 reconciler 输入。
-6. 在后续阶段加入 Audio Clip、Automation、Recording monitoring 和 frozen-revision export 计划。
+1. 已建立内置 Studio Grand Device Definition、Descriptor factory 与严格 decoder。
+2. 实现固定 PPQ 的 TempoMap 与 Tick/second 转换，再按 Gate B 实现 Transport。
+3. 编译 MIDI Note 事件，并建立确定性的 EventKey。
+4. 实现规划层 look-ahead scheduler 和 generation 失效。
+5. 支持播放中移动/删除 Note、Seek、Loop 和 Tempo change。
+6. 由后续真实消费者驱动 Track/Device GraphPlan、Audio Clip、Automation、Recording
+   monitoring 和 frozen-revision export 计划。
 
 ## 长期测试方向
 

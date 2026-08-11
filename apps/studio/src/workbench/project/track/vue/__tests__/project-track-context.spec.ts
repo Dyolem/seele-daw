@@ -14,6 +14,7 @@ describe('ProjectTrackVueContext', () => {
     const context: ProjectTrackVueContext = {
       projectTracks: Object.freeze({
         addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(),
+        useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
       }),
     }
     const providedApp = createApp({ render: () => null })
@@ -28,8 +29,6 @@ describe('ProjectTrackVueContext', () => {
         code: 'missing-context',
       }),
     )
-    expect(() => missingApp.runWithContext(() => useProjectTracks())).toThrow(
-      ProjectTrackVueError,
-    )
+    expect(() => missingApp.runWithContext(() => useProjectTracks())).toThrow(ProjectTrackVueError)
   })
 })

@@ -1,5 +1,6 @@
 import {
   parseClipId,
+  parseDeviceTypeId,
   parsePositiveTick,
   parseProjectColor,
   parseProjectId,
@@ -22,7 +23,10 @@ import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-sh
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
 import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
-import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import {
+  PROJECT_TRACK_INSTRUMENT_STATUS,
+  type ProjectTrackPresentation,
+} from '@/features/project-workspace/project-track-presentation'
 import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectSaveStatus,
@@ -49,6 +53,12 @@ interface MountShellOptions {
   readonly tracks?: readonly ProjectTrackPresentation[]
 }
 
+const STUDIO_GRAND_INSTRUMENT = Object.freeze({
+  deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
+  displayName: 'Studio Grand',
+  status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
+})
+
 function mountShell(options: MountShellOptions = {}) {
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
@@ -68,13 +78,13 @@ function mountShell(options: MountShellOptions = {}) {
     ),
   })
   const projectTracks: ProjectTrackCoordinator = Object.freeze({
-    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
-      () =>
-        Object.freeze({
-          commit: Object.freeze({}) as ProjectCommit,
-          trackId: parseTrackId('shell-created-track'),
-        }),
+    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
+      Object.freeze({
+        commit: Object.freeze({}) as ProjectCommit,
+        trackId: parseTrackId('shell-created-track'),
+      }),
     ),
+    useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
   })
   const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
@@ -89,9 +99,7 @@ function mountShell(options: MountShellOptions = {}) {
       pianoRollPresentation: null,
       projectId: 'workbench-shell-project',
       projectName: 'Midnight Study',
-      projectSession: createTestSession(
-        parseProjectId('workbench-shell-project-session'),
-      ),
+      projectSession: createTestSession(parseProjectId('workbench-shell-project-session')),
       saveFailureMessage: options.saveFailureMessage,
       saveStatus: options.saveStatus ?? ACTIVE_PROJECT_SAVE_STATUS.IDLE,
       tempo: 120,
@@ -237,6 +245,7 @@ describe('ProjectWorkbenchShell', () => {
         Object.freeze({
           color: parseProjectColor('#8B5CF6'),
           id: selectedTrackId,
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Instrument 1',
         }),
@@ -271,6 +280,7 @@ describe('ProjectWorkbenchShell', () => {
         Object.freeze({
           color: parseProjectColor('#8B5CF6'),
           id: selectedTrackId,
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Instrument 1',
         }),

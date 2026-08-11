@@ -106,13 +106,13 @@ function createProjectNavigationDecisionContext(): ProjectNavigationDecisionVueC
 function createProjectTrackContext(): ProjectTrackVueContext {
   return Object.freeze({
     projectTracks: Object.freeze({
-      addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
-        () =>
-          Object.freeze({
-            commit: Object.freeze({}) as ProjectCommit,
-            trackId: parseTrackId('app-created-track'),
-          }),
+      addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
+        Object.freeze({
+          commit: Object.freeze({}) as ProjectCommit,
+          trackId: parseTrackId('app-created-track'),
+        }),
       ),
+      useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
     }),
   })
 }
@@ -159,8 +159,7 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
           createProjectNavigationDecisionContext(),
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: createProjectTrackContext(),
-        [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]:
-          createKeyboardShortcutContext(),
+        [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: createKeyboardShortcutContext(),
       },
     },
   })

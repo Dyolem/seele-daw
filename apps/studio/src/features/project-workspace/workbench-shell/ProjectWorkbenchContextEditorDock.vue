@@ -15,13 +15,19 @@ import {
   type ProjectPianoRollPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
-import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import {
+  PROJECT_TRACK_INSTRUMENT_STATUS,
+  type ProjectTrackPresentation,
+} from '@/features/project-workspace/project-track-presentation'
 import {
   PROJECT_WORKBENCH_DOCK_MODE,
   type ProjectWorkbenchDockMode,
 } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
+import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
+import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
 
 interface ProjectWorkbenchContextEditorDockProps {
   readonly barSpanTick: Tick
@@ -35,6 +41,8 @@ interface ProjectWorkbenchContextEditorDockProps {
 }
 
 const props = defineProps<ProjectWorkbenchContextEditorDockProps>()
+const { projectTracks } = useProjectTracks()
+const toasts = useUiToastStore()
 const emit = defineEmits<{
   close: []
   minimize: []
@@ -50,11 +58,30 @@ const inspectorTitle = computed(() => {
 const selectedContextName = computed(
   () => props.selectedClip?.name ?? props.selectedTrack?.name ?? 'No selection',
 )
+const selectedInstrument = computed(() => props.selectedTrack?.instrument ?? null)
 const contextEmptyTitle = computed(() => {
   if (props.selectedClip !== null) return props.selectedClip.name
   if (props.selectedTrack !== null) return 'No MIDI clip selected'
   return 'Select a track'
 })
+
+function useStudioGrand(): void {
+  const track = props.selectedTrack
+  if (track === null || track.instrument?.status !== PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY) {
+    return
+  }
+
+  try {
+    projectTracks.useStudioGrand(track.id)
+  } catch (cause) {
+    toasts.danger(
+      'Instrument could not be selected',
+      cause instanceof Error && cause.message.trim().length > 0
+        ? cause.message
+        : 'The Project rejected the Instrument command. Please try again.',
+    )
+  }
+}
 </script>
 
 <template>
@@ -68,20 +95,54 @@ const contextEmptyTitle = computed(() => {
         <UiIcon :icon="OptionsIcon" :size="20" />
         <strong>{{ inspectorTitle }}</strong>
       </header>
-      <div v-if="props.dockMode !== PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED">
-        <span><UiIcon :icon="MidiIcon" :size="24" /></span>
-        <strong>
-          {{ props.selectedClip?.name ?? props.selectedTrack?.name ?? 'No track selected' }}
-        </strong>
-        <p v-if="props.selectedClip">
-          MIDI clip on {{ props.selectedTrack?.name ?? 'the selected track' }}. Clip properties
-          will appear here as editing capabilities arrive.
-        </p>
-        <p v-else-if="props.selectedTrack">
-          {{ props.selectedTrack.kind === 'instrument' ? 'Instrument' : 'Audio' }} track selected.
-          Track properties will appear here as editing capabilities arrive.
-        </p>
-        <p v-else>Select a track to inspect its editing context.</p>
+      <div
+        v-if="props.dockMode !== PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED"
+        class="project-workbench__inspector-content"
+      >
+        <section class="project-workbench__inspector-context">
+          <span><UiIcon :icon="MidiIcon" :size="24" /></span>
+          <strong>
+            {{ props.selectedClip?.name ?? props.selectedTrack?.name ?? 'No track selected' }}
+          </strong>
+          <p v-if="props.selectedClip">
+            MIDI clip on {{ props.selectedTrack?.name ?? 'the selected track' }}. Clip properties
+            will appear here as editing capabilities arrive.
+          </p>
+          <p v-else-if="props.selectedTrack">
+            {{ props.selectedTrack.kind === 'instrument' ? 'Instrument' : 'Audio' }} track selected.
+            Track properties will appear here as editing capabilities arrive.
+          </p>
+          <p v-else>Select a track to inspect its editing context.</p>
+        </section>
+
+        <section
+          v-if="selectedInstrument !== null"
+          class="project-workbench__instrument-card"
+          aria-label="Track instrument"
+        >
+          <span>Instrument</span>
+          <strong>{{ selectedInstrument.displayName }}</strong>
+          <p v-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.READY">
+            Selected in this Project. Audible playback is not connected yet.
+          </p>
+          <p v-else-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY">
+            This legacy Track has no sound selected.
+          </p>
+          <template v-else>
+            <p>The saved Instrument definition is not available. Its Project fact is preserved.</p>
+            <code v-if="selectedInstrument.deviceTypeId !== null">
+              {{ selectedInstrument.deviceTypeId }}
+            </code>
+          </template>
+          <UiButton
+            v-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY"
+            size="small"
+            variant="primary"
+            @click="useStudioGrand"
+          >
+            Use Studio Grand
+          </UiButton>
+        </section>
       </div>
     </aside>
 
@@ -139,8 +200,7 @@ const contextEmptyTitle = computed(() => {
       >
         <ProjectPianoRollSurface
           v-if="
-            props.pianoRollPresentation?.status ===
-            PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+            props.pianoRollPresentation?.status === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
           "
           :bar-span-tick="props.barSpanTick"
           :presentation="props.pianoRollPresentation"
@@ -213,17 +273,24 @@ const contextEmptyTitle = computed(() => {
   font-size: var(--sd-font-size-sm);
 }
 
-.project-workbench__inspector > div {
+.project-workbench__inspector-content {
   display: grid;
+  gap: var(--sd-space-4);
   min-block-size: 0;
-  place-items: center;
-  align-content: center;
-  padding: var(--sd-space-5);
+  align-content: start;
+  padding: var(--sd-space-4);
+  overflow-y: auto;
   color: var(--sd-color-text-muted);
+}
+
+.project-workbench__inspector-context {
+  display: grid;
+  justify-items: center;
+  padding-block: var(--sd-space-2);
   text-align: center;
 }
 
-.project-workbench__inspector > div > span,
+.project-workbench__inspector-context > span,
 .project-workbench__surface-empty > span {
   display: grid;
   inline-size: calc(var(--sd-control-height-md) + var(--sd-space-2));
@@ -236,18 +303,57 @@ const contextEmptyTitle = computed(() => {
   background: var(--sd-color-surface-sunken);
 }
 
-.project-workbench__inspector > div strong,
+.project-workbench__inspector-context strong,
 .project-workbench__surface-empty strong {
   color: var(--sd-color-text-secondary);
   font-size: var(--sd-font-size-sm);
 }
 
-.project-workbench__inspector > div p,
+.project-workbench__inspector-context p,
 .project-workbench__surface-empty p {
   max-inline-size: 24rem;
   margin: var(--sd-space-2) 0 0;
   font-size: var(--sd-font-size-xs);
   line-height: var(--sd-line-height-default);
+}
+
+.project-workbench__instrument-card {
+  display: grid;
+  gap: var(--sd-space-2);
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-color-border-default);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-color-surface-sunken);
+}
+
+.project-workbench__instrument-card > span {
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-workbench__instrument-card > strong {
+  color: var(--sd-color-text-primary);
+  font-size: var(--sd-font-size-sm);
+}
+
+.project-workbench__instrument-card > p {
+  margin: 0;
+  font-size: var(--sd-font-size-xs);
+  line-height: var(--sd-line-height-default);
+}
+
+.project-workbench__instrument-card > code {
+  overflow-wrap: anywhere;
+  color: var(--sd-color-text-secondary);
+  font-size: var(--sd-font-size-xs);
+}
+
+.project-workbench__instrument-card > .ui-button {
+  justify-self: start;
+  margin-block-start: var(--sd-space-1);
 }
 
 .project-workbench__context-editor {

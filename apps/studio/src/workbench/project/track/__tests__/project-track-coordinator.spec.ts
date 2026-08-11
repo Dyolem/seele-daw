@@ -1,12 +1,21 @@
 import {
   PROJECT_CHANGE_TYPE,
+  PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
+  createAddInstrumentTrackCommand,
   createInitialProjectSession,
+  createProjectFileDTO,
+  createProjectSessionFromProjectFile,
+  parseBipolarValue,
+  parseDeviceId,
+  parseLinearGain,
   parseProjectId,
   parseTempoEventId,
   parseTimeSignatureEventId,
+  parseTrackId,
   type ProjectSession,
 } from '@seele-daw/project-core'
+import { STUDIO_GRAND_DEVICE_DEFINITION, decodeStudioGrandDeviceState } from '@seele-daw/playback'
 import { describe, expect, it } from 'vitest'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -77,8 +86,42 @@ function createDependencies(
   }
 }
 
+function addLegacyInstrumentSlotTrack(session: ProjectSession, suffix: string) {
+  const trackId = parseTrackId(`track-legacy-slot-${suffix}`)
+  const deviceId = parseDeviceId(`device-legacy-slot-${suffix}`)
+  const result = session.execute(
+    createAddInstrumentTrackCommand({
+      baseRevision: session.modelRevision,
+      trackId,
+      name: 'Legacy Instrument',
+      color: null,
+      channel: {
+        gain: parseLinearGain(1),
+        pan: parseBipolarValue(0),
+        muted: false,
+        soloed: false,
+      },
+      instrumentDevice: {
+        id: deviceId,
+        typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
+        definitionVersion: 1,
+        enabled: true,
+        parameters: {},
+        opaqueState: null,
+      },
+      insertAt: session.getSnapshot().trackOrder.length,
+    }),
+  )
+
+  if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+    throw new Error('Expected the legacy Instrument Slot fixture to commit')
+  }
+
+  return { deviceId, trackId } as const
+}
+
 describe('ProjectTrackCoordinator', () => {
-  it('adds one append-only Instrument Slot Track with product defaults', () => {
+  it('adds one append-only Studio Grand Instrument Track with product defaults', () => {
     const session = createSession('defaults')
     const coordinator = createProjectTrackCoordinator(
       createDependencies(session, ['track-defaults', 'device-defaults'], 0),
@@ -96,9 +139,7 @@ describe('ProjectTrackCoordinator', () => {
       commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD,
     })
     expect(result.commit.delta.changes).toHaveLength(1)
-    expect(result.commit.delta.changes[0]?.type).toBe(
-      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED,
-    )
+    expect(result.commit.delta.changes[0]?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED)
     expect(snapshot.trackOrder).toEqual(['track-defaults'])
     expect(track).toMatchObject({
       id: 'track-defaults',
@@ -117,13 +158,83 @@ describe('ProjectTrackCoordinator', () => {
     })
     expect(device).toEqual({
       id: 'device-defaults',
-      typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
-      definitionVersion: 1,
+      typeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
+      definitionVersion: STUDIO_GRAND_DEVICE_DEFINITION.definitionVersion,
       enabled: true,
       parameters: {},
-      opaqueState: null,
+      opaqueState: { soundbankId: 'studio-grand' },
     })
+    expect(decodeStudioGrandDeviceState(device!)).toEqual({ soundbankId: 'studio-grand' })
     expect(session.canUndo).toBe(true)
+  })
+
+  it('explicitly replaces a legacy empty Slot and preserves it through save, Undo, and Redo', () => {
+    const session = createSession('legacy-slot')
+    const { deviceId, trackId } = addLegacyInstrumentSlotTrack(session, 'selection')
+    const coordinator = createProjectTrackCoordinator(createDependencies(session, [], 0))
+    const result = coordinator.useStudioGrand(trackId)
+
+    expect(result.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)
+    if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      throw new Error('Expected Studio Grand selection to commit')
+    }
+
+    expect(result.commit.delta.changes).toEqual([
+      expect.objectContaining({
+        type: PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED,
+        trackId,
+        deviceId,
+      }),
+    ])
+    expect(decodeStudioGrandDeviceState(session.getSnapshot().devices[0]!)).toEqual({
+      soundbankId: 'studio-grand',
+    })
+
+    const projectFile = createProjectFileDTO(session.getSnapshot())
+    const reloaded = createProjectSessionFromProjectFile(projectFile)
+    expect(
+      decodeStudioGrandDeviceState(
+        reloaded.getSnapshot().devices.find((device) => device.id === deviceId)!,
+      ),
+    ).toEqual({ soundbankId: 'studio-grand' })
+
+    session.undo()
+    expect(session.getSnapshot().devices.find((device) => device.id === deviceId)).toEqual(
+      expect.objectContaining({
+        id: deviceId,
+        typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
+        opaqueState: null,
+      }),
+    )
+
+    session.redo()
+    expect(
+      decodeStudioGrandDeviceState(
+        session.getSnapshot().devices.find((device) => device.id === deviceId)!,
+      ),
+    ).toEqual({ soundbankId: 'studio-grand' })
+  })
+
+  it('returns no-change when Studio Grand is already selected', () => {
+    const session = createSession('studio-grand-no-change')
+    const coordinator = createProjectTrackCoordinator(
+      createDependencies(
+        session,
+        ['track-studio-grand-no-change', 'device-studio-grand-no-change'],
+        0,
+      ),
+    )
+    const track = coordinator.addInstrumentTrack()
+    const contentStateId = session.contentStateId
+    const result = coordinator.useStudioGrand(track.trackId)
+
+    expect(result).toEqual({
+      status: PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE,
+      reason: 'already-at-target',
+      modelRevision: 1,
+    })
+    expect(session.modelRevision).toBe(1)
+    expect(session.contentStateId).toBe(contentStateId)
   })
 
   it('numbers sequential Instrument Tracks and avoids the adjacent color', () => {
@@ -193,6 +304,27 @@ describe('ProjectTrackCoordinator', () => {
         phase: ACTIVE_PROJECT_PHASE.IDLE,
       }),
     )
+    expect(() => coordinator.useStudioGrand(parseTrackId('track-not-ready'))).toThrowError(
+      expect.objectContaining<Partial<ProjectTrackError>>({
+        code: 'active-project-not-ready',
+        phase: ACTIVE_PROJECT_PHASE.IDLE,
+      }),
+    )
+  })
+
+  it('rejects Studio Grand selection for a missing Track without changing the Session', () => {
+    const session = createSession('missing-selection-track')
+    const coordinator = createProjectTrackCoordinator(createDependencies(session, [], 0))
+    const trackId = parseTrackId('track-missing-selection')
+
+    expect(() => coordinator.useStudioGrand(trackId)).toThrowError(
+      expect.objectContaining<Partial<ProjectTrackError>>({
+        code: 'track-not-found',
+        trackId,
+      }),
+    )
+    expect(session.modelRevision).toBe(0)
+    expect(session.getSnapshot().tracks).toEqual([])
   })
 
   it('rejects invalid randomness before consuming entity identities or mutating the Session', () => {

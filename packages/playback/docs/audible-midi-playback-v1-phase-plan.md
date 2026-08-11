@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 1A implemented and locally verified; review required before Batch 1B
+> Status: Batch 1B reviewed and complete; Batch 2A has not started
 >
 > Date: 2026-08-10
 >
@@ -55,7 +55,8 @@
 - Undo 必须恢复为空 Slot，Redo 必须恢复 Studio Grand。
 
 以上产品事实与迁移方式已经确认。Gate A 随 Batch 1A 启动进一步确认了第 2 节的具体
-`typeId`、Descriptor schema 与 Replace Command；Runtime 解析和 UI 接入仍属于后续批次。
+`typeId`、Descriptor schema 与 Replace Command；浏览器无关 decoder 和 Studio UI 已在
+Batch 1B 落地，Audio Runtime 仍属于后续批次。
 
 ### 1.2 已存在的架构与模型不变量
 
@@ -165,8 +166,8 @@ V1 不借此建立任意 Device Graph 编辑、Effect 插入、Preset 管理或�
 - Command 失败保留旧 Descriptor 并显示 Toast；
 - Instrument 选择成功后由 Snapshot / Commit 重新派生展示，不在 Pinia 复制 Device Fact；
 - 当前 Clip Selection 会把左侧面板切成 Clip Inspector，因此 Batch 1B 必须保证所选 Track 的
-  Instrument 状态和修复入口仍可发现；具体采用持久 Track 区块还是明确返回 Track Inspector，
-  在该批 UI 审阅时确认。
+  Instrument 状态和修复入口仍可发现；Batch 1B 采用持久 Track Instrument 区块，Clip
+  Inspector 仍显示 Clip 上下文，同时在下方保留 Instrument 状态与修复入口。
 
 ## 3. TempoMap 与播放时间
 
@@ -652,8 +653,8 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 
 ### Batch 1A：Project Core Instrument Device Replace
 
-> Implementation status: complete and awaiting review. Project Core type-check and all 27 test files /
-> 399 tests pass; repository `pnpm lint` and `pnpm check` pass. Batch 1B has not started.
+> Implementation status: reviewed and committed as `6b172d9`. Project Core type-check and all 27
+> test files / 399 tests pass; repository `pnpm lint` and `pnpm check` pass.
 
 - Gate A 关闭后，增加通用 Instrument Device Replace Command、Preparer、Mutation、Delta 与
   No-change；
@@ -664,6 +665,9 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 - 更新 Project Core 文档后停止审阅。
 
 ### Batch 1B：内置 Device Definition 与 Studio 入口
+
+> Implementation status: reviewed and complete. Playback 1 test file / 4 tests and Studio 40 test
+> files / 218 tests pass; repository `pnpm lint` and `pnpm check` pass.
 
 - `@seele-daw/playback` 建立唯一、浏览器无关的 Studio Grand Device Definition / state
   decoder；

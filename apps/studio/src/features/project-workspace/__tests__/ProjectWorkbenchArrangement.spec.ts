@@ -1,5 +1,6 @@
 import {
   parseClipId,
+  parseDeviceTypeId,
   parsePositiveTick,
   parseProjectColor,
   parseProjectId,
@@ -13,6 +14,7 @@ import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
+import { PROJECT_TRACK_INSTRUMENT_STATUS } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
@@ -28,11 +30,14 @@ import {
 } from '@/workbench/project/track/vue/project-track-context'
 
 const mountedWrappers: VueWrapper[] = []
+const STUDIO_GRAND_INSTRUMENT = Object.freeze({
+  deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
+  displayName: 'Studio Grand',
+  status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
+})
 
 interface ArrangementFixture {
-  readonly addEmptyMidiClip: ReturnType<
-    typeof vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>
-  >
+  readonly addEmptyMidiClip: ReturnType<typeof vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>>
   readonly addInstrumentTrack: ReturnType<
     typeof vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>
   >
@@ -61,15 +66,17 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       trackId: input.trackId,
     })
   })
-  const addInstrumentTrack = vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(
-    () =>
-      Object.freeze({
-        commit: Object.freeze({}) as ProjectCommit,
-        trackId: parseTrackId('track-created-from-menu'),
-      }),
+  const addInstrumentTrack = vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
+    Object.freeze({
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: parseTrackId('track-created-from-menu'),
+    }),
   )
   const context: ProjectTrackVueContext = Object.freeze({
-    projectTracks: Object.freeze({ addInstrumentTrack }),
+    projectTracks: Object.freeze({
+      addInstrumentTrack,
+      useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
+    }),
   })
   const clipContext: ProjectClipVueContext = Object.freeze({
     projectClips: Object.freeze({ addEmptyMidiClip }),
@@ -163,6 +170,7 @@ describe('ProjectWorkbenchArrangement', () => {
         Object.freeze({
           color: parseProjectColor('#4F8CFF'),
           id: parseTrackId('track-visible'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Instrument 1',
         }),
@@ -181,12 +189,14 @@ describe('ProjectWorkbenchArrangement', () => {
       Object.freeze({
         color: parseProjectColor('#4F8CFF'),
         id: parseTrackId('track-selection-first'),
+        instrument: STUDIO_GRAND_INSTRUMENT,
         kind: 'instrument' as const,
         name: 'Instrument 1',
       }),
       Object.freeze({
         color: parseProjectColor('#23B26D'),
         id: parseTrackId('track-selection-second'),
+        instrument: STUDIO_GRAND_INSTRUMENT,
         kind: 'instrument' as const,
         name: 'Instrument 2',
       }),
@@ -228,6 +238,7 @@ describe('ProjectWorkbenchArrangement', () => {
         Object.freeze({
           color: parseProjectColor('#4F8CFF'),
           id: trackId,
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Keys',
         }),
@@ -248,6 +259,7 @@ describe('ProjectWorkbenchArrangement', () => {
         Object.freeze({
           color: parseProjectColor('#23B26D'),
           id: trackId,
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Instrument 1',
         }),
@@ -274,6 +286,7 @@ describe('ProjectWorkbenchArrangement', () => {
         Object.freeze({
           color: parseProjectColor('#16B8D4'),
           id: trackId,
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Instrument 1',
         }),
@@ -297,6 +310,7 @@ describe('ProjectWorkbenchArrangement', () => {
         Object.freeze({
           color: parseProjectColor('#F59E0B'),
           id: trackId,
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Instrument 1',
         }),
@@ -330,6 +344,7 @@ describe('ProjectWorkbenchArrangement', () => {
         Object.freeze({
           color: null,
           id: trackId,
+          instrument: STUDIO_GRAND_INSTRUMENT,
           kind: 'instrument',
           name: 'Instrument 1',
         }),

@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 2B implemented and validated; awaiting review before Batch 3A
+> Status: Batch 2B reviewed and complete; Batch 3A has not started
 >
 > Date: 2026-08-10
 >
@@ -786,7 +786,7 @@ Gate A 已随 Batch 1A 关闭，Gate B 的 Compiler 部分已随 Batch 2B 关闭
 
 ### Batch 2B：具体 MIDI Plan Compiler
 
-> Implementation status: implemented and awaiting review. Playback type-check and 4 test files /
+> Implementation status: reviewed and committed as `ac1cc31`. Playback type-check and 4 test files /
 > 43 tests pass; repository `pnpm lint` and `pnpm check` pass.
 
 - Gate B 中与 Compiler unsupported content 相关的规则已按第 1.5 节关闭；

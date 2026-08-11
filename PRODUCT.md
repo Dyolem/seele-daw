@@ -707,11 +707,11 @@ Project Core 已具备：
 | 2026-08-11 | `INSTRUMENT-SELECTION`                                     | Project Core 建立 Instrument Device Replace、No-change、Delta、History、QueryIndex 与持久化回归。                                                                | `6b172d9`                       |
 | 2026-08-11 | `TRACK-CREATE`、`INSTRUMENT-SELECTION`                     | Playback 建立 Studio Grand Definition；新 Track 默认持久化选择，旧空 Slot 可从持续可见的 Inspector 显式选择，并显示 Missing 与失败反馈。                         | `88ce879`                       |
 | 2026-08-11 | Playback TempoMap                                          | 建立浏览器无关的多 Tempo Segment、Tick / Project Second 双向换算与严格时间错误边界。                                                                             | `b077dba`                       |
-| 2026-08-11 | Audible MIDI Compiler                                      | 建立通用 MIDISampleSynth Device schema、冻结 Track / Note Span 计划、稳定 occurrence key、unsupported content policy 与中性 Arrangement 范围。                   | Batch 2B，待审阅                |
+| 2026-08-11 | Audible MIDI Compiler                                      | 建立通用 MIDISampleSynth Device schema、冻结 Track / Note Span 计划、稳定 occurrence key、unsupported content policy 与中性 Arrangement 范围。                   | `ac1cc31`                       |
 
 ## 13. 当前验证基线
 
-Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A 与当前待审阅的 Batch 2B 工作树已通过本地验证：
+Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A 与 Batch 2B 已通过本地验证：
 
 - `pnpm lint`。
 - `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production

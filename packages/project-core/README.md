@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Add MIDI Clip 与 Add / Move / Remove / Resize MIDI Note Command、Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Replace Instrument Device、Add MIDI Clip 与 Add / Move / Remove / Resize MIDI Note Command、Instrument Device / Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -249,6 +249,14 @@ Remove / Add / Move / Resize 决定及未来迁移条件见
 
 Project Core 不生成 Track ID、默认名称或随机颜色，也不选择 Soundbank。调用方必须提供已确定的名称、颜色、Channel Strip、Device 和插入位置；新音轨不自动创建 Clip、MidiSource 或 Note。完整边界见 [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)。
 
+### Replace Instrument Device 纵向切片
+
+`ReplaceInstrumentDeviceCommand` 表达一次 Instrument Track 音源事实替换。公开 Command 使用 `instrument-device.replace` 判别字段，并携带 `baseRevision`、目标 `trackId` 和完整 replacement `DeviceDescriptor`；handler 从权威 Track 重新解析当前 Instrument Device，只允许保持原 Device ID 的一条 `DEVICE.REPLACE`，不会替换 Track Record 或改变 Track 拓扑。
+
+成功执行发布一条 `instrument-device.updated` change，携带 Track / Device 身份与 before / after Descriptor，只形成一次 revision、内容状态和 History 推进。Undo / Redo 复用相同 Record 与 Device ID；目标 Descriptor 深层值相等时返回 `no-change`，不产生 Commit、History、QueryIndex root 或通知。MIDI Note QueryIndex 只推进 revision，MIDI Note 局部订阅不接收该 change，`project-commit.all` 仍会收到提交。
+
+Project Core 继续只验证通用 Device 外壳，不识别 `Studio Grand`、`soundbankId` 或浏览器资产。未知合法 Descriptor 会通过 Snapshot、Project File V1 与 Checkpoint V1 完整往返。新 Track 默认选择什么声音、旧空 Slot 的可见修复入口以及内置 Device Definition 所有权属于后续 Studio / Playback 批次；完整阶段边界见 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
+
 ### Add MIDI Clip 纵向切片
 
 `AddMidiClipCommand` 把一个 MidiClip、它独占的 MidiSource 和空 Note Partition 作为一个完整产品意图。Handler 原子准备 `MIDI_SOURCE.INSERT`、`NOTE_PARTITION.INSERT` 与 `CLIP.INSERT`，其 inverse 按相反顺序撤销；成功提交、Undo 和 Redo 都只发布一条聚合的 `midi-clip.added` 或 `midi-clip.removed` change。
@@ -257,7 +265,7 @@ Project Core 验证目标 Instrument Track、Clip / Source / Partition 身份和
 
 ### ProjectCommit / ProjectDelta 基础层
 
-当前公开契约能够表达 Instrument Track Add / Remove、MIDI Clip Add / Remove 与 MIDI Note Add / Remove / Update。Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip change 聚合 Clip、Source 与 Note Partition，并携带时间线受影响范围；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 与 Resize 都使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
+当前公开契约能够表达 Instrument Device Update、Instrument Track Add / Remove、MIDI Clip Add / Remove 与 MIDI Note Add / Remove / Update。Instrument Device change 携带 Track / Device 身份与 before / after Descriptor；Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip change 聚合 Clip、Source 与 Note Partition，并携带时间线受影响范围；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 与 Resize 都使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
 
 包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
@@ -408,7 +416,7 @@ asset reference changes
 - Persistence 使用 `journalSequence`，不能复用 modelRevision；
 - Delta 可以丢弃；消费者错过增量后必须能从 Snapshot 全量重建。
 
-当前已实现 Instrument Track Add / Remove 与 MIDI Clip Add / Remove 的聚合 placement，以及 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
+当前已实现 Instrument Device Update、Instrument Track Add / Remove 与 MIDI Clip Add / Remove 的 change 映射，以及 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
 
 ## 并发与线程模型
 
@@ -516,11 +524,12 @@ src/
 11. 定义 storage-neutral Project Checkpoint 协议、Store port、保存 receipt 与候选恢复协调。
 12. 在 `platform-browser` 实现 IndexedDB immutable checkpoint + active/previous 指针事务。（已完成）
 13. 在 Studio 组合根接入保存和刷新恢复，形成第一条浏览器持久化纵向切片。
-14. 有真实格式演进或恢复需求后分别实现 JSON codec、migration、Journal；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
+14. 实现保持身份与 Track 拓扑的 Instrument Device Replace Command、Delta、No-change、History 与持久化往返。（已完成）
+15. 有真实格式演进或恢复需求后分别实现 JSON codec、migration、Journal；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 26 个测试文件、370 项测试。
+当前 Project Core 基线为 27 个测试文件、399 项测试。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 

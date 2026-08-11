@@ -6,6 +6,7 @@ export {
   createAddNoteCommand,
   createMoveNotesCommand,
   createRemoveNotesCommand,
+  createReplaceInstrumentDeviceCommand,
   createResizeNoteCommand,
 } from './commands/project-command'
 export type {
@@ -17,11 +18,13 @@ export type {
   CreateAddNoteCommandInput,
   CreateMoveNotesCommandInput,
   CreateRemoveNotesCommandInput,
+  CreateReplaceInstrumentDeviceCommandInput,
   CreateResizeNoteCommandInput,
   MoveNotesCommand,
   ProjectCommand,
   ProjectCommandType,
   RemoveNotesCommand,
+  ReplaceInstrumentDeviceCommand,
   ResizeNoteCommand,
 } from './commands/project-command'
 export { ProjectCommandError } from './commands/project-command-error'
@@ -33,6 +36,7 @@ export type {
 export { PROJECT_CHANGE_TYPE } from './commit/project-change'
 export type {
   AffectedTickRange,
+  InstrumentDeviceUpdatedChange,
   InstrumentTrackAddedChange,
   InstrumentTrackPlacement,
   InstrumentTrackRemovedChange,

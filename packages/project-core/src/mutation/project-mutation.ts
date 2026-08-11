@@ -70,7 +70,25 @@ export type TimeSignatureEventMutation = EntityMutation<
   typeof PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT,
   TimeSignatureEventRecord
 >
-export type DeviceMutation = EntityMutation<typeof PROJECT_MUTATION_TYPE.DEVICE, DeviceDescriptor>
+export interface DeviceInsertMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.DEVICE.INSERT
+  readonly after: DeviceDescriptor
+}
+
+export interface DeviceRemoveMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.DEVICE.REMOVE
+  readonly before: DeviceDescriptor
+}
+
+export interface DeviceReplaceMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.DEVICE.REPLACE
+  readonly before: DeviceDescriptor
+  readonly after: DeviceDescriptor
+  /** Track ownership is carried when a product Command changes a track-owned Device. */
+  readonly trackId?: TrackId
+}
+
+export type DeviceMutation = DeviceInsertMutation | DeviceRemoveMutation | DeviceReplaceMutation
 
 export interface TrackOrderInsertMutation {
   readonly type: typeof PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT
@@ -331,6 +349,7 @@ function copyProjectMutation(mutation: ProjectMutation, index: number | null): P
         type: mutation.type,
         before: mutation.before,
         after: mutation.after,
+        ...(mutation.trackId === undefined ? {} : { trackId: mutation.trackId }),
       })
 
     case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
@@ -478,6 +497,7 @@ function invertValidatedProjectMutation(mutation: ProjectMutation): ProjectMutat
         type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
         before: mutation.after,
         after: mutation.before,
+        ...(mutation.trackId === undefined ? {} : { trackId: mutation.trackId }),
       })
 
     case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:

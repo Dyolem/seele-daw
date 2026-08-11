@@ -7,7 +7,13 @@ import {
   type DeviceTypeId,
   type ParameterId,
 } from './ids'
-import { parseJsonValue, type JsonObject, type JsonValue } from './json-value'
+import {
+  jsonValuesHaveSameValues,
+  parseJsonValue,
+  type JsonObject,
+  type JsonValue,
+} from './json-value'
+import { ownPropertiesHaveSameValues } from './value-equality'
 
 export const DEVICE_DEFINITION_VERSION_MIN = 1
 
@@ -84,4 +90,23 @@ export function createDeviceDescriptor(input: CreateDeviceDescriptorInput): Devi
     parameters: parseParameters(input.parameters),
     opaqueState: parseJsonValue(input.opaqueState, 'DeviceDescriptor.opaqueState'),
   }
+}
+
+/** @internal Compares normalized Device facts without relying on caller object identity. */
+export function deviceDescriptorsHaveSameValues(
+  left: DeviceDescriptor,
+  right: DeviceDescriptor,
+): boolean {
+  return (
+    left.id === right.id &&
+    left.typeId === right.typeId &&
+    left.definitionVersion === right.definitionVersion &&
+    left.enabled === right.enabled &&
+    ownPropertiesHaveSameValues<JsonValue>(
+      left.parameters,
+      right.parameters,
+      jsonValuesHaveSameValues,
+    ) &&
+    jsonValuesHaveSameValues(left.opaqueState, right.opaqueState)
+  )
 }

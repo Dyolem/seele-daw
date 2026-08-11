@@ -1,4 +1,5 @@
 import { rejectDomainValue } from './domain-value-error'
+import { ownPropertiesHaveSameValues } from './value-equality'
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonArray = readonly JsonValue[]
@@ -137,4 +138,24 @@ function parseJsonValueInternal(
 
 export function parseJsonValue(value: unknown, valueName = 'JsonValue'): JsonValue {
   return parseJsonValueInternal(value, valueName, new Set())
+}
+
+/** @internal Compares normalized, acyclic JSON values independently of object key order. */
+export function jsonValuesHaveSameValues(left: JsonValue, right: JsonValue): boolean {
+  if (left === right) return true
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => jsonValuesHaveSameValues(value, right[index]!))
+    )
+  }
+
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
+    return false
+  }
+
+  return ownPropertiesHaveSameValues<JsonValue>(left, right, jsonValuesHaveSameValues)
 }

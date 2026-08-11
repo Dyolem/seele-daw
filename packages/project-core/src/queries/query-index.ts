@@ -360,6 +360,7 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
 
   for (const [changeIndex, change] of delta.changes.entries()) {
     switch (change.type) {
+      case PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED:
       case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED:
       case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
         break

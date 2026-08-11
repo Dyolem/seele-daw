@@ -1,9 +1,10 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Scope reviewed; documentation revision approved; production implementation pending
-> per-batch review
+> Status: Batch 1A implemented and locally verified; review required before Batch 1B
 >
 > Date: 2026-08-10
+>
+> Last updated: 2026-08-11
 >
 > Prerequisite checkpoint: `checkpoint/piano-roll-note-editing-2026-08-10`
 
@@ -53,8 +54,8 @@
 - 用户执行该操作后才形成 Project Command、dirty、Undo / Redo 和持久化事实；
 - Undo 必须恢复为空 Slot，Redo 必须恢复 Studio Grand。
 
-以上只确认产品事实与迁移方式，不自动批准具体 `typeId`、Descriptor schema、Command
-payload 或 Runtime 解析协议。
+以上产品事实与迁移方式已经确认。Gate A 随 Batch 1A 启动进一步确认了第 2 节的具体
+`typeId`、Descriptor schema 与 Replace Command；Runtime 解析和 UI 接入仍属于后续批次。
 
 ### 1.2 已存在的架构与模型不变量
 
@@ -84,27 +85,30 @@ payload 或 Runtime 解析协议。
 
 ### 1.4 尚待逐批确认的 Decision Gate
 
-以下内容仍不得因为出现在计划中就当作已批准产品行为：
+Gate A 已于 2026-08-11 关闭：Studio Grand 的 Device Definition 与 Project Core Replace
+Command 形状按第 2 节确认。以下 Gate B / C 内容仍不得因为出现在计划中就当作已批准产品
+行为：
 
-1. Studio Grand 的精确 Device Definition、Descriptor schema 与 Replace Command payload；
-2. Play / Pause / Return to Start、Space、自然结束、Playhead 起点和项目结尾的完整行为；
-3. Looped Clip、未知 Effect、Missing Instrument、加载失败和“没有任何可发声事件”时，是阻止
+1. Play / Pause / Return to Start、Space、自然结束、Playhead 起点和项目结尾的完整行为；
+2. Looped Clip、未知 Effect、Missing Instrument、加载失败和“没有任何可发声事件”时，是阻止
    全局播放、跳过 Track，还是带诊断继续；
-4. 自然结束后是否允许 Sample release tail 继续，以及 Transport 何时进入 Stopped；
-5. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
-6. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵。
+3. 自然结束后是否允许 Sample release tail 继续，以及 Transport 何时进入 Stopped；
+4. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
+5. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
 ## 2. Project Instrument Fact 与 Command 边界
 
-### 2.1 候选 Studio Grand Device Definition
+### 2.1 已确认的 Studio Grand Device Definition
 
-当前建议使用以下稳定定义，尚需在 Batch 1A 前单独确认：
+Gate A 已确认使用以下稳定定义：
 
 ```text
+id: 保持目标 Instrument Track 既有 instrumentDeviceId
 typeId: seele.sample-instrument
 definitionVersion: 1
+enabled: true
 parameters: {}
 opaqueState: { soundbankId: "studio-grand" }
 ```
@@ -115,7 +119,7 @@ Soundbank Manifest 解析，不能写入 Project File。
 现有 `DeviceDescriptor` 已能保存 `typeId`、`definitionVersion`、`parameters` 与
 `opaqueState`，因此这项事实不要求伪造 Project File V2。旧项目保持合法且不自动迁移。
 
-浏览器无关的内置 Device Definition 建议由 `@seele-daw/playback` 单点拥有，包括稳定 ID、
+浏览器无关的内置 Device Definition 由 `@seele-daw/playback` 单点拥有，包括稳定 ID、
 版本、状态 decoder 和编译规则。Studio 只决定“新 Track 默认选择 Studio Grand”，并复用
 该定义创建 Descriptor；Project Core 继续只验证通用 Device 外壳。Audio Web 只接收已编译
 的 Studio Grand Instrument Plan 与 `soundbankId`，不再次解释 Project Descriptor。
@@ -131,14 +135,15 @@ Studio `ProjectTrackCoordinator` 创建新 Instrument Track 时，继续由同�
 
 ### 2.3 旧空 Slot 选择 Instrument
 
-为旧项目增加一条产品级 Instrument Device Replace Command：
+Project Core 已增加产品级 Instrument Device Replace Command：
 
-- 候选输入包含 `baseRevision`、目标 Instrument `trackId` 与规范化的新 `DeviceDescriptor`；
+- 公开判别字段为 `instrument-device.replace`；输入包含 `baseRevision`、目标 Instrument
+  `trackId` 与规范化的新 `instrumentDevice: DeviceDescriptor`；
   不再额外传一份与 Descriptor 重复的 `deviceId`；
 - Preparer 重新读取当前 Track 和 Device，验证 Device 正是该 Track 的
   `instrumentDeviceId`，且 replacement 保持同一 Device ID；
 - Device ID 和 Track 拓扑保持不变，只产生一次 `DEVICE.REPLACE`；
-- Delta 使用 Instrument Device changed 语义，携带 Track / Device 身份与 before / after；
+- Delta 使用 `instrument-device.updated` 语义，携带 `trackId`、`deviceId` 与 before / after；
 - QueryIndex 必须显式消费该 Change 并推进到相同 revision；当前 Note Query 结果保持不变，
   `project-commit.all` 仍能通知 Playback Coordinator；
 - 成功只推进一个 revision、一个 dirty 内容身份和一个 History 步骤；
@@ -639,13 +644,16 @@ packages/audio-web/src/
 
 ## 10. 实施批次
 
-开始生产代码前按顺序关闭三个 Gate：
+Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序关闭其余 Gate：
 
-- Gate A：确认 Studio Grand Device Definition 与 Replace Command 形状；
+- Gate A（2026-08-11 已关闭）：确认 Studio Grand Device Definition 与 Replace Command 形状；
 - Gate B：确认 Transport、Project End、release tail、unsupported content 与零 Note Span 行为；
 - Gate C：确认采样来源 / 分发权限、Manifest、加载预算和浏览器验收矩阵。
 
 ### Batch 1A：Project Core Instrument Device Replace
+
+> Implementation status: complete and awaiting review. Project Core type-check and all 27 test files /
+> 399 tests pass; repository `pnpm lint` and `pnpm check` pass. Batch 1B has not started.
 
 - Gate A 关闭后，增加通用 Instrument Device Replace Command、Preparer、Mutation、Delta 与
   No-change；

@@ -3,6 +3,7 @@ import {
   parseClipId,
   parseMidiSourceId,
   parseNoteId,
+  parseTrackId,
   type ClipId,
   type MidiSourceId,
   type NoteId,
@@ -47,6 +48,9 @@ import {
 
 /** Canonical runtime discriminants for product-level project commands. */
 export const PROJECT_COMMAND_TYPE = {
+  INSTRUMENT_DEVICE: {
+    REPLACE: 'instrument-device.replace',
+  },
   INSTRUMENT_TRACK: {
     ADD: 'instrument-track.add',
   },
@@ -90,6 +94,13 @@ export interface AddInstrumentTrackCommand extends ProjectCommandBase<
   readonly insertAt: number
 }
 
+export interface ReplaceInstrumentDeviceCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE
+> {
+  readonly trackId: TrackId
+  readonly instrumentDevice: DeviceDescriptor
+}
+
 export interface AddMidiClipCommand extends ProjectCommandBase<
   typeof PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD
 > {
@@ -127,6 +138,7 @@ export interface ResizeNoteCommand extends MidiNoteCommandBase<
 
 export type ProjectCommand =
   | AddInstrumentTrackCommand
+  | ReplaceInstrumentDeviceCommand
   | AddMidiClipCommand
   | AddNoteCommand
   | MoveNotesCommand
@@ -141,6 +153,12 @@ export interface CreateAddInstrumentTrackCommandInput {
   readonly channel: CreateChannelStripDescriptorInput
   readonly instrumentDevice: CreateDeviceDescriptorInput
   readonly insertAt: number
+}
+
+export interface CreateReplaceInstrumentDeviceCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly trackId: TrackId
+  readonly instrumentDevice: CreateDeviceDescriptorInput
 }
 
 export interface CreateAddMidiClipCommandInput {
@@ -236,6 +254,17 @@ export function createAddInstrumentTrackCommand(
     track,
     instrumentDevice,
     insertAt: parseTrackOrderIndex(input.insertAt),
+  }
+}
+
+export function createReplaceInstrumentDeviceCommand(
+  input: CreateReplaceInstrumentDeviceCommandInput,
+): ReplaceInstrumentDeviceCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    trackId: parseTrackId(input.trackId),
+    instrumentDevice: createDeviceDescriptor(input.instrumentDevice),
   }
 }
 
@@ -363,6 +392,8 @@ function rejectUnknownCommand(command: never): never {
 /** @internal Revalidates structurally supplied commands before they read model state. */
 export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand {
   switch (command.type) {
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
+      return createReplaceInstrumentDeviceCommand(command)
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
       return createAddInstrumentTrackCommand({
         baseRevision: command.baseRevision,

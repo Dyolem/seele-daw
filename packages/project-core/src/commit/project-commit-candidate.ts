@@ -7,11 +7,13 @@ import {
   type ProjectCommand,
   type ProjectCommandType,
   type RemoveNotesCommand,
+  type ReplaceInstrumentDeviceCommand,
   type ResizeNoteCommand,
 } from '#internal/commands/project-command'
 import {
   PROJECT_CHANGE_TYPE,
   type AffectedTickRange,
+  type InstrumentDeviceUpdatedChange,
   type InstrumentTrackAddedChange,
   type InstrumentTrackPlacement,
   type InstrumentTrackRemovedChange,
@@ -41,8 +43,9 @@ import { MIDI_PITCH_MAX, MIDI_PITCH_MIN, parseMidiPitch } from '#internal/model/
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import { nextModelRevision } from '#internal/model/model-revision'
 import type { InstrumentTrackRecord } from '#internal/model/track'
+import { ownPropertiesHaveSameValues } from '#internal/model/value-equality'
 import { assertCreatedMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
-import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import type { DeviceReplaceMutation, ProjectMutation } from '#internal/mutation/project-mutation'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { addTicks, parseTick } from '#internal/time/tick'
 
@@ -91,6 +94,27 @@ function createClipRange(clip: MidiClipRecord): AffectedTickRange {
   return Object.freeze({
     startTick: clip.startTick,
     endTick: addTicks(clip.startTick, clip.spanTick),
+  })
+}
+
+function mapUpdatedInstrumentDevice(
+  mutation: DeviceReplaceMutation,
+  mutationIndex: number,
+): InstrumentDeviceUpdatedChange {
+  if (mutation.trackId === undefined) {
+    return rejectCandidate(
+      'unsupported-mutation-type',
+      `Device replacement at index ${mutationIndex} has no Instrument Track ownership`,
+      { mutationIndex, mutationType: mutation.type },
+    )
+  }
+
+  return Object.freeze({
+    type: PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED,
+    trackId: mutation.trackId,
+    deviceId: mutation.after.id,
+    before: mutation.before,
+    after: mutation.after,
   })
 }
 
@@ -276,6 +300,10 @@ function createProjectChanges(mutations: readonly ProjectMutation[]): readonly P
     const mutation = mutations[mutationIndex]!
 
     switch (mutation.type) {
+      case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
+        changes.push(mapUpdatedInstrumentDevice(mutation, mutationIndex))
+        break
+
       case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
         changes.push(mapAddedInstrumentTrack(mutations, mutationIndex))
         mutationIndex += 2
@@ -332,6 +360,18 @@ function matchesAddedInstrumentTrack(
   )
 }
 
+function matchesReplacedInstrumentDevice(
+  command: ReplaceInstrumentDeviceCommand,
+  mutation: ProjectMutation,
+): boolean {
+  return (
+    mutation.type === PROJECT_MUTATION_TYPE.DEVICE.REPLACE &&
+    mutation.trackId === command.trackId &&
+    mutation.before.id === command.instrumentDevice.id &&
+    mutation.after === command.instrumentDevice
+  )
+}
+
 function matchesAddedMidiClip(
   command: AddMidiClipCommand,
   mutations: readonly ProjectMutation[],
@@ -358,19 +398,6 @@ function matchesAddedMidiClip(
   )
 }
 
-function recordsHaveSameOwnValues(left: object, right: object): boolean {
-  const leftKeys = Reflect.ownKeys(left)
-  const rightKeys = Reflect.ownKeys(right)
-
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every(
-      (key) =>
-        Object.hasOwn(right, key) && Object.is(Reflect.get(left, key), Reflect.get(right, key)),
-    )
-  )
-}
-
 function matchesAddedNote(command: AddNoteCommand, mutation: ProjectMutation): boolean {
   if (
     mutation.type !== PROJECT_MUTATION_TYPE.NOTE.INSERT ||
@@ -388,7 +415,7 @@ function matchesAddedNote(command: AddNoteCommand, mutation: ProjectMutation): b
     channel: command.channel,
   })
 
-  return recordsHaveSameOwnValues(mutation.after, expectedNote)
+  return ownPropertiesHaveSameValues(mutation.after, expectedNote)
 }
 
 function matchesMovedNotes(
@@ -431,7 +458,7 @@ function matchesMovedNotes(
       pitch: parseMidiPitch(nextPitch),
     })
 
-    return recordsHaveSameOwnValues(mutation.after, expectedAfter)
+    return ownPropertiesHaveSameValues(mutation.after, expectedAfter)
   })
 }
 
@@ -471,14 +498,19 @@ function matchesResizedNote(command: ResizeNoteCommand, mutation: ProjectMutatio
     durationTick: command.durationTick,
   })
 
-  return recordsHaveSameOwnValues(mutation.after, expectedAfter)
+  return ownPropertiesHaveSameValues(mutation.after, expectedAfter)
 }
 
 function assertCommandPlanCorrespondence(command: ProjectCommand, plan: MutationPlan): void {
   const mutation = plan.forward[0]
   let matches = false
 
-  if (command.type === PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD) {
+  if (command.type === PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE) {
+    matches =
+      plan.forward.length === 1 &&
+      mutation !== undefined &&
+      matchesReplacedInstrumentDevice(command, mutation)
+  } else if (command.type === PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD) {
     matches = matchesAddedInstrumentTrack(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD) {
     matches = matchesAddedMidiClip(command, plan.forward)

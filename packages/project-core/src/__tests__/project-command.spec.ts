@@ -25,6 +25,7 @@ import {
   type MoveNotesCommand,
   type ProjectCommand,
   type RemoveNotesCommand,
+  type ReplaceInstrumentDeviceCommand,
   type ResizeNoteCommand,
 } from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
@@ -182,6 +183,7 @@ describe('ProjectCommand public contract', () => {
       | AddNoteCommand
       | MoveNotesCommand
       | RemoveNotesCommand
+      | ReplaceInstrumentDeviceCommand
       | ResizeNoteCommand
     >()
   })

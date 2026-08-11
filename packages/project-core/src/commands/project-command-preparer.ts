@@ -8,6 +8,7 @@ import {
   type ProjectCommandErrorDetails,
 } from '#internal/commands/project-command-error'
 import type { ProjectCommandPreparation } from '#internal/commands/project-command-preparation'
+import { prepareReplaceInstrumentDeviceCommand } from '#internal/commands/instrument-device-command-handler'
 import { prepareAddInstrumentTrackCommand } from '#internal/commands/instrument-track-command-handler'
 import { prepareAddMidiClipCommand } from '#internal/commands/midi-clip-command-handler'
 import {
@@ -30,6 +31,11 @@ function rejectUnknownCommand(command: never): never {
 
 function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
   switch (command.type) {
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
+      return {
+        deviceId: command.instrumentDevice.id,
+        trackId: command.trackId,
+      }
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
       return {
         deviceId: command.instrumentDevice.id,
@@ -81,6 +87,8 @@ export function prepareProjectCommand(
   }
 
   switch (normalizedCommand.type) {
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
+      return prepareReplaceInstrumentDeviceCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
       return prepareAddInstrumentTrackCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:

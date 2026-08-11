@@ -1,5 +1,5 @@
 import type { DeviceDescriptor } from '#internal/model/device'
-import type { ClipId, MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
+import type { ClipId, DeviceId, MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
 import type { MidiClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
@@ -9,6 +9,9 @@ import type { ValueOf } from '@seele-daw/type-utils'
 
 /** Canonical runtime discriminants for semantic project changes. */
 export const PROJECT_CHANGE_TYPE = {
+  INSTRUMENT_DEVICE: {
+    UPDATED: 'instrument-device.updated',
+  },
   INSTRUMENT_TRACK: {
     ADDED: 'instrument-track.added',
     REMOVED: 'instrument-track.removed',
@@ -39,6 +42,14 @@ export interface InstrumentTrackPlacement {
   readonly track: InstrumentTrackRecord
   readonly instrumentDevice: DeviceDescriptor
   readonly index: number
+}
+
+export interface InstrumentDeviceUpdatedChange {
+  readonly type: typeof PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED
+  readonly trackId: TrackId
+  readonly deviceId: DeviceId
+  readonly before: DeviceDescriptor
+  readonly after: DeviceDescriptor
 }
 
 interface InstrumentTrackChangeBase<Type extends ProjectChangeType> {
@@ -112,6 +123,7 @@ export interface MidiNoteUpdatedChange extends MidiNoteChangeBase<
 }
 
 export type ProjectChange =
+  | InstrumentDeviceUpdatedChange
   | InstrumentTrackAddedChange
   | InstrumentTrackRemovedChange
   | MidiClipAddedChange

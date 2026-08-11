@@ -11,6 +11,8 @@ import {
   type DeviceDescriptor,
   type JsonValue,
 } from '#internal/index'
+import { jsonValuesHaveSameValues } from '#internal/model/json-value'
+import { ownPropertiesHaveSameValues } from '#internal/model/value-equality'
 
 describe('JsonValue', () => {
   it.each([null, 'lead', true, false, 0, -12.5])('accepts the JSON primitive %s', (value) => {
@@ -124,6 +126,35 @@ describe('JsonValue', () => {
 
     expect(() => parseJsonValue(direct)).toThrow(DomainValueError)
     expect(() => parseJsonValue(first)).toThrow(DomainValueError)
+  })
+})
+
+describe('internal value equality', () => {
+  it('keeps Record comparison shallow and independent of own-key order', () => {
+    const sharedValue = { mode: 'shared' }
+
+    expect(
+      ownPropertiesHaveSameValues(
+        { first: 1, second: sharedValue },
+        { second: sharedValue, first: 1 },
+      ),
+    ).toBe(true)
+    expect(
+      ownPropertiesHaveSameValues(
+        { first: 1, second: sharedValue },
+        { first: 1, second: { mode: 'shared' } },
+      ),
+    ).toBe(false)
+  })
+
+  it('uses the same own-property primitive for recursive JSON equality', () => {
+    expect(
+      jsonValuesHaveSameValues(
+        { metadata: { family: 'piano', tags: ['grand', 'studio'] }, enabled: true },
+        { enabled: true, metadata: { tags: ['grand', 'studio'], family: 'piano' } },
+      ),
+    ).toBe(true)
+    expect(jsonValuesHaveSameValues([1, 2, 3], [1, 3, 2])).toBe(false)
   })
 })
 

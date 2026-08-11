@@ -1,0 +1,311 @@
+import {
+  PROJECT_PPQ,
+  createTempoEventRecord,
+  parseTick,
+  type TempoBpm,
+  type TempoEventRecord,
+  type Tick,
+} from '@seele-daw/project-core'
+
+import {
+  parseContinuousTickPosition,
+  parseProjectDurationSecond,
+  parseProjectSecond,
+  type ContinuousTickPosition,
+  type ProjectDurationSecond,
+  type ProjectSecond,
+} from './project-time'
+
+export type TempoMapErrorCode =
+  | 'duplicate-tempo-event-tick'
+  | 'invalid-initial-tempo-event-count'
+  | 'invalid-tempo-event'
+  | 'invalid-tempo-event-list'
+  | 'numeric-result-out-of-range'
+  | 'reversed-tick-range'
+
+/** Stable failure raised while creating or querying a browser-independent TempoMap. */
+export class TempoMapError extends Error {
+  readonly code: TempoMapErrorCode
+
+  constructor(code: TempoMapErrorCode, message: string) {
+    super(message)
+    this.name = 'TempoMapError'
+    this.code = code
+  }
+}
+
+interface TempoSegment {
+  readonly bpm: TempoBpm
+  readonly secondsPerTick: number
+  readonly startProjectSecond: ProjectSecond
+  readonly startTick: Tick
+}
+
+interface LocatedTempoSegment {
+  readonly index: number
+  readonly segment: TempoSegment
+}
+
+export interface TempoMap {
+  projectSecondAtTick(tick: Tick): ProjectSecond
+  tickPositionAtProjectSecond(projectSecond: ProjectSecond): ContinuousTickPosition
+  durationBetweenTicks(startTick: Tick, endTick: Tick): ProjectDurationSecond
+}
+
+function describeCause(cause: unknown): string {
+  return cause instanceof Error && cause.message.length > 0 ? cause.message : 'unknown failure'
+}
+
+function normalizeTempoEvents(input: readonly TempoEventRecord[]): readonly TempoEventRecord[] {
+  // Preserve the static element type because Array.isArray narrows readonly arrays to any[].
+  const tempoEventRecords: readonly TempoEventRecord[] = input
+
+  if (!Array.isArray(input)) {
+    throw new TempoMapError('invalid-tempo-event-list', 'TempoMap requires a Tempo Event array')
+  }
+
+  const tempoEvents = tempoEventRecords.map((tempoEvent, eventIndex) => {
+    try {
+      return createTempoEventRecord(tempoEvent)
+    } catch (cause) {
+      throw new TempoMapError(
+        'invalid-tempo-event',
+        `Tempo Event at input index ${eventIndex} is invalid: ${describeCause(cause)}`,
+      )
+    }
+  })
+  tempoEvents.sort((left, right) => {
+    if (left.tick !== right.tick) return left.tick - right.tick
+    if (left.id < right.id) return -1
+    if (left.id > right.id) return 1
+    return 0
+  })
+
+  const initialEventCount = tempoEvents.filter(({ tick }) => tick === 0).length
+  if (initialEventCount !== 1) {
+    throw new TempoMapError(
+      'invalid-initial-tempo-event-count',
+      `TempoMap requires exactly one Tempo Event at Tick 0, received ${initialEventCount}`,
+    )
+  }
+
+  for (let index = 1; index < tempoEvents.length; index += 1) {
+    const previous = tempoEvents[index - 1]
+    const current = tempoEvents[index]
+    if (previous !== undefined && current !== undefined && previous.tick === current.tick) {
+      throw new TempoMapError(
+        'duplicate-tempo-event-tick',
+        `Tempo Events ${previous.id} and ${current.id} share Tick ${current.tick}`,
+      )
+    }
+  }
+
+  return Object.freeze(tempoEvents)
+}
+
+function parseCalculatedProjectSecond(value: number, context: string): ProjectSecond {
+  try {
+    return parseProjectSecond(value)
+  } catch {
+    throw new TempoMapError(
+      'numeric-result-out-of-range',
+      `${context} produced an out-of-range ProjectSecond`,
+    )
+  }
+}
+
+function parseCalculatedTickPosition(value: number, context: string): ContinuousTickPosition {
+  try {
+    return parseContinuousTickPosition(value)
+  } catch {
+    throw new TempoMapError(
+      'numeric-result-out-of-range',
+      `${context} produced an out-of-range ContinuousTickPosition`,
+    )
+  }
+}
+
+function parseCalculatedDuration(value: number, context: string): ProjectDurationSecond {
+  try {
+    return parseProjectDurationSecond(value)
+  } catch {
+    throw new TempoMapError(
+      'numeric-result-out-of-range',
+      `${context} produced an out-of-range ProjectDurationSecond`,
+    )
+  }
+}
+
+function createTempoSegments(tempoEvents: readonly TempoEventRecord[]): readonly TempoSegment[] {
+  const segments: TempoSegment[] = []
+  let previousSegment: TempoSegment | null = null
+
+  for (const tempoEvent of tempoEvents) {
+    let startProjectSecond = parseProjectSecond(0)
+
+    if (previousSegment !== null) {
+      const elapsedTick = tempoEvent.tick - previousSegment.startTick
+      const calculatedStart =
+        previousSegment.startProjectSecond + elapsedTick * previousSegment.secondsPerTick
+      startProjectSecond = parseCalculatedProjectSecond(
+        calculatedStart,
+        `Tempo Segment at Tick ${tempoEvent.tick}`,
+      )
+
+      if (startProjectSecond <= previousSegment.startProjectSecond) {
+        throw new TempoMapError(
+          'numeric-result-out-of-range',
+          `Tempo Segment at Tick ${tempoEvent.tick} cannot be represented with increasing Project time`,
+        )
+      }
+    }
+
+    const segment = Object.freeze<TempoSegment>({
+      bpm: tempoEvent.bpm,
+      secondsPerTick: 60 / (tempoEvent.bpm * PROJECT_PPQ),
+      startProjectSecond,
+      startTick: tempoEvent.tick,
+    })
+    segments.push(segment)
+    previousSegment = segment
+  }
+
+  return Object.freeze(segments)
+}
+
+function findSegmentAtOrBefore(
+  segments: readonly TempoSegment[],
+  target: number,
+  positionOf: (segment: TempoSegment) => number,
+): LocatedTempoSegment {
+  const firstSegment = segments[0]
+  if (firstSegment === undefined) {
+    throw new TempoMapError(
+      'invalid-initial-tempo-event-count',
+      'TempoMap has no initial Tempo Segment',
+    )
+  }
+
+  let selectedSegment = firstSegment
+  let selectedIndex = 0
+  let lowerIndex = 1
+  let upperIndex = segments.length - 1
+
+  while (lowerIndex <= upperIndex) {
+    const candidateIndex = Math.floor((lowerIndex + upperIndex) / 2)
+    const candidate = segments[candidateIndex]
+    if (candidate === undefined) break
+
+    if (positionOf(candidate) <= target) {
+      selectedSegment = candidate
+      selectedIndex = candidateIndex
+      lowerIndex = candidateIndex + 1
+    } else {
+      upperIndex = candidateIndex - 1
+    }
+  }
+
+  return { index: selectedIndex, segment: selectedSegment }
+}
+
+/** Creates an immutable multi-segment TempoMap without retaining the caller's event array. */
+export function createTempoMap(input: readonly TempoEventRecord[]): TempoMap {
+  const tempoEvents = normalizeTempoEvents(input)
+  const segments = createTempoSegments(tempoEvents)
+
+  function projectSecondAtTick(tick: Tick): ProjectSecond {
+    const parsedTick = parseTick(tick)
+    const { segment } = findSegmentAtOrBefore(segments, parsedTick, ({ startTick }) => startTick)
+    const elapsedTick = parsedTick - segment.startTick
+    const calculatedSecond = segment.startProjectSecond + elapsedTick * segment.secondsPerTick
+    const projectSecond = parseCalculatedProjectSecond(calculatedSecond, `Tick ${parsedTick}`)
+
+    if (elapsedTick > 0 && projectSecond <= segment.startProjectSecond) {
+      throw new TempoMapError(
+        'numeric-result-out-of-range',
+        `Tick ${parsedTick} cannot be represented after its Tempo Segment boundary`,
+      )
+    }
+
+    return projectSecond
+  }
+
+  function tickPositionAtProjectSecond(projectSecond: ProjectSecond): ContinuousTickPosition {
+    const parsedProjectSecond = parseProjectSecond(projectSecond)
+    const { segment } = findSegmentAtOrBefore(
+      segments,
+      parsedProjectSecond,
+      ({ startProjectSecond }) => startProjectSecond,
+    )
+    const elapsedSecond = parsedProjectSecond - segment.startProjectSecond
+    const calculatedPosition = segment.startTick + elapsedSecond / segment.secondsPerTick
+    const tickPosition = parseCalculatedTickPosition(
+      calculatedPosition,
+      `ProjectSecond ${parsedProjectSecond}`,
+    )
+
+    if (elapsedSecond > 0 && tickPosition <= segment.startTick) {
+      throw new TempoMapError(
+        'numeric-result-out-of-range',
+        `ProjectSecond ${parsedProjectSecond} cannot be represented after its Tempo Segment boundary`,
+      )
+    }
+
+    return tickPosition
+  }
+
+  function durationBetweenTicks(startTick: Tick, endTick: Tick): ProjectDurationSecond {
+    const parsedStartTick = parseTick(startTick)
+    const parsedEndTick = parseTick(endTick)
+    if (parsedEndTick < parsedStartTick) {
+      throw new TempoMapError(
+        'reversed-tick-range',
+        `TempoMap Tick range ${parsedStartTick}...${parsedEndTick} is reversed`,
+      )
+    }
+
+    const located = findSegmentAtOrBefore(segments, parsedStartTick, ({ startTick }) => startTick)
+    let currentTick = parsedStartTick
+    let currentSegment = located.segment
+    let nextSegmentIndex = located.index + 1
+    let duration = 0
+
+    // Integrating relative segment durations avoids cancellation between large absolute seconds.
+    while (currentTick < parsedEndTick) {
+      const nextSegment = segments[nextSegmentIndex]
+      const segmentEndTick =
+        nextSegment === undefined || nextSegment.startTick > parsedEndTick
+          ? parsedEndTick
+          : nextSegment.startTick
+      const elapsedTick = segmentEndTick - currentTick
+      const calculatedDuration = duration + elapsedTick * currentSegment.secondsPerTick
+      const parsedDuration = parseCalculatedDuration(
+        calculatedDuration,
+        `Tick range ${parsedStartTick}...${segmentEndTick}`,
+      )
+
+      if (elapsedTick > 0 && parsedDuration <= duration) {
+        throw new TempoMapError(
+          'numeric-result-out-of-range',
+          `Tick range ${parsedStartTick}...${segmentEndTick} cannot be represented with increasing duration`,
+        )
+      }
+
+      duration = parsedDuration
+      currentTick = segmentEndTick
+      if (nextSegment !== undefined && currentTick < parsedEndTick) {
+        currentSegment = nextSegment
+        nextSegmentIndex += 1
+      }
+    }
+
+    return parseCalculatedDuration(duration, `Tick range ${parsedStartTick}...${parsedEndTick}`)
+  }
+
+  return Object.freeze({
+    durationBetweenTicks,
+    projectSecondAtTick,
+    tickPositionAtProjectSecond,
+  })
+}

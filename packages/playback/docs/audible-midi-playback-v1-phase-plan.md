@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 1B reviewed and complete; Batch 2A has not started
+> Status: Batch 2A reviewed and complete; Batch 2B has not started
 >
 > Date: 2026-08-10
 >
@@ -76,13 +76,19 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
 
 - V1 编译具体的 Track Playback Plan 与 MIDI Note Span，不建立通用 Effect Graph 或任意
   Device Graph；
-- V1 使用主线程原生 Web Audio 节点，不建立 AudioWorklet、SharedArrayBuffer 或跨线程
-  generation ACK；
+- V1 不建立 AudioWorklet、SharedArrayBuffer 或跨线程 generation ACK；Studio Grand 的当前
+  候选是主线程 Web Audio 原生节点，但仍须在 Gate C 听觉审阅，且不约束未来 FM / VA 引擎；
 - 播放中相关 Commit 首先采用 generation 失效、取消未来事件、`allNotesOff` 与完整 Snapshot
   重建，不在首版实现 Track / Range / Voice 级增量优化；
 - 两个编辑表面的 Playhead 作为独立可选批次，不阻塞首次可听闭环；
 - 内置采样的来源与分发权限、规范化 Manifest、首播加载预算和浏览器验收范围是进入 Audio
   Runtime 前的明确门槛。
+- 本阶段继续只实现 Studio Grand `MIDISampleSynth` 纵向切片；完整采集快照中的
+  `FMSynth` 与 `VASynth` 需要各自的 Device / Compiler / Runtime 产品切片，不能伪装成
+  Sample Instrument，也不在本阶段决定使用 Web Audio 原生节点、AudioWorklet 还是 WASM。
+- 本地完整 Soundbank 采集结果只作为只读设计证据；其中 Catalog、Indexes 与 Mapping 可以
+  驱动后续开发期规范化工具，但外部目录、远程 URL 和上游 schema 都不能成为生产运行时或
+  构建的隐式依赖。
 
 ### 1.4 尚待逐批确认的 Decision Gate
 
@@ -96,6 +102,11 @@ Command 形状按第 2 节确认。以下 Gate B / C 内容仍不得因为出现
 3. 自然结束后是否允许 Sample release tail 继续，以及 Transport 何时进入 Stopped；
 4. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
 5. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵。
+6. Sample 短于 Note 时是否自然结束，Sample 长于 Note 时采用何种 Note Off、包络和尾音策略；
+7. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
+   行为，哪些明确延期；
+8. Catalog / Indexes / Mapping 的哪些字段进入 Seele 自有 Manifest，以及如何记录来源、单位、
+   校验和和授权证据。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
@@ -204,6 +215,11 @@ secondsPerTick = 60 / (bpm * PROJECT_PPQ)
 换算过程使用有限 number，不提前把连续播放位置取整为 Project Tick。只有需要重新定位到
 Project Fact 边界时，调用者才采用显式舍入策略。无效、负数、NaN、Infinity 和溢出必须在
 Playback 边界失败关闭。
+
+Batch 2A 已按以上边界建立包内 `time/` 实现：输入数组与 Record 会先复制并重新验证；Segment
+累计起始秒只预计算一次，正向和反向查询使用二分查找；结果超出安全 number 范围或失去单调
+可表示性时抛出带稳定 code 的 Playback 错误。该实现尚无跨包消费者，因此不从 package root
+导出，也不提前加入 Snapshot、Time Signature、Transport、Scheduler 或 AudioContext。
 
 ### 3.3 Transport Mapping
 
@@ -435,6 +451,26 @@ Gate：
 仓库中的 `public/soundbanks` 是大型原始资源集合，包含成百上千个 ZIP 和多种格式。本阶段
 不扫描整个目录，也不把全部资源构建成运行时 Catalog。
 
+2026-08-11 对完整本地采集快照的只读核验记录了 439 个 Soundbank：289 个
+`MIDISampleSynth`、11 个 `FMSynth` 和 139 个 `VASynth`。三类数据不能共享同一种执行策略：
+
+- `MIDISampleSynth` 的 Mapping 描述 Sample Zone、pitch range、root pitch、可选 loop / tune /
+  attack / release 等语义，并配套实际 WAV / M4A 资源；
+- `FMSynth` 的 Mapping 是六算子 FM 合成参数，没有可直接播放的采样；
+- `VASynth` 的 Mapping 是 oscillator、filter、envelope、LFO、legato 与可选 metaparameter 等
+  合成参数，同样没有采样资源。
+
+因此当前 `seele.sample-instrument` 只覆盖 Studio Grand 仍然正确。FM / VA 后续必须先定义声音
+忠实度目标，再以独立纵向切片评估 Web Audio 平台能力、AudioWorklet 与 WASM 的实现边界；
+本阶段不能为了复用 Runtime 把合成器参数转换成假的 Sample Zone。
+
+采集快照中 `catalog/selected-soundbanks.json` 与 `catalog/soundbanks.raw.json` 提供发现、展示、
+engine 分类和 General MIDI 对应证据；`indexes/soundbank-map.json` 提供 slug 到 engine、目录、
+Catalog、Mapping、Archive 与 General MIDI 信息的反向索引，`indexes/by-general-midi-program.json`
+提供 Program 到候选及 canonical Soundbank 的映射。单个 Soundbank 的 Mapping 才提供上游播放
+语义证据。Batch 4A 应由开发期规范化工具组合这些信息，输出经过审阅的 Seele Manifest；
+外部采集目录、绝对路径、远程 URL 和原始上游 JSON 均不进入产品依赖。
+
 当前 `studio-grand` 目录的只读核验结果为：30 个已解压 WAV，均为 44.1 kHz、16-bit、
 stereo；目录连同 M4A ZIP 约 34 MB。ZIP 内的上游 JSON 含 BandLab 静态资源 URL，但仓库中
 未发现随资产保存的授权或可分发来源说明。因此，以下两项是进入 Audio Runtime 生产批次前
@@ -472,12 +508,18 @@ ZIP 选择、运行时解压、完整 Catalog 和缓存策略留到多音源产�
   unsupported-pitch diagnostic；不得擅自 Clamp 到钢琴边界；
 - 使用 Zone root pitch 与 `tuneCents` 计算 `playbackRate`；
 - 公式和正负方向在 Manifest contract test 中用已知 pitch vector 固定；
-- Velocity 首版候选映射为 `velocity / 127` 的 Voice Gain，再乘 Track 和 Master Gain；最终
-  曲线在 Audio Runtime Batch 的听觉审阅中确认；
+- 当前 Studio Grand Mapping 有 30 个 pitch Zone，但没有可证明多力度层切换的字段；Velocity
+  首版候选映射为 `velocity / 127` 的 Voice Gain，再乘 Track 和 Master Gain，这只能改变音量，
+  不能宣称真实还原钢琴随击键力度变化的音色，最终曲线和产品表述在 Gate C 听觉审阅中确认；
 - Pan 使用 Track `[-1, 1]` 的稳定事实；
-- Sample 自然衰减时不为延长 Note 而循环无 loop metadata 的音频；
-- Span End 使用 Manifest `releaseSeconds` 创建短 Gain Ramp，随后停止并释放 source；
-- Clip 边界 Note Off 同样允许 release tail，但不得继续持有逻辑 Active Note；
+- Sample 短于 Note 时不得在没有 loop metadata 的情况下自行循环；是接受自然结束、选择其他
+  Zone / 资产，还是在未来引入共鸣或物理模型，必须由 Gate C 结合真实音频决定；
+- Sample 长于 Note 时，Span End 的 Gain Ramp 曲线、持续时间、是否模拟制音器以及可保留的
+  release tail 都是 Gate C 候选，不把上游 `release` 字段未经验证直接当成最终物理钢琴模型；
+- Clip 边界同样结束逻辑 Active Note；听觉尾音可以按 Gate C 结果继续，但不能延长 Project
+  Note Fact 或阻止 Voice Token 最终释放；
+- Sustain、弦共鸣、踏板噪声、半踏板、release sample、多力度采样与更完整的物理建模不因
+  “Studio Grand”名称被默认承诺；Gate C 必须明确 V1 最小听觉目标及延期项；
 - 同 Pitch 重叠 Note 必须拥有独立 `AudioBufferSourceNode` 和 Voice Token。
 
 ### 6.3 加载与缓存
@@ -505,7 +547,8 @@ ZIP 选择、运行时解压、完整 Catalog 和缓存策略留到多音源产�
   但恢复时不得补发所有过期事件；
 - 项目关闭、Runtime 替换和应用 dispose 前执行 `allNotesOff`；
 - 所有 source、gain、panner、timer 和 listener 必须可计数并最终归零；
-- V1 使用主线程 Web Audio 原生节点，不提前引入 AudioWorklet 或 SharedArrayBuffer。
+- Studio Grand V1 候选使用主线程 Web Audio 原生节点，不提前引入 AudioWorklet 或
+  SharedArrayBuffer；该选择不替未来 FM / VA Synth 决定 Web Audio 与 WASM 架构。
 
 ## 7. Studio 状态与 UI 组合
 
@@ -616,7 +659,8 @@ apps/studio composition root
 
 约束：
 
-- `@seele-daw/playback` 只依赖 Project Core，不依赖 Editor、Vue、Browser 或 Audio Web；
+- `@seele-daw/playback` 只依赖 Project Core 和 compile-time 类型代数，不依赖 Editor、Vue、
+  Browser 或 Audio Web；
 - `@seele-daw/audio-web` 只消费 Playback 的公开计划，不 import Project Core 内部模型；
 - Studio 不把 Project Snapshot 直接交给 Audio Web；
 - Soundbank URL、Fetch 和 AudioContext 类型不能泄漏进 Playback 公共契约；
@@ -649,7 +693,8 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 
 - Gate A（2026-08-11 已关闭）：确认 Studio Grand Device Definition 与 Replace Command 形状；
 - Gate B：确认 Transport、Project End、release tail、unsupported content 与零 Note Span 行为；
-- Gate C：确认采样来源 / 分发权限、Manifest、加载预算和浏览器验收矩阵。
+- Gate C：确认采样来源 / 分发权限、Manifest、Note / Sample 长度与 release / 钢琴真实性边界、
+  加载预算和浏览器验收矩阵。
 
 ### Batch 1A：Project Core Instrument Device Replace
 
@@ -680,9 +725,13 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 
 ### Batch 2A：Playback TempoMap
 
+> Implementation status: reviewed and complete. Playback type-check and 2 test files /
+> 20 tests pass; repository `pnpm lint` and `pnpm check` pass.
+
 - Project Second 等强类型值；
 - 多 Tempo Segment Tick ↔ Second；
 - 不接 AudioContext，不接 Studio；
+- 仅作为包内能力供后续真实消费者使用，不提前扩大 package root API；
 - 更新 Playback README 后停止审阅。
 
 ### Batch 2B：具体 MIDI Plan Compiler
@@ -712,8 +761,11 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 ### Batch 4A：资产与 Manifest Gate
 
 - Gate C 的资产来源与可分发权限得到书面记录，否则本批停止；
-- 规范化 Manifest 与校验；
+- 以 Catalog / Indexes 反向定位资源与 General MIDI 语义，以 Mapping 提取播放字段，经开发期
+  工具生成并校验 Seele 自有 Manifest；外部采集目录不进入运行时；
 - 明确 21–108 裁剪、字段单位、文件列表与 checksum policy；
+- 用真实 Studio Grand 资产听觉审阅 Sample 短于 / 长于 Note、Note Off、release tail、
+  velocity 表现与 V1 钢琴真实性边界；
 - 测量全量 / 初始窗口加载量、解码后内存和失败恢复，确认加载策略；
 - 不实现完整 Catalog，完成后停止审阅。
 
@@ -721,7 +773,7 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 
 - AudioContext lifecycle；
 - WAV fetch / decode、Promise 去重与可重试缓存；
-- Sample Zone、Pitch、Velocity、Gain、Pan、Release；
+- 按 Gate C 结果实现 Sample Zone、Pitch、Velocity、Gain、Pan、Note Off 与 Release；
 - Voice Token、cancel、allNotesOff 与资源统计；
 - Fake Web Audio contract tests；
 - 不接 Workbench UI，完成后停止审阅。
@@ -813,7 +865,9 @@ Gate A 已随 Batch 1A 关闭；开始后续对应生产批次前仍需按顺序
 
 - 完整 Soundbank Catalog、搜索、分类、收藏和最近使用；
 - 运行时 ZIP 扫描 / 解压、M4A / WAV 自动协商或全量 2.2 GB 资源索引；
-- JSON Synth、Basic Synth、Sampler 编辑器或第三方 Plugin；
+- 通用 MIDISampleSynth Runtime、Sampler 编辑器或第三方 Plugin；
+- FMSynth / VASynth 引擎及其 Web Audio、AudioWorklet 或 WASM 技术选择；
+- 完整物理钢琴模型、多力度 Sample、制音器 / 弦共鸣、release sample 与踏板行为；
 - 通用 Effect Graph、Graph Reconciler、RuntimeDelta 与跨线程 generation ACK；
 - AudioWorklet、SharedArrayBuffer、WASM DSP；
 - Transport Loop、Looped Clip、Metronome、Count-in、Record、Punch；

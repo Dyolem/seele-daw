@@ -4,9 +4,8 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 1B 已实现浏览器无关的 Studio Grand Device Definition；尚未实现
-> TempoMap、Transport、Compiler、Scheduler 或任何音频运行时。长期架构中的名称
-> `playback-core` 对应当前包。
+> 当前状态：Batch 2A 已审阅完成浏览器无关的内部 TempoMap；尚未实现 Transport、
+> Compiler、Scheduler 或任何音频运行时。长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
 [Audible MIDI Playback V1 第六阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
@@ -31,6 +30,22 @@ Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect
 - Definition、factory 和 decoder 均不依赖 Vue、DOM、Web Audio、Soundbank URL 或浏览器资源。
 
 这一实现只定义 Project Instrument Fact 的播放侧身份，不代表 Studio Grand 已经能加载或发声。
+
+Batch 2A 还在包内建立了 `time/` 边界：
+
+- `ProjectSecond`、`ProjectDurationSecond` 与 `ContinuousTickPosition` 保持不同时间含义，不把
+  连续播放位置提前取整成 Project Tick；
+- `createTempoMap(tempoEvents)` 复制并规范化 Project Core 的 Tempo Event，要求恰好一枚
+  Tick `0` 事件并拒绝重复 Tick；
+- Tempo Event 从自身 Tick 起生效，最后一段 Tempo 无限延续；
+- 多段 Tick → ProjectSecond、ProjectSecond → 连续 Tick 与 Tick 区间时长使用预计算边界和
+  二分查找；
+- 非有限值、负数、反向区间、超出安全数值范围及无法保持单调性的结果失败关闭；
+- TempoMap 不保留调用方数组或 Record，也不依赖 Snapshot、Time Signature、Transport、
+  AudioContext 或浏览器。
+
+这组时间能力目前只供包内后续 Compiler / Transport 真实消费者使用，尚未从 package root
+导出。公开 API 继续只有 Studio Grand Device 边界，避免在消费者出现前冻结时间契约。
 
 ## 长期包定位
 
@@ -88,7 +103,8 @@ src/
 
 ## 依赖边界
 
-- 只依赖 [`@seele-daw/project-core`](../project-core/README.md) 的模型快照、增量和稳定类型。
+- 只依赖 [`@seele-daw/project-core`](../project-core/README.md) 的模型快照、增量和稳定类型；
+  `@seele-daw/type-utils` 只提供共享的 compile-time `Brand` 类型代数。
 - 禁止依赖 Vue、Pinia、DOM、Canvas、IndexedDB 或 OPFS。
 - 禁止创建或暴露具体 AudioContext、AudioNode、AudioParam 实例。
 - 禁止依赖 `editor`、`audio-web`、`platform-browser` 或 `apps/studio`。
@@ -97,7 +113,8 @@ src/
 ## 长期演进顺序
 
 1. 已建立内置 Studio Grand Device Definition、Descriptor factory 与严格 decoder。
-2. 实现固定 PPQ 的 TempoMap 与 Tick/second 转换，再按 Gate B 实现 Transport。
+2. 已建立固定 PPQ 的内部 TempoMap 与 Tick/second 转换；按阶段计划先由具体 MIDI Compiler
+   消费，再按 Gate B 实现 Transport。
 3. 编译 MIDI Note 事件，并建立确定性的 EventKey。
 4. 实现规划层 look-ahead scheduler 和 generation 失效。
 5. 支持播放中移动/删除 Note、Seek、Loop 和 Tempo change。

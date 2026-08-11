@@ -175,6 +175,9 @@ importers:
       '@seele-daw/project-core':
         specifier: workspace:*
         version: link:../project-core
+      '@seele-daw/type-utils':
+        specifier: workspace:*
+        version: link:../type-utils
 
   packages/project-core:
     dependencies:

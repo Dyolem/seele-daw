@@ -46,21 +46,21 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 
 ### 2.1 功能总览
 
-| 编号                  | 功能                      | 状态         | 当前边界                                                                                             |
-| --------------------- | ------------------------- | ------------ | ---------------------------------------------------------------------------------------------------- |
-| `PROJECT-ENTRY`       | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                 |
-| `PROJECT-LIFECYCLE`   | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                      |
-| `PROJECT-NAVIGATION`  | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                             |
-| `WORKBENCH-SHELL`     | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                       |
-| `PROJECT-HISTORY`     | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、空 MIDI Clip 与 MIDI Note 创建 / 移动 / 缩放 / 删除。                     |
-| `TRACK-CREATE`        | 创建 Instrument Track     | **用户可用** | 只创建空的 Instrument Slot Track。                                                                   |
-| `TRACK-SELECTION`     | Track 选择                | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。                                             |
-| `MIDI-CLIP-CREATE`    | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                             |
-| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock         | **局部可用** | 可调整布局并显示所选 Clip 的 Piano Roll Selection Surface。                                          |
-| `UI-FOUNDATION`       | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                      |
-| `KEYBOARD-SHORTCUTS`  | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 与 Piano Roll Escape / Delete / Backspace 已接入。                      |
-| `MIDI-NOTE-CORE`      | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                      |
-| `PLAYBACK`            | 播放与 Transport 执行     | **尚未实现** | 控件仅展示且明确禁用。                                                                               |
+| 编号                  | 功能                      | 状态         | 当前边界                                                                                                                     |
+| --------------------- | ------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `PROJECT-ENTRY`       | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                                         |
+| `PROJECT-LIFECYCLE`   | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                              |
+| `PROJECT-NAVIGATION`  | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                                     |
+| `WORKBENCH-SHELL`     | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                               |
+| `PROJECT-HISTORY`     | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、空 MIDI Clip 与 MIDI Note 创建 / 移动 / 缩放 / 删除。                                             |
+| `TRACK-CREATE`        | 创建 Instrument Track     | **用户可用** | 只创建空的 Instrument Slot Track。                                                                                           |
+| `TRACK-SELECTION`     | Track 选择                | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。                                                                     |
+| `MIDI-CLIP-CREATE`    | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                                     |
+| `CONTEXT-EDITOR-DOCK` | 上下文编辑器 Dock         | **局部可用** | 可调整布局并显示所选 Clip 的 Piano Roll Selection Surface。                                                                  |
+| `UI-FOUNDATION`       | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                              |
+| `KEYBOARD-SHORTCUTS`  | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 与 Piano Roll Escape / Delete / Backspace 已接入。                                              |
+| `MIDI-NOTE-CORE`      | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                              |
+| `PLAYBACK`            | 播放与 Transport 执行     | **尚未实现** | 控件仅展示且明确禁用。                                                                                                       |
 | `PIANO-ROLL`          | 钢琴卷帘编辑器            | **局部可用** | Grid / Note Renderer、Pencil Add、Cursor Selection / Move、Cursor / Pencil Resize、多选 Delete、Snap 与 Undo / Redo 已接入。 |
 
 ## 3. 项目入口与生命周期
@@ -204,8 +204,8 @@ Workbench 已建立真实项目状态驱动的布局：
 - 执行 Command 后可以 Undo；Undo 后可以 Redo。
 - 执行新的分叉 Command 会使旧 Redo 分支失效。
 - History 是 Session 本地状态，不保存到 Snapshot、Project File、Checkpoint 或 IndexedDB。
-- 当前 Studio 中可直接产生的历史操作包括 Instrument Track、空 MIDI Clip、Pencil Add
-  MIDI Note 与原子删除完整 Note Selection。
+- 当前 Studio 中可直接产生的历史操作包括 Instrument Track、空 MIDI Clip，以及 MIDI Note
+  Add、Selection Move、单 Note Resize 与原子删除完整 Note Selection。
 - Workbench 可使用 `Mod+Z` Undo、`Mod+Shift+Z` Redo；Windows 兼容 `Control+Y`。
 
 ### 5.3 `CONTEXT-EDITOR-DOCK` 编辑器 Dock
@@ -229,8 +229,9 @@ Dock 当前根据上下文显示：
 - 已选择 MIDI Clip 时的 Clip 摘要与可选择 Piano Roll。
 
 Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与基础 Selection，可
-使用 Pencil 创建 Note、用 Cursor 拖动 Selection，并用 `Delete` / `Backspace` 删除
-Selection；尚没有缩放、滚动、Resize 或 Velocity 编辑手势。
+使用 Pencil 创建 Note、用 Cursor 拖动 Selection、用 Cursor / Pencil 调整单 Note 左右边缘，
+并用 `Delete` / `Backspace` 删除 Selection；尚没有缩放、滚动、Box Selection 或 Velocity
+编辑手势。
 
 ### 5.4 `KEYBOARD-SHORTCUTS` Scoped Keyboard Shortcuts
 
@@ -549,15 +550,15 @@ Project Core 已具备：
 
 ### 8.4 Package 状态
 
-| Package                       | 当前能力                                                                                                                                                                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@seele-daw/project-core`     | 项目模型、含单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                         |
-| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                 |
-| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection Move / Cursor / Pencil Resize / 多选 Delete / Snap。 |
+| Package                       | 当前能力                                                                                                                                                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@seele-daw/project-core`     | 项目模型、含单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                                                       |
+| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                               |
+| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Add Track、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection Move / Cursor / Pencil Resize / 多选 Delete / Snap。          |
 | `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。 |
-| `@seele-daw/playback`         | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。                                                                                                                                                   |
-| `@seele-daw/audio-web`        | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。                                                                                                                                                    |
-| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                          |
+| `@seele-daw/playback`         | 只有包边界与入口骨架，未提供 Transport Runtime、Compiler 或 Scheduler。                                                                                                                                                                                 |
+| `@seele-daw/audio-web`        | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。                                                                                                                                                                                  |
+| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                        |
 
 ## 9. 明确尚未提供的产品能力
 
@@ -667,8 +668,8 @@ Project Core 已具备：
 | 2026-07-29 | `PIANO-ROLL`                                               | Note Move Snap 统一改为由绝对目标时间解析当前 Grid Coordinate；Off-grid Note 不再保留旧 Resolution 或自由移动偏移。                                              | `494b9de`                       |
 | 2026-08-10 | `PIANO-ROLL`                                               | 引入框架无关 Pointer Interaction Session，统一 Click / Add / Move 状态生命周期、动态 Alt、Window blur、显式取消与权威 revision 交接。                            | `94c3b54`                       |
 | 2026-08-10 | `MIDI-NOTE-CORE`                                           | Batch 3A 建立单 Note `ResizeNoteCommand`、最终几何验证、No-change、Note Update Delta 与 Undo / Redo；尚未接入 Studio。                                           | `0564669`                       |
-| 2026-08-10 | `PIANO-ROLL`                                               | Batch 3B 建立 Cursor / Pencil 单 Note Resize Gesture、左右 Edge 几何、Absolute Grid Snap、Source 边界、Preview、Intent 与 Interaction Session 分支。            | `aac0b20`                       |
-| 2026-08-10 | `MIDI-NOTE-CORE`、`PIANO-ROLL`                             | Batch 3C 接入 DOM 左右 Edge Hit、Resize Scene / Guide、Studio 单次 Command、Selection、Toast、权威 revision 交接与 Undo。                                      | `b7772b1`                       |
+| 2026-08-10 | `PIANO-ROLL`                                               | Batch 3B 建立 Cursor / Pencil 单 Note Resize Gesture、左右 Edge 几何、Absolute Grid Snap、Source 边界、Preview、Intent 与 Interaction Session 分支。             | `aac0b20`                       |
+| 2026-08-10 | `MIDI-NOTE-CORE`、`PIANO-ROLL`                             | Batch 3C 接入 DOM 左右 Edge Hit、Resize Scene / Guide、Studio 单次 Command、Selection、Toast、权威 revision 交接与 Undo。                                        | `b7772b1`                       |
 
 ## 13. 当前验证基线
 

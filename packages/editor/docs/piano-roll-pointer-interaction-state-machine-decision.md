@@ -6,10 +6,10 @@
 
 ## 背景
 
-Piano Roll 的 Pointer 交互已经不再只是一次 Click。一次 Note Move 同时涉及命中结果、
-Drag Threshold、Pointer Capture、Selection、Snap、动态修饰键、Preview、取消、Project
-Command，以及等待权威 Read Model 跟上 Commit revision。后续 Resize、框选、擦除、
-Velocity 和控制器曲线也会复用相同生命周期。
+Piano Roll 的 Pointer 交互已经不再只是一次 Click。Note Move 与单 Note Resize 同时涉及命中
+结果、Drag Threshold、Pointer Capture、Selection、Snap、动态修饰键、Preview、取消、
+Project Command，以及等待权威 Read Model 跟上 Commit revision。后续框选、擦除、Velocity
+和控制器曲线也可以复用相同生命周期。
 
 如果这些状态只由 Vue 组件中的多个布尔值和分散事件分支表达，容易产生非法组合，例如已经
 取消却仍在提交、Pointer Up 重复提交、失焦后残留 Preview，或 Commit 已成功但旧权威画面
@@ -56,8 +56,8 @@ committingNoteResize
 ```
 
 这不是一个覆盖整个 DAW 的万能状态机。共享 Session 只统一 Pointer 生命周期、取消、一次
-提交和权威交接；具体产品算法仍由独立、纯逻辑的 Gesture / Resolver 负责。Resize、框选等
-行为只有在自身状态复杂度真实增长时才增加独立 machine 或 actor，不能预建空状态层级。
+提交和权威交接；具体产品算法仍由独立、纯逻辑的 Gesture / Resolver 负责。框选等后续行为
+只有在自身状态复杂度真实增长时才增加独立 machine 或 actor，不能预建空状态层级。
 
 生产源码按责任分层，而不是继续与 Piano Roll Model 平铺：
 

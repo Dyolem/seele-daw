@@ -3,7 +3,8 @@
 > 技术基线：Vue 3 + TypeScript + Vite + Web Audio API + pnpm Workspace  
 > 产品定位：桌面浏览器优先、面向个人创作者的轻量 Web DAW  
 > 文档作用：回答系统如何拆分、模块如何依赖，以及从哪里开始开发  
-> 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3
+> 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3\
+> 最近校准：2026-08-10
 
 ---
 
@@ -17,6 +18,18 @@
 
 它不提前设计 AudioClip、Automation、Recording、Asset GC 等具体算法。开发到相应模块时，再单独补充设计文档和 ADR。
 
+### 0.1 当前实现校准
+
+本文描述长期稳定边界，不是“所有方框均已实现”的状态清单。当前真实能力以
+[产品功能手册](../../PRODUCT.md)为准；当前 Playback 工作以
+[Audible MIDI Playback V1 第六阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)
+为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
+架构文档的版本号。
+
+截至 2026-08-10，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
+多选 Delete 已形成闭环；Playback 与 Web Audio 生产实现尚未开始。长期架构中的通用
+Graph、RuntimeDelta、跨线程 ACK 和 AudioWorklet 路径都不能反推为该首版切片的必做范围。
+
 ---
 
 # 一、核心架构思想
@@ -29,14 +42,14 @@ Vue、Canvas、AudioNode、Selection、播放头和波形缓存都不是项目�
 
 ## 2. 所有修改通过命令提交
 
-~~~text
+```text
 用户输入
 -> Workbench Command
 -> Editor 解析当前上下文
 -> Project Command
 -> Project Kernel 原子提交
 -> Project Model 更新
-~~~
+```
 
 UI 组件不直接修改项目。Undo、Autosave、播放同步都以一次 Project Commit 为边界。
 
@@ -44,11 +57,11 @@ Workbench Command 是菜单、按钮和快捷键使用的命令 ID；它的 hand
 
 ## 3. 编辑与播放是项目的两个消费者
 
-~~~text
+```text
 Project Model
 ├── Editor Read Model -> Vue / Canvas
 └── Playback Compiler -> Audio Runtime
-~~~
+```
 
 编辑器关注“用户如何查看和修改项目”；音频系统关注“项目如何变成声音”。二者不能互相依赖。
 
@@ -64,7 +77,7 @@ Workbench 只提供编辑应用的公共框架，不直接包含 Piano Roll、Ar
 
 每个功能模块通过注册表贡献：
 
-~~~text
+```text
 Command
 Keybinding
 Tool
@@ -72,7 +85,7 @@ Surface / Panel
 Menu
 Device
 Importer / Exporter
-~~~
+```
 
 这样新增功能主要是增加一个 Contribution，而不是不断修改应用核心。
 
@@ -80,13 +93,13 @@ Importer / Exporter
 
 第一阶段只完成：
 
-~~~text
+```text
 Note 数据
 -> Piano Roll 编辑
 -> Undo
 -> 播放
 -> 保存与恢复
-~~~
+```
 
 这条链路跑通后，再扩展 Audio Clip、Mixer、Automation 和 Recording。
 
@@ -96,16 +109,16 @@ Note 数据
 
 VS Code 采用分层核心、服务注入、Contribution 和独立 Extension Host；Monaco 将编辑器分成 Model、ViewModel 和 View。我们借鉴这些思想，但不照搬其规模和目录。
 
-| VS Code / Monaco 思想 | Web DAW 对应设计 |
-| --- | --- |
+| VS Code / Monaco 思想                | Web DAW 对应设计                                   |
+| ------------------------------------ | -------------------------------------------------- |
 | base → platform → editor → workbench | project / platform → editor / playback → workbench |
-| Workbench Core 不直接依赖各个功能 | Studio Core 不直接实现 Piano Roll、Mixer 等功能 |
-| Feature Contribution | DAW Feature Contribution |
-| Constructor Service Injection | 服务接口 + Composition Root 手动注入 |
-| Model—ViewModel—View | Project Model—Editor Read Model—Vue / Canvas |
-| Extension Host 隔离不可信或重型能力 | Worker / AudioWorklet 隔离耗时与实时任务 |
-| common / browser 运行环境分离 | editor/common 与 editor/browser 分离 |
-| 自动检查层级依赖 | CI 检查包依赖和禁止 import |
+| Workbench Core 不直接依赖各个功能    | Studio Core 不直接实现 Piano Roll、Mixer 等功能    |
+| Feature Contribution                 | DAW Feature Contribution                           |
+| Constructor Service Injection        | 服务接口 + Composition Root 手动注入               |
+| Model—ViewModel—View                 | Project Model—Editor Read Model—Vue / Canvas       |
+| Extension Host 隔离不可信或重型能力  | Worker / AudioWorklet 隔离耗时与实时任务           |
+| common / browser 运行环境分离        | editor/common 与 editor/browser 分离               |
+| 自动检查层级依赖                     | CI 检查包依赖和禁止 import                         |
 
 特别值得保留的原则：
 
@@ -128,21 +141,27 @@ VS Code 官方源码组织说明：
 
 ## 7. 顶层架构
 
-~~~mermaid
+```mermaid
 flowchart TD
-  WB["Studio Workbench"] --> ED["Editor System"]
+  WB["Studio Composition Root / Workbench"] --> ED["Editor System"]
   WB --> PK["Project Kernel"]
+  WB --> PB["Playback Core"]
+  WB --> AR["Web Audio Runtime"]
+  WB --> PF["Platform Services"]
   ED --> PK
-  PK --> PB["Playback Core"]
-  PB --> AR["Web Audio Runtime"]
-  PK --> PF["Platform Services"]
-~~~
+  PK -- "Snapshot / Delta" --> PB
+  PB -- "Playback Plan" --> AR
+```
+
+图中的 `Project Kernel -> Playback Core` 表示由 Studio 组合根转交 Snapshot / Delta 的数据
+流，不表示 Project Core package 依赖 Playback。源码依赖方向相反：Playback 只依赖 Project
+Core 的公开事实契约。
 
 ### Studio Workbench
 
 应用外壳与功能宿主：
 
-~~~text
+```text
 布局与面板
 Command / Keybinding
 Context Keys
@@ -150,26 +169,26 @@ Context Keys
 Feature Registry
 Service Lifecycle
 Vue 组件装配
-~~~
+```
 
 ### Project Kernel
 
 创作数据和编辑事务中心：
 
-~~~text
+```text
 Project Model
 Project Command
 Transaction
 Undo / Redo
 Query
 Project Commit
-~~~
+```
 
 ### Editor System
 
 把输入转换为可提交编辑：
 
-~~~text
+```text
 Selection
 Tool
 Interaction State Machine
@@ -177,38 +196,41 @@ Snap
 Coordinate Transform
 Read Model
 Canvas Renderer
-~~~
+```
 
 ### Playback Core
 
 把项目编译成与浏览器实现无关的播放计划：
 
-~~~text
+```text
 Transport
 Timeline Query
 Playback Compiler
 Scheduler Plan
-Graph Plan
-~~~
+长期 Graph Plan
+```
+
+第一版可听切片只需要具体的 Track Playback Plan 与 MIDI Note Span，不先建立通用 Effect /
+Device Graph。
 
 ### Web Audio Runtime
 
 执行 Playback Core 生成的计划：
 
-~~~text
+```text
 AudioContext
 Web Audio Graph
 Look-ahead Execution
 AudioWorklet
 Voice Lifecycle
 Realtime / Offline Backend
-~~~
+```
 
 ### Platform Services
 
 封装浏览器能力：
 
-~~~text
+```text
 IndexedDB / OPFS
 Asset Storage
 File Import / Export
@@ -216,7 +238,7 @@ Worker
 Permissions
 Audio / MIDI Devices
 Runtime Capabilities
-~~~
+```
 
 ---
 
@@ -224,12 +246,12 @@ Runtime Capabilities
 
 ## 8. 四类状态
 
-| 状态 | 所有者 | 示例 |
-| --- | --- | --- |
-| 项目状态 | Project Kernel | Track、Clip、Note、Tempo |
-| 编辑会话状态 | Editor System | Selection、Tool、Drag Preview、Zoom |
-| 音频运行状态 | Audio Runtime | AudioNode、Voice、Meter、Transport Clock |
-| 应用状态 | Workbench | Panel、Dialog、Theme、Shortcut Context |
+| 状态         | 所有者                   | 示例                                   |
+| ------------ | ------------------------ | -------------------------------------- |
+| 项目状态     | Project Kernel           | Track、Clip、Note、Tempo               |
+| 编辑会话状态 | Editor System            | Selection、Tool、Drag Preview、Zoom    |
+| 播放运行状态 | Playback / Audio Runtime | Transport、Playhead、AudioNode、Voice  |
+| 应用状态     | Workbench                | Panel、Dialog、Theme、Shortcut Context |
 
 规则：
 
@@ -239,20 +261,27 @@ Runtime Capabilities
 - Vue / Pinia 主要保存 Workbench 与轻量 Editor 状态；
 - 大型 Project Model 不进入 Vue 深响应式。
 
+当前项目生命周期权威是 Studio 的 `ActiveProjectService`。ProjectSession 只拥有 Project
+Core 的模型、Command、History、Query 与订阅，不拥有 IndexedDB、AudioContext、Transport、
+Playback Runtime 或待完成的异步 resolver；Pinia 也不接管这些对象。
+
 ## 9. 一次编辑的完整流向
 
-~~~mermaid
+```mermaid
 flowchart TD
   IN["Pointer / Keyboard"] --> CMD["Command Service"]
   CMD --> TOOL["Editor Tool"]
   TOOL --> TX["Project Command"]
   TX --> COMMIT["Project Commit"]
-  COMMIT --> VIEW["Read Model"]
-  COMMIT --> PLAY["Playback Compiler"]
-  COMMIT --> SAVE["Persistence"]
-~~~
+  COMMIT --> PUB["Project Subscription"]
+  PUB --> VIEW["Read Model"]
+  PUB --> PLAY["Playback Compiler"]
+  PUB --> SAVE["Persistence"]
+```
 
-这条流向是整个系统最重要的主干。任何功能都应能说明自己位于其中的哪一段。
+这条流向是整个系统最重要的主干。Project Core 只发布合法 Commit；Studio 的应用层订阅者
+分别驱动 Read Model、Playback 与 Persistence。后两者失败不能回滚已经合法的 Project
+Commit。任何功能都应能说明自己位于其中的哪一段。
 
 ---
 
@@ -262,7 +291,7 @@ flowchart TD
 
 Workbench Core 应保持很小，只提供通用机制：
 
-~~~text
+```text
 CommandService
 KeybindingService
 ContextKeyService
@@ -271,29 +300,29 @@ SurfaceRegistry
 ToolRegistry
 ServiceCollection
 LifecycleService
-~~~
+```
 
 这些机制先用简单的 Map、接口和构造函数实现，不为它们设计复杂框架或 DSL。
 
 它不知道“钢琴卷帘如何移动 Note”，只知道：
 
-~~~text
+```text
 存在一个 Piano Roll Surface
 存在若干相关 Commands
 这些 Commands 在什么 Context 下可用
-~~~
+```
 
 ## 11. Context Keys
 
 借鉴 VS Code 的 when clause 思想，用上下文决定命令、菜单和快捷键是否可用：
 
-~~~text
+```text
 activeSurface == pianoRoll
 editorFocus == true
 selectionKind == note
 transportState == stopped
 canUndo == true
-~~~
+```
 
 Context Keys 只决定功能可用性，不保存领域数据。
 
@@ -301,23 +330,23 @@ Context Keys 只决定功能可用性，不保存领域数据。
 
 功能模块提供单一注册入口：
 
-~~~text
+```text
 piano-roll/
 ├── piano-roll.contribution.ts
 ├── common/
 ├── browser/
 └── tests/
-~~~
+```
 
 piano-roll.contribution.ts 负责注册：
 
-~~~text
+```text
 Piano Roll Surface
 Draw / Move / Resize / Delete Note Commands
 快捷键
 工具栏动作
 Inspector
-~~~
+```
 
 未来 Arrangement、Mixer、Device Rack 都采用相同结构。
 
@@ -331,7 +360,7 @@ Inspector
 
 跨模块能力通过接口表达：
 
-~~~text
+```text
 ProjectService
 CommandService
 HistoryService
@@ -339,7 +368,7 @@ PlaybackService
 StorageService
 AssetService
 CapabilityService
-~~~
+```
 
 采用构造函数注入或显式工厂注入。暂不需要复杂 IoC 框架。
 
@@ -357,14 +386,14 @@ CapabilityService
 
 拥有外部资源的对象统一实现 Dispose：
 
-~~~text
+```text
 Event Listener
 Worker
 AudioNode / MessagePort
 Timer
 Subscription
 Canvas Observer
-~~~
+```
 
 项目切换、面板关闭和应用退出都通过 LifecycleService 释放资源。
 
@@ -374,7 +403,7 @@ Canvas Observer
 
 ## 15. 初始目录
 
-~~~text
+```text
 web-daw/
 ├── apps/
 │   └── studio/
@@ -395,13 +424,13 @@ web-daw/
 ├── tooling/
 └── docs/
     └── adr/
-~~~
+```
 
 初期业务边界保持这五个 package，另设一个不产生运行时代码的 `type-utils` 基础叶子包。Asset、Persistence、Renderer 等先作为所属 package 的内部模块，边界稳定后再拆。
 
 ## 16. 依赖规则
 
-~~~text
+```text
 type-utils
   只提供纯编译期、跨领域的 TypeScript 类型工具
   不依赖任何业务 package
@@ -428,7 +457,7 @@ platform-browser
 studio
   可以依赖所有模块
   是唯一 Composition Root
-~~~
+```
 
 所有业务 package 都可以按需直接依赖 `type-utils`，但类型工具不得引用任何业务领域或演变为运行时 `shared` / `utils` 收容包。
 
@@ -442,23 +471,27 @@ studio
 
 ---
 
-# 八、第一阶段如何开工
+# 八、第一条纵向切片与当前进度
 
 ## 17. 唯一目标
 
 先完成一条最小 MIDI 纵向切片：
 
-~~~text
+```text
 创建 Instrument Track
 -> Piano Roll 绘制 Note
--> 移动 / 删除
+-> 移动 / 单 Note Resize / 删除
 -> Undo / Redo
 -> 简单乐器播放
 -> 保存
 -> 刷新后恢复
-~~~
+```
 
 ## 18. 开发顺序
+
+以下顺序是依赖基线，不再代表当前完成度。截至 2026-08-10，骨架、Project Kernel、
+Workbench、Piano Roll 与 Persistence 已完成当前纵向切片；下一项是经过独立阶段计划与逐批
+审阅的 Playback。不能因为下文历史编号把已经交付的 Persistence 当成 Playback 之后才开始。
 
 ### 第一步：搭骨架
 
@@ -470,7 +503,7 @@ studio
 
 只定义：
 
-~~~text
+```text
 Project
 Track
 MidiClip
@@ -479,8 +512,9 @@ ProjectSession
 AddNoteCommand
 MoveNotesCommand
 RemoveNotesCommand
+ResizeNoteCommand
 Undo / Redo
-~~~
+```
 
 先让这些逻辑完全脱离 Vue 和 Web Audio 通过测试。
 
@@ -488,13 +522,13 @@ Undo / Redo
 
 实现：
 
-~~~text
+```text
 ServiceCollection
 CommandService
 ContextKeyService
 Contribution Registry
 Vue App Shell
-~~~
+```
 
 只需支持一个主编辑区域，不先做复杂可拖拽布局。
 
@@ -504,25 +538,26 @@ Vue App Shell
 
 建立：
 
-~~~text
+```text
 Project Model
 -> PianoRoll Read Model
 -> Canvas Renderer
-~~~
+```
 
-拖拽时只更新 Preview，pointerup 才提交一个共享 Delta 的 `MoveNotesCommand`。
+拖拽时只更新 Preview，pointerup 才提交一个 `MoveNotesCommand` 或单 Note
+`ResizeNoteCommand`；一次手势最多形成一个 Commit / History 步骤。
 
 ### 第五步：Playback
 
 实现最小：
 
-~~~text
+```text
 TempoMap
 Transport
 Note Event Compiler
 Look-ahead Scheduler
 简单 Synth
-~~~
+```
 
 这一阶段不做通用 Device Graph。
 
@@ -534,17 +569,18 @@ Look-ahead Scheduler
 
 只有满足以下流程，才进入 Audio Clip：
 
-~~~text
+```text
 新建项目
 -> 创建 Track
 -> 画 Note
 -> 移动 Note
+-> 调整单 Note 长度
 -> Undo
 -> 播放
 -> 保存
 -> 刷新
 -> 项目一致恢复
-~~~
+```
 
 同时确认：
 
@@ -560,17 +596,17 @@ Look-ahead Scheduler
 
 ## 20. 功能扩展顺序
 
-| 阶段 | 新增 Contribution / Service |
-| --- | --- |
-| MIDI 闭环 | Piano Roll、Project Kernel、基础 Playback |
+| 阶段        | 新增 Contribution / Service                     |
+| ----------- | ----------------------------------------------- |
+| MIDI 闭环   | Piano Roll、Project Kernel、基础 Playback       |
 | Arrangement | Arrangement Surface、Audio Track、Clip Commands |
-| Asset | AssetService、Import Worker、Waveform |
-| Mixer | Mixer Panel、Channel Strip、Meter |
-| Device | DeviceRegistry、Device Rack、Graph Reconciler |
-| Automation | Automation Surface、Parameter Address |
-| Recording | InputService、Capture Worklet、RecordingSession |
-| Export | Offline Backend、Encoder Worker |
-| Cloud | CloudRepository、Version Sync |
+| Asset       | AssetService、Import Worker、Waveform           |
+| Mixer       | Mixer Panel、Channel Strip、Meter               |
+| Device      | DeviceRegistry、Device Rack、Graph Reconciler   |
+| Automation  | Automation Surface、Parameter Address           |
+| Recording   | InputService、Capture Worklet、RecordingSession |
+| Export      | Offline Backend、Encoder Worker                 |
+| Cloud       | CloudRepository、Version Sync                   |
 
 每次只扩展一条完整用户链路，不一次搭完所有空模块。
 
@@ -578,7 +614,7 @@ Look-ahead Scheduler
 
 以下内容不阻塞第一阶段：
 
-~~~text
+```text
 AudioClip 的完整时间语义
 OPFS 资产事务
 Device Plugin API
@@ -589,7 +625,7 @@ Offline Device 能力
 实时协作
 WebGL / OffscreenCanvas
 Turborepo
-~~~
+```
 
 开发到相应模块时，再从 v3 提取约束并建立专项文档。
 
@@ -597,7 +633,7 @@ Turborepo
 
 # 十、最终架构主干
 
-~~~text
+```text
 Studio Workbench
   提供服务、命令、上下文和 Contribution 宿主
 
@@ -618,7 +654,7 @@ Web Audio Runtime
 
 Platform Services
   封装浏览器存储、文件、Worker 和设备
-~~~
+```
 
 开发时只需要持续检查三个问题：
 

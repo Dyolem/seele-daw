@@ -1,10 +1,23 @@
 # @seele-daw/playback
 
-`playback` 是浏览器无关的播放编译核心，负责把项目快照和增量变化解释为图计划、时间线事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或 AudioNode。
+`playback` 是浏览器无关的播放编译核心。长期会把项目快照和增量变化解释为图计划、时间线
+事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
+AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
 > 当前状态：仅完成 package 骨架和公开入口。长期架构中的名称 `playback-core` 对应当前包。
 
-## 包定位
+当前阶段实施计划见
+[Audible MIDI Playback V1 第六阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
+
+这里的 `V1` 指第一版可听 MIDI 产品纵向切片，不是长期架构文档版本。经 2026-08-10 范围
+审阅，首版只建立具体的内置 Device Definition、Track Playback Plan、MIDI Note Span、
+Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect Graph、RuntimeDelta、
+跨线程 ACK 或 Loop / Seek 协议。Transport 行为、unsupported content、资产加载与浏览器矩阵
+仍按阶段计划中的 Decision Gate 逐批确认。
+
+## 长期包定位
+
+下图描述长期方向；当前 V1 不输出 GraphPlan 或 RuntimeDelta。
 
 ```text
 ProjectSnapshot + ProjectDelta
@@ -16,7 +29,9 @@ ProjectSnapshot + ProjectDelta
 
 Audio Runtime 不读取完整 ProjectModel；所有项目语义都必须先在本包编译成稳定、可序列化、可测试的计划。
 
-## 主要职责
+## 长期主要职责
+
+下表描述包的长期演进方向，不表示 Audible MIDI Playback V1 会一次实现所有能力。
 
 | 领域              | 规划职责                                                  |
 | ----------------- | --------------------------------------------------------- |
@@ -29,7 +44,7 @@ Audio Runtime 不读取完整 ProjectModel；所有项目语义都必须先在�
 | RuntimeDelta      | graph ops、timeline invalidation、parameter ops           |
 | Playback Sync     | modelRevision 与 engineGeneration 的对应和 ACK 状态       |
 
-## 核心契约
+## 长期核心契约
 
 - `modelRevision` 表示项目提交版本，`engineGeneration` 表示运行时计划世代，二者不得混用。
 - Seek、Stop、项目切换和需要重建未来事件的编辑必须增加 generation，使旧事件可被丢弃。
@@ -38,7 +53,9 @@ Audio Runtime 不读取完整 ProjectModel；所有项目语义都必须先在�
 - 播放中编辑的取消、release、重建和生效边界按操作定义，不能交给设备自行猜测。
 - 具体 look-ahead 毫秒数由 benchmark 决定，不作为固定架构常量。
 
-## 建议的内部模块
+## 长期候选内部模块
+
+目录只在真实批次出现消费者时建立；当前 V1 的精简目录以阶段计划为准。
 
 ```text
 src/
@@ -60,7 +77,7 @@ src/
 - 禁止依赖 `editor`、`audio-web`、`platform-browser` 或 `apps/studio`。
 - 第三方音频库不能定义项目时间、Transport、Device 身份或保存格式。
 
-## 分阶段计划
+## 长期演进顺序
 
 1. 实现固定 PPQ 的 TempoMap、Transport 和 Tick/second 转换。
 2. 编译 MIDI Note 事件，并建立确定性的 EventKey。
@@ -69,7 +86,7 @@ src/
 5. 增加 Track/Device GraphPlan、参数计划和增量 reconciler 输入。
 6. 在后续阶段加入 Audio Clip、Automation、Recording monitoring 和 frozen-revision export 计划。
 
-## 测试与验收
+## 长期测试方向
 
 - TempoMap、Tick/second 转换和 loop 边界 property tests；
 - 相同 snapshot 必须生成稳定一致的 plans；

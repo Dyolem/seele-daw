@@ -3,7 +3,7 @@
 > Status: Normative Draft  
 > Scope: Seele Studio editor and workbench  
 > Default theme: Piano Black  
-> Last updated: 2026-07-27
+> Last updated: 2026-08-10
 
 本文档定义 Seele Studio 编辑器的产品界面、交互模型与视觉语言。它是产品设计、前端实现、Canvas 渲染、主题开发和设计评审共同遵循的基线。
 
@@ -212,15 +212,15 @@ Workspace Fullscreen
 
 视觉设计必须尊重状态边界。一个状态显示在哪里，不等于它就由那个 Vue 组件拥有。
 
-| 状态类型              | 示例                                | 权威归属                                 | 持久化                 |
-| --------------------- | ----------------------------------- | ---------------------------------------- | ---------------------- |
-| Project facts         | 轨道、Clip、音符、轨道主题色        | Project Core                             | Project Checkpoint     |
-| Project lifecycle     | 当前项目、dirty、保存结果           | ActiveProjectService / application layer | 由项目服务协调         |
-| Workbench preferences | 主题、密度、面板高度、面板模式      | Workbench / preference store             | 本地用户偏好           |
-| Studio editor preferences | Tool、Snap、Grid Preset         | Studio preference store                  | 首批仅应用生命周期     |
-| Editor session        | 当前 Clip Selection、Zoom、Scroll   | 对应 Editor state                        | 默认不写入项目         |
-| Transient interaction | Hover、拖动预览、框选区域           | Surface interaction state                | 不持久化               |
-| Audio runtime         | 播放、调度、电平、设备状态          | Audio / playback runtime                 | 不进入 Project History |
+| 状态类型                  | 示例                              | 权威归属                                 | 持久化                 |
+| ------------------------- | --------------------------------- | ---------------------------------------- | ---------------------- |
+| Project facts             | 轨道、Clip、音符、轨道主题色      | Project Core                             | Project Checkpoint     |
+| Project lifecycle         | 当前项目、dirty、保存结果         | ActiveProjectService / application layer | 由项目服务协调         |
+| Workbench preferences     | 主题、密度、面板高度、面板模式    | Workbench / preference store             | 本地用户偏好           |
+| Studio editor preferences | Tool、Snap、Grid Preset           | Studio preference store                  | 首批仅应用生命周期     |
+| Editor session            | 当前 Clip Selection、Zoom、Scroll | 对应 Editor state                        | 默认不写入项目         |
+| Transient interaction     | Hover、拖动预览、框选区域         | Surface interaction state                | 不持久化               |
+| Audio runtime             | 播放、调度、电平、设备状态        | Audio / playback runtime                 | 不进入 Project History |
 
 ### 6.1 Vue / Pinia 边界
 
@@ -428,7 +428,8 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 - DOM 命中转换边界即使不迁移到 Canvas 也保留；只有真实性能数据要求时才增加 Canvas
   Hit 或空间索引。
 
-后续再引入力度编辑、Resize、Split、复制、Humanize、Quantize、Scale Assist 等能力；其产品边界必须在对应 Command 前讨论。
+后续再引入力度编辑、多 Note Resize、Split、复制、Humanize、Quantize、Scale Assist 等能力；
+其产品边界必须在对应 Command 前讨论。
 
 视觉与操作规则：
 
@@ -560,10 +561,10 @@ Record 红色只能表示录音、危险或停止性错误，不应成为普通�
 
 ### 9.5 Editor selection rendering
 
-| Token                         | 基准值                     | 用途                              |
-| ----------------------------- | -------------------------- | --------------------------------- |
-| `editor-note-selected-border` | `#F4E7B9`                  | Selected Note 的高对比实体轮廓    |
-| `editor-note-selected-glow`   | `rgb(232 217 168 / 58%)`   | Selected Note 的辅助外发光        |
+| Token                         | 基准值                   | 用途                           |
+| ----------------------------- | ------------------------ | ------------------------------ |
+| `editor-note-selected-border` | `#F4E7B9`                | Selected Note 的高对比实体轮廓 |
+| `editor-note-selected-glow`   | `rgb(232 217 168 / 58%)` | Selected Note 的辅助外发光     |
 
 Selected Border 是状态识别的主要信号；Glow 只用于从密集网格中提升层次，不能单独承担
 Selection 语义。DOM 与 Canvas Note Renderer 必须消费同一 Scene 中已经解析的 Border、Glow
@@ -840,14 +841,14 @@ Save / Discard / Cancel 的推荐顺序由平台约定适配，但主动作、�
 
 ### 16.2 Note 状态
 
-| 状态         | 表达                                 |
-| ------------ | ------------------------------------ |
-| Normal       | 轨道色 Solid / Surface 组合          |
-| Hover        | 轻微高光或边界                       |
+| 状态         | 表达                                             |
+| ------------ | ------------------------------------------------ |
+| Normal       | 轨道色 Solid / Surface 组合                      |
+| Hover        | 轻微高光或边界                                   |
 | Selected     | 高对比轮廓 + 克制 Glow，必要时显示 Resize Handle |
-| Muted        | 降低饱和度和不透明度，并保留形状     |
-| Preview      | Ghost 或描边，不覆盖原位置           |
-| Out of scale | 后续功能；不可只靠红色判错           |
+| Muted        | 降低饱和度和不透明度，并保留形状                 |
+| Preview      | Ghost 或描边，不覆盖原位置                       |
+| Out of scale | 后续功能；不可只靠红色判错                       |
 
 极短音符仍需保留可点击命中区域。视觉宽度和交互命中宽度可以不同。
 
@@ -1097,7 +1098,7 @@ Canvas 功能至少检查：
 - Global Bar 与 Transport 是一行合并还是两行布局；
 - Inspector 默认位于左下、右侧，还是根据编辑器切换；
 - Arrangement 与 Piano Roll 横向 Zoom 的默认同步规则；
-- Piano Roll Move、Resize、Split、Copy 的精确手势与边界；
+- Piano Roll Box Selection、多 Note Resize、Split、Copy 的精确手势与边界；
 - Track Color 是固定 Palette ID，还是允许任意色值；
 - 首批内置主题除 Piano Black 外的数量和视觉方向；
 - Browser / Library 与 Mixer 的最终工作区模式；

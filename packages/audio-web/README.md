@@ -1,10 +1,21 @@
 # @seele-daw/audio-web
 
-`audio-web` 是 Playback Core 的 Web Audio 执行后端，负责把浏览器无关的 RuntimeDelta、GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 AudioWorklet 资源。
+`audio-web` 是 Playback Core 的 Web Audio 执行后端。长期会把浏览器无关的 RuntimeDelta、
+GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 AudioWorklet 资源；
+当前首个可听切片只执行阶段计划定义的具体 Studio Grand 计划。
 
 > 当前状态：仅完成 package 骨架和公开入口，尚未创建音频上下文或运行时图。
 
-## 包定位
+当前可听 MIDI 阶段见
+[Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
+这里的 `V1` 指第一版可听产品纵向切片，不是架构文档版本。该切片只使用主线程原生 Web
+Audio 节点执行具体的 Studio Grand Voice Plan；通用 Graph Reconciler、RuntimeDelta、
+AudioWorklet 和跨线程 generation ACK 均延后。采样来源与分发权限、规范化 Manifest、加载
+预算和浏览器矩阵必须先通过计划中的资产 Gate。
+
+## 长期包定位
+
+下图描述长期方向；当前 V1 不包含 AudioWorklet 路径。
 
 ```text
 @seele-daw/playback plans
@@ -16,7 +27,7 @@
 
 本包是可丢弃、可重建的运行时，不是项目事实源。它执行已编译计划，不读取 ProjectModel，也不解释 Editor Command。
 
-## 主要职责
+## 长期主要职责
 
 | 领域               | 规划职责                                                  |
 | ------------------ | --------------------------------------------------------- |
@@ -39,7 +50,9 @@
 - 两条执行路径共用 `engineGeneration`、`EventKey` 和测试向量；
 - 收到旧 generation 的事件必须丢弃，迟到和溢出必须可观测。
 
-## 建议的内部模块
+## 长期候选内部模块
+
+目录只在真实消费者出现时建立；Audible MIDI Playback V1 的精简目录以阶段计划为准。
 
 ```text
 src/
@@ -74,7 +87,7 @@ Worklet entry 必须保持独立，只导入实时安全的协议和 DSP 代码�
 - Tone.js 只能作为原型或叶子 Device Adapter，不能成为 Transport、Graph 或项目格式。
 - 浏览器存储、文件和权限实现属于 `platform-browser`，由 Studio 组合根协作装配。
 
-## 分阶段计划
+## 长期演进顺序
 
 1. 建立 AudioContext lifecycle、最小 master output 和资源统计。
 2. 执行 MIDI Note 计划，提供简单 Synth 与可靠 `allNotesOff`。
@@ -83,7 +96,7 @@ Worklet entry 必须保持独立，只导入实时安全的协议和 DSP 代码�
 5. 实现 Sampler、Audio Clip voice 与 Worklet 消息协议。
 6. 后续加入 PCM recording、复杂 DSP/WASM 和 OfflineAudioContext 导出。
 
-## 测试与验收
+## 长期测试方向
 
 - 使用 fake clock/backend 验证节点开始、停止、取消和 generation；
 - Graph reconcile 前后连接、参数和 dispose 状态一致；

@@ -4,7 +4,16 @@
 > 产品目标：桌面浏览器优先、接近 BandLab 创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
+> 最近实现校准：2026-08-10\
 > 状态：Proposed Architecture Baseline v3
+
+> 本文描述长期目标，不是当前实现清单。当前仓库边界见
+> [Web DAW 简洁架构总纲](./web-daw-architecture-brief.md)，当前第一版可听产品切片见
+> [Audible MIDI Playback V1 第六阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)。
+> 后者的 `V1` 不是本文档版本；本文中的通用 Graph、RuntimeDelta、ACK 与 AudioWorklet
+> 仍是长期能力，除非阶段计划明确纳入，否则不能作为首版可听切片的验收要求。
+> 本文其余未加 `Audible MIDI Playback` 限定的 `V1` 是 2026-07-09 长期基线中的“首版产品 /
+> 模型”简称，同样不是文档版本；落地时仍须由对应专项计划重新确认。
 
 ---
 
@@ -22,18 +31,18 @@ v2 的总体方向是正确的，尤其应继续保留：
 
 v3 不推翻这些原则，而是补上会直接决定重写成败的硬契约：
 
-| v2 的模糊点                          | v3 的确定性决策                                                                                             |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| ProjectSession 容易成为总管一切的对象       | ProjectSession 仅作门面，内部拆成 Command Processor、Model Store、History、Query Index、Durability 与 Playback Sync |
-| ProjectDocument 同时像存储格式和运行时模型    | 持久化 DTO、内存模型、派生索引和运行时计划分离                                                                             |
-| ChangeSet 只有 changed IDs 和 flags | 改为类型化 ProjectDelta，携带实体、轨道、时间区间和失效原因                                                                  |
-| Content Lane 的产品语义尚未确定           | V1 不引入通用内容 Lane；Clip 直接属于 Track，Take Lane / Comping 在真正实现时加入                                          |
-| AudioClip 同时保存 Tick 长度和秒长度       | V1 明确“起点按音乐时间、素材按原速绝对时长”，避免两个权威长度                                                                     |
-| 一个 revision 同时承担编辑、保存、引擎与云版本     | 分离 modelRevision、journalSequence、engineGeneration 与 cloudVersion                                      |
-| look-ahead 只描述主线程定时器             | 改为规划层 + 执行层的两级调度，原生节点和 Worklet 分别执行                                                                   |
-| 录音可用 MediaRecorder 兜底            | DAW 主录音路径使用 AudioWorklet PCM；MediaRecorder 只适合低保真降级                                                   |
-| IndexedDB + OPFS 被视为一个原子存储       | 明确二者不能跨存储原子提交，采用“先完成 Blob，再提交 Manifest 引用”的协议                                                         |
-| 全局 revision 驱动 Vue 查询            | 改为按主题或实体订阅，避免每次事务让所有 selector 重算                                                                      |
+| v2 的模糊点                                    | v3 的确定性决策                                                                                                 |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| ProjectSession 容易成为总管一切的对象          | ProjectSession 仅作 Project Core 门面；Durability 与 Playback 由应用层订阅 Commit 后协调，不进入 Session 所有权 |
+| ProjectDocument 同时像存储格式和运行时模型     | 持久化 DTO、内存模型、派生索引和运行时计划分离                                                                  |
+| ChangeSet 只有 changed IDs 和 flags            | 改为类型化 ProjectDelta，携带实体、轨道、时间区间和失效原因                                                     |
+| Content Lane 的产品语义尚未确定                | V1 不引入通用内容 Lane；Clip 直接属于 Track，Take Lane / Comping 在真正实现时加入                               |
+| AudioClip 同时保存 Tick 长度和秒长度           | V1 明确“起点按音乐时间、素材按原速绝对时长”，避免两个权威长度                                                   |
+| 一个 revision 同时承担编辑、保存、引擎与云版本 | 分离 modelRevision、journalSequence、engineGeneration 与 cloudVersion                                           |
+| look-ahead 只描述主线程定时器                  | 改为规划层 + 执行层的两级调度，原生节点和 Worklet 分别执行                                                      |
+| 录音可用 MediaRecorder 兜底                    | DAW 主录音路径使用 AudioWorklet PCM；MediaRecorder 只适合低保真降级                                             |
+| IndexedDB + OPFS 被视为一个原子存储            | 明确二者不能跨存储原子提交，采用“先完成 Blob，再提交 Manifest 引用”的协议                                       |
+| 全局 revision 驱动 Vue 查询                    | 改为按主题或实体订阅，避免每次事务让所有 selector 重算                                                          |
 
 最终架构可概括为：
 
@@ -46,6 +55,10 @@ Web Audio Backend：执行图变更、调度、DSP、录音和导出
 Browser Infrastructure：存储、文件、Worker、权限和设备
 Vue Studio：界面与组合根
 ```
+
+当前首个可听切片把 `Playback Core` 收窄为具体 Track Playback Plan、MIDI Note Span、TempoMap、
+Transport Mapping 与 Scheduler Plan；把 `Web Audio Backend` 收窄为主线程原生 Web Audio 的
+Studio Grand Runtime。长期职责不要求一次性预建对应通用框架。
 
 ---
 
@@ -96,18 +109,18 @@ Comping / Take 管理
 
 V1 以真实上限而不是“无限扩展”为目标：
 
-| 指标        | 目标预算                                              |
-| --------- | ------------------------------------------------- |
-| 项目时长      | 15 分钟常规，30 分钟压力测试                                 |
-| Track     | 32 常规，64 压力测试                                     |
-| Clip      | 1,000 级                                           |
-| MIDI Note | 100,000 级压力数据集                                    |
-| 同时可见图元    | 10,000 级，超出后必须裁剪                                  |
-| 编辑响应      | 常规操作主线程 P95 小于 16 ms                              |
-| 拖拽 / 缩放   | 目标 60 FPS，不因提交事务逐帧改项目                             |
-| Scheduler | 不重复、不漏发；漂移可观测                                     |
-| 保存        | 提交后快速进入 journal 队列，明确显示 dirty / saved             |
-| 恢复        | 任意完整 snapshot + 连续 journal 可恢复到最后一致 modelRevision |
+| 指标         | 目标预算                                                        |
+| ------------ | --------------------------------------------------------------- |
+| 项目时长     | 15 分钟常规，30 分钟压力测试                                    |
+| Track        | 32 常规，64 压力测试                                            |
+| Clip         | 1,000 级                                                        |
+| MIDI Note    | 100,000 级压力数据集                                            |
+| 同时可见图元 | 10,000 级，超出后必须裁剪                                       |
+| 编辑响应     | 常规操作主线程 P95 小于 16 ms                                   |
+| 拖拽 / 缩放  | 目标 60 FPS，不因提交事务逐帧改项目                             |
+| Scheduler    | 不重复、不漏发；漂移可观测                                      |
+| 保存         | 提交后快速进入 journal 队列，明确显示 dirty / saved             |
+| 恢复         | 任意完整 snapshot + 连续 journal 可恢复到最后一致 modelRevision |
 
 这些是测试数据集和性能门槛，不是产品宣传承诺。每个阶段都必须以基准项目验证。
 
@@ -134,14 +147,14 @@ interface RuntimeCapabilities {
 
 产品能力按组合开放：
 
-| Profile      | 必需能力                                    | 产品行为                         |
-| ------------ | --------------------------------------- | ---------------------------- |
-| Edit         | Canvas、IndexedDB                        | 项目编辑与保存                      |
-| Playback     | Web Audio                               | 基础播放                         |
+| Profile      | 必需能力                                | 产品行为                            |
+| ------------ | --------------------------------------- | ----------------------------------- |
+| Edit         | Canvas、IndexedDB                       | 项目编辑与保存                      |
+| Playback     | Web Audio                               | 基础播放                            |
 | Full Audio   | AudioWorklet                            | 自定义 DSP、Meter、可靠 PCM Capture |
-| Enhanced IPC | crossOriginIsolated + SharedArrayBuffer | 环形缓冲区、低开销实时消息                |
-| Recording    | MediaDevices + AudioWorklet             | 正式录音                         |
-| Optional I/O | Web MIDI / File Picker                  | 有则启用，无则隐藏或使用 fallback        |
+| Enhanced IPC | crossOriginIsolated + SharedArrayBuffer | 环形缓冲区、低开销实时消息          |
+| Recording    | MediaDevices + AudioWorklet             | 正式录音                            |
+| Optional I/O | Web MIDI / File Picker                  | 有则启用，无则隐藏或使用 fallback   |
 
 SharedArrayBuffer 是优化路径，不得成为项目可打开、可保存或基础播放的正确性前提。
 
@@ -161,18 +174,18 @@ SharedArrayBuffer 是优化路径，不得成为项目可打开、可保存或�
 
 ## 5. 状态分类
 
-| 状态                                | 所有者                     | 是否持久化 | 是否 Undo       |
-| --------------------------------- | ----------------------- | ----- | ------------- |
-| Track、Clip、Note、Tempo、Device 描述   | ProjectModel            | 是     | 是             |
-| Selection、焦点、当前 Tool              | EditorSession           | 否     | 通常否           |
-| Zoom、Scroll、Panel Layout          | ViewState / Preferences | 可选    | 否             |
-| Drag Preview、Box Selection        | InteractionState        | 否     | 否             |
-| Transport、Active Voice、Graph Node | Audio Runtime           | 否     | 否             |
-| Query Index、Timeline Index        | Derived Cache           | 否     | 否             |
-| 原始音频 Blob                         | Asset Store             | 是     | 由引用事务管理       |
-| 解码 PCM、Waveform Peaks             | Cache                   | 可重建   | 否             |
-| Undo Stack                        | History Controller      | 默认会话级 | 不适用           |
-| Journal                           | Durability Layer        | 是     | 用于恢复，不等于 Undo |
+| 状态                                  | 所有者                  | 是否持久化 | 是否 Undo             |
+| ------------------------------------- | ----------------------- | ---------- | --------------------- |
+| Track、Clip、Note、Tempo、Device 描述 | ProjectModel            | 是         | 是                    |
+| Selection、焦点、当前 Tool            | EditorSession           | 否         | 通常否                |
+| Zoom、Scroll、Panel Layout            | ViewState / Preferences | 可选       | 否                    |
+| Drag Preview、Box Selection           | InteractionState        | 否         | 否                    |
+| Transport、Active Voice、Graph Node   | Audio Runtime           | 否         | 否                    |
+| Query Index、Timeline Index           | Derived Cache           | 否         | 否                    |
+| 原始音频 Blob                         | Asset Store             | 是         | 由引用事务管理        |
+| 解码 PCM、Waveform Peaks              | Cache                   | 可重建     | 否                    |
+| Undo Stack                            | History Controller      | 默认会话级 | 不适用                |
+| Journal                               | Durability Layer        | 是         | 用于恢复，不等于 Undo |
 
 Undo、Autosave Journal 和云端变更记录不是同一个概念，不能复用一条未经设计的 patch 流来承担三种职责。
 
@@ -200,13 +213,20 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  UI["Vue UI + Canvas"] --> ED["Editor Controller"]
+  APP["Studio Composition Root"] --> UI["Vue UI + Canvas"]
+  APP --> PK["Project Kernel"]
+  APP --> PC["Playback Compiler"]
+  APP --> AR["Web Audio Runtime"]
+  APP --> PS["Persistence"]
+  UI --> ED["Editor Controller"]
   ED --> PK["Project Kernel"]
   PK --> RM["Read Models"]
-  PK --> PC["Playback Compiler"]
+  PK -- "Published Snapshot / Delta" --> APP
   PC --> AR["Web Audio Runtime"]
-  PK --> PS["Persistence"]
 ```
+
+图中 Project Kernel 向 Composition Root 的箭头表示发布数据，不表示 `project-core` import
+应用层、Playback 或 Persistence。
 
 完整链路：
 
@@ -217,12 +237,12 @@ DOM / Pointer / Keyboard / MIDI
 -> 完整参数的 ProjectCommand
 -> ProjectKernel.commit()
 -> ProjectCommit(modelRevision + ProjectDelta)
-   -> QueryIndex 增量更新
-   -> History 记录
-   -> Journal 排队
-   -> PlaybackCompiler 编译
--> RuntimeDelta(engineGeneration)
--> WebAudioRuntime 应用并 ACK
+   -> Project Core 内部更新 QueryIndex / History 并发布 Commit
+   -> Studio 应用层订阅者分别协调 Persistence 与 Playback
+      -> Journal / Checkpoint 排队
+      -> PlaybackCompiler 编译
+-> 长期：RuntimeDelta(engineGeneration) -> WebAudioRuntime 应用并 ACK
+-> Audible MIDI V1：完整具体计划 + generation 失效 -> 主线程 Audio Runtime
 ```
 
 Project commit 不等待音频设备或磁盘 I/O。外部执行失败不能回滚已经合法的创作事实，但必须进入可观测的 pending / degraded / failed 状态。
@@ -238,11 +258,10 @@ web-daw/
 ├── packages/
 │   ├── type-utils/                纯编译期、跨领域 TypeScript 类型工具
 │   ├── project-core/              模型、时间、命令、事务、历史、查询端口
-│   ├── editor-core/               Tool、Interaction、Selection、Snap、Clipboard
-│   ├── playback-core/             Compiler、Transport、Scheduler 契约、RuntimePlan
+│   ├── editor/                    common Tool / Interaction 与 browser Renderer
+│   ├── playback/                  Compiler、Transport、Scheduler 契约、RuntimePlan
 │   ├── audio-web/                 Web Audio 图、设备、Worklet、录音、离线渲染
-│   ├── browser-infra/             IndexedDB、OPFS、文件、权限、Worker、资产实现
-│   └── editor-renderer/           Canvas、Viewport、DisplayList、Hit Test
+│   └── platform-browser/          IndexedDB、OPFS、文件、权限、Worker、资产实现
 ├── tooling/
 │   ├── eslint-config/
 │   ├── tsconfig/
@@ -256,12 +275,11 @@ web-daw/
 ```mermaid
 flowchart TD
   TU["type-utils"]
-  APP["studio"] --> ED["editor-core"]
-  APP --> REN["editor-renderer"]
+  APP["studio"] --> ED["editor"]
   APP --> AW["audio-web"]
+  APP --> BR["platform-browser"]
   ED --> PC["project-core"]
-  REN --> ED
-  PB["playback-core"] --> PC
+  PB["playback"] --> PC
   AW --> PB
   APP --> PB
   PC -. "type-only" .-> TU
@@ -270,7 +288,9 @@ flowchart TD
   AW -. "type-only" .-> TU
 ```
 
-browser-infra 由 studio 组合根注入各核心端口。它可以 import 端口类型，但任何核心包都不能 import browser-infra。
+`platform-browser` 由 studio 组合根注入各核心端口。它可以 import 端口类型，但任何核心包都
+不能 import `platform-browser`。Canvas、Viewport、DisplayList 与 Hit Test 当前留在
+`@seele-daw/editor/browser`；只有真实消费者证明需要独立发布时才拆 Renderer package。
 
 ### 8.2 拆包规则
 
@@ -289,9 +309,9 @@ browser-infra 由 studio 组合根注入各核心端口。它可以 import 端�
 
 ```text
 project-core 禁止 vue、pinia、web-audio、DOM、IndexedDB imports
-editor-core 禁止 vue、web-audio imports
-playback-core 禁止 Vue、DOM、具体 AudioNode imports
-audio-web 禁止 import editor-core
+editor 禁止 vue、web-audio imports
+playback 禁止 Vue、DOM、具体 AudioNode imports
+audio-web 禁止 import editor
 所有 Worklet 入口禁止 import 应用层和持久化层
 包之间禁止绕过 public entry 引用内部路径
 源码 package 的包内导入使用 package.json#imports 定义的 #internal/*，不能依赖消费者 tsconfig paths
@@ -458,9 +478,7 @@ interface AudioClip {
     mode: 'fixed'
     rate: 1
   }
-  placement:
-    | { kind: 'one-shot' }
-    | { kind: 'looped'; spanTick: Tick }
+  placement: { kind: 'one-shot' } | { kind: 'looped'; spanTick: Tick }
 }
 ```
 
@@ -484,6 +502,7 @@ interface AudioClip {
 ```ts
 type Tick = number & { readonly brand: 'Tick' }
 type ProjectSecond = number & { readonly brand: 'ProjectSecond' }
+type PlaybackClockSecond = number & { readonly brand: 'PlaybackClockSecond' }
 type AudioContextTime = number & { readonly brand: 'AudioContextTime' }
 type MediaTimeUs = number & { readonly brand: 'MediaTimeUs' }
 type AudioFrame = number & { readonly brand: 'AudioFrame' }
@@ -493,7 +512,7 @@ type CssPixel = number & { readonly brand: 'CssPixel' }
 规则：
 
 - Tick、MediaTimeUs、AudioFrame 必须为安全整数；
-- ProjectSecond 和 AudioContextTime 只在编译与运行时边界使用浮点；
+- ProjectSecond、PlaybackClockSecond 和 AudioContextTime 只在编译与运行时边界使用浮点；
 - V1 Tempo 只支持 step change，不支持 tempo ramp；
 - TempoMap 在每个 tempo segment 缓存累计秒数；
 - 第 0 Tick 必须存在 Tempo 与 Time Signature；
@@ -553,7 +572,7 @@ interface DeviceDescriptor {
 }
 ```
 
-Device Definition 必须声明：
+浏览器无关的 Device Definition 必须声明：
 
 ```text
 输入 / 输出端口类型
@@ -563,8 +582,12 @@ Device Definition 必须声明：
 tailTime
 是否支持 sample-accurate automation
 state migration
-runtime factory
+稳定 runtime kind / capability key
 ```
+
+具体 runtime factory 不进入 Project Core 或浏览器无关的 Device Definition。它由
+`audio-web` 的 runtime adapter registry 提供，并由 Studio Composition Root 将 capability
+key 映射到实现；缺少 adapter 时必须进入 Missing Device 状态，不能静默替换声音。
 
 加载项目时找不到设备实现：
 
@@ -597,16 +620,19 @@ interface ProjectSession {
 
 内部组件：
 
-| 组件                    | 单一职责                                |
-| --------------------- | ----------------------------------- |
-| CommandProcessor      | 路由命令、校验 baseRevision、执行 handler     |
-| ModelStore            | 持有当前 immutable root 与 modelRevision |
-| InvariantValidator    | 提交前验证跨实体不变量                         |
-| HistoryController     | Undo / Redo、合并策略                    |
-| QueryIndex            | 可重建索引与 selector 依赖                  |
-| ChangePublisher       | 发布 ProjectCommit                    |
-| DurabilityCoordinator | Journal / snapshot 状态，不直接写浏览器 API   |
-| PlaybackSync          | 将 ProjectDelta 交给 compiler 并跟踪 ACK  |
+| 组件               | 单一职责                                  |
+| ------------------ | ----------------------------------------- |
+| CommandProcessor   | 路由命令、校验 baseRevision、执行 handler |
+| ModelStore         | 持有当前 immutable root 与 modelRevision  |
+| InvariantValidator | 提交前验证跨实体不变量                    |
+| HistoryController  | Undo / Redo、合并策略                     |
+| QueryIndex         | 可重建索引与 selector 依赖                |
+| ChangePublisher    | 发布 ProjectCommit                        |
+
+Durability 与 Playback 都是 Project Commit 的外部消费者。当前 Studio 由
+`ActiveProjectService` 协调项目生命周期与持久化，由独立 Project Playback Coordinator 跟踪
+`engineGeneration` 和运行时状态；二者都不能塞回 ProjectSession，也不能让 Pinia 拥有
+ProjectSession、History、IndexedDB、AudioContext 或 pending resolver。
 
 ## 18. 命令与提交管线
 
@@ -669,12 +695,12 @@ ProjectDelta 是提交结果，不是项目真相，也不是永久事件溯源�
 
 ## 20. 四种版本号
 
-| 名称               | 所有者              | 用途                   |
-| ---------------- | ---------------- | -------------------- |
-| modelRevision    | Project Kernel   | 每次本地原子提交递增           |
-| journalSequence  | Persistence      | 判断 journal 连续性与恢复顺序  |
-| engineGeneration | Playback / Audio | 丢弃过期编译结果和 Worklet 事件 |
-| cloudVersion     | Cloud Repository | 乐观并发、冲突与同步           |
+| 名称             | 所有者           | 用途                               |
+| ---------------- | ---------------- | ---------------------------------- |
+| modelRevision    | Project Kernel   | 每次本地原子提交递增               |
+| journalSequence  | Persistence      | 判断 journal 连续性与恢复顺序      |
+| engineGeneration | Playback / Audio | 丢弃过期编译结果和已调度运行时事件 |
+| cloudVersion     | Cloud Repository | 乐观并发、冲突与同步               |
 
 禁止把它们都叫 revision。engineGeneration 落后于 modelRevision 是合法的短暂状态；UI 应能显示 Audio Sync pending 或 failed。
 
@@ -722,10 +748,7 @@ trackId -> device / routing summary
 订阅应支持主题和实体过滤：
 
 ```ts
-session.subscribe(
-  { topics: ['arrangement'], trackIds: visibleTrackIds },
-  onArrangementChanged
-)
+session.subscribe({ topics: ['arrangement'], trackIds: visibleTrackIds }, onArrangementChanged)
 ```
 
 不要用一个全局 revision ref 让 Mixer、Piano Roll、Inspector 和 Arrangement 在任意 Note 变化后全部重算。
@@ -866,12 +889,12 @@ Preview Playback、Drag Ghost、Box Selection 都不修改项目、不进入 His
 
 继续采用 DOM + Canvas 2D：
 
-| DOM                            | Canvas                           |
-| ------------------------------ | -------------------------------- |
+| DOM                              | Canvas                             |
+| -------------------------------- | ---------------------------------- |
 | App Shell、Toolbar、Track Header | Grid、Clip、Waveform               |
-| Inspector、Menu、Dialog          | Piano Roll Note                  |
-| Mixer 与 Device Controls        | Automation Curve                 |
-| 可访问性输入和语义摘要                    | Selection、Ghost、Playhead Overlay |
+| Inspector、Menu、Dialog          | Piano Roll Note                    |
+| Mixer 与 Device Controls         | Automation Curve                   |
+| 可访问性输入和语义摘要           | Selection、Ghost、Playhead Overlay |
 
 Renderer 内部：
 
@@ -930,7 +953,7 @@ Playhead / Meter
 ```ts
 function useProjectSelector<T>(
   selector: ProjectSelector<T>,
-  equality: (a: T, b: T) => boolean
+  equality: (a: T, b: T) => boolean,
 ): ShallowRef<T>
 ```
 
@@ -989,14 +1012,16 @@ audio-web 只负责把计划映射到 Web Audio 资源。
 
 ## 31. Transport 与时钟
 
-调度的权威时钟是 AudioContext.currentTime。performance.now 不能用来决定声音何时开始，只用于 UI 与诊断。
+浏览器无关的 Transport 使用抽象 `PlaybackClockSecond`；在 Web Audio Backend 中，这个时钟
+由 `AudioContext.currentTime` 实现。`performance.now` 不能用来决定声音何时开始，只用于 UI
+与诊断。
 
 ```ts
 interface TransportMapping {
   state: 'stopped' | 'playing' | 'paused' | 'recording'
   engineGeneration: number
   anchorTick: Tick
-  anchorContextTime: AudioContextTime
+  anchorPlaybackClockSecond: PlaybackClockSecond
   loop?: TickRange
 }
 ```
@@ -1005,12 +1030,14 @@ interface TransportMapping {
 
 ```text
 Tick <-> ProjectSecond
-ProjectSecond <-> AudioContextTime
-Tick <-> AudioContextTime
-AudioContextTime -> UI Output Time
+ProjectSecond <-> PlaybackClockSecond
+Tick <-> PlaybackClockSecond
+PlaybackClockSecond -> UI Output Time
 ```
 
-播放头显示可用 getOutputTimestamp 与可用的 latency 信息做视觉补偿，但这些估计不改变调度时间。
+`audio-web` 以当前 `AudioContext.currentTime` 实现 Playback Clock；边界只做品牌化适配，
+不再做第二次缩放或另设 wall-clock mapping。播放头显示可用 `getOutputTimestamp` 与可用的
+latency 信息做视觉补偿，但这些估计不改变调度时间。
 
 必须以 ADR 固定：
 
@@ -1036,7 +1063,7 @@ AudioContextTime -> UI Output Time
 从 TimelineIndex 查询事件
 展开 Clip Loop
 生成稳定 EventKey
-把 Tick 转成 AudioContextTime
+把 Tick 转成 PlaybackClockSecond
 批量交给执行层
 维护 horizon、drift 与 generation
 ```
@@ -1047,12 +1074,17 @@ AudioContextTime -> UI Output Time
 
 两类后端：
 
-| 事件类型                                    | 执行方式                                                               |
-| --------------------------------------- | ------------------------------------------------------------------ |
+| 事件类型                                  | 执行方式                                                                           |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
 | AudioBufferSource、Oscillator、AudioParam | 在主线程提前调用 start / stop / automation，Web Audio 渲染线程按 context time 执行 |
-| 自定义 Sampler、Synth、DSP                   | 批量发送带目标 AudioFrame 的事件到 AudioWorklet 队列                            |
+| 自定义 Sampler、Synth、DSP                | 批量发送带目标 AudioFrame 的事件到 AudioWorklet 队列                               |
 
 AudioWorklet 通信默认使用 MessagePort + 批量 DTO；跨源隔离可用时升级为 SharedArrayBuffer ring buffer。两条路径必须共享相同的 generation、EventKey 和测试向量。
+
+这是长期双路径目标。Audible MIDI Playback V1 只走第一条主线程原生节点路径，不建立
+AudioWorklet、SharedArrayBuffer 或跨线程 ACK；`audio-web` 在执行边界确认计划使用当前
+AudioContext 提供的 Playback Clock，并直接使用目标秒值，以内部 Voice Token 管理一次性
+Voice。
 
 ```ts
 interface ScheduledRuntimeEvent {
@@ -1082,19 +1114,26 @@ AudioContext latency
 
 ## 33. 播放中编辑语义
 
-| 变化位置 / 类型               | V1 策略                                     |
-| ----------------------- | ----------------------------------------- |
-| 调度窗口之外                  | 新 generation 正常编译                         |
-| 已调度但尚未开始的 Note / Source | cancel 或 stop 后按新计划重建                     |
-| 正在发声的 Note 被移动          | 当前 voice 快速 release，不在新位置补触发过去事件          |
-| 正在发声的 Note 被删除          | 快速 release                                |
-| 改变未来 Note velocity      | 取消旧事件并重建                                  |
-| 改变当前 Clip gain          | 短 ramp 到新值，避免 click                       |
-| 改变 Tempo                | 从安全锚点重建 Transport mapping 与未来窗口           |
-| Seek                    | generation + 1、取消未来事件、allNotesOff、从新位置预滚动 |
-| Track / Device 删除       | 先停止其 voice，再淡出和 dispose 图节点               |
+下表是长期细粒度目标，不是 Audible MIDI Playback V1 的首批实现要求：
+
+| 变化位置 / 类型                  | 长期目标策略                                              |
+| -------------------------------- | --------------------------------------------------------- |
+| 调度窗口之外                     | 新 generation 正常编译                                    |
+| 已调度但尚未开始的 Note / Source | cancel 或 stop 后按新计划重建                             |
+| 正在发声的 Note 被移动           | 当前 voice 快速 release，不在新位置补触发过去事件         |
+| 正在发声的 Note 被删除           | 快速 release                                              |
+| 改变未来 Note velocity           | 取消旧事件并重建                                          |
+| 改变当前 Clip gain               | 短 ramp 到新值，避免 click                                |
+| 改变 Tempo                       | 从安全锚点重建 Transport mapping 与未来窗口               |
+| Seek                             | generation + 1、取消未来事件、allNotesOff、从新位置预滚动 |
+| Track / Device 删除              | 先停止其 voice，再淡出和 dispose 图节点                   |
 
 “保留当前声部还是立即反映编辑”必须按操作定义，不允许每个设备自行猜测。
+
+首个可听切片采用固定的保守策略：任何相关 Commit 都增加 generation、取消未来调度、执行全局
+`allNotesOff`，再从完整最新 Snapshot 重建计划；不做 Track / Range / Voice 级增量失效。该策略
+可能截断当前长 Note，这是明确的首版限制。Transport 的精确自然结束与 release tail 行为仍由
+阶段 Decision Gate 决定。
 
 ## 34. Graph Compiler 与 Reconciler
 
@@ -1161,6 +1200,10 @@ Sampler / Synth / Meter / PCM Capture：AudioWorklet
 复杂、可复用 DSP：评估 Rust/C++ -> WebAssembly
 Tone.js：只允许原型或叶子 Device Adapter
 ```
+
+上表中的 Sampler AudioWorklet 是长期目标。Audible MIDI Playback V1 的 Studio Grand 使用
+主线程创建并提前调度 `AudioBufferSourceNode`、Gain 与 Pan，由 Web Audio 渲染线程按 Context
+时间执行；不得为了首个可听闭环先建设 Worklet 协议。
 
 第三方库可以替换实现，不能定义项目时间、设备身份、参数地址、保存格式和 Undo 语义。
 
@@ -1361,12 +1404,12 @@ fallback-supported
 
 ## 43. 存储职责
 
-| 存储         | 内容                                                 |
-| ---------- | -------------------------------------------------- |
+| 存储       | 内容                                                            |
+| ---------- | --------------------------------------------------------------- |
 | IndexedDB  | 项目元数据、snapshot manifest、journal、asset records、保存状态 |
-| OPFS       | 原始音频、大型 pending recording、可选 peaks / PCM cache     |
-| Memory LRU | 解码 PCM、Display cache、短期 Playback plan              |
-| Cloud      | 后期的 durable copy、版本与分享                             |
+| OPFS       | 原始音频、大型 pending recording、可选 peaks / PCM cache        |
+| Memory LRU | 解码 PCM、Display cache、短期 Playback plan                     |
+| Cloud      | 后期的 durable copy、版本与分享                                 |
 
 浏览器存储可能受配额、清理与用户操作影响。即使申请 persistent storage，也要提供项目 bundle 导出或云备份路径。
 
@@ -1502,12 +1545,12 @@ peaks、decoded PCM 和运行时索引默认不打包。导入时限制文件数
 
 ## 49. 线程职责
 
-| 执行环境                   | 职责                                                       |
-| ---------------------- | -------------------------------------------------------- |
+| 执行环境               | 职责                                                         |
+| ---------------------- | ------------------------------------------------------------ |
 | Main Thread            | Vue、Project Kernel、Editor、Canvas、Web Audio graph control |
-| General Worker         | hash、waveform、解析、迁移、WAV 编码、重计算                           |
-| Storage Worker         | OPFS SyncAccessHandle、录音文件流                              |
-| Audio Rendering Thread | 原生 AudioNode 与 AudioWorklet DSP                          |
+| General Worker         | hash、waveform、解析、迁移、WAV 编码、重计算                 |
+| Storage Worker         | OPFS SyncAccessHandle、录音文件流                            |
+| Audio Rendering Thread | 原生 AudioNode 与 AudioWorklet DSP                           |
 
 不要为了“用了 Worker”而把所有东西异步化。只有 CPU、I/O 或隔离收益明确的任务进入 Worker。
 
@@ -1576,15 +1619,15 @@ Storage quota / eviction risk
 
 ## 53. 故障域
 
-| 故障                  | 项目事实  | 处理                   |
-| ------------------- | ----- | -------------------- |
-| Audio Runtime 构图失败  | 保留    | 停止或降级播放，显示设备错误       |
-| Worker 崩溃           | 保留    | 重启并重做可重建任务           |
-| Peaks 损坏            | 保留    | 删除缓存并重建              |
-| Autosave 失败         | 内存仍有  | 保持 dirty，重试并提示       |
-| Asset finalize 失败   | 不提交引用 | 保留 recoverable temp  |
-| PlaybackCompiler 异常 | 保留    | 保持旧 generation 或安全停止 |
-| Migration 失败        | 原文件不动 | 只读诊断与副本恢复            |
+| 故障                   | 项目事实   | 处理                         |
+| ---------------------- | ---------- | ---------------------------- |
+| Audio Runtime 构图失败 | 保留       | 停止或降级播放，显示设备错误 |
+| Worker 崩溃            | 保留       | 重启并重做可重建任务         |
+| Peaks 损坏             | 保留       | 删除缓存并重建               |
+| Autosave 失败          | 内存仍有   | 保持 dirty，重试并提示       |
+| Asset finalize 失败    | 不提交引用 | 保留 recoverable temp        |
+| PlaybackCompiler 异常  | 保留       | 保持旧 generation 或安全停止 |
+| Migration 失败         | 原文件不动 | 只读诊断与副本恢复           |
 
 音频失败、存储失败和模型不合法必须是三类错误，不能统一成 console.error。
 
@@ -1752,19 +1795,19 @@ CI 必须检查：
 
 ## 58. 确定选型
 
-| 领域            | 选择                       | 说明                              |
-| ------------- | ------------------------ | ------------------------------- |
-| UI            | Vue 3 Composition API    | 团队经验连续，适合 Shell 与控件             |
-| Language      | TypeScript strict        | 核心 ID、时间和协议使用 branded types     |
-| Build         | Vite                     | Studio 与 Worklet / Worker 分入口构建 |
-| Workspace     | pnpm Workspace           | 足够支撑当前单 app、多核心包                |
-| App State     | Pinia                    | 只放 UI、偏好和轻量会话状态                 |
-| Dense Editor  | Canvas 2D + DOM          | 先分层、裁剪和缓存，profile 后升级           |
-| Audio         | Web Audio + AudioWorklet | 自有 Backend 与 Device contract    |
-| Storage       | IndexedDB（`idb` adapter）+ OPFS | 元数据事务与大型 Blob 分工                |
-| Unit Test     | Vitest                   | 与 Vite / TypeScript 集成          |
-| Property Test | fast-check 类工具           | 时间、Undo 与随机操作序列                 |
-| E2E           | Playwright               | Chromium / Firefox / WebKit     |
+| 领域          | 选择                             | 说明                                  |
+| ------------- | -------------------------------- | ------------------------------------- |
+| UI            | Vue 3 Composition API            | 团队经验连续，适合 Shell 与控件       |
+| Language      | TypeScript strict                | 核心 ID、时间和协议使用 branded types |
+| Build         | Vite                             | Studio 与 Worklet / Worker 分入口构建 |
+| Workspace     | pnpm Workspace                   | 足够支撑当前单 app、多核心包          |
+| App State     | Pinia                            | 只放 UI、偏好和轻量会话状态           |
+| Dense Editor  | Canvas 2D + DOM                  | 先分层、裁剪和缓存，profile 后升级    |
+| Audio         | Web Audio + AudioWorklet         | 自有 Backend 与 Device contract       |
+| Storage       | IndexedDB（`idb` adapter）+ OPFS | 元数据事务与大型 Blob 分工            |
+| Unit Test     | Vitest                           | 与 Vite / TypeScript 集成             |
+| Property Test | fast-check 类工具                | 时间、Undo 与随机操作序列             |
+| E2E           | Playwright                       | Chromium / Firefox / WebKit           |
 
 ## 59. 延迟决定的选型
 
@@ -1938,12 +1981,12 @@ cloudVersion / optimistic concurrency
 
 对旧代码逐模块标记：
 
-| 类别      | 判断                   |
-| ------- | -------------------- |
-| Keep    | 算法正确、无框架污染、测试可补      |
+| 类别    | 判断                             |
+| ------- | -------------------------------- |
+| Keep    | 算法正确、无框架污染、测试可补   |
 | Wrap    | 功能可用但接口不合，先放 adapter |
-| Rewrite | 依赖反向、状态多源或实时语义错误     |
-| Retire  | 新产品边界不再需要            |
+| Rewrite | 依赖反向、状态多源或实时语义错误 |
+| Retire  | 新产品边界不再需要               |
 
 迁移顺序以用户闭环为单位，不以 package 为单位。新旧系统共存时只允许一边拥有项目事实；adapter 不能双向同步两份可写状态。
 
@@ -2036,6 +2079,10 @@ Worklet 解析项目 JSON 或接收大对象
 
 ## 72. 一条 Note 的完整路径
 
+下列链路描述长期细粒度增量与 ACK 目标。当前 Audible MIDI Playback V1 在 Project Commit
+之后使用 generation 失效、全局 `allNotesOff` 与完整 Snapshot 重编译，不把 RuntimeDelta、
+Track / Range invalidation 或 Runtime ACK 作为首版前置条件。
+
 ```text
 PointerDown / Move
 -> Interaction Preview
@@ -2090,11 +2137,15 @@ last valid snapshot
 
 ---
 
-# 第十七部分：近期执行清单
+# 第十七部分：2026-07-09 执行清单（历史基线）
+
+本清单源于 2026-07-09 长期基线，不是当前完成度报告。Project Core、Piano Roll 与 Persistence
+的实际进展以 [产品功能手册](../../PRODUCT.md) 为准；Playback 项按当前阶段计划的批次与 Gate
+执行。
 
 - [ ] 把 v3 中 18 条 ADR 建成文件并逐项确认；
 - [ ] 明确 AudioClip fixed-time 与同轨重叠语义；
-- [ ] 建立 project-core、playback-core 与 audio-web 的依赖禁令；
+- [ ] 持续验证 project-core、playback 与 audio-web 的依赖禁令；
 - [ ] 定义 ProjectFileDTO v1 与 migration harness；
 - [ ] 定义 Tick、MediaTimeUs、AudioFrame 及 rounding policy；
 - [ ] 实现 ProjectKernel 最小门面与内部组件；

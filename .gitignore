@@ -42,5 +42,6 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
-# Resource
-*soundbanks
+# Developer-provided validation assets are served by Vite during local
+# development, but build.copyPublicDir keeps them out of production artifacts.
+/apps/studio/public/soundbanks/

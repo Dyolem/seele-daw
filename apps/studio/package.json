@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check build-only",
-    "build-only": "vite build",
-    "preview": "vite preview",
+    "build-only": "run-s build:vite check:dist-asset-boundary",
+    "build:vite": "vite build",
+    "check:dist-asset-boundary": "node ../../tooling/asset-rules/check-studio-soundbank-boundary.mjs",
+    "preview": "run-s check:dist-asset-boundary preview:vite",
+    "preview:vite": "vite preview",
     "type-check": "vue-tsc --build",
     "test:unit": "vitest",
     "test:run": "vitest run"

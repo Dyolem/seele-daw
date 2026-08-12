@@ -4,8 +4,9 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 3B 已完成并通过审阅。包内已有通用 Sample Instrument schema、TempoMap、
-> 具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；尚未实现任何音频运行时。
+> 当前状态：Batch 3B 已完成并通过审阅；Batch 4A.0 本地验证资产边界已实施、等待审阅。包内已有
+> 通用 Sample Instrument schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与
+> Scheduler Planner；尚未实现任何音频运行时。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
@@ -95,7 +96,7 @@ Batch 3A 进一步建立了浏览器无关的 Transport Mapping：
   保留 End，下一次 Play 从 Tick `0` 开始；
 - Transport 集中提供 Tick → PlaybackClockSecond 与 PlaybackClockSecond → continuous Tick
   position，并对时钟倒退、无活动映射、越界目标和未知 Plan status 失败关闭；
-- 逻辑自然结束不等待 Sample release tail。真实尾音仍由后续 Gate C 与 Audio Runtime 决定。
+- 逻辑自然结束不等待 Sample release tail。真实尾音仍由后续听觉 Gate 与 Audio Runtime 决定。
 
 Batch 3B 进一步建立了浏览器无关的 Scheduler Planner：
 

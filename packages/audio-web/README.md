@@ -4,14 +4,19 @@
 GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 AudioWorklet 资源；
 当前首个可听切片只执行阶段计划定义的具体 Studio Grand 计划。
 
-> 当前状态：仅完成 package 骨架和公开入口，尚未创建音频上下文或运行时图。
+> 当前状态：仅完成 package 骨架和公开入口，尚未创建音频上下文或运行时图。Studio 已建立
+> developer-local Soundbank 构建边界，但尚未建立 Manifest 或加载器。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
 这里的 `V1` 指第一版可听产品纵向切片，不是架构文档版本。该切片只使用主线程原生 Web
 Audio 节点执行具体的 Studio Grand Voice Plan；通用 Graph Reconciler、RuntimeDelta、
-AudioWorklet 和跨线程 generation ACK 均延后。采样来源与分发权限、规范化 Manifest、加载
-预算和浏览器矩阵必须先通过计划中的资产 Gate。
+AudioWorklet 和跨线程 generation ACK 均延后。当前采样只作为不可分发的本地验证输入，不再
+阻塞本地 Runtime 开发；规范化 Manifest、加载预算和浏览器矩阵仍须按阶段计划逐批审阅。任何
+把采样随构建公开交付的方案仍必须先解决替代资产或再分发权限。
+
+本地资产的来源链、指纹和分发边界见
+[Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)。
 
 ## 长期包定位
 

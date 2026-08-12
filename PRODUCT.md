@@ -6,7 +6,7 @@
 >
 > 最近更新：2026-08-12，功能代码基线 `145b3ab`，含已审阅的 Batch 3B 实现
 >
-> 当前阶段：Audible MIDI Playback V1 Batch 3B 已完成并通过审阅，准备规划 Batch 4A
+> 当前阶段：Audible MIDI Playback V1 Batch 4A.0 本地验证资产边界已实施，等待审阅
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -586,7 +586,7 @@ Project Core 已具备：
 | `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、默认 Studio Grand Add Track、旧 Slot 显式选择、Instrument 状态、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection Move / Cursor / Pencil Resize / 多选 Delete / Snap。 |
 | `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                             |
 | `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；尚未提供音频运行时。                                                                                                       |
-| `@seele-daw/audio-web`        | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank。                                                                                                                                                                                                                              |
+| `@seele-daw/audio-web`        | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank；本地验证资产可由 Vite dev server 提供，但生产构建不复制 Studio public。                                                                                                                                                       |
 | `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                    |
 
 ## 9. 明确尚未提供的产品能力
@@ -606,8 +606,8 @@ Project Core 已具备：
 
 ### 音源与声音
 
-- 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的生产 Manifest、加载、解压、
-  运行时索引与音色选择。
+- 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的 Manifest、加载、解压、运行时
+  索引与音色选择；该镜像不属于产品资源，Vite 生产构建禁止把 public 内容复制到 dist。
 - WAV / M4A 采样播放。
 - JSON 合成器定义的解析与合成引擎。
 - 完整 Instrument Browser、Preset Library、第三方 Device UI 与任意 Instrument 替换；当前只有旧空

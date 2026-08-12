@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 3B Scheduler Planner reviewed and committed; Batch 4A Gate planning pending
+> Status: Batch 4A.0 local validation asset boundary implemented; review pending
 >
 > Date: 2026-08-10
 >
@@ -82,24 +82,25 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
 - 播放中相关 Commit 首先采用 generation 失效、取消未来事件、`allNotesOff` 与完整 Snapshot
   重建，不在首版实现 Track / Range / Voice 级增量优化；
 - 两个编辑表面的 Playhead 作为独立可选批次，不阻塞首次可听闭环；
-- 内置采样的来源与分发权限、规范化 Manifest、首播加载预算和浏览器验收范围是进入 Audio
-  Runtime 前的明确门槛。
+- 当前内置采样只作为 developer-local、可替换且不可随 Seele 分发的验证输入；该边界不阻塞
+  本地 Audio Runtime 开发。规范化 Manifest、首播加载预算和浏览器验收范围仍是相应生产批次
+  的明确门槛，任何公开交付采样的方案则必须先补齐替代资产或再分发权限。
 - Compiler 支持整个 `MIDISampleSynth` 家族：每个符合 V1 schema 的
   `seele.sample-instrument` 都按其 `soundbankId` 生成 Sample Instrument Plan，不把 Studio
   Grand 名称作为白名单；Studio Grand 仍只是新 Track 默认音源与首个 Audio Runtime 验收资产。
 - 完整资源集合中的 `FMSynth` 与 `VASynth` 需要各自的 Device / Compiler / Runtime 产品切片，
   不能伪装成 Sample Instrument，也不在本阶段决定使用 Web Audio 原生节点、AudioWorklet
   还是 WASM。
-- Catalog、Indexes 与各 Soundbank Mapping 已迁入 Studio 的本地忽略资源树，供后续开发期
-  规范化工具使用；远程 URL、绝对路径和未经审阅的上游 schema 仍不能成为生产运行时或构建的
-  隐式依赖。
+- Catalog、Indexes 与各 Soundbank Mapping 位于忽略的 `apps/studio/public/soundbanks` 本地
+  开发资源树，供 Vite dev server 和后续规范化工具使用；生产构建关闭整个 public 复制。远程
+  URL、绝对路径和未经审阅的上游 schema 仍不能成为生产运行时或构建的隐式依赖。
 
 ### 1.4 尚待逐批确认的 Decision Gate
 
 Gate A 已于 2026-08-11 关闭：Studio Grand 的 Device Definition 与 Project Core Replace
 Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content 有关的规则已随 Batch
-2B 关闭，Transport Mapping 规则已在 Batch 3A 开始前确认；以下 Runtime Gate 与 Gate C 内容
-仍不得因为出现在计划中就当作已批准产品行为：
+2B 关闭，Transport Mapping 规则已在 Batch 3A 开始前确认。Batch 4A.0 已确认本地验证资产不
+等同于可分发产品资产；以下 Runtime 与听觉 Gate 仍不得因为出现在计划中就当作已批准产品行为：
 
 1. Runtime 加载失败、部分 Sample Zone 缺失时，Transport 与 UI 如何反馈；
 2. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
@@ -107,8 +108,8 @@ Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content �
 4. Sample 短于 Note 时是否自然结束，Sample 长于 Note 时采用何种 Note Off、包络和尾音策略；
 5. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
    行为，哪些明确延期；
-6. Catalog / Indexes / Mapping 的哪些字段进入 Seele 自有 Manifest，以及如何记录来源、单位、
-   校验和和授权证据。
+6. Catalog / Indexes / Mapping 的哪些字段进入本地生成的 Seele Manifest，以及如何记录单位、
+   校验和与替换关系；可分发 Manifest 只能在替代资产或再分发范围另行确认后进入产品资源。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
@@ -487,19 +488,25 @@ Planner 不创建 Timer。调用方注入 cadence 与 horizon 配置，且 horiz
 
 ### 6.1 首批资产边界
 
-本地 `apps/studio/public/soundbanks` 现已替换为下载器整理后的完整开发资源镜像：
+下载器整理后的完整开发资源镜像位于 Studio 的本地忽略 public 目录：
 
 ```text
-public/soundbanks/
+apps/studio/public/soundbanks/
 ├── catalog/       2 files
 ├── indexes/       2 files
 └── soundbanks/    1,756 files grouped by MIDISampleSynth / FMSynth / VASynth
 ```
 
 整棵资源树约 2.2 GB，已排除 `.DS_Store` 与 downloader reports，并通过 checksum dry-run 与
-外部下载器源逐文件核对。旧的扁平资源树已删除，外部下载器源保持不变。该路径继续由
-`.gitignore` 排除，只是本机开发证据与 Batch 4A 输入；本阶段不在应用启动时扫描整个目录，也
-不把全部资源构建成运行时 Catalog。
+外部下载器源逐文件核对。旧的扁平资源树已删除，外部下载器源保持不变。该路径由
+`.gitignore` 明确排除，只是本机开发证据与 Batch 4A 输入；本阶段不在应用启动时扫描整个
+目录，也不把全部资源构建成运行时 Catalog。
+
+实测 Vite 默认 build 会把整棵 public 目录复制进约 2.3 GB 的 `dist`。Batch 4A.0 因此显式设置
+`build.copyPublicDir = false`：本机 dev server 仍可通过同源 URL 提供验证资源，生产 build 不再
+复制任何 public 内容。原 favicon 已移入正常的 Vite 模块资产管线；build 完成后与 preview
+启动前还会拒绝 `apps/studio/dist/soundbanks`，防止配置漂移。`.gitignore` 只解决版本控制噪音，
+不能替代这项构建约束。
 
 2026-08-11 对完整本地采集快照的只读核验记录了 439 个 Soundbank：289 个
 `MIDISampleSynth`、11 个 `FMSynth` 和 139 个 `VASynth`。三类数据不能共享同一种执行策略：
@@ -524,35 +531,42 @@ Catalog、Mapping、Archive 与 General MIDI 信息的反向索引，`indexes/by
 上游绝对路径、远程 URL 和原始 JSON schema 均不进入生产运行时契约。
 
 Project 中稳定的 `soundbankId = studio-grand` 当前对应上游资源 slug
-`studio-grand-v2-v4`，该映射必须由 Seele 自有 Manifest 明确记录，不能靠字符串猜测。迁移后
-该目录包含 Catalog、Mapping、WAV ZIP 与 M4A ZIP 共 4 个文件，约 23 MB；Mapping 有 30 个
+`studio-grand-v2-v4`，该映射必须由 Seele 规范化 Manifest 明确记录，不能靠字符串猜测。该
+目录包含 Catalog、Mapping、WAV ZIP 与 M4A ZIP 共 4 个文件，约 23 MB；Mapping 有 30 个
 Sample Zone，WAV ZIP 内含 30 个 WAV 与一份上游 JSON，目前没有已解压 WAV。上游 JSON 含
-BandLab 静态资源 URL，但资源树中未发现随资产保存的授权或可分发来源说明。因此，以下两项是
-进入 Audio Runtime 生产批次前的阻断条件：
+BandLab 静态资源 URL，但资源树中未发现随资产保存的 LICENSE、NOTICE 或允许第三方 DAW
+打包原始采样的证明。
 
-1. 核实并记录资产来源、授权与项目可分发范围；
-2. 若现有资产不能合法随产品分发，先更换为可分发的 Studio Grand 资产，再确认 Manifest
-   与声音验收，不能仅改 URL 或名称继续使用。
+因此当前资产被明确分类为 **developer-local validation fixture**：Seele 不声称拥有再分发权，
+不提交、打包、部署或自动下载它；同时也不要求先取得书面再分发授权才开始本机发声验证。
+来源链、输入指纹和产品边界记录在
+[Studio Grand 本地验证资产记录](../../audio-web/docs/studio-grand-local-validation-assets.md)。若
+以后需要发布自带 Studio Grand 的构建，必须先换用明确可分发的替代资源，或取得覆盖该产品
+用法的授权，不能仅改 URL、文件名或显示名称继续使用当前采样。
 
-若 Gate C 确认现有资产可以随产品分发，Batch 4A 只为稳定 ID `studio-grand` 规范化当前
-`studio-grand-v2-v4`；若必须更换资产，以下规则同样适用于保持该 stable soundbank ID 的替代
-Studio Grand 资产：
+Batch 4A.1 可以针对当前本机 `studio-grand-v2-v4` 输入验证以下规范化规则：
 
-- 由开发期工具从选定的 WAV archive 提取、验证并放入明确的可分发资源路径；
-- 使用一份经过规范化并提交到仓库的小型 Studio Grand Manifest；
+- 仓库提交通用 Manifest contract、规范化 / 校验工具与合成测试 fixture；
+- 由开发期工具从选定的 WAV archive 提取、验证并放入忽略的本地生成目录；
+- 由同一工具在本地生成小型 Studio Grand Manifest；当前上游特定 Manifest 不作为可分发产品
+  资源提交；
 - Manifest 记录 stable soundbank ID、显示名、`releaseSeconds`、Sample Zone、root MIDI
   pitch、min / max range、`tuneCents` 和本地相对资源 key；
 - 所有带单位字段必须在名称或 schema 中明确单位；上游没有 `tuneCents` 时规范化为 `0`，
   不能依赖缺失值猜测；
 - Runtime Manifest 不保留上游远程 URL；
-- 资源 base URL 由 Studio / Browser Composition 输入，`@seele-daw/playback` 不知道 URL；
+- 本地资源 base URL 由 Studio Composition Root 注入，当前 dev 候选为同源 `/soundbanks`；
+  `@seele-daw/playback` 不知道 URL 或文件系统路径；
 - Manifest contract test 校验 Zone、文件存在性、格式和可选 checksum；
 - Manifest 生成或校验可以使用开发期脚本，但 Studio 启动时不解析任意 ZIP，也不执行目录
   扫描。
 
-选择 WAV 是 V1 的兼容性和可诊断性候选，仍须结合实际体积、解码和授权在 Gate C 确认，不
-代表完整 Soundbank 系统放弃压缩格式。运行时 ZIP 扫描 / 任意解压、M4A / WAV 自动协商、完整
-Catalog 和多音源缓存策略留到后续产品切片。
+未来替换为可分发资产后，可以在重新核验来源、产品范围和指纹的前提下提交对应生产 Manifest
+与资源；Project File 中的 stable `studio-grand` ID 和 Playback Plan 无需因此变化。
+
+选择 WAV 是本地 V1 验证的兼容性和可诊断性候选，仍须结合实际体积与解码数据确认；它不代表
+当前采样可以随产品分发，也不代表完整 Soundbank 系统放弃压缩格式。运行时 ZIP 扫描 / 任意
+解压、M4A / WAV 自动协商、完整 Catalog 和多音源缓存策略留到后续产品切片。
 
 ### 6.2 Sample 解析
 
@@ -581,7 +595,7 @@ Catalog 和多音源缓存策略留到后续产品切片。
 ### 6.3 加载与缓存
 
 - 首次 Play 从当前计划收集需要的唯一 Sample Zone；是一次性预载全计划，还是先加载初始
-  Scheduler 窗口，必须在 Batch 4A 用真实网络与内存数据完成 Decision Gate；
+  Scheduler 窗口，必须在 Batch 4A.2 用实际文件读取、解码与内存数据完成 Decision Gate；
 - Gate 必须记录最坏下载量、解码后 AudioBuffer 内存、允许等待时间、取消和单 Zone 失败是否
   中止整次 Play；
 - 在满足所选加载门槛前 Transport 不进入 Playing，UI 显示 `Loading instrument…`；
@@ -746,13 +760,16 @@ packages/audio-web/src/
 ## 10. 实施批次
 
 Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别随 Batch 2B 和 Batch 3A
-关闭。开始后续对应生产批次前仍需按顺序关闭其余 Gate：
+关闭。Gate C 现拆成资产边界、Manifest 语义与真实声音三个可独立审阅的子 Gate：
 
 - Gate A（2026-08-11 已关闭）：确认 Studio Grand Device Definition 与 Replace Command 形状；
 - Gate B（2026-08-11 已关闭）：按第 1.5 节处理 unsupported content 与零 Note Span，并按第
   3.4 节处理 Transport、自然结束和逻辑 release-tail 边界；真实声音的 release 行为仍属 Gate C；
-- Gate C：确认采样来源 / 分发权限、Manifest、Note / Sample 长度与 release / 钢琴真实性边界、
-  加载预算和浏览器验收矩阵。
+- Gate C.0（2026-08-12 已确认范围、实施等待审阅）：当前快照只作 developer-local 验证输入，
+  记录来源与指纹，保留在忽略的 dev public 并从 dist 排除；再分发证明只阻断公开交付采样，不
+  阻断本地 Runtime；
+- Gate C.1：确认 Manifest schema、规范化规则、资源完整性与本地 asset base 边界；
+- Gate C.2：确认 Note / Sample 长度、release / 钢琴真实性边界、加载预算和浏览器验收矩阵。
 
 ### Batch 1A：Project Core Instrument Device Replace
 
@@ -826,18 +843,33 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - late / drop policy 按 Gate 结果实现；
 - 不建立跨线程 ACK，完成后停止审阅。
 
-### Batch 4A：资产与 Manifest Gate
+### Batch 4A.0：本地验证资产边界
 
-- Gate C 的资产来源与可分发权限得到书面记录，否则本批停止；
-- 以已迁入本地忽略资源树的 Catalog / Indexes 反向定位资源与 General MIDI 语义，以 Mapping
-  提取播放字段，经开发期工具生成并校验 Seele 自有 Manifest；原始镜像不进入生产运行时；
-- 明确 stable `studio-grand` 到上游 `studio-grand-v2-v4` 的开发期映射，并从选定 archive
-  提取经过授权与校验的 V1 资源；
-- 明确 21–108 裁剪、字段单位、文件列表与 checksum policy；
-- 用真实 Studio Grand 资产听觉审阅 Sample 短于 / 长于 Note、Note Off、release tail、
-  velocity 表现与 V1 钢琴真实性边界；
-- 测量全量 / 初始窗口加载量、解码后内存和失败恢复，确认加载策略；
-- 不实现完整 Catalog，完成后停止审阅。
+> Implementation status: implemented locally; review pending.
+
+- 完整开发快照保留在忽略的 `apps/studio/public/soundbanks`，供本机 Vite dev server 使用；
+- 记录 Studio Grand 的本地来源链、输入指纹以及“不作为 Seele 可分发资产”的产品分类；
+- Vite production build 关闭整个 public 复制，favicon 进入模块资产管线；build / preview 额外
+  拒绝 dist Soundbank；
+- 不生成 Manifest、不解压 WAV、不实现加载器或 Audio Runtime，完成后停止审阅。
+
+### Batch 4A.1：Manifest Contract 与本地规范化工具
+
+- 以本地 Catalog / Indexes 反向定位资源与 General MIDI 语义，以 Mapping 提取播放字段；
+- 建立浏览器无关的 Seele Manifest schema、decoder / validator 与合成 contract fixtures；
+- 明确 stable `studio-grand` 到本地输入 `studio-grand-v2-v4` 的开发期映射；
+- 开发期工具核对已记录的输入指纹，生成忽略的本地 Manifest 并提取选定 WAV archive；
+- 明确 MIDI `21...108` 裁剪、字段单位、文件列表、相对 resource key 与 checksum policy；
+- 原始镜像、上游特定生成结果、绝对路径和远程 URL 不进入可分发产品构建或提交内容；
+- 不实现完整 Catalog 或 AudioContext，完成后停止审阅。
+
+### Batch 4A.2：加载测量与听觉 Gate
+
+- 通过 Studio 注入的开发期同源 asset base 使用本地生成的 Studio Grand 资源；
+- 用真实资产听觉审阅 Sample 短于 / 长于 Note、Note Off、release tail、velocity 表现与 V1
+  钢琴真实性边界；
+- 测量全量 / 初始窗口加载量、解码后内存和失败恢复，确认 Batch 4B 加载策略；
+- 记录本地验证结论，但不把当前采样纳入生产构建；完成后停止审阅。
 
 ### Batch 4B：Audio Web Studio Grand Runtime
 
@@ -964,7 +996,9 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 编辑、Undo / Redo、项目切换不会留下旧事件或残留 Voice；
 - Playback Core 不依赖浏览器，Audio Web 不读取 Project Model；
 - Runtime 对缺失资源、浏览器拒绝和 stale generation 失败关闭；
-- 内置采样来源与分发权限已记录，规范化 Manifest 和加载预算通过 Gate C；
+- 本地验证采样的来源、指纹与构建排除边界已记录，规范化 Manifest 和加载预算通过相应 Gate；
+- 任一公开构建都不包含当前本地快照；若产品需要自带采样，替代资产或覆盖该用法的再分发范围
+  已另行确认；
 - 自动化渲染、生产构建和真实浏览器听觉 smoke 通过；
 - [产品功能手册](../../../PRODUCT.md)、[设计语言](../../../DESIGN.md)、
   [Playback README](../README.md) 与 [Audio Web README](../../audio-web/README.md) 已同步；

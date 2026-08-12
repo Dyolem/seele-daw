@@ -6,6 +6,10 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    // Soundbanks in public are developer-local validation inputs and must not ship.
+    copyPublicDir: false,
+  },
   plugins: [
     vue(),
     vueJsx(),

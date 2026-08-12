@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-12，功能代码基线 `145b3ab`，含已审阅的 Batch 3B 实现
+> 最近更新：2026-08-12，功能代码基线 `4b0b5b2`，含已审阅的 Batch 4A.0 实现
 >
-> 当前阶段：Audible MIDI Playback V1 Batch 4A.0 本地验证资产边界已实施，等待审阅
+> 当前阶段：Audible MIDI Playback V1 Batch 4A.0 已完成并通过审阅，准备规划 Batch 4A.1
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 

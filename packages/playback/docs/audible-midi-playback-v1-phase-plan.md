@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 4A.0 local validation asset boundary implemented; review pending
+> Status: Batch 4A.0 local validation asset boundary reviewed and committed; Batch 4A.1 planning pending
 >
 > Date: 2026-08-10
 >
@@ -765,7 +765,7 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - Gate A（2026-08-11 已关闭）：确认 Studio Grand Device Definition 与 Replace Command 形状；
 - Gate B（2026-08-11 已关闭）：按第 1.5 节处理 unsupported content 与零 Note Span，并按第
   3.4 节处理 Transport、自然结束和逻辑 release-tail 边界；真实声音的 release 行为仍属 Gate C；
-- Gate C.0（2026-08-12 已确认范围、实施等待审阅）：当前快照只作 developer-local 验证输入，
+- Gate C.0（2026-08-12 已关闭）：当前快照只作 developer-local 验证输入，
   记录来源与指纹，保留在忽略的 dev public 并从 dist 排除；再分发证明只阻断公开交付采样，不
   阻断本地 Runtime；
 - Gate C.1：确认 Manifest schema、规范化规则、资源完整性与本地 asset base 边界；
@@ -845,7 +845,9 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 4A.0：本地验证资产边界
 
-> Implementation status: implemented locally; review pending.
+> Implementation status: reviewed and committed as `4b0b5b2`. Repository `pnpm lint`, Studio
+> type-check and guarded production build pass; Vite dev serves the recorded Studio Grand Mapping
+> while production `dist` excludes all public Soundbank assets.
 
 - 完整开发快照保留在忽略的 `apps/studio/public/soundbanks`，供本机 Vite dev server 使用；
 - 记录 Studio Grand 的本地来源链、输入指纹以及“不作为 Seele 可分发资产”的产品分类；

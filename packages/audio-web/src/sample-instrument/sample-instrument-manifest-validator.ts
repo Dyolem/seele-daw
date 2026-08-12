@@ -17,6 +17,10 @@ import {
 } from '#internal/sample-instrument/sample-instrument-manifest'
 import { SEELE_SUPPORTED_SFZ_PROFILE_V1 } from '#internal/sample-instrument/supported-sfz-profile-v1'
 import {
+  SampleResourceKeyError,
+  assertSafeSampleResourceKey,
+} from '#internal/sample-instrument/sample-resource-key'
+import {
   StructuredDataError,
   assertExactKeys,
   readArray,
@@ -201,37 +205,19 @@ function parseResource(input: unknown, path: string): SampleInstrumentResourceV1
   const object = readDataObject(input, path)
   assertExactKeys(object, ['key', 'mediaType'], [], path)
   const key = readNonBlankString(readRequiredValue(object, 'key', path), `${path}.key`)
-  assertSafeResourceKey(key, `${path}.key`)
+  try {
+    assertSafeSampleResourceKey(key)
+  } catch (error) {
+    if (error instanceof SampleResourceKeyError) {
+      fail('unsafe-resource-key', `${path}.key`, error.detail)
+    }
+    throw error
+  }
   const mediaType = readString(readRequiredValue(object, 'mediaType', path), `${path}.mediaType`)
   if (mediaType !== SEELE_SUPPORTED_SFZ_PROFILE_V1.audioMediaTypes[0]) {
     throw new StructuredDataError(`${path}.mediaType`, 'unsupported audio media type')
   }
   return Object.freeze({ key, mediaType: 'audio/wav' })
-}
-
-function assertSafeResourceKey(key: string, path: string): void {
-  if (key.length > 1024 || key.startsWith('/') || key.includes('\\') || key.includes('\0')) {
-    fail('unsafe-resource-key', path, 'resource key is not a safe relative POSIX path')
-  }
-
-  for (const segment of key.split('/')) {
-    let decodedSegment: string
-    try {
-      decodedSegment = decodeURIComponent(segment)
-    } catch {
-      fail('unsafe-resource-key', path, 'resource key contains invalid percent encoding')
-    }
-    if (
-      segment.length === 0 ||
-      decodedSegment === '.' ||
-      decodedSegment === '..' ||
-      decodedSegment.includes('/') ||
-      decodedSegment.includes('\\') ||
-      decodedSegment.includes('\0')
-    ) {
-      fail('unsafe-resource-key', path, 'resource key contains an unsafe path segment')
-    }
-  }
 }
 
 function parseTriggerMode(input: unknown, path: string): SampleInstrumentTriggerModeV1 {

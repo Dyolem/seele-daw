@@ -337,8 +337,9 @@ Soundbank 的控制数据与 Sample 集合。
 WAV 与 M4A 必须分别验证。尤其 `offset` 以 source frame 表达，而有损编码可能包含 priming /
 trim；在未证明 M4A 解码后 frame 与 loop 对齐前，不能把 WAV 的位置测量无条件套用到 M4A。
 
-ZIP entry 安全、大小预算、checksum、取消和产品 Bundle 形状不属于本逆向分析，另由资源导入
-批次定义。
+ZIP entry 安全、大小预算、checksum、取消和产品 Bundle 形状不属于本逆向分析。当前开发期
+资源边界与生成结果见
+[Studio Grand 本地验证资产记录](./studio-grand-local-validation-assets.md)。
 
 ## 9. 仍未解决的逆向问题
 

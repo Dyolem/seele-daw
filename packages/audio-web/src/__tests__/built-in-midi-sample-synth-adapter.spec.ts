@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BuiltInMidiSampleSynthAdapterError,
   adaptBuiltInMidiSampleSynthMapping,
+  inspectBuiltInMidiSampleSynthMapping,
   type BuiltInWavResourceRequest,
 } from '#internal/sample-instrument/built-in-midi-sample-synth-adapter'
 import {
@@ -16,6 +17,43 @@ function resolveWavResource({ fileName }: BuiltInWavResourceRequest) {
 }
 
 describe('Built-in MIDISampleSynth Mapping Adapter', () => {
+  it('allows multiple Zones to reuse one WAV while inventorying the entry once', () => {
+    const sharedResource = {
+      m4a: 'https://static.example.test/Shared.m4a',
+      wav: 'https://static.example.test/Shared.wav',
+    }
+    const mapping = createBuiltInMapping({
+      samples: [
+        createBuiltInZone({
+          fileName: 'Shared',
+          maxRange: null,
+          midiNumber: 60,
+          minRange: null,
+          urls: sharedResource,
+        }),
+        createBuiltInZone({
+          fileName: 'Shared',
+          maxRange: null,
+          midiNumber: 61,
+          minRange: null,
+          urls: sharedResource,
+        }),
+      ],
+    })
+
+    const manifest = adaptBuiltInMidiSampleSynthMapping(mapping, {
+      resolveWavResource,
+      soundbankId: parseSoundbankId('fixture-shared-resource'),
+    })
+
+    expect(manifest.zones).toHaveLength(2)
+    expect(manifest.zones.map(({ resource }) => resource.key)).toEqual([
+      'samples/Shared.wav',
+      'samples/Shared.wav',
+    ])
+    expect(inspectBuiltInMidiSampleSynthMapping(mapping).sampleFileNames).toEqual(['Shared'])
+  })
+
   it('normalizes unsorted range, exact-key, loop, envelope, tune, offset, and release override', () => {
     const mapping = createBuiltInMapping({
       release: 0.12,

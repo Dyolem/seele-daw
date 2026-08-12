@@ -11,10 +11,12 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "type-check": "tsc -p tsconfig.json",
+    "prepare:studio-grand-local": "jiti scripts/prepare-studio-grand-local-assets.ts",
+    "type-check": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
     "test:run": "vitest run --environment node"
   },
   "dependencies": {
-    "@seele-daw/playback": "workspace:*"
+    "@seele-daw/playback": "workspace:*",
+    "fflate": "0.8.3"
   }
 }

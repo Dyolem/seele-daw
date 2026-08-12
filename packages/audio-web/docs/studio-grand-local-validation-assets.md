@@ -1,6 +1,8 @@
 # Studio Grand 本地验证资产记录
 
-> Status: developer-local validation fixture; not a Seele distributable asset
+> Status: Batch 4A.1b local normalization implemented; review pending
+>
+> Asset classification: developer-local validation fixture; not a Seele distributable asset
 >
 > Recorded: 2026-08-12
 
@@ -89,6 +91,60 @@ Studio Grand 与其余 288 个 MIDISampleSynth 的 Mapping / Archive 全量字�
 包含 30 个 WAV 与一份 JSON。首个 Zone 从 MIDI `21` 开始，最后一个上游 Zone 延伸至 `119`；
 这些只是规范化输入，产品的 `21...108` 范围、字段单位和 release 行为仍须由后续 Manifest
 contract 与听觉审阅明确决定。
+
+## 本地规范化产物
+
+Batch 4A.1b 提供显式开发工具，不让 Studio 启动流程扫描原始 Catalog、Indexes 或 ZIP：
+
+```sh
+pnpm --filter @seele-daw/audio-web prepare:studio-grand-local
+```
+
+工具只接受上文已记录指纹的固定输入，通过 Catalog、General MIDI Index 与 Soundbank Map
+交叉确认目标身份，再验证单 Bank Catalog、外部 Mapping 以及 Archive 内嵌 Mapping。外部与内嵌
+Mapping 必须结构相同；稳定产品身份 `studio-grand` 只在该边界映射到当前本地 source slug。
+
+受限 ZIP Adapter 使用 `fflate` 解码，但只返回调用方预先声明的精确 entry 集合。它拒绝绝对路径、
+反斜杠、空段、`.` / `..`、编码后的 traversal、大小写或 Unicode normalization 冲突、未声明或
+缺失 entry，以及 Stored / Deflate 之外的压缩方法；解压可以通过 `AbortSignal` 取消。Studio Grand
+当前使用的预算为：
+
+| 预算                    | 上限   |
+| ----------------------- | ------ |
+| 压缩 Archive            | 32 MiB |
+| entry 数量              | 64     |
+| 单个 entry 解压后大小   | 8 MiB  |
+| 全部 entry 解压后总大小 | 64 MiB |
+| 单个 entry 解压比       | 64:1   |
+
+通用 Adapter 不猜测媒体类型或可信 checksum；调用方必须在返回字节进入产品资源前继续验证。本地
+Studio Grand 工具会先核对已记录的整包 SHA-256，再要求内外 Mapping 相同，严格解析每个 WAV 的
+RIFF / format / data metadata，并确认 Manifest 的 offset 与 loop 没有越过 WAV 时长。每个生成文件
+的 SHA-256 和 WAV metadata 写入校验报告。未来后端 Bundle 仍须提供其自身可信的期望摘要，不能把
+本机记录的指纹泛化为任意 Archive 的信任来源。
+
+生成目录仍位于被忽略且不会进入生产构建的 public 子树：
+
+```text
+apps/studio/public/soundbanks/generated/studio-grand/
+├── manifest.json
+├── preparation-report.json
+└── samples/
+    └── 30 WAV files
+```
+
+当前真实输入的生成结果为：
+
+- Archive 共 31 个 entry，压缩大小 `22,249,268` 字节，解压后总大小 `33,119,642` 字节；
+- 输出共 32 个文件：30 个 WAV、一个 Manifest 与一个 preparation report；
+- Manifest 保留 30 个 Zone，并把可播放范围显式裁剪为 MIDI `21...108`；
+- `manifest.json` SHA-256 为
+  `f0566a4573a63d252221a9cc53ca9fee194c187bbe4ccf44405a604b5eb45e98`。
+
+首次执行通过同目录 staging 后原子发布。若目标目录已存在，工具只接受目录集合、文件集合与
+全部内容哈希完全一致的结果；缺失、额外或漂移文件都会失败，不自动覆盖。相同输入重复执行已经
+核验为幂等。生成目录继续受 `.gitignore` 与 Vite `dist` guard 约束，因此这些本地产物不改变
+“不可作为 Seele 可分发资产”的分类。
 
 ## 授权状态
 

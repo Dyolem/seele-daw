@@ -1,6 +1,6 @@
 # Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1
 
-> Status: Batch 4A.1a implemented; awaiting review
+> Status: Batch 4A.1a reviewed and committed; Batch 4A.1b implemented, review pending
 >
 > Last updated: 2026-08-12
 
@@ -11,9 +11,10 @@
 2. **Sample Instrument Manifest V1**：Importer 规范化后交给 Seele Sample Runtime 的唯一数据
    形状。
 
-当前批次已经实现 Profile 常量、Manifest 类型、严格 validator 和默认内置
-`MIDISampleSynth` Mapping Adapter；尚未实现 SFZ 文本 parser、ZIP Adapter、AudioContext、Sample
-Loader、Voice 或任何真实发声。
+Batch 4A.1a 已实现并通过审阅：Profile 常量、Manifest 类型、严格 validator 和默认内置
+`MIDISampleSynth` Mapping Adapter 已提交。Batch 4A.1b 已实现独立的受限 ZIP / WAV 边界与本地
+规范化工具，正在等待审阅；尚未实现 SFZ 文本 parser、浏览器 Sample Loader、AudioContext、
+Voice 或任何真实发声。
 
 默认内置数据的字段统计与行为推断不是本规范的一部分，另见
 [默认内置 MIDISampleSynth 控制文件逆向分析](./default-built-in-midi-sample-synth-reverse-analysis.md)。
@@ -181,7 +182,7 @@ Importer 的责任；Runtime 不接收模糊的裸数值，也不重新读取源
 - 资源媒体类型当前只接受 `audio/wav`。
 
 稳定错误包含 code、data path 与 detail，使 Importer、测试和未来 Studio UI 不需要解析错误文案。
-Archive entry 的 byte size、checksum 与解压比例不在 Manifest V1；它们由下一资源边界验证。
+Archive entry 的 byte size、checksum 与解压比例不在 Manifest V1；它们由独立资源边界验证。
 
 ## 4. 默认内置 Mapping Compatibility Adapter
 
@@ -206,7 +207,25 @@ Archive entry 的 byte size、checksum 与解压比例不在 Manifest V1；它�
 Mapping、4,664 个 Zone 做过一次性兼容审计，全部可规范化。全量源数据仍受本地、不可分发资产
 边界约束，没有进入仓库 fixture。
 
-## 5. 明确延期
+## 5. Archive 与本地规范化边界
+
+Batch 4A.1b 不改变本文的发声语义，而是在 Manifest 外建立资源容器边界：
+
+- 受限 ZIP Adapter 只解压调用方预先声明的精确 entry 集合，并限制路径、压缩方法、entry 数量、
+  单文件 / 总解压大小和压缩比；支持 `AbortSignal`，返回稳定错误分类；
+- 安全相对 resource key 规则由 Manifest validator 与 ZIP entry 共用，避免两套路径判断漂移；
+- 严格 WAV metadata parser 只接受当前工具支持的 RIFF WAVE PCM / IEEE float 子集，并核对 format、
+  block alignment、data frame 与时长；
+- Studio Grand 开发工具交叉验证 Catalog / Indexes / Mapping、固定输入 SHA-256 与 Archive 内外
+  Mapping，生成 Manifest、30 个 WAV 和逐文件校验报告；
+- 生成目录被 Git 忽略并由 Vite production guard 排除，不能据此推导当前采样具有再分发范围。
+
+通用 ZIP Adapter 不把来源、可信摘要或媒体规则硬编码进容器实现；这些由调用方提供和验证。
+Manifest 只保存 Runtime 所需的稳定资源 key，不保存 ZIP entry、Catalog、远程 URL 或文件系统
+路径。详细预算与真实输出见
+[Studio Grand 本地验证资产记录](./studio-grand-local-validation-assets.md)。
+
+## 6. 明确延期
 
 本批次不实现：
 
@@ -214,15 +233,15 @@ Mapping、4,664 个 Zone 做过一次性兼容审计，全部可规范化。全�
 - velocity layer、round-robin、random、sequence、release trigger、key switch、controller 或复杂
   modulation；
 - SoundFont、DLS、DecentSampler 或其他格式 Importer；
-- ZIP 解压、Archive entry 安全、checksum、资源提取与本地 Studio Grand Manifest 生成；
+- 面向任意后端 Bundle 的可信 manifest / checksum 协议、任意 Archive 扫描与自动安装；
 - M4A 自动协商；
 - Sample Loader、AudioBuffer cache、AudioContext、Voice、真实 Note Off、loop 或 envelope 渲染。
 
-下一个独立资源批次可以在不改变 Manifest 发声契约的前提下，引入受限 ZIP Adapter 和本地
-规范化工具。SFZ 文本 Importer 也可单独实现，并以本文 Profile 与相同 Manifest contract tests
-作为验收标准。
+下一独立批次先基于本地规范化结果测量读取、解码内存与听觉边界，再确认浏览器 Sample Loader
+与 Runtime 策略。SFZ 文本 Importer 仍可单独实现，并以本文 Profile 与相同 Manifest contract
+tests 作为验收标准。
 
-## 6. 行业背景与参考
+## 7. 行业背景与参考
 
 行业没有要求所有 DAW 内置采样器共享同一内部播放器实现。开放格式解决交换问题，Importer
 把它们转换为产品自己的稳定语义；Plugin API 则解决宿主与第三方声音引擎之间的通信，两者不是

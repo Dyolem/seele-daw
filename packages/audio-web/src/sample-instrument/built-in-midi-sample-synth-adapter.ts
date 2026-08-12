@@ -87,7 +87,14 @@ interface ParsedBuiltInZone {
 interface ParsedBuiltInMapping {
   readonly displayName: string
   readonly mutexSets: readonly (readonly number[])[]
+  readonly sourceSlug: string
   readonly zones: readonly ParsedBuiltInZone[]
+}
+
+export interface BuiltInMidiSampleSynthMappingInventory {
+  readonly displayName: string
+  readonly sampleFileNames: readonly string[]
+  readonly sourceSlug: string
 }
 
 export interface BuiltInWavResourceRequest {
@@ -165,7 +172,6 @@ function validateKnownMappingMetadata(object: DataObject): void {
   readStringArray(readRequiredValue(object, 'filters', '$'), '$.filters')
   readString(readRequiredValue(object, 'instrumentSlug', '$'), '$.instrumentSlug')
   readBoolean(readRequiredValue(object, 'isDeprecated', '$'), '$.isDeprecated')
-  readString(readRequiredValue(object, 'slug', '$'), '$.slug')
   readString(readRequiredValue(object, 'subTitle', '$'), '$.subTitle')
   readString(readRequiredValue(object, 'updatedAt', '$'), '$.updatedAt')
   readStringArray(readRequiredValue(object, 'userInterfaces', '$'), '$.userInterfaces')
@@ -397,13 +403,40 @@ function readBuiltInMapping(input: unknown): ParsedBuiltInMapping {
   validateKnownMappingMetadata(object)
   const samples = readArray(readRequiredValue(object, 'samples', '$'), '$.samples')
   if (samples.length === 0) throw new StructuredDataError('$.samples', 'must not be empty')
+  const zones = samples.map((zone, index) =>
+    readBuiltInZone(zone, index, categoryInput, bankReleaseSecond),
+  )
   return Object.freeze({
     displayName: readNonBlankString(readRequiredValue(object, 'name', '$'), '$.name'),
     mutexSets: readMutexSets(readOptionalValue(object, 'mutexSets'), '$.mutexSets'),
-    zones: Object.freeze(
-      samples.map((zone, index) => readBuiltInZone(zone, index, categoryInput, bankReleaseSecond)),
-    ),
+    sourceSlug: readNonBlankString(readRequiredValue(object, 'slug', '$'), '$.slug'),
+    zones: Object.freeze(zones),
   })
+}
+
+export function inspectBuiltInMidiSampleSynthMapping(
+  input: unknown,
+): BuiltInMidiSampleSynthMappingInventory {
+  try {
+    const mapping = readBuiltInMapping(input)
+    return Object.freeze({
+      displayName: mapping.displayName,
+      sampleFileNames: Object.freeze(
+        [...new Set(mapping.zones.map(({ fileName }) => fileName))].sort(),
+      ),
+      sourceSlug: mapping.sourceSlug,
+    })
+  } catch (error) {
+    if (error instanceof BuiltInMidiSampleSynthAdapterError) throw error
+    if (error instanceof StructuredDataError) {
+      throw new BuiltInMidiSampleSynthAdapterError(
+        'invalid-built-in-mapping',
+        error.path,
+        error.detail,
+      )
+    }
+    throw error
+  }
 }
 
 function resolveResource(
@@ -502,11 +535,28 @@ function applyMutexSets(
   )
 }
 
+function createBuiltInZoneId(
+  zone: ParsedBuiltInZone,
+  repeatedFileNames: ReadonlySet<string>,
+): string {
+  const prefix = `built-in:${zone.fileName}`
+  if (!repeatedFileNames.has(zone.fileName)) return prefix
+  return zone.selector.kind === 'exact-midi'
+    ? `${prefix}:key:${zone.selector.pitch}`
+    : `${prefix}:range:${zone.selector.minimumPitch}-${zone.selector.maximumPitch}`
+}
+
 function compileBuiltInMapping(
   input: unknown,
   options: BuiltInMidiSampleSynthAdapterOptions,
 ): SampleInstrumentManifestV1 {
   const mapping = readBuiltInMapping(input)
+  const seenFileNames = new Set<string>()
+  const repeatedFileNames = new Set<string>()
+  for (const { fileName } of mapping.zones) {
+    if (seenFileNames.has(fileName)) repeatedFileNames.add(fileName)
+    seenFileNames.add(fileName)
+  }
   const zones = mapping.zones
     .map((zone, index): SampleInstrumentZoneV1 => {
       const resource = resolveResource(zone, index, options.resolveWavResource)
@@ -520,7 +570,7 @@ function compileBuiltInMapping(
         startOffsetSecond: resource.startOffsetSecond,
         triggerMode: zone.triggerMode,
         tuneCent: zone.tuneCent,
-        zoneId: `built-in:${zone.fileName}`,
+        zoneId: createBuiltInZoneId(zone, repeatedFileNames),
       }
     })
     .sort(compareSampleInstrumentZones)

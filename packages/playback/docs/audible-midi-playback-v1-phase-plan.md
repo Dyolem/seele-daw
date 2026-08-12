@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 3B Scheduler Planner implemented and validated; awaiting review before Batch 4A
+> Status: Batch 3B Scheduler Planner reviewed and committed; Batch 4A Gate planning pending
 >
 > Date: 2026-08-10
 >
@@ -818,8 +818,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 3B：Scheduler Planner
 
-> Implementation status: implemented and awaiting review. Playback type-check and 6 test files /
-> 75 tests pass; repository `pnpm lint` and `pnpm check` pass.
+> Implementation status: reviewed and committed as `145b3ab`. Playback type-check and 6 test
+> files / 75 tests pass; repository `pnpm lint` and `pnpm check` pass.
 
 - look-ahead window、连续 cursor、generation 与 occurrence 去重；
 - Scheduled Voice Plan 同时携带 Start / release 目标时刻；

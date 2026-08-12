@@ -4,7 +4,7 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 3B 已实现并等待审阅。包内已有通用 Sample Instrument schema、TempoMap、
+> 当前状态：Batch 3B 已完成并通过审阅。包内已有通用 Sample Instrument schema、TempoMap、
 > 具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；尚未实现任何音频运行时。
 > 长期架构中的名称 `playback-core` 对应当前包。
 

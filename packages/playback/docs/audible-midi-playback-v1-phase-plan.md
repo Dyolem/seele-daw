@@ -1,10 +1,10 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 3A Transport Mapping implemented and validated; awaiting review before Batch 3B
+> Status: Batch 3B Scheduler Planner implemented and validated; awaiting review before Batch 4A
 >
 > Date: 2026-08-10
 >
-> Last updated: 2026-08-11
+> Last updated: 2026-08-12
 >
 > Prerequisite checkpoint: `checkpoint/piano-roll-note-editing-2026-08-10`
 
@@ -35,8 +35,9 @@
 - Transport、Playhead、AudioBuffer、Voice 和 Scheduler 都不是 Project Fact。
 
 本阶段采用当前消费者所需的具体 Track / Note Span / Scheduler 计划，不借首条可听切片提前
-建立通用 Effect Graph、RuntimeDelta、跨线程 ACK 或完整 Device Platform。Transport 行为、
-不支持内容的降级方式和资产加载策略仍通过下文 Decision Gate 单独确认。
+建立通用 Effect Graph、RuntimeDelta、跨线程 ACK 或完整 Device Platform。Transport 与
+unsupported content 行为已经按批次确认；资产加载和真实声音策略仍通过下文 Decision Gate
+单独确认。
 
 阶段完成时，当前最小 MIDI 工作流应第一次满足架构总纲中的“写 Note 后能够播放”。
 
@@ -454,13 +455,19 @@ Planner 接受注入的 cadence 与 horizon 配置。V1 可以提供保守默认
 - late event 不能静默执行，Runtime 必须记录并采用明确的 drop / immediate policy；
 - 最终默认值由浏览器 smoke 和 benchmark 校准，不在架构层宣称固定真理。
 
-Late policy 仍属于 Scheduler Batch 的 Decision Gate。当前建议基线为：
+Batch 3B 已确认以下 Late policy：
 
 - Span Start 迟到但计划 End 仍在未来时立即开始，并仍在原 End 时间 release；
 - Span 到达时原计划 End 已经过期，则整枚 Span 丢弃；
-- Cancel 迟到时立即执行；
-- 每次 late / drop 都进入有界诊断计数，不为同类连续事件逐条弹 Toast；
-- generation 失效优先于 late 补偿，旧 generation 事件永远不执行。
+- 每批 late / drop 只进入有界诊断计数，不为同类连续事件逐条弹 Toast；
+- generation 失效优先于 late 补偿；Planner 拒绝已经观察过的新 generation 之后到达的旧
+  generation Snapshot，后续 Audio Runtime 仍必须独立丢弃旧 generation 事件；
+- 当前 Planner 只输出完整 Voice Span，不提前输出 Cancel 协议；Pause、Return、项目替换所需的
+  future cancel 与 `allNotesOff` 由后续 Coordinator / Audio Runtime 执行。
+
+Planner 不创建 Timer。调用方注入 cadence 与 horizon 配置，且 horizon 必须大于 cadence；每次
+唤醒传入一个冻结的 Transport Snapshot。新 generation 的首个窗口从其 Playback Anchor 开始，
+因此 Timer 首次迟到仍能执行上述补偿，同时继续遵守“Anchor 之前的长 Note 不 chase”。
 
 ### 5.3 Play、Pause 与 Return to Start
 
@@ -695,7 +702,7 @@ Plan。只有 Pointer Up 成功提交后才更新播放。Preview Audition 属�
         |
         v
 @seele-daw/playback
-  sample-instrument schema + Studio Grand default + TempoMap + concrete track/note-span plans
+  sample-instrument schema + TempoMap + track/note plans + Transport + scheduled voice plans
         |
         v
 @seele-daw/audio-web
@@ -800,8 +807,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 3A：Transport Mapping
 
-> Implementation status: implemented and awaiting review. Playback type-check and 5 test files /
-> 61 tests pass; repository `pnpm lint` and `pnpm check` pass.
+> Implementation status: reviewed and committed as `ae87ca4`. Playback type-check and 5 test
+> files / 61 tests pass; repository `pnpm lint` and `pnpm check` pass.
 
 - Gate B 中 Transport / Arrangement End / logical release-tail boundary 规则关闭；
 - Project Second / Playback Clock Second 边界；
@@ -810,6 +817,9 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 不接 AudioContext，不接 Studio，完成后停止审阅。
 
 ### Batch 3B：Scheduler Planner
+
+> Implementation status: implemented and awaiting review. Playback type-check and 6 test files /
+> 75 tests pass; repository `pnpm lint` and `pnpm check` pass.
 
 - look-ahead window、连续 cursor、generation 与 occurrence 去重；
 - Scheduled Voice Plan 同时携带 Start / release 目标时刻；
@@ -962,6 +972,7 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ## 参考
 
+- [Audible MIDI Scheduler 工作原理](./audible-midi-scheduler-primer.md)
 - [Web DAW 简洁架构总纲](../../../docs/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计](../../../docs/architecture/web-daw-long-term-architecture-v3.md)
 - [MIDI Project Model V1](../../project-core/docs/midi-project-model-v1.md)

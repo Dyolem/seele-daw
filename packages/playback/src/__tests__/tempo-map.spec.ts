@@ -11,10 +11,12 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   ProjectTimeError,
   parseContinuousTickPosition,
+  parsePlaybackClockDurationSecond,
   parsePlaybackClockSecond,
   parseProjectDurationSecond,
   parseProjectSecond,
   type ContinuousTickPosition,
+  type PlaybackClockDurationSecond,
   type PlaybackClockSecond,
   type ProjectDurationSecond,
   type ProjectSecond,
@@ -50,16 +52,19 @@ describe('Project time values', () => {
     const projectDuration = parseProjectDurationSecond(1.75)
     const tickPosition = parseContinuousTickPosition(960.5)
     const playbackClockSecond = parsePlaybackClockSecond(20.25)
+    const playbackClockDuration = parsePlaybackClockDurationSecond(0.1)
 
     expect(projectSecond).toBe(0.125)
     expect(projectDuration).toBe(1.75)
     expect(tickPosition).toBe(960.5)
     expect(playbackClockSecond).toBe(20.25)
+    expect(playbackClockDuration).toBe(0.1)
     expect(parseProjectSecond(-0)).toBe(0)
     expectTypeOf(projectSecond).toEqualTypeOf<ProjectSecond>()
     expectTypeOf(projectDuration).toEqualTypeOf<ProjectDurationSecond>()
     expectTypeOf(tickPosition).toEqualTypeOf<ContinuousTickPosition>()
     expectTypeOf(playbackClockSecond).toEqualTypeOf<PlaybackClockSecond>()
+    expectTypeOf(playbackClockDuration).toEqualTypeOf<PlaybackClockDurationSecond>()
   })
 
   it.each([
@@ -71,6 +76,7 @@ describe('Project time values', () => {
     ],
     ['invalid-project-second', () => parseProjectSecond(Number.MAX_SAFE_INTEGER + 1)],
     ['invalid-playback-clock-second', () => parsePlaybackClockSecond(-0.001)],
+    ['invalid-playback-clock-duration-second', () => parsePlaybackClockDurationSecond(Number.NaN)],
   ] as const)('rejects invalid values with stable code %s', (code, action) => {
     const error = captureError(action)
 

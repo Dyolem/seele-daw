@@ -4,9 +4,11 @@ export type ProjectSecond = Brand<number, 'ProjectSecond'>
 export type ProjectDurationSecond = Brand<number, 'ProjectDurationSecond'>
 export type ContinuousTickPosition = Brand<number, 'ContinuousTickPosition'>
 export type PlaybackClockSecond = Brand<number, 'PlaybackClockSecond'>
+export type PlaybackClockDurationSecond = Brand<number, 'PlaybackClockDurationSecond'>
 
 export type ProjectTimeErrorCode =
   | 'invalid-continuous-tick-position'
+  | 'invalid-playback-clock-duration-second'
   | 'invalid-playback-clock-second'
   | 'invalid-project-duration-second'
   | 'invalid-project-second'
@@ -66,6 +68,15 @@ export function parsePlaybackClockSecond(value: unknown): PlaybackClockSecond {
     'invalid-playback-clock-second',
     'PlaybackClockSecond',
   ) as PlaybackClockSecond
+}
+
+/** Parses a runtime scheduling duration without treating it as Project time. */
+export function parsePlaybackClockDurationSecond(value: unknown): PlaybackClockDurationSecond {
+  return requireNonNegativeSafeNumber(
+    value,
+    'invalid-playback-clock-duration-second',
+    'PlaybackClockDurationSecond',
+  ) as PlaybackClockDurationSecond
 }
 
 /** Parses a non-integer musical position without promoting it to a Project Tick fact. */

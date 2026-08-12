@@ -45,10 +45,10 @@ Vite dev server 直接提供 public 文件，适合浏览器通过同源 URL 验
 
 ## 来源链
 
-本机快照由项目所有者从独立的 `bandlab-soundbank-downloader` 工作目录提供，并于
-2026-08-11 迁入 Seele 开发工作区。快照内的 Catalog、Indexes、Mapping 和静态资源字段把数据
-标识为 BandLab Soundbank 数据；Seele 没有把该下载器、远程 URL 或上游 JSON schema 作为产品
-依赖。
+本机快照由项目所有者从独立的 Soundbank 采集工作目录提供，并于 2026-08-11 迁入 Seele 开发
+工作区。快照内的 Catalog、Indexes、Mapping 和静态资源字段标识了同一上游数据集合；Seele
+没有把采集工具、远程 URL 或上游 JSON schema 作为产品依赖。具体来源只在对应逆向分析中记录，
+产品与代码统一将规范化结果视为默认内置音源。
 
 只读盘点得到 439 个 Soundbank：
 
@@ -69,6 +69,9 @@ catalog/selected-soundbanks.json
 -> soundbanks/MIDISampleSynth/studio-grand-v2-v4/*.mapping.json
 -> soundbanks/MIDISampleSynth/studio-grand-v2-v4/*-wav.zip
 ```
+
+Studio Grand 与其余 288 个 MIDISampleSynth 的 Mapping / Archive 全量字段盘点与兼容性推断见
+[默认内置 MIDISampleSynth 控制文件逆向分析](./default-built-in-midi-sample-synth-reverse-analysis.md)。
 
 ## 已核验指纹
 

@@ -4,15 +4,20 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 4A.0 本地验证资产边界已完成并通过审阅。包内已有通用 Sample Instrument
-> schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；尚未
-> 实现 Manifest、资产加载或任何音频运行时。
+> 当前状态：Batch 4A.0 本地验证资产边界已完成并通过审阅；Batch 4A.1a 的 Supported SFZ
+> Profile、Manifest validator 与默认内置 Mapping Adapter 已在 `@seele-daw/audio-web` 实现，
+> 正在等待审阅。本包已有通用 Sample Instrument Device schema、TempoMap、具体 MIDI Plan
+> Compiler、Transport Mapping 与 Scheduler Planner；资产加载和音频运行时尚未实现。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
 [Audible MIDI Playback V1 第六阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
 Compiler、Transport 与 Scheduler 的协作和术语另见
 [Audible MIDI Scheduler 工作原理](./docs/audible-midi-scheduler-primer.md)。
+默认内置 MIDISampleSynth 数据的证据与兼容推断见
+[默认内置 MIDISampleSynth 控制文件逆向分析](../audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
+规范宿主语义见
+[Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../audio-web/docs/seele-supported-sfz-profile-v1.md)。
 
 这里的 `V1` 指第一版可听 MIDI 产品纵向切片，不是长期架构文档版本。经 2026-08-10 范围
 审阅，首版只建立具体的内置 Device Definition、Track Playback Plan、MIDI Note Span、
@@ -23,7 +28,7 @@ late / drop policy 已按批次收敛；资产加载与浏览器矩阵仍按阶�
 
 ## 当前已实现
 
-包根继续只公开首个真实消费者需要的 Studio Grand 产品边界：
+包根只公开真实跨包消费者需要的最小 Device / Soundbank 身份边界：
 
 - `STUDIO_GRAND_DEVICE_DEFINITION` 固定 `typeId = seele.sample-instrument`、
   `definitionVersion = 1` 与显示名称 `Studio Grand`；
@@ -33,6 +38,8 @@ late / drop policy 已按批次收敛；资产加载与浏览器矩阵仍按阶�
   版本、Parameters 或不兼容 State 返回 `null`，调用方据此显示 Missing，同时保留原始
   Descriptor；
 - Definition、factory 和 decoder 均不依赖 Vue、DOM、Web Audio、Soundbank URL 或浏览器资源。
+- `parseSoundbankId(value)` 与 branded `SoundbankId` 供 Audio Web 的 Manifest validator 复用同一
+  持久化身份约束，不公开 Catalog、路径或资源解析。
 
 包内同时建立了整个 MIDISampleSynth 家族共用的 V1 schema：
 
@@ -42,8 +49,9 @@ late / drop policy 已按批次收敛；资产加载与浏览器矩阵仍按阶�
 - Studio Grand factory 与严格 decoder 是上述 schema 的默认产品选择和精确特化，不是单独的
   Engine 类型。
 
-这部分仍是包内契约，因为当前跨包消费者只需要 Studio Grand factory。它只定义 Project
-Instrument Fact 的播放侧身份，不代表任一 Soundbank 已经能加载或发声。
+generic Device Definition、factory 与 decoder 仍是包内契约；跨包只额外公开上面的
+`SoundbankId` identity parser。它只定义 Project Instrument Fact 的播放侧身份，不代表任一
+Soundbank 已经能加载或发声。
 
 Batch 2A 还在包内建立了 `time/` 边界：
 

@@ -1,10 +1,10 @@
 # Web DAW 长期路线与架构设计 v3
 
 > 技术基线：Vue 3 + TypeScript + Vite + Web Audio API + pnpm Workspace\
-> 产品目标：桌面浏览器优先、接近 BandLab 创作闭环的轻量 Web DAW\
+> 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
-> 最近实现校准：2026-08-10\
+> 最近实现校准：2026-08-12\
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
@@ -58,7 +58,11 @@ Vue Studio：界面与组合根
 
 当前首个可听切片把 `Playback Core` 收窄为具体 Track Playback Plan、MIDI Note Span、TempoMap、
 Transport Mapping 与 Scheduler Plan；把 `Web Audio Backend` 收窄为主线程原生 Web Audio 的
-Studio Grand Runtime。长期职责不要求一次性预建对应通用框架。
+Manifest 驱动 MIDISampleSynth Runtime，并以 Studio Grand 作为首次听觉验收资产。长期职责不
+要求一次性预建对应通用 Graph 或 Synth 框架。Sample Instrument 的交换与执行进一步分层：
+Seele Supported SFZ Profile 声明公开 authoring 子集，各来源 Importer 消除自身语法、继承和
+私有默认值，规范化 Sample Instrument Manifest 才是内置 Runtime 的唯一输入。当前默认内置
+Mapping 的逆向推断只属于 Compatibility Adapter，不构成通用宿主规则。
 
 ---
 
@@ -1201,9 +1205,10 @@ Sampler / Synth / Meter / PCM Capture：AudioWorklet
 Tone.js：只允许原型或叶子 Device Adapter
 ```
 
-上表中的 Sampler AudioWorklet 是长期目标。Audible MIDI Playback V1 的 Studio Grand 使用
-主线程创建并提前调度 `AudioBufferSourceNode`、Gain 与 Pan，由 Web Audio 渲染线程按 Context
-时间执行；不得为了首个可听闭环先建设 Worklet 协议。
+上表中的 Sampler AudioWorklet 是长期目标。Audible MIDI Playback V1 的 MIDISampleSynth
+Runtime 使用主线程创建并提前调度 `AudioBufferSourceNode`、Gain 与 Pan，由 Web Audio 渲染
+线程按 Context 时间执行；Studio Grand 只是首个听觉验收资产，不得为了首个可听闭环先建设
+Worklet 协议。
 
 第三方库可以替换实现，不能定义项目时间、设备身份、参数地址、保存格式和 Undo 语义。
 

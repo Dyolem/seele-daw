@@ -2,21 +2,28 @@
 
 `audio-web` 是 Playback Core 的 Web Audio 执行后端。长期会把浏览器无关的 RuntimeDelta、
 GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 AudioWorklet 资源；
-当前首个可听切片只执行阶段计划定义的具体 Studio Grand 计划。
+当前首个可听切片先建立通用 MIDISampleSynth Sample Voice，并以 Studio Grand 完成首次产品
+听觉验收。
 
-> 当前状态：仅完成 package 骨架和公开入口，尚未创建音频上下文或运行时图。Studio 已建立
-> developer-local Soundbank 构建边界，但尚未建立 Manifest 或加载器。
+> 当前状态：Batch 4A.1a 已建立 Supported SFZ Profile V1、Sample Instrument Manifest V1 的
+> 严格 validator，以及默认内置 MIDISampleSynth Mapping Adapter，正在等待审阅。尚未实现
+> SFZ 文本 parser、ZIP Adapter、资源加载、音频上下文、Voice 或运行时图。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
-这里的 `V1` 指第一版可听产品纵向切片，不是架构文档版本。该切片只使用主线程原生 Web
-Audio 节点执行具体的 Studio Grand Voice Plan；通用 Graph Reconciler、RuntimeDelta、
-AudioWorklet 和跨线程 generation ACK 均延后。当前采样只作为不可分发的本地验证输入，不再
-阻塞本地 Runtime 开发；规范化 Manifest、加载预算和浏览器矩阵仍须按阶段计划逐批审阅。任何
-把采样随构建公开交付的方案仍必须先解决替代资产或再分发权限。
+这里的 `V1` 指第一版可听产品纵向切片，不是架构文档版本。该切片使用主线程原生 Web Audio
+节点执行 Manifest 驱动的 MIDISampleSynth Voice Plan；Studio Grand 是默认音源和首个验收
+资产，不是 Runtime 白名单。通用 Graph Reconciler、RuntimeDelta、AudioWorklet 和跨线程
+generation ACK 均延后。当前采样只作为不可分发的本地验证输入，不再阻塞本地 Runtime 开发；
+规范化 Manifest、加载预算和浏览器矩阵仍须按阶段计划逐批审阅。任何把采样随构建公开交付的
+方案仍必须先解决替代资产或再分发权限。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)。
+默认内置音源数据的字段、Archive 与行为证据见
+[默认内置 MIDISampleSynth 控制文件逆向分析](./docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
+Seele 自身的规范语义见
+[Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](./docs/seele-supported-sfz-profile-v1.md)。
 
 ## 长期包定位
 
@@ -94,11 +101,11 @@ Worklet entry 必须保持独立，只导入实时安全的协议和 DSP 代码�
 
 ## 长期演进顺序
 
-1. 建立 AudioContext lifecycle、最小 master output 和资源统计。
-2. 执行 MIDI Note 计划，提供简单 Synth 与可靠 `allNotesOff`。
-3. 实现 look-ahead native executor、generation 丢弃和 late-event 诊断。
+1. 在现有 Manifest 契约外建立受限 ZIP Adapter、本地规范化工具、Sample loader 与解码缓存。
+2. 建立 AudioContext lifecycle、Sample Voice、最小 master output 和资源统计。
+3. 实现 look-ahead native executor、generation 丢弃、可靠 `allNotesOff` 和 late-event 诊断。
 4. 增加稳定 Graph Runtime、Gain/Pan/Meter 和 Device contract suite。
-5. 实现 Sampler、Audio Clip voice 与 Worklet 消息协议。
+5. 实现 Audio Clip voice 与 Worklet 消息协议；FM / VA Synth 按独立产品切片选择执行技术。
 6. 后续加入 PCM recording、复杂 DSP/WASM 和 OfflineAudioContext 导出。
 
 ## 长期测试方向

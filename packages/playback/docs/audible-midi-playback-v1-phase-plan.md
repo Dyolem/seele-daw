@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 4A.0 local validation asset boundary reviewed and committed; Batch 4A.1 planning pending
+> Status: Batch 4A.1a contract and compatibility adapter implemented; review pending
 >
 > Date: 2026-08-10
 >
@@ -88,6 +88,13 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
 - Compiler 支持整个 `MIDISampleSynth` 家族：每个符合 V1 schema 的
   `seele.sample-instrument` 都按其 `soundbankId` 生成 Sample Instrument Plan，不把 Studio
   Grand 名称作为白名单；Studio Grand 仍只是新 Track 默认音源与首个 Audio Runtime 验收资产。
+- 2026-08-12 全量控制文件核验确认 MIDISampleSynth 内部同时存在 range / exact-key、gated /
+  one-shot、loop、tune、attack / release、offset 与 mutex 语义；这些结果是默认内置数据的
+  逆向证据，不是 Seele 宿主规则。兼容 Adapter 负责把来源特有推断规范化为显式 Manifest；
+  Profile 与 Runtime 不得依赖 Studio Grand 名称或这批 JSON 的隐式默认值。分别见
+  [默认内置 MIDISampleSynth 控制文件逆向分析](../../audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)
+  与
+  [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../../audio-web/docs/seele-supported-sfz-profile-v1.md)。
 - 完整资源集合中的 `FMSynth` 与 `VASynth` 需要各自的 Device / Compiler / Runtime 产品切片，
   不能伪装成 Sample Instrument，也不在本阶段决定使用 Web Audio 原生节点、AudioWorklet
   还是 WASM。
@@ -100,7 +107,10 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
 Gate A 已于 2026-08-11 关闭：Studio Grand 的 Device Definition 与 Project Core Replace
 Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content 有关的规则已随 Batch
 2B 关闭，Transport Mapping 规则已在 Batch 3A 开始前确认。Batch 4A.0 已确认本地验证资产不
-等同于可分发产品资产；以下 Runtime 与听觉 Gate 仍不得因为出现在计划中就当作已批准产品行为：
+等同于可分发产品资产。Gate C.1a 的架构范围已经确认：Seele 采用明确限定的 Supported SFZ
+Profile、显式 Manifest 和来源 Adapter；当前实现仍须通过本批审阅才能关闭。ZIP / Bundle
+边界另拆为 Gate C.1b。以下资源、Runtime 与听觉 Gate 仍不得因为出现在计划中就当作已批准
+产品行为：
 
 1. Runtime 加载失败、部分 Sample Zone 缺失时，Transport 与 UI 如何反馈；
 2. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
@@ -108,8 +118,9 @@ Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content �
 4. Sample 短于 Note 时是否自然结束，Sample 长于 Note 时采用何种 Note Off、包络和尾音策略；
 5. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
    行为，哪些明确延期；
-6. Catalog / Indexes / Mapping 的哪些字段进入本地生成的 Seele Manifest，以及如何记录单位、
-   校验和与替换关系；可分发 Manifest 只能在替代资产或再分发范围另行确认后进入产品资源。
+6. Catalog / Indexes 如何定位本地 Bundle、ZIP entry 与 checksum 如何验证，以及 stable
+   `studio-grand` 到当前本地输入的生成映射；可分发 Manifest / Bundle 只能在替代资产或再分发
+   范围另行确认后进入产品资源。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
@@ -484,7 +495,7 @@ Planner 不创建 Timer。调用方注入 cadence 与 horizon 配置，且 horiz
   release tail 不延长 Transport 时间，具体声音行为仍由 Gate C 决定；
 - 内部停止、Return 与 dispose 必须幂等。
 
-## 6. Studio Grand Sample Runtime
+## 6. MIDISampleSynth Sample Runtime（Studio Grand 首验）
 
 ### 6.1 首批资产边界
 
@@ -534,7 +545,7 @@ Project 中稳定的 `soundbankId = studio-grand` 当前对应上游资源 slug
 `studio-grand-v2-v4`，该映射必须由 Seele 规范化 Manifest 明确记录，不能靠字符串猜测。该
 目录包含 Catalog、Mapping、WAV ZIP 与 M4A ZIP 共 4 个文件，约 23 MB；Mapping 有 30 个
 Sample Zone，WAV ZIP 内含 30 个 WAV 与一份上游 JSON，目前没有已解压 WAV。上游 JSON 含
-BandLab 静态资源 URL，但资源树中未发现随资产保存的 LICENSE、NOTICE 或允许第三方 DAW
+静态资源 URL，但资源树中未发现随资产保存的 LICENSE、NOTICE 或允许第三方 DAW
 打包原始采样的证明。
 
 因此当前资产被明确分类为 **developer-local validation fixture**：Seele 不声称拥有再分发权，
@@ -544,46 +555,62 @@ BandLab 静态资源 URL，但资源树中未发现随资产保存的 LICENSE、
 以后需要发布自带 Studio Grand 的构建，必须先换用明确可分发的替代资源，或取得覆盖该产品
 用法的授权，不能仅改 URL、文件名或显示名称继续使用当前采样。
 
-Batch 4A.1 可以针对当前本机 `studio-grand-v2-v4` 输入验证以下规范化规则：
+Batch 4A.1a 先建立与 Archive 无关的语义边界；Studio Grand 不限定 schema 能力：
 
-- 仓库提交通用 Manifest contract、规范化 / 校验工具与合成测试 fixture；
-- 由开发期工具从选定的 WAV archive 提取、验证并放入忽略的本地生成目录；
-- 由同一工具在本地生成小型 Studio Grand Manifest；当前上游特定 Manifest 不作为可分发产品
-  资源提交；
-- Manifest 记录 stable soundbank ID、显示名、`releaseSeconds`、Sample Zone、root MIDI
-  pitch、min / max range、`tuneCents` 和本地相对资源 key；
-- 所有带单位字段必须在名称或 schema 中明确单位；上游没有 `tuneCents` 时规范化为 `0`，
-  不能依赖缺失值猜测；
-- Runtime Manifest 不保留上游远程 URL；
-- 本地资源 base URL 由 Studio Composition Root 注入，当前 dev 候选为同源 `/soundbanks`；
-  `@seele-daw/playback` 不知道 URL 或文件系统路径；
-- Manifest contract test 校验 Zone、文件存在性、格式和可选 checksum；
-- Manifest 生成或校验可以使用开发期脚本，但 Studio 启动时不解析任意 ZIP，也不执行目录
-  扫描。
+- Supported SFZ Profile V1 明确公开 authoring 子集、字段单位和 unsupported diagnostic，不宣称
+  完整 SFZ 兼容；
+- Sample Instrument Manifest V1 记录 stable soundbank ID、显示名、显式 range / exact-key
+  selector、root MIDI pitch、`tuneCent`、gated / one-shot、continuous / sustain loop seconds、
+  source frame 归一后的 start offset seconds、attack / release、exclusive group 与安全相对 WAV
+  resource key；
+- 严格 validator 拒绝未知字段、版本、非 canonical Zone、selector 重叠、不安全路径、无 release
+  gated Zone、one-shot loop 和悬空 exclusive group，并返回冻结副本；
+- 默认内置 Mapping Adapter 隔离 `category=kit` 默认 one-shot、缺失 `loop_mode` 时的 continuous
+  loop、bank-level release fallback 和 `mutexSets` 等来源特有推断；Manifest / Runtime 不重复
+  解释这些私有规则；
+- 当前全量 289 份 Mapping、4,664 个 Zone 已通过开发者本机兼容审计；原始数据和生成结果不进入
+  仓库或可分发产品构建。
+
+Batch 4A.1b 再建立资源容器与本地生成边界：
+
+- 由受限 ZIP Adapter 从选定 WAV Archive 读取、验证并提取到忽略的本地生成目录；
+- 开发期工具组合 Catalog / Indexes / Mapping，明确 stable `studio-grand` 到
+  `studio-grand-v2-v4` 的输入映射并生成小型 Manifest；
+- ZIP entry path、数量、单文件 / 总解压大小、压缩比、checksum、取消和错误分类单独验证；
+- 本地 resource base URL 由 Studio Composition Root 注入；`@seele-daw/playback` 不知道 URL、
+  ZIP 或文件系统路径；
+- Studio 启动时不扫描任意 ZIP 或完整本地目录，资源只按经过验证的 Bundle / Manifest 加载。
 
 未来替换为可分发资产后，可以在重新核验来源、产品范围和指纹的前提下提交对应生产 Manifest
 与资源；Project File 中的 stable `studio-grand` ID 和 Playback Plan 无需因此变化。
 
 选择 WAV 是本地 V1 验证的兼容性和可诊断性候选，仍须结合实际体积与解码数据确认；它不代表
-当前采样可以随产品分发，也不代表完整 Soundbank 系统放弃压缩格式。运行时 ZIP 扫描 / 任意
-解压、M4A / WAV 自动协商、完整 Catalog 和多音源缓存策略留到后续产品切片。
+当前采样可以随产品分发，也不代表完整 Soundbank 系统放弃压缩格式。Batch 4A.1b 引入受路径、
+entry、大小、checksum 和取消约束的第三方 ZIP 解码；任意 Archive 扫描、M4A / WAV 自动协商、
+完整 Catalog 和全量多音源缓存策略仍留到后续产品切片。
 
 ### 6.2 Sample 解析
 
+- 默认内置数据的 Zone、trigger、loop、tune、offset、envelope 与 mutex 证据见
+  [默认内置 MIDISampleSynth 控制文件逆向分析](../../audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
+  Seele 的规范输入与 validator 规则见
+  [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../../audio-web/docs/seele-supported-sfz-profile-v1.md)。
+  Adapter 必须输出显式含义，Audio Runtime 不重新解释 Catalog 或来源默认值；
 - Studio Grand V1 的声明可播放范围为 MIDI Pitch `21...108`；该范围内每个 Pitch 必须落入
   一个明确 Sample Zone，Zone 重叠或空洞由 Manifest 校验拒绝；
 - 当前上游 JSON 的最后一个 Zone 延伸到 `119`，规范化 Manifest 必须显式裁剪到已选择的钢琴
   产品范围 `21...108`，不能让上游范围偶然成为产品语义；
 - 范围外 Note 仍是合法 Project Fact，但 Studio Grand 不为它发声，并按 Track 聚合为
   unsupported-pitch diagnostic；不得擅自 Clamp 到钢琴边界；
-- 使用 Zone root pitch 与 `tuneCents` 计算 `playbackRate`；
+- 使用 Zone root pitch 与 `tuneCent` 计算 `playbackRate`；
 - 公式和正负方向在 Manifest contract test 中用已知 pitch vector 固定；
 - 当前 Studio Grand Mapping 有 30 个 pitch Zone，但没有可证明多力度层切换的字段；Velocity
   首版候选映射为 `velocity / 127` 的 Voice Gain，再乘 Track 和 Master Gain，这只能改变音量，
   不能宣称真实还原钢琴随击键力度变化的音色，最终曲线和产品表述在 Gate C 听觉审阅中确认；
 - Pan 使用 Track `[-1, 1]` 的稳定事实；
-- Sample 短于 Note 时不得在没有 loop metadata 的情况下自行循环；是接受自然结束、选择其他
-  Zone / 资产，还是在未来引入共鸣或物理模型，必须由 Gate C 结合真实音频决定；
+- 没有有效 loop metadata 的 Zone 在 Sample 短于 Note 时不得自行循环；有有效 loop 的 Zone
+  必须按 Mapping 循环，并在 Gate C.2 确认 loop-through-release 的听觉边界；Studio Grand 属于
+  前一种无 loop 情况；
 - Sample 长于 Note 时，Span End 的 Gain Ramp 曲线、持续时间、是否模拟制音器以及可保留的
   release tail 都是 Gate C 候选，不把上游 `release` 字段未经验证直接当成最终物理钢琴模型；
 - Clip 边界同样结束逻辑 Active Note；听觉尾音可以按 Gate C 结果继续，但不能延长 Project
@@ -594,11 +621,13 @@ Batch 4A.1 可以针对当前本机 `studio-grand-v2-v4` 输入验证以下规�
 
 ### 6.3 加载与缓存
 
-- 首次 Play 从当前计划收集需要的唯一 Sample Zone；是一次性预载全计划，还是先加载初始
-  Scheduler 窗口，必须在 Batch 4A.2 用实际文件读取、解码与内存数据完成 Decision Gate；
-- Gate 必须记录最坏下载量、解码后 AudioBuffer 内存、允许等待时间、取消和单 Zone 失败是否
-  中止整次 Play；
+- 首次 Play 从当前计划收集唯一 Soundbank Bundle 与需要解码的 Sample Zone；当前 ZIP 传输意味
+  网络层先取得完整目标 Bundle，取得 Bundle 后是一次性解码全计划 Zone，还是只解码初始
+  Scheduler 窗口，必须在 Batch 4A.2 用实际读取、解压、解码与内存数据完成 Decision Gate；
+- Gate 必须分别记录 Bundle 下载 / 解压量、encoded Sample byte、解码后 AudioBuffer 内存、
+  允许等待时间、取消以及 Bundle / 单 Zone 失败是否中止整次 Play；
 - 在满足所选加载门槛前 Transport 不进入 Playing，UI 显示 `Loading instrument…`；
+- 同一 Soundbank Bundle 的并发 fetch / unzip Promise 去重；
 - 同一 Zone 的并发请求 Promise 去重；
 - 成功解码的 AudioBuffer 进入可丢弃内存缓存；
 - 失败的 Promise 不永久污染缓存，用户重试可以重新请求；
@@ -751,6 +780,7 @@ packages/playback/src/
 └── scheduler/
 
 packages/audio-web/src/
+├── sample-instrument/  Supported SFZ Profile、Manifest 与来源 Adapter
 ├── context/
 ├── soundbank/
 ├── voices/
@@ -760,7 +790,7 @@ packages/audio-web/src/
 ## 10. 实施批次
 
 Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别随 Batch 2B 和 Batch 3A
-关闭。Gate C 现拆成资产边界、Manifest 语义与真实声音三个可独立审阅的子 Gate：
+关闭。Gate C 现拆成资产边界、Manifest 语义、资源容器与真实声音四个可独立审阅的子 Gate：
 
 - Gate A（2026-08-11 已关闭）：确认 Studio Grand Device Definition 与 Replace Command 形状；
 - Gate B（2026-08-11 已关闭）：按第 1.5 节处理 unsupported content 与零 Note Span，并按第
@@ -768,7 +798,9 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - Gate C.0（2026-08-12 已关闭）：当前快照只作 developer-local 验证输入，
   记录来源与指纹，保留在忽略的 dev public 并从 dist 排除；再分发证明只阻断公开交付采样，不
   阻断本地 Runtime；
-- Gate C.1：确认 Manifest schema、规范化规则、资源完整性与本地 asset base 边界；
+- Gate C.1a（实现待审阅）：确认 Supported SFZ Profile V1、Manifest V1、严格 validator 与
+  默认内置 Mapping Adapter；逆向分析只作为来源兼容证据，不定义宿主默认值；
+- Gate C.1b：确认受限 ZIP 边界、资源完整性、本地生成映射与 asset base；
 - Gate C.2：确认 Note / Sample 长度、release / 钢琴真实性边界、加载预算和浏览器验收矩阵。
 
 ### Batch 1A：Project Core Instrument Device Replace
@@ -855,15 +887,37 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
   拒绝 dist Soundbank；
 - 不生成 Manifest、不解压 WAV、不实现加载器或 Audio Runtime，完成后停止审阅。
 
-### Batch 4A.1：Manifest Contract 与本地规范化工具
+### Batch 4A.1a：Supported SFZ Profile、Manifest Contract 与默认内置 Adapter
 
-- 以本地 Catalog / Indexes 反向定位资源与 General MIDI 语义，以 Mapping 提取播放字段；
-- 建立浏览器无关的 Seele Manifest schema、decoder / validator 与合成 contract fixtures；
+> Implementation status: implemented and awaiting review. Audio Web type-check and 3 test files /
+> 17 tests pass; a developer-local compatibility audit also normalized all 289 MIDISampleSynth
+> mappings / 4,664 zones without adding the source assets to repository fixtures.
+
+- 建立明确限定的 Supported SFZ Profile V1 常量；只声明已支持的 header、opcode、loop mode、
+  WAV 媒体与 tune 范围，不把当前私有 Mapping 当成宿主规范；
+- 建立浏览器无关的 Sample Instrument Manifest V1 类型与严格 decoder / validator；
+- Manifest 显式表达 range / exact-key、one-shot / gated、continuous / sustain loop、tune、offset、
+  attack / release、exclusive group、字段单位与安全相对 WAV resource key；
+- 默认内置 Mapping Adapter 只在自身边界内处理 `category=kit`、缺失 `loop_mode`、bank release、
+  `mutexSets`、source-frame offset 和 URL basename 等兼容规则；
+- 使用 Studio Grand、loop、envelope / one-shot、mutex、offset、URL 编码文件名与上游乱序 range
+  的合成输入固定 contract，并拒绝未知字段、非零 crossfade 和歧义控制；
+- 最终 Adapter 结果统一经过 Manifest validator；原始镜像、上游远程 URL 和绝对路径不进入
+  Manifest、测试 fixture 或可分发构建；
+- 不实现 SFZ 文本 parser、ZIP、Catalog 工具、AudioContext 或真实发声，完成后停止审阅。
+
+### Batch 4A.1b：受限 ZIP Adapter 与本地规范化工具
+
+- 引入第三方 ZIP 解码库，并在外层验证 entry path、数量、单文件 / 总解压大小、压缩比、
+  checksum、取消和错误分类；
+- 以本地 Catalog / Indexes 反向定位资源与 General MIDI 语义，以 Mapping Adapter 生成 Manifest；
 - 明确 stable `studio-grand` 到本地输入 `studio-grand-v2-v4` 的开发期映射；
-- 开发期工具核对已记录的输入指纹，生成忽略的本地 Manifest 并提取选定 WAV archive；
-- 明确 MIDI `21...108` 裁剪、字段单位、文件列表、相对 resource key 与 checksum policy；
-- 原始镜像、上游特定生成结果、绝对路径和远程 URL 不进入可分发产品构建或提交内容；
-- 不实现完整 Catalog 或 AudioContext，完成后停止审阅。
+- 核对已记录的输入指纹，生成忽略的本地 Manifest 并提取选定 WAV Archive；
+- 在 Bundle 资源验证中确认文件存在性、WAV 格式、loop / offset 不超出 decoded duration 与
+  Studio Grand MIDI `21...108` 产品裁剪；
+- 当前 raw Archive 与未来后端 Bundle 复用受限容器边界，但不在 Studio 启动时扫描任意 ZIP 或
+  完整资源树；
+- 不实现完整 Catalog、M4A 自动协商、AudioContext 或真实发声，完成后停止审阅。
 
 ### Batch 4A.2：加载测量与听觉 Gate
 
@@ -873,11 +927,12 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 测量全量 / 初始窗口加载量、解码后内存和失败恢复，确认 Batch 4B 加载策略；
 - 记录本地验证结论，但不把当前采样纳入生产构建；完成后停止审阅。
 
-### Batch 4B：Audio Web Studio Grand Runtime
+### Batch 4B：Audio Web MIDISampleSynth Runtime（Studio Grand 首验）
 
 - AudioContext lifecycle；
-- WAV fetch / decode、Promise 去重与可重试缓存；
-- 按 Gate C 结果实现 Sample Zone、Pitch、Velocity、Gain、Pan、Note Off 与 Release；
+- Bundle / WAV fetch、受限 ZIP decode、AudioBuffer decode、Promise 去重与可重试缓存；
+- 按 Gate C 结果实现 range / exact-key、trigger、loop、Pitch / Tune、Offset、Velocity、Gain、Pan、
+  Envelope、Note Off 与 mutex；
 - Voice Token、cancel、allNotesOff 与资源统计；
 - Fake Web Audio contract tests；
 - 不接 Workbench UI，完成后停止审阅。
@@ -929,8 +984,10 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - User gesture 前不创建 AudioContext；
 - 同一 Sample Zone 并发只解码一次；
 - decode failure 可重试；
-- Pitch playbackRate 与 Velocity Gain vector；
-- Span End、Clip Boundary、cancel 和快速 release；
+- range / exact-key 唯一 Zone 选择与 unsupported pitch；
+- Pitch / Tune playbackRate、Offset 与 Velocity Gain vector；
+- no-loop、`0/0`、有效 loop、loop-through-release 与 one-shot；
+- attack / release override、mutex、Span End、Clip Boundary、cancel 和快速 release；
 - old generation event 被丢弃；
 - allNotesOff / dispose 后 Voice、Node、Timer 和 Listener 为零。
 
@@ -968,8 +1025,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 本阶段不实现：
 
 - 完整 Soundbank Catalog、搜索、分类、收藏和最近使用；
-- 运行时 ZIP 扫描 / 解压、M4A / WAV 自动协商或全量 2.2 GB 资源索引；
-- 通用 MIDISampleSynth Runtime、Sampler 编辑器或第三方 Plugin；
+- 任意 ZIP / 上游 schema 扫描、M4A / WAV 自动协商或全量 2.2 GB 资源索引；
+- Sampler 编辑器、任意用户 Sample 导入或第三方 Plugin；
 - FMSynth / VASynth 引擎及其 Web Audio、AudioWorklet 或 WASM 技术选择；
 - 完整物理钢琴模型、多力度 Sample、制音器 / 弦共鸣、release sample 与踏板行为；
 - 通用 Effect Graph、Graph Reconciler、RuntimeDelta 与跨线程 generation ACK；

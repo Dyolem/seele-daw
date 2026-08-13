@@ -18,3 +18,16 @@ Composition Root 可以知道并装配全部领域包与浏览器实现。
 
 完整规则见
 [Studio Keyboard Shortcut Architecture](../../docs/studio-keyboard-shortcut-architecture.md)。
+
+当前应用级能力还包括 `ProjectPlaybackCoordinator`：
+
+- Composition Root 创建唯一 Coordinator、Browser Runtime 与 Timer，并在 Active Project、Vue
+  Binding 和浏览器音频资源之间建立显式生命周期；
+- Coordinator 从稳定 Project Snapshot 编译计划，组合浏览器无关 Transport / Scheduler，再把
+  Voice Plan 交给 Audio Web；它不写 Project Fact，也不进入 Pinia；
+- Vue Context 只暴露命令能力和 shallow frozen playback state，Transport 组件继续通过 Props /
+  Emits 接收展示状态与上报用户意图；
+- 首个 Play 用户手势才激活 AudioContext 和准备当前计划所需的同源 Manifest/WAV；应用退出、
+  项目切换和计划替换都会停止 Timer、使 Voice 失效并释放 Project playback lifetime；
+- 当前本地 Studio Grand asset base 只服务 Vite dev 验证，production build 仍不复制 public
+  Soundbank；其他 Soundbank 若没有 Composition Root location，会以可见错误失败关闭。

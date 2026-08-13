@@ -43,8 +43,22 @@ import {
   type ProjectNavigationDecisionVueBinding,
 } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
 import {
-  createProjectTrackCoordinator,
-} from '@/workbench/project/track/project-track-coordinator'
+  createBrowserProjectPlaybackRuntime,
+  createDefaultBuiltInSampleAssetLocations,
+} from '@/workbench/project/playback/browser-runtime'
+import { createBrowserProjectPlaybackTimer } from '@/workbench/project/playback/browser-timer'
+import {
+  createProjectPlaybackCoordinator,
+  type ProjectPlaybackCoordinator,
+  type ProjectPlaybackRuntimePort,
+  type ProjectPlaybackTimerPort,
+} from '@/workbench/project/playback/project-playback-coordinator'
+import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/workbench/project/playback/vue/project-playback-context'
+import {
+  createProjectPlaybackVueBinding,
+  type ProjectPlaybackVueBinding,
+} from '@/workbench/project/playback/vue/project-playback-vue-binding'
+import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import { PROJECT_TRACK_CONTEXT_KEY } from '@/workbench/project/track/vue/project-track-context'
 import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/workbench/project/vue/active-project-context'
 import {
@@ -63,6 +77,8 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
   readonly createProjectEntityId?: () => string
   readonly createRandomValue?: () => number
   readonly keyboardBindingRegistry?: StudioKeyboardBindingRegistry
+  readonly projectPlaybackRuntime?: ProjectPlaybackRuntimePort
+  readonly projectPlaybackTimer?: ProjectPlaybackTimerPort
 }
 
 export interface StudioApplication {
@@ -77,6 +93,8 @@ class StudioApplicationImpl implements StudioApplication {
   readonly projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator
   readonly #vueApplication: VueApplication
   readonly #projectRuntime: BrowserActiveProjectRuntime
+  readonly #projectPlayback: ProjectPlaybackCoordinator
+  readonly #projectPlaybackBinding: ProjectPlaybackVueBinding
   readonly #activeProjectBinding: ActiveProjectVueBinding
   readonly #projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding
   readonly #projectNavigationGuardDispose: ProjectNavigationGuardDispose
@@ -88,6 +106,8 @@ class StudioApplicationImpl implements StudioApplication {
   constructor(
     vueApplication: VueApplication,
     projectRuntime: BrowserActiveProjectRuntime,
+    projectPlayback: ProjectPlaybackCoordinator,
+    projectPlaybackBinding: ProjectPlaybackVueBinding,
     activeProjectBinding: ActiveProjectVueBinding,
     projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding,
     projectNavigationGuardDispose: ProjectNavigationGuardDispose,
@@ -97,6 +117,8 @@ class StudioApplicationImpl implements StudioApplication {
   ) {
     this.#vueApplication = vueApplication
     this.#projectRuntime = projectRuntime
+    this.#projectPlayback = projectPlayback
+    this.#projectPlaybackBinding = projectPlaybackBinding
     this.#activeProjectBinding = activeProjectBinding
     this.#projectNavigationDecisionBinding = projectNavigationDecisionBinding
     this.#projectNavigationGuardDispose = projectNavigationGuardDispose
@@ -151,9 +173,17 @@ class StudioApplicationImpl implements StudioApplication {
           this.#keyboardShortcuts.dispose()
         } finally {
           try {
-            this.#activeProjectBinding.dispose()
+            this.#projectPlaybackBinding.dispose()
           } finally {
-            this.#projectRuntime.dispose()
+            try {
+              this.#projectPlayback.dispose()
+            } finally {
+              try {
+                this.#activeProjectBinding.dispose()
+              } finally {
+                this.#projectRuntime.dispose()
+              }
+            }
           }
         }
       }
@@ -174,6 +204,9 @@ export function composeStudioApplication(
   let projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding | null = null
   let projectNavigationGuardDispose: ProjectNavigationGuardDispose | null = null
   let keyboardShortcuts: StudioKeyboardShortcutCoordinator | null = null
+  let projectPlayback: ProjectPlaybackCoordinator | null = null
+  let projectPlaybackBinding: ProjectPlaybackVueBinding | null = null
+  let unownedProjectPlaybackRuntime: ProjectPlaybackRuntimePort | null = null
 
   try {
     activeProjectBinding = createActiveProjectVueBinding(projectRuntime.activeProject)
@@ -199,6 +232,20 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
     })
+    const projectPlaybackRuntime =
+      composition.projectPlaybackRuntime ??
+      createBrowserProjectPlaybackRuntime({
+        assetBaseBySoundbank: createDefaultBuiltInSampleAssetLocations(location.origin),
+        expectedOrigin: location.origin,
+      })
+    unownedProjectPlaybackRuntime = projectPlaybackRuntime
+    projectPlayback = createProjectPlaybackCoordinator({
+      activeProject: projectRuntime.activeProject,
+      runtime: projectPlaybackRuntime,
+      timer: composition.projectPlaybackTimer ?? createBrowserProjectPlaybackTimer(),
+    })
+    unownedProjectPlaybackRuntime = null
+    projectPlaybackBinding = createProjectPlaybackVueBinding(projectPlayback)
     keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
       bindingRegistry:
         composition.keyboardBindingRegistry ??
@@ -219,6 +266,7 @@ export function composeStudioApplication(
       PROJECT_MIDI_NOTE_CONTEXT_KEY,
       Object.freeze({ projectMidiNotes }),
     )
+    vueApplication.provide(PROJECT_PLAYBACK_CONTEXT_KEY, projectPlaybackBinding.context)
     vueApplication.provide(
       STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
       Object.freeze({ keyboardShortcuts }),
@@ -234,6 +282,8 @@ export function composeStudioApplication(
     return new StudioApplicationImpl(
       vueApplication,
       projectRuntime,
+      projectPlayback,
+      projectPlaybackBinding,
       activeProjectBinding,
       projectNavigationDecisionBinding,
       projectNavigationGuardDispose,
@@ -252,9 +302,18 @@ export function composeStudioApplication(
           keyboardShortcuts?.dispose()
         } finally {
           try {
-            activeProjectBinding?.dispose()
+            projectPlaybackBinding?.dispose()
           } finally {
-            projectRuntime.dispose()
+            try {
+              if (projectPlayback === null) unownedProjectPlaybackRuntime?.dispose()
+              else projectPlayback.dispose()
+            } finally {
+              try {
+                activeProjectBinding?.dispose()
+              } finally {
+                projectRuntime.dispose()
+              }
+            }
           }
         }
       }

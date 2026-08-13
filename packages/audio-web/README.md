@@ -5,9 +5,10 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 当前首个可听切片先建立通用 MIDISampleSynth Sample Voice，并以 Studio Grand 完成首次产品
 听觉验收。
 
-> 当前状态：Batch 4A.2、Batch 4B.1 与 Batch 4B.2 已通过审阅。当前已有用户激活的 AudioContext、
-> 最小 master output、Manifest 驱动的 Sample Voice、Note Off / loop / mutex、generation 与资源
-> 统计；尚未实现 SFZ 文本 parser、Scheduler Executor 或 Studio Transport 接入。
+> 当前状态：Batch 4A.2、Batch 4B.1 与 Batch 4B.2 已通过审阅；Studio Batch 5A 首次可听闭环
+> 已实现，等待审阅。当前已有用户激活的 AudioContext、最小 master output、Manifest 驱动的
+> Sample Voice、Note Off / loop / mutex、generation 与资源统计；Studio 通过公开 API 组合资源
+> 准备和 Voice 执行，但 SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
@@ -64,6 +65,16 @@ Batch 4B.2 在同一包内增加执行边界：
   拒绝。source、gain、output 与 `ended` listener 都计数，并在自然结束、失败、dispose 后归零；
 - 本批不拥有 Timer，不接 Scheduler wake-up、Workbench 或 Transport UI；这些属于 Batch 5A 的
   Composition Root 闭环。
+
+Batch 5A 没有把 Studio 职责下沉进本包，而是公开已有真实边界：
+
+- `WebAudioContextRuntime` 仍在首个 Play 手势内才创建 / resume Context；
+- `SampleInstrumentResourceCache`、`prepareAudibleMidiSampleResources` 与
+  `SampleInstrumentVoiceRuntime` 由 Studio Composition Root 串接；
+- Studio 注入同源 Soundbank asset base、byte budget 与生命周期，Audio Web 不读取 Router、Vue、
+  Project Model 或本地 Catalog；
+- Playback Scheduler 仍在浏览器无关包内规划；Studio 的 25 ms Timer 只唤醒规划并把冻结 Voice
+  Plan 交给本包执行，因此这里没有新增第二套时间权威。
 
 当前 Sample Instrument 已形成三组不同变化原因，因此按职责分层；其中较短的文件名是这个模块
 在语义仍然明确时的局部选择，不构成禁止文件名重复目录上下文的全局规则：

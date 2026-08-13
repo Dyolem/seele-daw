@@ -4,11 +4,11 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 4A.2 与 Audio Web Batch 4B.1、Batch 4B.2 已通过审阅。本包已有通用 Sample
-> Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、
-> Transport Mapping 与 Scheduler Planner；包根现在只额外公开 Audio Web 真实消费者需要的
-> `AudibleMidiProjectPlan` 与 `ScheduledSampleVoicePlan` 类型，浏览器 Fetch/decode/Voice 仍完全
-> 位于 Audio Web。
+> 当前状态：Batch 4A.2 与 Audio Web Batch 4B.1、Batch 4B.2 已通过审阅；Studio Batch 5A
+> 首次可听闭环已实现，等待审阅。本包已有通用 Sample Instrument Device schema、TempoMap、
+> 具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner。包根现在公开 Studio 与
+> Audio Web 这两个真实消费者所需的最小编译、时钟、Transport、Scheduler 与只读计划表面；
+> 浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
@@ -31,11 +31,15 @@ late / drop policy 已按批次收敛；资产加载与浏览器矩阵仍按阶�
 
 ## 当前已实现
 
-包根只公开真实跨包消费者需要的最小 Device / Soundbank 身份边界：
+包根只公开真实跨包消费者需要的最小播放边界：
 
-- `AudibleMidiProjectPlan` 与 `ScheduledSampleVoicePlan` 只导出类型：前者供 Audio Web 从稳定计划
-  收集实际需要的 Soundbank/Pitch，后者供 Voice Runtime 执行已排程事件；Compiler、Transport
-  和 Scheduler 写能力仍保持包内，未扩大为尚无产品消费者的运行时 API；
+- `compileAudibleMidiProject`、`createAudibleMidiTransport` 与
+  `createAudibleMidiSchedulerPlanner` 供 Studio Composition Root 的 Playback Coordinator
+  建立同一份稳定计划、Transport Mapping 与 look-ahead window；
+- `AudibleMidiProjectPlan` 与 `ScheduledSampleVoicePlan` 分别供 Audio Web 收集实际需要的
+  Soundbank/Pitch，以及让 Voice Runtime 执行已排程事件；
+- Playback Clock parser、Plan / Transport / Scheduler outcome 与对应最小类型随真实 Studio
+  消费者公开；TempoMap 实现、Compiler 内部 DTO 建造和未来写协议仍保持包内；
 
 - `STUDIO_GRAND_DEVICE_DEFINITION` 固定 `typeId = seele.sample-instrument`、
   `definitionVersion = 1` 与显示名称 `Studio Grand`；
@@ -93,9 +97,8 @@ Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
 - 没有可听 Note Span 是带 diagnostic 的合法 Empty Plan，不是编译异常；伪造或引用不一致的
   Snapshot 则失败关闭。
 
-Compiler、Transport 与 Scheduler 计划暂不从 package root 导出；Audio Web 接入前再由真实跨包
-消费者验证并收敛公开表面。资源准备失败属于后续 Manifest / Audio Runtime 边界，不能倒逼
-Compiler 按 Soundbank 名称静默丢弃 Track。
+Compiler 现在由 Studio 通过 package root 调用；资源准备失败仍属于 Manifest / Audio Runtime
+边界，不能倒逼 Compiler 按 Soundbank 名称静默丢弃 Track。
 
 Batch 3A 进一步建立了浏览器无关的 Transport Mapping：
 
@@ -130,8 +133,9 @@ Batch 3B 进一步建立了浏览器无关的 Scheduler Planner：
 - Planner 不创建 Cancel、`allNotesOff`、AudioContext、AudioNode 或 UI 状态，这些仍由后续
   Coordinator 与 Audio Runtime 拥有。
 
-Transport 与 Scheduler 当前仍是包内能力；Studio 控件、快捷键、当前时间、AudioContext 和
-发声都尚未接入。
+Transport 与 Scheduler 已由 Studio Batch 5A 的 Coordinator 消费。它们仍不知道 Vue、Timer、
+AudioContext、资源 URL 或 Voice；Studio 决定当前 `25 ms` 唤醒与 `200 ms` look-ahead 产品参数，
+Audio Web 只执行冻结的 Voice Plan。
 
 ## 长期包定位
 

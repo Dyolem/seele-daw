@@ -4,7 +4,7 @@
 > 产品定位：桌面浏览器优先、面向个人创作者的轻量 Web DAW  
 > 文档作用：回答系统如何拆分、模块如何依赖，以及从哪里开始开发  
 > 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3\
-> 最近校准：2026-08-10
+> 最近校准：2026-08-13
 
 ---
 
@@ -26,9 +26,10 @@
 为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
 架构文档的版本号。
 
-截至 2026-08-10，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
-多选 Delete 已形成闭环；Playback 与 Web Audio 生产实现尚未开始。长期架构中的通用
-Graph、RuntimeDelta、跨线程 ACK 和 AudioWorklet 路径都不能反推为该首版切片的必做范围。
+截至 2026-08-13，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
+多选 Delete 已形成闭环；Playback 已建立 TempoMap、Compiler、Transport 与 Scheduler，Audio Web
+已建立 Sample 资源准备和 Voice Runtime，Studio 首次可听闭环已实现并等待审阅。长期架构中的
+通用 Graph、RuntimeDelta、跨线程 ACK 和 AudioWorklet 路径都不能反推为该首版切片的必做范围。
 
 ---
 
@@ -381,6 +382,12 @@ CapabilityService
 5. 管理启动与 Dispose。
 
 任何业务类都不应在内部自行 new Storage、AudioRuntime 或 ProjectSession。
+
+当前首个可听切片由 Studio 的 `ProjectPlaybackCoordinator` 落实这条组合边界：它订阅
+`ActiveProjectService`、把 Snapshot 交给 Playback Compiler、以注入的 AudioContext Clock 驱动
+Transport / Scheduler，并把冻结 Voice Plan 交给 Audio Web。Vue 只通过 typed Context 观察
+shallow frozen state；Timer、AudioContext、解码缓存和 Voice 都由应用生命周期释放，不进入
+Pinia 或 Project Core。
 
 ## 14. 生命周期
 

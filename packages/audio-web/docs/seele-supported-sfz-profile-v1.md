@@ -14,7 +14,8 @@
 Batch 4A.1a 已实现并通过审阅：Profile 常量、Manifest 类型、严格 validator 和默认内置
 `MIDISampleSynth` Mapping Adapter 已提交。Batch 4A.1b 的独立受限 ZIP / WAV 边界与本地规范化
 工具也已通过审阅并提交；Batch 4B.1 资源准备以及 Batch 4B.2 的生产 AudioContext 与 Voice 执行
-均已通过审阅。尚未实现 SFZ 文本 parser、Studio Timeline 发声闭环。
+均已通过审阅。尚未实现 SFZ 文本 parser；Studio Timeline 首次可听闭环已在 Batch 5A 实现并
+等待审阅。
 
 默认内置数据的字段统计与行为推断不是本规范的一部分，另见
 [默认内置 MIDISampleSynth 控制文件逆向分析](./default-built-in-midi-sample-synth-reverse-analysis.md)。

@@ -31,6 +31,14 @@ import {
   useProjectMidiNotes,
   type ProjectMidiNoteVueContext,
 } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import type {
+  ProjectPlaybackRuntimePort,
+  ProjectPlaybackTimerPort,
+} from '@/workbench/project/playback/project-playback-coordinator'
+import {
+  useProjectPlayback,
+  type ProjectPlaybackVueContext,
+} from '@/workbench/project/playback/vue/project-playback-context'
 import {
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
   PROJECT_NAVIGATION_DECISION,
@@ -53,10 +61,20 @@ interface RuntimeFixture {
   readonly listRecentProjects: ReturnType<
     typeof vi.fn<BrowserActiveProjectRuntime['projectCatalog']['listRecentProjects']>
   >
-  readonly unsubscribe: ReturnType<typeof vi.fn<() => void>>
   readonly save: ReturnType<typeof vi.fn<() => Promise<void>>>
   readonly dispose: ReturnType<typeof vi.fn<() => void>>
+  readonly subscriptions: ReturnType<typeof vi.fn<() => void>>[]
 }
+
+const INERT_PLAYBACK_RUNTIME: ProjectPlaybackRuntimePort = Object.freeze({
+  prepare: () => Promise.reject(new Error('Playback is not used by this composition test')),
+  dispose() {},
+})
+
+const INERT_PLAYBACK_TIMER: ProjectPlaybackTimerPort = Object.freeze({
+  clear() {},
+  setRepeating: () => Object.freeze({}),
+})
 
 function createTestRouter(): Router {
   return createRouter({
@@ -69,9 +87,7 @@ function createRuntimeFixture(
   order: string[] = [],
   state: ActiveProjectState = Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE }),
 ): RuntimeFixture {
-  const unsubscribe = vi.fn<() => void>(() => {
-    order.push('binding')
-  })
+  const subscriptions: ReturnType<typeof vi.fn<() => void>>[] = []
   const open = vi.fn<(projectId: ProjectId) => Promise<void>>(() => Promise.resolve())
   const listRecentProjects = vi.fn<
     BrowserActiveProjectRuntime['projectCatalog']['listRecentProjects']
@@ -82,7 +98,13 @@ function createRuntimeFixture(
     create: () => Promise.resolve(parseProjectId('studio-created-project')),
     open,
     save,
-    subscribe: () => unsubscribe,
+    subscribe: () => {
+      const subscription = vi.fn<() => void>(() => {
+        order.push('binding')
+      })
+      subscriptions.push(subscription)
+      return subscription
+    },
     dispose() {},
   }
   const dispose = vi.fn<() => void>(() => {
@@ -97,7 +119,7 @@ function createRuntimeFixture(
     },
     open,
     listRecentProjects,
-    unsubscribe,
+    subscriptions,
     save,
     dispose,
   }
@@ -142,9 +164,7 @@ function requireProjectTrackContext(
   return context
 }
 
-function requireProjectClipContext(
-  context: ProjectClipVueContext | null,
-): ProjectClipVueContext {
+function requireProjectClipContext(context: ProjectClipVueContext | null): ProjectClipVueContext {
   if (context === null) throw new Error('Expected the Project Clip Context')
   return context
 }
@@ -167,6 +187,27 @@ function requireKeyboardShortcutContext(
   return context
 }
 
+function requireProjectPlaybackContext(
+  context: ProjectPlaybackVueContext | null,
+): ProjectPlaybackVueContext {
+  if (context === null) throw new Error('Expected the Project Playback Context')
+  return context
+}
+
+function createCompositionOptions() {
+  return {
+    projectPlaybackRuntime: INERT_PLAYBACK_RUNTIME,
+    projectPlaybackTimer: INERT_PLAYBACK_TIMER,
+  }
+}
+
+function createTrackedPlaybackRuntime(order: string[]): ProjectPlaybackRuntimePort {
+  return Object.freeze({
+    prepare: () => Promise.reject(new Error('Playback is not used by this composition test')),
+    dispose: () => order.push('playback-runtime'),
+  })
+}
+
 describe('StudioApplication', () => {
   it('installs Pinia and Router while providing the owned Active Project Context', () => {
     const fixture = createRuntimeFixture()
@@ -179,6 +220,7 @@ describe('StudioApplication', () => {
     let projectMidiNoteContext: ProjectMidiNoteVueContext | null = null
     let projectTrackContext: ProjectTrackVueContext | null = null
     let keyboardShortcutContext: StudioKeyboardShortcutVueContext | null = null
+    let projectPlaybackContext: ProjectPlaybackVueContext | null = null
     const rootComponent = defineComponent({
       setup() {
         const activeProject = useActiveProject()
@@ -187,6 +229,7 @@ describe('StudioApplication', () => {
         projectMidiNoteContext = useProjectMidiNotes()
         projectTrackContext = useProjectTracks()
         keyboardShortcutContext = useStudioKeyboardShortcuts()
+        projectPlaybackContext = useProjectPlayback()
         const projectNavigationDecision = useProjectNavigationDecision()
         const installedRouter = useRouter()
         const store = useCompositionStore()
@@ -204,6 +247,7 @@ describe('StudioApplication', () => {
       projectRuntime: fixture.runtime,
       createProjectEntityId: () => 'studio-project-entity',
       createRandomValue: () => 0,
+      ...createCompositionOptions(),
     })
     const container = document.createElement('div')
 
@@ -215,16 +259,17 @@ describe('StudioApplication', () => {
     )
     expect(Object.isFrozen(requireProjectClipContext(projectClipContext).projectClips)).toBe(true)
     expect(
-      Object.isFrozen(
-        requireProjectMidiNoteContext(projectMidiNoteContext).projectMidiNotes,
-      ),
+      Object.isFrozen(requireProjectMidiNoteContext(projectMidiNoteContext).projectMidiNotes),
     ).toBe(true)
-    expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(true)
+    expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(
+      true,
+    )
     expect(
-      requireKeyboardShortcutContext(
-        keyboardShortcutContext,
-      ).keyboardShortcuts.listShortcuts(),
+      requireKeyboardShortcutContext(keyboardShortcutContext).keyboardShortcuts.listShortcuts(),
     ).toEqual([])
+    expect(requireProjectPlaybackContext(projectPlaybackContext).state.value.phase).toBe(
+      'unavailable',
+    )
     application.dispose()
   })
 
@@ -241,6 +286,7 @@ describe('StudioApplication', () => {
       }),
       router: createTestRouter(),
       projectRuntime: fixture.runtime,
+      ...createCompositionOptions(),
     })
     application.mount(document.createElement('div'))
     const context = requireNavigationDecisionContext(decisionContext)
@@ -291,6 +337,7 @@ describe('StudioApplication', () => {
       }),
       router,
       projectRuntime: fixture.runtime,
+      ...createCompositionOptions(),
     })
     application.mount(document.createElement('div'))
     const context = requireNavigationDecisionContext(decisionContext)
@@ -323,6 +370,7 @@ describe('StudioApplication', () => {
       }),
       router: createTestRouter(),
       projectRuntime: fixture.runtime,
+      ...createCompositionOptions(),
     })
     application.mount(document.createElement('div'))
     const context = requireNavigationDecisionContext(decisionContext)
@@ -348,6 +396,7 @@ describe('StudioApplication', () => {
       rootComponent: { render: () => null },
       router: createTestRouter(),
       projectRuntime: fixture.runtime,
+      ...createCompositionOptions(),
     })
 
     const resolution = await application.projectEntry.resolve(projectId)
@@ -370,14 +419,19 @@ describe('StudioApplication', () => {
       }),
       router: createTestRouter(),
       projectRuntime: fixture.runtime,
+      projectPlaybackRuntime: createTrackedPlaybackRuntime(order),
+      projectPlaybackTimer: INERT_PLAYBACK_TIMER,
     })
 
     application.mount(document.createElement('div'))
     application.dispose()
     application.dispose()
 
-    expect(order).toEqual(['component', 'binding', 'runtime'])
-    expect(fixture.unsubscribe).toHaveBeenCalledOnce()
+    expect(order).toEqual(['component', 'binding', 'playback-runtime', 'binding', 'runtime'])
+    expect(fixture.subscriptions).toHaveLength(2)
+    expect(fixture.subscriptions.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(
+      true,
+    )
     expect(fixture.dispose).toHaveBeenCalledOnce()
   })
 
@@ -387,18 +441,23 @@ describe('StudioApplication', () => {
       rootComponent: { render: () => null },
       router: createTestRouter(),
       projectRuntime: fixture.runtime,
+      ...createCompositionOptions(),
     })
 
     application.dispose()
     application.dispose()
 
-    expect(fixture.unsubscribe).toHaveBeenCalledOnce()
+    expect(fixture.subscriptions).toHaveLength(2)
+    expect(fixture.subscriptions.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(
+      true,
+    )
     expect(fixture.dispose).toHaveBeenCalledOnce()
   })
 
   it('releases the transferred Runtime when application composition fails', () => {
     const fixture = createRuntimeFixture()
     const router = createTestRouter()
+    const playbackDispose = vi.fn<() => void>()
     const failureCause = new Error('Router installation failed')
     vi.spyOn(router, 'install').mockImplementation(() => {
       throw failureCause
@@ -409,9 +468,18 @@ describe('StudioApplication', () => {
         rootComponent: { render: () => null },
         router,
         projectRuntime: fixture.runtime,
+        projectPlaybackRuntime: Object.freeze({
+          prepare: INERT_PLAYBACK_RUNTIME.prepare,
+          dispose: playbackDispose,
+        }),
+        projectPlaybackTimer: INERT_PLAYBACK_TIMER,
       }),
     ).toThrow(failureCause)
-    expect(fixture.unsubscribe).toHaveBeenCalledOnce()
+    expect(fixture.subscriptions).toHaveLength(2)
+    expect(fixture.subscriptions.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(
+      true,
+    )
+    expect(playbackDispose).toHaveBeenCalledOnce()
     expect(fixture.dispose).toHaveBeenCalledOnce()
   })
 
@@ -421,6 +489,7 @@ describe('StudioApplication', () => {
       rootComponent: { render: () => null },
       router: createTestRouter(),
       projectRuntime: mountedFixture.runtime,
+      ...createCompositionOptions(),
     })
     mountedApplication.mount(document.createElement('div'))
 
@@ -434,6 +503,7 @@ describe('StudioApplication', () => {
       rootComponent: { render: () => null },
       router: createTestRouter(),
       projectRuntime: disposedFixture.runtime,
+      ...createCompositionOptions(),
     })
     disposedApplication.dispose()
 

@@ -2,7 +2,7 @@
 
 > Status: Normative
 > Scope: `apps/studio` Vue application layer
-> Last updated: 2026-07-28
+> Last updated: 2026-08-13
 
 本文档规定 Seele Studio 如何在组件本地状态、Props / Emits、Pinia 与
 `provide / inject` 之间选择。它补充根目录 `DESIGN.md` 的状态所有权约束，不改变
@@ -71,9 +71,15 @@ Store 或 Context。
 | Project Clip | Coordinator | Project Command 能力 |
 | Project MIDI Note | Coordinator | Clip 目标校验与 Project Command 能力 |
 | Navigation Decision | pending binding + resolver | 一次性异步决策 Port |
+| Project Playback | Coordinator + shallow Vue Binding | 外部音频资源、Transport 命令与可丢弃状态投影 |
 
 Context 可以携带 `shallowRef`，但如果该对象开始拥有大量 UI 状态、派生值、协调动作、
 重置规则和多个跨分支消费者，它已经成为手写 Store，应重新评估 Pinia。
+
+Project Playback 是 Context 而不是 Pinia 的边界示例：权威 Coordinator 由 Composition Root
+创建，拥有 Project subscription、Transport / Scheduler、Timer、AudioContext、解码缓存和 Voice
+生命周期；Vue Binding 只把冻结的 phase、position、diagnostics 与 feedback 投影到一个
+`shallowRef`。组件不能把这些外部资源复制进 Store，也不能把播放状态写回 Project History。
 
 ### 2.4 Pinia
 

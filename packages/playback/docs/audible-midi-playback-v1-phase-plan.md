@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 4A.2, Batch 4B.1 and Batch 4B.2 reviewed; Batch 5A is next
+> Status: Batch 4A.2, Batch 4B.1, Batch 4B.2 and Batch 5A reviewed; follow-up refinements deferred
 >
 > Date: 2026-08-10
 >
@@ -112,15 +112,10 @@ Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content �
 Gate C.2 已建立加载估算和 dev-only 试听入口，真实浏览器加载、解码、发声与人工试听均成功；
 `0.133 s linear release` 未感知到明显 click，可以作为后续实现和 A/B 比较的基线，但不因此
 成为最终的通用包络曲线。Batch 4B.1 已按 Gate 的加载建议实现并通过审阅；Batch 4B.2 已落实并
-通过审阅下列首版规则：
-
-1. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
-2. 是否接受 `curve: null/0` 线性 amplitude、非零 shape 的 Seele V1 指数形状，以及
-   `velocity / 127` 的首版映射；
-3. 是否接受普通 gated Note Off 使用 Zone release、`6 ms` linear fast release 只用于 cancel /
-   generation / allNotesOff / `off_mode=fast` 的边界；
-4. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
-   行为，哪些明确延期。
+通过审阅首版包络、Velocity、Note Off、loop、mutex、generation 与 Voice 生命周期规则。
+Batch 5A 采用 capability-based Chrome-first 验收：自动测试保证 Composition / 状态 / 资源
+边界，真实 Chrome 人工 smoke 负责验证用户手势解锁与声卡输出；多浏览器矩阵留到阶段加固或
+明确兼容性切片。
 
 Gate C.1b 已把 Catalog / Indexes 的本地定位、stable `studio-grand` 到当前输入的生成映射、ZIP
 安全预算、固定输入指纹与输出校验报告落实为开发工具。可分发 Manifest / Bundle 仍只能在替代
@@ -685,7 +680,7 @@ Playback Coordinator，并通过类型化 Vue Context 提供命令能力与 shal
 
 ### 7.2 Transport UI
 
-以下是 Batch 5A 的候选 UI 契约，必须在接入 Studio 前单独审阅：
+Batch 5A 已按以下 UI 契约实现并通过功能审核；进一步优化留待后续讨论：
 
 - Play 按钮在 Playing 时切换为 Pause 图标和可访问名称；
 - Loading 时按钮显示 Busy 并阻止重复请求；
@@ -697,8 +692,8 @@ Playback Coordinator，并通过类型化 Vue Context 提供命令能力与 shal
 - Modal / Dialog 继续高于 Transport Scope；
 - 无可播放 Route、零 Note Span、unsupported content 或 Runtime Failure 提供明确的邻近状态、
   disabled reason 或 Toast，具体阻止层级由对应 Gate 决定；
-- V1 没有 Meter 数据时不继续显示会被理解为实时电平的 `0.0 dB`；应改成明确不可用的占位或
-  隐藏输出读数，最终视觉在 Studio Batch 审阅。
+- V1 没有 Meter 数据时不继续显示会被理解为实时电平的 `0.0 dB`；当前实现显示明确不可用的
+  `Meter —`。
 
 ### 7.3 可选 Playhead 批次
 
@@ -823,7 +818,7 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
   形状；
 - Gate C.2（2026-08-13 工具、客观测量与人工试听已审）：浏览器加载和单音发声成功，当前
   linear release 无明显 click；Batch 4B.1 已按加载建议实现并通过审阅。Batch 4B.2 的包络、
-  velocity 与 Voice 行为也已通过审阅；浏览器验收策略仍在首次 Studio 闭环前确认。
+  velocity 与 Voice 行为也已通过审阅；首次 Studio 闭环采用 capability-based Chrome-first。
 
 ### Batch 1A：Project Core Instrument Device Replace
 
@@ -964,8 +959,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 > Implementation status: reviewed and committed as `dc8ccfd`. Playback and Audio Web type-check
 > pass; Playback 7 test files / 76 tests and Audio Web 12 test files / 75 tests pass.
 
-- `@seele-daw/playback` 包根只新增 `AudibleMidiProjectPlan` type export，供真实 Audio Web 消费者
-  使用，不公开 Compiler、Transport 或 Scheduler 写能力；
+- 当时 `@seele-daw/playback` 包根只新增 `AudibleMidiProjectPlan` type export，供首个真实 Audio
+  Web 消费者使用；Compiler、Transport 与 Scheduler 直到 Batch 5A 出现 Studio 消费者才公开；
 - 按完整稳定 Plan 的 Track route 聚合 Soundbank/Pitch，并拒绝 blocked、缺失/重复/inaudible route、
   缺失 asset location、Manifest identity 不一致和 unsupported pitch；
 - 实现同源 Manifest/WAV Fetch、byte budget、严格解析/验证、AudioBuffer decode、Promise 去重、
@@ -977,7 +972,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 4B.2：Audio Web MIDISampleSynth Voice（Studio Grand 首验）
 
-> Implementation status: reviewed on 2026-08-13. Repository `pnpm check`, changed-scope Oxlint /
+> Implementation status: reviewed and committed as `772210f` on 2026-08-13. Repository
+> `pnpm check`, changed-scope Oxlint /
 > ESLint and formatting pass; Playback 7 test files / 76 tests and Audio Web 15 test files / 104 tests
 > pass.
 
@@ -1005,6 +1001,13 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 5A：Studio Transport 与首次可听闭环
 
+> Implementation status: reviewed on 2026-08-13; the core runtime was committed as `7242a52` and
+> the UI is recorded in the following split commit. Playback type-check and 7 test files / 76 tests,
+> Audio Web type-check and 16 test files / 105 tests, and Studio type-check and 42 test files / 230
+> tests pass. Full repository verification and an in-app Chromium runtime smoke also pass. Further
+> listening and interaction refinements are deferred for separate discussion and are not claimed by
+> this functional review.
+
 - Composition Root 创建 Project Playback Coordinator；
 - 用户手势内 prepare / load / resume / play；
 - 按 Gate B 接通 Transport、快捷键与当前时间显示；
@@ -1012,6 +1015,26 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 项目切换与应用 dispose；
 - 浏览器自动渲染 smoke 与至少一次真实 Chrome 人工听觉 smoke；
 - 更新 DESIGN / PRODUCT 后停止审阅。
+
+当前实现采用以下具体边界：
+
+- Coordinator 使用 `25 ms` wake cadence 与 `200 ms` look-ahead horizon；这些是 Studio 当前
+  产品参数，不写进 Playback 文件协议；
+- 首个 Play 在同步用户手势调用链起点激活 AudioContext，再异步准备完整稳定 Plan 实际引用的
+  Manifest/WAV；Loading 不重复；
+- Package root 只公开 Studio / Audio Web 已存在的真实消费者所需 Compiler、Clock、Transport、
+  Scheduler 与 Runtime 表面；
+- Play 在 Playing 时显示 Pause，Return to Start 在 Loading / Playing / 非零位置可用，时间显示
+  `mm:ss.mmm`，Record / Loop 保持 Disabled，伪 Meter 改为 `Meter —`；
+- `Space` 位于 Workbench Scope，可编辑元素、IME composing 与 Navigation Modal 继续优先；
+- Empty Plan 只通过 Disabled Play reason 安静反馈，不在打开 Workbench 时弹 Toast；Partial 与
+  Runtime failure 使用 Toast / 邻近 reason；
+- Project switch、应用 dispose、加载竞态与 Runtime failure 都会停止 Timer、失效 / 释放 Voice，
+  且不修改 Project Fact；失败允许重试；
+- 任何 Project Commit 当前安全停止旧 playback lifetime 并从 Tick `0` 重编译。保持当前位置并
+  无缝继续属于 Batch 6，不能把当前停止重建表述为已经实现播放中编辑连续性；
+- Studio 只为 `studio-grand` 注入 dev-local asset base；其他合法 MIDISampleSynth 仍能编译，但
+  缺失 location 时明确失败，不静默跳过或替换。
 
 ### Batch 5B：可选 Playhead
 

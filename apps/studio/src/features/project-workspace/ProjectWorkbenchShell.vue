@@ -21,6 +21,11 @@ interface ProjectWorkbenchShellProps {
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly isDirty: boolean
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly playbackCanToggle: boolean
+  readonly playbackCanReturnToStart: boolean
+  readonly playbackFeedback: string | null
+  readonly playbackPhase: 'failed' | 'loading' | 'paused' | 'playing' | 'stopped' | 'unavailable'
+  readonly playbackTime: string
   readonly projectId: string
   readonly projectName: string
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
@@ -37,6 +42,8 @@ const props = withDefaults(defineProps<ProjectWorkbenchShellProps>(), {
 })
 const emit = defineEmits<{
   leaveProject: []
+  playbackReturnToStart: []
+  playbackToggle: []
   redo: []
   save: []
   undo: []
@@ -67,10 +74,17 @@ function openContextEditor(): void {
       :can-redo="props.canRedo"
       :can-undo="props.canUndo"
       :is-context-editor-open="isContextEditorOpen"
+      :playback-can-toggle="props.playbackCanToggle"
+      :playback-can-return-to-start="props.playbackCanReturnToStart"
+      :playback-feedback="props.playbackFeedback"
+      :playback-phase="props.playbackPhase"
+      :playback-time="props.playbackTime"
       :tempo="props.tempo"
       :time-signature-denominator="props.timeSignatureDenominator"
       :time-signature-numerator="props.timeSignatureNumerator"
       @open-context-editor="openContextEditor"
+      @playback-return-to-start="emit('playbackReturnToStart')"
+      @playback-toggle="emit('playbackToggle')"
       @redo="emit('redo')"
       @undo="emit('undo')"
     />

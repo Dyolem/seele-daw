@@ -20,6 +20,7 @@ import {
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
@@ -35,6 +36,9 @@ import {
   type FailedProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
+import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
+import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
 const props = defineProps<{
@@ -52,8 +56,11 @@ interface ProjectPresentation {
 
 const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
+const projectNavigationDecision = useProjectNavigationDecision()
 const { keyboardShortcuts } = useStudioKeyboardShortcuts()
+const { projectPlayback, state: playbackState } = useProjectPlayback()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
+const toasts = useUiToastStore()
 const router = useRouter()
 const requestedProjectId = shallowRef<ProjectId | null>(null)
 const failure = shallowRef<FailedProjectEntryResolution | null>(null)
@@ -101,6 +108,27 @@ const clipSelectionCandidates = computed(
     )
   },
 )
+
+const playbackTime = computed(() => formatPlaybackTime(playbackState.value.positionProjectSecond))
+const playbackCanReturnToStart = computed(
+  () =>
+    playbackState.value.phase === PROJECT_PLAYBACK_PHASE.LOADING ||
+    playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING ||
+    playbackState.value.positionProjectSecond > 0,
+)
+const playbackCanToggle = computed(
+  () =>
+    playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.LOADING &&
+    (playbackState.value.planStatus === 'partial' || playbackState.value.planStatus === 'playable'),
+)
+
+function formatPlaybackTime(projectSecond: number): string {
+  const safeMillisecond = Math.max(0, Math.floor(projectSecond * 1_000))
+  const minute = Math.floor(safeMillisecond / 60_000)
+  const second = Math.floor((safeMillisecond % 60_000) / 1_000)
+  const millisecond = safeMillisecond % 1_000
+  return `${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}.${String(millisecond).padStart(3, '0')}`
+}
 
 function describeFailure(resolution: FailedProjectEntryResolution): string {
   const cause = resolution.failureCause
@@ -191,6 +219,16 @@ function describeSaveFailure(saveFailure: unknown): string | null {
 
 const disposeKeyboardShortcuts = keyboardShortcuts.register([
   {
+    actionId: STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE,
+    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE),
+    description: 'Play or pause the active Project.',
+    isEnabled: () =>
+      playbackCanToggle.value && projectNavigationDecision.pendingDecision.value === null,
+    label: 'Play or pause',
+    run: () => projectPlayback.togglePlayPause(),
+    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
+  },
+  {
     actionId: STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
     bindings: keyboardShortcuts.bindingsFor(
       STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
@@ -228,6 +266,28 @@ const disposeKeyboardShortcuts = keyboardShortcuts.register([
     scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
   },
 ])
+
+watch(
+  () => {
+    const feedback = playbackState.value.feedback
+    return feedback === null ? null : `${feedback.kind}:${feedback.message}`
+  },
+  () => {
+    const feedback = playbackState.value.feedback
+    if (feedback === null || playbackState.value.phase === PROJECT_PLAYBACK_PHASE.LOADING) return
+    switch (feedback.kind) {
+      case 'error':
+        toasts.danger('Playback unavailable', feedback.message)
+        break
+      case 'info':
+        // Empty-project guidance already lives on the disabled Play control; avoid a launch toast.
+        break
+      case 'warning':
+        toasts.warning('Playback is partial', feedback.message)
+        break
+    }
+  },
+)
 
 watch(
   () => props.projectId,
@@ -285,6 +345,7 @@ watch(
 )
 
 onUnmounted(() => {
+  if (playbackCanReturnToStart.value) projectPlayback.returnToStart()
   disposeKeyboardShortcuts()
   isUnmounted = true
   requestGeneration += 1
@@ -302,6 +363,11 @@ onUnmounted(() => {
     :clips="clipPresentations"
     :is-dirty="readyProject.isDirty"
     :piano-roll-presentation="pianoRollPresentation"
+    :playback-can-toggle="playbackCanToggle"
+    :playback-can-return-to-start="playbackCanReturnToStart"
+    :playback-feedback="playbackState.feedback?.message ?? null"
+    :playback-phase="playbackState.phase"
+    :playback-time="playbackTime"
     :project-id="readyProject.projectId"
     :project-name="projectPresentation.projectName"
     :project-session="readyProject.session"
@@ -312,6 +378,8 @@ onUnmounted(() => {
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
     :tracks="trackPresentations"
     @leave-project="router.push(createProjectEntryLocation())"
+    @playback-return-to-start="projectPlayback.returnToStart()"
+    @playback-toggle="projectPlayback.togglePlayPause()"
     @redo="redoProject"
     @save="saveProject"
     @undo="undoProject"

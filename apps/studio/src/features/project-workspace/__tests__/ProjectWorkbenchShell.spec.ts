@@ -97,6 +97,11 @@ function mountShell(options: MountShellOptions = {}) {
       clips: options.clips ?? Object.freeze([]),
       isDirty: options.isDirty ?? false,
       pianoRollPresentation: null,
+      playbackCanToggle: true,
+      playbackCanReturnToStart: false,
+      playbackFeedback: null,
+      playbackPhase: 'stopped',
+      playbackTime: '00:00.000',
       projectId: 'workbench-shell-project',
       projectName: 'Midnight Study',
       projectSession: createTestSession(parseProjectId('workbench-shell-project-session')),
@@ -136,7 +141,9 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('.project-workbench__save').attributes('disabled')).toBeDefined()
     expect(wrapper.get('button[aria-label="Undo"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('button[aria-label="Redo"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('button[aria-label^="Play —"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[aria-label="Play"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('button[aria-label="Return to start"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.project-workbench__output-level').text()).toContain('Meter —')
     expect(
       wrapper.get('.project-workbench__track-actions button').attributes('disabled'),
     ).toBeUndefined()
@@ -150,6 +157,28 @@ describe('ProjectWorkbenchShell', () => {
 
     expect(wrapper.emitted('undo')).toHaveLength(1)
     expect(wrapper.emitted('redo')).toBeUndefined()
+  })
+
+  it('projects playback state and emits enabled Transport intents', async () => {
+    const wrapper = mountShell()
+
+    await wrapper.setProps({
+      playbackCanReturnToStart: true,
+      playbackFeedback: 'Some content will be skipped.',
+      playbackPhase: 'playing',
+      playbackTime: '01:02.345',
+    })
+
+    expect(wrapper.get('button[aria-label="Pause"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('.project-workbench__time').text()).toBe('01:02.345')
+    expect(wrapper.get('.project-workbench__time').attributes('title')).toBe(
+      'Some content will be skipped.',
+    )
+    await wrapper.get('button[aria-label="Pause"]').trigger('click')
+    await wrapper.get('button[aria-label="Return to start"]').trigger('click')
+
+    expect(wrapper.emitted('playbackToggle')).toHaveLength(1)
+    expect(wrapper.emitted('playbackReturnToStart')).toHaveLength(1)
   })
 
   it('renders the Project menu through its portal with the styled overlay classes', async () => {

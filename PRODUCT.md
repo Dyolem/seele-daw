@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-13，已审阅代码基线 `dc8ccfd`，另含已审阅的 Batch 4B.2 实现
+> 最近更新：2026-08-13，已审阅代码基线 `7242a52`，另含本次 Batch 5A UI 提交
 >
-> 当前阶段：Audible MIDI Playback V1 Batch 4B.2 已通过审阅，准备进入 Batch 5A
+> 当前阶段：Audible MIDI Playback V1 Batch 5A 已通过功能审核，优化项留待后续讨论
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -40,12 +40,16 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 5. 在 Piano Roll 聚焦时使用 `Delete` / `Backspace` 原子删除完整 Note Selection。
 6. 通过 Undo / Redo 撤销或恢复 Track、Instrument 选择、MIDI Clip 与 MIDI Note 创建、移动、
    缩放、删除操作。
-7. 显式保存项目。
-8. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
-9. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
+7. 在 Vite 本地开发环境点击 Play 或按 `Space`，加载当前计划所需的 Studio Grand 采样并听见
+   Note；可 Pause、继续和 Return to Start。
+8. 显式保存项目。
+9. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
+10. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
-当前用户闭环已经保存并展示内置 Studio Grand 的 Instrument 事实，但 Studio 尚未调用已经就绪
-的 Audio Web 资源准备与 Sample Voice Runtime，因此界面仍不加载采样、不输出音频，也不提供播放。
+当前可听闭环使用 `apps/studio/public/soundbanks` 中开发者本机的 Studio Grand 验证资产；Vite
+production build 仍禁止复制整棵 public，因此这个资产映射不是公开构建的可分发内置内容。没有
+本地资产、保存了其他尚未配置 location 的 Sample Instrument，或浏览器拒绝 AudioContext 时，
+Studio 会明确失败，不静默替换声音。
 
 ### 2.1 功能总览
 
@@ -62,9 +66,9 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 | `MIDI-CLIP-CREATE`     | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                                     |
 | `CONTEXT-EDITOR-DOCK`  | 上下文编辑器 Dock         | **局部可用** | 可调整布局并显示所选 Clip 的 Piano Roll Selection Surface。                                                                  |
 | `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                              |
-| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo 与 Piano Roll Escape / Delete / Backspace 已接入。                                              |
+| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                 |
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                              |
-| `PLAYBACK`             | 播放与 Transport 执行     | **尚未实现** | 控件仅展示且明确禁用。                                                                                                       |
+| `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可加载 Studio Grand 并 Play / Pause / Return；Loop、Seek、Record、Meter 与播放中无缝重建尚未实现。               |
 | `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | Grid / Note Renderer、Pencil Add、Cursor Selection / Move、Cursor / Pencil Resize、多选 Delete、Snap 与 Undo / Redo 已接入。 |
 
 ## 3. 项目入口与生命周期
@@ -193,10 +197,11 @@ Workbench 已建立真实项目状态驱动的布局：
 
 桌面布局要求至少 900 px 宽。更窄的视口显示说明与 `Back to projects`，不展示编辑工作区。
 
-以下控件目前只是诚实占位，必须保持禁用或明确显示不可用：
+Transport 当前接通 Play / Pause、Return to Start 与 `mm:ss.mmm` 当前项目时间；资源 Loading
+期间显示 Busy，失败或部分支持状态提供 disabled reason / Toast。以下控件仍只是诚实占位：
 
-- Return to start、Play、Record、Loop。
-- 当前播放时间和输出电平只显示默认值，不代表真实运行状态。
+- Record、Loop；
+- 输出电平显示 `Meter —`，不代表真实运行状态；
 - Grid、Arrangement Zoom、Track options。
 - Track Mute、Solo 及其他通道控制。
 
@@ -248,6 +253,7 @@ Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与�
 - `Mod+Z`：当前 Session 可以 Undo 时执行 Undo；
 - `Mod+Shift+Z`：当前 Session 可以 Redo 时执行 Redo；
 - `Control+Y`：兼容 Windows 常用 Redo Binding。
+- `Space`：当前计划可播放且没有导航 Modal 时 Play / Pause；Loading 期间不重复触发。
 - `Escape`：Piano Roll 正在拖动 Note 时取消本次 Move；否则在存在 Note Selection 时清空
   Selection。
 - `Delete` / `Backspace`：Piano Roll 聚焦且存在 Note Selection 时原子删除完整
@@ -315,12 +321,12 @@ Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与�
 | Magenta | `#C65AD9` |
 
 “Virtual instrument” 当前创建一个已选择 Studio Grand 的 Instrument Track。该选择是可保存的
-Project Fact，不是播放时的隐式 fallback；Studio 尚未接通已有的采样准备与音频 Runtime，因此
-Track 仍不会发声。
+Project Fact，不是播放时的隐式 fallback；在本地开发资产可用时，该 Track 的 MIDI Note 可通过
+Transport 发声。
 
 ### 6.2 `INSTRUMENT-SELECTION` Track Instrument
 
-**用户可用，但尚不发声**
+**用户可用；本地开发资产可发声**
 
 所选 Instrument Track 的左侧 Inspector 持续显示 Instrument 区块；即使当前选择的是该
 Track 上的 MIDI Clip，Instrument 状态和修复入口仍然可见：
@@ -337,7 +343,7 @@ Track 上的 MIDI Clip，Instrument 状态和修复入口仍然可见：
 - 展示始终从 Active Project 的 Snapshot 派生，不在 Pinia 或组件本地复制 Device Fact。
 
 V1 当前只有这一个显式选择动作，不伪装成完整 Instrument Browser、Preset Library 或插件
-管理器；Studio 尚未调用 Studio Grand 的采样准备与 Voice Runtime，选择成功也不会立即产生声音。
+管理器；选择成功不会 Preview Audition，只有主 Timeline Transport 播放已有 MIDI Note。
 
 ### 6.3 `MIDI-CLIP-CREATE` 创建空 MIDI Clip
 
@@ -583,10 +589,10 @@ Project Core 已具备：
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、含单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                                                                        |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                           |
-| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、默认 Studio Grand Add Track、旧 Slot 显式选择、Instrument 状态、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection Move / Cursor / Pencil Resize / 多选 Delete / Snap。 |
+| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return / 时间与反馈、默认 Studio Grand Add Track、旧 Slot 显式选择、Arrangement 空 MIDI Clip、Track / Clip Selection 与 Piano Roll Note 编辑。                                                |
 | `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                             |
-| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；公开 Audio Web 消费的只读 Plan 类型，但不提供音频运行时。                                                                  |
-| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Note Off、loop、mutex、generation 与资源统计；尚未接入 Studio Scheduler / Transport，生产构建仍不复制 Studio public。                                               |
+| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；公开 Studio / Audio Web 真实消费者所需的最小计划与运行时规划 API，不提供音频资源。                                              |
+| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Note Off、loop、mutex、generation 与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                                                   |
 | `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                    |
 
 ## 9. 明确尚未提供的产品能力
@@ -609,13 +615,14 @@ Project Core 已具备：
 - 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的完整 Catalog / Indexes 扫描、
   运行时安装与音色选择；当前只支持由开发工具规范化后的同源 Manifest/WAV，且该镜像不属于产品
   资源，Vite 生产构建禁止把 public 内容复制到 dist。
-- Studio 中的 WAV Sample Voice 播放闭环与 M4A 自动协商；Audio Web 内部的 WAV 资源准备和
-  Sample Voice 已就绪但尚未接 UI / Scheduler。
+- M4A 自动协商、远程 / 安装式 Soundbank 获取与可分发内置资产；当前 Studio 只从本地 Vite dev
+  同源路径准备 Manifest/WAV。
 - JSON 合成器定义的解析与合成引擎。
 - 完整 Instrument Browser、Preset Library、第三方 Device UI 与任意 Instrument 替换；当前只有旧空
   Slot 的 `Use Studio Grand`。
 - 通用 Web Audio Graph、AudioWorklet 与电平；当前只有 Sample Voice 所需的最小 master output。
-- 播放、暂停、定位、循环、录音与监听。
+- Seek / Scrub、Loop、Record、实时 Meter、监听和播放中编辑的无缝续播；当前只支持 Play / Pause /
+  Resume / Return to Start，项目内容 Commit 会安全停止并从头重建计划。
 
 ### 其他 Track 类型
 
@@ -713,12 +720,14 @@ Project Core 已具备：
 | 2026-08-11 | Audible MIDI Transport                                     | 建立注入单调时钟的 stopped / playing / paused 映射、独立 generation、自然结束与双向调度时间换算；尚未接入 Studio 或声音。                                        | `ae87ca4`                       |
 | 2026-08-12 | Audible MIDI Scheduler                                     | 建立连续半开 look-ahead 窗口、冻结 Sample Voice Plan、generation / occurrence 去重、迟到立即开始与过期丢弃；尚未执行声音。                                       | `145b3ab`                       |
 | 2026-08-13 | Audio Web Sample Resource Preparation                      | 按稳定 Playback Plan 准备实际引用的 Manifest/WAV，建立同源边界、byte budget、并发去重、取消、失败重试和应用生命周期解码缓存；尚未接入 Studio。                   | `dc8ccfd`                       |
-| 2026-08-13 | Audio Web Sample Voice Runtime                             | 建立用户激活的 AudioContext、master output、Manifest 驱动的 Pitch/Envelope/Loop/Mutex Voice、generation/cancel/allNotesOff 与零残留资源统计；已通过审阅。        | 本次提交                        |
+| 2026-08-13 | Audio Web Sample Voice Runtime                             | 建立用户激活的 AudioContext、master output、Manifest 驱动的 Pitch/Envelope/Loop/Mutex Voice、generation/cancel/allNotesOff 与零残留资源统计；已通过审阅。        | `772210f`                       |
+| 2026-08-13 | `PLAYBACK`、`KEYBOARD-SHORTCUTS`                           | Studio 组合 Compiler、Transport、Scheduler、资源准备与 Voice；接通 Play/Pause/Return、Space、时间、Loading/失败反馈和清理；已通过功能审核。                     | `7242a52`（核心）与本次 UI 提交 |
 
 ## 13. 当前验证基线
 
 Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、Batch 3B、Batch 4A 与
-Batch 4B.1 与 Batch 4B.2 已通过本地验证和审阅：
+Batch 4B.1、Batch 4B.2 与 Batch 5A 已通过本地验证和功能审核；Batch 5A 另通过浏览器运行时
+smoke，进一步听觉与交互优化留待后续讨论：
 
 - 最近已提交基线通过 `pnpm lint` 与 `pnpm check`，包括 Architecture、Workspace Type Check、
   全部测试与 Studio Production Build。
@@ -728,8 +737,8 @@ Batch 4B.1 与 Batch 4B.2 已通过本地验证和审阅：
 - platform-browser：2 个测试文件，18 项测试。
 - editor：10 个测试文件，104 项测试。
 - playback：7 个测试文件，76 项测试。
-- audio-web：15 个测试文件，104 项测试。
-- Studio：40 个测试文件，218 项测试。
+- audio-web：16 个测试文件，105 项测试。
+- Studio：42 个测试文件，230 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

@@ -96,7 +96,7 @@ Hover、Pressed、Selected、Focused、Disabled、Busy 和 Error 在所有组件
 | Project Entry       | 新建、打开、最近项目、失败反馈           | 启动页                   | Piano Black 首批入口    |
 | Project Lifecycle   | 当前项目、保存、dirty、离开确认          | 全局状态与对话框         | 已有应用服务，UI 待完善 |
 | Global Bar          | 品牌入口、项目名、保存状态、全局菜单     | 顶部全局区               | 首批外壳已实现          |
-| Transport           | 播放、停止、录音、循环、时间、速度、拍号 | 顶部全局区或独立控制行   | 外壳已实现，播放待接入  |
+| Transport           | 播放、暂停、返回开头、时间、速度、拍号   | 顶部全局区或独立控制行   | 首次可听切片已接入      |
 | Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸       | 整个编辑器框架           | 首批外壳已实现          |
 | Track List          | 轨道身份、颜色、静音、独奏、音量等       | Arrangement 左列         | Arrangement 切片        |
 | Arrangement         | 时间线、Clip、播放头、选择与编辑         | 主工作区                 | 核心编辑表面            |
@@ -295,7 +295,7 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 内置按键集中在强类型默认 Keymap；Feature 只按 Action ID 获取当前 Binding，不散落字符串；
 - 用户输入必须先验证，无效 Binding 在 Settings 字段旁提示且不得进入注册或持久化；
 - 首批 Workbench Binding 为 Save `Mod+S`、Undo `Mod+Z`、Redo `Mod+Shift+Z`，并兼容
-  Windows `Control+Y`；
+  Windows `Control+Y`；Transport Play / Pause 使用 `Space`；
 - focused Piano Roll 的 `Escape` 清空 Selection，但只有 Editor Session 已接入且该表面
   获得焦点时才注册。
 
@@ -303,7 +303,20 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 模块不得直接依赖其 alpha API。架构见
 [Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
 
-### 7.4 选择模型
+### 7.4 Transport 首次可听状态
+
+- Play 在 Playing 时必须切换成 Pause 图标、pressed 状态和可访问名称；
+- 首播资源准备期间保持按钮原尺寸，以旋转状态图标和 `Loading instrument…` 命名表达 Busy，
+  并阻止重复请求；Reduced Motion 下只降低转速，不移除必要状态区别；
+- Return to Start 只在 Loading、Playing 或当前位置非零时可用；Record 与 Loop 在能力接通前继续
+  Disabled；
+- 时间使用稳定的 `mm:ss.mmm`，由 Transport 权威位置投影，不能累计视觉帧差；
+- 没有真实 Meter 数据时显示 `Meter —`，不得用 `0.0 dB` 暗示已有实时测量；
+- Empty 通过 disabled reason 安静反馈；Blocked、Partial 与 Runtime Failure 必须通过邻近 title
+  或 Toast 明确反馈；失败不改变 Project dirty、History 或保存事实；
+- Play / Pause 的 `Space` 属于 Workbench Scope，可编辑控件、IME composing 和 Modal 仍优先。
+
+### 7.5 选择模型
 
 所有编辑表面共享以下概念：
 

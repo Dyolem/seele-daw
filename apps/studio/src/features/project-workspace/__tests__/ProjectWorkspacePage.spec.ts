@@ -24,7 +24,7 @@ import {
   PROJECT_ROUTE_NAME,
   PROJECT_ROUTE_QUERY,
 } from '@/router/project-routes'
-import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
 import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
 import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
@@ -32,6 +32,7 @@ import {
   STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
   type StudioKeyboardShortcutVueContext,
 } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
   ACTIVE_PROJECT_PHASE,
@@ -59,6 +60,24 @@ import {
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'
 import {
+  PROJECT_NAVIGATION_INTENT_KIND,
+  type ProjectNavigationDecisionRequest,
+} from '@/workbench/project/navigation/project-navigation-confirmation'
+import {
+  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
+  type PendingProjectNavigationDecision,
+  type ProjectNavigationDecisionVueContext,
+} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
+import {
+  PROJECT_PLAYBACK_PHASE,
+  type ProjectPlaybackState,
+} from '@/workbench/project/playback/project-playback-state'
+import {
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  type ProjectPlaybackVueContext,
+} from '@/workbench/project/playback/vue/project-playback-context'
+import {
   ACTIVE_PROJECT_CONTEXT_KEY,
   type ActiveProjectVueContext,
 } from '@/workbench/project/vue/active-project-context'
@@ -76,6 +95,17 @@ interface PageFixture {
   readonly projectEntryContext: ProjectEntryVueContext
   readonly state: ShallowRef<ActiveProjectState>
 }
+
+const STOPPED_PLAYBACK_STATE = Object.freeze<ProjectPlaybackState>({
+  diagnostics: Object.freeze([]),
+  failureCause: null,
+  feedback: null,
+  modelRevision: null,
+  phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+  planStatus: null,
+  positionProjectSecond: 0,
+  projectId: null,
+})
 
 interface Deferred<T> {
   readonly promise: Promise<T>
@@ -181,6 +211,27 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   const keyboardShortcutContext: StudioKeyboardShortcutVueContext = Object.freeze({
     keyboardShortcuts,
   })
+  const playbackState = shallowRef(STOPPED_PLAYBACK_STATE)
+  const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
+    get state() {
+      return playbackState.value
+    },
+    pause: vi.fn<ProjectPlaybackCoordinator['pause']>(() => false),
+    play: vi.fn<ProjectPlaybackCoordinator['play']>(async () => false),
+    returnToStart: vi.fn<ProjectPlaybackCoordinator['returnToStart']>(() => false),
+    subscribe: vi.fn<ProjectPlaybackCoordinator['subscribe']>(() => () => undefined),
+    togglePlayPause: vi.fn<ProjectPlaybackCoordinator['togglePlayPause']>(() => true),
+    dispose: vi.fn<ProjectPlaybackCoordinator['dispose']>(),
+  })
+  const projectPlaybackContext: ProjectPlaybackVueContext = Object.freeze({
+    projectPlayback,
+    state: shallowReadonly(playbackState),
+  })
+  const pendingNavigationDecision = shallowRef<PendingProjectNavigationDecision | null>(null)
+  const projectNavigationDecisionContext: ProjectNavigationDecisionVueContext = Object.freeze({
+    pendingDecision: shallowReadonly(pendingNavigationDecision),
+    resolve: () => false,
+  })
   const wrapper = mount(ProjectWorkspacePage, {
     props: { projectId },
     global: {
@@ -189,6 +240,8 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
+        [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]: projectNavigationDecisionContext,
+        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: projectPlaybackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
         [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboardShortcutContext,
       },
@@ -198,6 +251,9 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   return {
     router,
     keyboardBindingRegistry,
+    pendingNavigationDecision,
+    projectPlayback,
+    playbackState,
     selection: useProjectWorkbenchSelectionStore(pinia),
     wrapper,
   }
@@ -323,6 +379,73 @@ describe('ProjectWorkspacePage', () => {
 
     const unavailableRedo = keyboardBindingRegistry.dispatch('Mod+Shift+Z')
     expect(unavailableRedo.defaultPrevented).toBe(false)
+  })
+
+  it('toggles playable Transport through Space unless a navigation modal owns focus', async () => {
+    const projectId = parseProjectId('project-workspace-page-playback-shortcut')
+    const session = createTestSession(projectId)
+    const fixture = createFixture(
+      async () =>
+        Object.freeze({
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId,
+        }),
+      createReadyState(projectId, session),
+    )
+    const {
+      keyboardBindingRegistry,
+      pendingNavigationDecision,
+      projectPlayback,
+      playbackState,
+    } = await mountPage(fixture, projectId)
+    playbackState.value = Object.freeze({
+      ...STOPPED_PLAYBACK_STATE,
+      modelRevision: session.modelRevision,
+      planStatus: 'playable',
+      projectId,
+    })
+    await nextTick()
+
+    const handled = keyboardBindingRegistry.dispatch('Space')
+
+    expect(handled.defaultPrevented).toBe(true)
+    expect(projectPlayback.togglePlayPause).toHaveBeenCalledOnce()
+
+    const request: ProjectNavigationDecisionRequest = Object.freeze({
+      activeProjectId: projectId,
+      contentStateId: session.contentStateId,
+      intent: Object.freeze({ kind: PROJECT_NAVIGATION_INTENT_KIND.LEAVE_PROJECT }),
+      previousSaveFailure: null,
+      saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    })
+    pendingNavigationDecision.value = Object.freeze<PendingProjectNavigationDecision>({ request })
+    const ignored = keyboardBindingRegistry.dispatch('Space')
+
+    expect(ignored.defaultPrevented).toBe(false)
+    expect(projectPlayback.togglePlayPause).toHaveBeenCalledOnce()
+  })
+
+  it('keeps empty-plan guidance on the disabled Play control without a launch Toast', async () => {
+    const projectId = parseProjectId('project-workspace-page-empty-playback')
+    const fixture = createFixture(
+      async () =>
+        Object.freeze({
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId,
+        }),
+      createReadyState(projectId),
+    )
+    const { playbackState, wrapper } = await mountPage(fixture, projectId)
+    playbackState.value = Object.freeze({
+      ...STOPPED_PLAYBACK_STATE,
+      feedback: Object.freeze({ kind: 'info', message: 'No audible MIDI notes to play.' }),
+      planStatus: 'empty',
+      projectId,
+    })
+    await nextTick()
+
+    expect(wrapper.get('button[aria-label="Play — No audible MIDI notes to play."]')).toBeTruthy()
+    expect(useUiToastStore().message).toBeNull()
   })
 
   it('returns a missing requested Project to Entry with an exclusion notice', async () => {

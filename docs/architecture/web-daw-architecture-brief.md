@@ -28,7 +28,7 @@
 
 截至 2026-08-13，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
 多选 Delete 已形成闭环；Playback 已建立 TempoMap、Compiler、Transport 与 Scheduler，Audio Web
-已建立 Sample 资源准备和 Voice Runtime，Studio 首次可听闭环已实现并等待审阅。长期架构中的
+已建立 Sample 资源准备和 Voice Runtime，Studio 首次可听闭环已实现并通过功能审核。长期架构中的
 通用 Graph、RuntimeDelta、跨线程 ACK 和 AudioWorklet 路径都不能反推为该首版切片的必做范围。
 
 ---

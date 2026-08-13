@@ -123,7 +123,7 @@ function useStudioGrand(): void {
           <span>Instrument</span>
           <strong>{{ selectedInstrument.displayName }}</strong>
           <p v-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.READY">
-            Selected in this Project. Audible playback is not connected yet.
+            Selected in this Project. Use the Transport to play this Track's MIDI notes.
           </p>
           <p v-else-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY">
             This legacy Track has no sound selected.

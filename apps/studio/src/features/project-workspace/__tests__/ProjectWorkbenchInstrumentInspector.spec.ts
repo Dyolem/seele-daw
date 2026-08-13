@@ -137,6 +137,7 @@ describe('Project Workbench Instrument Inspector', () => {
 
     const instrument = wrapper.get('[aria-label="Track instrument"]')
     expect(instrument.text()).toContain('Studio Grand')
+    expect(instrument.text()).toContain("Use the Transport to play this Track's MIDI notes.")
     expect(instrument.find('button').exists()).toBe(false)
   })
 

@@ -46,6 +46,15 @@ import {
   PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
   type ProjectNavigationDecisionVueContext,
 } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
+import {
+  PROJECT_PLAYBACK_PHASE,
+  type ProjectPlaybackState,
+} from '@/workbench/project/playback/project-playback-state'
+import {
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  type ProjectPlaybackVueContext,
+} from '@/workbench/project/playback/vue/project-playback-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
   PROJECT_TRACK_CONTEXT_KEY,
@@ -140,6 +149,33 @@ function createKeyboardShortcutContext(): StudioKeyboardShortcutVueContext {
   })
 }
 
+function createProjectPlaybackContext(): ProjectPlaybackVueContext {
+  const state = shallowRef<ProjectPlaybackState>(
+    Object.freeze({
+      diagnostics: Object.freeze([]),
+      failureCause: null,
+      feedback: Object.freeze({ kind: 'info', message: 'No audible MIDI notes to play.' }),
+      modelRevision: null,
+      phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+      planStatus: 'empty',
+      positionProjectSecond: 0,
+      projectId: null,
+    }),
+  )
+  const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
+    get state() {
+      return state.value
+    },
+    pause: () => false,
+    play: async () => false,
+    returnToStart: () => false,
+    subscribe: () => () => undefined,
+    togglePlayPause: () => false,
+    dispose() {},
+  })
+  return Object.freeze({ projectPlayback, state: shallowReadonly(state) })
+}
+
 async function mountApp(state: ActiveProjectState, projectId: ProjectId | null = null) {
   const router = createStudioRouter(createMemoryHistory())
   await router.push(
@@ -158,6 +194,7 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
           createProjectNavigationDecisionContext(),
+        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: createProjectPlaybackContext(),
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: createProjectTrackContext(),
         [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: createKeyboardShortcutContext(),
       },

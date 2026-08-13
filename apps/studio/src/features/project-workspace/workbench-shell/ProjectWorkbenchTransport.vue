@@ -3,10 +3,13 @@ import ArrowRedoIcon from '~icons/fluent/arrow-redo-20-regular'
 import ArrowRepeatIcon from '~icons/fluent/arrow-repeat-all-20-regular'
 import ArrowUndoIcon from '~icons/fluent/arrow-undo-20-regular'
 import PanelBottomIcon from '~icons/fluent/panel-bottom-20-regular'
+import PauseIcon from '~icons/fluent/pause-20-regular'
 import PlayIcon from '~icons/fluent/play-20-regular'
 import PreviousIcon from '~icons/fluent/previous-20-regular'
 import RecordIcon from '~icons/fluent/record-20-regular'
 import SpeakerIcon from '~icons/fluent/speaker-2-20-regular'
+import SpinnerIcon from '~icons/fluent/spinner-ios-20-regular'
+import { computed } from 'vue'
 
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
@@ -15,6 +18,11 @@ interface ProjectWorkbenchTransportProps {
   readonly canRedo: boolean
   readonly canUndo: boolean
   readonly isContextEditorOpen: boolean
+  readonly playbackCanToggle: boolean
+  readonly playbackCanReturnToStart: boolean
+  readonly playbackFeedback: string | null
+  readonly playbackPhase: 'failed' | 'loading' | 'paused' | 'playing' | 'stopped' | 'unavailable'
+  readonly playbackTime: string
   readonly tempo: number
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
@@ -23,9 +31,26 @@ interface ProjectWorkbenchTransportProps {
 const props = defineProps<ProjectWorkbenchTransportProps>()
 const emit = defineEmits<{
   openContextEditor: []
+  playbackReturnToStart: []
+  playbackToggle: []
   redo: []
   undo: []
 }>()
+
+const playbackIcon = computed(() => {
+  if (props.playbackPhase === 'loading') return SpinnerIcon
+  if (props.playbackPhase === 'playing') return PauseIcon
+  return PlayIcon
+})
+
+const playbackLabel = computed(() => {
+  if (props.playbackPhase === 'loading') return 'Loading instrument…'
+  if (props.playbackPhase === 'playing') return 'Pause'
+  if (!props.playbackCanToggle && props.playbackFeedback !== null) {
+    return `Play — ${props.playbackFeedback}`
+  }
+  return 'Play'
+})
 </script>
 
 <template>
@@ -61,25 +86,39 @@ const emit = defineEmits<{
 
     <div class="project-workbench__playback-group" aria-label="Playback controls">
       <UiIconButton
-        disabled
+        :disabled="!props.playbackCanReturnToStart"
         :icon="PreviousIcon"
-        label="Return to start — playback is not connected"
+        label="Return to start"
+        @click="emit('playbackReturnToStart')"
       />
-      <UiIconButton disabled :icon="PlayIcon" label="Play — playback is not connected" />
+      <UiIconButton
+        :disabled="!props.playbackCanToggle"
+        :class="{ 'project-workbench__playback-loading': props.playbackPhase === 'loading' }"
+        :icon="playbackIcon"
+        :label="playbackLabel"
+        :pressed="props.playbackPhase === 'playing'"
+        @click="emit('playbackToggle')"
+      />
       <UiIconButton
         class="project-workbench__record-control"
         disabled
         :icon="RecordIcon"
         label="Record — recording is not connected"
       />
-      <UiIconButton disabled :icon="ArrowRepeatIcon" label="Loop — playback is not connected" />
-      <output class="project-workbench__time" aria-label="Current play time"> 00:00.000 </output>
+      <UiIconButton disabled :icon="ArrowRepeatIcon" label="Loop — looping is not connected" />
+      <output
+        class="project-workbench__time"
+        aria-label="Current play time"
+        :title="props.playbackFeedback ?? undefined"
+      >
+        {{ props.playbackTime }}
+      </output>
     </div>
 
     <div class="project-workbench__transport-end">
-      <div class="project-workbench__output-level" title="Audio output is not connected">
+      <div class="project-workbench__output-level" title="Output metering is not available">
         <UiIcon :icon="SpeakerIcon" :size="20" />
-        <span>0.0 dB</span>
+        <span>Meter —</span>
       </div>
       <UiIconButton
         :icon="PanelBottomIcon"
@@ -165,6 +204,10 @@ const emit = defineEmits<{
   color: var(--sd-color-state-record);
 }
 
+.project-workbench__playback-loading :deep(svg) {
+  animation: project-workbench-playback-spin 800ms linear infinite;
+}
+
 .project-workbench__time {
   min-inline-size: 6.75rem;
   padding-inline: var(--sd-space-3);
@@ -193,6 +236,18 @@ const emit = defineEmits<{
 @media (max-width: 71.9375rem) {
   .project-workbench__output-level span {
     display: none;
+  }
+}
+
+@keyframes project-workbench-playback-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-workbench__playback-loading :deep(svg) {
+    animation-duration: 1.6s;
   }
 }
 

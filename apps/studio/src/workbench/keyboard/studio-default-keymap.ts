@@ -24,6 +24,9 @@ const DEFAULT_KEYMAP = {
   [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR]: Object.freeze([
     defineStudioKeyboardBinding('Escape'),
   ]),
+  [STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE]: Object.freeze([
+    defineStudioKeyboardBinding('Space'),
+  ]),
   [STUDIO_KEYBOARD_ACTION.PROJECT_SAVE]: Object.freeze([
     defineStudioKeyboardBinding('Mod+S'),
   ]),
@@ -53,6 +56,10 @@ export function createStudioKeyboardKeymap(
     [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR]: Object.freeze([
       ...(overrides[STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR] ??
         DEFAULT_KEYMAP[STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR]),
+    ]),
+    [STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE]: Object.freeze([
+      ...(overrides[STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE] ??
+        DEFAULT_KEYMAP[STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE]),
     ]),
     [STUDIO_KEYBOARD_ACTION.PROJECT_SAVE]: Object.freeze([
       ...(overrides[STUDIO_KEYBOARD_ACTION.PROJECT_SAVE] ??

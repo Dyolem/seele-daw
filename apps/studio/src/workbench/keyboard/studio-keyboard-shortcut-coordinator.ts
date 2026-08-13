@@ -11,6 +11,7 @@ export const STUDIO_KEYBOARD_ACTION = {
   HISTORY_UNDO: 'history.undo',
   PIANO_ROLL_NOTES_REMOVE: 'piano-roll.notes.remove',
   PIANO_ROLL_SELECTION_CLEAR: 'piano-roll.selection.clear',
+  PLAYBACK_TOGGLE: 'playback.toggle',
   PROJECT_SAVE: 'project.save',
 } as const
 

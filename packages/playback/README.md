@@ -4,8 +4,8 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 4A.2 与 Audio Web Batch 4B.1、Batch 4B.2 已通过审阅；Studio Batch 5A
-> 首次可听闭环已实现，等待审阅。本包已有通用 Sample Instrument Device schema、TempoMap、
+> 当前状态：Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2 与 Studio Batch 5A 已通过功能审阅；
+> 进一步优化留待后续讨论。本包已有通用 Sample Instrument Device schema、TempoMap、
 > 具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner。包根现在公开 Studio 与
 > Audio Web 这两个真实消费者所需的最小编译、时钟、Transport、Scheduler 与只读计划表面；
 > 浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。

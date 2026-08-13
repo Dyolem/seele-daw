@@ -13,8 +13,8 @@
 
 Batch 4A.1a 已实现并通过审阅：Profile 常量、Manifest 类型、严格 validator 和默认内置
 `MIDISampleSynth` Mapping Adapter 已提交。Batch 4A.1b 的独立受限 ZIP / WAV 边界与本地规范化
-工具也已通过审阅并提交；尚未实现 SFZ 文本 parser、正式浏览器 Sample Loader、生产
-AudioContext、Voice 或 Timeline 发声。
+工具也已通过审阅并提交；Batch 4B.1 资源准备以及 Batch 4B.2 的生产 AudioContext 与 Voice 执行
+均已通过审阅。尚未实现 SFZ 文本 parser、Studio Timeline 发声闭环。
 
 默认内置数据的字段统计与行为推断不是本规范的一部分，另见
 [默认内置 MIDISampleSynth 控制文件逆向分析](./default-built-in-midi-sample-synth-reverse-analysis.md)。
@@ -164,6 +164,13 @@ resource:
 Manifest 使用秒，而 SFZ `offset` / `loop_start` / `loop_end` 使用 source sample frame。单位转换是
 Importer 的责任；Runtime 不接收模糊的裸数值，也不重新读取源格式默认值。
 
+Batch 4B.2 为 envelope shape 固定了一项 Seele Runtime 执行定义：`curve: null` 与 `0` 使用
+linear amplitude；非零 curve 使用归一化指数进度
+`expm1(shape * t) / expm1(shape)`，其中 `t` 为 `0...1`，shape 在执行时钳制到 `[-10, 10]`。
+Runtime 用分段原生 linear ramps 逼近该曲线，使未来 cancel / choke 能替换尚未发生的 automation。
+这不是对任一来源私有播放器数学实现的声明；未来 SFZ Importer 只负责保留 Profile 中的 shape
+输入，Manifest Runtime 负责上述稳定执行含义。
+
 ### 3.3 Validator 不变量
 
 `parseSampleInstrumentManifestV1(input)` 在不可信数据进入未来 Sample Runtime 前执行严格解码：
@@ -235,7 +242,7 @@ Manifest 只保存 Runtime 所需的稳定资源 key，不保存 ZIP entry、Cat
 - SoundFont、DLS、DecentSampler 或其他格式 Importer；
 - 面向任意后端 Bundle 的可信 manifest / checksum 协议、任意 Archive 扫描与自动安装；
 - M4A 自动协商；
-- Sample Loader、AudioBuffer cache、AudioContext、Voice、真实 Note Off、loop 或 envelope 渲染。
+- Studio Scheduler Executor、Transport UI、浏览器自动音频渲染 smoke 与真实 Timeline 发声闭环。
 
 下一独立批次先基于本地规范化结果测量读取、解码内存与听觉边界，再确认浏览器 Sample Loader
 与 Runtime 策略。SFZ 文本 Importer 仍可单独实现，并以本文 Profile 与相同 Manifest contract

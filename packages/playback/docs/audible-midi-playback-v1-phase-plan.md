@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 4A.2 reviewed; Batch 4B.1 resource preparation implemented, review pending
+> Status: Batch 4A.2, Batch 4B.1 and Batch 4B.2 reviewed; Batch 5A is next
 >
 > Date: 2026-08-10
 >
@@ -111,14 +111,14 @@ Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content �
 显式 Manifest 和来源 Adapter。Gate C.1b 已随受限 ZIP / WAV 与本地规范化工具审阅关闭。
 Gate C.2 已建立加载估算和 dev-only 试听入口，真实浏览器加载、解码、发声与人工试听均成功；
 `0.133 s linear release` 未感知到明显 click，可以作为后续实现和 A/B 比较的基线，但不因此
-成为最终的通用包络曲线。Batch 4B.1 已按 Gate 的加载建议实现资源准备层，正在等待审阅；以下
-其余 Runtime 细节仍不得因为出现在计划中就当作已批准产品行为：
+成为最终的通用包络曲线。Batch 4B.1 已按 Gate 的加载建议实现并通过审阅；Batch 4B.2 已落实并
+通过审阅下列首版规则：
 
-1. 是否接受 Batch 4B.1 已实现的“进入 Playing 前准备全部计划所需 Zone；任一必需资源失败则
-   本次 Play 不开始并可重试；未引用 Zone 不阻断”作为 V1 正式加载规则；
-2. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
-3. Manifest `curve: null` 的 fallback、velocity gain 映射，以及 linear amplitude 与
-   exponential / linear-dB release 的最终选择；
+1. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
+2. 是否接受 `curve: null/0` 线性 amplitude、非零 shape 的 Seele V1 指数形状，以及
+   `velocity / 127` 的首版映射；
+3. 是否接受普通 gated Note Off 使用 Zone release、`6 ms` linear fast release 只用于 cancel /
+   generation / allNotesOff / `off_mode=fast` 的边界；
 4. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
    行为，哪些明确延期。
 
@@ -822,8 +822,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - Gate C.1b（2026-08-12 已关闭）：确认受限 ZIP / WAV 边界、资源完整性、本地生成映射与输出
   形状；
 - Gate C.2（2026-08-13 工具、客观测量与人工试听已审）：浏览器加载和单音发声成功，当前
-  linear release 无明显 click；Batch 4B.1 已按加载建议实现并等待审阅，包络、velocity 与浏览器
-  策略在对应后续生产批次前确认。
+  linear release 无明显 click；Batch 4B.1 已按加载建议实现并通过审阅。Batch 4B.2 的包络、
+  velocity 与 Voice 行为也已通过审阅；浏览器验收策略仍在首次 Studio 闭环前确认。
 
 ### Batch 1A：Project Core Instrument Device Replace
 
@@ -961,8 +961,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 4B.1：Audio Web Sample 资源准备层
 
-> Implementation status: implemented, review pending. Playback and Audio Web type-check pass;
-> Playback 7 test files / 76 tests and Audio Web 12 test files / 75 tests pass.
+> Implementation status: reviewed and committed as `dc8ccfd`. Playback and Audio Web type-check
+> pass; Playback 7 test files / 76 tests and Audio Web 12 test files / 75 tests pass.
 
 - `@seele-daw/playback` 包根只新增 `AudibleMidiProjectPlan` type export，供真实 Audio Web 消费者
   使用，不公开 Compiler、Transport 或 Scheduler 写能力；
@@ -977,12 +977,31 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 4B.2：Audio Web MIDISampleSynth Voice（Studio Grand 首验）
 
+> Implementation status: reviewed on 2026-08-13. Repository `pnpm check`, changed-scope Oxlint /
+> ESLint and formatting pass; Playback 7 test files / 76 tests and Audio Web 15 test files / 104 tests
+> pass.
+
 - AudioContext activation/lifecycle 与最小 master output；
 - 按 Gate C 结果实现 range / exact-key、trigger、loop、Pitch / Tune、Offset、Velocity、Gain、Pan、
   Envelope、Note Off 与 mutex；
 - Voice Token、cancel、allNotesOff 与 Voice/Node 资源统计；
 - Fake Web Audio contract tests；
 - 不接 Workbench UI，完成后停止审阅。
+
+实现并经审阅固定以下首版语义：
+
+- 构造时保持 dormant，只有 `activate()` 才创建 / resume AudioContext；master output 为唯一 Gain；
+- `curve: null/0` 是 linear amplitude，非零 curve 使用 Seele V1 的归一化指数 shape 与分段原生
+  ramp；当前数值边界为 `[-10, 10]`；
+- Velocity 为 `velocity / 127`，Voice Gain 再乘 Track Gain，Master Gain 由 master node 应用；
+- gated Note Off 使用 Zone release；`off_mode=normal` 同样进入 Zone release；cancel、generation
+  切换、`allNotesOff` 与 `off_mode=fast` 使用 `6 ms` linear fast release；
+- `continuous` loop 贯穿 release；`sustain` loop 在 Note Off 切到无 loop tail；one-shot 忽略普通
+  Span End，但仍可被 cancel / allNotesOff / mutex 强制结束；
+- Voice Token 使用 `(engineGeneration, occurrenceKey)`；旧 generation 丢弃，重复 token 拒绝；
+  Runtime 不创建 Timer，dispose 后 Voice/Node/Listener 统计归零；
+- `StereoPannerNode` 缺失时仅中心 Pan 可退化为 Gain pass-through，非中心 Pan 明确失败，不偷偷
+  改变 pan law。
 
 ### Batch 5A：Studio Transport 与首次可听闭环
 

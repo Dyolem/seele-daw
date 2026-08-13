@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-12，功能代码基线 `4b0b5b2`，含已审阅的 Batch 4A.0 实现
+> 最近更新：2026-08-13，已审阅代码基线 `dc8ccfd`，另含已审阅的 Batch 4B.2 实现
 >
-> 当前阶段：Audible MIDI Playback V1 Batch 4A.0 已完成并通过审阅，准备规划 Batch 4A.1
+> 当前阶段：Audible MIDI Playback V1 Batch 4B.2 已通过审阅，准备进入 Batch 5A
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -44,8 +44,8 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 8. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
 9. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
-当前闭环已经保存并展示内置 Studio Grand 的 Instrument 事实，但还不加载采样、不输出音频，
-也不提供播放。
+当前用户闭环已经保存并展示内置 Studio Grand 的 Instrument 事实，但 Studio 尚未调用已经就绪
+的 Audio Web 资源准备与 Sample Voice Runtime，因此界面仍不加载采样、不输出音频，也不提供播放。
 
 ### 2.1 功能总览
 
@@ -315,8 +315,8 @@ Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与�
 | Magenta | `#C65AD9` |
 
 “Virtual instrument” 当前创建一个已选择 Studio Grand 的 Instrument Track。该选择是可保存的
-Project Fact，不是播放时的隐式 fallback；采样加载与音频运行时尚未接通，因此 Track 仍不会
-发声。
+Project Fact，不是播放时的隐式 fallback；Studio 尚未接通已有的采样准备与音频 Runtime，因此
+Track 仍不会发声。
 
 ### 6.2 `INSTRUMENT-SELECTION` Track Instrument
 
@@ -337,7 +337,7 @@ Track 上的 MIDI Clip，Instrument 状态和修复入口仍然可见：
 - 展示始终从 Active Project 的 Snapshot 派生，不在 Pinia 或组件本地复制 Device Fact。
 
 V1 当前只有这一个显式选择动作，不伪装成完整 Instrument Browser、Preset Library 或插件
-管理器；Studio Grand 的采样资源尚未加载，选择成功也不会立即产生声音。
+管理器；Studio 尚未调用 Studio Grand 的采样准备与 Voice Runtime，选择成功也不会立即产生声音。
 
 ### 6.3 `MIDI-CLIP-CREATE` 创建空 MIDI Clip
 
@@ -585,8 +585,8 @@ Project Core 已具备：
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                           |
 | `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、默认 Studio Grand Add Track、旧 Slot 显式选择、Instrument 状态、Arrangement 空 MIDI Clip 创建、Track / Clip Selection，以及 Piano Roll Pencil Add / Cursor Selection Move / Cursor / Pencil Resize / 多选 Delete / Snap。 |
 | `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                             |
-| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；尚未提供音频运行时。                                                                                                       |
-| `@seele-daw/audio-web`        | 只有包边界与入口骨架，未连接 AudioContext、AudioWorklet 或 Soundbank；本地验证资产可由 Vite dev server 提供，但生产构建不复制 Studio public。                                                                                                                                                       |
+| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；公开 Audio Web 消费的只读 Plan 类型，但不提供音频运行时。                                                                  |
+| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Note Off、loop、mutex、generation 与资源统计；尚未接入 Studio Scheduler / Transport，生产构建仍不复制 Studio public。                                               |
 | `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                    |
 
 ## 9. 明确尚未提供的产品能力
@@ -606,13 +606,15 @@ Project Core 已具备：
 
 ### 音源与声音
 
-- 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的 Manifest、加载、解压、运行时
-  索引与音色选择；该镜像不属于产品资源，Vite 生产构建禁止把 public 内容复制到 dist。
-- WAV / M4A 采样播放。
+- 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的完整 Catalog / Indexes 扫描、
+  运行时安装与音色选择；当前只支持由开发工具规范化后的同源 Manifest/WAV，且该镜像不属于产品
+  资源，Vite 生产构建禁止把 public 内容复制到 dist。
+- Studio 中的 WAV Sample Voice 播放闭环与 M4A 自动协商；Audio Web 内部的 WAV 资源准备和
+  Sample Voice 已就绪但尚未接 UI / Scheduler。
 - JSON 合成器定义的解析与合成引擎。
 - 完整 Instrument Browser、Preset Library、第三方 Device UI 与任意 Instrument 替换；当前只有旧空
   Slot 的 `Use Studio Grand`。
-- Web Audio Graph、AudioWorklet、主输出与电平。
+- 通用 Web Audio Graph、AudioWorklet 与电平；当前只有 Sample Voice 所需的最小 master output。
 - 播放、暂停、定位、循环、录音与监听。
 
 ### 其他 Track 类型
@@ -710,18 +712,23 @@ Project Core 已具备：
 | 2026-08-11 | Audible MIDI Compiler                                      | 建立通用 MIDISampleSynth Device schema、冻结 Track / Note Span 计划、稳定 occurrence key、unsupported content policy 与中性 Arrangement 范围。                   | `ac1cc31`                       |
 | 2026-08-11 | Audible MIDI Transport                                     | 建立注入单调时钟的 stopped / playing / paused 映射、独立 generation、自然结束与双向调度时间换算；尚未接入 Studio 或声音。                                        | `ae87ca4`                       |
 | 2026-08-12 | Audible MIDI Scheduler                                     | 建立连续半开 look-ahead 窗口、冻结 Sample Voice Plan、generation / occurrence 去重、迟到立即开始与过期丢弃；尚未执行声音。                                       | `145b3ab`                       |
+| 2026-08-13 | Audio Web Sample Resource Preparation                      | 按稳定 Playback Plan 准备实际引用的 Manifest/WAV，建立同源边界、byte budget、并发去重、取消、失败重试和应用生命周期解码缓存；尚未接入 Studio。                   | `dc8ccfd`                       |
+| 2026-08-13 | Audio Web Sample Voice Runtime                             | 建立用户激活的 AudioContext、master output、Manifest 驱动的 Pitch/Envelope/Loop/Mutex Voice、generation/cancel/allNotesOff 与零残留资源统计；已通过审阅。        | 本次提交                        |
 
 ## 13. 当前验证基线
 
-Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A 与 Batch 3B 已通过本地验证：
+Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、Batch 3B、Batch 4A 与
+Batch 4B.1 与 Batch 4B.2 已通过本地验证和审阅：
 
-- `pnpm lint`。
-- `pnpm check`，包括 Architecture、Workspace Type Check、全部测试与 Studio Production
-  Build。
+- 最近已提交基线通过 `pnpm lint` 与 `pnpm check`，包括 Architecture、Workspace Type Check、
+  全部测试与 Studio Production Build。
+- Batch 4B.2 已通过完整 `pnpm check`（Architecture、Workspace Type Check、全部测试、
+  Studio Production Build 与 soundbank dist boundary），并通过改动范围的 Oxlint / ESLint 与格式检查。
 - Project Core：27 个测试文件，399 项测试。
 - platform-browser：2 个测试文件，18 项测试。
 - editor：10 个测试文件，104 项测试。
-- playback：6 个测试文件，75 项测试。
+- playback：7 个测试文件，76 项测试。
+- audio-web：15 个测试文件，104 项测试。
 - Studio：40 个测试文件，218 项测试。
 - type-utils：1 个测试文件，2 项测试。
 

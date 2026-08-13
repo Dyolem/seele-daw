@@ -4,10 +4,11 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 4A.2 已通过审阅；Audio Web Batch 4B.1 正在等待审阅。本包已有通用 Sample
-> Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler
-> Planner；包根现在只额外公开 Audio Web 真实消费者需要的 `AudibleMidiProjectPlan` 类型，浏览器
-> Fetch/decode 仍完全位于 Audio Web。
+> 当前状态：Batch 4A.2 与 Audio Web Batch 4B.1、Batch 4B.2 已通过审阅。本包已有通用 Sample
+> Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、
+> Transport Mapping 与 Scheduler Planner；包根现在只额外公开 Audio Web 真实消费者需要的
+> `AudibleMidiProjectPlan` 与 `ScheduledSampleVoicePlan` 类型，浏览器 Fetch/decode/Voice 仍完全
+> 位于 Audio Web。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
@@ -32,8 +33,9 @@ late / drop policy 已按批次收敛；资产加载与浏览器矩阵仍按阶�
 
 包根只公开真实跨包消费者需要的最小 Device / Soundbank 身份边界：
 
-- `AudibleMidiProjectPlan` 只导出类型，供 Audio Web 从稳定计划收集实际需要的 Soundbank/Pitch；
-  Compiler 函数、Transport 和 Scheduler 仍保持包内，未扩大为尚无产品消费者的运行时 API；
+- `AudibleMidiProjectPlan` 与 `ScheduledSampleVoicePlan` 只导出类型：前者供 Audio Web 从稳定计划
+  收集实际需要的 Soundbank/Pitch，后者供 Voice Runtime 执行已排程事件；Compiler、Transport
+  和 Scheduler 写能力仍保持包内，未扩大为尚无产品消费者的运行时 API；
 
 - `STUDIO_GRAND_DEVICE_DEFINITION` 固定 `typeId = seele.sample-instrument`、
   `definitionVersion = 1` 与显示名称 `Studio Grand`；

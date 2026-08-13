@@ -8,9 +8,11 @@
     "#internal/*": "./src/*.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./development/sample-instrument-audition": "./src/development/sample-instrument-audition.ts"
   },
   "scripts": {
+    "measure:studio-grand-local": "jiti scripts/measure-studio-grand-local-assets.ts",
     "prepare:studio-grand-local": "jiti scripts/prepare-studio-grand-local-assets.ts",
     "type-check": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
     "test:run": "vitest run --environment node"

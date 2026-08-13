@@ -5,10 +5,9 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 当前首个可听切片先建立通用 MIDISampleSynth Sample Voice，并以 Studio Grand 完成首次产品
 听觉验收。
 
-> 当前状态：Batch 4A.1a 已审阅并提交为 `4993f16`。Batch 4A.1b 已实现受限 ZIP Adapter、WAV
-> metadata 校验和 Studio Grand 本地规范化工具，正在等待审阅；真实本地输入已经生成 30 个
-> WAV、Manifest 与校验报告。尚未实现 SFZ 文本 parser、浏览器资源加载、音频上下文、Voice 或
-> 运行时图。
+> 当前状态：Batch 4A.2 的确定性加载估算与 Studio dev-only 浏览器试听页已通过审阅；真实
+> Chromium Fetch / decode / 单音 smoke 和人工试听均成功，`0.133 s linear release` 未感知到
+> 明显 click。尚未实现 SFZ 文本 parser、正式浏览器资源加载、生产音频上下文、Voice 或运行时图。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
@@ -22,6 +21,8 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
 4A.1b 的生成命令、ZIP 安全预算和本地输出结果。
+加载成本、浏览器测量、人工试听结论与保留项见
+[Studio Grand 加载测量与听觉 Gate](./docs/studio-grand-loading-and-listening-gate.md)。
 默认内置音源数据的字段、Archive 与行为证据见
 [默认内置 MIDISampleSynth 控制文件逆向分析](./docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
 Seele 自身的规范语义见
@@ -103,7 +104,7 @@ Worklet entry 必须保持独立，只导入实时安全的协议和 DSP 代码�
 
 ## 长期演进顺序
 
-1. 基于已生成的 Studio Grand Manifest / WAV 测量加载、解码内存与听觉边界。
+1. 确认 Batch 4B 的加载策略、release fallback、velocity 与浏览器验收范围。
 2. 建立 AudioContext lifecycle、Sample loader / cache、Sample Voice、最小 master output 和资源统计。
 3. 实现 look-ahead native executor、generation 丢弃、可靠 `allNotesOff` 和 late-event 诊断。
 4. 增加稳定 Graph Runtime、Gain/Pan/Meter 和 Device contract suite。

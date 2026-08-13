@@ -1,6 +1,6 @@
 # Studio Grand 本地验证资产记录
 
-> Status: Batch 4A.1b local normalization implemented; review pending
+> Status: Batch 4A.1b reviewed and committed as `07f4218`
 >
 > Asset classification: developer-local validation fixture; not a Seele distributable asset
 >
@@ -145,6 +145,9 @@ apps/studio/public/soundbanks/generated/studio-grand/
 全部内容哈希完全一致的结果；缺失、额外或漂移文件都会失败，不自动覆盖。相同输入重复执行已经
 核验为幂等。生成目录继续受 `.gitignore` 与 Vite `dist` guard 约束，因此这些本地产物不改变
 “不可作为 Seele 可分发资产”的分类。
+
+基于这些规范化产物得到的内存预算、Chromium decode smoke 与试听清单见
+[Studio Grand 加载测量与听觉 Gate](./studio-grand-loading-and-listening-gate.md)。
 
 ## 授权状态
 

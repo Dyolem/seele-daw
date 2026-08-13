@@ -4,10 +4,10 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 4A.1a 已审阅并提交为 `4993f16`；Batch 4A.1b 的受限 ZIP/WAV 边界与 Studio
-> Grand 本地规范化工具已在 `@seele-daw/audio-web` 实现，正在等待审阅。本包已有通用 Sample
-> Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler
-> Planner；浏览器资产加载和音频运行时尚未实现。
+> 当前状态：Batch 4A.2 的确定性加载估算、Studio dev-only 浏览器试听页和人工试听均已通过
+> 审阅，`0.133 s linear release` 未感知到明显 click。本包已有通用 Sample Instrument Device
+> schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；正式
+> 浏览器资产加载和音频运行时尚未实现。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
@@ -18,6 +18,8 @@ Compiler、Transport 与 Scheduler 的协作和术语另见
 [默认内置 MIDISampleSynth 控制文件逆向分析](../audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
 规范宿主语义见
 [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../audio-web/docs/seele-supported-sfz-profile-v1.md)。
+当前加载测量、人工试听结论与保留项见
+[Studio Grand 加载测量与听觉 Gate](../audio-web/docs/studio-grand-loading-and-listening-gate.md)。
 
 这里的 `V1` 指第一版可听 MIDI 产品纵向切片，不是长期架构文档版本。经 2026-08-10 范围
 审阅，首版只建立具体的内置 Device Definition、Track Playback Plan、MIDI Note Span、

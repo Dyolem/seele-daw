@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/src/assets/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="seele-sample-instrument-asset-base" content="/soundbanks/generated/studio-grand/" />
+    <meta
+      name="seele-sample-instrument-loading-estimate"
+      content="/soundbanks/measurements/studio-grand/loading-estimate.json"
+    />
+    <title>Seele Sample Instrument Audition</title>
+  </head>
+  <body>
+    <main class="audition-shell">
+      <header class="audition-header">
+        <div>
+          <p class="eyebrow">Developer-only · Batch 4A.2</p>
+          <h1>Sample Instrument loading &amp; listening gate</h1>
+          <p class="lede">
+            这里比较加载成本、Note/Sample 长度、Note Off release 与 velocity 候选。它不是正式
+            Transport 或 Audio Runtime，也不会进入生产构建。
+          </p>
+        </div>
+        <output id="session-status" class="status" data-kind="idle">正在读取 Manifest…</output>
+      </header>
+
+      <section class="panel" aria-labelledby="static-measurement-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Deterministic preflight</p>
+            <h2 id="static-measurement-title">静态资源预算</h2>
+          </div>
+          <code id="manifest-digest">Manifest digest pending</code>
+        </div>
+        <div class="metric-grid">
+          <article class="metric-card">
+            <span>完整音源</span>
+            <strong id="full-resource-count">—</strong>
+            <small id="full-resource-size">—</small>
+          </article>
+          <article class="metric-card">
+            <span>参考初始窗口</span>
+            <strong id="window-resource-count">—</strong>
+            <small id="window-resource-size">—</small>
+          </article>
+          <article class="metric-card">
+            <span>Sample 时长范围</span>
+            <strong id="sample-duration-range">—</strong>
+            <small>按源 WAV 时长，未计 Pitch 转调</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="browser-measurement-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Browser measurement</p>
+            <h2 id="browser-measurement-title">真实 Fetch / decodeAudioData</h2>
+          </div>
+          <span id="decoded-cache-count" class="badge">0 decoded</span>
+        </div>
+        <label class="field field-wide">
+          <span>参考窗口 MIDI pitches</span>
+          <input id="window-pitches" type="text" value="48, 60, 64, 67, 72" />
+        </label>
+        <div class="button-row">
+          <button id="activate-audio" type="button">激活 AudioContext</button>
+          <button id="measure-window" type="button">测量参考窗口</button>
+          <button id="measure-full" type="button">测量完整音源</button>
+          <button id="clear-cache" type="button" class="secondary">清空 decoded cache</button>
+        </div>
+        <pre id="browser-measurement-output" class="result" tabindex="0">尚未运行浏览器测量。</pre>
+      </section>
+
+      <section class="panel" aria-labelledby="audition-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Listening comparison</p>
+            <h2 id="audition-title">单音试听</h2>
+          </div>
+          <span class="badge">Headphones recommended</span>
+        </div>
+
+        <div class="preset-row" aria-label="试听预设">
+          <button type="button" class="preset" data-pitch="60" data-duration="0.08">短 C4</button>
+          <button type="button" class="preset" data-pitch="60" data-duration="4">长 C4</button>
+          <button type="button" class="preset" data-pitch="108" data-duration="10">超长 C8</button>
+        </div>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>MIDI pitch</span>
+            <input id="pitch" type="number" min="21" max="108" step="1" value="60" />
+          </label>
+          <label class="field">
+            <span>Note duration (s)</span>
+            <input id="note-duration" type="number" min="0.001" max="60" step="0.01" value="0.25" />
+          </label>
+          <label class="field">
+            <span>Velocity</span>
+            <input id="velocity" type="number" min="1" max="127" step="1" value="96" />
+          </label>
+          <label class="field">
+            <span>Velocity curve</span>
+            <select id="velocity-curve">
+              <option value="constant">Constant gain</option>
+              <option value="linear-amplitude" selected>Linear amplitude</option>
+              <option value="squared-amplitude">Squared amplitude</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Note Off policy</span>
+            <select id="note-off-mode">
+              <option value="natural-end">Ignore Note Off / natural end</option>
+              <option value="linear-release" selected>Linear release</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Release (s)</span>
+            <input
+              id="release-duration"
+              type="number"
+              min="0.001"
+              max="5"
+              step="0.001"
+              value="0.133"
+            />
+          </label>
+        </div>
+
+        <div class="button-row">
+          <button id="audition-note" type="button">试听 Note</button>
+          <button id="stop-all" type="button" class="secondary">停止全部</button>
+        </div>
+        <pre id="audition-output" class="result" tabindex="0">
+选择参数后试听；先比较 natural end 与 0.133s linear release。</pre
+        >
+      </section>
+
+      <section class="panel" aria-labelledby="review-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Human review</p>
+            <h2 id="review-title">听觉观察记录</h2>
+          </div>
+        </div>
+        <div class="observation-grid">
+          <label class="field field-wide">
+            <span>短 Note / release</span>
+            <textarea
+              id="short-note-observation"
+              rows="3"
+              placeholder="例如：natural tail 是否拖沓；0.133s 是否有 click 或截断感"
+            ></textarea>
+          </label>
+          <label class="field field-wide">
+            <span>长 Note / Sample 自然结束</span>
+            <textarea
+              id="long-note-observation"
+              rows="3"
+              placeholder="例如：C8 在 Note Off 前自然结束是否可接受"
+            ></textarea>
+          </label>
+          <label class="field field-wide">
+            <span>Velocity 与钢琴真实性</span>
+            <textarea
+              id="velocity-observation"
+              rows="3"
+              placeholder="比较 constant / linear / squared；记录只改变音量的局限"
+            ></textarea>
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="copy-review" type="button" class="secondary">复制审阅 JSON</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/development/sample-instrument-audition/main.ts"></script>
+  </body>
+</html>

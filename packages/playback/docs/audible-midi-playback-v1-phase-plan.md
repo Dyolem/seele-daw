@@ -1,10 +1,10 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 4A.1a reviewed and committed; Batch 4A.1b implemented, review pending
+> Status: Batch 4A.2 reviewed; browser loading and human listening smoke passed; Batch 4B not started
 >
 > Date: 2026-08-10
 >
-> Last updated: 2026-08-12
+> Last updated: 2026-08-13
 >
 > Prerequisite checkpoint: `checkpoint/piano-roll-note-editing-2026-08-10`
 
@@ -108,19 +108,24 @@ Gate A 已于 2026-08-11 关闭：Studio Grand 的 Device Definition 与 Project
 Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content 有关的规则已随 Batch
 2B 关闭，Transport Mapping 规则已在 Batch 3A 开始前确认。Batch 4A.0 已确认本地验证资产不
 等同于可分发产品资产。Gate C.1a 已随审阅关闭：Seele 采用明确限定的 Supported SFZ Profile、
-显式 Manifest 和来源 Adapter。Gate C.1b 的受限 ZIP / WAV 边界和本地规范化实现正在等待审阅。
-以下 Runtime 与听觉 Gate 仍不得因为出现在计划中就当作已批准产品行为：
+显式 Manifest 和来源 Adapter。Gate C.1b 已随受限 ZIP / WAV 与本地规范化工具审阅关闭。
+Gate C.2 已建立加载估算和 dev-only 试听入口，真实浏览器加载、解码、发声与人工试听均成功；
+`0.133 s linear release` 未感知到明显 click，可以作为后续实现和 A/B 比较的基线，但不因此
+成为最终的通用包络曲线。以下 Runtime 细节仍不得因为出现在计划中就当作已批准产品行为：
 
-1. Runtime 加载失败、部分 Sample Zone 缺失时，Transport 与 UI 如何反馈；
-2. 首次 Play 是预载全项目所需 Zone，还是只预载初始窗口并继续后台加载；
-3. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
-4. Sample 短于 Note 时是否自然结束，Sample 长于 Note 时采用何种 Note Off、包络和尾音策略；
-5. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
+1. 是否接受“进入 Playing 前准备全部计划所需 Zone；任一必需资源失败则本次 Play 不开始并可
+   重试；未引用 Zone 不阻断”的 V1 加载建议；
+2. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
+3. Manifest `curve: null` 的 fallback、velocity gain 映射，以及 linear amplitude 与
+   exponential / linear-dB release 的最终选择；
+4. Studio Grand V1 要实现到何种钢琴发声真实性，包括力度音色、制音、共鸣、踏板和 release
    行为，哪些明确延期。
 
 Gate C.1b 已把 Catalog / Indexes 的本地定位、stable `studio-grand` 到当前输入的生成映射、ZIP
 安全预算、固定输入指纹与输出校验报告落实为开发工具。可分发 Manifest / Bundle 仍只能在替代
 资产或再分发范围另行确认后进入产品资源。
+Gate C.2 的客观数据、浏览器 smoke、加载建议和人工试听清单见
+[Studio Grand 加载测量与听觉 Gate](../../audio-web/docs/studio-grand-loading-and-listening-gate.md)。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
@@ -572,7 +577,7 @@ Batch 4A.1a 已建立与 Archive 无关的语义边界；Studio Grand 不限定 
 - 当前全量 289 份 Mapping、4,664 个 Zone 已通过开发者本机兼容审计；原始数据和生成结果不进入
   仓库或可分发产品构建。
 
-Batch 4A.1b 已实现资源容器与本地生成边界，正在等待审阅：
+Batch 4A.1b 已实现并通过审阅，建立以下资源容器与本地生成边界：
 
 - 由受限 ZIP Adapter 从选定 WAV Archive 读取、验证并提取到忽略的本地生成目录；
 - 开发期工具组合 Catalog / Indexes / Mapping，明确 stable `studio-grand` 到
@@ -624,11 +629,15 @@ entry、大小、取消约束的第三方 ZIP 解码，并由调用方负责可�
 
 ### 6.3 加载与缓存
 
-- 首次 Play 从当前计划收集唯一 Soundbank Bundle 与需要解码的 Sample Zone；当前 ZIP 传输意味
-  网络层先取得完整目标 Bundle，取得 Bundle 后是一次性解码全计划 Zone，还是只解码初始
-  Scheduler 窗口，必须在 Batch 4A.2 用实际读取、解压、解码与内存数据完成 Decision Gate；
-- Gate 必须分别记录 Bundle 下载 / 解压量、encoded Sample byte、解码后 AudioBuffer 内存、
-  允许等待时间、取消以及 Bundle / 单 Zone 失败是否中止整次 Play；
+- Batch 4A.2 已测得完整 30 WAV 为 31.57 MiB encoded / 63.14 MiB decoded Float32；稳定参考窗口
+  `48, 60, 64, 67, 72` 的 5 WAV 为 6.49 / 12.98 MiB。localhost Chromium 的并发解码 smoke
+  只证明执行路径可用，不构成远程下载 SLO；
+- 待审建议是首次 Play 从当前稳定计划收集唯一 Sample resource key，并在进入 Playing 前准备
+  全部计划所需 Zone；不默认解码完整 Instrument，也不只准备首个 Scheduler horizon；
+- 任一计划必需 Zone 失败则本次 Play 不开始并允许重试；未被当前计划引用的缺失 Zone 不阻断。
+  当前 ZIP 交付可能仍要求网络层先取得完整 Bundle，但解码集合继续按计划裁剪；
+- 正式 Runtime 仍须记录 Bundle 下载 / 解压量、encoded Sample byte、解码后 AudioBuffer 内存、
+  允许等待时间、取消以及 Bundle / 单 Zone failure；
 - 在满足所选加载门槛前 Transport 不进入 Playing，UI 显示 `Loading instrument…`；
 - 同一 Soundbank Bundle 的并发 fetch / unzip Promise 去重；
 - 同一 Zone 的并发请求 Promise 去重；
@@ -803,8 +812,10 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
   阻断本地 Runtime；
 - Gate C.1a（2026-08-12 已关闭）：确认 Supported SFZ Profile V1、Manifest V1、严格 validator
   与默认内置 Mapping Adapter；逆向分析只作为来源兼容证据，不定义宿主默认值；
-- Gate C.1b（实现待审阅）：确认受限 ZIP / WAV 边界、资源完整性、本地生成映射与输出形状；
-- Gate C.2：确认 Note / Sample 长度、release / 钢琴真实性边界、加载预算和浏览器验收矩阵。
+- Gate C.1b（2026-08-12 已关闭）：确认受限 ZIP / WAV 边界、资源完整性、本地生成映射与输出
+  形状；
+- Gate C.2（2026-08-13 工具、客观测量与人工试听已审）：浏览器加载和单音发声成功，当前
+  linear release 无明显 click；正式加载、包络、velocity 与浏览器策略在 Batch 4B 开始前确认。
 
 ### Batch 1A：Project Core Instrument Device Replace
 
@@ -911,9 +922,9 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 
 ### Batch 4A.1b：受限 ZIP Adapter 与本地规范化工具
 
-> Implementation status: implemented and awaiting review. Audio Web type-check and 7 test files /
-> 38 tests pass. The recorded local input generates 30 WAV files, a 30-zone Manifest covering MIDI
-> `21...108`, and a preparation report; repeated generation is idempotent.
+> Implementation status: reviewed and committed as `07f4218`. Audio Web type-check and 7 test
+> files / 38 tests passed. The recorded local input generates 30 WAV files, a 30-zone Manifest
+> covering MIDI `21...108`, and a preparation report; repeated generation is idempotent.
 
 - 引入第三方 ZIP 解码库，并在外层验证 entry path、数量、单文件 / 总解压大小、压缩比、取消和
   错误分类；可信 checksum 由具体调用方提供；
@@ -927,6 +938,12 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 不实现完整 Catalog、M4A 自动协商、AudioContext 或真实发声，完成后停止审阅。
 
 ### Batch 4A.2：加载测量与听觉 Gate
+
+> Implementation status: reviewed on 2026-08-13. Audio Web type-check and 9 test files / 47 tests
+> pass; Studio type-check and 40 test files / 218 tests pass. Chromium fetched/decoded both the
+> 5-resource reference window and all 30 resources, activated AudioContext only after a click, and
+> scheduled the audition release graph. Human listening succeeded in the user's browser and the
+> Codex Chromium; the current `0.133 s linear release` produced no perceived click.
 
 - 通过 Studio 注入的开发期同源 asset base 使用本地生成的 Studio Grand 资源；
 - 用真实资产听觉审阅 Sample 短于 / 长于 Note、Note Off、release tail、velocity 表现与 V1

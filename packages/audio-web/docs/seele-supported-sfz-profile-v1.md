@@ -1,6 +1,6 @@
 # Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1
 
-> Status: Batch 4A.1a reviewed and committed; Batch 4A.1b implemented, review pending
+> Status: Batch 4A.1b reviewed and committed as `07f4218`
 >
 > Last updated: 2026-08-12
 
@@ -12,9 +12,9 @@
    形状。
 
 Batch 4A.1a 已实现并通过审阅：Profile 常量、Manifest 类型、严格 validator 和默认内置
-`MIDISampleSynth` Mapping Adapter 已提交。Batch 4A.1b 已实现独立的受限 ZIP / WAV 边界与本地
-规范化工具，正在等待审阅；尚未实现 SFZ 文本 parser、浏览器 Sample Loader、AudioContext、
-Voice 或任何真实发声。
+`MIDISampleSynth` Mapping Adapter 已提交。Batch 4A.1b 的独立受限 ZIP / WAV 边界与本地规范化
+工具也已通过审阅并提交；尚未实现 SFZ 文本 parser、正式浏览器 Sample Loader、生产
+AudioContext、Voice 或 Timeline 发声。
 
 默认内置数据的字段统计与行为推断不是本规范的一部分，另见
 [默认内置 MIDISampleSynth 控制文件逆向分析](./default-built-in-midi-sample-synth-reverse-analysis.md)。

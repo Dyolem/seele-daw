@@ -1,4 +1,5 @@
 /** Public API for playback compilation, transport, and scheduler contracts. */
+export type { AudibleMidiProjectPlan } from './compiler/audible-midi-plan'
 export { parseSoundbankId } from './sample-instrument-device'
 export type { SoundbankId } from './sample-instrument-device'
 export {

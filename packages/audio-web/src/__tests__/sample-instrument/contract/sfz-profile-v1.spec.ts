@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { SEELE_SUPPORTED_SFZ_PROFILE_V1 } from '#internal/sample-instrument/supported-sfz-profile-v1'
+import { SEELE_SUPPORTED_SFZ_PROFILE_V1 } from '#internal/sample-instrument/contract/sfz-profile-v1'
 
 describe('Seele Supported SFZ Profile V1', () => {
   it('declares the exact source semantics that Manifest V1 can execute', () => {

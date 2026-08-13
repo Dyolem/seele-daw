@@ -11,11 +11,11 @@ import {
   type SampleInstrumentSelectorV1,
   type SampleInstrumentTriggerModeV1,
   type SampleInstrumentZoneV1,
-} from '#internal/sample-instrument/sample-instrument-manifest'
+} from '#internal/sample-instrument/contract/manifest'
 import {
   SampleInstrumentManifestError,
   parseSampleInstrumentManifestV1,
-} from '#internal/sample-instrument/sample-instrument-manifest-validator'
+} from '#internal/sample-instrument/contract/manifest-validator'
 import {
   StructuredDataError,
   assertExactKeys,
@@ -29,7 +29,7 @@ import {
   readRequiredValue,
   readString,
   type DataObject,
-} from '#internal/sample-instrument/structured-data-decoder'
+} from '#internal/sample-instrument/contract/structured-data'
 
 const MAPPING_REQUIRED_KEYS = Object.freeze([
   'category',

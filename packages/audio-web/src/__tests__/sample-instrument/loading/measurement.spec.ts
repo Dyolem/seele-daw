@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest'
 import {
   SAMPLE_INSTRUMENT_MANIFEST_SCHEMA,
   SAMPLE_INSTRUMENT_MANIFEST_VERSION,
-} from '#internal/sample-instrument/sample-instrument-manifest'
-import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest-validator'
+} from '#internal/sample-instrument/contract/manifest'
+import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
 import {
   SampleInstrumentLoadingMeasurementError,
   estimateSampleInstrumentLoading,
   measureSampleInstrumentPitchForAudition,
   type SampleInstrumentResourceMeasurement,
-} from '#internal/sample-instrument/sample-instrument-loading-measurement'
+} from '#internal/sample-instrument/loading/measurement'
 
 const RESOURCES: readonly SampleInstrumentResourceMeasurement[] = Object.freeze([
   Object.freeze({

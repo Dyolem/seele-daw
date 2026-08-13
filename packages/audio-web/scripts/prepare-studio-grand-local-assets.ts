@@ -9,16 +9,16 @@ import { parseSoundbankId } from '@seele-daw/playback'
 import {
   adaptBuiltInMidiSampleSynthMapping,
   inspectBuiltInMidiSampleSynthMapping,
-} from '#internal/sample-instrument/built-in-midi-sample-synth-adapter'
-import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest'
+} from '#internal/sample-instrument/assets/built-in-mapping-adapter'
+import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
 import {
   extractRestrictedZipArchive,
   type RestrictedZipArchiveLimits,
-} from '#internal/sample-instrument/restricted-zip-archive'
+} from '#internal/sample-instrument/assets/restricted-zip'
 import {
   parseSupportedWavMetadata,
   type SupportedWavMetadata,
-} from '#internal/sample-instrument/supported-wav-file'
+} from '#internal/sample-instrument/contract/wav-file'
 
 import {
   resolveBuiltInSoundbankSource,

@@ -45,3 +45,13 @@ export function assertSafeSampleResourceKey(key: string): void {
     }
   }
 }
+
+/** Resolves a logical POSIX resource key without letting filename characters alter URL semantics. */
+export function resolveSampleResourceUrl(baseUrl: URL, key: string): URL {
+  assertSafeSampleResourceKey(key)
+  const encodedPath = key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')
+  return new URL(encodedPath, baseUrl)
+}

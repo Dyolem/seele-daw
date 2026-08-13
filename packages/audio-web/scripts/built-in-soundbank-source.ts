@@ -1,7 +1,7 @@
 import {
   SampleResourceKeyError,
   assertSafeSampleResourceKey,
-} from '#internal/sample-instrument/sample-resource-key'
+} from '#internal/sample-instrument/contract/resource-key'
 import {
   StructuredDataError,
   readArray,
@@ -12,7 +12,7 @@ import {
   readRequiredValue,
   readString,
   type DataObject,
-} from '#internal/sample-instrument/structured-data-decoder'
+} from '#internal/sample-instrument/contract/structured-data'
 
 const MIDI_SAMPLE_SYNTH_ENGINE = 'MIDISampleSynth'
 

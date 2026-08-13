@@ -3,9 +3,9 @@ import {
   type SampleInstrumentManifestV1,
   type SampleInstrumentSelectorV1,
   type SampleInstrumentZoneV1,
-} from '#internal/sample-instrument/sample-instrument-manifest'
-import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest-validator'
-import type { SupportedWavMetadata } from '#internal/sample-instrument/supported-wav-file'
+} from '#internal/sample-instrument/contract/manifest'
+import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
+import type { SupportedWavMetadata } from '#internal/sample-instrument/contract/wav-file'
 
 export type LocalSampleInstrumentPreparationErrorCode =
   | 'invalid-pitch-range'

@@ -7,7 +7,7 @@ import {
   type RestrictedZipArchiveErrorCode,
   type RestrictedZipArchiveLimits,
   type RestrictedZipArchiveOptions,
-} from '#internal/sample-instrument/restricted-zip-archive'
+} from '#internal/sample-instrument/assets/restricted-zip'
 
 const DEFAULT_LIMITS: RestrictedZipArchiveLimits = Object.freeze({
   maximumArchiveByteLength: 1_000_000,

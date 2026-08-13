@@ -5,9 +5,9 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 当前首个可听切片先建立通用 MIDISampleSynth Sample Voice，并以 Studio Grand 完成首次产品
 听觉验收。
 
-> 当前状态：Batch 4A.2 的确定性加载估算与 Studio dev-only 浏览器试听页已通过审阅；真实
-> Chromium Fetch / decode / 单音 smoke 和人工试听均成功，`0.133 s linear release` 未感知到
-> 明显 click。尚未实现 SFZ 文本 parser、正式浏览器资源加载、生产音频上下文、Voice 或运行时图。
+> 当前状态：Batch 4A.2 已通过审阅。Batch 4B.1 已实现按完整稳定 Playback Plan 准备实际引用
+> Sample、同源 Manifest/WAV 加载、大小预算、并发去重、取消、失败重试和应用生命周期解码缓存，
+> 正在等待审阅。尚未实现 SFZ 文本 parser、Voice、Scheduler Executor 或 Studio Transport 接入。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
@@ -27,6 +27,33 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 [默认内置 MIDISampleSynth 控制文件逆向分析](./docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
 Seele 自身的规范语义见
 [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](./docs/seele-supported-sfz-profile-v1.md)。
+
+Batch 4B.1 的生产资源准备边界保持在包内：
+
+- 只消费 Playback 公开的 `AudibleMidiProjectPlan`，不读取 Project Model；
+- 按 Soundbank 聚合整份稳定 Plan 的唯一 Pitch，经严格 Manifest 选择实际 resource key；
+- 同源 asset base 由 Composition Root 注入，逻辑 POSIX key 在 HTTP 边界逐段编码；
+- Manifest 与 WAV 都受调用方 byte budget 约束；WAV 在 `decodeAudioData` 前再次验证容器；
+- 同一资源的并发 Fetch/decode 共享；单个等待者取消不误伤其他等待者，最后一个离开才取消底层
+  请求；失败请求不会永久污染缓存；
+- 成功 Manifest 与 AudioBuffer 由应用生命周期缓存拥有；准备结果为冻结数组，Project Runtime
+  dispose 不会误释放共享 AudioBuffer；应用 dispose 会中止 pending 请求并清空引用；
+- 本批只支持同源、可寻址 Manifest/WAV 首验，不扫描 Catalog，不加载整棵 Soundbank，也不创建
+  AudioNode 或控制 Transport。
+
+当前 Sample Instrument 已形成三组不同变化原因，因此按职责分层；其中较短的文件名是这个模块
+在语义仍然明确时的局部选择，不构成禁止文件名重复目录上下文的全局规则：
+
+```text
+src/sample-instrument/
+├── contract/  Manifest、Supported SFZ Profile、resource key 与 WAV 边界
+├── assets/    默认内置 Mapping Adapter 与受限 ZIP 输入
+└── loading/   Zone 选择、测量、资源缓存与 Playback Plan 资源准备
+```
+
+`development/sample-instrument-audition.ts` 仍保留领域限定词，因为其父目录只有
+`development` 上下文；包外开发入口也保持不变。测试目录镜像上述职责，但共享 fixture 继续放在
+`__tests__/support`，不为单个文件建立额外层级。
 
 ## 长期包定位
 
@@ -104,8 +131,8 @@ Worklet entry 必须保持独立，只导入实时安全的协议和 DSP 代码�
 
 ## 长期演进顺序
 
-1. 确认 Batch 4B 的加载策略、release fallback、velocity 与浏览器验收范围。
-2. 建立 AudioContext lifecycle、Sample loader / cache、Sample Voice、最小 master output 和资源统计。
+1. 审阅 Batch 4B.1 资源准备层并确认加载策略。
+2. 确认 release fallback 与 velocity，建立 Sample Voice、最小 master output 和资源统计。
 3. 实现 look-ahead native executor、generation 丢弃、可靠 `allNotesOff` 和 late-event 诊断。
 4. 增加稳定 Graph Runtime、Gain/Pan/Meter 和 Device contract suite。
 5. 实现 Audio Clip voice 与 Worklet 消息协议；FM / VA Synth 按独立产品切片选择执行技术。

@@ -3,7 +3,7 @@ import { unzip, type UnzipFileInfo, type Unzipped } from 'fflate'
 import {
   SampleResourceKeyError,
   assertSafeSampleResourceKey,
-} from '#internal/sample-instrument/sample-resource-key'
+} from '#internal/sample-instrument/contract/resource-key'
 
 const STORED_COMPRESSION_METHOD = 0
 const DEFLATE_COMPRESSION_METHOD = 8

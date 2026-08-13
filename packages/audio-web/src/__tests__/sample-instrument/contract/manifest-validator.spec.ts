@@ -5,11 +5,11 @@ import {
   SAMPLE_INSTRUMENT_MANIFEST_SCHEMA,
   SAMPLE_INSTRUMENT_MANIFEST_VERSION,
   type SampleInstrumentManifestV1,
-} from '#internal/sample-instrument/sample-instrument-manifest'
+} from '#internal/sample-instrument/contract/manifest'
 import {
   SampleInstrumentManifestError,
   parseSampleInstrumentManifestV1,
-} from '#internal/sample-instrument/sample-instrument-manifest-validator'
+} from '#internal/sample-instrument/contract/manifest-validator'
 
 function createZone(
   zoneId: string,

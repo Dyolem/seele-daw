@@ -6,7 +6,7 @@ import {
   adaptBuiltInMidiSampleSynthMapping,
   inspectBuiltInMidiSampleSynthMapping,
   type BuiltInWavResourceRequest,
-} from '#internal/sample-instrument/built-in-midi-sample-synth-adapter'
+} from '#internal/sample-instrument/assets/built-in-mapping-adapter'
 import {
   createBuiltInMapping,
   createBuiltInZone,

@@ -3,14 +3,14 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest'
-import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest-validator'
+import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
+import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
 import {
   estimateSampleInstrumentLoading,
   measureSampleInstrumentPitchForAudition,
   type SampleInstrumentResourceMeasurement,
-} from '#internal/sample-instrument/sample-instrument-loading-measurement'
-import { parseSupportedWavMetadata } from '#internal/sample-instrument/supported-wav-file'
+} from '#internal/sample-instrument/loading/measurement'
+import { parseSupportedWavMetadata } from '#internal/sample-instrument/contract/wav-file'
 
 const REFERENCE_INITIAL_WINDOW_PITCHES = Object.freeze([48, 60, 64, 67, 72])
 const REFERENCE_NOTE_DURATIONS_SECOND = Object.freeze([0.08, 0.25, 1, 4, 10])

@@ -1,9 +1,8 @@
-import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest'
-import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest-validator'
-import {
-  findSampleInstrumentZoneForPitch,
-  type SampleInstrumentResourceMeasurement,
-} from '#internal/sample-instrument/sample-instrument-loading-measurement'
+import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
+import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
+import { findSampleInstrumentZoneForPitch } from '#internal/sample-instrument/loading/zone-selection'
+import { resolveSampleResourceUrl } from '#internal/sample-instrument/contract/resource-key'
+import { type SampleInstrumentResourceMeasurement } from '#internal/sample-instrument/loading/measurement'
 
 export type SampleInstrumentAuditionNoteOffMode = 'linear-release' | 'natural-end'
 export type SampleInstrumentAuditionVelocityCurve =
@@ -380,7 +379,10 @@ export class SampleInstrumentAuditionSession {
     context: AudioContext,
   ): Promise<LoadedAuditionResource> {
     const fetchStarted = this.#now()
-    const response = await this.#fetchNoStore(new URL(key, this.#assetBaseUrl), `${key}: request`)
+    const response = await this.#fetchNoStore(
+      resolveSampleResourceUrl(this.#assetBaseUrl, key),
+      `${key}: request`,
+    )
     if (!response.ok) {
       fail('resource-load-failed', `${key}: request failed with HTTP ${response.status}`)
     }

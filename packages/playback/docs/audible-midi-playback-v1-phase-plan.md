@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 第六阶段计划
 
-> Status: Batch 4A.2 reviewed; browser loading and human listening smoke passed; Batch 4B not started
+> Status: Batch 4A.2 reviewed; Batch 4B.1 resource preparation implemented, review pending
 >
 > Date: 2026-08-10
 >
@@ -111,10 +111,11 @@ Command 形状按第 2 节确认。Gate B 中与 Compiler unsupported content �
 显式 Manifest 和来源 Adapter。Gate C.1b 已随受限 ZIP / WAV 与本地规范化工具审阅关闭。
 Gate C.2 已建立加载估算和 dev-only 试听入口，真实浏览器加载、解码、发声与人工试听均成功；
 `0.133 s linear release` 未感知到明显 click，可以作为后续实现和 A/B 比较的基线，但不因此
-成为最终的通用包络曲线。以下 Runtime 细节仍不得因为出现在计划中就当作已批准产品行为：
+成为最终的通用包络曲线。Batch 4B.1 已按 Gate 的加载建议实现资源准备层，正在等待审阅；以下
+其余 Runtime 细节仍不得因为出现在计划中就当作已批准产品行为：
 
-1. 是否接受“进入 Playing 前准备全部计划所需 Zone；任一必需资源失败则本次 Play 不开始并可
-   重试；未引用 Zone 不阻断”的 V1 加载建议；
+1. 是否接受 Batch 4B.1 已实现的“进入 Playing 前准备全部计划所需 Zone；任一必需资源失败则
+   本次 Play 不开始并可重试；未引用 Zone 不阻断”作为 V1 正式加载规则；
 2. Audible V1 的浏览器验收是 capability-based Chrome-first，还是同时要求多浏览器矩阵；
 3. Manifest `curve: null` 的 fallback、velocity gain 映射，以及 linear amplitude 与
    exponential / linear-dB release 的最终选择；
@@ -632,17 +633,20 @@ entry、大小、取消约束的第三方 ZIP 解码，并由调用方负责可�
 - Batch 4A.2 已测得完整 30 WAV 为 31.57 MiB encoded / 63.14 MiB decoded Float32；稳定参考窗口
   `48, 60, 64, 67, 72` 的 5 WAV 为 6.49 / 12.98 MiB。localhost Chromium 的并发解码 smoke
   只证明执行路径可用，不构成远程下载 SLO；
-- 待审建议是首次 Play 从当前稳定计划收集唯一 Sample resource key，并在进入 Playing 前准备
-  全部计划所需 Zone；不默认解码完整 Instrument，也不只准备首个 Scheduler horizon；
-- 任一计划必需 Zone 失败则本次 Play 不开始并允许重试；未被当前计划引用的缺失 Zone 不阻断。
-  当前 ZIP 交付可能仍要求网络层先取得完整 Bundle，但解码集合继续按计划裁剪；
-- 正式 Runtime 仍须记录 Bundle 下载 / 解压量、encoded Sample byte、解码后 AudioBuffer 内存、
-  允许等待时间、取消以及 Bundle / 单 Zone failure；
+- Batch 4B.1 已从当前完整稳定 Plan 按 Soundbank 聚合唯一 Pitch，经严格 Manifest 收集 resource
+  key，并在进入 Playing 前准备全部计划所需 Zone；不默认解码完整 Instrument，也不只准备首个
+  Scheduler horizon；
+- 任一计划必需 Zone 失败则准备失败并允许重试；未被当前计划引用的缺失 Zone 不阻断。当前首验
+  使用同源可寻址 Manifest/WAV；未来 ZIP 交付可能仍先取得完整 Bundle，但解码集合继续按计划
+  裁剪并复用已实现的受限 ZIP 边界；
+- Manifest / WAV response 都由 Composition Root 提供正整数 byte budget；WAV 在 decode 前严格
+  验证，逻辑 POSIX resource key 在 URL 边界逐段编码；
+- 同一 Manifest / resource 的并发请求去重；单个等待者取消不误伤其他等待者，最后一个等待者
+  离开才中止底层 Fetch；失败 Promise 被移除，允许下次重试；
+- 成功 AudioBuffer 进入应用生命周期可丢弃缓存，提供 active request、Manifest、decoded resource
+  与 Float32 byte 统计；`clearDecodedResources()` 和幂等 `dispose()` 清理引用，缓存不拥有或关闭
+  注入的 AudioContext；
 - 在满足所选加载门槛前 Transport 不进入 Playing，UI 显示 `Loading instrument…`；
-- 同一 Soundbank Bundle 的并发 fetch / unzip Promise 去重；
-- 同一 Zone 的并发请求 Promise 去重；
-- 成功解码的 AudioBuffer 进入可丢弃内存缓存；
-- 失败的 Promise 不永久污染缓存，用户重试可以重新请求；
 - 解码缓存是 Audio Web 中独立、可丢弃的应用生命周期资源，由 Studio Composition Root
   创建；Project Runtime dispose 释放 Voice、Timer 和 Listener，但不误清理仍由共享缓存拥有
   的 AudioBuffer；应用 dispose 再释放缓存引用；
@@ -792,7 +796,10 @@ packages/playback/src/
 └── scheduler/
 
 packages/audio-web/src/
-├── sample-instrument/  Supported SFZ Profile、Manifest 与来源 Adapter
+├── sample-instrument/
+│   ├── contract/       Supported SFZ Profile、Manifest 与资源格式边界
+│   ├── assets/         来源 Adapter 与受限资源容器
+│   └── loading/        Zone 选择、资源缓存与 Plan 资源准备
 ├── context/
 ├── soundbank/
 ├── voices/
@@ -815,7 +822,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - Gate C.1b（2026-08-12 已关闭）：确认受限 ZIP / WAV 边界、资源完整性、本地生成映射与输出
   形状；
 - Gate C.2（2026-08-13 工具、客观测量与人工试听已审）：浏览器加载和单音发声成功，当前
-  linear release 无明显 click；正式加载、包络、velocity 与浏览器策略在 Batch 4B 开始前确认。
+  linear release 无明显 click；Batch 4B.1 已按加载建议实现并等待审阅，包络、velocity 与浏览器
+  策略在对应后续生产批次前确认。
 
 ### Batch 1A：Project Core Instrument Device Replace
 
@@ -951,14 +959,28 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 测量全量 / 初始窗口加载量、解码后内存和失败恢复，确认 Batch 4B 加载策略；
 - 记录本地验证结论，但不把当前采样纳入生产构建；完成后停止审阅。
 
-### Batch 4B：Audio Web MIDISampleSynth Runtime（Studio Grand 首验）
+### Batch 4B.1：Audio Web Sample 资源准备层
 
-- AudioContext lifecycle；
-- Bundle / WAV fetch、按交付形状复用受限 ZIP decode、AudioBuffer decode、Promise 去重与可重试
-  缓存；
+> Implementation status: implemented, review pending. Playback and Audio Web type-check pass;
+> Playback 7 test files / 76 tests and Audio Web 12 test files / 75 tests pass.
+
+- `@seele-daw/playback` 包根只新增 `AudibleMidiProjectPlan` type export，供真实 Audio Web 消费者
+  使用，不公开 Compiler、Transport 或 Scheduler 写能力；
+- 按完整稳定 Plan 的 Track route 聚合 Soundbank/Pitch，并拒绝 blocked、缺失/重复/inaudible route、
+  缺失 asset location、Manifest identity 不一致和 unsupported pitch；
+- 实现同源 Manifest/WAV Fetch、byte budget、严格解析/验证、AudioBuffer decode、Promise 去重、
+  独立等待者取消、最后等待者中止、失败重试、应用生命周期缓存和资源统计；
+- 未取消的空 Plan 成功返回零资源；准备结果携带 `modelRevision` 并使用冻结数组，不泄漏内部
+  可变 Map；
+- 不创建 Voice、AudioNode 或 AudioContext，不接 Transport/Scheduler/Workbench，不扫描 Catalog 或
+  完整 Soundbank；完成后停止审阅。
+
+### Batch 4B.2：Audio Web MIDISampleSynth Voice（Studio Grand 首验）
+
+- AudioContext activation/lifecycle 与最小 master output；
 - 按 Gate C 结果实现 range / exact-key、trigger、loop、Pitch / Tune、Offset、Velocity、Gain、Pan、
   Envelope、Note Off 与 mutex；
-- Voice Token、cancel、allNotesOff 与资源统计；
+- Voice Token、cancel、allNotesOff 与 Voice/Node 资源统计；
 - Fake Web Audio contract tests；
 - 不接 Workbench UI，完成后停止审阅。
 

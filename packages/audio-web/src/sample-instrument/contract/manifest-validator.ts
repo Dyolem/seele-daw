@@ -14,12 +14,12 @@ import {
   type SampleInstrumentSelectorV1,
   type SampleInstrumentTriggerModeV1,
   type SampleInstrumentZoneV1,
-} from '#internal/sample-instrument/sample-instrument-manifest'
-import { SEELE_SUPPORTED_SFZ_PROFILE_V1 } from '#internal/sample-instrument/supported-sfz-profile-v1'
+} from '#internal/sample-instrument/contract/manifest'
+import { SEELE_SUPPORTED_SFZ_PROFILE_V1 } from '#internal/sample-instrument/contract/sfz-profile-v1'
 import {
   SampleResourceKeyError,
   assertSafeSampleResourceKey,
-} from '#internal/sample-instrument/sample-resource-key'
+} from '#internal/sample-instrument/contract/resource-key'
 import {
   StructuredDataError,
   assertExactKeys,
@@ -30,7 +30,7 @@ import {
   readNonBlankString,
   readRequiredValue,
   readString,
-} from '#internal/sample-instrument/structured-data-decoder'
+} from '#internal/sample-instrument/contract/structured-data'
 
 const MANIFEST_KEYS = Object.freeze([
   'displayName',

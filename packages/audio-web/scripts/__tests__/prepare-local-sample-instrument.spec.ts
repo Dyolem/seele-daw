@@ -5,9 +5,9 @@ import {
   SAMPLE_INSTRUMENT_MANIFEST_SCHEMA,
   SAMPLE_INSTRUMENT_MANIFEST_VERSION,
   type SampleInstrumentManifestV1,
-} from '#internal/sample-instrument/sample-instrument-manifest'
-import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/sample-instrument-manifest-validator'
-import type { SupportedWavMetadata } from '#internal/sample-instrument/supported-wav-file'
+} from '#internal/sample-instrument/contract/manifest'
+import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
+import type { SupportedWavMetadata } from '#internal/sample-instrument/contract/wav-file'
 
 import {
   LocalSampleInstrumentPreparationError,

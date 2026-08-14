@@ -326,7 +326,12 @@ describe('ProjectPlaybackCoordinator', () => {
 
     prepared.currentTime = 0.5 as typeof prepared.currentTime
     timer.fire()
-    expect(coordinator.state.positionProjectSecond).toBe(0.5)
+    expect(coordinator.state.positionProjectSecond).toBe(0)
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'playing',
+      positionProjectSecond: 0.5,
+      positionTick: 960,
+    })
     expect(coordinator.pause()).toBe(true)
     expect(coordinator.state.phase).toBe('paused')
     expect(prepared.generations).toEqual([1, 2])
@@ -1047,7 +1052,7 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(activeProject.commitObservers.size).toBe(0)
   })
 
-  it('publishes the retained end position and stops waking after natural end', async () => {
+  it('lets a visual sample publish retained natural end and stop Scheduler waking', async () => {
     const projectId = parseProjectId('project-playback-natural-end')
     const session = createPlayableSession(projectId)
     const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
@@ -1062,8 +1067,13 @@ describe('ProjectPlaybackCoordinator', () => {
     const prepared = runtime.prepared[0]!
 
     prepared.currentTime = 300 as typeof prepared.currentTime
-    timer.fire()
+    const visualPosition = coordinator.readVisualPosition()
 
+    expect(visualPosition).toMatchObject({
+      phase: 'stopped',
+      positionProjectSecond: 300,
+      positionTick: 576_000,
+    })
     expect(coordinator.state).toMatchObject({
       phase: 'stopped',
       positionProjectSecond: 300,
@@ -1099,7 +1109,7 @@ describe('ProjectPlaybackCoordinator', () => {
     coordinator.dispose()
   })
 
-  it('aborts and disposes the old runtime when the Active Project changes', async () => {
+  it('resets visual position while Active Project ownership changes', async () => {
     const firstProjectId = parseProjectId('project-playback-first')
     const firstSession = createPlayableSession(firstProjectId)
     const activeProject = createActiveProjectHarness(createReadyState(firstProjectId, firstSession))
@@ -1111,13 +1121,40 @@ describe('ProjectPlaybackCoordinator', () => {
     })
     await coordinator.play()
     const prepared = runtime.prepared[0]!
+    prepared.currentTime = 0.5 as typeof prepared.currentTime
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'playing',
+      positionProjectSecond: 0.5,
+      positionTick: 960,
+      projectId: firstProjectId,
+    })
 
     activeProject.publish(Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE }))
 
     expect(coordinator.state.phase).toBe('unavailable')
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'unavailable',
+      positionProjectSecond: 0,
+      positionTick: 0,
+      projectId: null,
+    })
     expect(prepared.allNotesOffCount).toBe(1)
     expect(prepared.disposeCount).toBe(1)
+
+    const secondProjectId = parseProjectId('project-playback-second')
+    const secondSession = createPlayableSession(secondProjectId)
+    activeProject.publish(createReadyState(secondProjectId, secondSession))
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'stopped',
+      positionProjectSecond: 0,
+      positionTick: 0,
+      projectId: secondProjectId,
+    })
+
     coordinator.dispose()
+    expect(() => coordinator.readVisualPosition()).toThrowError(
+      expect.objectContaining({ code: 'coordinator-disposed' }),
+    )
   })
 
   it('reports runtime failures without changing Project facts and allows retry', async () => {

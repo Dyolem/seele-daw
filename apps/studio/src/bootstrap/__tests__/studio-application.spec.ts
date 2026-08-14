@@ -35,6 +35,7 @@ import type {
   ProjectPlaybackRuntimePort,
   ProjectPlaybackTimerPort,
 } from '@/workbench/project/playback/project-playback-coordinator'
+import type { ProjectPlaybackVisualFramePort } from '@/workbench/project/playback/project-playback-visual-position'
 import {
   useProjectPlayback,
   type ProjectPlaybackVueContext,
@@ -74,6 +75,11 @@ const INERT_PLAYBACK_RUNTIME: ProjectPlaybackRuntimePort = Object.freeze({
 const INERT_PLAYBACK_TIMER: ProjectPlaybackTimerPort = Object.freeze({
   clear() {},
   setRepeating: () => Object.freeze({}),
+})
+
+const INERT_PLAYBACK_VISUAL_FRAME: ProjectPlaybackVisualFramePort = Object.freeze({
+  cancel() {},
+  request: () => Object.freeze({}),
 })
 
 function createTestRouter(): Router {
@@ -199,6 +205,7 @@ function createCompositionOptions() {
   return {
     projectPlaybackRuntime: INERT_PLAYBACK_RUNTIME,
     projectPlaybackTimer: INERT_PLAYBACK_TIMER,
+    projectPlaybackVisualFrame: INERT_PLAYBACK_VISUAL_FRAME,
   }
 }
 

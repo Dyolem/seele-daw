@@ -46,6 +46,7 @@ import {
   createBrowserProjectPlaybackRuntime,
   createDefaultBuiltInSampleAssetLocations,
 } from '@/workbench/project/playback/browser-runtime'
+import { createBrowserProjectPlaybackVisualFrame } from '@/workbench/project/playback/browser-animation-frame'
 import { createBrowserProjectPlaybackTimer } from '@/workbench/project/playback/browser-timer'
 import {
   createProjectPlaybackCoordinator,
@@ -53,6 +54,7 @@ import {
   type ProjectPlaybackRuntimePort,
   type ProjectPlaybackTimerPort,
 } from '@/workbench/project/playback/project-playback-coordinator'
+import type { ProjectPlaybackVisualFramePort } from '@/workbench/project/playback/project-playback-visual-position'
 import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/workbench/project/playback/vue/project-playback-context'
 import {
   createProjectPlaybackVueBinding,
@@ -79,6 +81,7 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
   readonly keyboardBindingRegistry?: StudioKeyboardBindingRegistry
   readonly projectPlaybackRuntime?: ProjectPlaybackRuntimePort
   readonly projectPlaybackTimer?: ProjectPlaybackTimerPort
+  readonly projectPlaybackVisualFrame?: ProjectPlaybackVisualFramePort
 }
 
 export interface StudioApplication {
@@ -245,7 +248,10 @@ export function composeStudioApplication(
       timer: composition.projectPlaybackTimer ?? createBrowserProjectPlaybackTimer(),
     })
     unownedProjectPlaybackRuntime = null
-    projectPlaybackBinding = createProjectPlaybackVueBinding(projectPlayback)
+    projectPlaybackBinding = createProjectPlaybackVueBinding(
+      projectPlayback,
+      composition.projectPlaybackVisualFrame ?? createBrowserProjectPlaybackVisualFrame(),
+    )
     keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
       bindingRegistry:
         composition.keyboardBindingRegistry ??
@@ -262,10 +268,7 @@ export function composeStudioApplication(
     vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
     vueApplication.provide(PROJECT_TRACK_CONTEXT_KEY, Object.freeze({ projectTracks }))
     vueApplication.provide(PROJECT_CLIP_CONTEXT_KEY, Object.freeze({ projectClips }))
-    vueApplication.provide(
-      PROJECT_MIDI_NOTE_CONTEXT_KEY,
-      Object.freeze({ projectMidiNotes }),
-    )
+    vueApplication.provide(PROJECT_MIDI_NOTE_CONTEXT_KEY, Object.freeze({ projectMidiNotes }))
     vueApplication.provide(PROJECT_PLAYBACK_CONTEXT_KEY, projectPlaybackBinding.context)
     vueApplication.provide(
       STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,

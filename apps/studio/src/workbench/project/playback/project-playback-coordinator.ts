@@ -46,6 +46,7 @@ import {
   type ProjectPlaybackStateObserver,
   type ProjectPlaybackUnsubscribe,
 } from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 
 export interface ProjectPlaybackPreparedRuntime {
   readonly modelRevision: ModelRevision
@@ -106,6 +107,7 @@ export interface ProjectPlaybackCoordinator {
   readonly state: ProjectPlaybackState
   pause(): boolean
   play(): Promise<boolean>
+  readVisualPosition(): ProjectPlaybackVisualPosition
   returnToStart(): boolean
   subscribe(observer: ProjectPlaybackStateObserver): ProjectPlaybackUnsubscribe
   togglePlayPause(): boolean
@@ -135,6 +137,7 @@ const SCHEDULER_WAKE_CADENCE_MILLISECOND = SCHEDULER_WAKE_CADENCE_SECOND * 1_000
 const EMPTY_PREPARATION_FAILURES = Object.freeze<
   readonly ProjectPlaybackInstrumentPreparationFailure[]
 >([])
+const ZERO_VISUAL_POSITION_TICK = 0 as ProjectPlaybackVisualPosition['positionTick']
 
 const UNAVAILABLE_STATE = Object.freeze<ProjectPlaybackState>({
   diagnostics: Object.freeze([]),
@@ -206,6 +209,20 @@ function createState(input: {
   })
 }
 
+function createVisualPosition(
+  state: ProjectPlaybackState,
+  positionProjectSecond = state.positionProjectSecond,
+  positionTick = ZERO_VISUAL_POSITION_TICK,
+): ProjectPlaybackVisualPosition {
+  return Object.freeze({
+    modelRevision: state.modelRevision,
+    phase: state.phase,
+    positionProjectSecond,
+    positionTick,
+    projectId: state.projectId,
+  })
+}
+
 function isPlayablePlan(plan: AudibleMidiProjectPlan): boolean {
   return (
     plan.status === AUDIBLE_MIDI_PLAN_STATUS.PARTIAL ||
@@ -274,6 +291,31 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
   get state(): ProjectPlaybackState {
     return this.#state
+  }
+
+  readVisualPosition(): ProjectPlaybackVisualPosition {
+    this.#assertLive()
+    const transport = this.#transport
+    if (transport === null) return createVisualPosition(this.#state)
+
+    try {
+      const snapshot = transport.getSnapshot()
+      if (this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING && snapshot.state !== 'playing') {
+        // A visual sample may observe natural end before the Scheduler wakes. Close the same
+        // low-frequency state transition here while retaining the Transport's End position.
+        this.#stopTimer()
+        this.#startRetiredRuntimeCleanup()
+        this.#publishTransportState(snapshot)
+      }
+      return createVisualPosition(
+        this.#state,
+        snapshot.positionProjectSecond,
+        snapshot.positionTick,
+      )
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return createVisualPosition(this.#state)
+    }
   }
 
   async play(): Promise<boolean> {
@@ -1092,8 +1134,8 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         this.#publishTransportState(snapshot)
         return
       }
+      // Scheduler cadence plans audio only; visual consumers sample this Transport separately.
       this.#scheduleNextWindow(snapshot)
-      this.#publishTransportState(snapshot)
     } catch (cause) {
       this.#failCurrentPlan(cause)
     }

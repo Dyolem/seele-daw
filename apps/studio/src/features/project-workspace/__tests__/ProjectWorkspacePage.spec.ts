@@ -74,6 +74,7 @@ import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import {
   PROJECT_PLAYBACK_CONTEXT_KEY,
   type ProjectPlaybackVueContext,
@@ -214,12 +215,24 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
     keyboardShortcuts,
   })
   const playbackState = shallowRef(STOPPED_PLAYBACK_STATE)
+  const playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
+    Object.freeze({
+      modelRevision: null,
+      phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+      positionProjectSecond: 0,
+      positionTick: 0 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId: null,
+    }),
+  )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
     get state() {
       return playbackState.value
     },
     pause: vi.fn<ProjectPlaybackCoordinator['pause']>(() => false),
     play: vi.fn<ProjectPlaybackCoordinator['play']>(async () => false),
+    readVisualPosition: vi.fn<ProjectPlaybackCoordinator['readVisualPosition']>(
+      () => playbackVisualPosition.value,
+    ),
     returnToStart: vi.fn<ProjectPlaybackCoordinator['returnToStart']>(() => false),
     subscribe: vi.fn<ProjectPlaybackCoordinator['subscribe']>(() => () => undefined),
     togglePlayPause: vi.fn<ProjectPlaybackCoordinator['togglePlayPause']>(() => true),
@@ -228,6 +241,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   const projectPlaybackContext: ProjectPlaybackVueContext = Object.freeze({
     projectPlayback,
     state: shallowReadonly(playbackState),
+    visualPosition: shallowReadonly(playbackVisualPosition),
   })
   const pendingNavigationDecision = shallowRef<PendingProjectNavigationDecision | null>(null)
   const projectNavigationDecisionContext: ProjectNavigationDecisionVueContext = Object.freeze({
@@ -256,6 +270,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
     pendingNavigationDecision,
     projectPlayback,
     playbackState,
+    playbackVisualPosition,
     selection: useProjectWorkbenchSelectionStore(pinia),
     wrapper,
   }
@@ -280,6 +295,29 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
     expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_000)
+  })
+
+  it('renders Transport time from the shared visual position source', async () => {
+    const projectId = parseProjectId('project-workspace-page-visual-position')
+    const session = createTestSession(projectId)
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId, session),
+    )
+    const { playbackState, playbackVisualPosition, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    playbackVisualPosition.value = Object.freeze({
+      modelRevision: session.modelRevision,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+      positionProjectSecond: 65.432,
+      positionTick: 125_629.44 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId,
+    })
+    await nextTick()
+
+    expect(playbackState.value.positionProjectSecond).toBe(0)
+    expect(wrapper.get('[aria-label="Current play time"]').text()).toBe('01:05.432')
   })
 
   it('delegates a dirty Workbench Save action to Active Project', async () => {

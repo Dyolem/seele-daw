@@ -148,6 +148,12 @@ Transport 与 Scheduler 已由 Studio Batch 5A 的 Coordinator 消费。它们�
 AudioContext、资源 URL 或 Voice；Studio 决定当前 `25 ms` 唤醒与 `200 ms` look-ahead 产品参数，
 Audio Web 只执行冻结的 Voice Plan。
 
+Studio Batch 7C 进一步把听觉调度 cadence 与视觉采样解耦：Scheduler 的 `25 ms` Timer 只推进
+look-ahead 计划；应用级视觉位置源通过 Transport / Playback Clock 读取权威 Project Second 与
+continuous Tick。`requestAnimationFrame` 只决定视图何时读取，不累计 frame delta，因此后台
+降频后恢复也不会形成第二套时间。该投影属于 Studio Composition / View 生命周期，不进入本包、
+Project、Pinia、History、dirty 或 Commit Subscription；后续多个 Playhead 必须共享这一位置源。
+
 Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 
 - `createAudibleMidiReconciliationPlan` 验证连续 Commit 链，并对完整新旧 Plan 输出 occurrence /

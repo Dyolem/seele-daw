@@ -361,6 +361,11 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
   Track 标题、操作区和控制行保持固定，原生横向滚动轨道不得延伸到 Track 控制列下方。
 - 默认时间轴至少覆盖项目起始拍号的 150 小节，并由最远 Clip 末端精确扩展；Ruler、Lane、
   Clip 定位与 Transport 自然结束必须消费同一派生范围。
+- Transport Position MUST 是播放期间视觉位置的唯一运行时权威。视图 MAY 使用
+  `requestAnimationFrame` 决定采样时机，但不得累计 frame delta 形成第二套播放时钟；后台恢复、
+  Pause、Return、自然结束和项目切换后必须重新读取权威位置。
+- 当前时间显示、Arrangement Playhead 与 Piano Roll Playhead MUST 消费同一共享视觉位置投影；
+  高频视觉位置不得进入 Project、Pinia、History、dirty 或 Commit Subscription。
 - 横向滚动和缩放的具体修饰键必须由 Keybinding 层统一定义，并允许平台适配。
 - Zoom 应围绕指针、播放头或明确焦点稳定缩放，不能无缘由跳回时间零点。
 - Arrangement 与 Piano Roll 可以分别保存 Zoom；“同步视图”应是显式选项。
@@ -1010,12 +1015,17 @@ SHOULD 使用 Canvas 的区域：
 
 Canvas 不是绕开可访问性和状态边界的理由。DOM 与 Canvas 必须读取同一 Editor state 和 Project Query，不得各自维护业务副本。
 
-当前至少 150 小节、少量 Clip、尚无 Zoom / Drag / Playhead 的 Arrangement 纵向切片 MAY
+当前至少 150 小节、少量 Clip、尚无 Zoom / Drag / 可见 Playhead 的 Arrangement 纵向切片 MAY
 继续使用 DOM，以验证真实创建、选择、打开、横向滚动和可访问交互。Track 控制行与 Lane 已经
 消费同一排序和行高；右侧 Arrangement 是唯一二维滚动视口，左侧 Track 列以裁切的合成层从
 视图跟随其纵向位置。Ruler 与 Lane 共享横向滚动，原生横向滚动条只属于 Arrangement；引入
 可变 Zoom、大量 Clip、高频播放图层或拖动预览前，必须以性能数据和交互需求重新评估 Canvas /
 分层渲染；渲染技术迁移不得改变 Project Command、Presentation、Selection 与滚动权威边界。
+
+Studio 已建立应用级共享视觉位置投影：普通 Playback State 只发布 Play、Pause、Return、自然
+结束、项目切换和失败等低频转换；一个受生命周期管理的动画帧循环在播放时直接采样 Transport。
+Scheduler cadence 只负责音频 look-ahead，不是 UI 刷新源。后续 DOM 或 Canvas Playhead 必须读取
+这份投影，并只更新独立轻量图层，不能各自维护计时器或累计时间。
 
 ### 21.2 禁止项
 

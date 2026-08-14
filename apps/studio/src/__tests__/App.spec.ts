@@ -51,6 +51,7 @@ import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import {
   PROJECT_PLAYBACK_CONTEXT_KEY,
   type ProjectPlaybackVueContext,
@@ -163,18 +164,32 @@ function createProjectPlaybackContext(): ProjectPlaybackVueContext {
       projectId: null,
     }),
   )
+  const visualPosition = shallowRef<ProjectPlaybackVisualPosition>(
+    Object.freeze({
+      modelRevision: null,
+      phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+      positionProjectSecond: 0,
+      positionTick: 0 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId: null,
+    }),
+  )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
     get state() {
       return state.value
     },
     pause: () => false,
     play: async () => false,
+    readVisualPosition: () => visualPosition.value,
     returnToStart: () => false,
     subscribe: () => () => undefined,
     togglePlayPause: () => false,
     dispose() {},
   })
-  return Object.freeze({ projectPlayback, state: shallowReadonly(state) })
+  return Object.freeze({
+    projectPlayback,
+    state: shallowReadonly(state),
+    visualPosition: shallowReadonly(visualPosition),
+  })
 }
 
 async function mountApp(state: ActiveProjectState, projectId: ProjectId | null = null) {

@@ -1156,11 +1156,20 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7C：共享视觉位置源
 
+> Implementation status: implemented locally and awaiting review. Studio owns one frame-sampled
+> visual position projection. Architecture lint, affected ESLint / Oxlint, Studio type-check,
+> Studio 42 files / 254 tests and the Studio production build pass.
+
 - Studio 从 Transport / Playback Clock 派生可供视图读取的当前 Tick 与状态，不维护第二套累计
   时间；
 - `requestAnimationFrame` 只驱动视觉采样，后台恢复时重新读取权威 Transport Position；
 - 高频视觉帧不进入 Project、Pinia、History、dirty 或 Commit Subscription；
 - Pause、Return、自然结束、项目切换与 dispose 后的视觉位置和订阅生命周期可重复验证。
+- 普通 Playback State 只发布 Play / Pause / Return / 自然结束 / 项目切换 / 失败等低频转换；
+  Scheduler 的 `25 ms` cadence 只规划音频，不再承担 UI 位置发布；
+- Vue Binding 同时暴露低频状态和只读视觉位置，并保证最多只有一个待处理动画帧。既有 Transport
+  时间显示已切换到该视觉位置；Arrangement 与 Piano Roll 的可见 Playhead 仍分别属于 Batch 7D
+  与 Batch 7E。
 
 #### Batch 7D：Arrangement Playhead 与 Follow
 

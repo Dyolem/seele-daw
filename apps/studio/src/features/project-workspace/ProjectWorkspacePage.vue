@@ -68,7 +68,11 @@ const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
 const projectNavigationDecision = useProjectNavigationDecision()
 const { keyboardShortcuts } = useStudioKeyboardShortcuts()
-const { projectPlayback, state: playbackState } = useProjectPlayback()
+const {
+  projectPlayback,
+  state: playbackState,
+  visualPosition: playbackVisualPosition,
+} = useProjectPlayback()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const toasts = useUiToastStore()
 const router = useRouter()
@@ -123,12 +127,14 @@ const clipSelectionCandidates = computed((): readonly ProjectWorkbenchClipSelect
   )
 })
 
-const playbackTime = computed(() => formatPlaybackTime(playbackState.value.positionProjectSecond))
+const playbackTime = computed(() =>
+  formatPlaybackTime(playbackVisualPosition.value.positionProjectSecond),
+)
 const playbackCanReturnToStart = computed(
   () =>
     playbackState.value.phase === PROJECT_PLAYBACK_PHASE.LOADING ||
     playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING ||
-    playbackState.value.positionProjectSecond > 0,
+    playbackVisualPosition.value.positionProjectSecond > 0,
 )
 const playbackCanToggle = computed(
   () =>

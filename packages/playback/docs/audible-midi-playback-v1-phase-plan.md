@@ -4,7 +4,7 @@
 >
 > Date: 2026-08-10
 >
-> Last updated: 2026-08-13
+> Last updated: 2026-08-14
 >
 > Prerequisite checkpoint: `checkpoint/piano-roll-note-editing-2026-08-10`
 
@@ -79,8 +79,9 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
   Device Graph；
 - V1 不建立 AudioWorklet、SharedArrayBuffer 或跨线程 generation ACK；Studio Grand 的当前
   候选是主线程 Web Audio 原生节点，但仍须在 Gate C 听觉审阅，且不约束未来 FM / VA 引擎；
-- 播放中相关 Commit 首先采用 generation 失效、取消未来事件、`allNotesOff` 与完整 Snapshot
-  重建，不在首版实现 Track / Range / Voice 级增量优化；
+- 播放中相关 Commit 采用专用于 Audible MIDI 的选择性 reconciliation：重建尚未发声的队列，
+  只结束被修改的活动 Voice，并保留无关 Track / Note 的持续发声；全局 `allNotesOff` 只用于
+  Pause、Return、项目生命周期、全局时间映射改变或状态无法证明安全的兜底路径；
 - 两个编辑表面的 Playhead 作为独立可选批次，不阻塞首次可听闭环；
 - 当前内置采样只作为 developer-local、可替换且不可随 Seele 分发的验证输入；该边界不阻塞
   本地 Audio Runtime 开发。规范化 Manifest、首播加载预算和浏览器验收范围仍是相应生产批次
@@ -721,28 +722,49 @@ Batch 5A 已按以下 UI 契约实现并通过功能审核；进一步优化留�
 - Save / Checkpoint 不产生 Project Commit，不使正在播放的计划失效；
 - Note Add / Move / Resize / Remove、Clip / Track / Instrument 变化、Undo 和 Redo 都必须使
   相关未来事件失效；
-- 新计划必须明确对应新的 `modelRevision` 和新的 `engineGeneration`；
-- V1 同一主线程内先同步使旧 generation 无效，再安装新计划，不建立无真实异步消费者的
-  generation ACK；
+- 新计划必须明确对应新的 `modelRevision`；原子安装时再产生新的 `engineGeneration`；连续多次
+  Commit 可以在资源准备期间合并到一个最终安装 generation；
+- generation 只控制后续 Scheduler / Runtime 接受哪个调度批次，不再隐含结束全部旧 Voice；
+- V1 同一主线程内同步安装新 generation，不建立无真实异步消费者的 generation ACK；
 - 外部音频失败不回滚 Project Commit；Runtime 可以保留安全旧计划或停止，但必须报告状态；
-- 如果 Commit 序列出现 gap，丢弃增量并从新的完整 Snapshot 重建。
+- Playback 使用完整的新旧 Audible Plan 判断真实听觉变化；Commit / Delta 保留操作来源和连续性；
+- 连续 Commit 链可以合并；如果实际观察链出现 gap，丢弃增量、从完整 Snapshot 重建并进入全局
+  安全兜底。
 
-### 8.2 V1 生效策略
+### 8.2 选择性生效策略
 
-为先保证正确性，V1 在相关 Commit 后固定执行保守重建：
+当前 `200 ms` look-ahead 是实现参数，不是用户可见的编辑冻结区。一次相关 Commit 按三个时间
+状态处理：
 
-1. 读取当前听觉位置；
-2. generation + 1；
-3. 取消旧 generation 的 future schedule；
-4. 对 V1 当前全部活动 Voice 执行快速 `allNotesOff`；
-5. 从新 Snapshot / Plan 的当前位置之后继续规划；
-6. 不对当前位置之前已经开始的长 Note 执行 chase。
+| Project Fact 变化             | 尚未调度         | 已调度但未开始                   | 正在发声                                                      |
+| ----------------------------- | ---------------- | -------------------------------- | ------------------------------------------------------------- |
+| Note Add                      | 使用新 Note      | 起点仍在当前位置之后则补调度     | 起点已过去则不 Chase                                          |
+| Note Delete                   | 不再调度         | 取消旧 Voice                     | 只快速释放该 occurrence                                       |
+| Note Move / Pitch             | 使用新位置与音高 | 取消旧 Voice，并按未来新起点重排 | 释放旧 Voice；新起点在未来才重排，不立即重触发                |
+| Note Resize                   | 使用新范围       | 取消并重排                       | 新终点已过去则释放；仍在未来则调整 Note Off；进入尾音后不复活 |
+| Velocity / Channel            | 使用新值         | 取消并重排                       | 不改变已触发 Voice，留到下一次 Note On                        |
+| Clip / Track Remove           | 不再调度其内容   | 取消其 future Voice              | 只释放所属 Clip / Track Voice                                 |
+| Instrument Replace            | 新事件使用新音源 | 取消该 Track 旧事件              | 只释放该 Track，其他 Track 继续                               |
+| Tempo / 全局路由 / 不可信状态 | 完整重建         | 全部取消                         | 允许全局 `allNotesOff`                                        |
 
-该策略会在任意相关编辑后截断本来未受影响的活动长 Note，这是 V1 为换取确定性接受的限制。
-Track / Range / Voice 级失效与保留未受影响 Voice 留到有实际听觉需求和基准后单独实现。不得
-为追求局部优化让旧 Note Span 在新 Project Fact 下继续错误发声。
+实现可以在原子切换时取消并重建全部尚未开始的旧队列，因为它们尚未产生声音；活动 Voice
+必须按 occurrence / Track 选择性保留或结束。已经开始由声卡渲染的结果无法倒放撤回，极靠近
+当前时刻的取消是 best effort。Undo / Redo 使用其还原操作的同一语义。
 
-### 8.3 交互 Preview
+Gain / Pan / Mute 最终应通过持久 Track Bus 实时作用于持续声音；当前没有对应 Project Command
+和 Track Bus，本阶段不脱离真实编辑能力提前建设 Mixer Graph。
+
+### 8.3 安装顺序与资源准备
+
+1. 从新 Snapshot 编译完整 Audible Plan，并与已安装 Plan 形成 reconciliation；
+2. 立即禁止旧 Scheduler 再产生已失效 occurrence / Track，并按表处理已交付 Voice；
+3. 异步准备新 Plan 需要的资源；期间未受影响的旧内容继续播放；
+4. 丢弃 stale preparation，只让最新连续 revision 进入安装；
+5. 读取当前听觉位置、递增 generation、取消旧 queued Voice，并原子安装新 Transport / Scheduler；
+6. 从当前位置之后填充新 look-ahead；不 Chase 已经越过起点的 Note；
+7. 旧 Runtime 在其保留 Voice 全部结束后释放。
+
+### 8.4 交互 Preview
 
 Piano Roll Move / Resize Preview 不产生 Project Commit，因此不改变 Timeline Playback
 Plan。只有 Pointer Up 成功提交后才更新播放。Preview Audition 属于未来独立功能，不得把
@@ -1043,16 +1065,19 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 独立图层、rAF 视觉刷新、后台恢复与 dispose；
 - 未进入或未完成不阻塞 Audible V1 封版。
 
-### Batch 6：播放中编辑与阶段加固
+### Batch 6：选择性 Playback Reconciliation 与阶段加固
 
-- Commit subscription、revision gap 与 full rebuild；
-- Note Move / Resize / Delete、Undo / Redo 和 Instrument Replace 生效；
-- generation 失效、取消 future schedule、全局 `allNotesOff` 与旧事件丢弃；
-- Pause / Resume、后台 suspend、连续项目切换和资源泄漏回归；
-- 完整 `pnpm lint`、`pnpm check`、生产构建和浏览器 smoke；
-- 封版第六阶段并建立 checkpoint tag。
+- **6A Reconciliation Contract**：完整 Plan 差异、Commit 链验证、occurrence / Track 失效计划；
+- **6B Transport Plan Handoff**：保留当前位置、单调 generation、新 Plan Anchor 与 Scheduler；
+- **6C Selective Voice Lifecycle**：generation 与断音解耦、Voice handle、cancel、Note Off 重排；
+- **6D Studio Note Reconciliation**：Note Add / Move / Resize / Delete 与 Undo / Redo 连续生效；
+- **6E Track / Instrument Reconciliation**：Track / Clip 生命周期、Instrument Replace 与异步资源；
+- **6F Hardening**：gap / stale / failure 兜底、Pause / Resume、项目切换和资源泄漏回归；
+- 完整 `pnpm lint`、`pnpm check` 与生产构建；本阶段不新增 E2E，若未来需要浏览器产品流自动化，
+  另行采用 Playwright 建设；
+- 全部批次通过审核后再封版第六阶段并建立 checkpoint tag。
 
-每个独立 Core / Runtime / Studio 批次完成后停止，等待用户审阅；未经确认不连续推进下一批。
+Batch 6 的每个独立批次完成验证后直接形成单独提交，连续推进；全部完成后统一逐提交审核。
 
 ## 11. 测试与验收
 
@@ -1080,7 +1105,7 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - old generation event 被丢弃；
 - allNotesOff / dispose 后 Voice、Node、Timer 和 Listener 为零。
 
-浏览器自动化还应通过 `OfflineAudioContext` 或等价可观测渲染验证：
+Audio Runtime 单元 / 集成测试可通过 `OfflineAudioContext` 或等价可观测渲染验证：
 
 - 已知 Note Plan 产生非静音输出；
 - Pitch 比例、开始时刻、release 与声道输出在容差内；
@@ -1097,9 +1122,10 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 若进入可选 Batch 5B，两个 Playhead 使用同一 Transport Position；
 - Record、Loop 和 Output Meter 不伪装为已接通。
 
-### 11.4 浏览器 Smoke
+### 11.4 浏览器验证边界
 
-自动化渲染不能证明真实声卡输出。Batch 5A 和阶段封版至少人工验证：
+Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览器操作作为提交门槛；以下场景
+保留为以后 Playwright 与专门兼容性批次的候选验收清单：
 
 1. Chrome 中创建 Track / Clip / Note；
 2. 首次 Play 能经过用户手势解锁并听见 Studio Grand；

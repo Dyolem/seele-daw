@@ -4,9 +4,34 @@ export { AUDIBLE_MIDI_PLAN_STATUS } from './compiler/audible-midi-plan'
 export type {
   AudibleMidiPlanStatus,
   AudibleMidiProjectPlan,
+  MasterChannelPlan,
+  MidiNoteSpanPlan,
+  NoteOccurrenceKey,
   PlaybackDiagnostic,
   PlaybackDiagnosticCode,
+  TrackPlaybackPlan,
 } from './compiler/audible-midi-plan'
+export {
+  AUDIBLE_MIDI_NOTE_RECONCILIATION_COMMAND_TYPES,
+  AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND,
+  AUDIBLE_MIDI_RECONCILIATION_REASON,
+  AUDIBLE_MIDI_RECONCILIATION_SCOPE,
+  AUDIBLE_MIDI_TRACK_CHANGE_KIND,
+  AudibleMidiReconciliationError,
+  createAudibleMidiReconciliationPlan,
+} from './reconciliation/audible-midi-reconciliation'
+export type {
+  AudibleMidiOccurrenceChange,
+  AudibleMidiOccurrenceChangeKind,
+  AudibleMidiOccurrenceField,
+  AudibleMidiReconciliationPlan,
+  AudibleMidiReconciliationReason,
+  AudibleMidiReconciliationScope,
+  AudibleMidiTrackChange,
+  AudibleMidiTrackChangeKind,
+  AudibleMidiTrackField,
+  CreateAudibleMidiReconciliationPlanInput,
+} from './reconciliation/audible-midi-reconciliation'
 export {
   AUDIBLE_MIDI_SCHEDULER_OUTCOME,
   createAudibleMidiSchedulerPlanner,

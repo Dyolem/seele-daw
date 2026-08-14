@@ -45,6 +45,10 @@ function replacePlan(
   return Object.freeze({ ...plan, ...overrides })
 }
 
+function nextModelRevision(plan: AudibleMidiProjectPlan): ModelRevision {
+  return (plan.modelRevision + 1) as ModelRevision
+}
+
 function captureError(action: () => void): unknown {
   try {
     action()
@@ -178,6 +182,130 @@ describe('Audible MIDI Transport', () => {
     expect(transport.getSnapshot()).toMatchObject({
       positionProjectSecond: 0.5,
       positionTick: 960,
+    })
+  })
+
+  it('hands a Playing transport to a newer Plan without losing its clock position', () => {
+    const plan = createFixturePlan()
+    const nextPlan = replacePlan(plan, { modelRevision: nextModelRevision(plan) })
+    const clock = new ManualPlaybackClock(10)
+    const transport = createAudibleMidiTransport(plan, clock)
+
+    transport.play()
+    clock.advanceBy(0.25)
+    const handedOff = transport.handoffPlan(nextPlan)
+
+    expect(handedOff).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.HANDED_OFF,
+      snapshot: {
+        anchorPlaybackClockSecond: 10.25,
+        anchorProjectSecond: 0.25,
+        engineGeneration: 2,
+        modelRevision: 1,
+        positionProjectSecond: 0.25,
+        positionTick: 480,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+      },
+    })
+
+    clock.advanceBy(0.25)
+    expect(transport.getSnapshot()).toMatchObject({
+      engineGeneration: 2,
+      modelRevision: 1,
+      positionProjectSecond: 0.5,
+      positionTick: 960,
+      state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+    })
+  })
+
+  it('hands off Paused state without consuming Playback Clock time', () => {
+    const plan = createFixturePlan()
+    const clock = new ManualPlaybackClock(30)
+    const transport = createAudibleMidiTransport(plan, clock)
+    transport.play()
+    clock.advanceBy(0.25)
+    transport.pause()
+    clock.advanceBy(5)
+
+    const handedOff = transport.handoffPlan(
+      replacePlan(plan, { modelRevision: nextModelRevision(plan) }),
+    )
+
+    expect(handedOff).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.HANDED_OFF,
+      snapshot: {
+        anchorPlaybackClockSecond: null,
+        anchorProjectSecond: null,
+        engineGeneration: 3,
+        modelRevision: 1,
+        positionProjectSecond: 0.25,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.PAUSED,
+      },
+    })
+  })
+
+  it('stops a handoff whose new Arrangement ends before the current position', () => {
+    const plan = createFixturePlan()
+    const clock = new ManualPlaybackClock(40)
+    const transport = createAudibleMidiTransport(plan, clock)
+    transport.play()
+    clock.advanceBy(0.5)
+
+    const handedOff = transport.handoffPlan(
+      replacePlan(plan, {
+        arrangementEndTick: parseTick(240),
+        modelRevision: nextModelRevision(plan),
+      }),
+    )
+
+    expect(handedOff.snapshot).toMatchObject({
+      arrangementEndProjectSecond: 0.125,
+      arrangementEndTick: 240,
+      engineGeneration: 2,
+      positionProjectSecond: 0.125,
+      positionTick: 240,
+      state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+    })
+  })
+
+  it('installs an unplayable handoff as Stopped while preserving its current position', () => {
+    const plan = createFixturePlan()
+    const clock = new ManualPlaybackClock(50)
+    const transport = createAudibleMidiTransport(plan, clock)
+    transport.play()
+    clock.advanceBy(0.25)
+
+    const handedOff = transport.handoffPlan(
+      replacePlan(plan, {
+        midiNoteSpans: Object.freeze([]),
+        modelRevision: nextModelRevision(plan),
+        status: AUDIBLE_MIDI_PLAN_STATUS.EMPTY,
+      }),
+    )
+
+    expect(handedOff.snapshot).toMatchObject({
+      engineGeneration: 2,
+      modelRevision: 1,
+      planStatus: AUDIBLE_MIDI_PLAN_STATUS.EMPTY,
+      positionProjectSecond: 0.25,
+      state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+    })
+    expect(transport.play()).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_EMPTY,
+      snapshot: { engineGeneration: 2 },
+    })
+  })
+
+  it('rejects a stale handoff without changing the installed Plan', () => {
+    const plan = createFixturePlan()
+    const transport = createAudibleMidiTransport(plan, new ManualPlaybackClock())
+
+    expect(() => transport.handoffPlan(plan)).toThrow(
+      expect.objectContaining({ code: 'handoff-plan-not-forward' }) as AudibleMidiTransportError,
+    )
+    expect(transport.getSnapshot()).toMatchObject({
+      engineGeneration: INITIAL_ENGINE_GENERATION,
+      modelRevision: plan.modelRevision,
     })
   })
 

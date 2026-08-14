@@ -20,6 +20,7 @@ it('exports the browser-independent playback slice required by Studio and Audio 
   expectTypeOf<AudibleMidiProjectPlan>().toHaveProperty('midiNoteSpans')
   expectTypeOf<ScheduledSampleVoicePlan>().toHaveProperty('startPlaybackClockSecond')
   expectTypeOf<PlaybackClock>().toHaveProperty('now')
+  expectTypeOf<ReturnType<typeof createAudibleMidiTransport>>().toHaveProperty('handoffPlan')
 
   expect(compileAudibleMidiProject).toBeTypeOf('function')
   expect(createAudibleMidiTransport).toBeTypeOf('function')
@@ -30,5 +31,6 @@ it('exports the browser-independent playback slice required by Studio and Audio 
   expect(AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE).toBe('playable')
   expect(AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE).toBe('selective')
   expect(AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED).toBe('played')
+  expect(AUDIBLE_MIDI_TRANSPORT_OUTCOME.HANDED_OFF).toBe('handed-off')
   expect(AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED).toBe('planned')
 })

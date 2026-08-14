@@ -30,6 +30,7 @@ export type AudibleMidiTransportState =
   (typeof AUDIBLE_MIDI_TRANSPORT_STATE)[keyof typeof AUDIBLE_MIDI_TRANSPORT_STATE]
 
 export const AUDIBLE_MIDI_TRANSPORT_OUTCOME = Object.freeze({
+  HANDED_OFF: 'handed-off',
   NO_CHANGE: 'no-change',
   PAUSED: 'paused',
   PLAN_BLOCKED: 'plan-blocked',
@@ -43,6 +44,7 @@ export type AudibleMidiTransportOutcome =
 
 export type AudibleMidiTransportErrorCode =
   | 'engine-generation-overflow'
+  | 'handoff-plan-not-forward'
   | 'invalid-plan-status'
   | 'playback-clock-before-anchor'
   | 'playback-clock-regressed'
@@ -98,6 +100,7 @@ export interface AudibleMidiTransportTransition {
 
 export interface AudibleMidiTransport {
   getSnapshot(): AudibleMidiTransportSnapshot
+  handoffPlan(plan: AudibleMidiProjectPlan): AudibleMidiTransportTransition
   pause(): AudibleMidiTransportTransition
   play(): AudibleMidiTransportTransition
   playbackClockSecondAtTick(tick: Tick): PlaybackClockSecond
@@ -149,14 +152,14 @@ export function createAudibleMidiTransport(
   plan: AudibleMidiProjectPlan,
   clock: PlaybackClock,
 ): AudibleMidiTransport {
-  const planStatus = parsePlanStatus(plan.status)
-  const modelRevision = plan.modelRevision
-  const arrangementEndTick = parseTick(plan.arrangementEndTick)
-  const tempoMap: TempoMap = createTempoMapFromSegments(plan.tempoSegments)
-  const arrangementEndProjectSecond = tempoMap.projectSecondAtTick(arrangementEndTick)
+  let planStatus = parsePlanStatus(plan.status)
+  let modelRevision = plan.modelRevision
+  let arrangementEndTick = parseTick(plan.arrangementEndTick)
+  let tempoMap: TempoMap = createTempoMapFromSegments(plan.tempoSegments)
+  let arrangementEndProjectSecond = tempoMap.projectSecondAtTick(arrangementEndTick)
   const zeroProjectSecond = parseProjectSecond(0)
   const zeroTickPosition = parseContinuousTickPosition(0)
-  const arrangementEndTickPosition = parseContinuousTickPosition(arrangementEndTick)
+  let arrangementEndTickPosition = parseContinuousTickPosition(arrangementEndTick)
 
   let state: AudibleMidiTransportState = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
   let engineGeneration = INITIAL_ENGINE_GENERATION
@@ -319,6 +322,66 @@ export function createAudibleMidiTransport(
     return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.PAUSED, pausedProjectSecond)
   }
 
+  function handoffPlan(nextPlan: AudibleMidiProjectPlan): AudibleMidiTransportTransition {
+    if (!Number.isSafeInteger(nextPlan.modelRevision) || nextPlan.modelRevision <= modelRevision) {
+      throw new AudibleMidiTransportError(
+        'handoff-plan-not-forward',
+        `Transport handoff requires a modelRevision after ${modelRevision}`,
+      )
+    }
+
+    // Normalize every replacement value before observing the clock or mutating active state.
+    const nextPlanStatus = parsePlanStatus(nextPlan.status)
+    const nextArrangementEndTick = parseTick(nextPlan.arrangementEndTick)
+    const nextTempoMap = createTempoMapFromSegments(nextPlan.tempoSegments)
+    const nextArrangementEndProjectSecond = nextTempoMap.projectSecondAtTick(nextArrangementEndTick)
+    const nextArrangementEndTickPosition = parseContinuousTickPosition(nextArrangementEndTick)
+    const nextGeneration = incrementEngineGeneration(engineGeneration)
+    const wasPlaying = state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
+    const currentProjectSecond = synchronizePlayingPosition()
+    const continuesPlaying = wasPlaying && state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
+    const handoffPlaybackClockSecond = continuesPlaying ? lastObservedPlaybackClockSecond : null
+
+    planStatus = nextPlanStatus
+    modelRevision = nextPlan.modelRevision
+    arrangementEndTick = nextArrangementEndTick
+    tempoMap = nextTempoMap
+    arrangementEndProjectSecond = nextArrangementEndProjectSecond
+    arrangementEndTickPosition = nextArrangementEndTickPosition
+    engineGeneration = nextGeneration
+
+    const handoffProjectSecond = parseProjectSecond(
+      Math.min(currentProjectSecond, arrangementEndProjectSecond),
+    )
+    const nextPlanIsPlayable =
+      planStatus === AUDIBLE_MIDI_PLAN_STATUS.PARTIAL ||
+      planStatus === AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE
+
+    if (
+      !nextPlanIsPlayable ||
+      handoffProjectSecond >= arrangementEndProjectSecond ||
+      !continuesPlaying
+    ) {
+      if (!nextPlanIsPlayable || handoffProjectSecond >= arrangementEndProjectSecond) {
+        state = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
+      }
+      anchorProjectSecond = handoffProjectSecond
+      anchorPlaybackClockSecond = null
+      return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.HANDED_OFF, handoffProjectSecond)
+    }
+
+    if (handoffPlaybackClockSecond === null) {
+      throw new AudibleMidiTransportError(
+        'transport-not-playing',
+        'Playing Transport handoff has no observed Playback Clock position',
+      )
+    }
+    state = AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
+    anchorProjectSecond = handoffProjectSecond
+    anchorPlaybackClockSecond = handoffPlaybackClockSecond
+    return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.HANDED_OFF, handoffProjectSecond)
+  }
+
   function returnToStart(): AudibleMidiTransportTransition {
     if (
       state === AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED &&
@@ -378,6 +441,7 @@ export function createAudibleMidiTransport(
 
   return Object.freeze({
     getSnapshot,
+    handoffPlan,
     pause,
     play,
     playbackClockSecondAtTick,

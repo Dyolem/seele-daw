@@ -4,15 +4,15 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：截至 2026-08-14，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2 与 Studio Batch
-> 5A 已通过功能审阅；Batch 6A–6F 已实现并完成本地验证，等待统一逐提交审核。本包已有通用
+> 当前状态：截至 2026-08-14，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
+> 5A 与 Batch 6A–6F 已通过功能审阅。本包已有通用
 > Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
 > Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
 > Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
-[Audible MIDI Playback V1 第六阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
+[Audible MIDI Playback V1 阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
 Compiler、Transport 与 Scheduler 的协作和术语另见
 [Audible MIDI Scheduler 工作原理](./docs/audible-midi-scheduler-primer.md)。
 默认内置 MIDISampleSynth 数据的证据与兼容推断见

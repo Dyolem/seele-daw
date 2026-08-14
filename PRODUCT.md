@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-13，已审阅代码基线 `7242a52`，另含本次 Batch 5A UI 提交
+> 最近更新：2026-08-14，代码基线 `dfbddce`，Batch 6A–6F 已通过统一逐提交审核
 >
-> 当前阶段：Audible MIDI Playback V1 Batch 5A 已通过功能审核，优化项留待后续讨论
+> 当前阶段：Audible MIDI Playback V1 的选择性播放同步已收口，继续实施 Batch 7 时间轴与播放头
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -68,7 +68,7 @@ Studio 会明确失败，不静默替换声音。
 | `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                              |
 | `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                 |
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                              |
-| `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可加载 Studio Grand 并 Play / Pause / Return；Loop、Seek、Record、Meter 与播放中无缝重建尚未实现。               |
+| `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return；播放中相关编辑按 Note / Track 选择性生效。Loop、Seek、Record、Meter 尚未实现。         |
 | `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | Grid / Note Renderer、Pencil Add、Cursor Selection / Move、Cursor / Pencil Resize、多选 Delete、Snap 与 Undo / Redo 已接入。 |
 
 ## 3. 项目入口与生命周期
@@ -275,6 +275,46 @@ Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与�
 用户 Keymap 的输入验证边界已经就绪，但可见设置面板尚未实现。未来无效输入必须在字段旁
 显示错误并保留原 Binding；损坏或不兼容的持久化覆盖应回退默认值，不能让错误延迟到 Feature
 注册时才以应用启动失败暴露。
+
+### 5.5 `PLAYBACK` 播放与播放中编辑
+
+**局部可用**
+
+播放过程中一旦 Project Commit 成功，Commit 后的 Project Facts 就立即成为权威。声音执行失败
+不能撤销合法编辑，也不能让旧 Project Facts 继续冒充当前项目内容。
+
+Studio 当前使用 `200 ms` look-ahead 提前安排即将发声的 Note。它只是内部调度参数，不是用户
+可见的编辑冻结区，也不决定一项编辑是否生效。产品行为取决于 Commit 到达时，一次 Note 发声
+处于以下哪个阶段：
+
+- **尚未调度**：还没有交给声音 Runtime；
+- **已调度但未开始**：已经安排了未来开始时刻，但尚未产生声音；
+- **正在发声**：已经开始产生声音，包括保持阶段和释放尾音阶段。
+
+播放中编辑遵循以下产品语义：
+
+| Project Fact 变化             | 尚未调度                  | 已调度但未开始                       | 正在发声                                                         |
+| ----------------------------- | ------------------------- | ------------------------------------ | ---------------------------------------------------------------- |
+| Note Add                      | 使用新 Note               | 新起点仍在当前位置之后则安排发声     | 起点已经过去时不追补发声                                         |
+| Note Delete                   | 不再安排                  | 取消尚未开始的旧发声                 | 只快速释放该 Note 的本次发声                                     |
+| Note Move / Pitch             | 使用新位置与音高          | 取消旧发声；新起点仍在未来时重新安排 | 释放旧发声；仅在新起点仍在未来时重新安排，不立即重触发           |
+| Note Resize                   | 使用新范围                | 取消并按新范围重新安排               | 新终点已过去则释放；仍在未来则调整结束时刻；进入尾音后不重新激活 |
+| Velocity / Channel            | 使用新值                  | 取消并按新值重新安排                 | 不改变已经触发的发声，新值从下一次 Note On 开始生效              |
+| Clip / Track Remove           | 不再安排其内容            | 取消所属 Clip / Track 的未来发声     | 只释放所属 Clip / Track 的发声                                   |
+| Instrument Replace            | 后续事件使用新音源        | 取消该 Track 使用旧音源的未来发声    | 只释放该 Track，其他 Track 继续发声                              |
+| Tempo / 全局路由 / 不可信状态 | 根据最新 Project 完整重建 | 取消全部尚未开始的发声               | 允许停止全部当前声音                                             |
+
+补充规则：
+
+- 尚未开始的旧队列可以在切换时整体取消并按最新 Project 重新建立，因为它们还没有产生声音；已经开始
+  的发声必须按具体 Note 或 Track 选择性保留或结束。
+- 与编辑无关的活动 Note 和 Track 继续发声，不因任意 Project Commit 被统一截断。
+- 已经由声卡渲染的声音无法撤回；极靠近当前播放位置的取消属于 best effort。
+- Note 起点已经越过当前播放位置时不执行 Note Chase，不为了反映新事实而立即补触发。
+- Undo / Redo 按其最终恢复出来的 Project Fact 变化应用同一套规则。
+- Pause、Return to Start、项目切换、全局时间映射变化或无法证明局部更新安全时，允许停止全部声音。
+- Velocity、Channel、Tempo 与全局路由的可见编辑入口尚未交付；表中对应行只约束这些能力未来接入
+  后的产品行为，不改变它们当前的功能状态。
 
 ## 6. Track
 
@@ -725,13 +765,13 @@ Project Core 已具备：
 | 2026-08-13 | Audio Web Sample Voice Runtime                             | 建立用户激活的 AudioContext、master output、Manifest 驱动的 Pitch/Envelope/Loop/Mutex Voice、generation/cancel/allNotesOff 与零残留资源统计；已通过审阅。        | `772210f`                       |
 | 2026-08-13 | `PLAYBACK`、`KEYBOARD-SHORTCUTS`                           | Studio 组合 Compiler、Transport、Scheduler、资源准备与 Voice；接通 Play/Pause/Return、Space、时间、Loading/失败反馈和清理；已通过功能审核。                      | `7242a52`（核心）与本次 UI 提交 |
 | 2026-08-14 | `PLAYBACK`                                                 | 建立完整 Plan Reconciliation、Transport 原位 handoff 与 generation/断音解耦的选择性 Voice 生命周期。                                                             | `33a9ea0`、`365044b`、`475d32c` |
-| 2026-08-14 | `PLAYBACK`                                                 | Studio 接入 Commit 顺序、Note / Track / Clip / Instrument 选择性生效、按 Soundbank 局部资源失败，以及 stale/gap/Pause/项目切换回归；等待统一逐提交审核。         | `2729357`、`a730119` 与本次提交 |
+| 2026-08-14 | `PLAYBACK`                                                 | Studio 接入 Commit 顺序、Note / Track / Clip / Instrument 选择性生效、按 Soundbank 局部资源失败，以及 stale/gap/Pause/项目切换回归；Batch 6A–6F 已通过统一审核。 | `2729357`、`a730119`、`dfbddce` |
 
 ## 13. 当前验证基线
 
 Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、Batch 3B、Batch 4A、
-Batch 4B.1、Batch 4B.2 与 Batch 5A 已通过本地验证和功能审核；Batch 5A 另通过浏览器运行时
-smoke。Batch 6A–6F 已于 2026-08-14 完成实现和本地验证，等待统一逐提交审核：
+Batch 4B.1、Batch 4B.2、Batch 5A 与 Batch 6A–6F 已通过本地验证和功能审核；Batch 5A 另通过
+浏览器运行时 smoke。Batch 6A–6F 已于 2026-08-14 完成统一逐提交审核：
 
 - 当前 Batch 6 工作区通过 `pnpm lint` 与 `pnpm check`，包括 Architecture、Workspace Type Check、
   全部测试、Studio Production Build 与 soundbank dist boundary；Batch 6 按约定未新增 E2E。

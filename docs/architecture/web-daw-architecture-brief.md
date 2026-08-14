@@ -22,15 +22,16 @@
 
 本文描述长期稳定边界，不是“所有方框均已实现”的状态清单。当前真实能力以
 [产品功能手册](../../PRODUCT.md)为准；当前 Playback 工作以
-[Audible MIDI Playback V1 第六阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)
+[Audible MIDI Playback V1 阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)
 为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
 架构文档的版本号。
 
 截至 2026-08-14，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
 多选 Delete 已形成闭环；Studio 首次可听闭环已通过功能审核。Playback Batch 6 已增加完整 Plan
 Reconciliation、Transport 原位 handoff 和选择性 Voice 生命周期，播放中 Note / Track /
-Instrument 变化可以保留无关活动 Voice；该批次已完成本地验证，等待统一逐提交审核。长期架构中的
-通用 Graph、RuntimeDelta、跨线程 ACK 和 AudioWorklet 路径仍不能反推为首版切片的必做范围。
+Instrument 变化可以保留无关活动 Voice；该批次已完成本地验证和统一逐提交审核。当前切片继续
+实施 Batch 7 的时间轴范围、播放头与跟随视图；长期架构中的通用 Graph、RuntimeDelta、跨线程
+ACK 和 AudioWorklet 路径仍不能反推为首版切片的必做范围。
 
 ---
 

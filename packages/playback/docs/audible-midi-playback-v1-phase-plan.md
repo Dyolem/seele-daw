@@ -1,6 +1,6 @@
-# Audible MIDI Playback V1 第六阶段计划
+# Audible MIDI Playback V1 阶段计划
 
-> Status: Batch 4A.2, Batch 4B.1, Batch 4B.2 and Batch 5A reviewed; follow-up refinements deferred
+> Status: Batch 1–6 reviewed; Batch 7 timeline and playhead work approved for implementation
 >
 > Date: 2026-08-10
 >
@@ -14,7 +14,7 @@
 
 ## 阶段目标
 
-第六阶段把已经完成的 MIDI 编辑闭环推进为第一条真正可听见的产品纵向切片：
+本阶段把已经完成的 MIDI 编辑闭环推进为第一条真正可听见、可观察播放位置的产品纵向切片：
 
 ```text
 创建默认 Studio Grand Instrument Track
@@ -22,6 +22,8 @@
 -> 使用经审阅确认的基础 Transport
 -> 听见按项目时间调度的采样钢琴
 -> 播放中编辑能够使旧事件安全失效
+-> 在至少 150 小节的编排时间轴中看见并跟随播放位置
+-> 在当前 MIDI Clip 中看见同一播放位置
 -> Save / Reload 后保留所选 Instrument
 ```
 
@@ -82,7 +84,8 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
 - 播放中相关 Commit 采用专用于 Audible MIDI 的选择性 reconciliation：重建尚未发声的队列，
   只结束被修改的活动 Voice，并保留无关 Track / Note 的持续发声；全局 `allNotesOff` 只用于
   Pause、Return、项目生命周期、全局时间映射改变或状态无法证明安全的兜底路径；
-- 两个编辑表面的 Playhead 作为独立可选批次，不阻塞首次可听闭环；
+- Arrangement 与 Piano Roll 的 Playhead、编排滚动和最小时间轴范围已纳入 Batch 7；它们读取同一
+  Transport Position，但不引入 Seek / Scrub 或持久化 UI 状态；
 - 当前内置采样只作为 developer-local、可替换且不可随 Seele 分发的验证输入；该边界不阻塞
   本地 Audio Runtime 开发。规范化 Manifest、首播加载预算和浏览器验收范围仍是相应生产批次
   的明确门槛，任何公开交付采样的方案则必须先补齐替代资产或再分发权限。
@@ -696,12 +699,12 @@ Batch 5A 已按以下 UI 契约实现并通过功能审核；进一步优化留�
 - V1 没有 Meter 数据时不继续显示会被理解为实时电平的 `0.0 dB`；当前实现显示明确不可用的
   `Meter —`。
 
-### 7.3 可选 Playhead 批次
+### 7.3 Batch 7 时间轴与 Playhead
 
-首次可听闭环只要求稳定的当前时间显示。Arrangement 与 Piano Roll Playhead 是随后独立审阅
-的可选批次；未完成时不阻塞 Audible V1 的声音验收。
+首次可听闭环已经用稳定的当前时间显示完成声音验收。Batch 7 继续补齐桌面 DAW 中用于定位
+播放位置的基础空间语义，但不借此引入 Seek / Scrub、Zoom 或完整 Arrangement Editing。
 
-若本阶段继续实现 Playhead，则遵守：
+实现遵守：
 
 - Arrangement 和当前打开的 Piano Roll 读取同一 Transport Position；
 - 位置来自 `AudioContext.currentTime` 对应的 Transport Mapping，而不是累计
@@ -711,6 +714,15 @@ Batch 5A 已按以下 UI 契约实现并通过功能审核；进一步优化留�
   事件调度时间；
 - 高频位置不写入 Project、Pinia 或 Project Commit Subscription；
 - Playhead 层独立于静态 Grid 和 Note / Clip Scene，移动 Playhead 不重建全部内容；
+- Arrangement Track 控制行与对应 Lane 共用一个纵向滚动权威，不能通过两套独立 scrollTop
+  进行事后同步；左侧控制列固定，横向滚动只作用于 Ruler 与 Lane 时间内容；
+- 当前项目时间轴至少覆盖 150 个初始拍号小节；内容超过该范围时扩展到最远 Clip End。该范围
+  是从 Project Facts 派生的 View / Playback 边界，不写入 Project File，也不使旧项目变 dirty；
+- Transport 到达派生时间轴末端时自然停止；没有可听 Note 的 Empty Plan 仍保持不可播放；
+- Arrangement Follow 默认开启并采用分页式自动滚动。用户主动横向滚动或进行时间轴编辑时，
+  当前播放轮次暂停 Follow，用户可通过可见控制重新启用；
+- Piano Roll 把同一全局 Transport Tick 投影为当前 Clip 的局部位置；位置在 Clip 范围外时隐藏，
+  不为了显示 Playhead 扩大 Clip 或执行 Note Chase；
 - V1 没有拖动 Playhead Seek；后续 Ruler Interaction 单独设计命中、Capture 和 Snap。
 
 ## 8. 播放中编辑与 revision 交接
@@ -1064,17 +1076,15 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - Studio 只为 `studio-grand` 注入 dev-local asset base；其他合法 MIDISampleSynth 仍能编译，但
   缺失 location 时明确失败，不静默跳过或替换。
 
-### Batch 5B：可选 Playhead
+### Batch 5B：历史 Playhead 候选
 
-- 只有用户在 Batch 5A 后单独确认才进入；
-- Arrangement 与 Piano Roll 读取同一 Transport Position；
-- 独立图层、rAF 视觉刷新、后台恢复与 dispose；
-- 未进入或未完成不阻塞 Audible V1 封版。
+该候选没有在 Batch 5 后直接实施。用户已把它扩展为包含时间轴范围、编排滚动、播放末端与
+Follow 语义的 Batch 7；后续以 Batch 7 的分批边界为准，不能把本节重新当作独立实现入口。
 
 ### Batch 6：选择性 Playback Reconciliation 与阶段加固
 
-> Implementation status: Batch 6A–6F implemented and locally verified on 2026-08-14; pending the
-> requested unified per-commit user review. Full `pnpm lint` and `pnpm check` pass, including 8
+> Implementation status: Batch 6A–6F reviewed on 2026-08-14. Full `pnpm lint` and `pnpm check`
+> pass, including 8
 > Playback files / 86 tests, 16 Audio Web files / 110 tests, 42 Studio files / 246 tests, Studio
 > production build and the soundbank dist boundary. No Batch 6 E2E was added. No phase checkpoint
 > or tag has been created.
@@ -1087,9 +1097,72 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - **6F Hardening**：gap / stale / failure 兜底、Pause / Resume、项目切换和资源泄漏回归；
 - 完整 `pnpm lint`、`pnpm check` 与生产构建；本阶段不新增 E2E，若未来需要浏览器产品流自动化，
   另行采用 Playwright 建设；
-- 全部批次通过审核后再封版第六阶段并建立 checkpoint tag。
+- Batch 6A–6F 已完成统一逐提交审核；Audible MIDI Playback V1 继续进入 Batch 7，当前不创建
+  checkpoint tag。
 
-Batch 6 的每个独立批次完成验证后直接形成单独提交，连续推进；全部完成后统一逐提交审核。
+Batch 6 的每个独立批次均已按约定形成单独提交并完成统一审核。
+
+### Batch 7：时间轴范围、滚动与播放头
+
+> Implementation status: approved for implementation on 2026-08-14. Batch 7A starts after this
+> documentation closure commit. Each independent Batch 7 implementation stops for user review
+> before commit. No E2E is required; future browser flow automation may use Playwright as a
+> dedicated slice.
+
+Batch 7 不改变 Project File V1，也不提前建设 Zoom、Seek、Scrub 或 Arrangement Clip Editing。
+它按以下顺序实施：
+
+#### Batch 7A：编排区共用纵向滚动
+
+- Track 控制行和对应 Arrangement Lane 放入同一个纵向滚动容器，以 DOM 行配对保证同一水平
+  高度；
+- 鼠标位于左侧控制区或右侧 Lane 时都滚动同一权威，不能维护两套可漂移的 `scrollTop`；
+- Track 标题、Add Track、Ruler 与 Lane 标题固定在滚动内容上方；
+- 本批不改变横向时间轴宽度、播放行为、Project Fact 或 Track 排序 / 高度。
+
+#### Batch 7B：派生时间轴范围
+
+- 定义 `minimumTimelineEndTick = initialBarSpanTick * 150`；默认 4/4、PPQ 960 项目对应
+  `576000` Tick；
+- 定义 `contentEndTick = max(clip.startTick + clip.spanTick)`，并以
+  `timelineEndTick = max(minimumTimelineEndTick, contentEndTick)` 作为 Ruler 与 Lane 的共同末端；
+- 该最小范围适用于新旧项目，是确定性的派生规则，不写入 Project、不给旧项目制造迁移或 dirty；
+- 空项目与短项目仍显示至少 150 小节；内容越过该位置时自动扩展，不裁剪 Project Fact；
+- Transport 自然结束从原始 `arrangementEndTick` 切换到 `timelineEndTick`。短项目允许在内容结束后
+  播放静音直到时间轴末端；没有可听 Note Span 的 Empty Plan 仍不可启动；
+- 到达时间轴末端时停止 Transport，并对仍在发声的 Voice 使用现有无 click 的安全释放。
+
+#### Batch 7C：共享视觉位置源
+
+- Studio 从 Transport / Playback Clock 派生可供视图读取的当前 Tick 与状态，不维护第二套累计
+  时间；
+- `requestAnimationFrame` 只驱动视觉采样，后台恢复时重新读取权威 Transport Position；
+- 高频视觉帧不进入 Project、Pinia、History、dirty 或 Commit Subscription；
+- Pause、Return、自然结束、项目切换与 dispose 后的视觉位置和订阅生命周期可重复验证。
+
+#### Batch 7D：Arrangement Playhead 与 Follow
+
+- Ruler 与 Lane 上显示同一条不可交互 Playhead，使用独立轻量图层移动；
+- Arrangement 横向滚动只作用于 Ruler 与 Lane 时间内容，左侧 Track 控制列保持固定；
+- Follow 默认开启，使用分页式而非持续居中的自动滚动，避免播放时视图不断抖动；
+- 用户主动横向滚动或进行时间轴编辑时，当前播放轮次暂停 Follow；可见 Follow 控制允许立即
+  恢复，不把该状态保存为 Project Fact；
+- Playhead 不接收 Pointer 命中，不实现点击定位、拖动 Seek 或 Scrub。
+
+#### Batch 7E：Piano Roll Playhead
+
+- 当前 Piano Roll 读取与 Arrangement 相同的全局 Transport Tick；
+- 用 `globalTick - clip.startTick` 投影为 Clip 局部位置，只在 `[0, clip.spanTick]` 范围显示；
+- 切换 Selection、Clip、项目或退出编辑器时更新 / 清理投影；
+- 当前完整 Clip 视口不增加 Zoom、Scroll 或自动跟随，也不改变 Note 编辑手势。
+
+#### Batch 7F：加固与文档同步
+
+- 回归多 Track 行配对、150 小节最小范围、超长 Clip 扩展、自然结束与无残留 Voice；
+- 回归前台 / 后台视觉恢复、手动滚动暂停 Follow、Return、Pause、项目切换与 dispose；
+- 运行 lint、type-check、全部测试和 Studio production build；按约定不新增 E2E；
+- 同步 PRODUCT、DESIGN、Playback / Audio Web README 与架构校准；全部 Batch 7 提交经用户审核后，
+  再单独决定 Audible MIDI Playback V1 是否封版和建立 checkpoint tag。
 
 ## 11. 测试与验收
 
@@ -1134,7 +1207,9 @@ Audio Runtime 单元 / 集成测试可通过 `OfflineAudioContext` 或等价可�
 - 播放中远期 Note 编辑不截断无关活动 Voice，Delete / Move / Resize 只作用于目标 occurrence；
 - Instrument Replace 只释放目标 Track；缺失新 Soundbank 显示 warning，其他 Track 继续；
 - stale preparation、Commit gap、Pause / Resume、项目切换与 retired Runtime 回收可重复验证；
-- 若进入可选 Batch 5B，两个 Playhead 使用同一 Transport Position；
+- Batch 7 的两个 Playhead 使用同一 Transport Position，编排 Track / Lane 纵向滚动不漂移；
+- 时间轴至少覆盖 150 个初始拍号小节，超长 Clip 扩展共同末端，Transport 在该末端停止；
+- Arrangement 手动横向滚动暂停当前轮次 Follow，Pause / Return / 后台恢复不产生第二套时间；
 - Record、Loop 和 Output Meter 不伪装为已接通。
 
 ### 11.4 浏览器验证边界
@@ -1162,7 +1237,7 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 - 通用 Effect Graph、Graph Reconciler、RuntimeDelta 与跨线程 generation ACK；
 - AudioWorklet、SharedArrayBuffer、WASM DSP；
 - Transport Loop、Looped Clip、Metronome、Count-in、Record、Punch；
-- Ruler Seek / Scrub、播放范围 Selection 或 Follow Playhead；
+- Ruler Seek / Scrub 或播放范围 Selection；
 - Piano Key / Note Preview Audition；
 - Live Meter、Master Volume UI、Mixer、Effect Chain；
 - Sustain Pedal、CC、Pitch Bend、Aftertouch、MPE；
@@ -1177,7 +1252,7 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 
 ## 13. 完成定义
 
-只有同时满足以下条件，第六阶段才算完成：
+只有同时满足以下条件，Audible MIDI Playback V1 才可候选封版：
 
 - 用户能够从 Project Fact 确认 Track 使用 Studio Grand；
 - 用户创建的 MIDI Note 能按 Project 时间和 Pitch 发声；
@@ -1190,9 +1265,11 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 - 任一公开构建都不包含当前本地快照；若产品需要自带采样，替代资产或覆盖该用法的再分发范围
   已另行确认；
 - 自动化渲染、生产构建和真实浏览器听觉 smoke 通过；
+- Arrangement Track / Lane 共享纵向滚动，派生时间轴、两个 Playhead 与 Follow 通过 Batch 7
+  产品验收；
 - [产品功能手册](../../../PRODUCT.md)、[设计语言](../../../DESIGN.md)、
   [Playback README](../README.md) 与 [Audio Web README](../../audio-web/README.md) 已同步；
-- 用户逐批审阅通过并建立新的阶段 checkpoint。
+- 用户逐批审阅通过；是否建立新的阶段 checkpoint 由 Batch 7 审核结束后的独立决定确认。
 
 ## 参考
 

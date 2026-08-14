@@ -4,12 +4,12 @@
 > 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
-> 最近实现校准：2026-08-12\
+> 最近实现校准：2026-08-14\
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
 > [Web DAW 简洁架构总纲](./web-daw-architecture-brief.md)，当前第一版可听产品切片见
-> [Audible MIDI Playback V1 第六阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)。
+> [Audible MIDI Playback V1 阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)。
 > 后者的 `V1` 不是本文档版本；本文中的通用 Graph、RuntimeDelta、ACK 与 AudioWorklet
 > 仍是长期能力，除非阶段计划明确纳入，否则不能作为首版可听切片的验收要求。
 > 本文其余未加 `Audible MIDI Playback` 限定的 `V1` 是 2026-07-09 长期基线中的“首版产品 /

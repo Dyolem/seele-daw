@@ -91,22 +91,22 @@ Hover、Pressed、Selected、Focused、Disabled、Busy 和 Error 在所有组件
 
 ### 4.1 模块总览
 
-| 模块                | 主要职责                                 | 主要表面                 | 当前定位                |
-| ------------------- | ---------------------------------------- | ------------------------ | ----------------------- |
-| Project Entry       | 新建、打开、最近项目、失败反馈           | 启动页                   | Piano Black 首批入口    |
-| Project Lifecycle   | 当前项目、保存、dirty、离开确认          | 全局状态与对话框         | 已有应用服务，UI 待完善 |
-| Global Bar          | 品牌入口、项目名、保存状态、全局菜单     | 顶部全局区               | 首批外壳已实现          |
-| Transport           | 播放、暂停、返回开头、时间、速度、拍号   | 顶部全局区或独立控制行   | 首次可听切片已接入      |
-| Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸       | 整个编辑器框架           | 首批外壳已实现          |
-| Track List          | 轨道身份、颜色、静音、独奏、音量等       | Arrangement 左列         | Arrangement 切片        |
-| Arrangement         | 时间线、Clip、播放头、选择与编辑         | 主工作区                 | 核心编辑表面            |
-| Context Editor Dock | 承载当前内容的下方编辑器                 | 下方可调整面板           | Piano Roll 切片         |
-| Piano Roll          | MIDI 音符编辑、键盘、网格、力度          | 下方面板或工作区全屏     | 第一类业务编辑器        |
-| Inspector           | 当前选择的属性与批量操作                 | 左下或侧边区域           | 随业务能力渐进实现      |
-| Browser / Library   | 乐器、Loop、文件和预设浏览               | 可停靠侧栏               | 后续阶段                |
-| Mixer               | 通道、路由、发送、插件与电平             | 独立工作区或面板         | 后续阶段                |
-| Menus & Commands    | 可发现命令、快捷键、上下文动作           | 菜单、右键菜单、命令面板 | 随功能同步建设          |
-| Feedback Layer      | 对话框、Toast、进度、内联错误            | 覆盖层与状态区           | 跨模块能力              |
+| 模块                | 主要职责                               | 主要表面                 | 当前定位                |
+| ------------------- | -------------------------------------- | ------------------------ | ----------------------- |
+| Project Entry       | 新建、打开、最近项目、失败反馈         | 启动页                   | Piano Black 首批入口    |
+| Project Lifecycle   | 当前项目、保存、dirty、离开确认        | 全局状态与对话框         | 已有应用服务，UI 待完善 |
+| Global Bar          | 品牌入口、项目名、保存状态、全局菜单   | 顶部全局区               | 首批外壳已实现          |
+| Transport           | 播放、暂停、返回开头、时间、速度、拍号 | 顶部全局区或独立控制行   | 首次可听切片已接入      |
+| Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸     | 整个编辑器框架           | 首批外壳已实现          |
+| Track List          | 轨道身份、颜色、静音、独奏、音量等     | Arrangement 左列         | Arrangement 切片        |
+| Arrangement         | 时间线、Clip、播放头、选择与编辑       | 主工作区                 | 核心编辑表面            |
+| Context Editor Dock | 承载当前内容的下方编辑器               | 下方可调整面板           | Piano Roll 切片         |
+| Piano Roll          | MIDI 音符编辑、键盘、网格、力度        | 下方面板或工作区全屏     | 第一类业务编辑器        |
+| Inspector           | 当前选择的属性与批量操作               | 左下或侧边区域           | 随业务能力渐进实现      |
+| Browser / Library   | 乐器、Loop、文件和预设浏览             | 可停靠侧栏               | 后续阶段                |
+| Mixer               | 通道、路由、发送、插件与电平           | 独立工作区或面板         | 后续阶段                |
+| Menus & Commands    | 可发现命令、快捷键、上下文动作         | 菜单、右键菜单、命令面板 | 随功能同步建设          |
+| Feedback Layer      | 对话框、Toast、进度、内联错误          | 覆盖层与状态区           | 跨模块能力              |
 
 ### 4.2 Workbench Shell 的定义
 
@@ -353,8 +353,14 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 ### 7.6 时间线、滚动与缩放
 
 - 鼠标滚轮默认纵向滚动当前表面。
-- Arrangement 的 Track 控制行与对应 Lane MUST 共用同一个纵向滚动权威，并通过配对行保持
-  高度一致；不得维护两个独立 `scrollTop` 再事后同步。
+- Arrangement 右侧时间内容 MUST 是唯一真实纵向滚动权威和唯一 `scrollTop` 持有者；左侧
+  Track 控制区是裁切的从视图，只按该位置执行合成层位移，不得维护第二个可漂移的滚动状态。
+- Track 控制行与对应 Lane MUST 消费同一排序和固定行高来源。Track 区域的纵向滚轮输入应转发
+  给 Arrangement；键盘焦点进入被裁切的 Track 控件时，必须通过 Arrangement 权威使该行可见。
+- Arrangement Ruler 与全部 Lane MUST 共用同一个横向滚动权威；横向移动时间内容时，左侧
+  Track 标题、操作区和控制行保持固定，原生横向滚动轨道不得延伸到 Track 控制列下方。
+- 默认时间轴至少覆盖项目起始拍号的 150 小节，并由最远 Clip 末端精确扩展；Ruler、Lane、
+  Clip 定位与 Transport 自然结束必须消费同一派生范围。
 - 横向滚动和缩放的具体修饰键必须由 Keybinding 层统一定义，并允许平台适配。
 - Zoom 应围绕指针、播放头或明确焦点稳定缩放，不能无缘由跳回时间零点。
 - Arrangement 与 Piano Roll 可以分别保存 Zoom；“同步视图”应是显式选项。
@@ -1004,11 +1010,12 @@ SHOULD 使用 Canvas 的区域：
 
 Canvas 不是绕开可访问性和状态边界的理由。DOM 与 Canvas 必须读取同一 Editor state 和 Project Query，不得各自维护业务副本。
 
-首个固定 8 小节、少量 Clip、尚无 Zoom / 横向 Scroll / Drag / Playhead 的 Arrangement
-纵向切片 MAY 使用 DOM，以先验证真实创建、选择、打开和可访问交互。Track 控制行与 Lane
-已经使用同一 DOM 配对行和纵向滚动视口；引入可变 Zoom、横向 Scroll、大量 Clip、高频播放
-图层或拖动预览前，必须以性能数据和交互需求重新评估 Canvas / 分层渲染；渲染技术迁移不得
-改变 Project Command、Presentation、Selection 与纵向滚动的权威边界。
+当前至少 150 小节、少量 Clip、尚无 Zoom / Drag / Playhead 的 Arrangement 纵向切片 MAY
+继续使用 DOM，以验证真实创建、选择、打开、横向滚动和可访问交互。Track 控制行与 Lane 已经
+消费同一排序和行高；右侧 Arrangement 是唯一二维滚动视口，左侧 Track 列以裁切的合成层从
+视图跟随其纵向位置。Ruler 与 Lane 共享横向滚动，原生横向滚动条只属于 Arrangement；引入
+可变 Zoom、大量 Clip、高频播放图层或拖动预览前，必须以性能数据和交互需求重新评估 Canvas /
+分层渲染；渲染技术迁移不得改变 Project Command、Presentation、Selection 与滚动权威边界。
 
 ### 21.2 禁止项
 
@@ -1096,8 +1103,9 @@ Canvas 功能至少检查：
 8. 主题改变视觉表达，不改变布局、功能和交互语义。
 9. Theme、Density、UI Scale、Contrast、Motion 是独立设置。
 10. Workbench Shell 只提供编辑器骨架；真正的 Arrangement、Piano Roll 等业务界面按产品切片规划实现。
-11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM，Track 控制行与 Lane 共用纵向滚动；
-    进入 Zoom、横向 Scroll、大量对象或高频交互前重新评估 Canvas。
+11. Arrangement Clip 切片使用 DOM，默认派生至少 150 小节；右侧 Arrangement 独占真实二维
+    滚动状态，左侧 Track 列以无独立 `scrollTop` 的裁切从视图跟随，Ruler 与 Lane 共用横向
+    滚动；进入 Zoom、大量对象或高频交互前重新评估 Canvas。
 12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，Grid 使用 Canvas，Note 通过可替换 Renderer Port 输出。
 13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，横向初始显示完整 Clip。
 14. Piano Roll 显式提供 Pencil 与 Cursor，默认 Pencil；Cursor 负责 Selection 与 Note

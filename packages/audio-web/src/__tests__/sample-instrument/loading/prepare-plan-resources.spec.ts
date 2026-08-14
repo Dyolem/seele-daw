@@ -64,6 +64,7 @@ function createPlan(
     modelRevision: 0,
     status,
     tempoSegments: Object.freeze([]),
+    timelineEndTick: 1_920,
     tracks: Object.freeze(options.duplicateTrackRoute ? [track, track] : [track]),
   })
   // Playback owns validation and branding; this fixture supplies its already-validated DTO shape.

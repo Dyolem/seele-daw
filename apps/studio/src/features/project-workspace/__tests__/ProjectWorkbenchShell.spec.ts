@@ -110,6 +110,7 @@ function mountShell(options: MountShellOptions = {}) {
       tempo: 120,
       timeSignatureDenominator: 4,
       timeSignatureNumerator: 4,
+      timelineEndTick: parseTick(576_000),
       tracks: options.tracks ?? Object.freeze([]),
     },
     global: {
@@ -130,6 +131,9 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.findComponent(ProjectWorkbenchGlobalBar).exists()).toBe(true)
     expect(wrapper.findComponent(ProjectWorkbenchTransport).exists()).toBe(true)
     expect(workspace.findComponent(ProjectWorkbenchArrangement).exists()).toBe(true)
+    expect(workspace.getComponent(ProjectWorkbenchArrangement).props('timelineEndTick')).toBe(
+      576_000,
+    )
     expect(workspace.findComponent(ProjectWorkbenchContextEditorDock).exists()).toBe(true)
   })
 

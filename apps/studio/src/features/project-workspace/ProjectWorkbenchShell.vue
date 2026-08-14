@@ -34,6 +34,7 @@ interface ProjectWorkbenchShellProps {
   readonly tempo: number
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
+  readonly timelineEndTick: Tick
   readonly tracks: readonly ProjectTrackPresentation[]
 }
 
@@ -103,6 +104,7 @@ function openContextEditor(): void {
         :piano-roll-presentation="props.pianoRollPresentation"
         :project-session="props.projectSession"
         :time-signature-numerator="props.timeSignatureNumerator"
+        :timeline-end-tick="props.timelineEndTick"
         :tracks="props.tracks"
         @context-editor-open-change="isContextEditorOpen = $event"
       />

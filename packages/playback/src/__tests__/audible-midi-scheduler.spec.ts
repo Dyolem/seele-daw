@@ -275,8 +275,8 @@ describe('Audible MIDI Scheduler Planner', () => {
     )
   })
 
-  it('clamps the final window at Arrangement End and becomes inactive after natural end', () => {
-    const plan = createFixturePlan()
+  it('clamps the final window at Timeline End and becomes inactive after natural end', () => {
+    const plan = replacePlan(createFixturePlan(), { timelineEndTick: parseTick(1_920) })
     const clock = new ManualPlaybackClock()
     const transport = createAudibleMidiTransport(plan, clock)
     const planner = createAudibleMidiSchedulerPlanner(plan, createConfiguration(0.1, 0.8))
@@ -304,6 +304,35 @@ describe('Audible MIDI Scheduler Planner', () => {
       engineGeneration: 1,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.INACTIVE,
       voicePlans: [],
+    })
+  })
+
+  it('keeps planning silent windows after authored content until the shared Timeline End', () => {
+    const plan = createFixturePlan()
+    const clock = new ManualPlaybackClock()
+    const transport = createAudibleMidiTransport(plan, clock)
+    const planner = createAudibleMidiSchedulerPlanner(plan, createConfiguration(0.1, 0.8))
+
+    expect(plan.arrangementEndTick).toBe(1_920)
+    expect(plan.timelineEndTick).toBe(576_000)
+    transport.play()
+    planner.planNextWindow(transport.getSnapshot())
+    clock.advanceBy(1)
+    const contentEndSnapshot = transport.getSnapshot()
+    const silentWindow = planner.planNextWindow(contentEndSnapshot)
+
+    expect(contentEndSnapshot).toMatchObject({
+      positionProjectSecond: 1,
+      positionTick: 1_920,
+      state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+    })
+    expect(silentWindow).toMatchObject({
+      outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED,
+      voicePlans: [],
+      window: {
+        fromPlaybackClockSecond: 0.8,
+        toPlaybackClockSecond: 1.8,
+      },
     })
   })
 
@@ -349,6 +378,10 @@ describe('Audible MIDI Scheduler Planner', () => {
     [
       'missing-track-route',
       (plan: AudibleMidiProjectPlan) => replacePlan(plan, { tracks: Object.freeze([]) }),
+    ],
+    [
+      'timeline-end-before-arrangement-end',
+      (plan: AudibleMidiProjectPlan) => replacePlan(plan, { timelineEndTick: parseTick(1_919) }),
     ],
   ] as const)('fails closed for malformed compiled plans with code %s', (code, createPlan) => {
     expect(() =>

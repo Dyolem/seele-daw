@@ -60,7 +60,7 @@ function captureError(action: () => void): unknown {
 }
 
 describe('Audible MIDI Transport', () => {
-  it('starts as a frozen Stopped snapshot at the beginning of the compiled Arrangement', () => {
+  it('starts as a frozen Stopped snapshot at the beginning of the compiled Timeline', () => {
     const plan = createFixturePlan()
     const transport = createAudibleMidiTransport(plan, new ManualPlaybackClock(10))
     const snapshot = transport.getSnapshot()
@@ -68,14 +68,14 @@ describe('Audible MIDI Transport', () => {
     expect(snapshot).toEqual({
       anchorPlaybackClockSecond: null,
       anchorProjectSecond: null,
-      arrangementEndProjectSecond: 1,
-      arrangementEndTick: 1_920,
       engineGeneration: INITIAL_ENGINE_GENERATION,
       modelRevision: plan.modelRevision,
       planStatus: AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE,
       positionProjectSecond: 0,
       positionTick: 0,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+      timelineEndProjectSecond: 300,
+      timelineEndTick: 576_000,
     })
     expect(Object.isFrozen(snapshot)).toBe(true)
     expect(Object.isFrozen(transport)).toBe(true)
@@ -109,16 +109,16 @@ describe('Audible MIDI Transport', () => {
     expect(played.snapshot).toMatchObject({
       anchorPlaybackClockSecond: 10,
       anchorProjectSecond: 0,
-      arrangementEndProjectSecond: 1.5,
       engineGeneration: 1,
       positionProjectSecond: 0,
       positionTick: 0,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+      timelineEndProjectSecond: 599.5,
     })
     expect(transport.playbackClockSecondAtTick(parseTick(960))).toBe(10.5)
     expect(transport.playbackClockSecondAtTick(parseTick(1_920))).toBe(11.5)
     expect(transport.tickPositionAtPlaybackClockSecond(parsePlaybackClockSecond(10.75))).toBe(1_200)
-    expect(transport.tickPositionAtPlaybackClockSecond(parsePlaybackClockSecond(12))).toBe(1_920)
+    expect(transport.tickPositionAtPlaybackClockSecond(parsePlaybackClockSecond(12))).toBe(2_400)
 
     clock.advanceBy(0.25)
     expect(transport.getSnapshot()).toMatchObject({
@@ -244,7 +244,7 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
-  it('stops a handoff whose new Arrangement ends before the current position', () => {
+  it('stops a handoff whose new Timeline ends before the current position', () => {
     const plan = createFixturePlan()
     const clock = new ManualPlaybackClock(40)
     const transport = createAudibleMidiTransport(plan, clock)
@@ -255,16 +255,17 @@ describe('Audible MIDI Transport', () => {
       replacePlan(plan, {
         arrangementEndTick: parseTick(240),
         modelRevision: nextModelRevision(plan),
+        timelineEndTick: parseTick(240),
       }),
     )
 
     expect(handedOff.snapshot).toMatchObject({
-      arrangementEndProjectSecond: 0.125,
-      arrangementEndTick: 240,
       engineGeneration: 2,
       positionProjectSecond: 0.125,
       positionTick: 240,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+      timelineEndProjectSecond: 0.125,
+      timelineEndTick: 240,
     })
   })
 
@@ -332,9 +333,13 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
-  it('stops at Arrangement End without changing generation and restarts from zero', () => {
+  it('stops at Timeline End without changing generation and restarts from zero', () => {
     const clock = new ManualPlaybackClock(20)
-    const transport = createAudibleMidiTransport(createFixturePlan(), clock)
+    const plan = createFixturePlan()
+    const transport = createAudibleMidiTransport(
+      replacePlan(plan, { timelineEndTick: parseTick(1_920) }),
+      clock,
+    )
 
     transport.play()
     clock.advanceBy(1)
@@ -363,7 +368,7 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
-  it('uses neutral Arrangement End even when a muted Clip extends past audible Notes', () => {
+  it('continues silently after authored content and stops at the shared Timeline End', () => {
     const { records, snapshot } = createAudibleMidiProjectFixture()
     const extendedMutedClip = createMidiClipRecord({
       ...records.pianoClip,
@@ -379,6 +384,7 @@ describe('Audible MIDI Transport', () => {
     const transport = createAudibleMidiTransport(plan, clock)
 
     expect(plan.arrangementEndTick).toBe(3_840)
+    expect(plan.timelineEndTick).toBe(576_000)
     transport.play()
     clock.advanceBy(1)
     expect(transport.getSnapshot()).toMatchObject({
@@ -388,6 +394,12 @@ describe('Audible MIDI Transport', () => {
     clock.advanceBy(1)
     expect(transport.getSnapshot()).toMatchObject({
       positionTick: 3_840,
+      state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+    })
+    clock.advanceBy(298)
+    expect(transport.getSnapshot()).toMatchObject({
+      positionProjectSecond: 300,
+      positionTick: 576_000,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
     })
   })
@@ -445,9 +457,9 @@ describe('Audible MIDI Transport', () => {
     )
 
     transport.play()
-    expect(() => transport.playbackClockSecondAtTick(parseTick(1_921))).toThrow(
+    expect(() => transport.playbackClockSecondAtTick(parseTick(576_001))).toThrow(
       expect.objectContaining({
-        code: 'target-tick-after-arrangement-end',
+        code: 'target-tick-after-timeline-end',
       }) as AudibleMidiTransportError,
     )
     expect(() =>
@@ -511,8 +523,8 @@ describe('Audible MIDI Transport', () => {
     })
 
     expect(transport.getSnapshot()).toMatchObject({
-      arrangementEndProjectSecond: 1,
       modelRevision: compiledPlan.modelRevision,
+      timelineEndProjectSecond: 300,
     })
   })
 })

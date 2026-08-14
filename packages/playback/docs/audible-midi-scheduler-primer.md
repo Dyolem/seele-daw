@@ -216,8 +216,9 @@ to = current + horizon = 10.05 + 0.25 = 10.30
 - 没有时间空隙；
 - 边界上的 occurrence 只属于一个窗口。
 
-窗口最终会被 `arrangementEndTick` 对应的 Playback Clock 截断，不会为逻辑编排终点之后生成
-新的 Voice Start。
+窗口最终会被 `timelineEndTick` 对应的 Playback Clock 截断。`arrangementEndTick` 只表示真实
+Clip 内容的中性末端；短项目在内容末端之后仍会推进无 Voice Start 的空窗口，直到共享时间轴
+末端。
 
 ## 4. Playhead 与 Scheduler cursor 的区别
 
@@ -244,7 +245,7 @@ planner.planNextWindow(transportSnapshot)
 
 每次调用依次执行：
 
-1. 验证 Transport Snapshot 的 `modelRevision` 与 Arrangement End 对应 Planner 的同一份编译
+1. 验证 Transport Snapshot 的 `modelRevision` 与 Timeline End 对应 Planner 的同一份编译
    计划；TempoMap 则从该计划的冻结 Segments 重建；
 2. 验证 generation 是安全整数，并且没有退回已经过期的旧 generation；
 3. 如果 Transport 不是 Playing，返回 `inactive`，不生成 Voice；
@@ -255,7 +256,7 @@ planner.planNextWindow(transportSnapshot)
 
 ```text
 from = previous planned-through
-to = min(current Playback Clock + horizon, Arrangement End)
+to = min(current Playback Clock + horizon, Timeline End)
 ```
 
 8. 从排序后的 Note Spans 中读取 Start 落入 `[from, to)` 的 occurrence；
@@ -355,8 +356,9 @@ Return to Start 产生新 generation 并把 Transport 放回 Stopped / Tick `0`�
 
 ### 7.5 Natural End
 
-自然到达 Arrangement End 时 Transport 进入 Stopped，但不额外增加 generation。Planner 停止
-生成窗口。下一次 Play 会增加 generation 并从 Tick `0` 建立新 Anchor。
+自然到达 Timeline End 时 Transport 进入 Stopped，但不额外增加 generation。Planner 停止生成
+窗口。下一次 Play 会增加 generation 并从 Tick `0` 建立新 Anchor。Timeline End 至少为项目起始
+拍号的 150 小节，并在 Clip 内容更长时精确扩展，因此它可能晚于 `arrangementEndTick`。
 
 ## 8. Resume 为什么不追赶 Anchor 之前的长 Note
 

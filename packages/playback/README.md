@@ -83,8 +83,9 @@ DTO 严格重建同一时间边界。两者仍未从 package root 导出。
 Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
 
 - `compileAudibleMidiProject(snapshot)` 把一次稳定 Snapshot 编译为冻结的
-  `AudibleMidiProjectPlan`，包含 `modelRevision`、中性的 `arrangementEndTick`、Tempo Segments、
-  Master / Track Plans、排序后的 Note Spans 和结构化 diagnostics；
+  `AudibleMidiProjectPlan`，包含 `modelRevision`、中性的内容末端 `arrangementEndTick`、派生视图 /
+  播放末端 `timelineEndTick`、Tempo Segments、Master / Track Plans、排序后的 Note Spans 和结构化
+  diagnostics；
 - 每个精确 V1 `seele.sample-instrument` Descriptor 都生成 `SampleInstrumentPlan(soundbankId)`；
   因此 Studio Grand 与其他 MIDISampleSynth 使用同一编译路径；
 - FM / VA、空 Slot、Disabled 或没有已知 Compiler route 的 Instrument 只跳过对应 Track，
@@ -96,6 +97,16 @@ Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
   影响最终计划排序；
 - 没有可听 Note Span 是带 diagnostic 的合法 Empty Plan，不是编译异常；伪造或引用不一致的
   Snapshot 则失败关闭。
+
+Batch 7B 增加了共享时间轴范围派生：
+
+- `deriveAudibleMidiTimelineRange(snapshot)` 以项目起始拍号的小节长度乘以 `150` 得到最小时间轴
+  末端，并在任意 Clip 内容超过该范围时精确扩展；
+- `contentEndTick` / `arrangementEndTick` 仍只描述全部原始 Clip 的内容范围；
+  `timelineEndTick = max(minimumTimelineEndTick, contentEndTick)` 同时约束 Studio Ruler / Lane 与
+  Playback 自然结束；
+- 该范围完全派生，不写入 Project File、不触发迁移或 dirty。没有可听 Note Span 的 Empty Plan
+  即使拥有时间轴范围也仍不可播放。
 
 Compiler 现在由 Studio 通过 package root 调用；资源准备失败仍属于 Manifest / Audio Runtime
 边界，不能倒逼 Compiler 按 Soundbank 名称静默丢弃 Track。
@@ -110,7 +121,7 @@ Batch 3A 进一步建立了浏览器无关的 Transport Mapping：
   位置、映射 anchors 与独立 `engineGeneration`；
 - Play / Resume、Pause 与 Return to Start 按已确认规则更新 generation；重复 No-change、Blocked
   或 Empty Plan 拒绝不更新；
-- Partial 与 Playable Plan 可播放；自然结束采用中性的 `arrangementEndTick`，进入 Stopped、
+- Partial 与 Playable Plan 可播放；自然结束采用派生的 `timelineEndTick`，进入 Stopped、
   保留 End，下一次 Play 从 Tick `0` 开始；
 - Transport 集中提供 Tick → PlaybackClockSecond 与 PlaybackClockSecond → continuous Tick
   position，并对时钟倒退、无活动映射、越界目标和未知 Plan status 失败关闭；
@@ -123,7 +134,7 @@ Batch 3B 进一步建立了浏览器无关的 Scheduler Planner：
 - `createAudibleMidiSchedulerPlanner(plan, configuration)` 复制并验证 Track Route、排序 Note
   Span、Tempo Segments 与 occurrence identity，不保留可变输入 Record；
 - `planNextWindow(transportSnapshot)` 从同一代 Transport Anchor 推进连续半开窗口，窗口在
-  Arrangement End 截止；Timer 只负责未来唤醒，不属于 Planner；
+  Timeline End 截止；Timer 只负责未来唤醒，不属于 Planner；
 - Scheduled Sample Voice 携带 generation、occurrence key、Soundbank / Device 路由、Track /
   Master Gain、Pan、Pitch、Velocity、Channel，以及目标 Start / release Clock Second；
 - 首次或延迟唤醒时，Start 已迟到但 release 尚未来的 Span 立即开始并保留原 release；已经结束

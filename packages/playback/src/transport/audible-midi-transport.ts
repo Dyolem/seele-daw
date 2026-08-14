@@ -49,7 +49,7 @@ export type AudibleMidiTransportErrorCode =
   | 'playback-clock-before-anchor'
   | 'playback-clock-regressed'
   | 'playback-clock-target-out-of-range'
-  | 'target-tick-after-arrangement-end'
+  | 'target-tick-after-timeline-end'
   | 'transport-not-playing'
 
 /** Stable failure raised when a Transport mapping cannot preserve its runtime invariants. */
@@ -68,13 +68,13 @@ export interface PlaybackClock {
 }
 
 interface AudibleMidiTransportSnapshotBase {
-  readonly arrangementEndProjectSecond: ProjectSecond
-  readonly arrangementEndTick: Tick
   readonly engineGeneration: EngineGeneration
   readonly modelRevision: ModelRevision
   readonly planStatus: AudibleMidiPlanStatus
   readonly positionProjectSecond: ProjectSecond
   readonly positionTick: ContinuousTickPosition
+  readonly timelineEndProjectSecond: ProjectSecond
+  readonly timelineEndTick: Tick
 }
 
 export interface PlayingAudibleMidiTransportSnapshot extends AudibleMidiTransportSnapshotBase {
@@ -154,12 +154,12 @@ export function createAudibleMidiTransport(
 ): AudibleMidiTransport {
   let planStatus = parsePlanStatus(plan.status)
   let modelRevision = plan.modelRevision
-  let arrangementEndTick = parseTick(plan.arrangementEndTick)
+  let timelineEndTick = parseTick(plan.timelineEndTick)
   let tempoMap: TempoMap = createTempoMapFromSegments(plan.tempoSegments)
-  let arrangementEndProjectSecond = tempoMap.projectSecondAtTick(arrangementEndTick)
+  let timelineEndProjectSecond = tempoMap.projectSecondAtTick(timelineEndTick)
   const zeroProjectSecond = parseProjectSecond(0)
   const zeroTickPosition = parseContinuousTickPosition(0)
-  let arrangementEndTickPosition = parseContinuousTickPosition(arrangementEndTick)
+  let timelineEndTickPosition = parseContinuousTickPosition(timelineEndTick)
 
   let state: AudibleMidiTransportState = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
   let engineGeneration = INITIAL_ENGINE_GENERATION
@@ -183,19 +183,19 @@ export function createAudibleMidiTransport(
     positionProjectSecond: ProjectSecond,
   ): ContinuousTickPosition {
     if (positionProjectSecond === zeroProjectSecond) return zeroTickPosition
-    if (positionProjectSecond === arrangementEndProjectSecond) return arrangementEndTickPosition
+    if (positionProjectSecond === timelineEndProjectSecond) return timelineEndTickPosition
     return tempoMap.tickPositionAtProjectSecond(positionProjectSecond)
   }
 
   function createSnapshot(positionProjectSecond: ProjectSecond): AudibleMidiTransportSnapshot {
     const base = {
-      arrangementEndProjectSecond,
-      arrangementEndTick,
       engineGeneration,
       modelRevision,
       planStatus,
       positionProjectSecond,
       positionTick: positionTickAtProjectSecond(positionProjectSecond),
+      timelineEndProjectSecond,
+      timelineEndTick,
     }
 
     if (state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING) {
@@ -242,14 +242,14 @@ export function createAudibleMidiTransport(
 
     const currentPlaybackClockSecond = readPlaybackClock()
     const elapsedPlaybackSecond = currentPlaybackClockSecond - anchorPlaybackClockSecond
-    const remainingProjectSecond = arrangementEndProjectSecond - anchorProjectSecond
+    const remainingProjectSecond = timelineEndProjectSecond - anchorProjectSecond
 
     if (elapsedPlaybackSecond >= remainingProjectSecond) {
       // Natural end preserves the logical End position without invalidating the current generation.
       state = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
-      anchorProjectSecond = arrangementEndProjectSecond
+      anchorProjectSecond = timelineEndProjectSecond
       anchorPlaybackClockSecond = null
-      return arrangementEndProjectSecond
+      return timelineEndProjectSecond
     }
 
     return parseProjectSecond(anchorProjectSecond + elapsedPlaybackSecond)
@@ -291,7 +291,7 @@ export function createAudibleMidiTransport(
 
     const startProjectSecond =
       state === AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED &&
-      anchorProjectSecond === arrangementEndProjectSecond
+      anchorProjectSecond === timelineEndProjectSecond
         ? zeroProjectSecond
         : anchorProjectSecond
     const startPlaybackClockSecond = readPlaybackClock()
@@ -332,10 +332,10 @@ export function createAudibleMidiTransport(
 
     // Normalize every replacement value before observing the clock or mutating active state.
     const nextPlanStatus = parsePlanStatus(nextPlan.status)
-    const nextArrangementEndTick = parseTick(nextPlan.arrangementEndTick)
+    const nextTimelineEndTick = parseTick(nextPlan.timelineEndTick)
     const nextTempoMap = createTempoMapFromSegments(nextPlan.tempoSegments)
-    const nextArrangementEndProjectSecond = nextTempoMap.projectSecondAtTick(nextArrangementEndTick)
-    const nextArrangementEndTickPosition = parseContinuousTickPosition(nextArrangementEndTick)
+    const nextTimelineEndProjectSecond = nextTempoMap.projectSecondAtTick(nextTimelineEndTick)
+    const nextTimelineEndTickPosition = parseContinuousTickPosition(nextTimelineEndTick)
     const nextGeneration = incrementEngineGeneration(engineGeneration)
     const wasPlaying = state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
     const currentProjectSecond = synchronizePlayingPosition()
@@ -344,14 +344,14 @@ export function createAudibleMidiTransport(
 
     planStatus = nextPlanStatus
     modelRevision = nextPlan.modelRevision
-    arrangementEndTick = nextArrangementEndTick
+    timelineEndTick = nextTimelineEndTick
     tempoMap = nextTempoMap
-    arrangementEndProjectSecond = nextArrangementEndProjectSecond
-    arrangementEndTickPosition = nextArrangementEndTickPosition
+    timelineEndProjectSecond = nextTimelineEndProjectSecond
+    timelineEndTickPosition = nextTimelineEndTickPosition
     engineGeneration = nextGeneration
 
     const handoffProjectSecond = parseProjectSecond(
-      Math.min(currentProjectSecond, arrangementEndProjectSecond),
+      Math.min(currentProjectSecond, timelineEndProjectSecond),
     )
     const nextPlanIsPlayable =
       planStatus === AUDIBLE_MIDI_PLAN_STATUS.PARTIAL ||
@@ -359,10 +359,10 @@ export function createAudibleMidiTransport(
 
     if (
       !nextPlanIsPlayable ||
-      handoffProjectSecond >= arrangementEndProjectSecond ||
+      handoffProjectSecond >= timelineEndProjectSecond ||
       !continuesPlaying
     ) {
-      if (!nextPlanIsPlayable || handoffProjectSecond >= arrangementEndProjectSecond) {
+      if (!nextPlanIsPlayable || handoffProjectSecond >= timelineEndProjectSecond) {
         state = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
       }
       anchorProjectSecond = handoffProjectSecond
@@ -401,10 +401,10 @@ export function createAudibleMidiTransport(
   function playbackClockSecondAtTick(tick: Tick): PlaybackClockSecond {
     const mapping = requireActiveMapping()
     const targetTick = parseTick(tick)
-    if (targetTick > arrangementEndTick) {
+    if (targetTick > timelineEndTick) {
       throw new AudibleMidiTransportError(
-        'target-tick-after-arrangement-end',
-        `Target Tick ${targetTick} is after Arrangement End ${arrangementEndTick}`,
+        'target-tick-after-timeline-end',
+        `Target Tick ${targetTick} is after Timeline End ${timelineEndTick}`,
       )
     }
 
@@ -428,9 +428,9 @@ export function createAudibleMidiTransport(
     }
 
     const elapsedPlaybackSecond = targetPlaybackClockSecond - mapping.anchorPlaybackClockSecond
-    const remainingProjectSecond = arrangementEndProjectSecond - mapping.anchorProjectSecond
+    const remainingProjectSecond = timelineEndProjectSecond - mapping.anchorProjectSecond
     if (elapsedPlaybackSecond >= remainingProjectSecond) {
-      return arrangementEndTickPosition
+      return timelineEndTickPosition
     }
 
     const targetProjectSecond = parseProjectSecond(

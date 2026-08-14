@@ -54,6 +54,15 @@ export type { StudioGrandDeviceState } from './studio-grand-device'
 export { parsePlaybackClockDurationSecond, parsePlaybackClockSecond } from './time/project-time'
 export type { PlaybackClockDurationSecond, PlaybackClockSecond } from './time/project-time'
 export {
+  AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
+  AudibleMidiTimelineError,
+  deriveAudibleMidiTimelineRange,
+} from './timeline/audible-midi-timeline'
+export type {
+  AudibleMidiTimelineErrorCode,
+  AudibleMidiTimelineRange,
+} from './timeline/audible-midi-timeline'
+export {
   AUDIBLE_MIDI_TRANSPORT_OUTCOME,
   createAudibleMidiTransport,
 } from './transport/audible-midi-transport'

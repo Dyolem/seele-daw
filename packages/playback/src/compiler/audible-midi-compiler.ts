@@ -1,5 +1,4 @@
 import {
-  ZERO_TICK,
   addTicks,
   parseDeviceTypeId,
   parseTick,
@@ -14,7 +13,6 @@ import {
   type MidiSourceId,
   type MidiSourceRecord,
   type ProjectSnapshot,
-  type Tick,
   type TrackId,
   type TrackRecord,
 } from '@seele-daw/project-core'
@@ -37,6 +35,7 @@ import {
   decodeSampleInstrumentDeviceState,
 } from '#internal/sample-instrument-device'
 import { createTempoMap } from '#internal/time/tempo-map'
+import { deriveAudibleMidiTimelineRange } from '#internal/timeline/audible-midi-timeline'
 
 // These IDs only classify V1 routing failures; they do not define FM or VA state/runtime contracts.
 const INSTRUMENT_SLOT_DEVICE_TYPE_ID = parseDeviceTypeId('seele.instrument-slot')
@@ -49,7 +48,6 @@ interface SnapshotIndexes {
   readonly sourcesById: ReadonlyMap<MidiSourceId, MidiSourceRecord>
   readonly notePartitionsBySourceId: ReadonlyMap<MidiSourceId, MidiNotePartitionSnapshot>
   readonly clipsByTrackId: ReadonlyMap<TrackId, readonly ClipRecord[]>
-  readonly arrangementEndTick: Tick
 }
 
 interface DiagnosticInput {
@@ -171,7 +169,6 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
   const notePartitionsBySourceId = indexNotePartitions(snapshot.midiNotePartitions)
   const mutableClipsByTrackId = new Map<TrackId, ClipRecord[]>()
   const clipIds = new Set<ClipId>()
-  let arrangementEndTick = ZERO_TICK
 
   validateTrackOrder(snapshot.trackOrder, tracksById)
 
@@ -191,10 +188,6 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
     const clips = mutableClipsByTrackId.get(clip.trackId) ?? []
     clips.push(clip)
     mutableClipsByTrackId.set(clip.trackId, clips)
-
-    // Arrangement extent reflects authored Clip geometry, including muted or unsupported content.
-    const clipEndTick = addTicks(clip.startTick, clip.spanTick)
-    if (clipEndTick > arrangementEndTick) arrangementEndTick = clipEndTick
   }
 
   const clipsByTrackId = new Map<TrackId, readonly ClipRecord[]>()
@@ -204,7 +197,6 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
   }
 
   return {
-    arrangementEndTick,
     clipsByTrackId,
     devicesById,
     notePartitionsBySourceId,
@@ -429,6 +421,7 @@ function derivePlanStatus(
 /** Compiles one stable Project Snapshot into a frozen, browser-independent MIDI playback plan. */
 export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMidiProjectPlan {
   const indexes = createSnapshotIndexes(snapshot)
+  const timelineRange = deriveAudibleMidiTimelineRange(snapshot)
   const tempoMap = createTempoMap(snapshot.tempoEvents)
   const diagnostics: PlaybackDiagnostic[] = []
   const trackPlans: TrackPlaybackPlan[] = []
@@ -508,13 +501,14 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
 
   // Freeze the complete plan boundary so later runtimes cannot mutate compiled Project meaning.
   return Object.freeze({
-    arrangementEndTick: indexes.arrangementEndTick,
+    arrangementEndTick: timelineRange.contentEndTick,
     diagnostics: Object.freeze(diagnostics),
     master: Object.freeze({ gain: snapshot.master.gain, muted: snapshot.master.muted }),
     midiNoteSpans: executableSpans,
     modelRevision: snapshot.modelRevision,
     status,
     tempoSegments: tempoMap.segments,
+    timelineEndTick: timelineRange.timelineEndTick,
     tracks: Object.freeze(trackPlans),
   })
 }

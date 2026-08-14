@@ -82,6 +82,7 @@ describe('Audible MIDI Compiler', () => {
     expect(firstPlan).not.toBe(secondPlan)
     expect(firstPlan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE)
     expect(firstPlan.arrangementEndTick).toBe(1_920)
+    expect(firstPlan.timelineEndTick).toBe(576_000)
     expect(firstPlan.tracks.map(({ trackId }) => trackId)).toEqual([
       records.alternateTrack.id,
       records.pianoTrack.id,
@@ -423,6 +424,7 @@ describe('Audible MIDI Compiler', () => {
 
     expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.EMPTY)
     expect(plan.arrangementEndTick).toBe(0)
+    expect(plan.timelineEndTick).toBe(576_000)
     expect(plan.midiNoteSpans).toEqual([])
     expect(diagnosticCodes(plan)).toEqual(['no-audible-midi-note-spans'])
   })

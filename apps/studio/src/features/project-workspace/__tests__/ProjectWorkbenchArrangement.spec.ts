@@ -7,6 +7,7 @@ import {
   parseTick,
   parseTrackId,
   type ProjectCommit,
+  type Tick,
 } from '@seele-daw/project-core'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -49,6 +50,7 @@ interface ArrangementFixture {
 interface MountArrangementOptions {
   readonly clips?: readonly ProjectMidiClipPresentation[]
   readonly createClipFailure?: Error
+  readonly timelineEndTick?: Tick
   readonly tracks?: InstanceType<typeof ProjectWorkbenchArrangement>['$props']['tracks']
 }
 
@@ -85,6 +87,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     props: {
       barSpanTick: parsePositiveTick(3_840),
       clips: options.clips ?? Object.freeze([]),
+      timelineEndTick: options.timelineEndTick ?? parseTick(3_840 * 8),
       tracks: options.tracks ?? Object.freeze([]),
     },
     global: {
@@ -118,6 +121,43 @@ afterEach(() => {
 })
 
 describe('ProjectWorkbenchArrangement', () => {
+  it('renders the 150-bar minimum Timeline as one shared Ruler and lane width', () => {
+    const { wrapper } = mountArrangement({
+      timelineEndTick: parseTick(576_000),
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: parseTrackId('track-150-bar-timeline'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument',
+          name: 'Timeline Track',
+        }),
+      ]),
+    })
+
+    const bars = wrapper.findAll('.project-workbench__ruler li')
+    const laneTargets = wrapper.findAll('.project-workbench__lane-grid button')
+
+    expect(bars).toHaveLength(150)
+    expect(bars[149]?.text()).toBe('150')
+    expect(laneTargets).toHaveLength(150)
+    expect(wrapper.get('.project-workbench__arrangement-layout').attributes('style')).toContain(
+      '--project-workbench-timeline-inline-size: 750rem',
+    )
+  })
+
+  it('preserves an exact partial final bar when authored content extends the minimum', () => {
+    const { wrapper } = mountArrangement({ timelineEndTick: parseTick(577_920) })
+    const bars = wrapper.findAll('.project-workbench__ruler li')
+
+    expect(bars).toHaveLength(151)
+    expect(bars[150]?.text()).toBe('151')
+    expect(bars[150]?.attributes('style')).toContain('--project-workbench-bar-inline-size: 2.5rem')
+    expect(wrapper.get('.project-workbench__arrangement-layout').attributes('style')).toContain(
+      '--project-workbench-timeline-inline-size: 752.5rem',
+    )
+  })
+
   it('presents all planned Track types in an accessible command menu', async () => {
     const { wrapper } = mountArrangement()
     const options = await openAddTrackMenu(wrapper)
@@ -184,7 +224,7 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(wrapper.find('.project-workbench__track-empty').exists()).toBe(false)
   })
 
-  it('pairs Track rows and lanes under one vertical scroll authority', () => {
+  it('keeps ordered Track and Lane pairs under one Arrangement scroll authority', () => {
     const { wrapper } = mountArrangement({
       tracks: Object.freeze([
         Object.freeze({
@@ -204,24 +244,142 @@ describe('ProjectWorkbenchArrangement', () => {
       ]),
     })
 
-    const scrollAuthority = wrapper.get('.project-workbench__arrangement-layout')
-    const pairedRows = scrollAuthority.findAll('.project-workbench__track-lane-row')
+    const scrollAuthority = wrapper.get('.project-workbench__arrangement-scroll-viewport')
+    const trackRows = wrapper.findAll('.project-workbench__track-row-slot')
+    const lanes = scrollAuthority.findAll('.project-workbench__arrangement-lane')
 
-    expect(pairedRows).toHaveLength(2)
-    expect(pairedRows.map((row) => row.get('.project-track-row__identity strong').text())).toEqual([
+    expect(trackRows.map((row) => row.attributes('data-track-id'))).toEqual([
+      'track-paired-first',
+      'track-paired-second',
+    ])
+    expect(trackRows.map((row) => row.get('.project-track-row__identity strong').text())).toEqual([
       'First paired track',
       'Second paired track',
     ])
-    expect(
-      pairedRows.map((row) =>
-        row.get('.project-workbench__arrangement-lane button').attributes('aria-label'),
-      ),
-    ).toEqual([
+    expect(lanes.map((lane) => lane.attributes('data-track-id'))).toEqual([
+      'track-paired-first',
+      'track-paired-second',
+    ])
+    expect(lanes.map((lane) => lane.get('button').attributes('aria-label'))).toEqual([
       expect.stringContaining('First paired track'),
       expect.stringContaining('Second paired track'),
     ])
-    expect(wrapper.find('.project-workbench__track-list').exists()).toBe(false)
-    expect(wrapper.find('.project-workbench__arrangement-host').exists()).toBe(false)
+    expect(
+      wrapper.get('.project-workbench__track-list').element.contains(scrollAuthority.element),
+    ).toBe(false)
+    expect(wrapper.find('.project-workbench__track-lane-row').exists()).toBe(false)
+  })
+
+  it('moves the clipped Track follower from Arrangement scroll events', async () => {
+    const { wrapper } = mountArrangement({
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: parseTrackId('track-scroll-follower'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument',
+          name: 'Scroll follower',
+        }),
+      ]),
+    })
+    const scrollAuthority = wrapper.get('.project-workbench__arrangement-scroll-viewport')
+    const scrollElement = scrollAuthority.element as HTMLElement
+
+    scrollElement.scrollTop = 96
+    await scrollAuthority.trigger('scroll')
+
+    expect(wrapper.get('.project-workbench__track-list').attributes('style')).toContain(
+      '--project-workbench-track-scroll-offset: -96px',
+    )
+  })
+
+  it('forwards vertical wheel input over Track controls to the Arrangement authority', async () => {
+    const { wrapper } = mountArrangement({
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: parseTrackId('track-wheel-follower'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument',
+          name: 'Wheel follower',
+        }),
+      ]),
+    })
+    const scrollElement = wrapper.get('.project-workbench__arrangement-scroll-viewport')
+      .element as HTMLElement
+    Object.defineProperties(scrollElement, {
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 1_000 },
+    })
+
+    await wrapper.get('.project-workbench__track-viewport').trigger('wheel', {
+      deltaMode: 0,
+      deltaY: 48,
+    })
+
+    expect(scrollElement.scrollTop).toBe(48)
+    expect(wrapper.get('.project-workbench__track-list').attributes('style')).toContain(
+      '--project-workbench-track-scroll-offset: -48px',
+    )
+  })
+
+  it('reveals a focused Track row by moving the Arrangement authority', async () => {
+    const { wrapper } = mountArrangement({
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: parseTrackId('track-focus-visible'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument' as const,
+          name: 'Visible focus row',
+        }),
+        Object.freeze({
+          color: parseProjectColor('#23B26D'),
+          id: parseTrackId('track-focus-clipped'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument' as const,
+          name: 'Clipped focus row',
+        }),
+      ]),
+    })
+    const scrollElement = wrapper.get('.project-workbench__arrangement-scroll-viewport')
+      .element as HTMLElement
+    const trackViewportElement = wrapper.get('.project-workbench__track-viewport')
+      .element as HTMLElement
+    const clippedRow = wrapper.findAll('.project-workbench__track-row-slot')[1]!
+    Object.defineProperties(scrollElement, {
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 1_000 },
+    })
+    vi.spyOn(trackViewportElement, 'getBoundingClientRect').mockReturnValue({
+      bottom: 300,
+      height: 200,
+      left: 0,
+      right: 260,
+      toJSON: () => ({}),
+      top: 100,
+      width: 260,
+      x: 0,
+      y: 100,
+    })
+    vi.spyOn(clippedRow.element, 'getBoundingClientRect').mockReturnValue({
+      bottom: 376,
+      height: 76,
+      left: 0,
+      right: 260,
+      toJSON: () => ({}),
+      top: 300,
+      width: 260,
+      x: 0,
+      y: 300,
+    })
+
+    await clippedRow.get('.project-track-row__select').trigger('focusin')
+
+    expect(scrollElement.scrollTop).toBe(76)
+    expect(wrapper.get('.project-workbench__track-list').attributes('style')).toContain(
+      '--project-workbench-track-scroll-offset: -76px',
+    )
   })
 
   it('shares one Track selection between Track Rows and Arrangement Lanes', async () => {
@@ -259,7 +417,7 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(lanes[0]!.classes()).toContain('project-workbench__arrangement-lane--selected')
   })
 
-  it('positions visible MIDI Clips against the fixed eight-bar Arrangement', () => {
+  it('positions visible MIDI Clips against the provided Timeline extent', () => {
     const trackId = parseTrackId('track-with-visible-clip')
     const clipId = parseClipId('clip-visible-on-arrangement')
     const { wrapper } = mountArrangement({

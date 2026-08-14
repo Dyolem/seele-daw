@@ -142,7 +142,8 @@ Gate C.2 的客观数据、浏览器 smoke、加载建议和人工试听清单�
   Effect 产生 blocking diagnostic，并清空整个计划的可执行 Note Span；
 - 没有可听 Note Span 返回带 diagnostic 的合法 Empty Plan，不抛 Compiler 异常；
 - `arrangementEndTick` 是所有 Clip 原始 `startTick + spanTick` 的中性最大值，Muted、Unsupported
-  或无法发声的内容仍参与；Batch 3A Transport 已确认并使用它作为自然结束点；
+  或无法发声的内容仍参与；Batch 3A 曾以它作为自然结束点，Batch 7B 已将自然结束切换为不小于
+  它的派生 `timelineEndTick`；
 - 所有 Track 的 Solo Fact 都参与全局派生，包括当前无法播放的 Audio Track；
 - Compiler 不读取 Catalog、Indexes、Mapping 或采样资源；资源不存在属于后续准备 / Runtime
   诊断，不能由 Compiler 按 Soundbank 名称预判。
@@ -275,7 +276,7 @@ engineGeneration
 playheadTickPosition
 anchorProjectSecond
 anchorPlaybackClockSecond
-arrangementEndTick
+timelineEndTick
 ```
 
 时间域固定为：
@@ -310,8 +311,9 @@ V1 不因未来 Seek 或 Transport Loop 预建公共协议；Paused 位置已经
   `playable` Plan 可以 Play；
 - Return to Start 使当前 generation 失效并回到 Stopped / Tick `0`；已在该状态时是幂等
   No-change；实际 `allNotesOff` 由后续 Scheduler / Audio Runtime 执行；
-- 自然结束采用 Compiler 的中性 `arrangementEndTick`，因此 Muted 或 Unsupported Clip 仍可延长
-  编排；到达末尾后进入 Stopped 并保留 End 位置，再次 Play 从 Tick `0` 开始；
+- 自然结束采用 Compiler 的派生 `timelineEndTick`；它至少覆盖 150 个起始拍号小节，并由包含
+  Muted 或 Unsupported Clip 在内的中性内容末端继续扩展；到达末尾后进入 Stopped 并保留 End
+  位置，再次 Play 从 Tick `0` 开始；
 - 有效 Play / Resume、Pause 与 Return to Start 分别更新 generation；被拒绝或重复的 No-change
   操作不更新；自然结束关闭当前播放但不额外更新，下一次 Play 再建立新 generation；
 - Transport 到达逻辑末尾时不等待 Sample release tail。真实尾音能否继续、如何结束及再次 Play
@@ -328,7 +330,8 @@ Compiler 接收一次稳定 `ProjectSnapshot`，输出浏览器无关的冻结�
 AudibleMidiProjectPlan
 ├── status: blocked | empty | partial | playable
 ├── modelRevision
-├── arrangementEndTick
+├── arrangementEndTick: authored Clip content extent
+├── timelineEndTick: derived view and natural-playback extent
 ├── tempoSegments[]
 ├── masterChannelPlan
 ├── trackPlaybackPlans[]
@@ -496,7 +499,7 @@ Planner 不创建 Timer。调用方注入 cadence 与 horizon 配置，且 horiz
   长 Note；
 - Return to Start 增加 generation、取消全部 future event、执行 `allNotesOff` 并把
   Playhead 归零；
-- 到达 `arrangementEndTick` 时停止 planner，Transport 进入 Stopped 并保留 End 位置；真实
+- 到达 `timelineEndTick` 时停止 planner，Transport 进入 Stopped 并保留 End 位置；真实
   release tail 不延长 Transport 时间，具体声音行为仍由 Gate C 决定；
 - 内部停止、Return 与 dispose 必须幂等。
 
@@ -714,8 +717,9 @@ Batch 5A 已按以下 UI 契约实现并通过功能审核；进一步优化留�
   事件调度时间；
 - 高频位置不写入 Project、Pinia 或 Project Commit Subscription；
 - Playhead 层独立于静态 Grid 和 Note / Clip Scene，移动 Playhead 不重建全部内容；
-- Arrangement Track 控制行与对应 Lane 共用一个纵向滚动权威，不能通过两套独立 scrollTop
-  进行事后同步；左侧控制列固定，横向滚动只作用于 Ruler 与 Lane 时间内容；
+- 右侧 Arrangement 时间内容持有唯一真实纵向滚动权威和唯一 `scrollTop`；左侧 Track 控制列
+  是裁切的合成层从视图，不维护第二套滚动状态。横向滚动只作用于 Ruler 与 Lane，原生滚动轨道
+  不延伸到 Track 控制列下方；
 - 当前项目时间轴至少覆盖 150 个初始拍号小节；内容超过该范围时扩展到最远 Clip End。该范围
   是从 Project Facts 派生的 View / Playback 边界，不写入 Project File，也不使旧项目变 dirty；
 - Transport 到达派生时间轴末端时自然停止；没有可听 Note 的 Empty Plan 仍保持不可播放；
@@ -916,7 +920,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 > Implementation status: reviewed and committed as `ae87ca4`. Playback type-check and 5 test
 > files / 61 tests pass; repository `pnpm lint` and `pnpm check` pass.
 
-- Gate B 中 Transport / Arrangement End / logical release-tail boundary 规则关闭；
+- Gate B 中 Transport / 原始 Arrangement End / logical release-tail boundary 规则关闭；其中自然
+  结束边界已在 Batch 7B 被派生 Timeline End 规则取代；
 - Project Second / Playback Clock Second 边界；
 - stopped / playing / paused 状态按确认结果落地；
 - engineGeneration、注入时钟与虚拟时钟测试；
@@ -1114,13 +1119,25 @@ Batch 7 不改变 Project File V1，也不提前建设 Zoom、Seek、Scrub 或 A
 
 #### Batch 7A：编排区共用纵向滚动
 
-- Track 控制行和对应 Arrangement Lane 放入同一个纵向滚动容器，以 DOM 行配对保证同一水平
-  高度；
-- 鼠标位于左侧控制区或右侧 Lane 时都滚动同一权威，不能维护两套可漂移的 `scrollTop`；
+> Implementation status: reviewed and committed as `42e5a0b`.
+
+- 该提交最初把 Track 控制行和对应 Arrangement Lane 放入同一个纵向滚动容器，以 DOM 行配对
+  保证同一水平高度；
+- 它确立了单一纵向滚动权威：鼠标位于左侧控制区或右侧 Lane 时都移动同一位置，不能维护两套
+  可漂移的 `scrollTop`；
 - Track 标题、Add Track、Ruler 与 Lane 标题固定在滚动内容上方；
 - 本批不改变横向时间轴宽度、播放行为、Project Fact 或 Track 排序 / 高度。
 
+Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横向滚动轨道延伸到 Track 控制列下方。
+后续主从组合保留 Batch 7A 的“单一权威”产品不变量，但不保留“必须位于同一个 DOM 滚动盒”
+这一实现方式。
+
 #### Batch 7B：派生时间轴范围
+
+> Implementation status: reviewed and complete on 2026-08-14. Playback 9 files / 93 tests,
+> Audio Web 16 / 110 and Studio 42 / 252 pass; affected type-checks, architecture lint and the Studio
+> production build also pass. Real-browser layout smoke confirms the Arrangement-only horizontal
+> scrollbar, Track follower alignment and Track-area wheel forwarding.
 
 - 定义 `minimumTimelineEndTick = initialBarSpanTick * 150`；默认 4/4、PPQ 960 项目对应
   `576000` Tick；
@@ -1128,6 +1145,11 @@ Batch 7 不改变 Project File V1，也不提前建设 Zoom、Seek、Scrub 或 A
   `timelineEndTick = max(minimumTimelineEndTick, contentEndTick)` 作为 Ruler 与 Lane 的共同末端；
 - 该最小范围适用于新旧项目，是确定性的派生规则，不写入 Project、不给旧项目制造迁移或 dirty；
 - 空项目与短项目仍显示至少 150 小节；内容越过该位置时自动扩展，不裁剪 Project Fact；
+- 右侧 Arrangement 成为唯一真实二维滚动容器；Ruler 与全部 Lane 使用同一横向位置，原生
+  横向滚动轨道从 Arrangement 边界开始；
+- 左侧 Track 控制列是无独立 `scrollTop` 的裁切从视图，通过合成层位移跟随 Arrangement 的
+  纵向位置。Track 区域滚轮转发到 Arrangement；焦点进入被裁切行时由 Arrangement 显示该行；
+- Track 控制行与 Lane 继续消费同一排序和固定行高，保留 Batch 7A 的行对齐与单一权威不变量；
 - Transport 自然结束从原始 `arrangementEndTick` 切换到 `timelineEndTick`。短项目允许在内容结束后
   播放静音直到时间轴末端；没有可听 Note Span 的 Empty Plan 仍不可启动；
 - 到达时间轴末端时停止 Transport，并对仍在发声的 Voice 使用现有无 click 的安全释放。
@@ -1143,7 +1165,7 @@ Batch 7 不改变 Project File V1，也不提前建设 Zoom、Seek、Scrub 或 A
 #### Batch 7D：Arrangement Playhead 与 Follow
 
 - Ruler 与 Lane 上显示同一条不可交互 Playhead，使用独立轻量图层移动；
-- Arrangement 横向滚动只作用于 Ruler 与 Lane 时间内容，左侧 Track 控制列保持固定；
+- Follow 只驱动 Batch 7B 已建立的 Ruler / Lane 横向滚动，左侧 Track 控制列继续保持固定；
 - Follow 默认开启，使用分页式而非持续居中的自动滚动，避免播放时视图不断抖动；
 - 用户主动横向滚动或进行时间轴编辑时，当前播放轮次暂停 Follow；可见 Follow 控制允许立即
   恢复，不把该状态保存为 Project Fact；
@@ -1265,8 +1287,8 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 - 任一公开构建都不包含当前本地快照；若产品需要自带采样，替代资产或覆盖该用法的再分发范围
   已另行确认；
 - 自动化渲染、生产构建和真实浏览器听觉 smoke 通过；
-- Arrangement Track / Lane 共享纵向滚动，派生时间轴、两个 Playhead 与 Follow 通过 Batch 7
-  产品验收；
+- Arrangement 单一纵向滚动权威与 Track 从视图、派生时间轴、两个 Playhead 与 Follow 通过
+  Batch 7 产品验收；
 - [产品功能手册](../../../PRODUCT.md)、[设计语言](../../../DESIGN.md)、
   [Playback README](../README.md) 与 [Audio Web README](../../audio-web/README.md) 已同步；
 - 用户逐批审阅通过；是否建立新的阶段 checkpoint 由 Batch 7 审核结束后的独立决定确认。

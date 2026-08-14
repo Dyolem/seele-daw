@@ -17,6 +17,7 @@ import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
+import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { createStudioRouter } from '@/router'
 import {
@@ -278,6 +279,7 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.find('.project-workbench').exists()).toBe(true)
     expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
+    expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_000)
   })
 
   it('delegates a dirty Workbench Save action to Active Project', async () => {
@@ -393,12 +395,8 @@ describe('ProjectWorkspacePage', () => {
         }),
       createReadyState(projectId, session),
     )
-    const {
-      keyboardBindingRegistry,
-      pendingNavigationDecision,
-      projectPlayback,
-      playbackState,
-    } = await mountPage(fixture, projectId)
+    const { keyboardBindingRegistry, pendingNavigationDecision, projectPlayback, playbackState } =
+      await mountPage(fixture, projectId)
     playbackState.value = Object.freeze({
       ...STOPPED_PLAYBACK_STATE,
       modelRevision: session.modelRevision,

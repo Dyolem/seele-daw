@@ -51,6 +51,7 @@ export type AudibleMidiSchedulerErrorCode =
   | 'playback-clock-window-out-of-range'
   | 'schedule-cursor-inconsistent'
   | 'stale-engine-generation'
+  | 'timeline-end-before-arrangement-end'
   | 'transport-mapping-changed-without-generation'
   | 'transport-plan-mismatch'
 
@@ -299,8 +300,15 @@ export function createAudibleMidiSchedulerPlanner(
   const modelRevision = plan.modelRevision
   const masterGain = plan.master.gain
   const arrangementEndTick = parseTick(plan.arrangementEndTick)
+  const timelineEndTick = parseTick(plan.timelineEndTick)
+  if (timelineEndTick < arrangementEndTick) {
+    throw new AudibleMidiSchedulerError(
+      'timeline-end-before-arrangement-end',
+      `Timeline End ${timelineEndTick} cannot precede Arrangement End ${arrangementEndTick}`,
+    )
+  }
   const tempoMap: TempoMap = createTempoMapFromSegments(plan.tempoSegments)
-  const arrangementEndProjectSecond = tempoMap.projectSecondAtTick(arrangementEndTick)
+  const timelineEndProjectSecond = tempoMap.projectSecondAtTick(timelineEndTick)
   const routes = normalizeTrackRoutes(plan)
   const spans = normalizeNoteSpans(plan, routes, arrangementEndTick)
 
@@ -324,8 +332,8 @@ export function createAudibleMidiSchedulerPlanner(
   function assertSnapshotMatchesPlan(snapshot: AudibleMidiTransportSnapshot): void {
     if (
       snapshot.modelRevision !== modelRevision ||
-      snapshot.arrangementEndTick !== arrangementEndTick ||
-      snapshot.arrangementEndProjectSecond !== arrangementEndProjectSecond
+      snapshot.timelineEndTick !== timelineEndTick ||
+      snapshot.timelineEndProjectSecond !== timelineEndProjectSecond
     ) {
       throw new AudibleMidiSchedulerError(
         'transport-plan-mismatch',
@@ -442,7 +450,7 @@ export function createAudibleMidiSchedulerPlanner(
     }
     if (
       snapshot.positionProjectSecond < snapshot.anchorProjectSecond ||
-      snapshot.positionProjectSecond > arrangementEndProjectSecond
+      snapshot.positionProjectSecond > timelineEndProjectSecond
     ) {
       throw new AudibleMidiSchedulerError(
         'transport-plan-mismatch',
@@ -453,12 +461,11 @@ export function createAudibleMidiSchedulerPlanner(
     const planningPlaybackClockSecond = playbackClockSecondAtProjectSecond(
       snapshot.positionProjectSecond,
     )
-    const arrangementEndPlaybackClockSecond = playbackClockSecondAtProjectSecond(
-      arrangementEndProjectSecond,
-    )
+    const timelineEndPlaybackClockSecond =
+      playbackClockSecondAtProjectSecond(timelineEndProjectSecond)
     const candidateWindowEnd = Math.min(
       planningPlaybackClockSecond + configuration.lookAheadHorizonSecond,
-      arrangementEndPlaybackClockSecond,
+      timelineEndPlaybackClockSecond,
     )
     const toPlaybackClockSecond = parseCalculatedPlaybackClockSecond(
       candidateWindowEnd,

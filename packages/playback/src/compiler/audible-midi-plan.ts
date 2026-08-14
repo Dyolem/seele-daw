@@ -92,7 +92,10 @@ export interface MidiNoteSpanPlan {
 export interface AudibleMidiProjectPlan {
   readonly status: AudibleMidiPlanStatus
   readonly modelRevision: ModelRevision
+  /** Furthest authored Clip end, including muted and unsupported content. */
   readonly arrangementEndTick: Tick
+  /** Shared derived view and natural-playback end; never precedes arrangementEndTick. */
+  readonly timelineEndTick: Tick
   readonly tempoSegments: readonly TempoSegmentPlan[]
   readonly master: MasterChannelPlan
   readonly tracks: readonly TrackPlaybackPlan[]

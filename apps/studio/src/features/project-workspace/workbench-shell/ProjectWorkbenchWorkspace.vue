@@ -26,6 +26,7 @@ const props = defineProps<{
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly timeSignatureNumerator: number
+  readonly timelineEndTick: Tick
   readonly tracks: readonly ProjectTrackPresentation[]
 }>()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
@@ -42,8 +43,7 @@ let resizeInteraction: DockResizeInteraction | null = null
 
 const isContextEditorOpen = computed(() => dockMode.value !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED)
 const selectedTrack = computed(
-  () =>
-    props.tracks.find((track) => track.id === workbenchSelection.selectedTrackId) ?? null,
+  () => props.tracks.find((track) => track.id === workbenchSelection.selectedTrackId) ?? null,
 )
 const selectedClip = computed(
   () => props.clips.find((clip) => clip.id === workbenchSelection.selectedClipId) ?? null,
@@ -228,6 +228,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN"
       :bar-span-tick="props.barSpanTick"
       :clips="props.clips"
+      :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
       @open-midi-clip="openContextEditor"
     />

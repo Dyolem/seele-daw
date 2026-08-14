@@ -1061,12 +1061,12 @@ describe('ProjectPlaybackCoordinator', () => {
     await coordinator.play()
     const prepared = runtime.prepared[0]!
 
-    prepared.currentTime = 10 as typeof prepared.currentTime
+    prepared.currentTime = 300 as typeof prepared.currentTime
     timer.fire()
 
     expect(coordinator.state).toMatchObject({
       phase: 'stopped',
-      positionProjectSecond: 1,
+      positionProjectSecond: 300,
     })
     expect(timer.callbacks.size).toBe(0)
     expect(prepared.allNotesOffCount).toBe(0)

@@ -4,9 +4,14 @@ import {
   ZERO_TICK,
   parsePositiveTick,
   parseProjectId,
+  parseTick,
   type ProjectId,
   type Tick,
 } from '@seele-daw/project-core'
+import {
+  AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
+  deriveAudibleMidiTimelineRange,
+} from '@seele-daw/playback'
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -45,6 +50,11 @@ const props = defineProps<{
   readonly projectId: string
 }>()
 
+const DEFAULT_BAR_SPAN_TICK = parsePositiveTick(PROJECT_PPQ * 4)
+const DEFAULT_TIMELINE_END_TICK = parseTick(
+  DEFAULT_BAR_SPAN_TICK * AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
+)
+
 interface ProjectPresentation {
   readonly barSpanTick: Tick
   readonly projectId: ProjectId | null
@@ -66,7 +76,7 @@ const requestedProjectId = shallowRef<ProjectId | null>(null)
 const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
 const projectPresentation = shallowRef<ProjectPresentation>({
-  barSpanTick: parsePositiveTick(PROJECT_PPQ * 4),
+  barSpanTick: DEFAULT_BAR_SPAN_TICK,
   projectId: null,
   projectName: 'Untitled Project',
   tempo: 120,
@@ -84,6 +94,12 @@ const readyProject = computed(() => {
     : null
 })
 const projectSnapshot = computed(() => readyProject.value?.session.getSnapshot() ?? null)
+const timelineEndTick = computed(() => {
+  const snapshot = projectSnapshot.value
+  return snapshot === null
+    ? DEFAULT_TIMELINE_END_TICK
+    : deriveAudibleMidiTimelineRange(snapshot).timelineEndTick
+})
 const trackPresentations = computed(() => {
   const snapshot = projectSnapshot.value
   return snapshot === null ? Object.freeze([]) : createProjectTrackPresentations(snapshot)
@@ -99,15 +115,13 @@ const pianoRollPresentation = computed(() => {
     ? null
     : createProjectPianoRollPresentation(snapshot, selectedClipId)
 })
-const clipSelectionCandidates = computed(
-  (): readonly ProjectWorkbenchClipSelectionCandidate[] => {
-    return Object.freeze(
-      clipPresentations.value.map((clip) =>
-        Object.freeze({ clipId: clip.id, trackId: clip.trackId }),
-      ),
-    )
-  },
-)
+const clipSelectionCandidates = computed((): readonly ProjectWorkbenchClipSelectionCandidate[] => {
+  return Object.freeze(
+    clipPresentations.value.map((clip) =>
+      Object.freeze({ clipId: clip.id, trackId: clip.trackId }),
+    ),
+  )
+})
 
 const playbackTime = computed(() => formatPlaybackTime(playbackState.value.positionProjectSecond))
 const playbackCanReturnToStart = computed(
@@ -191,11 +205,7 @@ async function saveProject(): Promise<void> {
 
 function canSaveProject(): boolean {
   const ready = readyProject.value
-  return (
-    ready !== null &&
-    ready.isDirty &&
-    ready.saveStatus !== ACTIVE_PROJECT_SAVE_STATUS.SAVING
-  )
+  return ready !== null && ready.isDirty && ready.saveStatus !== ACTIVE_PROJECT_SAVE_STATUS.SAVING
 }
 
 function undoProject(): boolean {
@@ -230,9 +240,7 @@ const disposeKeyboardShortcuts = keyboardShortcuts.register([
   },
   {
     actionId: STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
-    bindings: keyboardShortcuts.bindingsFor(
-      STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
-    ),
+    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PROJECT_SAVE),
     description: 'Save the active local project.',
     isEnabled: canSaveProject,
     label: 'Save project',
@@ -245,9 +253,7 @@ const disposeKeyboardShortcuts = keyboardShortcuts.register([
   },
   {
     actionId: STUDIO_KEYBOARD_ACTION.HISTORY_UNDO,
-    bindings: keyboardShortcuts.bindingsFor(
-      STUDIO_KEYBOARD_ACTION.HISTORY_UNDO,
-    ),
+    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.HISTORY_UNDO),
     description: 'Undo the latest committed project edit.',
     isEnabled: () => readyProject.value?.session.canUndo === true,
     label: 'Undo',
@@ -256,9 +262,7 @@ const disposeKeyboardShortcuts = keyboardShortcuts.register([
   },
   {
     actionId: STUDIO_KEYBOARD_ACTION.HISTORY_REDO,
-    bindings: keyboardShortcuts.bindingsFor(
-      STUDIO_KEYBOARD_ACTION.HISTORY_REDO,
-    ),
+    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.HISTORY_REDO),
     description: 'Redo the latest undone project edit.',
     isEnabled: () => readyProject.value?.session.canRedo === true,
     label: 'Redo',
@@ -301,7 +305,7 @@ watch(
     const ready = readyProject.value
     if (projectId === null || ready === null) {
       projectPresentation.value = {
-        barSpanTick: parsePositiveTick(PROJECT_PPQ * 4),
+        barSpanTick: DEFAULT_BAR_SPAN_TICK,
         projectId: null,
         projectName: 'Untitled Project',
         tempo: 120,
@@ -327,11 +331,7 @@ watch(
 )
 
 watch(
-  [
-    () => readyProject.value?.projectId ?? null,
-    trackPresentations,
-    clipSelectionCandidates,
-  ],
+  [() => readyProject.value?.projectId ?? null, trackPresentations, clipSelectionCandidates],
   ([projectId, tracks, clips]) => {
     if (projectId === null) return
 
@@ -376,6 +376,7 @@ onUnmounted(() => {
     :tempo="projectPresentation.tempo"
     :time-signature-denominator="projectPresentation.timeSignatureDenominator"
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
+    :timeline-end-tick="timelineEndTick"
     :tracks="trackPresentations"
     @leave-project="router.push(createProjectEntryLocation())"
     @playback-return-to-start="projectPlayback.returnToStart()"

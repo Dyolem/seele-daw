@@ -75,6 +75,7 @@ function createActiveProjectContext(state: ActiveProjectState): ActiveProjectVue
     open: async () => undefined,
     save: async () => undefined,
     subscribe: () => () => undefined,
+    subscribeCommits: () => () => undefined,
     dispose() {},
   }
 

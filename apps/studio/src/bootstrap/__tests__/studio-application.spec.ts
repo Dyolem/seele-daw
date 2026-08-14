@@ -105,6 +105,7 @@ function createRuntimeFixture(
       subscriptions.push(subscription)
       return subscription
     },
+    subscribeCommits: () => () => undefined,
     dispose() {},
   }
   const dispose = vi.fn<() => void>(() => {

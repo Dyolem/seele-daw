@@ -31,9 +31,37 @@ export class ManualProjectPlaybackTimer implements ProjectPlaybackTimerPort {
   }
 }
 
+export class ManualProjectPlaybackVoiceHandle implements ProjectPlaybackVoiceHandle {
+  readonly cancelCalls: (PlaybackClockSecond | undefined)[] = []
+  readonly releaseUpdates: PlaybackClockSecond[] = []
+  #active = true
+
+  constructor(
+    readonly engineGeneration: ScheduledSampleVoicePlan['engineGeneration'],
+    readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey'],
+  ) {}
+
+  cancel(atPlaybackClockSecond?: PlaybackClockSecond): boolean {
+    if (!this.#active) return false
+    this.#active = false
+    this.cancelCalls.push(atPlaybackClockSecond)
+    return true
+  }
+
+  isActive(): boolean {
+    return this.#active
+  }
+
+  rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): boolean {
+    if (!this.#active) return false
+    this.releaseUpdates.push(releasePlaybackClockSecond)
+    return true
+  }
+}
+
 export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRuntime {
   readonly generations: EngineGeneration[] = []
-  readonly handles: ProjectPlaybackVoiceHandle[] = []
+  readonly handles: ManualProjectPlaybackVoiceHandle[] = []
   readonly scheduled: ScheduledSampleVoicePlan[] = []
   allNotesOffCount = 0
   disposeCount = 0
@@ -52,6 +80,7 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
 
   dispose(): void {
     this.disposeCount += 1
+    for (const handle of this.handles) handle.cancel()
   }
 
   now(): PlaybackClockSecond {
@@ -60,18 +89,7 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
 
   schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle {
     this.scheduled.push(plan)
-    let active = true
-    const handle = Object.freeze({
-      cancel: () => {
-        if (!active) return false
-        active = false
-        return true
-      },
-      engineGeneration: plan.engineGeneration,
-      isActive: () => active,
-      occurrenceKey: plan.occurrenceKey,
-      rescheduleRelease: () => active,
-    })
+    const handle = new ManualProjectPlaybackVoiceHandle(plan.engineGeneration, plan.occurrenceKey)
     this.handles.push(handle)
     return handle
   }

@@ -49,6 +49,7 @@ function createActiveProjectContext(
     open: async () => undefined,
     save: async () => undefined,
     subscribe: () => () => undefined,
+    subscribeCommits: () => () => undefined,
     dispose() {},
   }
 

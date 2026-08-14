@@ -161,6 +161,7 @@ function createFixture(
     open: async () => undefined,
     save,
     subscribe: () => () => undefined,
+    subscribeCommits: () => () => undefined,
     dispose() {},
   }
 

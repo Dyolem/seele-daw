@@ -509,6 +509,79 @@ describe('ActiveProjectService saving and dirty state', () => {
 })
 
 describe('ActiveProjectService lifecycle and observers', () => {
+  it('forwards each active Session Commit after publishing its matching Ready state', async () => {
+    const projectId = createTestProjectId('commit-forwarding')
+    let session!: MutableTestProjectSession
+    const { service } = createServiceFixture(
+      undefined,
+      vi.fn<(projectId: ProjectId) => MutableTestProjectSession>((requestedProjectId) => {
+        session = createTestSession(requestedProjectId)
+        return session
+      }),
+      () => projectId,
+    )
+    await service.create()
+    const events: unknown[] = []
+    service.subscribeCommits({
+      onCommit(event) {
+        events.push(event)
+        expect(service.state).toBe(event.state)
+      },
+      onError() {},
+    })
+
+    await session.emitCommit()
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        projectId,
+        session,
+        state: expect.objectContaining({ modelRevision: 1 }),
+      }),
+    ])
+  })
+
+  it('isolates a failed Commit observer from later Commits and independent observers', async () => {
+    const projectId = createTestProjectId('commit-observer')
+    let session!: MutableTestProjectSession
+    const { service } = createServiceFixture(
+      undefined,
+      vi.fn<(projectId: ProjectId) => MutableTestProjectSession>((requestedProjectId) => {
+        session = createTestSession(requestedProjectId)
+        return session
+      }),
+      () => projectId,
+    )
+    await service.create()
+    const deliveryFailures: unknown[] = []
+    const healthyRevisions: number[] = []
+    service.subscribeCommits({
+      onCommit() {
+        throw new Error('Commit observer failed')
+      },
+      onError(failure) {
+        deliveryFailures.push(failure)
+      },
+    })
+    service.subscribeCommits({
+      onCommit(event) {
+        healthyRevisions.push(event.state.modelRevision)
+      },
+      onError() {},
+    })
+
+    await session.emitCommit()
+    await session.emitCommit()
+
+    expect(deliveryFailures).toEqual([
+      expect.objectContaining({
+        cause: expect.any(Error),
+        event: expect.objectContaining({ state: expect.objectContaining({ modelRevision: 1 }) }),
+      }),
+    ])
+    expect(healthyRevisions).toEqual([1, 2])
+  })
+
   it('ignores an in-flight open completion after disposal', async () => {
     const projectId = createTestProjectId('disposed')
     const gate = createDeferred()

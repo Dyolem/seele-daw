@@ -181,6 +181,7 @@ describe('ActiveProjectVueBinding', () => {
         observer.onError(failure)
         return unsubscribe
       },
+      subscribeCommits: () => () => undefined,
       dispose() {},
     }
 

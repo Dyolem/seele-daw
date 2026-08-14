@@ -1,13 +1,17 @@
 import {
   AUDIBLE_MIDI_PLAN_STATUS,
+  AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND,
+  AUDIBLE_MIDI_RECONCILIATION_SCOPE,
   AUDIBLE_MIDI_SCHEDULER_OUTCOME,
   AUDIBLE_MIDI_TRANSPORT_OUTCOME,
   compileAudibleMidiProject,
+  createAudibleMidiReconciliationPlan,
   createAudibleMidiSchedulerPlanner,
   createAudibleMidiTransport,
   parsePlaybackClockDurationSecond,
   parsePlaybackClockSecond,
   type AudibleMidiProjectPlan,
+  type AudibleMidiReconciliationPlan,
   type AudibleMidiSchedulerPlanner,
   type AudibleMidiTransport,
   type AudibleMidiTransportSnapshot,
@@ -15,9 +19,18 @@ import {
   type PlaybackClockSecond,
   type ScheduledSampleVoicePlan,
 } from '@seele-daw/playback'
-import type { ModelRevision, ProjectId, ProjectSession } from '@seele-daw/project-core'
+import {
+  PROJECT_COMMAND_TYPE,
+  type ModelRevision,
+  type ProjectCommit,
+  type ProjectId,
+  type ProjectSession,
+} from '@seele-daw/project-core'
 
-import type { ActiveProjectService } from '@/workbench/project/active-project-service'
+import type {
+  ActiveProjectCommitEvent,
+  ActiveProjectService,
+} from '@/workbench/project/active-project-service'
 import {
   ACTIVE_PROJECT_PHASE,
   type ActiveProjectState,
@@ -63,7 +76,7 @@ export interface ProjectPlaybackTimerPort {
 }
 
 export interface ProjectPlaybackCoordinatorDependencies {
-  readonly activeProject: Pick<ActiveProjectService, 'state' | 'subscribe'>
+  readonly activeProject: Pick<ActiveProjectService, 'state' | 'subscribe' | 'subscribeCommits'>
   readonly runtime: ProjectPlaybackRuntimePort
   readonly timer: ProjectPlaybackTimerPort
 }
@@ -87,6 +100,12 @@ interface ActivePlanIdentity {
   readonly modelRevision: ModelRevision
   readonly projectId: ProjectId
   readonly session: ProjectSession
+}
+
+interface ScheduledVoiceEntry {
+  readonly handle: ProjectPlaybackVoiceHandle
+  readonly plan: ScheduledSampleVoicePlan
+  readonly runtime: ProjectPlaybackPreparedRuntime
 }
 
 const SCHEDULER_WAKE_CADENCE_SECOND = parsePlaybackClockDurationSecond(0.025)
@@ -159,6 +178,20 @@ function isPlayablePlan(plan: AudibleMidiProjectPlan): boolean {
   )
 }
 
+function isMidiNoteReconciliationCommit(commit: ProjectCommit): boolean {
+  switch (commit.origin.commandType) {
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
+    case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
+      return true
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
+      return false
+  }
+}
+
 /**
  * Owns the Studio use case that joins Project facts, browser-independent playback planning, audio
  * resource preparation, native scheduling, user commands, and project/application cleanup.
@@ -168,6 +201,9 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   readonly #timerPort: ProjectPlaybackTimerPort
   readonly #subscriptions = new Set<StateSubscriptionEntry>()
   readonly #unsubscribeActiveProject: ProjectPlaybackUnsubscribe
+  readonly #unsubscribeActiveProjectCommits: ProjectPlaybackUnsubscribe
+  readonly #retiredRuntimes = new Set<ProjectPlaybackPreparedRuntime>()
+  readonly #scheduledVoices = new Set<ScheduledVoiceEntry>()
   #activePlanIdentity: ActivePlanIdentity | null = null
   #plan: AudibleMidiProjectPlan | null = null
   #preparedRuntime: ProjectPlaybackPreparedRuntime | null = null
@@ -176,6 +212,12 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #timerHandle: unknown = null
   #preparationAbortController: AbortController | null = null
   #requestSequence = 0
+  #pendingCommits: ProjectCommit[] = []
+  #pendingCommitEvent: ActiveProjectCommitEvent | null = null
+  #pendingCommitFlushQueued = false
+  #pendingCommitChainBroken = false
+  #pendingPlan: AudibleMidiProjectPlan | null = null
+  #suppressedOccurrenceKeys = new Set<ScheduledSampleVoicePlan['occurrenceKey']>()
   #state: ProjectPlaybackState = UNAVAILABLE_STATE
   #disposed = false
 
@@ -185,6 +227,10 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#synchronizeActiveProject(dependencies.activeProject.state)
     this.#unsubscribeActiveProject = dependencies.activeProject.subscribe({
       onStateChange: (state) => this.#synchronizeActiveProject(state),
+      onError: (failure) => this.#failCurrentPlan(failure.cause),
+    })
+    this.#unsubscribeActiveProjectCommits = dependencies.activeProject.subscribeCommits({
+      onCommit: (event) => this.#reconcileActiveProjectCommit(event),
       onError: (failure) => this.#failCurrentPlan(failure.cause),
     })
   }
@@ -220,7 +266,13 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     )
 
     try {
-      this.#preparedRuntime?.dispose()
+      const previousRuntime = this.#preparedRuntime
+      previousRuntime?.dispose()
+      if (previousRuntime !== null) {
+        for (const entry of this.#scheduledVoices) {
+          if (entry.runtime === previousRuntime) this.#scheduledVoices.delete(entry)
+        }
+      }
       this.#preparedRuntime = null
       const preparedRuntime = await this.#runtimePort.prepare(plan, abortController.signal)
       if (!this.#isCurrentRequest(requestSequence, plan, abortController)) {
@@ -280,7 +332,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
     this.#stopTimer()
     this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-    this.#preparedRuntime?.allNotesOff()
+    this.#allNotesOffRuntimes()
     this.#publishTransportState(transition.snapshot)
     return true
   }
@@ -296,7 +348,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#stopTimer()
     const transport = this.#transport
     if (transport === null) {
-      this.#preparedRuntime?.allNotesOff()
+      this.#allNotesOffRuntimes()
       this.#publishStoppedAtStart()
       return wasLoading
     }
@@ -304,9 +356,9 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     const transition = transport.returnToStart()
     if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START) {
       this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#preparedRuntime?.allNotesOff()
+      this.#allNotesOffRuntimes()
     } else {
-      this.#preparedRuntime?.allNotesOff()
+      this.#allNotesOffRuntimes()
     }
     this.#publishTransportState(transition.snapshot)
     return wasLoading || transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START
@@ -336,6 +388,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     if (this.#disposed) return
     this.#disposed = true
     this.#unsubscribeActiveProject()
+    this.#unsubscribeActiveProjectCommits()
     this.#releasePlanRuntime()
     this.#runtimePort.dispose()
     this.#activePlanIdentity = null
@@ -455,14 +508,57 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#cancelPreparation()
     this.#stopTimer()
     try {
-      this.#preparedRuntime?.allNotesOff()
+      this.#allNotesOffRuntimes()
     } catch {
-      // Disposal below remains authoritative after a context interruption.
+      // Runtime disposal below remains authoritative after a release failure.
     }
-    this.#preparedRuntime?.dispose()
+    const runtimes = new Set(this.#retiredRuntimes)
+    if (this.#preparedRuntime !== null) runtimes.add(this.#preparedRuntime)
+    for (const runtime of runtimes) runtime.dispose()
     this.#preparedRuntime = null
+    this.#retiredRuntimes.clear()
+    this.#scheduledVoices.clear()
+    this.#pendingCommits = []
+    this.#pendingCommitEvent = null
+    this.#pendingCommitFlushQueued = false
+    this.#pendingCommitChainBroken = false
+    this.#pendingPlan = null
+    this.#suppressedOccurrenceKeys.clear()
     this.#transport = null
     this.#scheduler = null
+  }
+
+  #allNotesOffRuntimes(): void {
+    let firstFailure: unknown = null
+    const runtimes = new Set(this.#retiredRuntimes)
+    if (this.#preparedRuntime !== null) runtimes.add(this.#preparedRuntime)
+    for (const runtime of runtimes) {
+      try {
+        runtime.allNotesOff()
+      } catch (error) {
+        firstFailure ??= error
+      }
+    }
+    if (firstFailure !== null && !this.#disposed) throw firstFailure
+  }
+
+  #collectFinishedVoicesAndRuntimes(): void {
+    for (const entry of this.#scheduledVoices) {
+      let active = false
+      try {
+        active = entry.handle.isActive()
+      } catch {
+        // A failed or disposed Runtime cannot retain a usable scheduled Voice.
+      }
+      if (!active) this.#scheduledVoices.delete(entry)
+    }
+
+    for (const runtime of this.#retiredRuntimes) {
+      const hasActiveVoice = [...this.#scheduledVoices].some((entry) => entry.runtime === runtime)
+      if (hasActiveVoice) continue
+      runtime.dispose()
+      this.#retiredRuntimes.delete(runtime)
+    }
   }
 
   #requirePlayablePlan(): AudibleMidiProjectPlan {
@@ -498,7 +594,15 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     }
     const batch = scheduler.planNextWindow(snapshot)
     if (batch.outcome !== AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED) return
-    for (const voicePlan of batch.voicePlans) preparedRuntime.schedule(voicePlan)
+    for (const voicePlan of batch.voicePlans) {
+      if (this.#suppressedOccurrenceKeys.has(voicePlan.occurrenceKey)) continue
+      const handle = preparedRuntime.schedule(voicePlan)
+      if (handle !== null) {
+        this.#scheduledVoices.add(
+          Object.freeze({ handle, plan: voicePlan, runtime: preparedRuntime }),
+        )
+      }
+    }
   }
 
   #startTimer(): void {
@@ -515,6 +619,258 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#timerHandle = null
   }
 
+  #reconcileActiveProjectCommit(event: ActiveProjectCommitEvent): void {
+    if (this.#disposed) return
+    const identity = this.#activePlanIdentity
+    if (
+      identity === null ||
+      identity.projectId !== event.projectId ||
+      identity.session !== event.session
+    ) {
+      return
+    }
+
+    const expectedBaseRevision =
+      this.#pendingCommits.at(-1)?.modelRevision ?? identity.modelRevision
+    if (event.commit.baseRevision !== expectedBaseRevision) {
+      this.#pendingCommitChainBroken = true
+    }
+    this.#pendingCommits.push(event.commit)
+    this.#pendingCommitEvent = event
+
+    if (this.#pendingCommitFlushQueued) return
+    this.#pendingCommitFlushQueued = true
+    void Promise.resolve().then(() => {
+      this.#pendingCommitFlushQueued = false
+      this.#flushActiveProjectCommits()
+    })
+  }
+
+  #flushActiveProjectCommits(): void {
+    if (this.#disposed) return
+    const event = this.#pendingCommitEvent
+    const previousPlan = this.#plan
+    const identity = this.#activePlanIdentity
+    if (event === null || previousPlan === null || identity === null) return
+    if (event.projectId !== identity.projectId || event.session !== identity.session) return
+
+    let nextPlan: AudibleMidiProjectPlan
+    try {
+      nextPlan = compileAudibleMidiProject(event.session.getSnapshot())
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return
+    }
+
+    if (
+      this.#pendingCommitChainBroken ||
+      this.#pendingCommits.at(-1)?.modelRevision !== nextPlan.modelRevision
+    ) {
+      this.#installStoppedPlan(event, nextPlan)
+      return
+    }
+
+    let reconciliation: AudibleMidiReconciliationPlan
+    try {
+      reconciliation = createAudibleMidiReconciliationPlan({
+        commits: this.#pendingCommits,
+        nextPlan,
+        previousPlan,
+      })
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return
+    }
+
+    const canContinueRuntime =
+      (this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING ||
+        this.#state.phase === PROJECT_PLAYBACK_PHASE.PAUSED) &&
+      this.#preparedRuntime !== null &&
+      this.#transport !== null &&
+      this.#scheduler !== null
+    const noteOnly = this.#pendingCommits.every(isMidiNoteReconciliationCommit)
+    if (
+      !canContinueRuntime ||
+      !noteOnly ||
+      reconciliation.scope !== AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE
+    ) {
+      this.#installStoppedPlan(event, nextPlan)
+      return
+    }
+
+    try {
+      this.#applyImmediateNoteReconciliation(reconciliation)
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return
+    }
+    this.#suppressedOccurrenceKeys = new Set(reconciliation.invalidatedPreviousOccurrenceKeys)
+    this.#prepareSelectiveHandoff(event, previousPlan, nextPlan)
+  }
+
+  #applyImmediateNoteReconciliation(reconciliation: AudibleMidiReconciliationPlan): void {
+    const runtime = this.#preparedRuntime
+    const transport = this.#transport
+    if (runtime === null || transport === null) return
+    const now = runtime.now()
+
+    for (const change of reconciliation.occurrenceChanges) {
+      if (change.kind === AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED) continue
+      const entries = [...this.#scheduledVoices].filter(
+        ({ handle }) => handle.occurrenceKey === change.occurrenceKey,
+      )
+      for (const entry of entries) {
+        if (!entry.handle.isActive()) {
+          this.#scheduledVoices.delete(entry)
+          continue
+        }
+        if (entry.plan.startPlaybackClockSecond >= now) {
+          entry.handle.cancel(now)
+          continue
+        }
+        if (
+          change.kind === AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.REMOVED ||
+          change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE)
+        ) {
+          entry.handle.cancel(now)
+          continue
+        }
+        if (
+          change.kind !== AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED ||
+          change.after === null ||
+          !change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE)
+        ) {
+          continue
+        }
+
+        const nextStart = transport.playbackClockSecondAtTick(change.after.startTick)
+        if (nextStart > now) {
+          entry.handle.cancel(now)
+          continue
+        }
+        const nextRelease = transport.playbackClockSecondAtTick(change.after.endTick)
+        entry.handle.rescheduleRelease(nextRelease)
+      }
+    }
+  }
+
+  #prepareSelectiveHandoff(
+    event: ActiveProjectCommitEvent,
+    previousPlan: AudibleMidiProjectPlan,
+    nextPlan: AudibleMidiProjectPlan,
+  ): void {
+    this.#preparationAbortController?.abort()
+    const abortController = new AbortController()
+    const requestSequence = ++this.#requestSequence
+    this.#preparationAbortController = abortController
+    this.#pendingPlan = nextPlan
+
+    void this.#runtimePort
+      .prepare(nextPlan, abortController.signal)
+      .then((preparedRuntime) => {
+        if (
+          this.#disposed ||
+          abortController.signal.aborted ||
+          requestSequence !== this.#requestSequence ||
+          this.#plan !== previousPlan ||
+          this.#pendingPlan !== nextPlan ||
+          this.#activePlanIdentity?.session !== event.session
+        ) {
+          preparedRuntime.dispose()
+          return
+        }
+        if (preparedRuntime.modelRevision !== nextPlan.modelRevision) {
+          preparedRuntime.dispose()
+          throw new ProjectPlaybackError(
+            'playback-unavailable',
+            'Prepared Playback Runtime does not match the reconciled modelRevision',
+          )
+        }
+        this.#installSelectiveHandoff(event, nextPlan, preparedRuntime)
+      })
+      .catch((cause: unknown) => {
+        if (
+          this.#disposed ||
+          abortController.signal.aborted ||
+          requestSequence !== this.#requestSequence
+        ) {
+          return
+        }
+        this.#failCurrentPlan(cause)
+      })
+      .finally(() => {
+        if (this.#preparationAbortController === abortController) {
+          this.#preparationAbortController = null
+        }
+      })
+  }
+
+  #installSelectiveHandoff(
+    event: ActiveProjectCommitEvent,
+    nextPlan: AudibleMidiProjectPlan,
+    nextRuntime: ProjectPlaybackPreparedRuntime,
+  ): void {
+    const transport = this.#transport
+    const previousRuntime = this.#preparedRuntime
+    if (transport === null || previousRuntime === null) {
+      nextRuntime.dispose()
+      this.#installStoppedPlan(event, nextPlan)
+      return
+    }
+
+    const now = previousRuntime.now()
+    for (const entry of this.#scheduledVoices) {
+      if (entry.plan.startPlaybackClockSecond >= now) entry.handle.cancel(now)
+    }
+    const transition = transport.handoffPlan(nextPlan)
+    nextRuntime.advanceGeneration(transition.snapshot.engineGeneration)
+
+    this.#preparedRuntime = nextRuntime
+    this.#retiredRuntimes.add(previousRuntime)
+    this.#scheduler = createAudibleMidiSchedulerPlanner(nextPlan, {
+      lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
+      wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,
+    })
+    this.#plan = nextPlan
+    this.#activePlanIdentity = Object.freeze({
+      modelRevision: nextPlan.modelRevision,
+      projectId: event.projectId,
+      session: event.session,
+    })
+    this.#pendingCommits = []
+    this.#pendingCommitEvent = null
+    this.#pendingCommitChainBroken = false
+    this.#pendingPlan = null
+    this.#suppressedOccurrenceKeys.clear()
+
+    if (transition.snapshot.state === 'playing') {
+      this.#scheduleNextWindow(transition.snapshot)
+      this.#startTimer()
+    } else {
+      this.#stopTimer()
+    }
+    this.#publishTransportState(transition.snapshot)
+    this.#collectFinishedVoicesAndRuntimes()
+  }
+
+  #installStoppedPlan(event: ActiveProjectCommitEvent, nextPlan: AudibleMidiProjectPlan): void {
+    this.#releasePlanRuntime()
+    this.#activePlanIdentity = Object.freeze({
+      modelRevision: nextPlan.modelRevision,
+      projectId: event.projectId,
+      session: event.session,
+    })
+    this.#plan = nextPlan
+    this.#publish(
+      createState({
+        diagnostics: nextPlan.diagnostics,
+        phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+        plan: nextPlan,
+        projectId: event.projectId,
+      }),
+    )
+  }
+
   #synchronizeActiveProject(state: ActiveProjectState): void {
     if (this.#disposed) return
     if (state.phase !== ACTIVE_PROJECT_PHASE.READY) {
@@ -526,11 +882,9 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     }
 
     const current = this.#activePlanIdentity
-    if (
-      current?.projectId === state.projectId &&
-      current.session === state.session &&
-      current.modelRevision === state.modelRevision
-    ) {
+    if (current?.projectId === state.projectId && current.session === state.session) {
+      // ActiveProjectService publishes the matching Ready state before forwarding its Commit.
+      // The Commit path owns revision reconciliation so state consumers cannot race it.
       return
     }
 
@@ -570,6 +924,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
   #tick(): void {
     if (this.#disposed) return
+    this.#collectFinishedVoicesAndRuntimes()
     const transport = this.#transport
     if (transport === null) return
     try {

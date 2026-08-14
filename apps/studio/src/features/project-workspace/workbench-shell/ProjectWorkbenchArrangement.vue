@@ -108,10 +108,7 @@ function createBarStartTick(barIndex: number): Tick {
   return parseTick(barIndex * props.barSpanTick)
 }
 
-function createEmptyMidiClip(
-  track: ProjectTrackPresentation,
-  barIndex: number,
-): void {
+function createEmptyMidiClip(track: ProjectTrackPresentation, barIndex: number): void {
   try {
     const result = projectClips.addEmptyMidiClip({
       targetTick: createBarStartTick(barIndex),
@@ -135,7 +132,11 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
 </script>
 
 <template>
-  <div class="project-workbench__arrangement-layout">
+  <div
+    class="project-workbench__arrangement-layout"
+    role="region"
+    aria-label="Arrangement tracks and lanes"
+  >
     <aside class="project-workbench__track-panel" aria-label="Tracks">
       <header class="project-workbench__track-heading">
         <strong>Tracks</strong>
@@ -149,25 +150,9 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
       <div class="project-workbench__track-actions">
         <ProjectAddTrackMenu @select="handleTrackTypeSelection" />
       </div>
-      <div v-if="props.tracks.length === 0" class="project-workbench__track-empty">
-        <span>
-          <UiIcon :icon="MusicNoteIcon" :size="20" />
-        </span>
-        <strong>No tracks yet</strong>
-        <p>Add a virtual instrument to start arranging your Project.</p>
-      </div>
-      <div v-else class="project-workbench__track-list">
-        <ProjectWorkbenchTrackRow
-          v-for="track in props.tracks"
-          :key="track.id"
-          :selected="workbenchSelection.selectedTrackId === track.id"
-          :track="track"
-          @select="selectTrack(track)"
-        />
-      </div>
     </aside>
 
-    <section class="project-workbench__arrangement" aria-label="Arrangement host">
+    <section class="project-workbench__arrangement" aria-label="Timeline">
       <header class="project-workbench__ruler">
         <ol aria-label="Timeline bars">
           <li v-for="bar in ARRANGEMENT_BAR_COUNT" :key="bar">{{ bar }}</li>
@@ -196,55 +181,73 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
       <div class="project-workbench__lane-heading" aria-hidden="true">
         <span>Track lanes</span>
       </div>
-      <div class="project-workbench__arrangement-host">
-        <div v-if="props.tracks.length === 0" class="project-workbench__surface-empty">
-          <span><UiIcon :icon="GridIcon" :size="24" /></span>
-          <strong>Arrangement</strong>
-          <p>Add a Track to prepare the Arrangement surface.</p>
-        </div>
-        <div v-else class="project-workbench__arrangement-lanes">
-          <div
-            v-for="track in props.tracks"
-            :key="track.id"
-            class="project-workbench__arrangement-lane"
-            :class="{
-              'project-workbench__arrangement-lane--selected':
-                workbenchSelection.selectedTrackId === track.id,
-            }"
-            :style="createTrackStyle(track)"
-          >
-            <div class="project-workbench__lane-grid">
-              <button
-                v-for="bar in ARRANGEMENT_BAR_COUNT"
-                :key="bar"
-                type="button"
-                :aria-label="
-                  `Bar ${bar} on ${track.name}. Double-click or press Enter to add a MIDI clip.`
-                "
-                :aria-pressed="workbenchSelection.selectedTrackId === track.id"
-                @click="selectTrack(track)"
-                @dblclick="createEmptyMidiClip(track, bar - 1)"
-                @keydown.enter.prevent="createEmptyMidiClip(track, bar - 1)"
-              ></button>
-            </div>
-            <span class="project-workbench__lane-accent" aria-hidden="true"></span>
-            <p v-if="clipsForTrack(track.id).length === 0">
-              Double-click a bar to add a MIDI clip
-            </p>
-            <ProjectWorkbenchMidiClip
-              v-for="clip in clipsForTrack(track.id)"
-              :key="clip.id"
-              :clip="clip"
-              :selected="workbenchSelection.selectedClipId === clip.id"
-              :timeline-span-tick="timelineSpanTick"
-              @open="emit('openMidiClip')"
-              @select="selectClip(clip)"
-            />
-          </div>
-        </div>
-      </div>
     </section>
 
+    <div v-if="props.tracks.length === 0" class="project-workbench__arrangement-empty">
+      <div class="project-workbench__track-empty">
+        <span>
+          <UiIcon :icon="MusicNoteIcon" :size="20" />
+        </span>
+        <strong>No tracks yet</strong>
+        <p>Add a virtual instrument to start arranging your Project.</p>
+      </div>
+      <div class="project-workbench__surface-empty">
+        <span><UiIcon :icon="GridIcon" :size="24" /></span>
+        <strong>Arrangement</strong>
+        <p>Add a Track to prepare the Arrangement surface.</p>
+      </div>
+    </div>
+    <div
+      v-else
+      class="project-workbench__track-lane-list"
+      role="list"
+      aria-label="Track rows and Arrangement lanes"
+    >
+      <div
+        v-for="track in props.tracks"
+        :key="track.id"
+        class="project-workbench__track-lane-row"
+        role="listitem"
+      >
+        <ProjectWorkbenchTrackRow
+          :selected="workbenchSelection.selectedTrackId === track.id"
+          :track="track"
+          @select="selectTrack(track)"
+        />
+        <div
+          class="project-workbench__arrangement-lane"
+          :class="{
+            'project-workbench__arrangement-lane--selected':
+              workbenchSelection.selectedTrackId === track.id,
+          }"
+          :style="createTrackStyle(track)"
+        >
+          <div class="project-workbench__lane-grid">
+            <button
+              v-for="bar in ARRANGEMENT_BAR_COUNT"
+              :key="bar"
+              type="button"
+              :aria-label="`Bar ${bar} on ${track.name}. Double-click or press Enter to add a MIDI clip.`"
+              :aria-pressed="workbenchSelection.selectedTrackId === track.id"
+              @click="selectTrack(track)"
+              @dblclick="createEmptyMidiClip(track, bar - 1)"
+              @keydown.enter.prevent="createEmptyMidiClip(track, bar - 1)"
+            ></button>
+          </div>
+          <span class="project-workbench__lane-accent" aria-hidden="true"></span>
+          <p v-if="clipsForTrack(track.id).length === 0">Double-click a bar to add a MIDI clip</p>
+          <ProjectWorkbenchMidiClip
+            v-for="clip in clipsForTrack(track.id)"
+            :key="clip.id"
+            :clip="clip"
+            :selected="workbenchSelection.selectedClipId === clip.id"
+            :timeline-span-tick="timelineSpanTick"
+            @open="emit('openMidiClip')"
+            @select="selectClip(clip)"
+          />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -253,14 +256,39 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
   display: grid;
   min-inline-size: 0;
   min-block-size: 0;
+  block-size: 100%;
   grid-row: 1;
   grid-template-columns: var(--project-workbench-track-width) minmax(0, 1fr);
+  grid-template-rows:
+    calc(var(--project-workbench-ruler-height) + var(--project-workbench-track-actions-height))
+    minmax(
+      calc(
+        100% - var(--project-workbench-ruler-height) - var(--project-workbench-track-actions-height)
+      ),
+      auto
+    );
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: linear-gradient(
+    to right,
+    var(--sd-color-surface-panel) 0 var(--project-workbench-track-width),
+    var(--sd-color-surface-canvas) var(--project-workbench-track-width) 100%
+  );
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .project-workbench__track-panel {
+  position: sticky;
+  z-index: var(--sd-layer-sticky);
+  inset-block-start: 0;
   display: grid;
   min-block-size: 0;
-  grid-template-rows: var(--project-workbench-ruler-height) auto minmax(0, 1fr);
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-rows:
+    var(--project-workbench-ruler-height)
+    var(--project-workbench-track-actions-height);
   border-inline-end: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
 }
@@ -290,18 +318,15 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
   inline-size: 100%;
 }
 
-.project-workbench__track-list {
-  min-block-size: 0;
-  overflow: auto;
-}
-
 .project-workbench__track-empty {
   display: grid;
   min-block-size: 0;
   place-items: center;
   align-content: center;
   padding: var(--sd-space-5);
+  border-inline-end: 1px solid var(--sd-color-border-default);
   color: var(--sd-color-text-muted);
+  background: var(--sd-color-surface-panel);
   text-align: center;
 }
 
@@ -333,12 +358,17 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
 }
 
 .project-workbench__arrangement {
+  position: sticky;
+  z-index: var(--sd-layer-sticky);
+  inset-block-start: 0;
   display: grid;
   min-inline-size: 0;
   min-block-size: 0;
+  grid-column: 2;
+  grid-row: 1;
   grid-template-rows:
-    var(--project-workbench-ruler-height) var(--project-workbench-track-actions-height)
-    minmax(0, 1fr);
+    var(--project-workbench-ruler-height)
+    var(--project-workbench-track-actions-height);
   background: var(--sd-color-surface-canvas);
 }
 
@@ -386,20 +416,29 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
   font-size: var(--sd-font-size-xs);
 }
 
-.project-workbench__arrangement-host {
-  position: relative;
+.project-workbench__arrangement-empty,
+.project-workbench__track-lane-list {
   min-inline-size: 0;
   min-block-size: 0;
-  overflow: hidden;
-  background:
-    linear-gradient(to right, var(--sd-color-border-subtle) 1px, transparent 1px),
-    var(--sd-color-surface-canvas);
-  background-size: calc(100% / 8) 100%;
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
-.project-workbench__arrangement-lanes {
-  min-inline-size: 40rem;
+.project-workbench__arrangement-empty {
+  display: grid;
   min-block-size: 100%;
+  grid-template-columns: var(--project-workbench-track-width) minmax(0, 1fr);
+}
+
+.project-workbench__track-lane-list {
+  min-block-size: 100%;
+}
+
+.project-workbench__track-lane-row {
+  display: grid;
+  min-inline-size: 0;
+  min-block-size: var(--project-workbench-track-row-height);
+  grid-template-columns: var(--project-workbench-track-width) minmax(0, 1fr);
 }
 
 .project-workbench__arrangement-lane {
@@ -419,8 +458,7 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
 
 .project-workbench__arrangement-lane--selected {
   background: color-mix(in srgb, var(--project-track-color) 11%, transparent);
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--project-track-color) 48%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--project-track-color) 48%, transparent);
 }
 
 .project-workbench__lane-accent {
@@ -441,7 +479,7 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
 .project-workbench__lane-grid button {
   padding: 0;
   border: 0;
-  border-inline-start: 1px solid transparent;
+  border-inline-start: 1px solid var(--sd-color-border-subtle);
   color: inherit;
   background: transparent;
   cursor: crosshair;
@@ -449,6 +487,10 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
 
 .project-workbench__lane-grid button:hover {
   background: color-mix(in srgb, var(--project-track-color) 8%, transparent);
+}
+
+.project-workbench__lane-grid button:first-child {
+  border-inline-start-color: var(--sd-color-border-default);
 }
 
 .project-workbench__lane-grid button:focus-visible {
@@ -468,13 +510,17 @@ function selectClip(clip: ProjectMidiClipPresentation): void {
 }
 
 .project-workbench__surface-empty {
-  position: absolute;
-  inset: 0;
   display: grid;
+  min-inline-size: 0;
+  min-block-size: 0;
   place-items: center;
   align-content: center;
   padding: var(--sd-space-6);
   color: var(--sd-color-text-muted);
+  background:
+    linear-gradient(to right, var(--sd-color-border-subtle) 1px, transparent 1px),
+    var(--sd-color-surface-canvas);
+  background-size: calc(100% / 8) 100%;
   text-align: center;
 }
 </style>

@@ -184,6 +184,46 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(wrapper.find('.project-workbench__track-empty').exists()).toBe(false)
   })
 
+  it('pairs Track rows and lanes under one vertical scroll authority', () => {
+    const { wrapper } = mountArrangement({
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: parseTrackId('track-paired-first'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument' as const,
+          name: 'First paired track',
+        }),
+        Object.freeze({
+          color: parseProjectColor('#23B26D'),
+          id: parseTrackId('track-paired-second'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument' as const,
+          name: 'Second paired track',
+        }),
+      ]),
+    })
+
+    const scrollAuthority = wrapper.get('.project-workbench__arrangement-layout')
+    const pairedRows = scrollAuthority.findAll('.project-workbench__track-lane-row')
+
+    expect(pairedRows).toHaveLength(2)
+    expect(pairedRows.map((row) => row.get('.project-track-row__identity strong').text())).toEqual([
+      'First paired track',
+      'Second paired track',
+    ])
+    expect(
+      pairedRows.map((row) =>
+        row.get('.project-workbench__arrangement-lane button').attributes('aria-label'),
+      ),
+    ).toEqual([
+      expect.stringContaining('First paired track'),
+      expect.stringContaining('Second paired track'),
+    ])
+    expect(wrapper.find('.project-workbench__track-list').exists()).toBe(false)
+    expect(wrapper.find('.project-workbench__arrangement-host').exists()).toBe(false)
+  })
+
   it('shares one Track selection between Track Rows and Arrangement Lanes', async () => {
     const tracks = Object.freeze([
       Object.freeze({

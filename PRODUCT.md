@@ -186,7 +186,8 @@ Workbench 已建立真实项目状态驱动的布局：
 
 - Global Bar：项目菜单、品牌、项目名称、保存状态与 Save。
 - Transport Bar：Undo / Redo、Tempo、拍号、播放区和 MIDI Editor 开关。
-- Arrangement：Track 控制区、时间标尺、Track Lane 和 Add Track。
+- Arrangement：Track 控制区、时间标尺、Track Lane 和 Add Track；Track 控制行与 Lane 共用纵向
+  滚动并始终保持行对齐。
 - Context Editor Dock：Track Inspector 与未来 MIDI Editor 宿主。
 
 项目菜单当前提供：
@@ -392,6 +393,8 @@ V1 当前只有这一个显式选择动作，不伪装成完整 Instrument Brows
 在 Instrument Track 的 Arrangement Lane 中创建空 MIDI Clip：
 
 - Arrangement 当前展示固定 8 小节，按项目起始拍号计算小节宽度。
+- Track 控制行与对应 Lane 位于同一个纵向滚动视口和同一个配对行；滚轮位于任一侧时都会移动
+  两侧内容，Track 标题、Add Track、Ruler 与 Lane 标题保持固定。
 - 双击 Lane 的目标空白小节创建 MIDI Clip；键盘用户聚焦小节后按 Enter 执行同一动作。
 - Clip 起点吸附到双击位置所在小节的开头。
 - 默认长度为一个小节；当前阶段按项目起始拍号计算小节长度。
@@ -644,7 +647,7 @@ Project Core 已具备：
 - MIDI Clip 移动、复制、调整长度、拆分、删除或多选；当前只支持创建、单选与打开上下文。
 - Piano Roll Velocity 编辑；当前支持 Pencil Add、Cursor Selection / Move、Cursor / Pencil
   单 Note Resize 与多选 Delete。
-- Arrangement 时间轴滚动、缩放、Grid 和 Snap。
+- Arrangement 横向时间轴滚动、缩放、Grid 和 Snap；Track / Lane 共用纵向滚动已可用。
 - 框选尚无 Preview；当前用户可见 Drag Preview 覆盖 Cursor Note Move 与 Cursor / Pencil
   单 Note Resize。
 - Track 重命名、改色、删除、复制、重排。

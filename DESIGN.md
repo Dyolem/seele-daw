@@ -353,6 +353,8 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 ### 7.6 时间线、滚动与缩放
 
 - 鼠标滚轮默认纵向滚动当前表面。
+- Arrangement 的 Track 控制行与对应 Lane MUST 共用同一个纵向滚动权威，并通过配对行保持
+  高度一致；不得维护两个独立 `scrollTop` 再事后同步。
 - 横向滚动和缩放的具体修饰键必须由 Keybinding 层统一定义，并允许平台适配。
 - Zoom 应围绕指针、播放头或明确焦点稳定缩放，不能无缘由跳回时间零点。
 - Arrangement 与 Piano Roll 可以分别保存 Zoom；“同步视图”应是显式选项。
@@ -1002,10 +1004,11 @@ SHOULD 使用 Canvas 的区域：
 
 Canvas 不是绕开可访问性和状态边界的理由。DOM 与 Canvas 必须读取同一 Editor state 和 Project Query，不得各自维护业务副本。
 
-首个固定 8 小节、少量 Clip、尚无 Zoom / Scroll / Drag / Playhead 的 Arrangement
-纵向切片 MAY 使用 DOM，以先验证真实创建、选择、打开和可访问交互。引入可变 Zoom、横向
-Scroll、大量 Clip、高频播放图层或拖动预览前，必须以性能数据和交互需求重新评估 Canvas /
-分层渲染；渲染技术迁移不得改变 Project Command、Presentation 与 Selection 的权威边界。
+首个固定 8 小节、少量 Clip、尚无 Zoom / 横向 Scroll / Drag / Playhead 的 Arrangement
+纵向切片 MAY 使用 DOM，以先验证真实创建、选择、打开和可访问交互。Track 控制行与 Lane
+已经使用同一 DOM 配对行和纵向滚动视口；引入可变 Zoom、横向 Scroll、大量 Clip、高频播放
+图层或拖动预览前，必须以性能数据和交互需求重新评估 Canvas / 分层渲染；渲染技术迁移不得
+改变 Project Command、Presentation、Selection 与纵向滚动的权威边界。
 
 ### 21.2 禁止项
 
@@ -1093,7 +1096,8 @@ Canvas 功能至少检查：
 8. 主题改变视觉表达，不改变布局、功能和交互语义。
 9. Theme、Density、UI Scale、Contrast、Motion 是独立设置。
 10. Workbench Shell 只提供编辑器骨架；真正的 Arrangement、Piano Roll 等业务界面按产品切片规划实现。
-11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM；进入 Zoom、Scroll、大量对象或高频交互前重新评估 Canvas。
+11. 首个固定 8 小节的 Arrangement Clip 切片使用 DOM，Track 控制行与 Lane 共用纵向滚动；
+    进入 Zoom、横向 Scroll、大量对象或高频交互前重新评估 Canvas。
 12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，Grid 使用 Canvas，Note 通过可替换 Renderer Port 输出。
 13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，横向初始显示完整 Clip。
 14. Piano Roll 显式提供 Pencil 与 Cursor，默认 Pencil；Cursor 负责 Selection 与 Note

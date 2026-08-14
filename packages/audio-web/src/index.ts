@@ -12,3 +12,11 @@ export type {
   SampleInstrumentResourceCacheLimits,
 } from './sample-instrument/loading/resource-cache'
 export { SampleInstrumentVoiceRuntime } from './sample-instrument/voice/voice-runtime'
+export type {
+  SampleInstrumentVoiceReleaseUpdateOutcome,
+  SampleInstrumentVoiceReleaseUpdateResult,
+  SampleInstrumentVoiceRuntimeStatistics,
+  SampleInstrumentVoiceScheduleOutcome,
+  SampleInstrumentVoiceScheduleResult,
+  SampleInstrumentVoiceToken,
+} from './sample-instrument/voice/voice-runtime'

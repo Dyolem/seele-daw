@@ -196,7 +196,7 @@ function createRuntime(
     output,
     preparedResources: options.preparedResources ?? createPreparedResources(),
   })
-  runtime.activateGeneration(1 as ScheduledSampleVoicePlan['engineGeneration'])
+  runtime.advanceGeneration(1 as ScheduledSampleVoicePlan['engineGeneration'])
   return { context, master, runtime, setMasterGainAtTime }
 }
 
@@ -345,6 +345,119 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(runtime.cancel(result.token!)).toBe(false)
   })
 
+  it('reschedules a gated Note Off before release without recreating its active Voice', () => {
+    const { context, runtime } = createRuntime({ currentTime: 2 })
+    const result = runtime.schedule(
+      createPlan('rescheduled-note', 50, {
+        startPlaybackClockSecond: 1,
+        releasePlaybackClockSecond: 6,
+      }),
+    )
+
+    expect(runtime.hasVoice(result.token!)).toBe(true)
+    expect(runtime.rescheduleRelease(result.token!, 8)).toEqual({
+      outcome: 'rescheduled',
+      releasePlaybackClockSecond: 8,
+    })
+    expect(context.gainNodes[0]?.gain.events).toContainEqual({
+      kind: 'cancel-and-hold',
+      time: 6,
+    })
+    expect(context.gainNodes[0]?.gain.events.at(-1)).toEqual({
+      kind: 'linear-ramp',
+      time: 8.4,
+      value: 0,
+    })
+    expect(context.bufferSources[0]?.stops).toHaveLength(2)
+    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(6.401)
+    expect(context.bufferSources[0]?.stops[1]).toBeCloseTo(8.401)
+
+    context.bufferSources[0]?.finish()
+    expect(runtime.hasVoice(result.token!)).toBe(false)
+    expect(runtime.rescheduleRelease(result.token!, 9)).toEqual({
+      outcome: 'not-found',
+      releasePlaybackClockSecond: null,
+    })
+  })
+
+  it('replaces a future sustain-loop tail when its Note Off moves', () => {
+    const { context, runtime } = createRuntime({ currentTime: 2 })
+    const result = runtime.schedule(
+      createPlan('rescheduled-sustain-note', 62, {
+        startPlaybackClockSecond: 1,
+        releasePlaybackClockSecond: 5,
+      }),
+    )
+
+    expect(runtime.rescheduleRelease(result.token!, 7)).toMatchObject({
+      outcome: 'rescheduled',
+      releasePlaybackClockSecond: 7,
+    })
+    expect(context.bufferSources).toHaveLength(3)
+    expect(context.bufferSources[0]?.stops).toEqual([5, 7])
+    expect(context.bufferSources[1]).toMatchObject({
+      disconnectCallCount: 1,
+      starts: [{ duration: null, offset: 1.25, when: 5 }],
+      stops: [5.501, 2],
+    })
+    expect(context.bufferSources[2]).toMatchObject({
+      loop: false,
+      starts: [{ duration: null, offset: 1.25, when: 7 }],
+      stops: [7.501],
+    })
+  })
+
+  it('does not resurrect a release tail or reinterpret one-shot Note length', () => {
+    const released = createRuntime({ currentTime: 6 })
+    const gated = released.runtime.schedule(
+      createPlan('already-released-note', 60, {
+        startPlaybackClockSecond: 1,
+        releasePlaybackClockSecond: 7,
+      }),
+    )
+    released.context.currentTime = 7
+    expect(released.runtime.rescheduleRelease(gated.token!, 9)).toEqual({
+      outcome: 'release-started',
+      releasePlaybackClockSecond: 7,
+    })
+
+    const oneShot = createRuntime({ currentTime: 1 })
+    const oneShotVoice = oneShot.runtime.schedule(
+      createPlan('one-shot-resize', 63, {
+        startPlaybackClockSecond: 1,
+        releasePlaybackClockSecond: 2,
+      }),
+    )
+    expect(oneShot.runtime.rescheduleRelease(oneShotVoice.token!, 3)).toEqual({
+      outcome: 'one-shot',
+      releasePlaybackClockSecond: 2,
+    })
+  })
+
+  it('starts normal release now when a resized Note end has already passed', () => {
+    const { context, runtime } = createRuntime({ currentTime: 1 })
+    const result = runtime.schedule(
+      createPlan('shortened-active-note', 60, {
+        startPlaybackClockSecond: 1,
+        releasePlaybackClockSecond: 6,
+      }),
+    )
+    context.currentTime = 3
+
+    expect(runtime.rescheduleRelease(result.token!, 2)).toEqual({
+      outcome: 'released-now',
+      releasePlaybackClockSecond: 3,
+    })
+    expect(context.gainNodes[0]?.gain.events).toContainEqual({
+      kind: 'cancel-and-hold',
+      time: 3,
+    })
+    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(3.301)
+    expect(runtime.rescheduleRelease(result.token!, 8)).toMatchObject({
+      outcome: 'release-started',
+    })
+  })
+
   it('applies fast and normal exclusive-group release modes to older voices', () => {
     const { context, runtime } = createRuntime()
     runtime.schedule(
@@ -462,8 +575,8 @@ describe('Sample Instrument Voice Runtime', () => {
       ),
     ).toEqual({ outcome: 'expired', playbackRate: null, token: null, zoneId: null })
 
-    expect(runtime.activateGeneration(2 as ScheduledSampleVoicePlan['engineGeneration'])).toBe(true)
-    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(2.007)
+    expect(runtime.advanceGeneration(2 as ScheduledSampleVoicePlan['engineGeneration'])).toBe(true)
+    expect(context.bufferSources[0]?.stops).toEqual([8.301])
     expect(
       runtime.schedule(
         createPlan('shared-occurrence', 60, {
@@ -473,7 +586,7 @@ describe('Sample Instrument Voice Runtime', () => {
         }),
       ).outcome,
     ).toBe('scheduled')
-    expect(runtime.cancel(active.token!)).toBe(false)
+    expect(runtime.cancel(active.token!)).toBe(true)
   })
 
   it('supports allNotesOff and deterministic disposal without residual listeners or nodes', () => {

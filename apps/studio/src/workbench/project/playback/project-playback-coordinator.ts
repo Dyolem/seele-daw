@@ -12,6 +12,7 @@ import {
   type AudibleMidiTransport,
   type AudibleMidiTransportSnapshot,
   type PlaybackDiagnostic,
+  type PlaybackClockSecond,
   type ScheduledSampleVoicePlan,
 } from '@seele-daw/playback'
 import type { ModelRevision, ProjectId, ProjectSession } from '@seele-daw/project-core'
@@ -33,11 +34,19 @@ import {
 
 export interface ProjectPlaybackPreparedRuntime {
   readonly modelRevision: ModelRevision
-  activateGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void
+  advanceGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void
   allNotesOff(): void
   dispose(): void
   now(): ReturnType<typeof parsePlaybackClockSecond>
-  schedule(plan: ScheduledSampleVoicePlan): void
+  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null
+}
+
+export interface ProjectPlaybackVoiceHandle {
+  readonly engineGeneration: ScheduledSampleVoicePlan['engineGeneration']
+  readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey']
+  cancel(atPlaybackClockSecond?: PlaybackClockSecond): boolean
+  isActive(): boolean
+  rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): boolean
 }
 
 export interface ProjectPlaybackRuntimePort {
@@ -246,7 +255,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
           `Transport rejected Play with outcome ${transition.outcome}`,
         )
       }
-      preparedRuntime.activateGeneration(transition.snapshot.engineGeneration)
+      preparedRuntime.advanceGeneration(transition.snapshot.engineGeneration)
       this.#scheduleNextWindow(transition.snapshot)
       this.#startTimer()
       this.#publishTransportState(transition.snapshot)
@@ -270,7 +279,8 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PAUSED) return false
 
     this.#stopTimer()
-    this.#preparedRuntime?.activateGeneration(transition.snapshot.engineGeneration)
+    this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
+    this.#preparedRuntime?.allNotesOff()
     this.#publishTransportState(transition.snapshot)
     return true
   }
@@ -293,7 +303,8 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
     const transition = transport.returnToStart()
     if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START) {
-      this.#preparedRuntime?.activateGeneration(transition.snapshot.engineGeneration)
+      this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
+      this.#preparedRuntime?.allNotesOff()
     } else {
       this.#preparedRuntime?.allNotesOff()
     }

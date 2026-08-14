@@ -19,6 +19,7 @@ import {
 import type {
   ProjectPlaybackPreparedRuntime,
   ProjectPlaybackRuntimePort,
+  ProjectPlaybackVoiceHandle,
 } from '@/workbench/project/playback/project-playback-coordinator'
 
 export interface BrowserProjectPlaybackRuntimeOptions {
@@ -49,8 +50,8 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
     this.#audioContext = audioContext
   }
 
-  activateGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void {
-    this.#voiceRuntime.activateGeneration(generation)
+  advanceGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void {
+    this.#voiceRuntime.advanceGeneration(generation)
   }
 
   allNotesOff(): void {
@@ -65,8 +66,24 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
     return parsePlaybackClockSecond(this.#audioContext.currentTime)
   }
 
-  schedule(plan: ScheduledSampleVoicePlan): void {
-    this.#voiceRuntime.schedule(plan)
+  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
+    const result = this.#voiceRuntime.schedule(plan)
+    if (result.outcome !== 'scheduled' || result.token === null) return null
+    const token = result.token
+    return Object.freeze<ProjectPlaybackVoiceHandle>({
+      cancel: (atPlaybackClockSecond) => this.#voiceRuntime.cancel(token, atPlaybackClockSecond),
+      engineGeneration: token.engineGeneration,
+      isActive: () => this.#voiceRuntime.hasVoice(token),
+      occurrenceKey: token.occurrenceKey,
+      rescheduleRelease: (releasePlaybackClockSecond) => {
+        const update = this.#voiceRuntime.rescheduleRelease(token, releasePlaybackClockSecond)
+        return (
+          update.outcome === 'no-change' ||
+          update.outcome === 'released-now' ||
+          update.outcome === 'rescheduled'
+        )
+      },
+    })
   }
 }
 

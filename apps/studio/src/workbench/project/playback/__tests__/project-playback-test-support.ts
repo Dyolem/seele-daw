@@ -2,6 +2,7 @@ import type {
   ProjectPlaybackPreparedRuntime,
   ProjectPlaybackRuntimePort,
   ProjectPlaybackTimerPort,
+  ProjectPlaybackVoiceHandle,
 } from '@/workbench/project/playback/project-playback-coordinator'
 import type {
   AudibleMidiProjectPlan,
@@ -32,6 +33,7 @@ export class ManualProjectPlaybackTimer implements ProjectPlaybackTimerPort {
 
 export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRuntime {
   readonly generations: EngineGeneration[] = []
+  readonly handles: ProjectPlaybackVoiceHandle[] = []
   readonly scheduled: ScheduledSampleVoicePlan[] = []
   allNotesOffCount = 0
   disposeCount = 0
@@ -39,12 +41,13 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
 
   constructor(readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision']) {}
 
-  activateGeneration(generation: EngineGeneration): void {
+  advanceGeneration(generation: EngineGeneration): void {
     this.generations.push(generation)
   }
 
   allNotesOff(): void {
     this.allNotesOffCount += 1
+    for (const handle of this.handles) handle.cancel()
   }
 
   dispose(): void {
@@ -55,8 +58,22 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
     return this.currentTime
   }
 
-  schedule(plan: ScheduledSampleVoicePlan): void {
+  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle {
     this.scheduled.push(plan)
+    let active = true
+    const handle = Object.freeze({
+      cancel: () => {
+        if (!active) return false
+        active = false
+        return true
+      },
+      engineGeneration: plan.engineGeneration,
+      isActive: () => active,
+      occurrenceKey: plan.occurrenceKey,
+      rescheduleRelease: () => active,
+    })
+    this.handles.push(handle)
+    return handle
   }
 }
 

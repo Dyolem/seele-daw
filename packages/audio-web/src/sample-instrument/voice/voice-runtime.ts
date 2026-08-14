@@ -18,6 +18,7 @@ import {
 } from '#internal/sample-instrument/voice/envelope'
 
 const DEFAULT_FAST_RELEASE_SECOND = 0.006
+const RESCHEDULED_ATTACK_SEGMENT_COUNT = 32
 const SOURCE_STOP_SAFETY_SECOND = 0.001
 
 type EngineGeneration = ScheduledSampleVoicePlan['engineGeneration']
@@ -35,6 +36,19 @@ export interface SampleInstrumentVoiceScheduleResult {
   readonly playbackRate: number | null
   readonly token: SampleInstrumentVoiceToken | null
   readonly zoneId: string | null
+}
+
+export type SampleInstrumentVoiceReleaseUpdateOutcome =
+  | 'no-change'
+  | 'not-found'
+  | 'one-shot'
+  | 'release-started'
+  | 'released-now'
+  | 'rescheduled'
+
+export interface SampleInstrumentVoiceReleaseUpdateResult {
+  readonly outcome: SampleInstrumentVoiceReleaseUpdateOutcome
+  readonly releasePlaybackClockSecond: number | null
 }
 
 export interface SampleInstrumentVoiceRuntimeStatistics {
@@ -100,10 +114,12 @@ interface ActiveSampleVoice {
   readonly token: SampleInstrumentVoiceToken
   readonly zone: SampleInstrumentZoneV1
   forcedReleaseStartTime: number | null
+  releasePlaybackClockSecond: number
 }
 
 interface ActiveSampleSource {
   readonly handleEnded: EventListener
+  readonly kind: 'primary' | 'release'
   readonly node: AudioBufferSourceNode
 }
 
@@ -272,17 +288,17 @@ function calculatePlannedGainAtTime(voice: ActiveSampleVoice, time: number): num
           attack.curve,
         )
 
-  if (voice.zone.triggerMode === 'gated' && time >= voice.plan.releasePlaybackClockSecond) {
+  if (voice.zone.triggerMode === 'gated' && time >= voice.releasePlaybackClockSecond) {
     const release = voice.zone.amplitudeEnvelope.release
     if (release === null || release.durationSecond === 0) return 0
     const attackAtRelease = calculatePlannedGainAtTimeBeforeRelease(
       voice,
-      voice.plan.releasePlaybackClockSecond,
+      voice.releasePlaybackClockSecond,
     )
     gain = evaluateSampleInstrumentEnvelopeTransition(
       attackAtRelease,
       0,
-      Math.min(1, (time - voice.plan.releasePlaybackClockSecond) / release.durationSecond),
+      Math.min(1, (time - voice.releasePlaybackClockSecond) / release.durationSecond),
       release.curve,
     )
   }
@@ -343,15 +359,14 @@ export class SampleInstrumentVoiceRuntime {
     })
   }
 
-  activateGeneration(generation: EngineGeneration): boolean {
+  advanceGeneration(generation: EngineGeneration): boolean {
     this.#assertUsable()
     validateGeneration(generation)
     const activeGeneration = this.#activeGeneration
     if (activeGeneration !== null && generation < activeGeneration) {
-      fail('invalid-generation', `Cannot reactivate stale engineGeneration ${generation}`)
+      fail('invalid-generation', `Cannot advance to stale engineGeneration ${generation}`)
     }
     if (activeGeneration === generation) return false
-    this.allNotesOff()
     this.#activeGeneration = generation
     return true
   }
@@ -441,6 +456,7 @@ export class SampleInstrumentVoiceRuntime {
       output,
       plan,
       playbackRate,
+      releasePlaybackClockSecond: plan.releasePlaybackClockSecond,
       sources: new Set<ActiveSampleSource>(),
       startTime,
       token,
@@ -483,6 +499,66 @@ export class SampleInstrumentVoiceRuntime {
     )
   }
 
+  hasVoice(token: SampleInstrumentVoiceToken): boolean {
+    this.#assertUsable()
+    validateVoiceToken(token)
+    return this.#voices.has(voiceKey(token))
+  }
+
+  rescheduleRelease(
+    token: SampleInstrumentVoiceToken,
+    releasePlaybackClockSecond: number,
+  ): SampleInstrumentVoiceReleaseUpdateResult {
+    this.#assertUsable()
+    validateVoiceToken(token)
+    if (!Number.isFinite(releasePlaybackClockSecond) || releasePlaybackClockSecond < 0) {
+      fail('invalid-voice-plan', 'Voice release time must be a finite non-negative second')
+    }
+    const voice = this.#voices.get(voiceKey(token))
+    if (voice === undefined) {
+      return Object.freeze({ outcome: 'not-found', releasePlaybackClockSecond: null })
+    }
+    if (voice.zone.triggerMode === 'one-shot') {
+      return Object.freeze({
+        outcome: 'one-shot',
+        releasePlaybackClockSecond: voice.releasePlaybackClockSecond,
+      })
+    }
+    if (releasePlaybackClockSecond <= voice.startTime) {
+      fail('invalid-voice-plan', 'Voice release time must remain after its scheduled start')
+    }
+    if (releasePlaybackClockSecond === voice.releasePlaybackClockSecond) {
+      return Object.freeze({
+        outcome: 'no-change',
+        releasePlaybackClockSecond: voice.releasePlaybackClockSecond,
+      })
+    }
+
+    const context = requireRunningContext(this.#output)
+    if (
+      voice.forcedReleaseStartTime !== null ||
+      context.currentTime >= voice.releasePlaybackClockSecond
+    ) {
+      return Object.freeze({
+        outcome: 'release-started',
+        releasePlaybackClockSecond: voice.releasePlaybackClockSecond,
+      })
+    }
+    if (releasePlaybackClockSecond <= context.currentTime) {
+      this.#releaseVoice(voice, context.currentTime, 'normal')
+      return Object.freeze({
+        outcome: 'released-now',
+        releasePlaybackClockSecond: context.currentTime,
+      })
+    }
+
+    this.#reschedulePlannedRelease(voice, releasePlaybackClockSecond)
+    return Object.freeze({
+      outcome: 'rescheduled',
+      releasePlaybackClockSecond,
+    })
+  }
+
   allNotesOff(atAudioContextSecond?: number): number {
     this.#assertUsable()
     const releaseTime = atAudioContextSecond ?? this.#output.audioContext.currentTime
@@ -514,12 +590,121 @@ export class SampleInstrumentVoiceRuntime {
     if (this.#disposed) fail('disposed', 'Sample Instrument Voice Runtime is disposed')
   }
 
+  #reschedulePlannedRelease(
+    voice: ActiveSampleVoice,
+    nextReleasePlaybackClockSecond: number,
+  ): void {
+    const previousReleasePlaybackClockSecond = voice.releasePlaybackClockSecond
+    const cancellationTime = Math.min(
+      previousReleasePlaybackClockSecond,
+      nextReleasePlaybackClockSecond,
+    )
+    const release = voice.zone.amplitudeEnvelope.release
+    if (release === null) {
+      fail(
+        'invalid-voice-plan',
+        `${voice.zone.zoneId} is gated without release`,
+        voice.plan.soundbankId,
+      )
+    }
+
+    try {
+      voice.gain.gain.cancelAndHoldAtTime(cancellationTime)
+      this.#scheduleRemainingAttack(voice, cancellationTime, nextReleasePlaybackClockSecond)
+      scheduleSampleInstrumentEnvelopeTransition(
+        voice.gain.gain,
+        calculatePlannedGainAtTimeBeforeRelease(voice, nextReleasePlaybackClockSecond),
+        0,
+        nextReleasePlaybackClockSecond,
+        release,
+      )
+      this.#rescheduleSourceRelease(voice, nextReleasePlaybackClockSecond, release.durationSecond)
+      voice.releasePlaybackClockSecond = nextReleasePlaybackClockSecond
+    } catch (error) {
+      this.#stopAndDisconnectVoice(voice)
+      if (error instanceof SampleInstrumentVoiceRuntimeError) throw error
+      fail(
+        'voice-create-failed',
+        `Voice ${voice.plan.occurrenceKey} release could not be rescheduled: ${errorDetail(error)}`,
+        voice.plan.soundbankId,
+      )
+    }
+  }
+
+  #scheduleRemainingAttack(voice: ActiveSampleVoice, fromTime: number, throughTime: number): void {
+    const attack = voice.zone.amplitudeEnvelope.attack
+    const attackEndTime = voice.startTime + attack.durationSecond
+    const endTime = Math.min(attackEndTime, throughTime)
+    if (attack.durationSecond === 0 || endTime <= fromTime) return
+
+    const remainingFraction = (endTime - fromTime) / attack.durationSecond
+    const segmentCount = Math.max(
+      1,
+      Math.ceil(RESCHEDULED_ATTACK_SEGMENT_COUNT * remainingFraction),
+    )
+    for (let index = 1; index <= segmentCount; index += 1) {
+      const time = fromTime + (endTime - fromTime) * (index / segmentCount)
+      voice.gain.gain.linearRampToValueAtTime(
+        calculatePlannedGainAtTimeBeforeRelease(voice, time),
+        time,
+      )
+    }
+  }
+
+  #rescheduleSourceRelease(
+    voice: ActiveSampleVoice,
+    releaseTime: number,
+    releaseDurationSecond: number,
+  ): void {
+    const stopTime = releaseTime + releaseDurationSecond + SOURCE_STOP_SAFETY_SECOND
+    if (voice.zone.loop.kind !== 'sustain' || releaseDurationSecond === 0) {
+      // Web Audio applies the latest stop() call while an earlier scheduled stop has not fired.
+      for (const source of voice.sources) source.node.stop(stopTime)
+      return
+    }
+
+    const sourcesBeforeReplacement = Array.from(voice.sources)
+    for (const source of sourcesBeforeReplacement) {
+      if (source.kind === 'release') {
+        this.#discardSource(voice, source)
+      } else {
+        source.node.stop(releaseTime)
+      }
+    }
+    const releaseSource = this.#createSource(
+      voice,
+      voice.audioBuffer,
+      false,
+      releaseTime,
+      'release',
+    )
+    releaseSource.start(
+      releaseTime,
+      calculateSustainReleaseOffset(voice.zone, voice.playbackRate, voice.startTime, releaseTime),
+    )
+    releaseSource.stop(stopTime)
+  }
+
+  #discardSource(voice: ActiveSampleVoice, source: ActiveSampleSource): void {
+    source.node.removeEventListener('ended', source.handleEnded)
+    try {
+      source.node.stop(this.#output.audioContext.currentTime)
+    } catch {
+      // A source that has already ended is still detached from the replacement Voice schedule.
+    }
+    try {
+      source.node.disconnect()
+    } catch {
+      // Detachment stays idempotent for partially scheduled browser nodes.
+    }
+    voice.sources.delete(source)
+  }
+
   #scheduleVoiceNodes(voice: ActiveSampleVoice, resource: LoadedSampleInstrumentResource): void {
-    const { gain, output, plan, startTime, zone } = voice
+    const { gain, output, plan, releasePlaybackClockSecond: releaseTime, startTime, zone } = voice
     gain.connect(output)
     output.connect(this.#output.masterInput)
 
-    const releaseTime = plan.releasePlaybackClockSecond
     const attackLimit =
       zone.triggerMode === 'gated'
         ? Math.max(0, releaseTime - startTime)
@@ -549,7 +734,13 @@ export class SampleInstrumentVoiceRuntime {
     const releaseEndTime = releaseTime + release.durationSecond
     if (zone.loop.kind === 'sustain' && release.durationSecond > 0) {
       source.stop(releaseTime)
-      const releaseSource = this.#createSource(voice, resource.audioBuffer, false, releaseTime)
+      const releaseSource = this.#createSource(
+        voice,
+        resource.audioBuffer,
+        false,
+        releaseTime,
+        'release',
+      )
       releaseSource.start(
         releaseTime,
         calculateSustainReleaseOffset(zone, voice.playbackRate, startTime, releaseTime),
@@ -565,6 +756,7 @@ export class SampleInstrumentVoiceRuntime {
     audioBuffer: AudioBuffer,
     useZoneLoop = true,
     playbackRateTime = voice.startTime,
+    kind: ActiveSampleSource['kind'] = 'primary',
   ): AudioBufferSourceNode {
     const source = this.#output.audioContext.createBufferSource()
     source.buffer = audioBuffer
@@ -585,7 +777,7 @@ export class SampleInstrumentVoiceRuntime {
       voice.sources.delete(activeSource)
       if (voice.sources.size === 0) this.#finishVoice(voice)
     }
-    const activeSource = Object.freeze({ handleEnded, node: source })
+    const activeSource = Object.freeze({ handleEnded, kind, node: source })
     voice.sources.add(activeSource)
     source.addEventListener('ended', handleEnded, { once: true })
     return source
@@ -683,11 +875,17 @@ export class SampleInstrumentVoiceRuntime {
         voice.zone.loop.kind === 'sustain' &&
         release.durationSecond > 0 &&
         releaseTime >= voice.startTime &&
-        releaseTime < voice.plan.releasePlaybackClockSecond
+        releaseTime < voice.releasePlaybackClockSecond
       ) {
         const sourcesBeforeRelease = [...voice.sources]
         for (const source of sourcesBeforeRelease) source.node.stop(releaseTime)
-        const releaseSource = this.#createSource(voice, voice.audioBuffer, false, releaseTime)
+        const releaseSource = this.#createSource(
+          voice,
+          voice.audioBuffer,
+          false,
+          releaseTime,
+          'release',
+        )
         releaseSource.start(
           releaseTime,
           calculateSustainReleaseOffset(

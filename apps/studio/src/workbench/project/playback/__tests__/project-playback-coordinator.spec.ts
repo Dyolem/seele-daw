@@ -185,11 +185,13 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(coordinator.pause()).toBe(true)
     expect(coordinator.state.phase).toBe('paused')
     expect(prepared.generations).toEqual([1, 2])
+    expect(prepared.allNotesOffCount).toBe(1)
     expect(timer.callbacks.size).toBe(0)
 
     expect(coordinator.returnToStart()).toBe(true)
     expect(coordinator.state).toMatchObject({ phase: 'stopped', positionProjectSecond: 0 })
     expect(prepared.generations).toEqual([1, 2, 3])
+    expect(prepared.allNotesOffCount).toBe(2)
     coordinator.dispose()
     expect(runtime.disposeCount).toBe(1)
   })

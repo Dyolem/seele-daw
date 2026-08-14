@@ -41,6 +41,7 @@ import {
 } from '@seele-daw/project-core'
 import {
   createStudioGrandDeviceDescriptor,
+  parsePlaybackClockSecond,
   parseSoundbankId,
   type AudibleMidiProjectPlan,
   type SoundbankId,
@@ -60,6 +61,7 @@ import {
 } from '@/workbench/project/active-project-state'
 import {
   ControlledProjectPlaybackRuntime,
+  DeferredProjectPlaybackRuntime,
   ManualPreparedPlaybackRuntime,
   ManualProjectPlaybackTimer,
   type ManualProjectPlaybackVoiceHandle,
@@ -136,6 +138,8 @@ const MISSING_SOUNDBANK_ID = parseSoundbankId('missing-piano')
 const LIFECYCLE_CLIP_ID = parseClipId('clip-playback-coordinator-lifecycle')
 const LIFECYCLE_SOURCE_ID = parseMidiSourceId('source-playback-coordinator-lifecycle')
 const REPLACEMENT_FUTURE_NOTE_ID = parseNoteId('note-playback-coordinator-replacement')
+const RAPID_NOTE_ID = parseNoteId('note-playback-coordinator-rapid')
+const LATEST_NOTE_ID = parseNoteId('note-playback-coordinator-latest')
 
 interface PlayableTrackFixture {
   readonly clipId: ClipId
@@ -757,6 +761,290 @@ describe('ProjectPlaybackCoordinator', () => {
       phase: 'playing',
     })
     coordinator.dispose()
+  })
+
+  it('aborts stale preparation and installs only the latest continuous Commit revision', async () => {
+    const projectId = parseProjectId('project-playback-latest-revision')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new DeferredProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    const initialPlay = coordinator.play()
+    await vi.waitFor(() => expect(runtime.requests).toHaveLength(1))
+    const firstRuntime = runtime.resolve(0, parsePlaybackClockSecond(0))
+    await expect(initialPlay).resolves.toBe(true)
+    const activeHandle = requireVoiceHandle(firstRuntime, runtime.requests[0]!.plan, NOTE_ID)
+    firstRuntime.currentTime = parsePlaybackClockSecond(0.1)
+
+    const firstCommit = requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(120),
+        noteId: RAPID_NOTE_ID,
+        pitch: parseMidiPitch(67),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(1_200),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    activeProject.publishCommit(firstCommit)
+    await vi.waitFor(() => expect(runtime.requests).toHaveLength(2))
+
+    const latestCommit = requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(120),
+        noteId: LATEST_NOTE_ID,
+        pitch: parseMidiPitch(69),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(1_440),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    activeProject.publishCommit(latestCommit)
+    await vi.waitFor(() => expect(runtime.requests).toHaveLength(3))
+    expect(runtime.requests[1]?.signal.aborted).toBe(true)
+
+    const staleRuntime = runtime.resolve(1, parsePlaybackClockSecond(0.1))
+    await vi.waitFor(() => expect(staleRuntime.disposeCount).toBe(1))
+    const latestRuntime = runtime.resolve(2, parsePlaybackClockSecond(0.1))
+    await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
+
+    expect(activeHandle.isActive()).toBe(true)
+    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(latestRuntime.generations).toEqual([2])
+    expect(coordinator.state.phase).toBe('playing')
+    coordinator.dispose()
+  })
+
+  it('falls back to a stopped full Snapshot when the observed Commit chain has a gap', async () => {
+    const projectId = parseProjectId('project-playback-commit-gap')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+
+    requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(120),
+        noteId: RAPID_NOTE_ID,
+        pitch: parseMidiPitch(67),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(1_200),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    const latestCommit = requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(120),
+        noteId: LATEST_NOTE_ID,
+        pitch: parseMidiPitch(69),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(1_440),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    activeProject.publishCommit(latestCommit)
+    await vi.waitFor(() => expect(coordinator.state.phase).toBe('stopped'))
+
+    expect(coordinator.state.modelRevision).toBe(session.modelRevision)
+    expect(firstRuntime.allNotesOffCount).toBe(1)
+    expect(firstRuntime.disposeCount).toBe(1)
+    expect(runtime.prepared).toHaveLength(1)
+    await expect(coordinator.play()).resolves.toBe(true)
+    expect(runtime.plans.at(-1)?.modelRevision).toBe(session.modelRevision)
+    coordinator.dispose()
+  })
+
+  it('fails on the latest Project revision when selective preparation cannot continue safely', async () => {
+    const projectId = parseProjectId('project-playback-reconciliation-failure')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const cause = new Error('AudioContext was interrupted during preparation')
+    runtime.failure = cause
+
+    const commit = requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(120),
+        noteId: RAPID_NOTE_ID,
+        pitch: parseMidiPitch(67),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(1_200),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(coordinator.state.phase).toBe('failed'))
+
+    expect(coordinator.state).toMatchObject({
+      failureCause: cause,
+      modelRevision: session.modelRevision,
+    })
+    expect(firstRuntime.allNotesOffCount).toBe(1)
+    expect(firstRuntime.disposeCount).toBe(1)
+    runtime.failure = null
+    await expect(coordinator.play()).resolves.toBe(true)
+    expect(runtime.plans.at(-1)?.modelRevision).toBe(session.modelRevision)
+    coordinator.dispose()
+  })
+
+  it('reports an all-notes-off failure instead of leaving Transport and UI state divergent', async () => {
+    const projectId = parseProjectId('project-playback-pause-failure')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    await coordinator.play()
+    const prepared = runtime.prepared[0]!
+    const cause = new Error('Voice release failed')
+    prepared.allNotesOffFailure = cause
+    const revisionBefore = session.modelRevision
+
+    expect(coordinator.pause()).toBe(false)
+
+    expect(coordinator.state).toMatchObject({
+      failureCause: cause,
+      modelRevision: revisionBefore,
+      phase: 'failed',
+    })
+    expect(prepared.disposeCount).toBe(1)
+    expect(session.modelRevision).toBe(revisionBefore)
+    coordinator.dispose()
+  })
+
+  it('cleans a retired release tail after a paused edit and resumes the handed-off Plan', async () => {
+    const projectId = parseProjectId('project-playback-paused-edit')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    runtime.voicesRemainActiveDuringRelease = true
+    const timer = new ManualProjectPlaybackTimer()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer,
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const releaseTail = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
+    firstRuntime.currentTime = parsePlaybackClockSecond(0.1)
+    runtime.currentTime = parsePlaybackClockSecond(0.1)
+    expect(coordinator.pause()).toBe(true)
+    expect(releaseTail.isActive()).toBe(true)
+    expect(timer.callbacks.size).toBe(0)
+
+    const commit = requireCommitted(
+      session,
+      createResizeNoteCommand({
+        baseRevision: session.modelRevision,
+        durationTick: parsePositiveTick(1_440),
+        noteId: NOTE_ID,
+        sourceId: SOURCE_ID,
+        startTick: parseTick(0),
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
+
+    expect(coordinator.state.phase).toBe('paused')
+    expect(releaseTail.releaseUpdates).toEqual([])
+    expect(firstRuntime.disposeCount).toBe(0)
+    expect(timer.callbacks.size).toBe(1)
+    releaseTail.finish()
+    timer.fire()
+    expect(firstRuntime.disposeCount).toBe(1)
+    expect(timer.callbacks.size).toBe(0)
+
+    await expect(coordinator.play()).resolves.toBe(true)
+    expect(runtime.prepared.at(-1)?.generations).toEqual([4])
+    expect(coordinator.state.phase).toBe('playing')
+    coordinator.dispose()
+  })
+
+  it('aborts an in-flight handoff when a different Active Project takes ownership', async () => {
+    const firstProjectId = parseProjectId('project-playback-pending-first')
+    const firstSession = createPlayableSession(firstProjectId)
+    const activeProject = createActiveProjectHarness(createReadyState(firstProjectId, firstSession))
+    const runtime = new DeferredProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    const initialPlay = coordinator.play()
+    await vi.waitFor(() => expect(runtime.requests).toHaveLength(1))
+    const firstRuntime = runtime.resolve(0, parsePlaybackClockSecond(0))
+    await initialPlay
+    firstRuntime.currentTime = parsePlaybackClockSecond(0.1)
+
+    const commit = requireCommitted(
+      firstSession,
+      createAddNoteCommand({
+        baseRevision: firstSession.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(120),
+        noteId: RAPID_NOTE_ID,
+        pitch: parseMidiPitch(67),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(1_200),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(runtime.requests).toHaveLength(2))
+
+    const secondProjectId = parseProjectId('project-playback-pending-second')
+    const secondSession = createPlayableSession(secondProjectId)
+    activeProject.publish(createReadyState(secondProjectId, secondSession))
+    expect(runtime.requests[1]?.signal.aborted).toBe(true)
+    expect(firstRuntime.allNotesOffCount).toBe(1)
+    expect(firstRuntime.disposeCount).toBe(1)
+
+    const staleRuntime = runtime.resolve(1, parsePlaybackClockSecond(0.1))
+    await vi.waitFor(() => expect(staleRuntime.disposeCount).toBe(1))
+    expect(coordinator.state).toMatchObject({
+      modelRevision: secondSession.modelRevision,
+      phase: 'stopped',
+      projectId: secondProjectId,
+    })
+    coordinator.dispose()
+    expect(activeProject.observers.size).toBe(0)
+    expect(activeProject.commitObservers.size).toBe(0)
   })
 
   it('publishes the retained end position and stops waking after natural end', async () => {

@@ -4,7 +4,7 @@
 > 产品定位：桌面浏览器优先、面向个人创作者的轻量 Web DAW  
 > 文档作用：回答系统如何拆分、模块如何依赖，以及从哪里开始开发  
 > 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3\
-> 最近校准：2026-08-13
+> 最近校准：2026-08-14
 
 ---
 
@@ -26,10 +26,11 @@
 为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
 架构文档的版本号。
 
-截至 2026-08-13，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
-多选 Delete 已形成闭环；Playback 已建立 TempoMap、Compiler、Transport 与 Scheduler，Audio Web
-已建立 Sample 资源准备和 Voice Runtime，Studio 首次可听闭环已实现并通过功能审核。长期架构中的
-通用 Graph、RuntimeDelta、跨线程 ACK 和 AudioWorklet 路径都不能反推为该首版切片的必做范围。
+截至 2026-08-14，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
+多选 Delete 已形成闭环；Studio 首次可听闭环已通过功能审核。Playback Batch 6 已增加完整 Plan
+Reconciliation、Transport 原位 handoff 和选择性 Voice 生命周期，播放中 Note / Track /
+Instrument 变化可以保留无关活动 Voice；该批次已完成本地验证，等待统一逐提交审核。长期架构中的
+通用 Graph、RuntimeDelta、跨线程 ACK 和 AudioWorklet 路径仍不能反推为首版切片的必做范围。
 
 ---
 

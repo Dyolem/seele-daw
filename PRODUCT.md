@@ -585,15 +585,15 @@ Project Core 已具备：
 
 ### 8.4 Package 状态
 
-| Package                       | 当前能力                                                                                                                                                                                                                                                                                            |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、含单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                                                                        |
-| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                           |
-| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return / 时间与反馈、默认 Studio Grand Add Track、旧 Slot 显式选择、Arrangement 空 MIDI Clip、Track / Clip Selection 与 Piano Roll Note 编辑。                                                |
-| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                             |
-| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner；公开 Studio / Audio Web 真实消费者所需的最小计划与运行时规划 API，不提供音频资源。                                              |
-| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Note Off、loop、mutex、generation 与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                                                   |
-| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                    |
+| Package                       | 当前能力                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、含单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                                                                                         |
+| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                                            |
+| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return / 时间与反馈、播放中 Note / Track / Instrument 选择性重协调、默认 Studio Grand Add Track、旧 Slot 显式选择、Arrangement 空 MIDI Clip、Track / Clip Selection 与 Piano Roll Note 编辑。 |
+| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                                              |
+| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；公开 Studio / Audio Web 真实消费者所需的最小规划 API，不提供音频资源。                    |
+| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、可重排 Note Off、loop、mutex、选择性 cancel、generation 与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                |
+| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                     |
 
 ## 9. 明确尚未提供的产品能力
 
@@ -621,8 +621,10 @@ Project Core 已具备：
 - 完整 Instrument Browser、Preset Library、第三方 Device UI 与任意 Instrument 替换；当前只有旧空
   Slot 的 `Use Studio Grand`。
 - 通用 Web Audio Graph、AudioWorklet 与电平；当前只有 Sample Voice 所需的最小 master output。
-- Seek / Scrub、Loop、Record、实时 Meter、监听和播放中编辑的无缝续播；当前只支持 Play / Pause /
-  Resume / Return to Start，项目内容 Commit 会安全停止并从头重建计划。
+- Seek / Scrub、Loop、Record、实时 Meter、监听，以及 Gain / Pan / Mute 的持久 Track Bus 实时更新。
+  当前支持 Play / Pause / Resume / Return to Start；播放中的 Note Add / Move / Resize / Delete、
+  Undo / Redo、Track / Clip 生命周期和 Instrument Replace 会从当前位置选择性生效，不相关的活动
+  Voice 继续。Tempo、全局路由、Commit gap 与不可信失败仍允许全局安全停止。
 
 ### 其他 Track 类型
 
@@ -721,24 +723,26 @@ Project Core 已具备：
 | 2026-08-12 | Audible MIDI Scheduler                                     | 建立连续半开 look-ahead 窗口、冻结 Sample Voice Plan、generation / occurrence 去重、迟到立即开始与过期丢弃；尚未执行声音。                                       | `145b3ab`                       |
 | 2026-08-13 | Audio Web Sample Resource Preparation                      | 按稳定 Playback Plan 准备实际引用的 Manifest/WAV，建立同源边界、byte budget、并发去重、取消、失败重试和应用生命周期解码缓存；尚未接入 Studio。                   | `dc8ccfd`                       |
 | 2026-08-13 | Audio Web Sample Voice Runtime                             | 建立用户激活的 AudioContext、master output、Manifest 驱动的 Pitch/Envelope/Loop/Mutex Voice、generation/cancel/allNotesOff 与零残留资源统计；已通过审阅。        | `772210f`                       |
-| 2026-08-13 | `PLAYBACK`、`KEYBOARD-SHORTCUTS`                           | Studio 组合 Compiler、Transport、Scheduler、资源准备与 Voice；接通 Play/Pause/Return、Space、时间、Loading/失败反馈和清理；已通过功能审核。                     | `7242a52`（核心）与本次 UI 提交 |
+| 2026-08-13 | `PLAYBACK`、`KEYBOARD-SHORTCUTS`                           | Studio 组合 Compiler、Transport、Scheduler、资源准备与 Voice；接通 Play/Pause/Return、Space、时间、Loading/失败反馈和清理；已通过功能审核。                      | `7242a52`（核心）与本次 UI 提交 |
+| 2026-08-14 | `PLAYBACK`                                                 | 建立完整 Plan Reconciliation、Transport 原位 handoff 与 generation/断音解耦的选择性 Voice 生命周期。                                                             | `33a9ea0`、`365044b`、`475d32c` |
+| 2026-08-14 | `PLAYBACK`                                                 | Studio 接入 Commit 顺序、Note / Track / Clip / Instrument 选择性生效、按 Soundbank 局部资源失败，以及 stale/gap/Pause/项目切换回归；等待统一逐提交审核。         | `2729357`、`a730119` 与本次提交 |
 
 ## 13. 当前验证基线
 
-Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、Batch 3B、Batch 4A 与
+Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、Batch 3B、Batch 4A、
 Batch 4B.1、Batch 4B.2 与 Batch 5A 已通过本地验证和功能审核；Batch 5A 另通过浏览器运行时
-smoke，进一步听觉与交互优化留待后续讨论：
+smoke。Batch 6A–6F 已于 2026-08-14 完成实现和本地验证，等待统一逐提交审核：
 
-- 最近已提交基线通过 `pnpm lint` 与 `pnpm check`，包括 Architecture、Workspace Type Check、
-  全部测试与 Studio Production Build。
+- 当前 Batch 6 工作区通过 `pnpm lint` 与 `pnpm check`，包括 Architecture、Workspace Type Check、
+  全部测试、Studio Production Build 与 soundbank dist boundary；Batch 6 按约定未新增 E2E。
 - Batch 4B.2 已通过完整 `pnpm check`（Architecture、Workspace Type Check、全部测试、
   Studio Production Build 与 soundbank dist boundary），并通过改动范围的 Oxlint / ESLint 与格式检查。
 - Project Core：27 个测试文件，399 项测试。
 - platform-browser：2 个测试文件，18 项测试。
 - editor：10 个测试文件，104 项测试。
-- playback：7 个测试文件，76 项测试。
-- audio-web：16 个测试文件，105 项测试。
-- Studio：42 个测试文件，230 项测试。
+- playback：8 个测试文件，86 项测试。
+- audio-web：16 个测试文件，110 项测试。
+- Studio：42 个测试文件，246 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

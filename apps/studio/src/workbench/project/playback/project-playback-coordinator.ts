@@ -244,6 +244,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #transport: AudibleMidiTransport | null = null
   #scheduler: AudibleMidiSchedulerPlanner | null = null
   #timerHandle: unknown = null
+  #retiredRuntimeCleanupTimerHandle: unknown = null
   #preparationAbortController: AbortController | null = null
   #requestSequence = 0
   #pendingCommits: ProjectCommit[] = []
@@ -366,14 +367,20 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#assertLive()
     const transport = this.#transport
     if (transport === null) return false
-    const transition = transport.pause()
-    if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PAUSED) return false
+    try {
+      const transition = transport.pause()
+      if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PAUSED) return false
 
-    this.#stopTimer()
-    this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-    this.#allNotesOffRuntimes()
-    this.#publishTransportState(transition.snapshot)
-    return true
+      this.#stopTimer()
+      this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
+      this.#allNotesOffRuntimes()
+      this.#startRetiredRuntimeCleanup()
+      this.#publishTransportState(transition.snapshot)
+      return true
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return false
+    }
   }
 
   returnToStart(): boolean {
@@ -385,22 +392,29 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     const wasLoading = this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING
     this.#cancelPreparation()
     this.#stopTimer()
-    const transport = this.#transport
-    if (transport === null) {
-      this.#allNotesOffRuntimes()
-      this.#publishStoppedAtStart()
-      return wasLoading
-    }
+    try {
+      const transport = this.#transport
+      if (transport === null) {
+        this.#allNotesOffRuntimes()
+        this.#startRetiredRuntimeCleanup()
+        this.#publishStoppedAtStart()
+        return wasLoading
+      }
 
-    const transition = transport.returnToStart()
-    if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START) {
-      this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#allNotesOffRuntimes()
-    } else {
-      this.#allNotesOffRuntimes()
+      const transition = transport.returnToStart()
+      if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START) {
+        this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
+        this.#allNotesOffRuntimes()
+      } else {
+        this.#allNotesOffRuntimes()
+      }
+      this.#startRetiredRuntimeCleanup()
+      this.#publishTransportState(transition.snapshot)
+      return wasLoading || transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return false
     }
-    this.#publishTransportState(transition.snapshot)
-    return wasLoading || transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START
   }
 
   togglePlayPause(): boolean {
@@ -466,6 +480,52 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         phase: PROJECT_PLAYBACK_PHASE.FAILED,
         plan,
         projectId,
+      }),
+    )
+  }
+
+  #failActiveProjectRevision(event: ActiveProjectCommitEvent, cause: unknown): void {
+    this.#releasePlanRuntime()
+    this.#activePlanIdentity = Object.freeze({
+      modelRevision: event.state.modelRevision,
+      projectId: event.projectId,
+      session: event.session,
+    })
+    this.#plan = null
+    this.#publish(
+      Object.freeze({
+        diagnostics: Object.freeze([]),
+        failureCause: cause,
+        feedback: feedbackForFailure(cause),
+        modelRevision: event.state.modelRevision,
+        phase: PROJECT_PLAYBACK_PHASE.FAILED,
+        planStatus: null,
+        positionProjectSecond: 0,
+        projectId: event.projectId,
+      }),
+    )
+  }
+
+  #failReconciledPlan(
+    event: ActiveProjectCommitEvent,
+    nextPlan: AudibleMidiProjectPlan,
+    cause: unknown,
+  ): void {
+    this.#releasePlanRuntime()
+    this.#activePlanIdentity = Object.freeze({
+      modelRevision: nextPlan.modelRevision,
+      projectId: event.projectId,
+      session: event.session,
+    })
+    this.#plan = nextPlan
+    this.#publish(
+      createState({
+        diagnostics: nextPlan.diagnostics,
+        failureCause: cause,
+        feedback: feedbackForFailure(cause),
+        phase: PROJECT_PLAYBACK_PHASE.FAILED,
+        plan: nextPlan,
+        projectId: event.projectId,
       }),
     )
   }
@@ -549,6 +609,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #releasePlanRuntime(): void {
     this.#cancelPreparation()
     this.#stopTimer()
+    this.#stopRetiredRuntimeCleanup()
     try {
       this.#allNotesOffRuntimes()
     } catch {
@@ -603,6 +664,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       runtime.dispose()
       this.#retiredRuntimes.delete(runtime)
     }
+    if (this.#retiredRuntimes.size === 0) this.#stopRetiredRuntimeCleanup()
   }
 
   #requirePlayablePlan(): AudibleMidiProjectPlan {
@@ -655,6 +717,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   }
 
   #startTimer(): void {
+    this.#stopRetiredRuntimeCleanup()
     if (this.#timerHandle !== null) return
     this.#timerHandle = this.#timerPort.setRepeating(
       () => this.#tick(),
@@ -666,6 +729,24 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     if (this.#timerHandle === null) return
     this.#timerPort.clear(this.#timerHandle)
     this.#timerHandle = null
+  }
+
+  #startRetiredRuntimeCleanup(): void {
+    if (this.#disposed) return
+    this.#collectFinishedVoicesAndRuntimes()
+    if (this.#retiredRuntimes.size === 0 || this.#retiredRuntimeCleanupTimerHandle !== null) {
+      return
+    }
+    this.#retiredRuntimeCleanupTimerHandle = this.#timerPort.setRepeating(() => {
+      if (this.#disposed) return
+      this.#collectFinishedVoicesAndRuntimes()
+    }, SCHEDULER_WAKE_CADENCE_MILLISECOND)
+  }
+
+  #stopRetiredRuntimeCleanup(): void {
+    if (this.#retiredRuntimeCleanupTimerHandle === null) return
+    this.#timerPort.clear(this.#retiredRuntimeCleanupTimerHandle)
+    this.#retiredRuntimeCleanupTimerHandle = null
   }
 
   #reconcileActiveProjectCommit(event: ActiveProjectCommitEvent): void {
@@ -700,14 +781,19 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     const event = this.#pendingCommitEvent
     const previousPlan = this.#plan
     const identity = this.#activePlanIdentity
-    if (event === null || previousPlan === null || identity === null) return
+    if (event === null || identity === null) return
     if (event.projectId !== identity.projectId || event.session !== identity.session) return
 
     let nextPlan: AudibleMidiProjectPlan
     try {
       nextPlan = compileAudibleMidiProject(event.session.getSnapshot())
     } catch (cause) {
-      this.#failCurrentPlan(cause)
+      this.#failActiveProjectRevision(event, cause)
+      return
+    }
+
+    if (previousPlan === null) {
+      this.#installStoppedPlan(event, nextPlan)
       return
     }
 
@@ -727,7 +813,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         previousPlan,
       })
     } catch (cause) {
-      this.#failCurrentPlan(cause)
+      this.#failReconciledPlan(event, nextPlan, cause)
       return
     }
 
@@ -750,7 +836,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     try {
       this.#applyImmediateReconciliation(reconciliation)
     } catch (cause) {
-      this.#failCurrentPlan(cause)
+      this.#failReconciledPlan(event, nextPlan, cause)
       return
     }
     this.#suppressedOccurrenceKeys = new Set(reconciliation.invalidatedPreviousOccurrenceKeys)
@@ -801,6 +887,10 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
           change.after === null ||
           !change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE)
         ) {
+          continue
+        }
+        if (this.#state.phase !== PROJECT_PLAYBACK_PHASE.PLAYING) {
+          entry.handle.cancel(now)
           continue
         }
 
@@ -860,7 +950,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         ) {
           return
         }
-        this.#failCurrentPlan(cause)
+        this.#failReconciledPlan(event, nextPlan, cause)
       })
       .finally(() => {
         if (this.#preparationAbortController === abortController) {
@@ -914,6 +1004,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       this.#startTimer()
     } else {
       this.#stopTimer()
+      this.#startRetiredRuntimeCleanup()
     }
     this.#publishTransportState(transition.snapshot)
     this.#collectFinishedVoicesAndRuntimes()
@@ -997,6 +1088,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       const snapshot = transport.getSnapshot()
       if (snapshot.state !== 'playing') {
         this.#stopTimer()
+        this.#startRetiredRuntimeCleanup()
         this.#publishTransportState(snapshot)
         return
       }

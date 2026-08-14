@@ -1059,8 +1059,8 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
   Runtime failure 使用 Toast / 邻近 reason；
 - Project switch、应用 dispose、加载竞态与 Runtime failure 都会停止 Timer、失效 / 释放 Voice，
   且不修改 Project Fact；失败允许重试；
-- 任何 Project Commit 当前安全停止旧 playback lifetime 并从 Tick `0` 重编译。保持当前位置并
-  无缝继续属于 Batch 6，不能把当前停止重建表述为已经实现播放中编辑连续性；
+- Batch 5A 交付时，任何 Project Commit 会安全停止旧 playback lifetime 并从 Tick `0` 重编译；
+  该历史限制已由 Batch 6 的选择性 handoff 取代，不能再描述为当前行为；
 - Studio 只为 `studio-grand` 注入 dev-local asset base；其他合法 MIDISampleSynth 仍能编译，但
   缺失 location 时明确失败，不静默跳过或替换。
 
@@ -1072,6 +1072,12 @@ Gate A 已随 Batch 1A 关闭；Gate B 的 Compiler 与 Transport 部分分别�
 - 未进入或未完成不阻塞 Audible V1 封版。
 
 ### Batch 6：选择性 Playback Reconciliation 与阶段加固
+
+> Implementation status: Batch 6A–6F implemented and locally verified on 2026-08-14; pending the
+> requested unified per-commit user review. Full `pnpm lint` and `pnpm check` pass, including 8
+> Playback files / 86 tests, 16 Audio Web files / 110 tests, 42 Studio files / 246 tests, Studio
+> production build and the soundbank dist boundary. No Batch 6 E2E was added. No phase checkpoint
+> or tag has been created.
 
 - **6A Reconciliation Contract**：完整 Plan 差异、Commit 链验证、occurrence / Track 失效计划；
 - **6B Transport Plan Handoff**：保留当前位置、单调 generation、新 Plan Anchor 与 Scheduler；
@@ -1125,6 +1131,9 @@ Audio Runtime 单元 / 集成测试可通过 `OfflineAudioContext` 或等价可�
 - Space 不侵入输入控件或 Modal；
 - Project switch 停止旧项目声音；
 - Runtime failure 不改变 Project dirty / History；
+- 播放中远期 Note 编辑不截断无关活动 Voice，Delete / Move / Resize 只作用于目标 occurrence；
+- Instrument Replace 只释放目标 Track；缺失新 Soundbank 显示 warning，其他 Track 继续；
+- stale preparation、Commit gap、Pause / Resume、项目切换与 retired Runtime 回收可重复验证；
 - 若进入可选 Batch 5B，两个 Playhead 使用同一 Transport Position；
 - Record、Loop 和 Output Meter 不伪装为已接通。
 
@@ -1158,7 +1167,8 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 - Live Meter、Master Volume UI、Mixer、Effect Chain；
 - Sustain Pedal、CC、Pitch Bend、Aftertouch、MPE；
 - Note Chase、Preview Playback、Offline Export；
-- Track / Range / Voice 级播放中增量失效优化；
+- 避免完整 Plan 编译 / Runtime 准备的 Range Index 与增量性能优化；当前已具备 occurrence / Track
+  选择性声音语义，但仍以完整新旧 Plan 比较和完整稳定 Plan 准备为正确性基线；
 - Audio Track、Audio Clip、Recording；
 - Piano Roll Box Selection、Velocity、Zoom / Scroll；
 - Arrangement Clip Move / Resize / Copy / Split 与完整 Interactive Snap V1。

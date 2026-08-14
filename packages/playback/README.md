@@ -4,11 +4,11 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2 与 Studio Batch 5A 已通过功能审阅；
-> 进一步优化留待后续讨论。本包已有通用 Sample Instrument Device schema、TempoMap、
-> 具体 MIDI Plan Compiler、Transport Mapping 与 Scheduler Planner。包根现在公开 Studio 与
-> Audio Web 这两个真实消费者所需的最小编译、时钟、Transport、Scheduler 与只读计划表面；
-> 浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
+> 当前状态：截至 2026-08-14，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2 与 Studio Batch
+> 5A 已通过功能审阅；Batch 6A–6F 已实现并完成本地验证，等待统一逐提交审核。本包已有通用
+> Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
+> Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
+> Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
 当前阶段实施计划见
@@ -137,6 +137,17 @@ Transport 与 Scheduler 已由 Studio Batch 5A 的 Coordinator 消费。它们�
 AudioContext、资源 URL 或 Voice；Studio 决定当前 `25 ms` 唤醒与 `200 ms` look-ahead 产品参数，
 Audio Web 只执行冻结的 Voice Plan。
 
+Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
+
+- `createAudibleMidiReconciliationPlan` 验证连续 Commit 链，并对完整新旧 Plan 输出 occurrence /
+  Track 变化、失效 key、受影响 Track 与全局 reset 原因；
+- Transport `handoffPlan` 保留当前位置与单调 Playback Clock anchor，在原位递增
+  `engineGeneration`，不把 generation 变化等同于 `allNotesOff`；
+- Note / Clip / Track / Instrument 的活动 Voice 语义由 Studio 按操作执行；Scheduler 只从新
+  anchor 规划尚未越过起点的事件，不执行 Note Chase；
+- Tempo、Master route、Commit gap 或不可播放目标仍明确要求全局安全兜底。Playback 不拥有
+  AudioContext、Voice handle、资源准备或 UI warning。
+
 ## 长期包定位
 
 下图描述长期方向；当前 V1 不输出 GraphPlan 或 RuntimeDelta。
@@ -207,7 +218,8 @@ src/
 3. 已编译具体 Track / MIDI Note Span 计划，并建立确定性的 NoteOccurrenceKey。
 4. 已建立注入时钟的 stopped / playing / paused Transport Mapping 与 generation 失效。
 5. 已建立规划层 look-ahead Scheduler、连续 cursor、occurrence 去重与 late / drop policy。
-6. 支持播放中移动/删除 Note、Seek、Loop 和 Tempo change。
+6. 已支持播放中 Note / Track / Instrument 的选择性失效；Seek、Loop 和 Tempo change 仍待后续
+   产品切片。
 7. 由后续真实消费者驱动 Track/Device GraphPlan、Audio Clip、Automation、Recording
    monitoring 和 frozen-revision export 计划。
 

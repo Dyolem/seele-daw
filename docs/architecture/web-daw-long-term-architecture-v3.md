@@ -1118,7 +1118,8 @@ AudioContext latency
 
 ## 33. 播放中编辑语义
 
-下表是长期细粒度目标，不是 Audible MIDI Playback V1 的首批实现要求：
+下表既是长期细粒度方向，也是 Audible MIDI Playback V1 Batch 6 已采用的 Note / Track /
+Instrument 选择性语义；其中 Clip Gain ramp、Tempo 编辑与 Seek 仍属于后续能力：
 
 | 变化位置 / 类型                  | 长期目标策略                                              |
 | -------------------------------- | --------------------------------------------------------- |
@@ -1134,10 +1135,11 @@ AudioContext latency
 
 “保留当前声部还是立即反映编辑”必须按操作定义，不允许每个设备自行猜测。
 
-首个可听切片采用固定的保守策略：任何相关 Commit 都增加 generation、取消未来调度、执行全局
-`allNotesOff`，再从完整最新 Snapshot 重建计划；不做 Track / Range / Voice 级增量失效。该策略
-可能截断当前长 Note，这是明确的首版限制。Transport 的精确自然结束与 release tail 行为仍由
-阶段 Decision Gate 决定。
+Audible MIDI Playback V1 Batch 6 仍从完整最新 Snapshot 编译 Plan，但会先验证 Commit 链并比较
+完整新旧 Plan：未开始的旧队列可以整体取消后从当前位置重建；已开始的 Voice 按 occurrence 或
+Track 选择性保留、快速 release 或重排 Note Off。generation 只失效未来 Scheduler 交付，不再
+隐含全局断音。Tempo / Master route、Commit gap、项目切换和不可信 Runtime failure 才允许全局
+`allNotesOff`。V1 尚未引入 RuntimeDelta、Range Index、Graph Reconciler 或跨线程 ACK。
 
 ## 34. Graph Compiler 与 Reconciler
 
@@ -2084,9 +2086,9 @@ Worklet 解析项目 JSON 或接收大对象
 
 ## 72. 一条 Note 的完整路径
 
-下列链路描述长期细粒度增量与 ACK 目标。当前 Audible MIDI Playback V1 在 Project Commit
-之后使用 generation 失效、全局 `allNotesOff` 与完整 Snapshot 重编译，不把 RuntimeDelta、
-Track / Range invalidation 或 Runtime ACK 作为首版前置条件。
+下列链路描述长期细粒度增量与 ACK 目标。当前 Audible MIDI Playback V1 仍使用完整 Snapshot
+重编译和同步 generation handoff，但已经按 occurrence / Track 选择性取消、保留活动 Voice；它
+不把 RuntimeDelta、Range Index 或 Runtime ACK 作为首版前置条件。
 
 ```text
 PointerDown / Move

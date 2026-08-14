@@ -5,10 +5,11 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 当前首个可听切片先建立通用 MIDISampleSynth Sample Voice，并以 Studio Grand 完成首次产品
 听觉验收。
 
-> 当前状态：Batch 4A.2、Batch 4B.1、Batch 4B.2 与 Studio Batch 5A 已通过功能审阅；进一步优化
-> 留待后续讨论。当前已有用户激活的 AudioContext、最小 master output、Manifest 驱动的
-> Sample Voice、Note Off / loop / mutex、generation 与资源统计；Studio 通过公开 API 组合资源
-> 准备和 Voice 执行，但 SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
+> 当前状态：Batch 4A.2、Batch 4B.1、Batch 4B.2 与 Studio Batch 5A 已通过功能审阅；截至
+> 2026-08-14，Batch 6 的选择性 Voice 生命周期与按 Soundbank 局部资源失败已实现并完成本地
+> 验证，等待统一逐提交审核。当前已有用户激活的 AudioContext、最小 master output、Manifest
+> 驱动的 Sample Voice、可重排 Note Off、loop / mutex、generation、选择性 cancel 与资源统计；
+> SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。

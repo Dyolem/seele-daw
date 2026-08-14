@@ -37,17 +37,24 @@ export class ManualProjectPlaybackVoiceHandle implements ProjectPlaybackVoiceHan
   readonly cancelCalls: (PlaybackClockSecond | undefined)[] = []
   readonly releaseUpdates: PlaybackClockSecond[] = []
   #active = true
+  #releaseRequested = false
 
   constructor(
     readonly engineGeneration: ScheduledSampleVoicePlan['engineGeneration'],
     readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey'],
+    readonly remainsActiveDuringRelease = false,
   ) {}
 
   cancel(atPlaybackClockSecond?: PlaybackClockSecond): boolean {
-    if (!this.#active) return false
-    this.#active = false
+    if (!this.#active || this.#releaseRequested) return false
+    this.#releaseRequested = true
+    if (!this.remainsActiveDuringRelease) this.#active = false
     this.cancelCalls.push(atPlaybackClockSecond)
     return true
+  }
+
+  finish(): void {
+    this.#active = false
   }
 
   isActive(): boolean {
@@ -55,7 +62,7 @@ export class ManualProjectPlaybackVoiceHandle implements ProjectPlaybackVoiceHan
   }
 
   rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): boolean {
-    if (!this.#active) return false
+    if (!this.#active || this.#releaseRequested) return false
     this.releaseUpdates.push(releasePlaybackClockSecond)
     return true
   }
@@ -66,21 +73,25 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
   readonly handles: ManualProjectPlaybackVoiceHandle[] = []
   readonly scheduled: ScheduledSampleVoicePlan[] = []
   allNotesOffCount = 0
+  allNotesOffFailure: unknown = null
   disposeCount = 0
   currentTime = 0 as PlaybackClockSecond
   readonly preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[]
   readonly #unavailableSoundbankIds: ReadonlySet<
     ProjectPlaybackInstrumentPreparationFailure['soundbankId']
   >
+  readonly #voicesRemainActiveDuringRelease: boolean
 
   constructor(
     readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision'],
     preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = [],
+    voicesRemainActiveDuringRelease = false,
   ) {
     this.preparationFailures = Object.freeze([...preparationFailures])
     this.#unavailableSoundbankIds = new Set(
       preparationFailures.map(({ soundbankId }) => soundbankId),
     )
+    this.#voicesRemainActiveDuringRelease = voicesRemainActiveDuringRelease
   }
 
   advanceGeneration(generation: EngineGeneration): void {
@@ -89,12 +100,13 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
 
   allNotesOff(): void {
     this.allNotesOffCount += 1
+    if (this.allNotesOffFailure !== null) throw this.allNotesOffFailure
     for (const handle of this.handles) handle.cancel()
   }
 
   dispose(): void {
     this.disposeCount += 1
-    for (const handle of this.handles) handle.cancel()
+    for (const handle of this.handles) handle.finish()
   }
 
   now(): PlaybackClockSecond {
@@ -104,7 +116,11 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
   schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
     if (this.#unavailableSoundbankIds.has(plan.soundbankId)) return null
     this.scheduled.push(plan)
-    const handle = new ManualProjectPlaybackVoiceHandle(plan.engineGeneration, plan.occurrenceKey)
+    const handle = new ManualProjectPlaybackVoiceHandle(
+      plan.engineGeneration,
+      plan.occurrenceKey,
+      this.#voicesRemainActiveDuringRelease,
+    )
     this.handles.push(handle)
     return handle
   }
@@ -115,9 +131,11 @@ export class ControlledProjectPlaybackRuntime implements ProjectPlaybackRuntimeP
   readonly preparationOptions: ProjectPlaybackPreparationOptions[] = []
   readonly signals: AbortSignal[] = []
   readonly prepared: ManualPreparedPlaybackRuntime[] = []
+  currentTime = 0 as PlaybackClockSecond
   disposeCount = 0
   failure: unknown = null
   preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = []
+  voicesRemainActiveDuringRelease = false
 
   async prepare(
     plan: AudibleMidiProjectPlan,
@@ -128,9 +146,58 @@ export class ControlledProjectPlaybackRuntime implements ProjectPlaybackRuntimeP
     this.signals.push(signal)
     this.preparationOptions.push(options)
     if (this.failure !== null) throw this.failure
-    const runtime = new ManualPreparedPlaybackRuntime(plan.modelRevision, this.preparationFailures)
+    const runtime = new ManualPreparedPlaybackRuntime(
+      plan.modelRevision,
+      this.preparationFailures,
+      this.voicesRemainActiveDuringRelease,
+    )
+    runtime.currentTime = this.currentTime
     this.prepared.push(runtime)
     return runtime
+  }
+
+  dispose(): void {
+    this.disposeCount += 1
+  }
+}
+
+interface DeferredPreparationRequest {
+  readonly options: ProjectPlaybackPreparationOptions
+  readonly plan: AudibleMidiProjectPlan
+  readonly reject: (cause: unknown) => void
+  readonly resolve: (runtime: ManualPreparedPlaybackRuntime) => void
+  readonly signal: AbortSignal
+}
+
+export class DeferredProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
+  readonly prepared: ManualPreparedPlaybackRuntime[] = []
+  readonly requests: DeferredPreparationRequest[] = []
+  disposeCount = 0
+
+  prepare(
+    plan: AudibleMidiProjectPlan,
+    signal: AbortSignal,
+    options: ProjectPlaybackPreparationOptions,
+  ): Promise<ProjectPlaybackPreparedRuntime> {
+    return new Promise((resolve, reject) => {
+      this.requests.push(Object.freeze({ options, plan, reject, resolve, signal }))
+    })
+  }
+
+  resolve(index: number, currentTime: PlaybackClockSecond): ManualPreparedPlaybackRuntime {
+    const request = this.requests[index]
+    if (request === undefined) throw new Error(`Missing deferred preparation ${index}`)
+    const runtime = new ManualPreparedPlaybackRuntime(request.plan.modelRevision)
+    runtime.currentTime = currentTime
+    this.prepared.push(runtime)
+    request.resolve(runtime)
+    return runtime
+  }
+
+  reject(index: number, cause: unknown): void {
+    const request = this.requests[index]
+    if (request === undefined) throw new Error(`Missing deferred preparation ${index}`)
+    request.reject(cause)
   }
 
   dispose(): void {

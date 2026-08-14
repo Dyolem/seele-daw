@@ -764,6 +764,12 @@ Gain / Pan / Mute 最终应通过持久 Track Bus 实时作用于持续声音；
 6. 从当前位置之后填充新 look-ahead；不 Chase 已经越过起点的 Note；
 7. 旧 Runtime 在其保留 Voice 全部结束后释放。
 
+首次 Play 的资源准备继续 fail-fast。只有已经安装安全旧 Runtime 的连续选择性 handoff 才允许
+按 Soundbank 跳过不可用 Instrument：目标 Track 立即停止旧 Voice、后续保持静音并显示明确
+warning，其他已准备 Track 与活动 Voice 继续；不得把缺失音源静默替换成 Studio Grand。结构性
+Plan 错误、Commit gap、Tempo / 全局路由变化和无法归属到单一 Instrument 的失败仍走全局安全
+兜底。
+
 ### 8.4 交互 Preview
 
 Piano Roll Move / Resize Preview 不产生 Project Commit，因此不改变 Timeline Playback

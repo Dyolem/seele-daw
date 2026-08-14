@@ -1,5 +1,7 @@
 import type {
+  ProjectPlaybackInstrumentPreparationFailure,
   ProjectPlaybackPreparedRuntime,
+  ProjectPlaybackPreparationOptions,
   ProjectPlaybackRuntimePort,
   ProjectPlaybackTimerPort,
   ProjectPlaybackVoiceHandle,
@@ -66,8 +68,20 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
   allNotesOffCount = 0
   disposeCount = 0
   currentTime = 0 as PlaybackClockSecond
+  readonly preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[]
+  readonly #unavailableSoundbankIds: ReadonlySet<
+    ProjectPlaybackInstrumentPreparationFailure['soundbankId']
+  >
 
-  constructor(readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision']) {}
+  constructor(
+    readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision'],
+    preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = [],
+  ) {
+    this.preparationFailures = Object.freeze([...preparationFailures])
+    this.#unavailableSoundbankIds = new Set(
+      preparationFailures.map(({ soundbankId }) => soundbankId),
+    )
+  }
 
   advanceGeneration(generation: EngineGeneration): void {
     this.generations.push(generation)
@@ -87,7 +101,8 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
     return this.currentTime
   }
 
-  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle {
+  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
+    if (this.#unavailableSoundbankIds.has(plan.soundbankId)) return null
     this.scheduled.push(plan)
     const handle = new ManualProjectPlaybackVoiceHandle(plan.engineGeneration, plan.occurrenceKey)
     this.handles.push(handle)
@@ -97,16 +112,23 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
 
 export class ControlledProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
   readonly plans: AudibleMidiProjectPlan[] = []
+  readonly preparationOptions: ProjectPlaybackPreparationOptions[] = []
   readonly signals: AbortSignal[] = []
   readonly prepared: ManualPreparedPlaybackRuntime[] = []
   disposeCount = 0
   failure: unknown = null
+  preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = []
 
-  async prepare(plan: AudibleMidiProjectPlan, signal: AbortSignal) {
+  async prepare(
+    plan: AudibleMidiProjectPlan,
+    signal: AbortSignal,
+    options: ProjectPlaybackPreparationOptions,
+  ) {
     this.plans.push(plan)
     this.signals.push(signal)
+    this.preparationOptions.push(options)
     if (this.failure !== null) throw this.failure
-    const runtime = new ManualPreparedPlaybackRuntime(plan.modelRevision)
+    const runtime = new ManualPreparedPlaybackRuntime(plan.modelRevision, this.preparationFailures)
     this.prepared.push(runtime)
     return runtime
   }

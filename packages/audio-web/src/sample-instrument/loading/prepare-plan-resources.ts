@@ -23,8 +23,27 @@ export interface PreparedAudibleMidiSampleInstrument {
 }
 
 export interface PreparedAudibleMidiSampleResources {
+  readonly failures: readonly AudibleMidiSamplePreparationFailure[]
   readonly instruments: readonly PreparedAudibleMidiSampleInstrument[]
   readonly modelRevision: AudibleMidiProjectPlan['modelRevision']
+}
+
+export const AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE = Object.freeze({
+  FAIL_FAST: 'fail-fast',
+  SKIP_UNAVAILABLE_INSTRUMENTS: 'skip-unavailable-instruments',
+} as const)
+
+export type AudibleMidiSamplePreparationFailureMode =
+  (typeof AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE)[keyof typeof AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE]
+
+export interface AudibleMidiSamplePreparationFailure {
+  readonly cause: unknown
+  readonly soundbankId: SoundbankId
+}
+
+export interface PrepareAudibleMidiSampleResourcesOptions {
+  readonly failureMode?: AudibleMidiSamplePreparationFailureMode
+  readonly signal?: AbortSignal
 }
 
 export type AudibleMidiSamplePreparationErrorCode =
@@ -32,6 +51,7 @@ export type AudibleMidiSamplePreparationErrorCode =
   | 'blocked-plan'
   | 'duplicate-track-route'
   | 'inaudible-track-route'
+  | 'invalid-failure-mode'
   | 'invalid-pitch'
   | 'invalid-plan-status'
   | 'missing-asset-location'
@@ -139,13 +159,39 @@ function createPreparedInstrument(
   })
 }
 
-/** Prepares every Sample resource referenced by a stable plan before Transport enters Playing. */
+function parseFailureMode(
+  value: AudibleMidiSamplePreparationFailureMode | undefined,
+): AudibleMidiSamplePreparationFailureMode {
+  switch (value) {
+    case undefined:
+    case AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST:
+      return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST
+    case AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS:
+      return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS
+    default:
+      fail('invalid-failure-mode', `Unknown Sample preparation failure mode ${String(value)}`)
+  }
+}
+
+type InstrumentPreparationResult =
+  | {
+      readonly kind: 'prepared'
+      readonly instrument: PreparedAudibleMidiSampleInstrument
+    }
+  | {
+      readonly kind: 'failed'
+      readonly failure: AudibleMidiSamplePreparationFailure
+    }
+
+/** Prepares Sample resources for one stable Plan under an explicit per-Instrument failure policy. */
 export async function prepareAudibleMidiSampleResources(
   plan: AudibleMidiProjectPlan,
   cache: SampleInstrumentResourceCache,
   locator: AudibleMidiSampleResourceLocator,
-  signal?: AbortSignal,
+  options: PrepareAudibleMidiSampleResourcesOptions = {},
 ): Promise<PreparedAudibleMidiSampleResources> {
+  const failureMode = parseFailureMode(options.failureMode)
+  const { signal } = options
   if (signal?.aborted === true) {
     fail('aborted', 'Sample resource preparation was aborted')
   }
@@ -161,33 +207,56 @@ export async function prepareAudibleMidiSampleResources(
   }
 
   const pitchesBySoundbank = collectPitchesBySoundbank(plan)
-  const instruments = await Promise.all(
+  const results = await Promise.all(
     [...pitchesBySoundbank].map(async ([soundbankId, pitches]) => {
-      const location = requireLocation(locator, soundbankId)
-      const manifest = await cache.loadManifest(location, signal)
-      let resourceKeys: readonly string[]
       try {
-        resourceKeys = collectSampleInstrumentResourceKeysForPitches(manifest, pitches)
-      } catch (error) {
-        if (error instanceof SampleInstrumentZoneSelectionError) {
-          if (error.code === 'invalid-pitch') {
-            fail('invalid-pitch', `Audible MIDI Plan contains invalid pitch ${error.pitch}`)
+        const location = requireLocation(locator, soundbankId)
+        const manifest = await cache.loadManifest(location, signal)
+        let resourceKeys: readonly string[]
+        try {
+          resourceKeys = collectSampleInstrumentResourceKeysForPitches(manifest, pitches)
+        } catch (error) {
+          if (error instanceof SampleInstrumentZoneSelectionError) {
+            if (error.code === 'invalid-pitch') {
+              fail('invalid-pitch', `Audible MIDI Plan contains invalid pitch ${error.pitch}`)
+            }
+            fail(
+              'unsupported-pitch',
+              `${soundbankId} does not cover MIDI pitch ${error.pitch}`,
+              soundbankId,
+            )
           }
-          fail(
-            'unsupported-pitch',
-            `${soundbankId} does not cover MIDI pitch ${error.pitch}`,
-            soundbankId,
-          )
+          throw error
         }
-        throw error
+        const prepared = await cache.prepare(location, resourceKeys, signal)
+        return Object.freeze<InstrumentPreparationResult>({
+          instrument: createPreparedInstrument(soundbankId, prepared),
+          kind: 'prepared',
+        })
+      } catch (cause) {
+        if (
+          signal?.aborted === true ||
+          failureMode === AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST
+        ) {
+          throw cause
+        }
+        return Object.freeze<InstrumentPreparationResult>({
+          failure: Object.freeze({ cause, soundbankId }),
+          kind: 'failed',
+        })
       }
-      const prepared = await cache.prepare(location, resourceKeys, signal)
-      return [soundbankId, createPreparedInstrument(soundbankId, prepared)] as const
     }),
   )
+  const failures: AudibleMidiSamplePreparationFailure[] = []
+  const instruments: PreparedAudibleMidiSampleInstrument[] = []
+  for (const result of results) {
+    if (result.kind === 'prepared') instruments.push(result.instrument)
+    else failures.push(result.failure)
+  }
 
   return Object.freeze({
-    instruments: Object.freeze(instruments.map(([, instrument]) => instrument)),
+    failures: Object.freeze(failures),
+    instruments: Object.freeze(instruments),
     modelRevision: plan.modelRevision,
   })
 }

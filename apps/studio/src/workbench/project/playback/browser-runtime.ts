@@ -1,8 +1,10 @@
 import {
+  AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE,
   SampleInstrumentResourceCache,
   SampleInstrumentVoiceRuntime,
   WebAudioContextRuntime,
   prepareAudibleMidiSampleResources,
+  type AudibleMidiSamplePreparationFailureMode,
   type AudibleMidiSampleResourceLocator,
   type PreparedAudibleMidiSampleResources,
   type SampleInstrumentResourceCacheLimits,
@@ -16,10 +18,13 @@ import {
   type SoundbankId,
 } from '@seele-daw/playback'
 
-import type {
-  ProjectPlaybackPreparedRuntime,
-  ProjectPlaybackRuntimePort,
-  ProjectPlaybackVoiceHandle,
+import {
+  PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE,
+  type ProjectPlaybackInstrumentFailureMode,
+  type ProjectPlaybackPreparedRuntime,
+  type ProjectPlaybackPreparationOptions,
+  type ProjectPlaybackRuntimePort,
+  type ProjectPlaybackVoiceHandle,
 } from '@/workbench/project/playback/project-playback-coordinator'
 
 export interface BrowserProjectPlaybackRuntimeOptions {
@@ -35,10 +40,23 @@ const DEFAULT_RESOURCE_LIMITS = Object.freeze<SampleInstrumentResourceCacheLimit
   maximumResourceByteLength: 4 * 1_024 * 1_024,
 })
 
+function resolvePreparationFailureMode(
+  mode: ProjectPlaybackInstrumentFailureMode,
+): AudibleMidiSamplePreparationFailureMode {
+  switch (mode) {
+    case PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN:
+      return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST
+    case PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS:
+      return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS
+  }
+}
+
 class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRuntime {
   readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision']
+  readonly preparationFailures: ProjectPlaybackPreparedRuntime['preparationFailures']
   readonly #voiceRuntime: SampleInstrumentVoiceRuntime
   readonly #audioContext: AudioContext
+  readonly #unavailableSoundbankIds: ReadonlySet<SoundbankId>
 
   constructor(
     preparedResources: PreparedAudibleMidiSampleResources,
@@ -46,8 +64,12 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
     audioContext: AudioContext,
   ) {
     this.modelRevision = preparedResources.modelRevision
+    this.preparationFailures = preparedResources.failures
     this.#voiceRuntime = voiceRuntime
     this.#audioContext = audioContext
+    this.#unavailableSoundbankIds = new Set(
+      preparedResources.failures.map(({ soundbankId }) => soundbankId),
+    )
   }
 
   advanceGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void {
@@ -67,6 +89,7 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
   }
 
   schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
+    if (this.#unavailableSoundbankIds.has(plan.soundbankId)) return null
     const result = this.#voiceRuntime.schedule(plan)
     if (result.outcome !== 'scheduled' || result.token === null) return null
     const token = result.token
@@ -109,6 +132,7 @@ class BrowserProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
   async prepare(
     plan: AudibleMidiProjectPlan,
     signal: AbortSignal,
+    options: ProjectPlaybackPreparationOptions,
   ): Promise<ProjectPlaybackPreparedRuntime> {
     if (this.#disposed) throw new Error('Browser Project Playback Runtime is disposed')
     // AudioContext activation stays at the start of the synchronous user-gesture call stack;
@@ -132,7 +156,11 @@ class BrowserProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
         return assetBaseUrl === undefined ? null : Object.freeze({ assetBaseUrl, soundbankId })
       },
     })
-    const preparedResources = await prepareAudibleMidiSampleResources(plan, cache, locator, signal)
+    const failureMode = resolvePreparationFailureMode(options.instrumentFailureMode)
+    const preparedResources = await prepareAudibleMidiSampleResources(plan, cache, locator, {
+      failureMode,
+      signal,
+    })
     if (signal.aborted) throw new DOMException('Playback preparation was aborted', 'AbortError')
     const voiceRuntime = new SampleInstrumentVoiceRuntime({ output, preparedResources })
     return new PreparedBrowserProjectPlaybackRuntime(

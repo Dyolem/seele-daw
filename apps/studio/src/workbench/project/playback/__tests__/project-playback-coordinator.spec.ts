@@ -1,15 +1,19 @@
 import {
+  DEVICE_DEFINITION_VERSION_MIN,
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddInstrumentTrackCommand,
   createAddMidiClipCommand,
   createAddNoteCommand,
+  createDeviceDescriptor,
   createInitialProjectSession,
   createMoveNotesCommand,
   createRemoveNotesCommand,
+  createReplaceInstrumentDeviceCommand,
   createResizeNoteCommand,
   parseBipolarValue,
   parseClipId,
   parseDeviceId,
+  parseDeviceTypeId,
   parseLinearGain,
   parseMidiChannel,
   parseMidiPitch,
@@ -24,13 +28,23 @@ import {
   parseTickDelta,
   parseTimeSignatureEventId,
   parseTrackId,
+  type ClipId,
+  type DeviceId,
+  type MidiPitch,
+  type MidiSourceId,
   type NoteId,
   type ProjectCommand,
   type ProjectCommit,
   type ProjectId,
   type ProjectSession,
+  type TrackId,
 } from '@seele-daw/project-core'
-import { createStudioGrandDeviceDescriptor, type AudibleMidiProjectPlan } from '@seele-daw/playback'
+import {
+  createStudioGrandDeviceDescriptor,
+  parseSoundbankId,
+  type AudibleMidiProjectPlan,
+  type SoundbankId,
+} from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
 import type {
@@ -50,7 +64,10 @@ import {
   ManualProjectPlaybackTimer,
   type ManualProjectPlaybackVoiceHandle,
 } from '@/workbench/project/playback/__tests__/project-playback-test-support'
-import { createProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
+import {
+  PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE,
+  createProjectPlaybackCoordinator,
+} from '@/workbench/project/playback/project-playback-coordinator'
 
 class ActiveProjectHarness {
   readonly commitObservers = new Set<ActiveProjectCommitObserver>()
@@ -109,6 +126,26 @@ const NOTE_ID = parseNoteId('note-playback-coordinator')
 const SECOND_NOTE_ID = parseNoteId('note-playback-coordinator-second')
 const FAR_NOTE_ID = parseNoteId('note-playback-coordinator-far')
 const MOVED_NOTE_ID = parseNoteId('note-playback-coordinator-moved')
+const SECOND_TRACK_ID = parseTrackId('track-playback-coordinator-second')
+const SECOND_DEVICE_ID = parseDeviceId('device-playback-coordinator-second')
+const SECOND_CLIP_ID = parseClipId('clip-playback-coordinator-second')
+const SECOND_SOURCE_ID = parseMidiSourceId('source-playback-coordinator-second')
+const SECOND_TRACK_NOTE_ID = parseNoteId('note-playback-coordinator-second-track')
+const REPLACEMENT_SOUNDBANK_ID = parseSoundbankId('replacement-piano')
+const MISSING_SOUNDBANK_ID = parseSoundbankId('missing-piano')
+const LIFECYCLE_CLIP_ID = parseClipId('clip-playback-coordinator-lifecycle')
+const LIFECYCLE_SOURCE_ID = parseMidiSourceId('source-playback-coordinator-lifecycle')
+const REPLACEMENT_FUTURE_NOTE_ID = parseNoteId('note-playback-coordinator-replacement')
+
+interface PlayableTrackFixture {
+  readonly clipId: ClipId
+  readonly deviceId: DeviceId
+  readonly insertAt: number
+  readonly noteId: NoteId
+  readonly pitch: MidiPitch
+  readonly sourceId: MidiSourceId
+  readonly trackId: TrackId
+}
 
 function requireCommitted(session: ProjectSession, command: ProjectCommand): ProjectCommit {
   const result = session.execute(command)
@@ -118,14 +155,26 @@ function requireCommitted(session: ProjectSession, command: ProjectCommand): Pro
   return result.commit
 }
 
-function createPlayableSession(projectId: ProjectId): ProjectSession {
-  const session = createInitialProjectSession({
-    projectId,
-    projectName: 'Audible Project',
-    tempoEventId: parseTempoEventId('tempo-playback-coordinator'),
-    timeSignatureEventId: parseTimeSignatureEventId('meter-playback-coordinator'),
+function requireUndo(session: ProjectSession): ProjectCommit {
+  const commit = session.undo()
+  if (commit === null) throw new Error('Expected Project History to produce an Undo Commit')
+  return commit
+}
+
+function createSampleInstrumentDescriptor(deviceId: DeviceId, soundbankId: SoundbankId) {
+  return createDeviceDescriptor({
+    definitionVersion: DEVICE_DEFINITION_VERSION_MIN,
+    enabled: true,
+    id: deviceId,
+    opaqueState: { soundbankId },
+    parameters: {},
+    typeId: parseDeviceTypeId('seele.sample-instrument'),
   })
-  session.execute(
+}
+
+function addPlayableTrack(session: ProjectSession, fixture: PlayableTrackFixture): void {
+  requireCommitted(
+    session,
     createAddInstrumentTrackCommand({
       baseRevision: session.modelRevision,
       channel: {
@@ -135,41 +184,73 @@ function createPlayableSession(projectId: ProjectId): ProjectSession {
         soloed: false,
       },
       color: null,
-      insertAt: 0,
-      instrumentDevice: createStudioGrandDeviceDescriptor(DEVICE_ID),
+      insertAt: fixture.insertAt,
+      instrumentDevice: createStudioGrandDeviceDescriptor(fixture.deviceId),
       name: 'Piano',
-      trackId: TRACK_ID,
+      trackId: fixture.trackId,
     }),
   )
-  session.execute(
+  requireCommitted(
+    session,
     createAddMidiClipCommand({
       baseRevision: session.modelRevision,
-      clipId: CLIP_ID,
+      clipId: fixture.clipId,
       color: null,
       loop: null,
       muted: false,
       name: 'Phrase',
-      sourceId: SOURCE_ID,
+      sourceId: fixture.sourceId,
       sourceLengthTick: parsePositiveTick(1_920),
       sourceOffsetTick: parseTick(0),
       spanTick: parsePositiveTick(1_920),
       startTick: parseTick(0),
-      trackId: TRACK_ID,
+      trackId: fixture.trackId,
     }),
   )
-  session.execute(
+  requireCommitted(
+    session,
     createAddNoteCommand({
       baseRevision: session.modelRevision,
       channel: parseMidiChannel(0),
       durationTick: parsePositiveTick(960),
-      noteId: NOTE_ID,
-      pitch: parseMidiPitch(60),
-      sourceId: SOURCE_ID,
+      noteId: fixture.noteId,
+      pitch: fixture.pitch,
+      sourceId: fixture.sourceId,
       startTick: parseTick(0),
       velocity: parseMidiVelocity(100),
     }),
   )
+}
+
+function createPlayableSession(projectId: ProjectId): ProjectSession {
+  const session = createInitialProjectSession({
+    projectId,
+    projectName: 'Audible Project',
+    tempoEventId: parseTempoEventId('tempo-playback-coordinator'),
+    timeSignatureEventId: parseTimeSignatureEventId('meter-playback-coordinator'),
+  })
+  addPlayableTrack(session, {
+    clipId: CLIP_ID,
+    deviceId: DEVICE_ID,
+    insertAt: 0,
+    noteId: NOTE_ID,
+    pitch: parseMidiPitch(60),
+    sourceId: SOURCE_ID,
+    trackId: TRACK_ID,
+  })
   return session
+}
+
+function addSecondPlayableTrack(session: ProjectSession): void {
+  addPlayableTrack(session, {
+    clipId: SECOND_CLIP_ID,
+    deviceId: SECOND_DEVICE_ID,
+    insertAt: 1,
+    noteId: SECOND_TRACK_NOTE_ID,
+    pitch: parseMidiPitch(64),
+    sourceId: SECOND_SOURCE_ID,
+    trackId: SECOND_TRACK_ID,
+  })
 }
 
 function createReadyState(projectId: ProjectId, session: ProjectSession): ReadyActiveProjectState {
@@ -436,6 +517,245 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(activeHandle.releaseUpdates).toEqual([0.75])
     expect(firstRuntime.allNotesOffCount).toBe(0)
     expect(coordinator.state.phase).toBe('playing')
+    coordinator.dispose()
+  })
+
+  it('releases only the replaced Instrument Track and schedules its future Notes with the new Soundbank', async () => {
+    const projectId = parseProjectId('project-playback-instrument-replace')
+    const session = createPlayableSession(projectId)
+    addSecondPlayableTrack(session)
+    requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(240),
+        noteId: REPLACEMENT_FUTURE_NOTE_ID,
+        pitch: parseMidiPitch(67),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(720),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const timer = new ManualProjectPlaybackTimer()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer,
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const replacedTrackHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
+    const continuingTrackHandle = requireVoiceHandle(
+      firstRuntime,
+      runtime.plans[0]!,
+      SECOND_TRACK_NOTE_ID,
+    )
+    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+
+    const commit = requireCommitted(
+      session,
+      createReplaceInstrumentDeviceCommand({
+        baseRevision: session.modelRevision,
+        instrumentDevice: createSampleInstrumentDescriptor(DEVICE_ID, REPLACEMENT_SOUNDBANK_ID),
+        trackId: TRACK_ID,
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
+
+    expect(replacedTrackHandle.isActive()).toBe(false)
+    expect(replacedTrackHandle.cancelCalls).toEqual([0.1])
+    expect(continuingTrackHandle.isActive()).toBe(true)
+    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(
+      runtime.preparationOptions.map(({ instrumentFailureMode }) => instrumentFailureMode),
+    ).toEqual([
+      PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
+    ])
+
+    const nextRuntime = runtime.prepared[1]!
+    expect(nextRuntime.scheduled).toEqual([])
+    nextRuntime.currentTime = 0.2 as typeof nextRuntime.currentTime
+    timer.fire()
+    expect(nextRuntime.scheduled).toEqual([
+      expect.objectContaining({
+        pitch: 67,
+        soundbankId: REPLACEMENT_SOUNDBANK_ID,
+        startPlaybackClockSecond: 0.375,
+        trackId: TRACK_ID,
+      }),
+    ])
+    coordinator.dispose()
+  })
+
+  it('keeps unrelated Tracks playing and reports a missing replacement Soundbank', async () => {
+    const projectId = parseProjectId('project-playback-instrument-missing')
+    const session = createPlayableSession(projectId)
+    addSecondPlayableTrack(session)
+    requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(240),
+        noteId: REPLACEMENT_FUTURE_NOTE_ID,
+        pitch: parseMidiPitch(67),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(720),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const timer = new ManualProjectPlaybackTimer()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer,
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const replacedTrackHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
+    const continuingTrackHandle = requireVoiceHandle(
+      firstRuntime,
+      runtime.plans[0]!,
+      SECOND_TRACK_NOTE_ID,
+    )
+    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const cause = new Error('Replacement manifest is unavailable')
+    runtime.preparationFailures = [Object.freeze({ cause, soundbankId: MISSING_SOUNDBANK_ID })]
+
+    const commit = requireCommitted(
+      session,
+      createReplaceInstrumentDeviceCommand({
+        baseRevision: session.modelRevision,
+        instrumentDevice: createSampleInstrumentDescriptor(DEVICE_ID, MISSING_SOUNDBANK_ID),
+        trackId: TRACK_ID,
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
+
+    expect(replacedTrackHandle.isActive()).toBe(false)
+    expect(continuingTrackHandle.isActive()).toBe(true)
+    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(coordinator.state).toMatchObject({
+      failureCause: [expect.objectContaining({ cause, soundbankId: MISSING_SOUNDBANK_ID })],
+      feedback: {
+        kind: 'warning',
+        message: expect.stringContaining(MISSING_SOUNDBANK_ID),
+      },
+      phase: 'playing',
+    })
+    const nextRuntime = runtime.prepared[1]!
+    nextRuntime.currentTime = 0.2 as typeof nextRuntime.currentTime
+    timer.fire()
+    expect(nextRuntime.scheduled).toEqual([])
+    expect(coordinator.state.phase).toBe('playing')
+    coordinator.dispose()
+  })
+
+  it('hands off an empty Track addition and its Undo without interrupting existing Voices', async () => {
+    const projectId = parseProjectId('project-playback-track-lifecycle')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
+    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+
+    const addCommit = requireCommitted(
+      session,
+      createAddInstrumentTrackCommand({
+        baseRevision: session.modelRevision,
+        channel: {
+          gain: parseLinearGain(1),
+          muted: false,
+          pan: parseBipolarValue(0),
+          soloed: false,
+        },
+        color: null,
+        insertAt: 1,
+        instrumentDevice: createStudioGrandDeviceDescriptor(SECOND_DEVICE_ID),
+        name: 'Empty Piano',
+        trackId: SECOND_TRACK_ID,
+      }),
+    )
+    activeProject.publishCommit(addCommit)
+    await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
+    expect(activeHandle.isActive()).toBe(true)
+
+    const addedTrackRuntime = runtime.prepared[1]!
+    addedTrackRuntime.currentTime = 0.1 as typeof addedTrackRuntime.currentTime
+    activeProject.publishCommit(requireUndo(session))
+    await vi.waitFor(() => expect(runtime.prepared).toHaveLength(3))
+
+    expect(activeHandle.isActive()).toBe(true)
+    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(coordinator.state).toMatchObject({
+      modelRevision: session.modelRevision,
+      phase: 'playing',
+    })
+    coordinator.dispose()
+  })
+
+  it('hands off an empty Clip addition and its Undo without interrupting existing Voices', async () => {
+    const projectId = parseProjectId('project-playback-clip-lifecycle')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
+    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+
+    const addCommit = requireCommitted(
+      session,
+      createAddMidiClipCommand({
+        baseRevision: session.modelRevision,
+        clipId: LIFECYCLE_CLIP_ID,
+        color: null,
+        loop: null,
+        muted: false,
+        name: 'Future Empty Clip',
+        sourceId: LIFECYCLE_SOURCE_ID,
+        sourceLengthTick: parsePositiveTick(960),
+        sourceOffsetTick: parseTick(0),
+        spanTick: parsePositiveTick(960),
+        startTick: parseTick(1_920),
+        trackId: TRACK_ID,
+      }),
+    )
+    activeProject.publishCommit(addCommit)
+    await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
+    expect(activeHandle.isActive()).toBe(true)
+
+    const addedClipRuntime = runtime.prepared[1]!
+    addedClipRuntime.currentTime = 0.1 as typeof addedClipRuntime.currentTime
+    activeProject.publishCommit(requireUndo(session))
+    await vi.waitFor(() => expect(runtime.prepared).toHaveLength(3))
+
+    expect(activeHandle.isActive()).toBe(true)
+    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(coordinator.state).toMatchObject({
+      modelRevision: session.modelRevision,
+      phase: 'playing',
+    })
     coordinator.dispose()
   })
 

@@ -2,6 +2,7 @@ import { parseSoundbankId, type AudibleMidiProjectPlan } from '@seele-daw/playba
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE,
   AudibleMidiSamplePreparationError,
   prepareAudibleMidiSampleResources,
   type AudibleMidiSampleResourceLocator,
@@ -15,6 +16,7 @@ import {
 } from '#internal/__tests__/support/sample-instrument-resource-fixture'
 
 const TRACK_ID = 'track-fixture'
+const UNAVAILABLE_SOUNDBANK_ID = parseSoundbankId('unavailable-fixture')
 const LOCATION = Object.freeze({
   assetBaseUrl: 'https://studio.test/assets/fixture-piano/',
   soundbankId: FIXTURE_SOUNDBANK_ID,
@@ -68,6 +70,39 @@ function createPlan(
   return plan as unknown as AudibleMidiProjectPlan
 }
 
+function createPlanWithUnavailableInstrument(): AudibleMidiProjectPlan {
+  const base = createPlan([60])
+  const availableTrack = base.tracks[0]!
+  const availableSpan = base.midiNoteSpans[0]!
+  const unavailableTrackId = 'track-unavailable'
+  return Object.freeze({
+    ...base,
+    midiNoteSpans: Object.freeze([
+      availableSpan,
+      Object.freeze({
+        ...availableSpan,
+        noteId: 'note-unavailable',
+        occurrenceKey: JSON.stringify([unavailableTrackId, 0]),
+        pitch: 64,
+        trackId: unavailableTrackId,
+      }),
+    ]),
+    tracks: Object.freeze([
+      availableTrack,
+      Object.freeze({
+        ...availableTrack,
+        instrument: Object.freeze({
+          ...availableTrack.instrument,
+          deviceId: 'device-unavailable',
+          soundbankId: UNAVAILABLE_SOUNDBANK_ID,
+        }),
+        instrumentDeviceId: 'device-unavailable',
+        trackId: unavailableTrackId,
+      }),
+    ]),
+  }) as unknown as AudibleMidiProjectPlan
+}
+
 function createFixture() {
   const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input) =>
     String(input).endsWith('manifest.json')
@@ -102,6 +137,7 @@ describe('Audible MIDI Sample resource preparation', () => {
     expect(prepared.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
       FIXTURE_SOUNDBANK_ID,
     ])
+    expect(prepared.failures).toEqual([])
     expect(prepared.instruments[0]?.resources.map(({ key }) => key)).toEqual([
       'samples/high.wav',
       'samples/low.wav',
@@ -120,6 +156,7 @@ describe('Audible MIDI Sample resource preparation', () => {
     )
 
     expect(prepared.instruments).toEqual([])
+    expect(prepared.failures).toEqual([])
     expect(prepared.modelRevision).toBe(0)
     expect(fetchImplementation).not.toHaveBeenCalled()
   })
@@ -130,11 +167,36 @@ describe('Audible MIDI Sample resource preparation', () => {
     controller.abort()
 
     await expect(
-      prepareAudibleMidiSampleResources(createPlan([], 'empty'), cache, locator, controller.signal),
+      prepareAudibleMidiSampleResources(createPlan([], 'empty'), cache, locator, {
+        signal: controller.signal,
+      }),
     ).rejects.toEqual(
       expect.objectContaining<Partial<AudibleMidiSamplePreparationError>>({ code: 'aborted' }),
     )
     expect(fetchImplementation).not.toHaveBeenCalled()
+  })
+
+  it('retains available Instruments and reports unavailable ones in selective mode', async () => {
+    const { cache, locator } = createFixture()
+
+    const prepared = await prepareAudibleMidiSampleResources(
+      createPlanWithUnavailableInstrument(),
+      cache,
+      locator,
+      {
+        failureMode: AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
+      },
+    )
+
+    expect(prepared.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
+      FIXTURE_SOUNDBANK_ID,
+    ])
+    expect(prepared.failures).toEqual([
+      expect.objectContaining({
+        cause: expect.objectContaining({ code: 'missing-asset-location' }),
+        soundbankId: UNAVAILABLE_SOUNDBANK_ID,
+      }),
+    ])
   })
 
   it.each([

@@ -3,6 +3,7 @@ import {
   AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND,
   AUDIBLE_MIDI_RECONCILIATION_SCOPE,
   AUDIBLE_MIDI_SCHEDULER_OUTCOME,
+  AUDIBLE_MIDI_TRACK_CHANGE_KIND,
   AUDIBLE_MIDI_TRANSPORT_OUTCOME,
   compileAudibleMidiProject,
   createAudibleMidiReconciliationPlan,
@@ -18,6 +19,7 @@ import {
   type PlaybackDiagnostic,
   type PlaybackClockSecond,
   type ScheduledSampleVoicePlan,
+  type SoundbankId,
 } from '@seele-daw/playback'
 import {
   PROJECT_COMMAND_TYPE,
@@ -47,11 +49,29 @@ import {
 
 export interface ProjectPlaybackPreparedRuntime {
   readonly modelRevision: ModelRevision
+  readonly preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[]
   advanceGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void
   allNotesOff(): void
   dispose(): void
   now(): ReturnType<typeof parsePlaybackClockSecond>
   schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null
+}
+
+export const PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE = Object.freeze({
+  FAIL_PLAN: 'fail-plan',
+  SKIP_UNAVAILABLE_INSTRUMENTS: 'skip-unavailable-instruments',
+} as const)
+
+export type ProjectPlaybackInstrumentFailureMode =
+  (typeof PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE)[keyof typeof PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE]
+
+export interface ProjectPlaybackInstrumentPreparationFailure {
+  readonly cause: unknown
+  readonly soundbankId: SoundbankId
+}
+
+export interface ProjectPlaybackPreparationOptions {
+  readonly instrumentFailureMode: ProjectPlaybackInstrumentFailureMode
 }
 
 export interface ProjectPlaybackVoiceHandle {
@@ -66,6 +86,7 @@ export interface ProjectPlaybackRuntimePort {
   prepare(
     plan: AudibleMidiProjectPlan,
     signal: AbortSignal,
+    options: ProjectPlaybackPreparationOptions,
   ): Promise<ProjectPlaybackPreparedRuntime>
   dispose(): void
 }
@@ -111,6 +132,9 @@ interface ScheduledVoiceEntry {
 const SCHEDULER_WAKE_CADENCE_SECOND = parsePlaybackClockDurationSecond(0.025)
 const SCHEDULER_LOOK_AHEAD_HORIZON_SECOND = parsePlaybackClockDurationSecond(0.2)
 const SCHEDULER_WAKE_CADENCE_MILLISECOND = SCHEDULER_WAKE_CADENCE_SECOND * 1_000
+const EMPTY_PREPARATION_FAILURES = Object.freeze<
+  readonly ProjectPlaybackInstrumentPreparationFailure[]
+>([])
 
 const UNAVAILABLE_STATE = Object.freeze<ProjectPlaybackState>({
   diagnostics: Object.freeze([]),
@@ -150,6 +174,17 @@ function feedbackForFailure(cause: unknown): ProjectPlaybackFeedback {
   return Object.freeze({ kind: 'error', message })
 }
 
+function feedbackForPreparationFailures(
+  failures: readonly ProjectPlaybackInstrumentPreparationFailure[],
+): ProjectPlaybackFeedback | null {
+  if (failures.length === 0) return null
+  const soundbankIds = [...new Set(failures.map(({ soundbankId }) => soundbankId))]
+  return Object.freeze({
+    kind: 'warning',
+    message: `Instrument resources could not be loaded for ${soundbankIds.join(', ')}; affected tracks are silent.`,
+  })
+}
+
 function createState(input: {
   readonly diagnostics: readonly PlaybackDiagnostic[]
   readonly failureCause?: unknown
@@ -178,17 +213,16 @@ function isPlayablePlan(plan: AudibleMidiProjectPlan): boolean {
   )
 }
 
-function isMidiNoteReconciliationCommit(commit: ProjectCommit): boolean {
+function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
   switch (commit.origin.commandType) {
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
       return true
-    case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
-    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
-    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
-      return false
   }
 }
 
@@ -217,7 +251,9 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #pendingCommitFlushQueued = false
   #pendingCommitChainBroken = false
   #pendingPlan: AudibleMidiProjectPlan | null = null
+  #runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
   #suppressedOccurrenceKeys = new Set<ScheduledSampleVoicePlan['occurrenceKey']>()
+  #suppressedTrackIds = new Set<ScheduledSampleVoicePlan['trackId']>()
   #state: ProjectPlaybackState = UNAVAILABLE_STATE
   #disposed = false
 
@@ -274,13 +310,16 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         }
       }
       this.#preparedRuntime = null
-      const preparedRuntime = await this.#runtimePort.prepare(plan, abortController.signal)
+      const preparedRuntime = await this.#runtimePort.prepare(plan, abortController.signal, {
+        instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      })
       if (!this.#isCurrentRequest(requestSequence, plan, abortController)) {
         preparedRuntime.dispose()
         return false
       }
 
       this.#preparedRuntime = preparedRuntime
+      this.#runtimePreparationFailures = preparedRuntime.preparationFailures
       if (this.#transport === null || this.#scheduler === null) {
         this.#transport = createAudibleMidiTransport(plan, {
           now: () => {
@@ -493,9 +532,12 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         phase = PROJECT_PLAYBACK_PHASE.STOPPED
         break
     }
+    const preparationFeedback = feedbackForPreparationFailures(this.#runtimePreparationFailures)
     this.#publish(
       createState({
         diagnostics: plan.diagnostics,
+        failureCause: preparationFeedback === null ? undefined : this.#runtimePreparationFailures,
+        feedback: preparationFeedback ?? undefined,
         phase,
         plan,
         positionProjectSecond: snapshot.positionProjectSecond,
@@ -523,7 +565,9 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#pendingCommitFlushQueued = false
     this.#pendingCommitChainBroken = false
     this.#pendingPlan = null
+    this.#runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
     this.#suppressedOccurrenceKeys.clear()
+    this.#suppressedTrackIds.clear()
     this.#transport = null
     this.#scheduler = null
   }
@@ -595,7 +639,12 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     const batch = scheduler.planNextWindow(snapshot)
     if (batch.outcome !== AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED) return
     for (const voicePlan of batch.voicePlans) {
-      if (this.#suppressedOccurrenceKeys.has(voicePlan.occurrenceKey)) continue
+      if (
+        this.#suppressedOccurrenceKeys.has(voicePlan.occurrenceKey) ||
+        this.#suppressedTrackIds.has(voicePlan.trackId)
+      ) {
+        continue
+      }
       const handle = preparedRuntime.schedule(voicePlan)
       if (handle !== null) {
         this.#scheduledVoices.add(
@@ -688,10 +737,10 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       this.#preparedRuntime !== null &&
       this.#transport !== null &&
       this.#scheduler !== null
-    const noteOnly = this.#pendingCommits.every(isMidiNoteReconciliationCommit)
+    const supportedCommits = this.#pendingCommits.every(supportsSelectiveReconciliation)
     if (
       !canContinueRuntime ||
-      !noteOnly ||
+      !supportedCommits ||
       reconciliation.scope !== AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE
     ) {
       this.#installStoppedPlan(event, nextPlan)
@@ -699,20 +748,32 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     }
 
     try {
-      this.#applyImmediateNoteReconciliation(reconciliation)
+      this.#applyImmediateReconciliation(reconciliation)
     } catch (cause) {
       this.#failCurrentPlan(cause)
       return
     }
     this.#suppressedOccurrenceKeys = new Set(reconciliation.invalidatedPreviousOccurrenceKeys)
+    this.#suppressedTrackIds = new Set(
+      reconciliation.trackChanges
+        .filter(({ kind }) => kind !== AUDIBLE_MIDI_TRACK_CHANGE_KIND.ADDED)
+        .map(({ trackId }) => trackId),
+    )
     this.#prepareSelectiveHandoff(event, previousPlan, nextPlan)
   }
 
-  #applyImmediateNoteReconciliation(reconciliation: AudibleMidiReconciliationPlan): void {
+  #applyImmediateReconciliation(reconciliation: AudibleMidiReconciliationPlan): void {
     const runtime = this.#preparedRuntime
     const transport = this.#transport
     if (runtime === null || transport === null) return
     const now = runtime.now()
+
+    for (const change of reconciliation.trackChanges) {
+      if (change.kind === AUDIBLE_MIDI_TRACK_CHANGE_KIND.ADDED) continue
+      for (const entry of this.#scheduledVoices) {
+        if (entry.plan.trackId === change.trackId) entry.handle.cancel(now)
+      }
+    }
 
     for (const change of reconciliation.occurrenceChanges) {
       if (change.kind === AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED) continue
@@ -766,7 +827,10 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#pendingPlan = nextPlan
 
     void this.#runtimePort
-      .prepare(nextPlan, abortController.signal)
+      .prepare(nextPlan, abortController.signal, {
+        instrumentFailureMode:
+          PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
+      })
       .then((preparedRuntime) => {
         if (
           this.#disposed ||
@@ -826,6 +890,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     nextRuntime.advanceGeneration(transition.snapshot.engineGeneration)
 
     this.#preparedRuntime = nextRuntime
+    this.#runtimePreparationFailures = nextRuntime.preparationFailures
     this.#retiredRuntimes.add(previousRuntime)
     this.#scheduler = createAudibleMidiSchedulerPlanner(nextPlan, {
       lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
@@ -842,6 +907,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#pendingCommitChainBroken = false
     this.#pendingPlan = null
     this.#suppressedOccurrenceKeys.clear()
+    this.#suppressedTrackIds.clear()
 
     if (transition.snapshot.state === 'playing') {
       this.#scheduleNextWindow(transition.snapshot)

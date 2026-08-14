@@ -76,6 +76,14 @@ Batch 5A 没有把 Studio 职责下沉进本包，而是公开已有真实边界
 - Playback Scheduler 仍在浏览器无关包内规划；Studio 的 25 ms Timer 只唤醒规划并把冻结 Voice
   Plan 交给本包执行，因此这里没有新增第二套时间权威。
 
+Batch 6E 在同一资源边界增加显式失败策略，但没有把 Track 或 Project 语义下沉：
+
+- 首次 Play 仍使用默认 `fail-fast`，任何所需 Soundbank 准备失败都会拒绝整次启动；
+- 已在播放中的选择性 Plan handoff 可以请求 `skip-unavailable-instruments`，资源层按 Soundbank
+  返回冻结的结构化 failure，同时保留成功准备的其他 Instrument；
+- Studio 根据 failure 决定受影响 Track 静音并显示 warning；Audio Web 只报告 Soundbank 与原因，
+  不读取 Track、Commit 或 UI 状态，也不静默替换为 Studio Grand。
+
 当前 Sample Instrument 已形成三组不同变化原因，因此按职责分层；其中较短的文件名是这个模块
 在语义仍然明确时的局部选择，不构成禁止文件名重复目录上下文的全局规则：
 

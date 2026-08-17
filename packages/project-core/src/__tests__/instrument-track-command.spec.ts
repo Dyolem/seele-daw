@@ -24,7 +24,7 @@ import {
   type ParameterId,
   type ProjectCommit,
 } from '#internal/index'
-import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
+import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
 import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
 import { MutationApplier } from '#internal/mutation/mutation-applier'
@@ -231,12 +231,10 @@ describe('AddInstrumentTrackCommand preparation', () => {
 
     const valueEqualCommand = createCommand(store)
 
-    expect(() =>
-      createProjectCommitCandidate(valueEqualCommand, preparation.plan),
-    ).toThrowError(expect.objectContaining({ code: 'command-plan-mismatch' }))
-    expect(() =>
-      createProjectCommitCandidate(preparation.command, preparation.plan),
-    ).not.toThrow()
+    expect(() => createProjectCommitCandidate(valueEqualCommand, preparation.plan)).toThrowError(
+      expect.objectContaining({ code: 'command-plan-mismatch' }),
+    )
+    expect(() => createProjectCommitCandidate(preparation.command, preparation.plan)).not.toThrow()
   })
 
   it('rejects occupied Track and Device identities and an out-of-bounds position', () => {

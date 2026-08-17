@@ -1,4 +1,4 @@
-import type { ProjectCommand } from '#internal/commands/project-command'
+import type { ProjectCommand } from '#internal/commands/protocol/project-command'
 import type { ModelRevision } from '#internal/model/model-revision'
 import type { MutationPlan } from '#internal/mutation/mutation-plan'
 

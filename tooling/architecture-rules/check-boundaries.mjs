@@ -38,6 +38,7 @@ const modelStoreWriteAccessConsumers = new Set([
   'packages/project-core/src/model/model-store.ts',
   'packages/project-core/src/mutation/mutation-applier.ts',
 ])
+const projectCoreCommandsDirectory = path.join(root, 'packages', 'project-core', 'src', 'commands')
 const errors = []
 
 async function collectFiles(directory) {
@@ -143,6 +144,12 @@ for (const file of await collectFiles(root)) {
 
   const source = await readFile(file, 'utf8')
   const relativeFile = path.relative(root, file).split(path.sep).join('/')
+
+  if (path.dirname(file) === projectCoreCommandsDirectory) {
+    errors.push(
+      `${relativeFile}: Project Core commands 根层不接受平铺源码；请归入 protocol、preparation 或领域功能目录`,
+    )
+  }
 
   for (const specifier of importsFrom(source)) {
     if (withoutSourceExtension(specifier).endsWith('/model-store-write-access')) {

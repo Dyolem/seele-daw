@@ -85,26 +85,47 @@ Command 层属于 Project Core，而不是新的 workspace package，原因是�
 - 拆出独立包会迫使 ModelStoreReader、MutationPlan 或其他内部能力成为跨包 API，破坏当前封装；
 - Command 不能依赖 Editor、Vue、Playback 或浏览器环境，因此仍符合 Project Core 的最内层依赖边界。
 
-### 使用顶层 `src/commands/`
+### 使用 `src/commands/` 共享根层与领域目录
 
-计划新增：
+当前结构：
 
 ```text
 packages/project-core/src/commands/
-├── project-command-preparation.ts
-├── project-command.ts
-├── project-command-error.ts
-├── project-command-preparer.ts
-└── midi-note-command-handler.ts
+├── protocol/
+│   ├── project-command.ts
+│   └── project-command-error.ts
+├── preparation/
+│   ├── project-command-preparation.ts
+│   └── project-command-preparer.ts
+├── instrument-device/
+│   └── command-handler.ts
+├── instrument-track/
+│   └── command-handler.ts
+├── midi-clip/
+│   └── command-handler.ts
+├── midi-note/
+│   ├── command-handler.ts
+│   └── command-validation.ts
+└── midi-clip-note-placement/
+    ├── add-command-handler.ts
+    ├── extend-command-handler.ts
+    └── note-placement-validation.ts
 ```
 
 目录职责：
 
-- `project-command.ts`：公开的 Command 判别词汇、readonly Command Record 和构造函数；
-- `project-command-error.ts`：稳定的产品语义拒绝错误；
-- `project-command-preparation.ts`：包内 `ready` / `no-change` 准备结果；
-- `project-command-preparer.ts`：共享校验、revision 检查和穷尽分派；
-- `midi-note-command-handler.ts`：Add、Move、RemoveNotes、Resize 的无状态计划生成算法。
+- `protocol/project-command.ts`：公开的 Command 判别词汇、readonly Command Record 和构造函数；
+- `protocol/project-command-error.ts`：稳定的产品语义拒绝错误；
+- `preparation/project-command-preparation.ts`：包内 `ready` / `no-change` 准备结果；
+- `preparation/project-command-preparer.ts`：共享校验、revision 检查和穷尽分派；
+- `midi-note/command-handler.ts`：Add、Move、RemoveNotes、Resize 的无状态计划生成算法；
+- `midi-note/command-validation.ts`：既有 Note Command 与 Clip / Note 放置共同使用的 Note 身份和
+  Source 边界校验；
+- 其他领域目录分别拥有对应产品命令的 handler 与局部协作者。
+
+commands 根层不放置源码。跨命令基础能力分别进入 `protocol/` 与 `preparation/`；领域 handler
+或 validation 进入产品职责目录。新增命令应先选择已有职责，确有新的稳定职责时再创建至少能够
+承载完整切片的目录。该约定由仓库架构检查执行。
 
 不放入 `model/`，因为 Command 不是可保存的项目事实；不放入 `mutation/`，因为 Command 表达产品意图，而 Mutation 只表达规范化存储变化。handler 当前没有跨调用状态、资源或生命周期，因此使用模块函数，不创建只有静态方法的 Class。
 

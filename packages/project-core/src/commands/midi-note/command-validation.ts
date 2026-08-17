@@ -1,5 +1,5 @@
-import { ProjectCommandError } from '#internal/commands/project-command-error'
-import type { ProjectCommandType } from '#internal/commands/project-command'
+import type { ProjectCommandType } from '#internal/commands/protocol/project-command'
+import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
 import type { MidiSourceId, NoteId } from '#internal/model/ids'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'

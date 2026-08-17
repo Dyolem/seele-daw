@@ -1,19 +1,19 @@
-import { ProjectCommandError } from '#internal/commands/project-command-error'
+import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
 import {
   assertMidiNoteIdAvailable,
   assertMidiNoteWithinSource,
   type MidiNoteCommandValidationContext,
-} from '#internal/commands/midi-note-command-validation'
+} from '#internal/commands/midi-note/command-validation'
 import {
   type AddNoteCommand,
   type MoveNotesCommand,
   type RemoveNotesCommand,
   type ResizeNoteCommand,
-} from '#internal/commands/project-command'
+} from '#internal/commands/protocol/project-command'
 import type {
   NoChangeProjectCommandPreparation,
   ReadyProjectCommandPreparation,
-} from '#internal/commands/project-command-preparation'
+} from '#internal/commands/preparation/project-command-preparation'
 import type { NoteId } from '#internal/model/ids'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
 import { MIDI_PITCH_MAX, MIDI_PITCH_MIN, parseMidiPitch } from '#internal/model/scalars'

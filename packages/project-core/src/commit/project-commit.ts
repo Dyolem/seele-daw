@@ -1,4 +1,4 @@
-import type { ProjectCommandType } from '#internal/commands/project-command'
+import type { ProjectCommandType } from '#internal/commands/protocol/project-command'
 import type { ProjectDelta } from '#internal/commit/project-delta'
 import type { ModelRevision } from '#internal/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'

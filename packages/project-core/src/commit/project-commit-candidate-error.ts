@@ -1,4 +1,4 @@
-import type { ProjectCommandType } from '#internal/commands/project-command'
+import type { ProjectCommandType } from '#internal/commands/protocol/project-command'
 import type { ProjectMutationType } from '#internal/mutation/mutation-type'
 
 export type ProjectCommitCandidateErrorCode =

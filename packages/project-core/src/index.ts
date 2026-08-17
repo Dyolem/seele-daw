@@ -10,7 +10,7 @@ export {
   createRemoveNotesCommand,
   createReplaceInstrumentDeviceCommand,
   createResizeNoteCommand,
-} from './commands/project-command'
+} from './commands/protocol/project-command'
 export type {
   AddInstrumentTrackCommand,
   AddMidiClipCommand,
@@ -32,12 +32,12 @@ export type {
   RemoveNotesCommand,
   ReplaceInstrumentDeviceCommand,
   ResizeNoteCommand,
-} from './commands/project-command'
-export { ProjectCommandError } from './commands/project-command-error'
+} from './commands/protocol/project-command'
+export { ProjectCommandError } from './commands/protocol/project-command-error'
 export type {
   ProjectCommandErrorCode,
   ProjectCommandErrorDetails,
-} from './commands/project-command-error'
+} from './commands/protocol/project-command-error'
 
 export { PROJECT_CHANGE_TYPE } from './commit/project-change'
 export type {

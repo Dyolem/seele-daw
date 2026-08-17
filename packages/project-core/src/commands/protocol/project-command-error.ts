@@ -1,6 +1,6 @@
 import type { ClipId, DeviceId, MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
-import type { ModelRevision } from '#internal/model/model-revision'
 import type { Tick } from '#internal/time/tick'
+import type { ModelRevision } from '#internal/model/model-revision'
 
 export type ProjectCommandErrorCode =
   | 'base-revision-mismatch'

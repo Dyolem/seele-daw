@@ -1,9 +1,9 @@
+import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
 import type {
   AddMidiClipCommand,
   AddMidiClipWithNoteCommand,
-} from '#internal/commands/project-command'
-import { ProjectCommandError } from '#internal/commands/project-command-error'
-import type { ReadyProjectCommandPreparation } from '#internal/commands/project-command-preparation'
+} from '#internal/commands/protocol/project-command'
+import type { ReadyProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'

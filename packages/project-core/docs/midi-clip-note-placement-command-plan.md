@@ -32,9 +32,10 @@ Clip、再调整长度、最后添加 Note，也不得用 `Promise.all` 模拟�
 在提交时仍然安全。
 
 两条新命令的实现按产品职责收纳在
-`src/commands/midi-clip-note-placement/`：Add、Extend 与共享放置校验分别成文件。既有平铺
-Command handler 暂不机械迁移；跨既有 Note Command 与本模块复用的通用 Note 身份和 Source
-边界校验仍位于 commands 根层，不错误归属给放置功能。
+`src/commands/midi-clip-note-placement/`：Add、Extend 与共享放置校验分别成文件。跨既有 Note
+Command 与本模块复用的通用 Note 身份和 Source 边界校验属于 `midi-note/`；其他领域 Command
+handler 也分别归入稳定功能目录。共享基础能力进入 `protocol/` 与 `preparation/`，commands
+根层不放置源码，并由架构检查阻止重新平铺。
 
 ## Command 契约
 

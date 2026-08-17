@@ -1,7 +1,7 @@
 import type {
   ProjectCommandPreparation,
   ReadyProjectCommandPreparation,
-} from '#internal/commands/project-command-preparation'
+} from '#internal/commands/preparation/project-command-preparation'
 import type { MutationPlan } from '#internal/mutation/mutation-plan'
 
 /** Narrows a command preparation in specs without adding test-only production exports. */

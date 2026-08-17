@@ -474,7 +474,13 @@ src/
 ├── model/          ModelStore、实体、ID 与不变量
 ├── time/           Tick、区间、TempoMap
 ├── mutation/       可逆基础变化、MutationPlan 与原子应用
-├── commands/       Command 协议、共享准备管线与既有 handler
+├── commands/       根层不放置源码，按共享职责或产品领域分目录
+│   ├── protocol/                  Command 协议与稳定拒绝错误
+│   ├── preparation/               准备结果、revision 检查与穷尽分派
+│   ├── instrument-device/         Instrument Device 命令实现
+│   ├── instrument-track/          Instrument Track 命令实现
+│   ├── midi-clip/                 基础 MIDI Clip 命令实现
+│   ├── midi-note/                 MIDI Note 命令实现与共享校验
 │   └── midi-clip-note-placement/  populated Clip Add / Extend 产品命令实现
 ├── commit/         ProjectCommit、ProjectDelta 与语义 change
 ├── session/        ProjectSession 与提交管线编排
@@ -486,7 +492,9 @@ src/
 └── index.ts        唯一公开入口
 ```
 
-这些名称是规划方向，不要求一次性全部创建。只有产生真实代码和稳定职责时才新增目录。
+这些目录对应已经存在的稳定职责。commands 根层不再接收任何 `.ts` 文件；跨命令基础能力进入
+`protocol/` 或 `preparation/`，新增领域命令进入拥有该语义的功能目录。只有产生真实代码和稳定
+职责时才新增目录，不能预建空目录或无职责的层级。
 
 目录归属遵守以下规则：
 

@@ -1,9 +1,9 @@
-import { ProjectCommandError } from '#internal/commands/project-command-error'
-import type { ReplaceInstrumentDeviceCommand } from '#internal/commands/project-command'
+import type { ReplaceInstrumentDeviceCommand } from '#internal/commands/protocol/project-command'
+import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
 import type {
   NoChangeProjectCommandPreparation,
   ReadyProjectCommandPreparation,
-} from '#internal/commands/project-command-preparation'
+} from '#internal/commands/preparation/project-command-preparation'
 import { deviceDescriptorsHaveSameValues, type DeviceDescriptor } from '#internal/model/device'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import type { InstrumentTrackRecord } from '#internal/model/track'

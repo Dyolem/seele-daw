@@ -32,7 +32,7 @@ import {
 } from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
-import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
+import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
 import { ModelStore } from '#internal/model/model-store'
 import { MutationApplier } from '#internal/mutation/mutation-applier'
 import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'

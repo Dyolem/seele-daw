@@ -11,7 +11,7 @@ import {
   type RemoveNotesCommand,
   type ReplaceInstrumentDeviceCommand,
   type ResizeNoteCommand,
-} from '#internal/commands/project-command'
+} from '#internal/commands/protocol/project-command'
 import {
   PROJECT_CHANGE_TYPE,
   type AffectedTickRange,

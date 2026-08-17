@@ -1,9 +1,9 @@
 import type {
   AddMidiClipWithNoteCommand,
   ExtendMidiClipWithNoteCommand,
-} from '#internal/commands/project-command'
-import { ProjectCommandError } from '#internal/commands/project-command-error'
-import type { MidiNoteCommandValidationContext } from '#internal/commands/midi-note-command-validation'
+} from '#internal/commands/protocol/project-command'
+import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
+import type { MidiNoteCommandValidationContext } from '#internal/commands/midi-note/command-validation'
 import type { MidiClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'

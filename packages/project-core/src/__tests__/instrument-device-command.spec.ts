@@ -25,7 +25,7 @@ import {
   type ProjectCommit,
   type ReplaceInstrumentDeviceCommand,
 } from '#internal/index'
-import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
+import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
 import {
   createHistoryProjectCommitCandidate,
   createProjectCommitCandidate,

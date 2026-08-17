@@ -1,4 +1,4 @@
-import { ProjectCommandError } from '#internal/commands/project-command-error'
+import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
 import {
   parseClipId,
   parseMidiSourceId,

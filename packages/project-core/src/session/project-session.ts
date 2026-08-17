@@ -1,11 +1,14 @@
-import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
-import type { ProjectCommand } from '#internal/commands/project-command'
+import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
+import type { ProjectCommand } from '#internal/commands/protocol/project-command'
 import {
   createHistoryProjectCommitCandidate,
   createProjectCommitCandidate,
 } from '#internal/commit/project-commit-candidate'
 import type { ProjectCommit } from '#internal/commit/project-commit'
-import { HistoryController, type PreparedHistoryTransition } from '#internal/history/history-controller'
+import {
+  HistoryController,
+  type PreparedHistoryTransition,
+} from '#internal/history/history-controller'
 import {
   createInitialModelStore,
   type CreateInitialModelStoreInput,

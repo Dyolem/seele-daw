@@ -1,6 +1,6 @@
-import type { AddMidiClipWithNoteCommand } from '#internal/commands/project-command'
-import type { ReadyProjectCommandPreparation } from '#internal/commands/project-command-preparation'
-import { assertNewMidiClipGraphCanBeAdded } from '#internal/commands/midi-clip-command-handler'
+import type { AddMidiClipWithNoteCommand } from '#internal/commands/protocol/project-command'
+import type { ReadyProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
+import { assertNewMidiClipGraphCanBeAdded } from '#internal/commands/midi-clip/command-handler'
 import {
   assertNoteWithinClipWindow,
   createPlacementNoteValidationContext,
@@ -8,7 +8,7 @@ import {
 import {
   assertMidiNoteIdAvailable,
   assertMidiNoteWithinSource,
-} from '#internal/commands/midi-note-command-validation'
+} from '#internal/commands/midi-note/command-validation'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'

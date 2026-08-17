@@ -2,15 +2,15 @@ import {
   normalizeProjectCommand,
   PROJECT_COMMAND_TYPE,
   type ProjectCommand,
-} from '#internal/commands/project-command'
+} from '#internal/commands/protocol/project-command'
 import {
   ProjectCommandError,
   type ProjectCommandErrorDetails,
-} from '#internal/commands/project-command-error'
-import type { ProjectCommandPreparation } from '#internal/commands/project-command-preparation'
-import { prepareReplaceInstrumentDeviceCommand } from '#internal/commands/instrument-device-command-handler'
-import { prepareAddInstrumentTrackCommand } from '#internal/commands/instrument-track-command-handler'
-import { prepareAddMidiClipCommand } from '#internal/commands/midi-clip-command-handler'
+} from '#internal/commands/protocol/project-command-error'
+import type { ProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
+import { prepareReplaceInstrumentDeviceCommand } from '#internal/commands/instrument-device/command-handler'
+import { prepareAddInstrumentTrackCommand } from '#internal/commands/instrument-track/command-handler'
+import { prepareAddMidiClipCommand } from '#internal/commands/midi-clip/command-handler'
 import { prepareAddMidiClipWithNoteCommand } from '#internal/commands/midi-clip-note-placement/add-command-handler'
 import { prepareExtendMidiClipWithNoteCommand } from '#internal/commands/midi-clip-note-placement/extend-command-handler'
 import {
@@ -18,7 +18,7 @@ import {
   prepareMoveNotesCommand,
   prepareRemoveNotesCommand,
   prepareResizeNoteCommand,
-} from '#internal/commands/midi-note-command-handler'
+} from '#internal/commands/midi-note/command-handler'
 import type { ModelStoreReader } from '#internal/model/model-store'
 
 function rejectUnknownCommand(command: never): never {

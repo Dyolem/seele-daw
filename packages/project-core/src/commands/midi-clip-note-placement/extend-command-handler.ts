@@ -1,6 +1,6 @@
-import type { ExtendMidiClipWithNoteCommand } from '#internal/commands/project-command'
-import { ProjectCommandError } from '#internal/commands/project-command-error'
-import type { ReadyProjectCommandPreparation } from '#internal/commands/project-command-preparation'
+import type { ExtendMidiClipWithNoteCommand } from '#internal/commands/protocol/project-command'
+import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
+import type { ReadyProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
 import {
   assertNoteWithinClipWindow,
   createPlacementNoteValidationContext,
@@ -8,7 +8,7 @@ import {
 import {
   assertMidiNoteIdAvailable,
   assertMidiNoteWithinSource,
-} from '#internal/commands/midi-note-command-validation'
+} from '#internal/commands/midi-note/command-validation'
 import { createMidiClipRecord, type MidiClipRecord } from '#internal/model/midi-clip'
 import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelStoreReader } from '#internal/model/model-store'

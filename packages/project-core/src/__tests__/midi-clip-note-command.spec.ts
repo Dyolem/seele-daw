@@ -26,7 +26,7 @@ import {
   type ProjectCommit,
   type ProjectCommandExecutionResult,
 } from '#internal/index'
-import { prepareProjectCommand } from '#internal/commands/project-command-preparer'
+import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
 import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'

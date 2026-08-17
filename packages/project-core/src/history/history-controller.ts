@@ -1,5 +1,8 @@
-import type { ProjectCommandType } from '#internal/commands/project-command'
-import { PROJECT_HISTORY_DIRECTION, type ProjectHistoryDirection } from '#internal/commit/project-commit'
+import type { ProjectCommandType } from '#internal/commands/protocol/project-command'
+import {
+  PROJECT_HISTORY_DIRECTION,
+  type ProjectHistoryDirection,
+} from '#internal/commit/project-commit'
 import type { ModelRevision } from '#internal/model/model-revision'
 import {
   assertCreatedMutationPlan,
@@ -75,14 +78,7 @@ export class HistoryController {
       next: this.#undoHead,
     })
 
-    return this.#createTransition(
-      plan,
-      commandType,
-      null,
-      nextUndoHead,
-      null,
-      afterContentStateId,
-    )
+    return this.#createTransition(plan, commandType, null, nextUndoHead, null, afterContentStateId)
   }
 
   prepareUndo(

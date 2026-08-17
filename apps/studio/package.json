@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "format": "pnpm --workspace-root format",
+    "format:check": "pnpm --workspace-root format:check",
+    "lint": "pnpm --workspace-root lint",
+    "lint:fix": "pnpm --workspace-root lint:fix",
     "build": "run-p type-check build-only",
     "build-only": "run-s build:vite check:dist-asset-boundary",
     "build:vite": "vite build",

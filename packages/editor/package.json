@@ -11,6 +11,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "format": "pnpm --workspace-root format",
+    "format:check": "pnpm --workspace-root format:check",
+    "lint": "pnpm --workspace-root lint",
+    "lint:fix": "pnpm --workspace-root lint:fix",
     "type-check": "tsc -p tsconfig.json",
     "test:run": "vitest run --environment node"
   },

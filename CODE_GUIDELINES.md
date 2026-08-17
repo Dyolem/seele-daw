@@ -4,7 +4,7 @@
 >
 > Scope: `apps/`、`packages/` 与 `tooling/` 中所有人工维护的生产代码、测试和工程文档
 >
-> Last updated: 2026-07-28
+> Last updated: 2026-08-17
 
 本文档规定 Seele DAW 在代码清晰度、复用、抽象、配置、状态所有权和测试方面的共同工程
 准则。它不重复格式化器、ESLint、TypeScript 或专项架构文档已经能够明确决定的细节。
@@ -30,19 +30,36 @@
 
 能够稳定自动检查的规则 SHOULD 进入工具链，而不是只写在文档中：
 
-| 问题                                         | 主要执行者                             |
-| -------------------------------------------- | -------------------------------------- |
-| 格式、未使用代码和常见语法问题               | Oxlint、ESLint、Prettier compatibility |
-| 类型安全、项目引用和 Vue 模板类型            | TypeScript、`vue-tsc`                  |
-| Workspace 依赖、私有别名和测试反向依赖       | `tooling/architecture-rules`           |
-| 行为、不变量、失败恢复和生命周期             | 自动化测试                             |
-| 抽象是否必要、命名是否准确、状态归属是否合理 | 设计与代码评审                         |
+| 问题                                         | 主要执行者                   |
+| -------------------------------------------- | ---------------------------- |
+| 格式                                         | Oxfmt                        |
+| 未使用代码和常见语法问题                     | Oxlint、ESLint               |
+| 类型安全、项目引用和 Vue 模板类型            | TypeScript、`vue-tsc`        |
+| Workspace 依赖、私有别名和测试反向依赖       | `tooling/architecture-rules` |
+| 行为、不变量、失败恢复和生命周期             | 自动化测试                   |
+| 抽象是否必要、命名是否准确、状态归属是否合理 | 设计与代码评审               |
 
 不要在本文档中规定空格、分号、引号或 import 排序等格式细节。若规则会产生大量误报，也不要
 为了“更严格”而强行加入 lint；应先证明它能识别项目中的真实缺陷。
 
 提交前至少运行与改动风险相称的检查。跨 package、状态权威、持久化或生产组合变更默认运行
 `pnpm check`；纯文档变更至少运行链接、格式和 `git diff --check` 等适用检查。
+
+### 2.1 Workspace 质量命令
+
+- 根 `package.json`、`.oxfmtrc.json`、`.oxlintrc.json` 与 `eslint.config.ts` 是质量工具的
+  唯一配置权威。Workspace package MUST NOT 建立自己的格式或 lint 配置。
+- `pnpm lint`、`pnpm format:check` 与 `pnpm check` MUST 对源码保持只读；其中 `pnpm lint`
+  同时执行架构、workspace 命令一致性、Oxfmt、Oxlint 与 ESLint 检查，`pnpm check` 必须包含
+  完整 `pnpm lint`。
+- 只有显式写入命令 `pnpm format` 与 `pnpm lint:fix` 可以批量改写源码。不得把直接运行
+  `pnpm exec oxfmt`、`oxlint --fix` 或 `eslint --fix` 当作提交前检查。
+- 各 workspace package 的 `lint`、`lint:fix`、`format` 与 `format:check` 脚本 MUST 只委托
+  根命令。在 package 或其功能子目录运行 `pnpm lint`，语义与仓库根目录完全相同；package
+  范围的类型和测试命令仍可独立运行。
+- 全仓 Oxfmt 基线必须保持通过。格式器解析版本由 `pnpm-lock.yaml` 锁定；版本或规则升级需要
+  单独批次：更新 lockfile 与配置、生成一次机械格式提交并完成完整验证，不得与产品行为改动
+  混在同一提交。
 
 ## 3. 以产品切片驱动实现
 

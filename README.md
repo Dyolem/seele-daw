@@ -27,6 +27,7 @@ seele-daw/
 ├── tooling/
 │   ├── architecture-rules/  包依赖边界检查
 │   ├── eslint-config/       ESLint 共享配置演进位置
+│   ├── quality-rules/       Workspace 质量命令一致性检查
 │   └── tsconfig/            TypeScript 共享配置
 └── docs/
     ├── architecture/        架构基线文档
@@ -59,9 +60,16 @@ pnpm dev
 pnpm type-check
 pnpm test:run
 pnpm lint
+pnpm lint:fix
+pnpm format
+pnpm format:check
 pnpm build
 pnpm check
 ```
+
+`pnpm lint`、`pnpm format:check` 与 `pnpm check` 不重写源码；`pnpm format` 和
+`pnpm lint:fix` 是显式写入命令。质量配置只由仓库根目录维护，在任一 workspace package 或其
+功能目录执行同名命令时，会委托根目录并检查整个 workspace，避免子包形成不同格式基线。
 
 ## 导入路径
 

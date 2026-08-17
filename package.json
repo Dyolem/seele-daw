@@ -3,11 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.3.0",
-  "engines": {
-    "node": ">=24 <25",
-    "pnpm": ">=11.3.0 <12"
-  },
   "scripts": {
     "dev": "pnpm --filter @seele-daw/studio dev",
     "build": "pnpm --filter @seele-daw/studio build",
@@ -16,12 +11,17 @@
     "test": "pnpm test:unit",
     "test:unit": "pnpm --filter @seele-daw/studio test:unit",
     "test:run": "pnpm --recursive --if-present test:run",
-    "lint": "run-s lint:architecture lint:oxlint lint:eslint",
+    "lint": "run-s lint:architecture lint:workspace-quality format:check lint:oxlint lint:eslint",
     "lint:architecture": "node tooling/architecture-rules/check-boundaries.mjs",
-    "lint:oxlint": "oxlint apps packages --fix",
-    "lint:eslint": "eslint . --fix --cache",
-    "format": "oxfmt apps/ packages/ tooling/",
-    "check": "run-s lint:architecture type-check test:run build"
+    "lint:workspace-quality": "node tooling/quality-rules/check-workspace-quality-scripts.mjs",
+    "lint:oxlint": "oxlint .",
+    "lint:eslint": "eslint . --cache",
+    "lint:fix": "run-s lint:fix:oxlint lint:fix:eslint format",
+    "lint:fix:oxlint": "oxlint . --fix",
+    "lint:fix:eslint": "eslint . --fix --cache",
+    "format": "oxfmt --config=.oxfmtrc.json --disable-nested-config --write .",
+    "format:check": "oxfmt --config=.oxfmtrc.json --disable-nested-config --check .",
+    "check": "run-s lint type-check test:run build"
   },
   "devDependencies": {
     "@iconify-json/fluent": "1.2.53",
@@ -50,5 +50,10 @@
     "vitest": "^4.1.9",
     "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.3.5"
-  }
+  },
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11.3.0 <12"
+  },
+  "packageManager": "pnpm@11.3.0"
 }

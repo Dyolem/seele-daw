@@ -12,6 +12,10 @@
     "./development/sample-instrument-audition": "./src/development/sample-instrument-audition.ts"
   },
   "scripts": {
+    "format": "pnpm --workspace-root format",
+    "format:check": "pnpm --workspace-root format:check",
+    "lint": "pnpm --workspace-root lint",
+    "lint:fix": "pnpm --workspace-root lint:fix",
     "measure:studio-grand-local": "jiti scripts/measure-studio-grand-local-assets.ts",
     "prepare:studio-grand-local": "jiti scripts/prepare-studio-grand-local-assets.ts",
     "type-check": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",

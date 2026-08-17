@@ -1,10 +1,10 @@
 # Audible MIDI Playback V1 阶段计划
 
-> Status: Batch 1–6 reviewed; Batch 7 timeline and playhead work approved for implementation
+> Status: Batch 1–6 reviewed; Batch 7E.0 committed; Piano Roll dual-scope correction in progress
 >
 > Date: 2026-08-10
 >
-> Last updated: 2026-08-14
+> Last updated: 2026-08-17
 >
 > Prerequisite checkpoint: `checkpoint/piano-roll-note-editing-2026-08-10`
 
@@ -23,7 +23,7 @@
 -> 听见按项目时间调度的采样钢琴
 -> 播放中编辑能够使旧事件安全失效
 -> 在至少 150 小节的编排时间轴中看见并跟随播放位置
--> 在当前 MIDI Clip 中看见同一播放位置
+-> 在 Track 全局或当前 MIDI Clip 视图中看见同一播放位置
 -> Save / Reload 后保留所选 Instrument
 ```
 
@@ -1188,12 +1188,12 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 - 每次进入 Playing 时重新默认开启 Follow；程序化分页跳转不会被后续原生 `scroll` 事件误判为
   用户中断。手动横向滚动、Pointer 时间轴操作和对应 Keyboard 操作会暂停本次 Follow。
 
-#### Batch 7E：Piano Roll Playhead
+#### Batch 7E.0：Clip Focus Piano Roll Playhead 基线
 
-> Implementation status: reviewed and approved for commit on 2026-08-17. The Piano Roll reads the
-> shared visual position through one transform-only child layer. Architecture lint, affected
-> ESLint / Oxlint, Studio type-check, Studio 45 files / 266 tests and the Studio production build
-> pass.
+> Implementation status: reviewed and committed as `7531677` on 2026-08-17. The Clip-local Piano
+> Roll reads the shared visual position through one transform-only child layer. Architecture lint,
+> affected ESLint / Oxlint, Studio type-check, Studio 45 files / 266 tests and the Studio production
+> build pass.
 
 - 当前 Piano Roll 读取与 Arrangement 相同的全局 Transport Tick；
 - 用 `globalTick - clip.startTick` 投影为 Clip 局部位置，只在 `[0, clip.spanTick]` 范围显示；
@@ -1203,6 +1203,63 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
   Editor Session 不消费 Transport 视觉帧；
 - `clip.startTick` 由 Studio Presentation 显式提供，不能用代表 MIDI Source 读取偏移的
   `sourceStartTick` 代替。项目身份不匹配、全局位置位于 Clip 外或编辑器卸载时不保留旧投影。
+
+该提交是后续 `Clip Focus` 模式的可复用基线，不再被视为 Piano Roll 最终唯一时间语义。用户
+审核发现，仅显示完整 Clip 会允许 Piano Roll 与 Arrangement 对 Clip 边界产生不同理解；因此
+以下双模式校准已经确认，并拆成独立可审阅批次。
+
+#### Batch 7E.1–7E.5：Piano Roll Track / Clip 双模式校准
+
+> Implementation status: Batch 7E.1 is implemented locally and awaiting review. It does not change
+> the visible Piano Roll Surface or Project facts.
+
+一个 Project MIDI Clip 仍是唯一权威实体，Piano Roll 不创建第二份 Clip Fact。两种模式只是
+同一 Track / Clip / MidiSource 图的不同投影：
+
+- `Track` 是默认模式，使用全局 Project Tick，显示当前 Instrument Track 的全部 MIDI Clip 与
+  其中可见 Note；
+- `Clip Focus` 是可选模式，复用 Batch 7E.0 的 Clip-local Viewport，只编辑当前 Clip；
+- 编辑模式属于 Studio 应用生命周期偏好，不进入 Project File、History、dirty、Checkpoint 或
+  Pinia 中的 Project Session 所有权；
+- 非循环 Clip 中 Note 的全局位置固定为
+  `clip.startTick + note.startTick - clip.sourceOffsetTick`；Clip 末端继续只由
+  `clip.startTick + clip.spanTick` 派生，不增加重复 `endTick` Fact；
+- 当前重叠 Clip 都是合法 Project Fact。Track 模式命中已有内容时以显式 Active Clip 作为编辑
+  目标，不根据视觉重叠猜测；
+- looped Clip 先保留可见但明确不可编辑，等待循环实例与 Source 写回语义单独确认。
+
+Track 模式 Pencil 在全局时间轴上的首版自动放置规则已经确认：
+
+| Pointer 位置                                 | Clip / Note 结果                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 位于一个非循环 Clip 内                       | 写入该 Clip；若重叠区域存在多个 Clip，Active Clip 优先，否则必须先显式选择，不能猜测 |
+| Note 起点在 Clip 内、尾端越界                | 在不跨越下一 Clip 的前提下原子扩展该 Clip 右端并创建 Note                            |
+| 位于左侧相邻 Clip 末端之后不超过一个当前小节 | 若扩展不会碰到下一 Clip，原子向右扩展该 Clip 并创建 Note                             |
+| 更远的空白区域                               | 从包含 Pointer 的小节边界创建新的非循环 Clip / MidiSource，并在同一次提交中创建 Note |
+| 位于既有 Clip 之前                           | 创建新 Clip，不在 V1 自动左扩已有 Clip                                               |
+| 目标是 looped Clip 或归属仍有歧义            | 不提交并显示明确原因                                                                 |
+
+任何自动扩展都不得越过下一 Clip；创建 / 扩展 Clip 与创建 Note 必须表达为一次产品意图、一次
+原子 Project Command、一个 Commit 和一个 History 步骤，不能由 Studio 串联多次 Command
+模拟事务。
+
+实施顺序：
+
+1. **Batch 7E.1：共享 Track 全局 Read Model 与 Scope 状态。** Editor 从 immutable Snapshot
+   投影 Track 上排序后的 Clip window 与全局 Note 位置；Studio 只建立默认 `Track` / 可选
+   `Clip Focus` 偏好。本批不改变现有可见 Surface，也不写 Project Fact。
+2. **Batch 7E.2：原子 Clip 边界与 Note 放置。** Project Core 增加真实产品命令，覆盖新建
+   Clip / MidiSource / Note 和向右扩 Clip / Source 后添加 Note，并定义 Undo / Redo、Delta、
+   Query 与冲突验证。
+3. **Batch 7E.3：Track 模式 Surface。** Studio 接入 Track Ruler、Clip window、横向滚动、
+   Active Clip 与放置 Preview；Clip 变化继续直接反映到 Arrangement。
+4. **Batch 7E.4：Clip Focus 适配与可见切换。** 同一 Surface 提供模式切换，Clip Focus 禁止在
+   当前 Clip 外自动创建或扩展其他 Clip；切换模式不产生 Project Commit。
+5. **Batch 7E.5：双模式 Playhead / Follow。** Track 模式直接投影全局 Tick 并按分页规则跟随；
+   Clip Focus 继续使用 `globalTick - clip.startTick`，两者仍只消费同一共享视觉位置。
+
+每个子批次继续独立停止审阅，不能把 Core 事务、Editor 投影与 Studio UI 合并成一个不可审阅
+提交。
 
 #### Batch 7F：加固与文档同步
 

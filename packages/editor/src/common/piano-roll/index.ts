@@ -122,3 +122,5 @@ export type {
   CreatePianoRollViewportInput,
   PianoRollViewport,
 } from './piano-roll-viewport'
+
+export * from './track/index'

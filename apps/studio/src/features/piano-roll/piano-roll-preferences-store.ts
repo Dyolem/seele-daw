@@ -10,6 +10,13 @@ export const PIANO_ROLL_TOOL = {
 
 export type PianoRollTool = ValueOf<typeof PIANO_ROLL_TOOL>
 
+export const PIANO_ROLL_EDITING_SCOPE = {
+  CLIP: 'clip',
+  TRACK: 'track',
+} as const
+
+export type PianoRollEditingScope = ValueOf<typeof PIANO_ROLL_EDITING_SCOPE>
+
 export const PIANO_ROLL_GRID_PRESET = {
   SIXTEENTH: '1/16',
 } as const
@@ -21,6 +28,8 @@ const GRID_PRESET_SUBDIVISION_SPAN_TICK = Object.freeze({
 }) satisfies Readonly<Record<PianoRollGridPreset, Tick>>
 
 export const PIANO_ROLL_DEFAULT_TOOL = PIANO_ROLL_TOOL.PENCIL
+export const PIANO_ROLL_DEFAULT_EDITING_SCOPE =
+  PIANO_ROLL_EDITING_SCOPE.TRACK
 export const PIANO_ROLL_DEFAULT_SNAP_ENABLED = true
 export const PIANO_ROLL_DEFAULT_GRID_PRESET =
   PIANO_ROLL_GRID_PRESET.SIXTEENTH
@@ -34,6 +43,9 @@ export const usePianoRollPreferencesStore = defineStore(
   'piano-roll-preferences',
   () => {
     const activeTool = shallowRef<PianoRollTool>(PIANO_ROLL_DEFAULT_TOOL)
+    const editingScope = shallowRef<PianoRollEditingScope>(
+      PIANO_ROLL_DEFAULT_EDITING_SCOPE,
+    )
     const snapEnabled = shallowRef(PIANO_ROLL_DEFAULT_SNAP_ENABLED)
     const gridPreset = shallowRef<PianoRollGridPreset>(
       PIANO_ROLL_DEFAULT_GRID_PRESET,
@@ -44,6 +56,10 @@ export const usePianoRollPreferencesStore = defineStore(
 
     function activateTool(tool: PianoRollTool): void {
       activeTool.value = tool
+    }
+
+    function selectEditingScope(scope: PianoRollEditingScope): void {
+      editingScope.value = scope
     }
 
     function setSnapEnabled(enabled: boolean): void {
@@ -60,16 +76,19 @@ export const usePianoRollPreferencesStore = defineStore(
 
     function reset(): void {
       activeTool.value = PIANO_ROLL_DEFAULT_TOOL
+      editingScope.value = PIANO_ROLL_DEFAULT_EDITING_SCOPE
       snapEnabled.value = PIANO_ROLL_DEFAULT_SNAP_ENABLED
       gridPreset.value = PIANO_ROLL_DEFAULT_GRID_PRESET
     }
 
     return {
       activeTool,
+      editingScope,
       snapEnabled,
       gridPreset,
       subdivisionSpanTick,
       activateTool,
+      selectEditingScope,
       setSnapEnabled,
       toggleSnap,
       selectGridPreset,

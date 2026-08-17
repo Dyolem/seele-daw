@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-14，代码基线 `dfbddce`，Batch 6A–6F 已通过统一逐提交审核
+> 最近更新：2026-08-17，代码基线 `7531677`；Batch 7E.1 Track 全局 Read Model 正在审核
 >
-> 当前阶段：Audible MIDI Playback V1 的选择性播放同步已收口，继续实施 Batch 7 时间轴与播放头
+> 当前阶段：Audible MIDI Playback V1 继续实施 Batch 7 Piano Roll Track / Clip 双模式校准
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -305,11 +305,12 @@ Scrub。Follow 在每次进入 Playing 时默认开启，并只分页滚动右�
 Track 控制列保持固定。用户主动横向滚动或通过 Pointer / Keyboard 操作时间轴会暂停本次 Follow，
 可见 Follow 控制可以立即恢复。该状态不保存为 Project Fact。
 
-当前 Piano Roll 也显示不可交互 Playhead：它用 `globalTick - clip.startTick` 把同一全局 Transport
-位置换算为所选 Clip 的局部位置，只在 `[0, clip.spanTick]` 内显示，并通过独立图层的
-`translate3d(...)` 移动。切换 Clip、Selection 或项目以及退出编辑器时，投影会更新或清理；项目
-身份不匹配时不会显示旧项目位置。当前完整 Clip 视口不增加 Zoom、横向滚动或自动跟随，也不改变
-已有 Note 编辑手势。
+当前已交付的 Clip Focus Piano Roll 基线也显示不可交互 Playhead：它用
+`globalTick - clip.startTick` 把同一全局 Transport 位置换算为所选 Clip 的局部位置，只在
+`[0, clip.spanTick]` 内显示，并通过独立图层的 `translate3d(...)` 移动。切换 Clip、Selection 或
+项目以及退出编辑器时，投影会更新或清理；项目身份不匹配时不会显示旧项目位置。已确认的后续
+Track 默认模式将直接使用全局 Tick，并在自身横向视口中执行 Follow；完成该模式前，当前完整
+Clip 视口仍不增加 Zoom、横向滚动或自动跟随。
 
 - **尚未调度**：还没有交给声音 Runtime；
 - **已调度但未开始**：已经安排了未来开始时刻，但尚未产生声音；
@@ -551,9 +552,44 @@ Undo 步骤的集合操作必须建立一个封闭 MutationPlan，不能由 Stud
 
 **局部可用**
 
+Piano Roll 已确认采用“一个 Project 模型、两种编辑投影”，不是为编辑器复制第二份 Clip：
+
+- `Track` 是默认编辑模式，显示当前 Instrument Track 的全局时间轴、全部 MIDI Clip 及其中
+  可见 Note；
+- `Clip Focus` 是可选模式，只显示并编辑当前 Clip 的局部时间窗口；
+- 模式选择是 Studio 应用生命周期偏好，不是 Project Fact，不产生 dirty、History 或 Commit；
+- 两种模式读取同一 `MidiClipRecord`、`MidiSourceRecord` 和 Note Partition。Clip 右端始终由
+  `startTick + spanTick` 派生，不创建 Piano Roll 专用 Clip 或重复 `endTick`；
+- 非循环 Clip 的 Note 全局 Tick 为
+  `clip.startTick + note.startTick - clip.sourceOffsetTick`；Clip Focus 则继续使用当前
+  Clip-local / Source-local 映射；
+- looped Clip 可以出现在 Track 投影中，但在循环实例选择与 Source 写回语义确认前不可编辑。
+
+Track 模式 Pencil 在全局空白时间轴上的产品规则：
+
+| Pointer 位置 | 行为 |
+| ------------ | ---- |
+| 位于一个非循环 Clip 内 | 写入该 Clip；重叠 Clip 区域优先使用 Active Clip，没有明确目标时不猜测 |
+| Note 起点在 Clip 内但尾端越界 | 若不跨越下一 Clip，原子扩展 Clip 右端并创建 Note |
+| 位于左侧相邻 Clip 末端之后不超过一个当前小节 | 若不与下一 Clip 相交，原子向右扩展该 Clip 并创建 Note |
+| 更远的空白区域 | 从包含 Pointer 的小节边界创建新非循环 Clip / MidiSource，并原子创建 Note |
+| 位于既有 Clip 之前 | 创建新 Clip；V1 不自动向左扩展已有 Clip |
+| looped Clip 或目标归属有歧义 | 拒绝本次提交并显示原因 |
+
+自动扩展永远不能跨越下一 Clip。新建 / 扩展 Clip 与创建 Note 是一次用户手势、一个原子 Project
+Command、一个 Commit 和一个 History 步骤；Studio 不得通过多次命令拼接事务。Clip Focus
+模式不会因为用户在局部视口操作而自动创建其他 Clip。
+
+当前实现状态需要与已确认的最终规则区分：Clip Focus Surface 和局部 Playhead 已经可见；Editor
+已经建立 immutable Snapshot 到 Track 全局 Clip / Note 的共享只读投影，Studio Preference
+Store 也已预留默认 Track Scope。可见模式切换、Track Ruler / Clip window、全局 Pencil 放置和
+Track Playhead / Follow 仍按独立批次接入，不能从读模型推断为已经交付。
+
 `@seele-daw/editor/common` 已提供：
 
 - 非循环 MIDI Clip 与其 MidiSource 的稳定 1:1 编辑上下文；
+- immutable Snapshot 派生的 Track 全局 Clip / Note Read Model，以及明确的 looped Clip
+  unsupported 投影；
 - Clip-local Tick 与 Source Tick 的双向映射；
 - 可见 Tick / Pitch / CSS Pixel Viewport；
 - 不提前 Snap 的连续 X → Tick 位置换算；
@@ -636,9 +672,9 @@ Note 被删除或移出当前 Clip Source 时间窗口时由权威 Query 清理�
 
 当前明确限制：
 
-- 不支持 looped Clip，不能把循环实例错误显示成非循环 Source；
+- 不支持 looped Clip 编辑，不能把循环实例错误显示成非循环 Source；
 - Grid Preset UI 当前只显示已确认的 `1/16`，尚不能选择其他直线、三连音或附点值；
-- 首批视图固定显示完整 Clip 和 MIDI 48–72，尚无 Zoom / Scroll；
+- 当前可见基线固定显示完整 Clip 和 MIDI 48–72，尚无模式切换、Track 全局 Zoom / Scroll；
 - 用户可以创建、选择、移动、调整长度和删除 Note，但还不能编辑 Velocity；
 - Canvas Note Adapter 可以显示 Resize Preview，但尚未提供 Canvas Hit；当前产品默认使用
   DOM Note Renderer 完成 Edge Hit。
@@ -661,8 +697,8 @@ Project Core 已具备：
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、含单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                                                                                                                                                                                         |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                                                                                                                                            |
-| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return / 共享视觉位置与时间反馈、播放中 Note / Track / Instrument 选择性重协调、默认 Studio Grand Add Track、旧 Slot 显式选择、派生 150 小节 Arrangement、横向滚动、Arrangement Playhead / 分页 Follow 与 Piano Roll Playhead、空 MIDI Clip、Track / Clip Selection 与 Piano Roll Note 编辑。 |
-| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                                                                                                                                              |
+| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return / 共享视觉位置与时间反馈、播放中 Note / Track / Instrument 选择性重协调、默认 Studio Grand Add Track、旧 Slot 显式选择、派生 150 小节 Arrangement、横向滚动、Arrangement Playhead / 分页 Follow 与 Clip Focus Piano Roll Playhead、空 MIDI Clip、Track / Clip Selection 与 Piano Roll Note 编辑；Piano Roll Scope 偏好已建立，Track 模式 UI 尚未接入。 |
+| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note Snapshot 投影、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                                                                                                                    |
 | `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、派生 Timeline 范围、具体 MIDI Plan Compiler、Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；公开 Studio / Audio Web 真实消费者所需的最小规划 API，不提供音频资源。                                                                                                |
 | `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、可重排 Note Off、loop、mutex、选择性 cancel、generation 与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                                                                                                                |
 | `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                                                                                                                     |

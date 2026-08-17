@@ -369,8 +369,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - Arrangement Playhead MUST 位于不接收 Pointer 命中的独立轻量图层，并用
   `transform: translate3d(...)` 移动；高频更新不得修改 `left`、`inset-inline-start` 或其他触发布局
   的动态位置属性。Follow 只分页滚动右侧时间视口，左侧 Track 控制列保持固定。
-- Piano Roll Playhead MUST 用 `globalTick - clip.startTick` 投影同一位置，只在 Clip 与当前 Viewport
-  范围内显示，并通过独立 transform-only 图层移动。`sourceStartTick` 表示 MIDI Source 读取偏移，
+- Piano Roll Playhead MUST 按当前编辑 Scope 投影同一位置：`Track` 模式直接使用全局 Tick；
+  `Clip Focus` 模式使用 `globalTick - clip.startTick`，并只在 Clip 与当前 Viewport 范围内显示。
+  两种模式都通过独立 transform-only 图层移动。`sourceStartTick` 表示 MIDI Source 读取偏移，
   MUST NOT 被当作 Clip 在 Arrangement 的起点。
 - 用户主动横向滚动或操作时间轴时，本次 Follow 暂停；可见 Follow 控制 MUST 能立即恢复。该状态
   是当前视图的瞬时产品状态，不属于 Project Fact。
@@ -393,6 +394,8 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 双击 MIDI Clip 或执行 “Open in MIDI Editor” 打开 Piano Roll。
 - 打开新 Clip 时，Context Editor Dock 默认复用当前位置和高度。
 - Arrangement 中的 Clip 选择与 Piano Roll 当前编辑对象必须可区分：选择多个 Clip 不代表把所有内容混入同一个编辑器。
+- Piano Roll 的 `Track` / `Clip Focus` 是同一 Project Clip 图的视图 Scope，不建立编辑器私有
+  Clip。Active Clip 在重叠区域提供明确写入目标，但不能改变 Arrangement Selection 的含义。
 - 若被编辑对象被删除，Piano Roll 应退出失效上下文，显示空状态或关闭，而不是保留幽灵数据。
 
 ### 7.9 Piano Roll
@@ -408,10 +411,28 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 显示播放头；
 - 通过 Inspector 或工具区编辑基础属性。
 
+已确认的双模式结构：
+
+- `Track` 是默认 Scope，以全局 Project Tick 显示当前 Instrument Track 上的全部 MIDI Clip；
+- `Clip Focus` 是可选 Scope，以 Clip-local Tick 聚焦一个 Clip；
+- Scope 是 Studio 应用生命周期偏好，不进入 Project Fact、History、dirty 或 Checkpoint；
+- 两种模式读取相同的 `MidiClipRecord`、`MidiSourceRecord` 与 Note Partition；Clip 末端只由
+  `startTick + spanTick` 派生；
+- Track 投影中非循环 Note 的全局位置是
+  `clip.startTick + note.startTick - clip.sourceOffsetTick`；
+- looped Clip 在循环实例编辑语义确认前可以显示，但 MUST 明确不可编辑。
+
+Track 模式在空白时间创建 Note 时，优先写入命中的 Active 非循环 Clip；Note 尾端越界或 Pointer
+位于左侧相邻 Clip 末端后一个当前小节以内时，可以向右扩展该 Clip，但 MUST NOT 跨越下一 Clip。
+更远空白以及既有 Clip 之前的空白创建新的、按小节边界对齐的非循环 Clip / MidiSource；V1 不
+自动左扩已有 Clip。创建 / 扩展 Clip 与创建 Note MUST 由一次原子 Project Command 完成。
+Clip Focus 不自动创建其他 Clip。重叠区域没有 Active Clip 或目标为 looped Clip 时，交互 MUST
+拒绝提交并解释原因，不能猜测写入归属。
+
 首批默认编辑语义：
 
 - MIDI 60 显示为 `C4`，初始纵向视图以 C4 附近为中心；
-- 初次打开 Clip 时横向显示完整 Clip，Arrangement 与 Piano Roll 暂不强制同步 Zoom；
+- Clip Focus 初次打开 Clip 时横向显示完整 Clip，Arrangement 与 Piano Roll 暂不强制同步 Zoom；
 - 初始 Grid 为 `1/16`，Snap 默认开启；
 - 显式提供 Pencil 与 Cursor，默认工具为 Pencil；
 - Cursor 负责 Note Selection 与 Note Body Move，不在空白 Grid 创建 Note；
@@ -422,7 +443,7 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - X 受 Timeline Grid Snap 影响；开启 Snap 时使用 Pointer 所在 Grid 单元的左边界，关闭
   Snap 时保留 Pencil X 对应的最近整数 Tick；
 - Y 不进入 Timeline Snap，直接使用 Pointer 覆盖的离散 Pitch Row。
-- Tool、Snap 与 Grid Preset 属于 Studio 应用生命周期偏好；切换 Project、Clip 或 Dock
+- Scope、Tool、Snap 与 Grid Preset 属于 Studio 应用生命周期偏好；切换 Project、Clip 或 Dock
   布局不重置，页面刷新恢复默认值；
 - 首批只确认 `1/16` Grid Preset，其他直线、三连音或附点 Preset 必须由后续产品切片定义。
 
@@ -1039,10 +1060,11 @@ Arrangement 当前使用独立 DOM Playhead 子组件直接消费该投影，并
 `translate3d(...)`。Ruler、Lane、Clip Scene 不消费高频位置；分页 Follow 由 Arrangement 右侧
 滚动权威执行，手动横向导航会暂停当前播放轮次的自动滚动。
 
-Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。Studio Presentation 显式携带 Project
-身份和 Arrangement `clip.startTick`，子组件再映射到当前 Clip-local Viewport；静态 Canvas Grid、
-DOM Note Scene、Project Query 和 Editor Session 都不订阅高频 Transport 帧。当前完整 Clip 视口
-没有 Zoom、横向滚动或 Follow。
+Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。已交付的 Clip Focus 基线由 Studio
+Presentation 显式携带 Project 身份和 Arrangement `clip.startTick`，子组件再映射到当前
+Clip-local Viewport；后续 Track Scope 直接消费全局 Tick，并在自身横向权威上分页 Follow。静态
+Canvas Grid、DOM Note Scene、Project Query 和 Editor Session 都不订阅高频 Transport 帧。当前
+可见的完整 Clip 视口没有 Zoom、横向滚动或 Follow。
 
 ### 21.2 禁止项
 
@@ -1134,13 +1156,16 @@ Canvas 功能至少检查：
     滚动状态，左侧 Track 列以无独立 `scrollTop` 的裁切从视图跟随，Ruler 与 Lane 共用横向
     滚动；进入 Zoom、大量对象或高频交互前重新评估 Canvas。
 12. Piano Roll 使用混合表面：Toolbar、标尺、钢琴键盘和可访问状态使用 DOM，Grid 使用 Canvas，Note 通过可替换 Renderer Port 输出。
-13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，横向初始显示完整 Clip。
+13. MIDI 60 显示为 C4；首批视图以 C4 附近为中心，Clip Focus 横向初始显示完整 Clip。
 14. Piano Roll 显式提供 Pencil 与 Cursor，默认 Pencil；Cursor 负责 Selection 与 Note
     Body Move，Pencil 不发起 Move。
 15. Piano Roll 初始 Grid 为 1/16、Snap 默认开启；视觉 Grid 与交互 Snap 消费同一 Common Grid。
 16. Pencil Click 空白 Grid 创建长度为一格、Velocity 100、UI Channel 1 的 Note；成功后只选中新 Note并保持 Pencil。
 17. Note 左右边缘 Resize 对 Cursor 与 Pencil 同时开放；一次 Drag 只产生一次提交。
 18. Piano Roll 首批使用 DPR-aware Canvas Grid 与 keyed DOM Note；Canvas Note Adapter 消费同一 Scene，是否切换由真实基准决定。
+19. Piano Roll 使用同一 Project 模型的双 Scope：默认 `Track` 全局时间轴，可选 `Clip Focus`
+    局部时间轴；Scope 是应用偏好，不是 Project Fact。Track 空白区域的 Clip 自动创建 / 向右
+    扩展与 Note 创建必须是一个原子 Command，且自动扩展不能跨越下一 Clip。
 
 ## 24. 待后续切片决定
 

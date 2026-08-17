@@ -2,7 +2,8 @@
 
 `editor` 负责把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑会话状态，但不拥有 Track、Clip、Note 等项目事实。
 
-> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model、
+> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model，以及从
+> immutable Snapshot 派生的 Track 全局 Clip / Note Read Model；
 > Clip-scoped Note Selection Session、Timeline Grid Snap 与 Pencil Note Placement；
 > Cursor Move 与 Cursor / Pencil 单 Note Resize Gesture、Preview 和 Interaction Session
 > 分支已经就绪；
@@ -29,15 +30,15 @@ DOM / Pointer / Keyboard / MIDI
 
 ## 主要职责
 
-| 领域          | 规划职责                                                              |
-| ------------- | --------------------------------------------------------------------- |
-| EditorSession | Selection、focused surface、active tool、内部 Clipboard               |
-| 输入          | DOM/MIDI 事件归一化为框架无关的 EditorInput                           |
-| Surface       | 坐标转换、Hit Test、Snap candidates、Read Model                       |
-| Tool          | Idle/Pressed/Dragging/Committing/Cancelled 显式状态机                 |
-| Preview       | Drag ghost、box selection、snap result，不写 ProjectModel             |
-| 命令解析      | 根据上下文把 EditorIntent 转成完整 ProjectCommand                     |
-| Read Model    | 面向可见范围的稳定查询结果，不复制完整项目                            |
+| 领域          | 规划职责                                                             |
+| ------------- | -------------------------------------------------------------------- |
+| EditorSession | Selection、focused surface、active tool、内部 Clipboard              |
+| 输入          | DOM/MIDI 事件归一化为框架无关的 EditorInput                          |
+| Surface       | 坐标转换、Hit Test、Snap candidates、Read Model                      |
+| Tool          | Idle/Pressed/Dragging/Committing/Cancelled 显式状态机                |
+| Preview       | Drag ghost、box selection、snap result，不写 ProjectModel            |
+| 命令解析      | 根据上下文把 EditorIntent 转成完整 ProjectCommand                    |
+| Read Model    | 面向可见范围的稳定查询结果，不复制完整项目                           |
 | Renderer      | DOM / Canvas Adapter、Scene、空间索引、dirty region、frame scheduler |
 
 ## 状态所有权
@@ -56,7 +57,7 @@ DOM / Pointer / Keyboard / MIDI
 ```text
 src/
 ├── common/
-│   ├── piano-roll/   已实现的 Clip Context、Viewport 与可见 Note Read Model
+│   ├── piano-roll/   已实现的 Clip / Track 投影、Viewport 与可见 Note Read Model
 │   ├── input/        EditorInput 与 EditorIntent
 │   ├── session/      Selection、focus、clipboard
 │   ├── surfaces/     Surface 契约与领域坐标
@@ -97,6 +98,22 @@ src/
 
 完整边界见
 [Piano Roll Common Foundation 实施计划](./docs/piano-roll-common-foundation-plan.md)。
+
+## 已实现：Piano Roll Track 全局 Read Model 基础
+
+为同一个 Piano Roll 支持默认 Track Scope 与可选 Clip Focus，`common/piano-roll/track` 已提供：
+
+- 从一个 immutable `ProjectSnapshot + TrackId` 派生排序后的全局 Clip window；
+- 用 `clip.startTick + note.startTick - clip.sourceOffsetTick` 把非循环 Clip 中可见 Note 映射到
+  Project Tick；
+- Clip / Source endpoint 的双向映射，以及由 `startTick + spanTick` 派生的 Clip 末端；
+- 可选 Active Clip 身份；已删除或不属于该 Track 的旧身份会清空，不产生幽灵选择；
+- looped Clip 仍出现在投影中，但带有明确 `unsupported` 状态且不伪造重复 Note 实例；
+- 缺失 Track、非 Instrument Track、断裂的 Source / Note Partition 引用均失败关闭。
+
+该能力是纯 Snapshot Read Model，不订阅 ProjectSession、不拥有 Selection，也不写 Project Fact。
+当前 Studio 可见 Surface 仍使用既有 Clip-local 流程；Track Ruler、Clip window、全局放置与模式切换
+由后续纵向批次组合。
 
 ## 已实现：Piano Roll Editor Session
 
@@ -183,8 +200,10 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 5. **已完成**：多 Note Remove、Cursor Move 与 Cursor / Pencil 单 Note Resize 已接入
    Studio，完整边界见
    [Piano Roll Note Editing 第五阶段计划](./docs/piano-roll-note-editing-phase-plan.md)。
-6. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
-7. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
+6. **进行中**：同一 Project 模型的 Track 全局 / Clip Focus 双 Scope；共享 Track Read Model
+   已完成，原子 Clip / Note 放置与 Studio Surface 尚待后续批次。
+7. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
+8. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 
 ## 测试与验收
 

@@ -10,6 +10,10 @@ export type PianoRollErrorCode =
   | 'looped-clip-unsupported'
   | 'read-model-disposed'
   | 'tick-outside-clip'
+  | 'track-clip-note-partition-missing'
+  | 'track-clip-source-missing'
+  | 'track-not-found'
+  | 'track-not-instrument'
   | 'viewport-clip-mismatch'
   | 'viewport-outside-clip'
 

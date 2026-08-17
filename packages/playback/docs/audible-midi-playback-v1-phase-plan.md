@@ -1156,9 +1156,9 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7C：共享视觉位置源
 
-> Implementation status: implemented locally and awaiting review. Studio owns one frame-sampled
-> visual position projection. Architecture lint, affected ESLint / Oxlint, Studio type-check,
-> Studio 42 files / 254 tests and the Studio production build pass.
+> Implementation status: reviewed, committed and pushed as `c9b4a02`. Studio owns one
+> frame-sampled visual position projection. Architecture lint, affected ESLint / Oxlint, Studio
+> type-check, Studio 42 files / 254 tests and the Studio production build pass.
 
 - Studio 从 Transport / Playback Clock 派生可供视图读取的当前 Tick 与状态，不维护第二套累计
   时间；
@@ -1173,12 +1173,20 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7D：Arrangement Playhead 与 Follow
 
+> Implementation status: reviewed and approved for commit on 2026-08-17. The Playhead updates one
+> transform-only layer. Architecture lint, affected ESLint / Oxlint, Studio type-check, Studio 43
+> files / 262 tests and the Studio production build pass.
+
 - Ruler 与 Lane 上显示同一条不可交互 Playhead，使用独立轻量图层移动；
 - Follow 只驱动 Batch 7B 已建立的 Ruler / Lane 横向滚动，左侧 Track 控制列继续保持固定；
 - Follow 默认开启，使用分页式而非持续居中的自动滚动，避免播放时视图不断抖动；
 - 用户主动横向滚动或进行时间轴编辑时，当前播放轮次暂停 Follow；可见 Follow 控制允许立即
   恢复，不把该状态保存为 Project Fact；
 - Playhead 不接收 Pointer 命中，不实现点击定位、拖动 Seek 或 Scrub。
+- 高频位置只使独立 Playhead 子组件更新 `translate3d(...)`，不动态修改 `left` / logical inset，
+  也不让静态 Ruler、Lane 或 Clip Scene 消费视觉位置；
+- 每次进入 Playing 时重新默认开启 Follow；程序化分页跳转不会被后续原生 `scroll` 事件误判为
+  用户中断。手动横向滚动、Pointer 时间轴操作和对应 Keyboard 操作会暂停本次 Follow。
 
 #### Batch 7E：Piano Roll Playhead
 

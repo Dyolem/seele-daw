@@ -26,6 +26,7 @@
   --sd-editor-grid-subdivision: rgb(242 238 229 / 7%);
   --sd-editor-grid-beat: rgb(242 238 229 / 13%);
   --sd-editor-grid-bar: rgb(242 238 229 / 28%);
+  --sd-editor-playhead: #ff4d47;
   --sd-editor-note-border: rgb(242 238 229 / 72%);
   --sd-editor-note-selected-border: #f4e7b9;
   --sd-editor-note-selected-glow: rgb(232 217 168 / 58%);

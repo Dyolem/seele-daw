@@ -3,6 +3,7 @@ import { parseTick, type Tick, type TrackId } from '@seele-daw/project-core'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
+import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
 import { computed, nextTick, shallowRef, type StyleValue, watch } from 'vue'
@@ -13,6 +14,12 @@ import type { ProjectTrackPresentation } from '@/features/project-workspace/proj
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
+import ArrangementPlayhead from '@/features/project-workspace/workbench-shell/arrangement/ArrangementPlayhead.vue'
+import {
+  TIMELINE_BAR_INLINE_SIZE_REM,
+  resolvePagedFollowScrollLeft,
+  timelinePositionRatio,
+} from '@/features/project-workspace/workbench-shell/arrangement/timeline-layout'
 import {
   PROJECT_ADD_TRACK_TYPE,
   type ProjectAddTrackType,
@@ -21,13 +28,24 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { useProjectClips } from '@/workbench/project/clip/vue/project-clip-context'
+import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
+import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
 
-const TIMELINE_BAR_INLINE_SIZE_REM = 5
 const WHEEL_DELTA_MODE_LINE = 1
 const WHEEL_DELTA_MODE_PAGE = 2
 const WHEEL_LINE_BLOCK_SIZE_PX = 16
 const EMPTY_CLIPS: readonly ProjectMidiClipPresentation[] = Object.freeze([])
+const TIMELINE_INTERACTION_KEYS = new Set([
+  ' ',
+  'ArrowLeft',
+  'ArrowRight',
+  'End',
+  'Enter',
+  'Home',
+  'PageDown',
+  'PageUp',
+])
 
 interface TimelineBarPresentation {
   readonly number: number
@@ -38,6 +56,7 @@ interface TimelineBarPresentation {
 const props = defineProps<{
   readonly barSpanTick: Tick
   readonly clips: readonly ProjectMidiClipPresentation[]
+  readonly projectId: string
   readonly timelineEndTick: Tick
   readonly tracks: readonly ProjectTrackPresentation[]
 }>()
@@ -46,12 +65,33 @@ const emit = defineEmits<{
 }>()
 
 const { projectClips } = useProjectClips()
+const { state: playbackState, visualPosition: playbackVisualPosition } = useProjectPlayback()
 const { projectTracks } = useProjectTracks()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const toasts = useUiToastStore()
 const arrangementViewportElement = shallowRef<HTMLElement | null>(null)
 const trackViewportElement = shallowRef<HTMLElement | null>(null)
 const trackFollowerElement = shallowRef<HTMLElement | null>(null)
+const isTimelineFollowSuspended = shallowRef(false)
+let observedArrangementScrollLeft = 0
+
+const isCurrentProjectPlaying = computed(
+  () =>
+    playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING &&
+    playbackState.value.projectId === props.projectId,
+)
+const isTimelineFollowActive = computed(
+  () => isCurrentProjectPlaying.value && !isTimelineFollowSuspended.value,
+)
+const timelineFollowLabel = computed(() => {
+  if (!isCurrentProjectPlaying.value) return 'Timeline follow — starts with playback'
+  return isTimelineFollowSuspended.value ? 'Resume timeline follow' : 'Pause timeline follow'
+})
+const currentPlaybackPositionTick = computed(() =>
+  playbackVisualPosition.value.projectId === props.projectId
+    ? playbackVisualPosition.value.positionTick
+    : 0,
+)
 
 const timelineBars = computed((): readonly TimelineBarPresentation[] => {
   const barCount = Math.ceil(props.timelineEndTick / props.barSpanTick)
@@ -187,7 +227,70 @@ function setArrangementScrollTop(nextScrollTop: number): void {
 }
 
 function handleArrangementScroll(event: Event): void {
-  synchronizeTrackFollower((event.currentTarget as HTMLElement).scrollTop)
+  const viewport = event.currentTarget as HTMLElement
+  synchronizeTrackFollower(viewport.scrollTop)
+  if (viewport.scrollLeft === observedArrangementScrollLeft) return
+
+  observedArrangementScrollLeft = viewport.scrollLeft
+  suspendTimelineFollow()
+}
+
+function setArrangementScrollLeft(nextScrollLeft: number): void {
+  const viewport = arrangementViewportElement.value
+  if (viewport === null) return
+
+  const maximumScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
+  viewport.scrollLeft = Math.min(maximumScrollLeft, Math.max(0, nextScrollLeft))
+  // Consume the ensuing native scroll event as this page jump, not as user navigation.
+  observedArrangementScrollLeft = viewport.scrollLeft
+}
+
+function followCurrentPlaybackPosition(): void {
+  const viewport = arrangementViewportElement.value
+  if (viewport === null || !isTimelineFollowActive.value) return
+
+  setArrangementScrollLeft(
+    resolvePagedFollowScrollLeft({
+      clientWidth: viewport.clientWidth,
+      positionRatio: timelinePositionRatio(
+        currentPlaybackPositionTick.value,
+        props.timelineEndTick,
+      ),
+      scrollLeft: viewport.scrollLeft,
+      scrollWidth: viewport.scrollWidth,
+    }),
+  )
+}
+
+function suspendTimelineFollow(): void {
+  if (isCurrentProjectPlaying.value) isTimelineFollowSuspended.value = true
+}
+
+function toggleTimelineFollow(): void {
+  if (!isCurrentProjectPlaying.value) return
+
+  isTimelineFollowSuspended.value = !isTimelineFollowSuspended.value
+  if (!isTimelineFollowSuspended.value) void nextTick(followCurrentPlaybackPosition)
+}
+
+function isFollowControlTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('.project-workbench__follow-control') !== null
+}
+
+function handleTimelinePointerDown(event: PointerEvent): void {
+  if (!isFollowControlTarget(event.target)) suspendTimelineFollow()
+}
+
+function handleTimelineKeydown(event: KeyboardEvent): void {
+  if (!isFollowControlTarget(event.target) && TIMELINE_INTERACTION_KEYS.has(event.key)) {
+    suspendTimelineFollow()
+  }
+}
+
+function handleArrangementWheel(event: WheelEvent): void {
+  if (event.deltaX !== 0 || (event.shiftKey && event.deltaY !== 0)) {
+    suspendTimelineFollow()
+  }
 }
 
 function wheelBlockDelta(event: WheelEvent, viewport: HTMLElement): number {
@@ -244,6 +347,24 @@ watch(
     const viewport = arrangementViewportElement.value
     if (viewport !== null) setArrangementScrollTop(viewport.scrollTop)
   },
+)
+
+watch(
+  isCurrentProjectPlaying,
+  (isPlaying, wasPlaying) => {
+    if (!isPlaying || wasPlaying) return
+
+    isTimelineFollowSuspended.value = false
+    void nextTick(followCurrentPlaybackPosition)
+  },
+  { immediate: true },
+)
+
+watch(currentPlaybackPositionTick, followCurrentPlaybackPosition, { flush: 'post' })
+
+watch(
+  () => props.timelineEndTick,
+  () => void nextTick(followCurrentPlaybackPosition),
 )
 </script>
 
@@ -311,7 +432,10 @@ watch(
       class="project-workbench__arrangement-scroll-viewport"
       aria-label="Timeline"
       tabindex="0"
+      @keydown.capture="handleTimelineKeydown"
+      @pointerdown.capture="handleTimelinePointerDown"
       @scroll.passive="handleArrangementScroll"
+      @wheel.passive="handleArrangementWheel"
     >
       <div class="project-workbench__arrangement-content">
         <div class="project-workbench__arrangement">
@@ -322,6 +446,15 @@ watch(
               </li>
             </ol>
             <div class="project-workbench__arrangement-tools">
+              <UiIconButton
+                class="project-workbench__follow-control"
+                :disabled="!isCurrentProjectPlaying"
+                :icon="TargetArrowIcon"
+                :label="timelineFollowLabel"
+                :pressed="isTimelineFollowActive"
+                size="small"
+                @click="toggleTimelineFollow"
+              />
               <UiIconButton
                 disabled
                 :icon="GridIcon"
@@ -398,6 +531,11 @@ watch(
             />
           </div>
         </div>
+        <ArrangementPlayhead
+          :bar-span-tick="props.barSpanTick"
+          :project-id="props.projectId"
+          :timeline-end-tick="props.timelineEndTick"
+        />
       </div>
     </section>
   </div>
@@ -407,7 +545,8 @@ watch(
 .project-workbench__arrangement-layout {
   --project-workbench-arrangement-tools-width: calc(
     var(--sd-control-height-sm) + var(--sd-control-height-sm) + var(--sd-control-height-sm) +
-      var(--sd-space-0-5) + var(--sd-space-0-5) + 2px
+      var(--sd-control-height-sm) + var(--sd-space-0-5) + var(--sd-space-0-5) +
+      var(--sd-space-0-5) + 2px
   );
   display: grid;
   min-inline-size: 0;
@@ -542,6 +681,7 @@ watch(
 }
 
 .project-workbench__arrangement-content {
+  position: relative;
   display: grid;
   inline-size: var(--project-workbench-timeline-inline-size);
   min-block-size: 100%;

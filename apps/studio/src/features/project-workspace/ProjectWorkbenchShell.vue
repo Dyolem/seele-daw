@@ -102,6 +102,7 @@ function openContextEditor(): void {
         :bar-span-tick="props.barSpanTick"
         :clips="props.clips"
         :piano-roll-presentation="props.pianoRollPresentation"
+        :project-id="props.projectId"
         :project-session="props.projectSession"
         :time-signature-numerator="props.timeSignatureNumerator"
         :timeline-end-tick="props.timelineEndTick"

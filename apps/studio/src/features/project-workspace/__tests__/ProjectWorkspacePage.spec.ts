@@ -318,6 +318,9 @@ describe('ProjectWorkspacePage', () => {
 
     expect(playbackState.value.positionProjectSecond).toBe(0)
     expect(wrapper.get('[aria-label="Current play time"]').text()).toBe('01:05.432')
+    expect(wrapper.get('.project-workbench__arrangement-playhead').attributes('style')).toContain(
+      'transform: translate3d(163.58rem, 0, 0)',
+    )
   })
 
   it('delegates a dirty Workbench Save action to Active Project', async () => {

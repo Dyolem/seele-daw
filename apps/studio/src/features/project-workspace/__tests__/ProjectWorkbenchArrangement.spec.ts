@@ -11,7 +11,7 @@ import {
 } from '@seele-daw/project-core'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { nextTick } from 'vue'
+import { nextTick, shallowRef, type ShallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
@@ -24,6 +24,16 @@ import {
   PROJECT_CLIP_CONTEXT_KEY,
   type ProjectClipVueContext,
 } from '@/workbench/project/clip/vue/project-clip-context'
+import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
+import {
+  PROJECT_PLAYBACK_PHASE,
+  type ProjectPlaybackState,
+} from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
+import {
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  type ProjectPlaybackVueContext,
+} from '@/workbench/project/playback/vue/project-playback-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
   PROJECT_TRACK_CONTEXT_KEY,
@@ -44,12 +54,16 @@ interface ArrangementFixture {
   >
   readonly selection: ReturnType<typeof useProjectWorkbenchSelectionStore>
   readonly toasts: ReturnType<typeof useUiToastStore>
+  readonly playbackState: ShallowRef<ProjectPlaybackState>
+  readonly playbackVisualPosition: ShallowRef<ProjectPlaybackVisualPosition>
   readonly wrapper: VueWrapper
 }
 
 interface MountArrangementOptions {
   readonly clips?: readonly ProjectMidiClipPresentation[]
   readonly createClipFailure?: Error
+  readonly playbackPhase?: ProjectPlaybackState['phase']
+  readonly playbackPositionTick?: number
   readonly timelineEndTick?: Tick
   readonly tracks?: InstanceType<typeof ProjectWorkbenchArrangement>['$props']['tracks']
 }
@@ -58,7 +72,8 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
   const toasts = useUiToastStore(pinia)
-  selection.activateProject(parseProjectId('arrangement-selection-project'))
+  const projectId = parseProjectId('arrangement-selection-project')
+  selection.activateProject(projectId)
   const addEmptyMidiClip = vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) => {
     if (options.createClipFailure !== undefined) throw options.createClipFailure
 
@@ -83,10 +98,48 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   const clipContext: ProjectClipVueContext = Object.freeze({
     projectClips: Object.freeze({ addEmptyMidiClip }),
   })
+  const playbackState = shallowRef<ProjectPlaybackState>(
+    Object.freeze({
+      diagnostics: Object.freeze([]),
+      failureCause: null,
+      feedback: null,
+      modelRevision: null,
+      phase: options.playbackPhase ?? PROJECT_PLAYBACK_PHASE.STOPPED,
+      planStatus: 'playable',
+      positionProjectSecond: 0,
+      projectId,
+    }),
+  )
+  const playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
+    Object.freeze({
+      modelRevision: null,
+      phase: playbackState.value.phase,
+      positionProjectSecond: 0,
+      positionTick: (options.playbackPositionTick ??
+        0) as ProjectPlaybackVisualPosition['positionTick'],
+      projectId,
+    }),
+  )
+  const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
+    state: playbackState.value,
+    pause: () => false,
+    play: async () => false,
+    readVisualPosition: () => playbackVisualPosition.value,
+    returnToStart: () => false,
+    subscribe: () => () => {},
+    togglePlayPause: () => false,
+    dispose() {},
+  })
+  const playbackContext: ProjectPlaybackVueContext = Object.freeze({
+    projectPlayback,
+    state: playbackState,
+    visualPosition: playbackVisualPosition,
+  })
   const wrapper = mount(ProjectWorkbenchArrangement, {
     props: {
       barSpanTick: parsePositiveTick(3_840),
       clips: options.clips ?? Object.freeze([]),
+      projectId,
       timelineEndTick: options.timelineEndTick ?? parseTick(3_840 * 8),
       tracks: options.tracks ?? Object.freeze([]),
     },
@@ -94,6 +147,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       plugins: [pinia],
       provide: {
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: clipContext,
+        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: context,
       },
     },
@@ -105,6 +159,8 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     addInstrumentTrack,
     selection,
     toasts,
+    playbackState,
+    playbackVisualPosition,
     wrapper,
   }
 }
@@ -113,6 +169,17 @@ async function openAddTrackMenu(wrapper: VueWrapper): Promise<HTMLElement[]> {
   await wrapper.get('.project-add-track__trigger').trigger('click')
   await nextTick()
   return [...document.body.querySelectorAll<HTMLElement>('.project-add-track__option')]
+}
+
+function setPlaybackPosition(fixture: ArrangementFixture, positionTick: number): void {
+  fixture.playbackVisualPosition.value = Object.freeze({
+    ...fixture.playbackVisualPosition.value,
+    positionTick: positionTick as ProjectPlaybackVisualPosition['positionTick'],
+  })
+}
+
+function setPlaybackPhase(fixture: ArrangementFixture, phase: ProjectPlaybackState['phase']): void {
+  fixture.playbackState.value = Object.freeze({ ...fixture.playbackState.value, phase })
 }
 
 afterEach(() => {
@@ -156,6 +223,97 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(wrapper.get('.project-workbench__arrangement-layout').attributes('style')).toContain(
       '--project-workbench-timeline-inline-size: 752.5rem',
     )
+  })
+
+  it('projects the shared Transport Tick through a transform-only Playhead layer', async () => {
+    const fixture = mountArrangement({ playbackPositionTick: 3_840 })
+    const playhead = fixture.wrapper.get('.project-workbench__arrangement-playhead')
+
+    expect(playhead.attributes('aria-hidden')).toBe('true')
+    expect(playhead.attributes('style')).toContain('transform: translate3d(5rem, 0, 0)')
+    expect(playhead.attributes('style')).not.toContain('left')
+
+    setPlaybackPosition(fixture, 7_680)
+    await nextTick()
+
+    expect(playhead.attributes('style')).toContain('transform: translate3d(10rem, 0, 0)')
+
+    fixture.playbackVisualPosition.value = Object.freeze({
+      ...fixture.playbackVisualPosition.value,
+      positionTick: 15_360 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId: parseProjectId('stale-playhead-project'),
+    })
+    await nextTick()
+
+    expect(playhead.attributes('style')).toContain('transform: translate3d(0rem, 0, 0)')
+  })
+
+  it('follows the playing position by discrete Arrangement viewport pages', async () => {
+    const fixture = mountArrangement({ playbackPhase: PROJECT_PLAYBACK_PHASE.PLAYING })
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+    const viewportElement = viewport.element as HTMLElement
+    Object.defineProperties(viewportElement, {
+      clientWidth: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1_600 },
+    })
+
+    setPlaybackPosition(fixture, 7_680)
+    await nextTick()
+
+    expect(viewportElement.scrollLeft).toBe(400)
+    expect(
+      fixture.wrapper.get('.project-workbench__follow-control').attributes('aria-pressed'),
+    ).toBe('true')
+
+    viewportElement.scrollTop = 96
+    await viewport.trigger('scroll')
+    expect(
+      fixture.wrapper.get('.project-workbench__follow-control').attributes('aria-pressed'),
+    ).toBe('true')
+
+    setPlaybackPosition(fixture, 15_360)
+    await nextTick()
+
+    expect(viewportElement.scrollLeft).toBe(800)
+  })
+
+  it('suspends Follow after manual Timeline navigation and can resume immediately', async () => {
+    const fixture = mountArrangement({ playbackPhase: PROJECT_PLAYBACK_PHASE.PLAYING })
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+    const viewportElement = viewport.element as HTMLElement
+    Object.defineProperties(viewportElement, {
+      clientWidth: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1_600 },
+    })
+
+    viewportElement.scrollLeft = 160
+    await viewport.trigger('scroll')
+    setPlaybackPosition(fixture, 23_040)
+    await nextTick()
+
+    const followControl = fixture.wrapper.get('.project-workbench__follow-control')
+    expect(viewportElement.scrollLeft).toBe(160)
+    expect(followControl.attributes('aria-label')).toBe('Resume timeline follow')
+    expect(followControl.attributes('aria-pressed')).toBe('false')
+
+    await followControl.trigger('click')
+    await nextTick()
+
+    expect(viewportElement.scrollLeft).toBe(1_200)
+    expect(followControl.attributes('aria-pressed')).toBe('true')
+
+    await fixture.wrapper.get('.project-workbench__ruler li').trigger('pointerdown')
+    expect(followControl.attributes('aria-label')).toBe('Resume timeline follow')
+
+    setPlaybackPhase(fixture, PROJECT_PLAYBACK_PHASE.PAUSED)
+    await nextTick()
+    expect(followControl.attributes('disabled')).toBeDefined()
+
+    setPlaybackPhase(fixture, PROJECT_PLAYBACK_PHASE.PLAYING)
+    await nextTick()
+
+    expect(followControl.attributes('disabled')).toBeUndefined()
+    expect(followControl.attributes('aria-pressed')).toBe('true')
   })
 
   it('presents all planned Track types in an accessible command menu', async () => {

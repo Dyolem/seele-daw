@@ -24,6 +24,7 @@ const props = defineProps<{
   readonly barSpanTick: Tick
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly projectId: string
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly timeSignatureNumerator: number
   readonly timelineEndTick: Tick
@@ -228,6 +229,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN"
       :bar-span-tick="props.barSpanTick"
       :clips="props.clips"
+      :project-id="props.projectId"
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
       @open-midi-clip="openContextEditor"

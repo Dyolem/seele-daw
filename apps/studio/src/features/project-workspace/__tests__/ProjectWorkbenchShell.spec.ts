@@ -12,7 +12,7 @@ import {
 } from '@seele-daw/project-core'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { nextTick } from 'vue'
+import { nextTick, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
@@ -37,6 +37,16 @@ import {
   PROJECT_CLIP_CONTEXT_KEY,
   type ProjectClipVueContext,
 } from '@/workbench/project/clip/vue/project-clip-context'
+import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
+import {
+  PROJECT_PLAYBACK_PHASE,
+  type ProjectPlaybackState,
+} from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
+import {
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  type ProjectPlaybackVueContext,
+} from '@/workbench/project/playback/vue/project-playback-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
   PROJECT_TRACK_CONTEXT_KEY,
@@ -62,7 +72,8 @@ const STUDIO_GRAND_INSTRUMENT = Object.freeze({
 function mountShell(options: MountShellOptions = {}) {
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
-  selection.activateProject(parseProjectId('workbench-shell-project'))
+  const projectId = parseProjectId('workbench-shell-project')
+  selection.activateProject(projectId)
   if (options.selectedTrackId && options.selectedClipId) {
     selection.selectClip(options.selectedTrackId, options.selectedClipId)
   } else if (options.selectedTrackId) {
@@ -88,6 +99,42 @@ function mountShell(options: MountShellOptions = {}) {
   })
   const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
+  const playbackState = shallowRef<ProjectPlaybackState>(
+    Object.freeze({
+      diagnostics: Object.freeze([]),
+      failureCause: null,
+      feedback: null,
+      modelRevision: null,
+      phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+      planStatus: 'playable',
+      positionProjectSecond: 0,
+      projectId,
+    }),
+  )
+  const playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
+    Object.freeze({
+      modelRevision: null,
+      phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+      positionProjectSecond: 0,
+      positionTick: 0 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId,
+    }),
+  )
+  const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
+    state: playbackState.value,
+    pause: () => false,
+    play: async () => false,
+    readVisualPosition: () => playbackVisualPosition.value,
+    returnToStart: () => false,
+    subscribe: () => () => {},
+    togglePlayPause: () => false,
+    dispose() {},
+  })
+  const playbackContext: ProjectPlaybackVueContext = Object.freeze({
+    projectPlayback,
+    state: playbackState,
+    visualPosition: playbackVisualPosition,
+  })
 
   return mount(ProjectWorkbenchShell, {
     props: {
@@ -117,6 +164,7 @@ function mountShell(options: MountShellOptions = {}) {
       plugins: [pinia],
       provide: {
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
+        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
       },
     },
@@ -133,6 +181,9 @@ describe('ProjectWorkbenchShell', () => {
     expect(workspace.findComponent(ProjectWorkbenchArrangement).exists()).toBe(true)
     expect(workspace.getComponent(ProjectWorkbenchArrangement).props('timelineEndTick')).toBe(
       576_000,
+    )
+    expect(workspace.getComponent(ProjectWorkbenchArrangement).props('projectId')).toBe(
+      'workbench-shell-project',
     )
     expect(workspace.findComponent(ProjectWorkbenchContextEditorDock).exists()).toBe(true)
   })

@@ -154,6 +154,10 @@ continuous Tick。`requestAnimationFrame` 只决定视图何时读取，不累�
 降频后恢复也不会形成第二套时间。该投影属于 Studio Composition / View 生命周期，不进入本包、
 Project、Pinia、History、dirty 或 Commit Subscription；后续多个 Playhead 必须共享这一位置源。
 
+Studio Batch 7D 已让 Arrangement 从该位置源投影不可交互 Playhead，并用 transform-only 图层
+移动；分页 Follow 只滚动 Studio 的右侧时间视口。这些仍是 Studio View 行为，不扩展 Playback
+Core API，也不让 Scheduler cursor 冒充 Playhead。Piano Roll 将在后续批次消费同一位置源。
+
 Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 
 - `createAudibleMidiReconciliationPlan` 验证连续 Commit 链，并对完整新旧 Plan 输出 occurrence /

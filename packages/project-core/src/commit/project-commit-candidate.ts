@@ -2,7 +2,9 @@ import {
   PROJECT_COMMAND_TYPE,
   type AddInstrumentTrackCommand,
   type AddMidiClipCommand,
+  type AddMidiClipWithNoteCommand,
   type AddNoteCommand,
+  type ExtendMidiClipWithNoteCommand,
   type MoveNotesCommand,
   type ProjectCommand,
   type ProjectCommandType,
@@ -20,6 +22,7 @@ import {
   type MidiClipAddedChange,
   type MidiClipPlacement,
   type MidiClipRemovedChange,
+  type MidiClipUpdatedChange,
   type MidiNoteAddedChange,
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
@@ -38,9 +41,9 @@ import {
 } from '#internal/commit/project-commit'
 import type { ProjectDelta } from '#internal/commit/project-delta'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
-import type { MidiClipRecord } from '#internal/model/midi-clip'
+import { createMidiClipRecord, type MidiClipRecord } from '#internal/model/midi-clip'
 import { MIDI_PITCH_MAX, MIDI_PITCH_MIN, parseMidiPitch } from '#internal/model/scalars'
-import type { MidiSourceRecord } from '#internal/model/midi-source'
+import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
 import { nextModelRevision } from '#internal/model/model-revision'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import { ownPropertiesHaveSameValues } from '#internal/model/value-equality'
@@ -94,6 +97,16 @@ function createClipRange(clip: MidiClipRecord): AffectedTickRange {
   return Object.freeze({
     startTick: clip.startTick,
     endTick: addTicks(clip.startTick, clip.spanTick),
+  })
+}
+
+function createUpdatedClipRange(before: MidiClipRecord, after: MidiClipRecord): AffectedTickRange {
+  const beforeEndTick = addTicks(before.startTick, before.spanTick)
+  const afterEndTick = addTicks(after.startTick, after.spanTick)
+
+  return Object.freeze({
+    startTick: before.startTick < after.startTick ? before.startTick : after.startTick,
+    endTick: beforeEndTick > afterEndTick ? beforeEndTick : afterEndTick,
   })
 }
 
@@ -293,6 +306,52 @@ function mapRemovedMidiClip(
   })
 }
 
+type ClipReplaceMutation = Extract<
+  ProjectMutation,
+  { readonly type: typeof PROJECT_MUTATION_TYPE.CLIP.REPLACE }
+>
+type MidiSourceReplaceMutation = Extract<
+  ProjectMutation,
+  { readonly type: typeof PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE }
+>
+
+function mapUpdatedMidiClip(
+  clipMutation: ClipReplaceMutation,
+  sourceMutation: MidiSourceReplaceMutation | null,
+  mutationIndex: number,
+): MidiClipUpdatedChange {
+  if (
+    clipMutation.before.trackId !== clipMutation.after.trackId ||
+    clipMutation.before.sourceId !== clipMutation.after.sourceId ||
+    (sourceMutation !== null &&
+      (sourceMutation.before.id !== clipMutation.before.sourceId ||
+        sourceMutation.after.id !== clipMutation.after.sourceId))
+  ) {
+    return rejectCandidate(
+      'unsupported-mutation-type',
+      `MIDI Clip replacement at index ${mutationIndex} does not preserve its Track and Source ownership`,
+      { mutationIndex, mutationType: clipMutation.type },
+    )
+  }
+
+  return Object.freeze({
+    type: PROJECT_CHANGE_TYPE.MIDI_CLIP.UPDATED,
+    clipId: clipMutation.after.id,
+    sourceId: clipMutation.after.sourceId,
+    trackId: clipMutation.after.trackId,
+    affected: createUpdatedClipRange(clipMutation.before, clipMutation.after),
+    before: clipMutation.before,
+    after: clipMutation.after,
+    sourceUpdate:
+      sourceMutation === null
+        ? null
+        : Object.freeze({
+            before: sourceMutation.before,
+            after: sourceMutation.after,
+          }),
+  })
+}
+
 function createProjectChanges(mutations: readonly ProjectMutation[]): readonly ProjectChange[] {
   const changes: ProjectChange[] = []
 
@@ -323,6 +382,31 @@ function createProjectChanges(mutations: readonly ProjectMutation[]): readonly P
         changes.push(mapRemovedMidiClip(mutations, mutationIndex))
         mutationIndex += 2
         break
+
+      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE: {
+        const clipMutation = mutations[mutationIndex + 1]
+        if (clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.REPLACE) {
+          return rejectCandidate(
+            'unsupported-mutation-type',
+            `MIDI Source replacement at index ${mutationIndex} is not followed by its owning MIDI Clip replacement`,
+            { mutationIndex, mutationType: mutation.type },
+          )
+        }
+        changes.push(mapUpdatedMidiClip(clipMutation, mutation, mutationIndex))
+        mutationIndex += 1
+        break
+      }
+
+      case PROJECT_MUTATION_TYPE.CLIP.REPLACE: {
+        const sourceMutation = mutations[mutationIndex + 1]
+        if (sourceMutation?.type === PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE) {
+          changes.push(mapUpdatedMidiClip(mutation, sourceMutation, mutationIndex))
+          mutationIndex += 1
+        } else {
+          changes.push(mapUpdatedMidiClip(mutation, null, mutationIndex))
+        }
+        break
+      }
 
       default:
         changes.push(mapNoteMutationToChange(mutation, mutationIndex))
@@ -396,6 +480,95 @@ function matchesAddedMidiClip(
     partitionMutation.after.length === 0 &&
     clipMutation.after.sourceId === sourceMutation.after.id
   )
+}
+
+function matchesAddedMidiClipWithNote(
+  command: AddMidiClipWithNoteCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  const sourceMutation = mutations[0]
+  const partitionMutation = mutations[1]
+  const clipMutation = mutations[2]
+
+  return (
+    mutations.length === 3 &&
+    sourceMutation?.type === PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT &&
+    partitionMutation?.type === PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT &&
+    clipMutation?.type === PROJECT_MUTATION_TYPE.CLIP.INSERT &&
+    sourceMutation.after === command.source &&
+    clipMutation.after === command.clip &&
+    partitionMutation.sourceId === command.source.id &&
+    partitionMutation.after.length === 1 &&
+    partitionMutation.after[0] === command.note &&
+    command.clip.sourceId === command.source.id
+  )
+}
+
+function matchesExtendedMidiClipWithNote(
+  command: ExtendMidiClipWithNoteCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  let mutationIndex = 0
+  const sourceMutation =
+    mutations[mutationIndex]?.type === PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE
+      ? (mutations[mutationIndex++] as MidiSourceReplaceMutation)
+      : null
+  const clipMutation = mutations[mutationIndex++]
+  const noteMutation = mutations[mutationIndex++]
+
+  if (
+    mutationIndex !== mutations.length ||
+    clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.REPLACE ||
+    noteMutation?.type !== PROJECT_MUTATION_TYPE.NOTE.INSERT ||
+    clipMutation.before.id !== command.clipId ||
+    clipMutation.after.id !== command.clipId ||
+    clipMutation.before.loop !== null ||
+    clipMutation.after.loop !== null ||
+    command.spanTick <= clipMutation.before.spanTick ||
+    noteMutation.sourceId !== clipMutation.before.sourceId ||
+    noteMutation.after !== command.note
+  ) {
+    return false
+  }
+
+  const expectedClip = createMidiClipRecord({
+    ...clipMutation.before,
+    spanTick: command.spanTick,
+  })
+  if (!ownPropertiesHaveSameValues(clipMutation.after, expectedClip)) return false
+
+  const currentSourceReadEndTick = addTicks(
+    clipMutation.before.sourceOffsetTick,
+    clipMutation.before.spanTick,
+  )
+  const targetSourceReadEndTick = addTicks(
+    clipMutation.after.sourceOffsetTick,
+    clipMutation.after.spanTick,
+  )
+  const noteEndTick = addTicks(command.note.startTick, command.note.durationTick)
+  if (
+    noteEndTick <= currentSourceReadEndTick ||
+    command.note.startTick < clipMutation.after.sourceOffsetTick ||
+    noteEndTick > targetSourceReadEndTick
+  ) {
+    return false
+  }
+
+  if (sourceMutation === null) return true
+  if (
+    sourceMutation.before.id !== clipMutation.before.sourceId ||
+    sourceMutation.after.id !== clipMutation.after.sourceId ||
+    targetSourceReadEndTick <= sourceMutation.before.lengthTick
+  ) {
+    return false
+  }
+
+  const expectedSource = createMidiSourceRecord({
+    id: sourceMutation.before.id,
+    lengthTick: targetSourceReadEndTick,
+  })
+
+  return ownPropertiesHaveSameValues(sourceMutation.after, expectedSource)
 }
 
 function matchesAddedNote(command: AddNoteCommand, mutation: ProjectMutation): boolean {
@@ -514,6 +687,10 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
     matches = matchesAddedInstrumentTrack(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD) {
     matches = matchesAddedMidiClip(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE) {
+    matches = matchesAddedMidiClipWithNote(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE) {
+    matches = matchesExtendedMidiClipWithNote(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE) {
     matches = matchesRemovedNotes(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE) {

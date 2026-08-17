@@ -1210,8 +1210,11 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7E.1–7E.5：Piano Roll Track / Clip 双模式校准
 
-> Implementation status: Batch 7E.1 is implemented locally and awaiting review. It does not change
-> the visible Piano Roll Surface or Project facts.
+> Implementation status: Batch 7E.1 was reviewed and committed as `5e50228`. Batch 7E.2 is
+> implemented locally and awaiting review; it adds Project Core facts and contracts plus the minimum
+> exhaustive Playback / Studio reconciliation adaptation, but does not change the visible Piano Roll
+> Surface. Project Core 28 files / 409 tests, Playback 9 / 95 and Studio 45 / 267 pass; repository
+> `pnpm lint` and `pnpm check` pass.
 
 一个 Project MIDI Clip 仍是唯一权威实体，Piano Roll 不创建第二份 Clip Fact。两种模式只是
 同一 Track / Clip / MidiSource 图的不同投影：
@@ -1250,7 +1253,11 @@ Track 模式 Pencil 在全局时间轴上的首版自动放置规则已经确认
    `Clip Focus` 偏好。本批不改变现有可见 Surface，也不写 Project Fact。
 2. **Batch 7E.2：原子 Clip 边界与 Note 放置。** Project Core 增加真实产品命令，覆盖新建
    Clip / MidiSource / Note 和向右扩 Clip / Source 后添加 Note，并定义 Undo / Redo、Delta、
-   Query 与冲突验证。
+   Query 与冲突验证。当前本地实现使用 `midi-clip.add-with-note` 与
+   `midi-clip.extend-with-note` 两个显式产品命令；普通 Note Add / Move / Resize 仍保持严格
+   Source 边界，looped Clip、向左扩展与通用 Clip Resize 没有被顺带放宽。Playback
+   Reconciliation 能把 Clip Update 归因到受影响 occurrence；Studio 在播放中选择性接管这两个
+   Command，并在右扩暴露活动 Note 尾部时重排 release，不执行 Voice restart 或 all-notes-off。
 3. **Batch 7E.3：Track 模式 Surface。** Studio 接入 Track Ruler、Clip window、横向滚动、
    Active Clip 与放置 Preview；Clip 变化继续直接反映到 Arrangement。
 4. **Batch 7E.4：Clip Focus 适配与可见切换。** 同一 Surface 提供模式切换，Clip Focus 禁止在

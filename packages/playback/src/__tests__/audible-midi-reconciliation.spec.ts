@@ -3,12 +3,14 @@ import {
   PROJECT_COMMAND_TYPE,
   createAddInstrumentTrackCommand,
   createAddMidiClipCommand,
+  createAddMidiClipWithNoteCommand,
   createAddNoteCommand,
   createChannelStripDescriptor,
   createInitialProjectSession,
   createMoveNotesCommand,
   createRemoveNotesCommand,
   createReplaceInstrumentDeviceCommand,
+  createExtendMidiClipWithNoteCommand,
   parseBipolarValue,
   parseClipId,
   parseDeviceId,
@@ -60,7 +62,12 @@ function executeCommitted(session: ProjectSession, command: ProjectCommand): Pro
   return result.commit
 }
 
-function createFixture() {
+function createFixture(
+  overrides: {
+    readonly noteDurationTick?: number
+    readonly sourceLengthTick?: number
+  } = {},
+) {
   const session = createInitialProjectSession({
     projectId: parseProjectId('project-reconciliation'),
     projectName: 'Reconciliation',
@@ -98,7 +105,7 @@ function createFixture() {
       muted: false,
       name: 'Clip',
       sourceId: SOURCE_ID,
-      sourceLengthTick: parseTick(1_920),
+      sourceLengthTick: parseTick(overrides.sourceLengthTick ?? 1_920),
       sourceOffsetTick: parseTick(0),
       spanTick: parseTick(1_920),
       startTick: parseTick(0),
@@ -110,7 +117,7 @@ function createFixture() {
     createAddNoteCommand({
       baseRevision: session.modelRevision,
       channel: parseMidiChannel(0),
-      durationTick: parseTick(960),
+      durationTick: parseTick(overrides.noteDurationTick ?? 960),
       noteId: NOTE_ID,
       pitch: parseMidiPitch(60),
       sourceId: SOURCE_ID,
@@ -188,6 +195,97 @@ describe('Audible MIDI reconciliation', () => {
     })
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([])
     expect(plan.unchangedOccurrenceKeys).toEqual([previousPlan.midiNoteSpans[0]?.occurrenceKey])
+  })
+
+  it('attributes populated Clip creation to its composite product command', () => {
+    const { session } = createFixture()
+    const previousPlan = compileAudibleMidiProject(session.getSnapshot())
+    const addedNoteId = parseNoteId('note-reconciliation-populated-clip')
+    const commit = executeCommitted(
+      session,
+      createAddMidiClipWithNoteCommand({
+        baseRevision: session.modelRevision,
+        clipId: parseClipId('clip-reconciliation-populated'),
+        color: null,
+        loop: null,
+        muted: false,
+        name: 'Populated Clip',
+        noteChannel: parseMidiChannel(0),
+        noteDurationTick: parseTick(240),
+        noteId: addedNoteId,
+        notePitch: parseMidiPitch(67),
+        noteStartTick: parseTick(0),
+        noteVelocity: parseMidiVelocity(90),
+        sourceId: parseMidiSourceId('source-reconciliation-populated'),
+        sourceLengthTick: parseTick(960),
+        sourceOffsetTick: parseTick(0),
+        spanTick: parseTick(960),
+        startTick: parseTick(3_840),
+        trackId: TRACK_ID,
+      }),
+    )
+    const nextPlan = compileAudibleMidiProject(session.getSnapshot())
+
+    const plan = createAudibleMidiReconciliationPlan({
+      commits: [commit],
+      nextPlan,
+      previousPlan,
+    })
+
+    expect(plan.occurrenceChanges).toEqual([
+      expect.objectContaining({
+        after: expect.objectContaining({ noteId: addedNoteId }),
+        commandTypes: [PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE],
+        kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
+      }),
+    ])
+  })
+
+  it('attributes newly exposed and inserted occurrences to atomic Clip extension', () => {
+    const { session } = createFixture({
+      noteDurationTick: 2_160,
+      sourceLengthTick: 2_880,
+    })
+    const previousPlan = compileAudibleMidiProject(session.getSnapshot())
+    const addedNoteId = parseNoteId('note-reconciliation-clip-extension')
+    const commit = executeCommitted(
+      session,
+      createExtendMidiClipWithNoteCommand({
+        baseRevision: session.modelRevision,
+        clipId: CLIP_ID,
+        noteChannel: parseMidiChannel(0),
+        noteDurationTick: parseTick(240),
+        noteId: addedNoteId,
+        notePitch: parseMidiPitch(67),
+        noteStartTick: parseTick(2_160),
+        noteVelocity: parseMidiVelocity(90),
+        spanTick: parseTick(2_880),
+      }),
+    )
+    const nextPlan = compileAudibleMidiProject(session.getSnapshot())
+
+    const plan = createAudibleMidiReconciliationPlan({
+      commits: [commit],
+      nextPlan,
+      previousPlan,
+    })
+
+    expect(plan.occurrenceChanges).toHaveLength(2)
+    expect(plan.occurrenceChanges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          after: expect.objectContaining({ noteId: addedNoteId }),
+          commandTypes: [PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE],
+          kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
+        }),
+        expect.objectContaining({
+          after: expect.objectContaining({ endTick: 2_400, noteId: NOTE_ID }),
+          changedFields: ['endTick'],
+          commandTypes: [PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE],
+          kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
+        }),
+      ]),
+    )
   })
 
   it('invalidates a whole Track route when its Instrument is replaced', () => {

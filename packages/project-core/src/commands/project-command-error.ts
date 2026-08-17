@@ -4,6 +4,7 @@ import type { Tick } from '#internal/time/tick'
 
 export type ProjectCommandErrorCode =
   | 'base-revision-mismatch'
+  | 'clip-not-found'
   | 'clip-id-already-exists'
   | 'device-id-already-exists'
   | 'device-not-found'
@@ -17,10 +18,16 @@ export type ProjectCommandErrorCode =
   | 'midi-note-partition-already-exists'
   | 'midi-note-partition-missing'
   | 'midi-clip-out-of-source-range'
+  | 'midi-clip-extension-crosses-next-clip'
+  | 'midi-clip-extension-not-required'
+  | 'midi-clip-extension-not-rightward'
+  | 'midi-clip-extension-out-of-range'
   | 'midi-clip-track-kind-mismatch'
   | 'midi-source-id-already-exists'
   | 'midi-source-not-found'
+  | 'looped-midi-clip-unsupported'
   | 'note-id-already-exists'
+  | 'note-out-of-clip-range'
   | 'note-out-of-source-range'
   | 'note-pitch-out-of-range'
   | 'track-id-already-exists'
@@ -30,6 +37,8 @@ export type ProjectCommandErrorCode =
 
 export interface ProjectCommandErrorDetails {
   readonly baseRevision?: number
+  readonly blockingClipId?: ClipId
+  readonly clipEndTick?: Tick
   readonly clipId?: ClipId
   readonly commandType?: string
   readonly currentRevision?: ModelRevision
@@ -42,6 +51,8 @@ export interface ProjectCommandErrorDetails {
   readonly sourceId?: MidiSourceId
   readonly sourceLengthTick?: Tick
   readonly sourceReadEndTick?: Tick
+  readonly sourceReadStartTick?: Tick
+  readonly targetSpanTick?: Tick
   readonly trackId?: TrackId
   readonly trackKind?: string
   readonly trackOrderLength?: number
@@ -51,6 +62,8 @@ export interface ProjectCommandErrorDetails {
 export class ProjectCommandError extends Error {
   readonly code: ProjectCommandErrorCode
   readonly baseRevision: number | null
+  readonly blockingClipId: ClipId | null
+  readonly clipEndTick: Tick | null
   readonly clipId: ClipId | null
   readonly commandType: string | null
   readonly currentRevision: ModelRevision | null
@@ -63,6 +76,8 @@ export class ProjectCommandError extends Error {
   readonly sourceId: MidiSourceId | null
   readonly sourceLengthTick: Tick | null
   readonly sourceReadEndTick: Tick | null
+  readonly sourceReadStartTick: Tick | null
+  readonly targetSpanTick: Tick | null
   readonly trackId: TrackId | null
   readonly trackKind: string | null
   readonly trackOrderLength: number | null
@@ -76,6 +91,8 @@ export class ProjectCommandError extends Error {
     this.name = 'ProjectCommandError'
     this.code = code
     this.baseRevision = details.baseRevision ?? null
+    this.blockingClipId = details.blockingClipId ?? null
+    this.clipEndTick = details.clipEndTick ?? null
     this.clipId = details.clipId ?? null
     this.commandType = details.commandType ?? null
     this.currentRevision = details.currentRevision ?? null
@@ -88,6 +105,8 @@ export class ProjectCommandError extends Error {
     this.sourceId = details.sourceId ?? null
     this.sourceLengthTick = details.sourceLengthTick ?? null
     this.sourceReadEndTick = details.sourceReadEndTick ?? null
+    this.sourceReadStartTick = details.sourceReadStartTick ?? null
+    this.targetSpanTick = details.targetSpanTick ?? null
     this.trackId = details.trackId ?? null
     this.trackKind = details.trackKind ?? null
     this.trackOrderLength = details.trackOrderLength ?? null

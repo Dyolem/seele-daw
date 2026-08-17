@@ -21,6 +21,8 @@ import {
   type AddNoteCommand,
   type AddInstrumentTrackCommand,
   type AddMidiClipCommand,
+  type AddMidiClipWithNoteCommand,
+  type ExtendMidiClipWithNoteCommand,
   type ModelRevision,
   type MoveNotesCommand,
   type ProjectCommand,
@@ -180,7 +182,9 @@ describe('ProjectCommand public contract', () => {
     expectTypeOf<ProjectCommand>().toEqualTypeOf<
       | AddInstrumentTrackCommand
       | AddMidiClipCommand
+      | AddMidiClipWithNoteCommand
       | AddNoteCommand
+      | ExtendMidiClipWithNoteCommand
       | MoveNotesCommand
       | RemoveNotesCommand
       | ReplaceInstrumentDeviceCommand

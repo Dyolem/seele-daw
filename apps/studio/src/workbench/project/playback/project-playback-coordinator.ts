@@ -235,6 +235,8 @@ function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
     case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
     case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE:
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
@@ -927,7 +929,8 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         if (
           change.kind !== AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED ||
           change.after === null ||
-          !change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE)
+          (!change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE) &&
+            !change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE))
         ) {
           continue
         }

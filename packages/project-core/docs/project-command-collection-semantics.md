@@ -215,6 +215,13 @@ interface ResizeNoteCommand {
 - Clip Paste、Duplicate、Split 或 Import 具有独立身份和 Source 所有权规则；
 - 在这些真实产品入口出现前，现有单实体 Command 不因“未来可能批量”而调整。
 
+Track 全局 Piano Roll 的 `AddMidiClipWithNoteCommand` 与
+`ExtendMidiClipWithNoteCommand` 是本原则的具体应用：用户的一次 Pencil 放置会同时改变
+Clip、Source 与 Note，因此用一个产品语义命名的 Command 建立封闭 MutationPlan。它们不是
+可嵌套任意 Command 的 Batch / Composite API，也不能由 Studio 串联 Add Clip、Resize Clip 与
+Add Note 模拟。完整约束见
+[MIDI Clip / Note 原子放置命令计划](./midi-clip-note-placement-command-plan.md)。
+
 ## 6. 新命令审查清单
 
 新增或扩展 Command 前必须回答：

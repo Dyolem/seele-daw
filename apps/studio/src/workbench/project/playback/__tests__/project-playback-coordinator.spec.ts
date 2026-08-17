@@ -5,6 +5,7 @@ import {
   createAddMidiClipCommand,
   createAddNoteCommand,
   createDeviceDescriptor,
+  createExtendMidiClipWithNoteCommand,
   createInitialProjectSession,
   createMoveNotesCommand,
   createRemoveNotesCommand,
@@ -242,6 +243,63 @@ function createPlayableSession(projectId: ProjectId): ProjectSession {
     sourceId: SOURCE_ID,
     trackId: TRACK_ID,
   })
+  return session
+}
+
+function createEdgeClippedPlayableSession(projectId: ProjectId): ProjectSession {
+  const session = createInitialProjectSession({
+    projectId,
+    projectName: 'Edge-clipped Audible Project',
+    tempoEventId: parseTempoEventId('tempo-playback-coordinator-edge-clipped'),
+    timeSignatureEventId: parseTimeSignatureEventId('meter-playback-coordinator-edge-clipped'),
+  })
+  requireCommitted(
+    session,
+    createAddInstrumentTrackCommand({
+      baseRevision: session.modelRevision,
+      channel: {
+        gain: parseLinearGain(1),
+        muted: false,
+        pan: parseBipolarValue(0),
+        soloed: false,
+      },
+      color: null,
+      insertAt: 0,
+      instrumentDevice: createStudioGrandDeviceDescriptor(DEVICE_ID),
+      name: 'Piano',
+      trackId: TRACK_ID,
+    }),
+  )
+  requireCommitted(
+    session,
+    createAddMidiClipCommand({
+      baseRevision: session.modelRevision,
+      clipId: CLIP_ID,
+      color: null,
+      loop: null,
+      muted: false,
+      name: 'Edge-clipped Phrase',
+      sourceId: SOURCE_ID,
+      sourceLengthTick: parsePositiveTick(2_880),
+      sourceOffsetTick: parseTick(0),
+      spanTick: parsePositiveTick(1_920),
+      startTick: parseTick(0),
+      trackId: TRACK_ID,
+    }),
+  )
+  requireCommitted(
+    session,
+    createAddNoteCommand({
+      baseRevision: session.modelRevision,
+      channel: parseMidiChannel(0),
+      durationTick: parsePositiveTick(2_400),
+      noteId: NOTE_ID,
+      pitch: parseMidiPitch(60),
+      sourceId: SOURCE_ID,
+      startTick: parseTick(0),
+      velocity: parseMidiVelocity(100),
+    }),
+  )
   return session
 }
 
@@ -524,6 +582,45 @@ describe('ProjectPlaybackCoordinator', () => {
 
     expect(activeHandle.isActive()).toBe(true)
     expect(activeHandle.releaseUpdates).toEqual([0.75])
+    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(coordinator.state.phase).toBe('playing')
+    coordinator.dispose()
+  })
+
+  it('retimes an active edge-clipped Voice when atomic Clip extension exposes its tail', async () => {
+    const projectId = parseProjectId('project-playback-live-clip-extension')
+    const session = createEdgeClippedPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
+    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+
+    const commit = requireCommitted(
+      session,
+      createExtendMidiClipWithNoteCommand({
+        baseRevision: session.modelRevision,
+        clipId: CLIP_ID,
+        noteChannel: parseMidiChannel(0),
+        noteDurationTick: parsePositiveTick(240),
+        noteId: parseNoteId('note-playback-coordinator-clip-extension'),
+        notePitch: parseMidiPitch(67),
+        noteStartTick: parseTick(2_160),
+        noteVelocity: parseMidiVelocity(100),
+        spanTick: parsePositiveTick(2_880),
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
+
+    expect(activeHandle.isActive()).toBe(true)
+    expect(activeHandle.releaseUpdates).toEqual([1.25])
     expect(firstRuntime.allNotesOffCount).toBe(0)
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()

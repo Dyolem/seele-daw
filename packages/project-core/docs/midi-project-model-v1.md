@@ -4,7 +4,10 @@
 
 它是当前实现阶段的数据模型基线。字段或规则发生变化时，应先更新本文档；涉及不可逆文件格式或跨模块产品语义的决定，再补充 ADR。
 
-本文档不定义 Command handler 的具体实现。Add / Resize Note 和同一 MidiSource 内的 Move Note 已确定采用严格 Source 边界；Clip Move / Resize、跨 Source Note Move 与 Split 的算法仍暂缓。
+本文档不定义 Command handler 的具体实现。普通 Add / Resize Note 和同一 MidiSource 内的 Move
+Note 已确定采用严格 Source 边界；通用 Clip Move / Resize、跨 Source Note Move 与 Split 的
+算法仍暂缓。Track 全局 Piano Roll 已另行确定一项窄范围例外：创建 populated Clip，或为越过
+非循环 Clip 右端的新增 Note 原子右扩 Clip / Source。
 
 ## 目标与范围
 
@@ -38,7 +41,7 @@ V1 数据模型需要支持以下闭环：
 - Recording、Asset 和媒体垃圾回收；
 - Linked Clip、Take Lane、Comping；
 - Group、Return、Send 和任意路由图；
-- Clip Move / Resize、跨 Source Note Move、Split 的边界算法；
+- 通用 Clip Move / Resize、跨 Source Note Move、Split 的边界算法；
 - Loop 边界事件排序。
 
 这些能力不提前创建空表或占位抽象，在对应产品语义确定后通过新字段、联合类型分支和 schema migration 加入。
@@ -317,14 +320,27 @@ note.channel 是整数 0..15
 - Selection、hover 和拖拽预览不进入 Note Record；
 - Release Velocity、CC、Pitch Bend、Aftertouch 和 MPE 等到真正实现时再设计对应事件表。
 
-Add Note 和同一 MidiSource 内的 Move Notes 使用严格边界：每个 Note 区间必须完整落在
+普通 Add Note 和同一 MidiSource 内的 Move Notes 使用严格边界：每个 Note 区间必须完整落在
 Source 的半开区间内，Pitch 必须落在 0–127。越界 Command 必须整体拒绝，不执行 Core
-clamp、loop wrap 或 MidiSource / Clip 自动扩展。`MoveNotesCommand` 对非空、无重复的
+clamp、loop wrap 或隐式 MidiSource / Clip 自动扩展。`MoveNotesCommand` 对非空、无重复的
 `noteIds` 应用共享 `deltaTick` 与 `deltaPitch`，保持 Note ID、相对位置、duration、
 velocity 和 channel；两个 Delta 同时为零时返回 `no-change`，不形成空 MutationPlan。
 Snap、量化、像素坐标转换与交互边界 Clamp 由 Editor 在创建 Command 前完成，Core 仍在
 提交时基于权威 Record 复核全部目标。详细执行边界见
 [MIDI Note Command 层执行计划](./midi-note-command-layer-plan.md)。
+
+Track 全局 Piano Roll 的 Pencil 放置使用两个显式产品命令，而不是放宽普通 Note Command：
+
+- `AddMidiClipWithNoteCommand` 原子创建非循环 Clip、其独占 MidiSource 和包含第一枚 Note 的
+  Partition；
+- `ExtendMidiClipWithNoteCommand` 只允许确实越过现有 Source window 的 Note，原子向右扩展
+  非循环 Clip、按需增长 MidiSource 并插入该 Note；
+- 自动右扩不能越过同 Track 上从当前 Clip 末端起遇到的下一 Clip；与下一 Clip 恰好相接合法；
+- looped Clip、向左扩展和通用 Resize 仍不属于该协议；
+- 两种命令各自产生一个 Commit、一次 revision 推进和一个 History 步骤。
+
+完整边界见
+[MIDI Clip / Note 原子放置命令计划](./midi-clip-note-placement-command-plan.md)。
 
 运行时按 Source 分区存储 Note：
 
@@ -378,7 +394,10 @@ sourceStartTick
   < sourceStartTick + sourceSpanTick
 ```
 
-Clip Move / Resize、跨 Source Note Move 与 Split 如何改变这些字段，以及 Loop 边界的事件排序，留到相应命令和 Playback 实现前单独讨论。单 Note Resize 只改变 Note 自身的 Start / Duration，不改变 Clip 或 Source 字段。
+通用 Clip Move / Resize、跨 Source Note Move 与 Split 如何改变这些字段，以及 Loop 边界的事件
+排序，留到相应命令和 Playback 实现前单独讨论。`ExtendMidiClipWithNoteCommand` 只是非循环
+Clip 的窄范围右扩，不定义 looped Clip 或交互式 Resize 语义。单 Note Resize 只改变 Note 自身的
+Start / Duration，不改变 Clip 或 Source 字段。
 
 ## Timeline、Tempo 与 Time Signature
 
@@ -655,7 +674,7 @@ Loop 边界 Note Off / Note On 的排序仍需在 Playback Compiler 实现前确
 以下内容将在对应命令或模块开始实现前单独讨论并形成测试：
 
 - Move Clip、跨 Source Note Move 的边界与目标兼容性算法；
-- Resize Clip 的最小长度、裁剪和扩展算法；
+- 通用 Resize Clip 的最小长度、裁剪、向左扩展和交互算法；
 - Split Clip 对 Source 复制、窗口和 Note 的具体处理；
 - Loop 边界事件排序；
 - Snap、量化与舍入策略；

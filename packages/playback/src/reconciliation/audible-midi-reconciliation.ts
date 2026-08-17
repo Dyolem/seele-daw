@@ -207,6 +207,7 @@ function commandTypesForOccurrence(
             return change.sourceId === sourceId && change.noteId === noteId
           case 'midi-clip.added':
           case 'midi-clip.removed':
+          case 'midi-clip.updated':
             return change.clipId === clipId
           case 'instrument-device.updated':
           case 'instrument-track.added':
@@ -237,6 +238,7 @@ function commandTypesForTrack(
           case 'instrument-track.removed':
           case 'midi-clip.added':
           case 'midi-clip.removed':
+          case 'midi-clip.updated':
             return change.trackId === trackId
           case 'midi-note.added':
           case 'midi-note.removed':

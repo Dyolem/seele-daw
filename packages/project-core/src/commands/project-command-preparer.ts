@@ -11,6 +11,8 @@ import type { ProjectCommandPreparation } from '#internal/commands/project-comma
 import { prepareReplaceInstrumentDeviceCommand } from '#internal/commands/instrument-device-command-handler'
 import { prepareAddInstrumentTrackCommand } from '#internal/commands/instrument-track-command-handler'
 import { prepareAddMidiClipCommand } from '#internal/commands/midi-clip-command-handler'
+import { prepareAddMidiClipWithNoteCommand } from '#internal/commands/midi-clip-note-placement/add-command-handler'
+import { prepareExtendMidiClipWithNoteCommand } from '#internal/commands/midi-clip-note-placement/extend-command-handler'
 import {
   prepareAddNoteCommand,
   prepareMoveNotesCommand,
@@ -46,6 +48,18 @@ function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
         clipId: command.clip.id,
         sourceId: command.source.id,
         trackId: command.clip.trackId,
+      }
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE:
+      return {
+        clipId: command.clip.id,
+        noteId: command.note.id,
+        sourceId: command.source.id,
+        trackId: command.clip.trackId,
+      }
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE:
+      return {
+        clipId: command.clipId,
+        noteId: command.note.id,
       }
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
@@ -93,6 +107,10 @@ export function prepareProjectCommand(
       return prepareAddInstrumentTrackCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
       return prepareAddMidiClipCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE:
+      return prepareAddMidiClipWithNoteCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE:
+      return prepareExtendMidiClipWithNoteCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
       return prepareAddNoteCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:

@@ -1,5 +1,10 @@
 import { ProjectCommandError } from '#internal/commands/project-command-error'
 import {
+  assertMidiNoteIdAvailable,
+  assertMidiNoteWithinSource,
+  type MidiNoteCommandValidationContext,
+} from '#internal/commands/midi-note-command-validation'
+import {
   type AddNoteCommand,
   type MoveNotesCommand,
   type RemoveNotesCommand,
@@ -17,7 +22,7 @@ import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
-import { addTicks, parseTick } from '#internal/time/tick'
+import { parseTick } from '#internal/time/tick'
 
 type MidiNoteCommand = AddNoteCommand | MoveNotesCommand | RemoveNotesCommand | ResizeNoteCommand
 
@@ -78,49 +83,15 @@ function requireMidiNote(
   return note
 }
 
-function noteIdExists(reader: ModelStoreReader, noteId: NoteId): boolean {
-  for (const sourceId of reader.midiNotePartitionIds()) {
-    if (reader.getMidiNote(sourceId, noteId) !== undefined) return true
-  }
-
-  return false
-}
-
-function assertNoteIdAvailable(reader: ModelStoreReader, command: AddNoteCommand): void {
-  if (noteIdExists(reader, command.noteId)) {
-    throw new ProjectCommandError(
-      'note-id-already-exists',
-      `MIDI Note ID ${command.noteId} is already used in this project`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        noteId: command.noteId,
-        sourceId: command.sourceId,
-      },
-    )
-  }
-}
-
-function assertNoteWithinSource(
+function validationContext(
   command: AddNoteCommand | MoveNotesCommand | ResizeNoteCommand,
-  source: MidiSourceRecord,
-  note: MidiNoteRecord,
-): void {
-  const noteEndTick = addTicks(note.startTick, note.durationTick)
-
-  if (noteEndTick > source.lengthTick) {
-    throw new ProjectCommandError(
-      'note-out-of-source-range',
-      `MIDI Note ${note.id} ends at Tick ${noteEndTick}, beyond MidiSource ${source.id} length ${source.lengthTick}`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        noteEndTick,
-        noteId: note.id,
-        sourceId: source.id,
-        sourceLengthTick: source.lengthTick,
-      },
-    )
+  noteId: NoteId,
+): MidiNoteCommandValidationContext {
+  return {
+    baseRevision: command.baseRevision,
+    commandType: command.type,
+    noteId,
+    sourceId: command.sourceId,
   }
 }
 
@@ -141,7 +112,7 @@ export function prepareAddNoteCommand(
 ): ReadyProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
   assertNotePartitionExists(reader, command)
-  assertNoteIdAvailable(reader, command)
+  assertMidiNoteIdAvailable(reader, validationContext(command, command.noteId))
 
   const note = createMidiNoteRecord({
     id: command.noteId,
@@ -152,7 +123,7 @@ export function prepareAddNoteCommand(
     channel: command.channel,
   })
 
-  assertNoteWithinSource(command, source, note)
+  assertMidiNoteWithinSource(validationContext(command, note.id), source, note)
 
   return ready(command, [
     {
@@ -235,7 +206,7 @@ export function prepareMoveNotesCommand(
 
   const mutations = notes.map<ProjectMutation>((before) => {
     const after = createMovedNote(command, before)
-    assertNoteWithinSource(command, source, after)
+    assertMidiNoteWithinSource(validationContext(command, before.id), source, after)
 
     return {
       type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
@@ -269,7 +240,7 @@ export function prepareResizeNoteCommand(
     startTick: command.startTick,
     durationTick: command.durationTick,
   })
-  assertNoteWithinSource(command, source, after)
+  assertMidiNoteWithinSource(validationContext(command, before.id), source, after)
 
   return ready(command, [
     {

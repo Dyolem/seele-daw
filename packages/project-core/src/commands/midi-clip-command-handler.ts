@@ -1,4 +1,7 @@
-import type { AddMidiClipCommand } from '#internal/commands/project-command'
+import type {
+  AddMidiClipCommand,
+  AddMidiClipWithNoteCommand,
+} from '#internal/commands/project-command'
 import { ProjectCommandError } from '#internal/commands/project-command-error'
 import type { ReadyProjectCommandPreparation } from '#internal/commands/project-command-preparation'
 import type { ModelStoreReader } from '#internal/model/model-store'
@@ -6,7 +9,9 @@ import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { addTicks } from '#internal/time/tick'
 
-function commandDetails(command: AddMidiClipCommand) {
+type NewMidiClipCommand = AddMidiClipCommand | AddMidiClipWithNoteCommand
+
+function commandDetails(command: NewMidiClipCommand) {
   return {
     baseRevision: command.baseRevision,
     clipId: command.clip.id,
@@ -16,7 +21,7 @@ function commandDetails(command: AddMidiClipCommand) {
   } as const
 }
 
-function requireInstrumentTrack(reader: ModelStoreReader, command: AddMidiClipCommand): void {
+function requireInstrumentTrack(reader: ModelStoreReader, command: NewMidiClipCommand): void {
   const track = reader.getTrack(command.clip.trackId)
 
   if (track === undefined) {
@@ -38,7 +43,7 @@ function requireInstrumentTrack(reader: ModelStoreReader, command: AddMidiClipCo
 
 function assertClipGraphIdentitiesAvailable(
   reader: ModelStoreReader,
-  command: AddMidiClipCommand,
+  command: NewMidiClipCommand,
 ): void {
   if (reader.getClip(command.clip.id) !== undefined) {
     throw new ProjectCommandError(
@@ -65,7 +70,7 @@ function assertClipGraphIdentitiesAvailable(
   }
 }
 
-function assertClipWithinSource(command: AddMidiClipCommand): void {
+function assertClipWithinSource(command: NewMidiClipCommand): void {
   const sourceReadEndTick =
     command.clip.loop === null
       ? addTicks(command.clip.sourceOffsetTick, command.clip.spanTick)
@@ -84,14 +89,22 @@ function assertClipWithinSource(command: AddMidiClipCommand): void {
   }
 }
 
+/** Validates a complete new non-shared MIDI Clip ownership graph before planning content. */
+export function assertNewMidiClipGraphCanBeAdded(
+  reader: ModelStoreReader,
+  command: NewMidiClipCommand,
+): void {
+  requireInstrumentTrack(reader, command)
+  assertClipGraphIdentitiesAvailable(reader, command)
+  assertClipWithinSource(command)
+}
+
 /** Prepares one complete empty MIDI Clip ownership graph without taking write access. */
 export function prepareAddMidiClipCommand(
   reader: ModelStoreReader,
   command: AddMidiClipCommand,
 ): ReadyProjectCommandPreparation {
-  requireInstrumentTrack(reader, command)
-  assertClipGraphIdentitiesAvailable(reader, command)
-  assertClipWithinSource(command)
+  assertNewMidiClipGraphCanBeAdded(reader, command)
 
   return {
     status: 'ready',

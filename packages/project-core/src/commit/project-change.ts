@@ -19,6 +19,7 @@ export const PROJECT_CHANGE_TYPE = {
   MIDI_CLIP: {
     ADDED: 'midi-clip.added',
     REMOVED: 'midi-clip.removed',
+    UPDATED: 'midi-clip.updated',
   },
   MIDI_NOTE: {
     ADDED: 'midi-note.added',
@@ -96,6 +97,20 @@ export interface MidiClipRemovedChange extends MidiClipChangeBase<
   readonly before: MidiClipPlacement
 }
 
+export interface MidiClipSourceUpdate {
+  readonly before: MidiSourceRecord
+  readonly after: MidiSourceRecord
+}
+
+export interface MidiClipUpdatedChange extends MidiClipChangeBase<
+  typeof PROJECT_CHANGE_TYPE.MIDI_CLIP.UPDATED
+> {
+  readonly before: MidiClipRecord
+  readonly after: MidiClipRecord
+  /** Null when the existing Source already covers the extended Clip window. */
+  readonly sourceUpdate: MidiClipSourceUpdate | null
+}
+
 interface MidiNoteChangeBase<Type extends ProjectChangeType> {
   readonly type: Type
   readonly sourceId: MidiSourceId
@@ -128,6 +143,7 @@ export type ProjectChange =
   | InstrumentTrackRemovedChange
   | MidiClipAddedChange
   | MidiClipRemovedChange
+  | MidiClipUpdatedChange
   | MidiNoteAddedChange
   | MidiNoteRemovedChange
   | MidiNoteUpdatedChange

@@ -14,7 +14,7 @@ import {
   type CreateDeviceDescriptorInput,
   type DeviceDescriptor,
 } from '#internal/model/device'
-import { createMidiNoteRecord } from '#internal/model/midi-note'
+import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
 import {
   ModelRevisionError,
   parseModelRevision,
@@ -56,6 +56,8 @@ export const PROJECT_COMMAND_TYPE = {
   },
   MIDI_CLIP: {
     ADD: 'midi-clip.add',
+    ADD_WITH_NOTE: 'midi-clip.add-with-note',
+    EXTEND_WITH_NOTE: 'midi-clip.extend-with-note',
   },
   MIDI_NOTE: {
     ADD: 'midi-note.add',
@@ -108,6 +110,23 @@ export interface AddMidiClipCommand extends ProjectCommandBase<
   readonly source: MidiSourceRecord
 }
 
+export interface AddMidiClipWithNoteCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE
+> {
+  readonly clip: MidiClipRecord
+  readonly source: MidiSourceRecord
+  readonly note: MidiNoteRecord
+}
+
+export interface ExtendMidiClipWithNoteCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE
+> {
+  readonly clipId: ClipId
+  /** Final non-looped Clip span after the right-edge extension. */
+  readonly spanTick: Tick
+  readonly note: MidiNoteRecord
+}
+
 export interface AddNoteCommand extends MidiNoteCommandBase<
   typeof PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD
 > {
@@ -140,6 +159,8 @@ export type ProjectCommand =
   | AddInstrumentTrackCommand
   | ReplaceInstrumentDeviceCommand
   | AddMidiClipCommand
+  | AddMidiClipWithNoteCommand
+  | ExtendMidiClipWithNoteCommand
   | AddNoteCommand
   | MoveNotesCommand
   | RemoveNotesCommand
@@ -174,6 +195,29 @@ export interface CreateAddMidiClipCommandInput {
   readonly sourceLengthTick: Tick
   readonly sourceOffsetTick: Tick
   readonly loop: CreateMidiLoopInput | null
+}
+
+export interface CreateAddMidiClipWithNoteCommandInput extends CreateAddMidiClipCommandInput {
+  readonly loop: null
+  readonly noteId: NoteId
+  readonly noteStartTick: Tick
+  readonly noteDurationTick: Tick
+  readonly notePitch: MidiPitch
+  readonly noteVelocity: MidiVelocity
+  readonly noteChannel: MidiChannel
+}
+
+export interface CreateExtendMidiClipWithNoteCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly clipId: ClipId
+  /** Final non-looped Clip span after the right-edge extension. */
+  readonly spanTick: Tick
+  readonly noteId: NoteId
+  readonly noteStartTick: Tick
+  readonly noteDurationTick: Tick
+  readonly notePitch: MidiPitch
+  readonly noteVelocity: MidiVelocity
+  readonly noteChannel: MidiChannel
 }
 
 interface CreateNoteCommandInputBase {
@@ -291,6 +335,63 @@ export function createAddMidiClipCommand(input: CreateAddMidiClipCommandInput): 
     baseRevision: parseCommandBaseRevision(input.baseRevision),
     clip,
     source,
+  }
+}
+
+function createPlacementNote(
+  input: Pick<
+    CreateAddMidiClipWithNoteCommandInput,
+    'noteId' | 'noteStartTick' | 'noteDurationTick' | 'notePitch' | 'noteVelocity' | 'noteChannel'
+  >,
+): MidiNoteRecord {
+  return createMidiNoteRecord({
+    id: input.noteId,
+    startTick: input.noteStartTick,
+    durationTick: input.noteDurationTick,
+    pitch: input.notePitch,
+    velocity: input.noteVelocity,
+    channel: input.noteChannel,
+  })
+}
+
+export function createAddMidiClipWithNoteCommand(
+  input: CreateAddMidiClipWithNoteCommandInput,
+): AddMidiClipWithNoteCommand {
+  if (input.loop !== null) {
+    throw new ProjectCommandError(
+      'looped-midi-clip-unsupported',
+      'AddMidiClipWithNoteCommand only creates a non-looped MIDI Clip',
+      {
+        baseRevision: input.baseRevision,
+        clipId: input.clipId,
+        commandType: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE,
+        noteId: input.noteId,
+        sourceId: input.sourceId,
+        trackId: input.trackId,
+      },
+    )
+  }
+
+  const clipCommand = createAddMidiClipCommand(input)
+
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE,
+    baseRevision: clipCommand.baseRevision,
+    clip: clipCommand.clip,
+    source: clipCommand.source,
+    note: createPlacementNote(input),
+  }
+}
+
+export function createExtendMidiClipWithNoteCommand(
+  input: CreateExtendMidiClipWithNoteCommandInput,
+): ExtendMidiClipWithNoteCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    clipId: parseClipId(input.clipId),
+    spanTick: parsePositiveTick(input.spanTick),
+    note: createPlacementNote(input),
   }
 }
 
@@ -418,6 +519,55 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
         sourceLengthTick: command.source.lengthTick,
         sourceOffsetTick: command.clip.sourceOffsetTick,
         loop: command.clip.loop,
+      })
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE: {
+      if (command.clip.loop !== null) {
+        throw new ProjectCommandError(
+          'looped-midi-clip-unsupported',
+          `AddMidiClipWithNoteCommand cannot normalize looped MIDI Clip ${command.clip.id}`,
+          {
+            baseRevision: command.baseRevision,
+            clipId: command.clip.id,
+            commandType: command.type,
+            noteId: command.note.id,
+            sourceId: command.source.id,
+            trackId: command.clip.trackId,
+          },
+        )
+      }
+
+      return createAddMidiClipWithNoteCommand({
+        baseRevision: command.baseRevision,
+        clipId: command.clip.id,
+        trackId: command.clip.trackId,
+        name: command.clip.name,
+        color: command.clip.color,
+        muted: command.clip.muted,
+        startTick: command.clip.startTick,
+        spanTick: command.clip.spanTick,
+        sourceId: command.source.id,
+        sourceLengthTick: command.source.lengthTick,
+        sourceOffsetTick: command.clip.sourceOffsetTick,
+        loop: command.clip.loop,
+        noteId: command.note.id,
+        noteStartTick: command.note.startTick,
+        noteDurationTick: command.note.durationTick,
+        notePitch: command.note.pitch,
+        noteVelocity: command.note.velocity,
+        noteChannel: command.note.channel,
+      })
+    }
+    case PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE:
+      return createExtendMidiClipWithNoteCommand({
+        baseRevision: command.baseRevision,
+        clipId: command.clipId,
+        spanTick: command.spanTick,
+        noteId: command.note.id,
+        noteStartTick: command.note.startTick,
+        noteDurationTick: command.note.durationTick,
+        notePitch: command.note.pitch,
+        noteVelocity: command.note.velocity,
+        noteChannel: command.note.channel,
       })
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
       return createAddNoteCommand(command)

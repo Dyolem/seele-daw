@@ -4,6 +4,8 @@ import {
   type ProjectChange,
 } from '#internal/commit/project-change'
 import type { ProjectCommit } from '#internal/commit/project-commit'
+import type { MidiSourceId, NoteId } from '#internal/model/ids'
+import type { MidiNoteRecord } from '#internal/model/midi-note'
 import { ProjectSubscriptionError } from '#internal/subscriptions/project-subscription-error'
 import {
   PROJECT_SUBSCRIPTION_TYPE,
@@ -14,6 +16,7 @@ import {
   type ProjectSubscriptionObserver,
   type ProjectUnsubscribe,
 } from '#internal/subscriptions/project-subscription'
+import { addTicks } from '#internal/time/tick'
 
 interface SubscriptionEntry {
   active: boolean
@@ -31,6 +34,30 @@ function rangesIntersect(left: AffectedTickRange, right: AffectedTickRange): boo
   return left.startTick < right.endTick && right.startTick < left.endTick
 }
 
+function matchesMidiNoteAddress(
+  subscription: MidiNoteChangesSubscription,
+  sourceId: MidiSourceId,
+  noteId: NoteId,
+  affected: AffectedTickRange,
+): boolean {
+  return (
+    (subscription.sourceIds === undefined || subscription.sourceIds.includes(sourceId)) &&
+    (subscription.noteIds === undefined || subscription.noteIds.includes(noteId)) &&
+    (subscription.affected === undefined || rangesIntersect(subscription.affected, affected))
+  )
+}
+
+function matchesPlacedMidiNote(
+  subscription: MidiNoteChangesSubscription,
+  sourceId: MidiSourceId,
+  note: MidiNoteRecord,
+): boolean {
+  return matchesMidiNoteAddress(subscription, sourceId, note.id, {
+    startTick: note.startTick,
+    endTick: addTicks(note.startTick, note.durationTick),
+  })
+}
+
 function matchesMidiNoteChange(
   subscription: MidiNoteChangesSubscription,
   change: ProjectChange,
@@ -39,20 +66,23 @@ function matchesMidiNoteChange(
     case PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED:
     case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED:
     case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
-    case PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED:
-    case PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED:
+    case PROJECT_CHANGE_TYPE.MIDI_CLIP.UPDATED:
       return false
+
+    case PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED:
+      return change.after.notes.some((note) =>
+        matchesPlacedMidiNote(subscription, change.sourceId, note),
+      )
+
+    case PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED:
+      return change.before.notes.some((note) =>
+        matchesPlacedMidiNote(subscription, change.sourceId, note),
+      )
 
     case PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED:
     case PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED:
     case PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED:
-      return (
-        (subscription.sourceIds === undefined ||
-          subscription.sourceIds.includes(change.sourceId)) &&
-        (subscription.noteIds === undefined || subscription.noteIds.includes(change.noteId)) &&
-        (subscription.affected === undefined ||
-          rangesIntersect(subscription.affected, change.affected))
-      )
+      return matchesMidiNoteAddress(subscription, change.sourceId, change.noteId, change.affected)
   }
 }
 

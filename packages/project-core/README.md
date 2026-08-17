@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Replace Instrument Device、Add MIDI Clip 与 Add / Move / Remove / Resize MIDI Note Command、Instrument Device / Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Replace Instrument Device、Add MIDI Clip、原子 Add / Extend Clip with Note 与 Add / Move / Remove / Resize MIDI Note Command、Instrument Device / Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -231,10 +231,11 @@ Undo / Redo 原子恢复或重放完整集合。
 返回 `no-change`，合法变化只替换 Start / Duration，并保留 Note ID、Pitch、Velocity 与
 Channel。多 Note Resize 的共享 Anchor 或比例语义尚未定义，因此不提前泛化为集合协议。
 
-Add、Resize 和同一 MidiSource 内的 Move 使用严格 Source 与 MIDI Pitch 边界，不由 Core
-clamp、wrap 或自动扩展 Source / Clip。Editor 可以在 Preview 阶段约束几何或 Delta，Core
-仍基于提交时的权威 Record 完整复核。Command preparer 与 handler 不从 package root 导出；
-ProjectSession 是正式执行入口。完整规则和实现边界见
+普通 Add、Resize 和同一 MidiSource 内的 Move 使用严格 Source 与 MIDI Pitch 边界，不由 Core
+clamp、wrap 或隐式扩展 Source / Clip。只有明确的 `ExtendMidiClipWithNoteCommand` 才能把右扩
+Clip、按需增长 Source 与添加 Note 表达成一个产品意图。Editor 可以在 Preview 阶段约束几何或
+Delta，Core 仍基于提交时的权威 Record 完整复核。Command preparer 与 handler 不从 package
+root 导出；ProjectSession 是正式执行入口。完整规则和实现边界见
 [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
 
 Command 的单数或复数不由 Mutation 数量决定：Command 表达一次完整产品意图，Mutation
@@ -263,9 +264,22 @@ Project Core 继续只验证通用 Device 外壳，不识别 `Studio Grand`、`s
 
 Project Core 验证目标 Instrument Track、Clip / Source / Partition 身份和 Source 读取范围，但不决定双击手势、按小节吸附、默认长度、名称或颜色。MIDI Clip change 携带完整 ownership placement 与时间线受影响范围；QueryIndex 同步增加或移除对应 Note Partition，使新 Clip 可以立即接收现有 Note Command。完整边界见 [Add MIDI Clip Command 实施计划](./docs/add-midi-clip-command-plan.md)。
 
+### MIDI Clip / Note 原子放置纵向切片
+
+`AddMidiClipWithNoteCommand` 在同一计划中创建非循环 Clip、独占 Source 和包含第一枚 Note 的
+Partition；`ExtendMidiClipWithNoteCommand` 从权威模型读取已有非循环 Clip，向右替换最终
+`spanTick`、按需增长 Source，并插入导致扩展的 Note。两者都只产生一个 revision、内容状态和
+History 步骤，不允许 Studio 串联多次 Command。
+
+右扩只接受确实越过当前 Clip window、但完全落在目标 window 内的 Note；不能越过同 Track 上
+从当前末端起遇到的下一 Clip，looped Clip 明确不支持。Source 已有容量足够时不会制造等值
+Replace。新建 populated Clip 继续聚合为 `midi-clip.added / removed`；右扩发布
+`midi-clip.updated` 与 `midi-note.added / removed`。完整规则见
+[MIDI Clip / Note 原子放置命令计划](./docs/midi-clip-note-placement-command-plan.md)。
+
 ### ProjectCommit / ProjectDelta 基础层
 
-当前公开契约能够表达 Instrument Device Update、Instrument Track Add / Remove、MIDI Clip Add / Remove 与 MIDI Note Add / Remove / Update。Instrument Device change 携带 Track / Device 身份与 before / after Descriptor；Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip change 聚合 Clip、Source 与 Note Partition，并携带时间线受影响范围；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 与 Resize 都使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
+当前公开契约能够表达 Instrument Device Update、Instrument Track Add / Remove、MIDI Clip Add / Remove / Update 与 MIDI Note Add / Remove / Update。Instrument Device change 携带 Track / Device 身份与 before / after Descriptor；Track change 用一个 placement 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip Add / Remove 聚合 Clip、Source 与 Note Partition，Clip Update 携带 before / after Clip 和可选 Source Update；Note change 携带 Source / Note 身份、before / after Record，以及半开区间形式的受影响 Tick 范围，Move 与 Resize 都使用旧、新区间的保守并集。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始 Command 类型。
 
 包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
 
@@ -416,7 +430,7 @@ asset reference changes
 - Persistence 使用 `journalSequence`，不能复用 modelRevision；
 - Delta 可以丢弃；消费者错过增量后必须能从 Snapshot 全量重建。
 
-当前已实现 Instrument Device Update、Instrument Track Add / Remove 与 MIDI Clip Add / Remove 的 change 映射，以及 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
+当前已实现 Instrument Device Update、Instrument Track Add / Remove 与 MIDI Clip Add / Remove / Update 的 change 映射，以及 Note Add / Remove / Update 的 change 映射和受影响 Tick 范围；query invalidation、graph invalidation 与 asset reference change 仍由后续对应模块补充。
 
 ## 并发与线程模型
 
@@ -460,7 +474,8 @@ src/
 ├── model/          ModelStore、实体、ID 与不变量
 ├── time/           Tick、区间、TempoMap
 ├── mutation/       可逆基础变化、MutationPlan 与原子应用
-├── commands/       Command 与 handler
+├── commands/       Command 协议、共享准备管线与既有 handler
+│   └── midi-clip-note-placement/  populated Clip Add / Extend 产品命令实现
 ├── commit/         ProjectCommit、ProjectDelta 与语义 change
 ├── session/        ProjectSession 与提交管线编排
 ├── history/        Undo / Redo 与合并策略
@@ -525,11 +540,12 @@ src/
 12. 在 `platform-browser` 实现 IndexedDB immutable checkpoint + active/previous 指针事务。（已完成）
 13. 在 Studio 组合根接入保存和刷新恢复，形成第一条浏览器持久化纵向切片。
 14. 实现保持身份与 Track 拓扑的 Instrument Device Replace Command、Delta、No-change、History 与持久化往返。（已完成）
-15. 有真实格式演进或恢复需求后分别实现 JSON codec、migration、Journal；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
+15. 实现 Track 全局 Piano Roll 所需的 populated Clip Add 与 Clip / Source 右扩加 Note 原子命令。（已完成）
+16. 有真实格式演进或恢复需求后分别实现 JSON codec、migration、Journal；Audio Clip、完整 Device 能力和 Automation 只在对应产品阶段加入。
 
 ## 测试与验收
 
-当前 Project Core 基线为 27 个测试文件、399 项测试。
+当前 Project Core 基线为 28 个测试文件、409 项测试。
 
 测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
 
@@ -559,6 +575,7 @@ src/
 - [阶段成果：安全模型与原子 Mutation 内核](./docs/project-core-transaction-foundation-milestone.md)
 - [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)
 - [Add MIDI Clip Command 实施计划](./docs/add-midi-clip-command-plan.md)
+- [MIDI Clip / Note 原子放置命令计划](./docs/midi-clip-note-placement-command-plan.md)
 - [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)
 - [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
 - [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)

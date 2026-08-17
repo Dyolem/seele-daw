@@ -53,23 +53,23 @@ Studio 会明确失败，不静默替换声音。
 
 ### 2.1 功能总览
 
-| 编号                   | 功能                      | 状态         | 当前边界                                                                                                                     |
-| ---------------------- | ------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `PROJECT-ENTRY`        | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                                         |
-| `PROJECT-LIFECYCLE`    | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                              |
-| `PROJECT-NAVIGATION`   | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                                     |
-| `WORKBENCH-SHELL`      | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                               |
-| `PROJECT-HISTORY`      | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、Instrument 选择、空 MIDI Clip 与 MIDI Note 创建 / 移动 / 缩放 / 删除。                            |
-| `TRACK-CREATE`         | 创建 Instrument Track     | **用户可用** | 新 Track 默认持久化选择内置 Studio Grand。                                                                                   |
-| `INSTRUMENT-SELECTION` | 选择 Track Instrument     | **用户可用** | 显示 Studio Grand / Empty / Missing；旧空 Slot 可显式选择 Studio Grand。                                                     |
-| `TRACK-SELECTION`      | Track 选择                | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。                                                                     |
-| `MIDI-CLIP-CREATE`     | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                                     |
-| `CONTEXT-EDITOR-DOCK`  | 上下文编辑器 Dock         | **局部可用** | 可调整布局并显示所选 Clip 的 Piano Roll Selection Surface。                                                                  |
-| `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                              |
-| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                 |
-| `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                              |
-| `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return；播放中相关编辑按 Note / Track 选择性生效。Loop、Seek、Record、Meter 尚未实现。         |
-| `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | Grid / Note Renderer、Pencil Add、Cursor Selection / Move、Cursor / Pencil Resize、多选 Delete、Snap 与 Undo / Redo 已接入。 |
+| 编号                   | 功能                      | 状态         | 当前边界                                                                                                             |
+| ---------------------- | ------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `PROJECT-ENTRY`        | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                                 |
+| `PROJECT-LIFECYCLE`    | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                      |
+| `PROJECT-NAVIGATION`   | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                             |
+| `WORKBENCH-SHELL`      | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                       |
+| `PROJECT-HISTORY`      | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、Instrument 选择、空 MIDI Clip 与 MIDI Note 创建 / 移动 / 缩放 / 删除。                    |
+| `TRACK-CREATE`         | 创建 Instrument Track     | **用户可用** | 新 Track 默认持久化选择内置 Studio Grand。                                                                           |
+| `INSTRUMENT-SELECTION` | 选择 Track Instrument     | **用户可用** | 显示 Studio Grand / Empty / Missing；旧空 Slot 可显式选择 Studio Grand。                                             |
+| `TRACK-SELECTION`      | Track 选择                | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。                                                             |
+| `MIDI-CLIP-CREATE`     | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                             |
+| `CONTEXT-EDITOR-DOCK`  | 上下文编辑器 Dock         | **局部可用** | 可调整布局并在 Track 全局时间轴与所选 Clip Focus Piano Roll 之间切换。                                               |
+| `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                      |
+| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                         |
+| `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                      |
+| `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return；播放中相关编辑按 Note / Track 选择性生效。Loop、Seek、Record、Meter 尚未实现。 |
+| `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、原子 Pencil 放置、Clip 内完整 Note 编辑、Snap 与 Undo / Redo 已接入。      |
 
 ## 3. 项目入口与生命周期
 
@@ -238,12 +238,13 @@ Dock 当前根据上下文显示：
 
 - 未选择 Track 时的选择提示。
 - 已选择 Track、但没有 MIDI Clip 时的空状态。
-- 已选择 MIDI Clip 时的 Clip 摘要与可选择 Piano Roll。
+- 默认 Track Scope 的全局 Ruler、横向滚动、全部 Clip window 与可见 Note。
+- 已选择 MIDI Clip 时可切换到 Clip Focus；公共标题栏的 Scope 控件在空状态仍然可用。
 
-Piano Roll 已能渲染真实 Grid 和 Note，提供 Pencil / Cursor、Snap 与基础 Selection，可
-使用 Pencil 创建 Note、用 Cursor 拖动 Selection、用 Cursor / Pencil 调整单 Note 左右边缘，
-并用 `Delete` / `Backspace` 删除 Selection；尚没有缩放、滚动、Box Selection 或 Velocity
-编辑手势。
+Track Scope 可以选择 Active Clip，并用 Pencil 在全局时间轴中向既有 Clip 添加 Note、原子右扩
+Clip 或按小节新建 Clip；Clip Focus 提供 Cursor Selection / Move、Cursor / Pencil 单 Note
+Resize 与 `Delete` / `Backspace` 多选删除。当前仍没有 Zoom、Box Selection 或 Velocity 编辑；
+Track Cursor 的完整 Note 编辑也尚未接入。
 
 ### 5.4 `KEYBOARD-SHORTCUTS` Scoped Keyboard Shortcuts
 
@@ -305,12 +306,12 @@ Scrub。Follow 在每次进入 Playing 时默认开启，并只分页滚动右�
 Track 控制列保持固定。用户主动横向滚动或通过 Pointer / Keyboard 操作时间轴会暂停本次 Follow，
 可见 Follow 控制可以立即恢复。该状态不保存为 Project Fact。
 
-当前已交付的 Clip Focus Piano Roll 基线也显示不可交互 Playhead：它用
+Clip Focus Piano Roll 显示不可交互 Playhead：它用
 `globalTick - clip.startTick` 把同一全局 Transport 位置换算为所选 Clip 的局部位置，只在
 `[0, clip.spanTick]` 内显示，并通过独立图层的 `translate3d(...)` 移动。切换 Clip、Selection 或
-项目以及退出编辑器时，投影会更新或清理；项目身份不匹配时不会显示旧项目位置。已确认的后续
-Track 默认模式将直接使用全局 Tick，并在自身横向视口中执行 Follow；完成该模式前，当前完整
-Clip 视口仍不增加 Zoom、横向滚动或自动跟随。
+项目以及退出编辑器时，投影会更新或清理；项目身份不匹配时不会显示旧项目位置。默认 Track
+Surface 与可见 Scope 切换已经交付，但 Track Playhead / Follow 仍留给下一批；完成前 Track
+模式不伪造播放位置，当前完整 Clip 视口也不增加 Zoom、横向滚动或自动跟随。
 
 - **尚未调度**：还没有交给声音 Runtime；
 - **已调度但未开始**：已经安排了未来开始时刻，但尚未产生声音；
@@ -585,11 +586,10 @@ Track 模式 Pencil 在全局空白时间轴上的产品规则：
 Command、一个 Commit 和一个 History 步骤；Studio 不得通过多次命令拼接事务。Clip Focus
 模式不会因为用户在局部视口操作而自动创建其他 Clip。
 
-当前实现状态需要与已确认的最终规则区分：Clip Focus Surface 和局部 Playhead 已经可见；Editor
-已经建立 immutable Snapshot 到 Track 全局 Clip / Note 的共享只读投影，Studio Preference
-Store 也已预留默认 Track Scope；Project Core 已实现 populated Clip 新建与非循环 Clip 右扩加
-Note 的原子 Command。可见模式切换、Track Ruler / Clip window、全局 Pencil 放置和 Track
-Playhead / Follow 仍按独立批次接入，不能从内部能力推断为已经交付。
+当前实现状态需要与已确认的最终规则区分：默认 Track Surface 已显示全局 Ruler、横向滚动、
+Clip window、可见 Note、Active Clip 与原子 Pencil 放置；公共标题栏可以切换到既有 Clip Focus
+Surface，切换只改变 Studio 应用偏好。Track Cursor 的完整 Note 编辑以及 Track Playhead /
+Follow 仍按独立批次接入，不能从双模式 UI 推断为已经交付。
 
 `@seele-daw/editor/common` 已提供：
 
@@ -699,15 +699,15 @@ Project Core 已具备：
 
 ### 8.4 Package 状态
 
-| Package                       | 当前能力                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、含 populated Clip 新建、非循环 Clip 右扩加 Note 与单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                                                                                                                                                                                                         |
-| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return / 共享视觉位置与时间反馈、播放中 Note / Track / Instrument 选择性重协调、默认 Studio Grand Add Track、旧 Slot 显式选择、派生 150 小节 Arrangement、横向滚动、Arrangement Playhead / 分页 Follow 与 Clip Focus Piano Roll Playhead、空 MIDI Clip、Track / Clip Selection 与 Piano Roll Note 编辑；Piano Roll Scope 偏好已建立，Track 模式 UI 尚未接入。 |
-| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note Snapshot 投影、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                                                                                                                                                                        |
-| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、派生 Timeline 范围、具体 MIDI Plan Compiler、Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；公开 Studio / Audio Web 真实消费者所需的最小规划 API，不提供音频资源。                                                                                                                                                                |
-| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、可重排 Note Off、loop、mutex、选择性 cancel、generation 与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                                                                                                                                                                                |
-| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Package                       | 当前能力                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、含 populated Clip 新建、非循环 Clip 右扩加 Note 与单 Note Resize 的 Command、Commit、Session、History、Query、Snapshot、Project File V1 与 Checkpoint。                                                                                                                                                                                                                                                                              |
+| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store 与 Recent Project Catalog。                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `apps/studio`                 | 项目入口、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return / 共享视觉位置与时间反馈、播放中 Note / Track / Instrument 选择性重协调、默认 Studio Grand Add Track、旧 Slot 显式选择、派生 150 小节 Arrangement、横向滚动、Arrangement Playhead / 分页 Follow、Clip Focus Piano Roll Playhead、Track / Clip 双模式切换、Track 全局 Pencil 放置与 Clip Focus Note 编辑；Track Playhead / Follow 尚未接入。 |
+| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note Snapshot 投影、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                                                                                                                                                             |
+| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、派生 Timeline 范围、具体 MIDI Plan Compiler、Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；公开 Studio / Audio Web 真实消费者所需的最小规划 API，不提供音频资源。                                                                                                                                                     |
+| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、可重排 Note Off、loop、mutex、选择性 cancel、generation 与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                                                                                                                                                                     |
+| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ## 9. 明确尚未提供的产品能力
 

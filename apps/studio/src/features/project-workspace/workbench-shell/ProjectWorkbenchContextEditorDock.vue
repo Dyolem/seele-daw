@@ -166,6 +166,28 @@ function useStudioGrand(): void {
           <span>{{ selectedContextName }}</span>
         </div>
         <div class="project-workbench__dock-controls">
+          <div
+            class="project-workbench__scope-switch"
+            role="group"
+            aria-label="Piano Roll editing scope"
+          >
+            <button
+              type="button"
+              :aria-pressed="pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK"
+              title="Edit every MIDI clip on the selected track"
+              @click="pianoRollPreferences.selectEditingScope(PIANO_ROLL_EDITING_SCOPE.TRACK)"
+            >
+              Track
+            </button>
+            <button
+              type="button"
+              :aria-pressed="pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.CLIP"
+              title="Edit only the selected MIDI clip"
+              @click="pianoRollPreferences.selectEditingScope(PIANO_ROLL_EDITING_SCOPE.CLIP)"
+            >
+              Clip Focus
+            </button>
+          </div>
           <UiIconButton
             :icon="MinimizeIcon"
             :label="
@@ -422,6 +444,48 @@ function useStudioGrand(): void {
 
 .project-workbench__dock-controls {
   gap: var(--sd-space-0-5);
+}
+
+.project-workbench__scope-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 1px;
+  padding: 2px;
+  margin-inline-end: var(--sd-space-1);
+  border: 1px solid var(--sd-color-border-subtle);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-color-surface-sunken);
+}
+
+.project-workbench__scope-switch > button {
+  min-block-size: calc(var(--sd-control-height-sm) - var(--sd-space-1));
+  padding-inline: var(--sd-space-2);
+  border: 0;
+  border-radius: var(--sd-radius-sm);
+  color: var(--sd-color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--sd-font-size-xs);
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    color var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    background var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
+}
+
+.project-workbench__scope-switch > button:hover {
+  color: var(--sd-color-text-secondary);
+  background: var(--sd-color-control-ghost-hover);
+}
+
+.project-workbench__scope-switch > button[aria-pressed='true'] {
+  color: var(--sd-color-text-primary);
+  background: var(--sd-color-control-secondary);
+}
+
+.project-workbench__scope-switch > button:focus-visible {
+  outline: 2px solid var(--sd-color-border-focus);
+  outline-offset: 1px;
 }
 
 .project-workbench__context-host {

@@ -12,6 +12,8 @@
 - Clip-scoped Note Selection、DOM Hit、Primary Pointer Click 与 focused Escape；
 - 应用生命周期级 Pencil / Cursor、Snap、`1/16` Grid，以及默认 `Track` / 可选 `Clip Focus`
   Scope Preference Store；Canvas Grid 消费其 Subdivision Tick；
+- MIDI Editor 公共标题栏提供始终可见的 `Track` / `Clip Focus` 单选切换；空 Clip Focus 状态仍
+  可切回 Track，切换不执行 Project Command；
 - 可见 Pencil / Cursor 单选工具与 Snap Toggle；
 - Pencil 空白 Click 的 X / Tick、Y / Pitch Placement、Clip 尾部限制与 Add Note Command；
   Snap 开启时 X 固定落在 Pointer 所在 Grid 单元的左边界；
@@ -39,10 +41,10 @@
 - Arrangement 与 Piano Roll 不维护第二份 Clip：原子命令发布的新建 / 扩展事实会由同一
   Snapshot 投影同时刷新两处。
 
-Scope Preference 的应用生命周期与默认 Track 值已经接入，但可见模式切换仍留给 Batch 7E.4；
-既有 Clip-local Surface 保留为 Clip Focus 实现。当前 Track Cursor 负责显式选择 Active Clip，
-完整 Note Selection / Move / Resize 仍在 Clip Focus；Track Playhead / Follow 留给 Batch 7E.5。
-Scope 不是 Project Fact，不得进入 ProjectSession、History、dirty 或 Checkpoint。
+Scope Preference、默认 Track 值与可见模式切换已经接入；既有 Clip-local Surface 保留为 Clip
+Focus 实现。当前 Track Cursor 负责显式选择 Active Clip，完整 Note Selection / Move / Resize
+仍在 Clip Focus；Track Playhead / Follow 留给 Batch 7E.5。Scope 不是 Project Fact，不得进入
+ProjectSession、History、dirty 或 Checkpoint。
 
 当前 Surface 已形成 Add、Cursor Move、Cursor / Pencil 单 Note Resize 与多选 Delete 写入
 闭环，但仍不能编辑 Velocity。默认 DOM Note Renderer 提供互不重叠的左右 Edge 热区；

@@ -217,7 +217,7 @@ Workspace Fullscreen
 | Project facts             | 轨道、Clip、音符、轨道主题色      | Project Core                             | Project Checkpoint     |
 | Project lifecycle         | 当前项目、dirty、保存结果         | ActiveProjectService / application layer | 由项目服务协调         |
 | Workbench preferences     | 主题、密度、面板高度、面板模式    | Workbench / preference store             | 本地用户偏好           |
-| Studio editor preferences | Tool、Snap、Grid Preset           | Studio preference store                  | 首批仅应用生命周期     |
+| Studio editor preferences | Scope、Tool、Snap、Grid Preset    | Studio preference store                  | 首批仅应用生命周期     |
 | Editor session            | 当前 Clip Selection、Zoom、Scroll | 对应 Editor state                        | 默认不写入项目         |
 | Transient interaction     | Hover、拖动预览、框选区域         | Surface interaction state                | 不持久化               |
 | Audio runtime             | 播放、调度、电平、设备状态        | Audio / playback runtime                 | 不进入 Project History |
@@ -416,6 +416,8 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - `Track` 是默认 Scope，以全局 Project Tick 显示当前 Instrument Track 上的全部 MIDI Clip；
 - `Clip Focus` 是可选 Scope，以 Clip-local Tick 聚焦一个 Clip；
 - Scope 是 Studio 应用生命周期偏好，不进入 Project Fact、History、dirty 或 Checkpoint；
+- Scope 使用公共 MIDI Editor 标题栏中的持续单选控件，并通过可见选中态与 `aria-pressed`
+  表达；控件在空 Clip Focus 状态仍保持可用，使用户可以显式返回 Track；
 - 两种模式读取相同的 `MidiClipRecord`、`MidiSourceRecord` 与 Note Partition；Clip 末端只由
   `startTick + spanTick` 派生；
 - Track 投影中非循环 Note 的全局位置是
@@ -488,8 +490,8 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 
 视觉与操作规则：
 
-- Piano Roll 顶部使用紧凑工具栏；Pencil / Cursor 作为一个持续单选组，Snap 与 Grid 值作为
-  相邻但独立的时间编辑组；
+- Piano Roll 公共标题栏提供 Track / Clip Focus Scope 单选；Surface 顶部继续使用紧凑工具栏，
+  Pencil / Cursor 作为一个持续单选组，Snap 与 Grid 值作为相邻但独立的时间编辑组；
 - 当前 Tool 与 Snap 必须在 Pointer 离开后仍通过边界、背景和 `aria-pressed` 清晰表达，
   不能只依赖 Tooltip 或图标颜色；
 - Pencil 激活时空白 Grid 使用 Crosshair Cursor；Note Body 按 Tool 表达 Move / Pencil
@@ -1060,11 +1062,12 @@ Arrangement 当前使用独立 DOM Playhead 子组件直接消费该投影，并
 `translate3d(...)`。Ruler、Lane、Clip Scene 不消费高频位置；分页 Follow 由 Arrangement 右侧
 滚动权威执行，手动横向导航会暂停当前播放轮次的自动滚动。
 
-Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。已交付的 Clip Focus 基线由 Studio
+Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。已交付的 Clip Focus Playhead 由 Studio
 Presentation 显式携带 Project 身份和 Arrangement `clip.startTick`，子组件再映射到当前
-Clip-local Viewport；后续 Track Scope 直接消费全局 Tick，并在自身横向权威上分页 Follow。静态
-Canvas Grid、DOM Note Scene、Project Query 和 Editor Session 都不订阅高频 Transport 帧。当前
-可见的完整 Clip 视口没有 Zoom、横向滚动或 Follow。
+Clip-local Viewport。Track Surface 与双 Scope 切换已经可见，但 Track Playhead 尚未接入；后续
+Track Playhead 直接消费全局 Tick，并在自身横向权威上分页 Follow。静态 Canvas Grid、DOM Note
+Scene、Project Query 和 Editor Session 都不订阅高频 Transport 帧。当前可见的完整 Clip 视口
+没有 Zoom、横向滚动或 Follow。
 
 ### 21.2 禁止项
 

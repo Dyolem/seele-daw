@@ -11,6 +11,10 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  PIANO_ROLL_EDITING_SCOPE,
+  usePianoRollPreferencesStore,
+} from '@/features/piano-roll/piano-roll-preferences-store'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import {
   PROJECT_TRACK_INSTRUMENT_STATUS,
@@ -37,6 +41,7 @@ interface MountInspectorOptions {
 
 function mountInspector(options: MountInspectorOptions) {
   const pinia = createPinia()
+  const pianoRollPreferences = usePianoRollPreferencesStore(pinia)
   const toasts = useUiToastStore(pinia)
   const useStudioGrand = vi.fn<ProjectTrackCoordinator['useStudioGrand']>()
   if (options.selectionFailure !== undefined) {
@@ -55,6 +60,7 @@ function mountInspector(options: MountInspectorOptions) {
       useStudioGrand,
     }),
   })
+  const projectSession = createTestSession(parseProjectId('project-instrument-inspector'))
   const wrapper = mount(ProjectWorkbenchContextEditorDock, {
     props: {
       barSpanTick: parsePositiveTick(3_840),
@@ -62,7 +68,7 @@ function mountInspector(options: MountInspectorOptions) {
       isMaximized: false,
       pianoRollPresentation: null,
       pianoRollTrackPresentation: null,
-      projectSession: createTestSession(parseProjectId('project-instrument-inspector')),
+      projectSession,
       selectedClip: options.selectedClip ?? null,
       selectedTrack: options.selectedTrack,
       timeSignatureNumerator: 4,
@@ -77,7 +83,7 @@ function mountInspector(options: MountInspectorOptions) {
   })
   mountedWrappers.push(wrapper)
 
-  return { toasts, useStudioGrand, wrapper }
+  return { pianoRollPreferences, projectSession, toasts, useStudioGrand, wrapper }
 }
 
 function createTrack(
@@ -97,6 +103,54 @@ afterEach(() => {
 })
 
 describe('Project Workbench Instrument Inspector', () => {
+  it('switches the visible Piano Roll scope without changing Project facts or History', async () => {
+    const selectedClip: ProjectMidiClipPresentation = Object.freeze({
+      color: null,
+      id: parseClipId('clip-scope-switch'),
+      muted: false,
+      name: 'Focused Verse',
+      spanTick: parsePositiveTick(3_840),
+      startTick: parseTick(0),
+      trackId: TRACK_ID,
+    })
+    const { pianoRollPreferences, projectSession, wrapper } = mountInspector({
+      selectedClip,
+      selectedTrack: createTrack({
+        deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
+        displayName: 'Studio Grand',
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
+      }),
+    })
+    const scopeSwitch = wrapper.get('[aria-label="Piano Roll editing scope"]')
+    const [trackButton, clipFocusButton] = scopeSwitch.findAll('button')
+    const initialRevision = projectSession.modelRevision
+    const initialContentStateId = projectSession.contentStateId
+
+    expect(trackButton?.text()).toBe('Track')
+    expect(trackButton?.attributes('aria-pressed')).toBe('true')
+    expect(clipFocusButton?.text()).toBe('Clip Focus')
+    expect(clipFocusButton?.attributes('aria-pressed')).toBe('false')
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Legacy Keys')
+
+    await clipFocusButton?.trigger('click')
+
+    expect(pianoRollPreferences.editingScope).toBe(PIANO_ROLL_EDITING_SCOPE.CLIP)
+    expect(trackButton?.attributes('aria-pressed')).toBe('false')
+    expect(clipFocusButton?.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Focused Verse')
+    expect(projectSession.modelRevision).toBe(initialRevision)
+    expect(projectSession.contentStateId).toBe(initialContentStateId)
+    expect(projectSession.canUndo).toBe(false)
+
+    await trackButton?.trigger('click')
+
+    expect(pianoRollPreferences.editingScope).toBe(PIANO_ROLL_EDITING_SCOPE.TRACK)
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Legacy Keys')
+    expect(projectSession.modelRevision).toBe(initialRevision)
+    expect(projectSession.contentStateId).toBe(initialContentStateId)
+    expect(projectSession.canUndo).toBe(false)
+  })
+
   it('keeps the legacy Slot action visible while its MIDI Clip is selected', async () => {
     const selectedClip: ProjectMidiClipPresentation = Object.freeze({
       color: null,

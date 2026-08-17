@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Tick } from '@seele-daw/project-core'
+import type { ProjectId, Tick } from '@seele-daw/project-core'
 import { computed, type StyleValue } from 'vue'
 
 import { timelinePositionRatio } from '@/features/project-workspace/timeline/layout'
@@ -8,17 +8,17 @@ import { useProjectPlayback } from '@/workbench/project/playback/vue/project-pla
 
 const props = defineProps<{
   readonly barSpanTick: Tick
-  readonly projectId: string
+  readonly projectId: ProjectId
   readonly timelineEndTick: Tick
 }>()
 const { visualPosition } = useProjectPlayback()
 
-const playheadStyle = computed((): StyleValue => {
-  const positionTick =
-    visualPosition.value.projectId === props.projectId ? visualPosition.value.positionTick : 0
+const playheadStyle = computed((): StyleValue | null => {
+  if (visualPosition.value.projectId !== props.projectId) return null
+
   const timelineBarCount = props.timelineEndTick / props.barSpanTick
   const inlineOffsetRem =
-    timelinePositionRatio(positionTick, props.timelineEndTick) *
+    timelinePositionRatio(visualPosition.value.positionTick, props.timelineEndTick) *
     timelineBarCount *
     PROJECT_TIMELINE_BAR_INLINE_SIZE_REM
 
@@ -29,14 +29,15 @@ const playheadStyle = computed((): StyleValue => {
 
 <template>
   <div
-    class="project-workbench__arrangement-playhead"
+    v-if="playheadStyle"
+    class="project-piano-roll-track__playhead"
     :style="playheadStyle"
     aria-hidden="true"
   ></div>
 </template>
 
 <style scoped>
-.project-workbench__arrangement-playhead {
+.project-piano-roll-track__playhead {
   position: absolute;
   z-index: var(--sd-layer-sticky-raised);
   inset-block: 0;
@@ -47,7 +48,7 @@ const playheadStyle = computed((): StyleValue => {
   will-change: transform;
 }
 
-.project-workbench__arrangement-playhead::before {
+.project-piano-roll-track__playhead::before {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: 50%;

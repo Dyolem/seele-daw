@@ -8,7 +8,7 @@ import {
 } from '@seele-daw/project-core'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { nextTick } from 'vue'
+import { nextTick, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/ProjectPianoRollTrackSurface.vue'
@@ -28,6 +28,16 @@ import {
   PROJECT_MIDI_NOTE_CONTEXT_KEY,
   type ProjectMidiNoteVueContext,
 } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
+import {
+  PROJECT_PLAYBACK_PHASE,
+  type ProjectPlaybackState,
+} from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
+import {
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  type ProjectPlaybackVueContext,
+} from '@/workbench/project/playback/vue/project-playback-context'
 import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 
 const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
@@ -159,6 +169,112 @@ function installSurfaceEnvironment(): void {
   installPointerCapture()
 }
 
+function createSurfaceFixture() {
+  installSurfaceEnvironment()
+  const projectId = parseProjectId('track-surface-project')
+  const session = createInitialProjectSession({
+    projectId,
+    projectName: 'Track Surface',
+    tempoEventId: parseTempoEventId('track-surface-tempo'),
+    timeSignatureEventId: parseTimeSignatureEventId('track-surface-meter'),
+  })
+  const readyState = createReadyState(session)
+  const track = createProjectTrackCoordinator({
+    activeProject: { state: readyState },
+    createRandomValue: () => 0,
+    createUniqueId: createIdentitySource('track-surface-track', 'track-surface-device'),
+  }).addInstrumentTrack()
+  const clip = createProjectClipCoordinator({
+    activeProject: { state: readyState },
+    createUniqueId: createIdentitySource('track-surface-clip', 'track-surface-source'),
+  }).addEmptyMidiClip({
+    targetTick: parseTick(0),
+    trackId: track.trackId,
+  })
+  const presentation = createProjectPianoRollTrackPresentation(
+    session.getSnapshot(),
+    track.trackId,
+    clip.clipId,
+  )
+  if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    throw new Error('Expected a ready Track Piano Roll presentation')
+  }
+
+  const projectMidiNotes = createProjectMidiNoteCoordinator({
+    activeProject: { state: readyState },
+    createUniqueId: () => 'track-surface-note',
+  })
+  const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
+    projectMidiNotes,
+  })
+  const playbackState = shallowRef<ProjectPlaybackState>(
+    Object.freeze({
+      diagnostics: Object.freeze([]),
+      failureCause: null,
+      feedback: null,
+      modelRevision: null,
+      phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+      planStatus: 'playable',
+      positionProjectSecond: 0,
+      projectId,
+    }),
+  )
+  const playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
+    Object.freeze({
+      modelRevision: null,
+      phase: PROJECT_PLAYBACK_PHASE.STOPPED,
+      positionProjectSecond: 1,
+      positionTick: 3_840 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId,
+    }),
+  )
+  const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
+    dispose() {},
+    pause: () => false,
+    play: async () => false,
+    readVisualPosition: () => playbackVisualPosition.value,
+    returnToStart: () => false,
+    state: playbackState.value,
+    subscribe: () => () => undefined,
+    togglePlayPause: () => false,
+  })
+  const playbackContext: ProjectPlaybackVueContext = Object.freeze({
+    projectPlayback,
+    state: playbackState,
+    visualPosition: playbackVisualPosition,
+  })
+  const pinia = createPinia()
+  const selection = useProjectWorkbenchSelectionStore(pinia)
+  selection.activateProject(projectId)
+  selection.selectClip(track.trackId, clip.clipId)
+  const wrapper = mount(ProjectPianoRollTrackSurface, {
+    attachTo: document.body,
+    props: {
+      barSpanTick: parseTick(3_840),
+      presentation,
+      timelineEndTick: parseTick(576_000),
+      timeSignatureNumerator: 4,
+    },
+    global: {
+      plugins: [pinia],
+      provide: {
+        [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
+        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
+      },
+    },
+  })
+
+  return {
+    clip,
+    playbackState,
+    playbackVisualPosition,
+    presentation,
+    selection,
+    session,
+    wrapper,
+  }
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
   restorePrototypeProperty('hasPointerCapture')
@@ -169,62 +285,7 @@ afterEach(() => {
 
 describe('ProjectPianoRollTrackSurface', () => {
   it('renders global Track time, previews extension and commits one Pencil placement', async () => {
-    installSurfaceEnvironment()
-    const projectId = parseProjectId('track-surface-project')
-    const session = createInitialProjectSession({
-      projectId,
-      projectName: 'Track Surface',
-      tempoEventId: parseTempoEventId('track-surface-tempo'),
-      timeSignatureEventId: parseTimeSignatureEventId('track-surface-meter'),
-    })
-    const readyState = createReadyState(session)
-    const track = createProjectTrackCoordinator({
-      activeProject: { state: readyState },
-      createRandomValue: () => 0,
-      createUniqueId: createIdentitySource('track-surface-track', 'track-surface-device'),
-    }).addInstrumentTrack()
-    const clip = createProjectClipCoordinator({
-      activeProject: { state: readyState },
-      createUniqueId: createIdentitySource('track-surface-clip', 'track-surface-source'),
-    }).addEmptyMidiClip({
-      targetTick: parseTick(0),
-      trackId: track.trackId,
-    })
-    const presentation = createProjectPianoRollTrackPresentation(
-      session.getSnapshot(),
-      track.trackId,
-      clip.clipId,
-    )
-    if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
-      throw new Error('Expected a ready Track Piano Roll presentation')
-    }
-
-    const projectMidiNotes = createProjectMidiNoteCoordinator({
-      activeProject: { state: readyState },
-      createUniqueId: () => 'track-surface-note',
-    })
-    const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
-      projectMidiNotes,
-    })
-    const pinia = createPinia()
-    const selection = useProjectWorkbenchSelectionStore(pinia)
-    selection.activateProject(projectId)
-    selection.selectClip(track.trackId, clip.clipId)
-    const wrapper = mount(ProjectPianoRollTrackSurface, {
-      attachTo: document.body,
-      props: {
-        barSpanTick: parseTick(3_840),
-        presentation,
-        timelineEndTick: parseTick(576_000),
-        timeSignatureNumerator: 4,
-      },
-      global: {
-        plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
-        },
-      },
-    })
+    const { clip, presentation, selection, session, wrapper } = createSurfaceFixture()
     await nextTick()
 
     expect(wrapper.findAll('.project-piano-roll-track__ruler li')).toHaveLength(150)
@@ -258,6 +319,86 @@ describe('ProjectPianoRollTrackSurface', () => {
     )
     expect(session.modelRevision).toBe(presentation.readModel.modelRevision + 1)
     expect(selection.selectedClipId).toBe(clip.clipId)
+
+    wrapper.unmount()
+  })
+
+  it('projects the shared global Tick and follows independent viewport pages', async () => {
+    const { playbackState, playbackVisualPosition, wrapper } = createSurfaceFixture()
+    await nextTick()
+
+    const playhead = wrapper.get('.project-piano-roll-track__playhead')
+    expect(playhead.attributes('style')).toContain('transform: translate3d(5rem, 0, 0)')
+    expect(playhead.attributes('style')).not.toContain('left')
+
+    const scrollViewport = wrapper.get('.project-piano-roll-track__scroll-viewport')
+    const scrollElement = scrollViewport.element as HTMLElement
+    Object.defineProperties(scrollElement, {
+      clientWidth: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1_600 },
+    })
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+      positionTick: 144_000 as ProjectPlaybackVisualPosition['positionTick'],
+    })
+    playbackState.value = Object.freeze({
+      ...playbackState.value,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+    })
+    await nextTick()
+    await nextTick()
+
+    const followControl = wrapper.get('.project-piano-roll-track__follow-control')
+    expect(scrollElement.scrollLeft).toBe(400)
+    expect(followControl.attributes('aria-pressed')).toBe('true')
+    expect(playhead.attributes('style')).toContain('transform: translate3d(187.5rem, 0, 0)')
+
+    scrollElement.scrollLeft = 160
+    await scrollViewport.trigger('scroll')
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      positionTick: 432_000 as ProjectPlaybackVisualPosition['positionTick'],
+    })
+    await nextTick()
+
+    expect(scrollElement.scrollLeft).toBe(160)
+    expect(followControl.attributes('aria-label')).toBe('Resume Track timeline follow')
+    expect(followControl.attributes('aria-pressed')).toBe('false')
+
+    await followControl.trigger('click')
+    await nextTick()
+
+    expect(scrollElement.scrollLeft).toBe(1_200)
+    expect(followControl.attributes('aria-pressed')).toBe('true')
+
+    await wrapper.get('.project-piano-roll-track__ruler li').trigger('pointerdown')
+    expect(followControl.attributes('aria-pressed')).toBe('false')
+
+    playbackState.value = Object.freeze({
+      ...playbackState.value,
+      phase: PROJECT_PLAYBACK_PHASE.PAUSED,
+    })
+    await nextTick()
+    expect(followControl.attributes('disabled')).toBeDefined()
+
+    playbackState.value = Object.freeze({
+      ...playbackState.value,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+    })
+    await nextTick()
+    await nextTick()
+    expect(followControl.attributes('aria-pressed')).toBe('true')
+
+    await scrollViewport.trigger('keydown', { key: 'ArrowRight' })
+    expect(followControl.attributes('aria-pressed')).toBe('false')
+
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      projectId: parseProjectId('stale-track-surface-project'),
+    })
+    await nextTick()
+    expect(wrapper.find('.project-piano-roll-track__playhead').exists()).toBe(false)
 
     wrapper.unmount()
   })

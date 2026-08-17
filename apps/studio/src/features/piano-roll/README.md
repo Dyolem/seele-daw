@@ -34,6 +34,9 @@
 - 默认 Track-time Surface：使用与 Arrangement 相同的全局 Project Tick 和每小节视觉宽度，
   显示当前 Instrument Track 的全部 Clip window 与可见 Note，并在 150 小节最小时间线上独立
   横向滚动；
+- Track-time Surface 使用独立 transform-only Playhead 直接投影全局 Tick；每次进入 Playing
+  默认启用自身的分页 Follow，手动滚动、Pointer 或 Keyboard 时间轴操作会暂停，可见控制可立即
+  恢复；Follow 状态不进入 Project Fact；
 - Active Clip 下拉选择、Clip window / Note 点击选择，以及 looped Clip 的可见不可编辑状态；
 - Track Pencil Hover Preview：明确显示写入已有 Clip、右扩 Clip、新建 Bar Clip 或 blocked
   原因；点击时 Coordinator 对当前 Snapshot / revision 重新解析，并用 Add Note、
@@ -43,8 +46,9 @@
 
 Scope Preference、默认 Track 值与可见模式切换已经接入；既有 Clip-local Surface 保留为 Clip
 Focus 实现。当前 Track Cursor 负责显式选择 Active Clip，完整 Note Selection / Move / Resize
-仍在 Clip Focus；Track Playhead / Follow 留给 Batch 7E.5。Scope 不是 Project Fact，不得进入
-ProjectSession、History、dirty 或 Checkpoint。
+仍在 Clip Focus。Track 与 Clip Focus Playhead 都消费同一共享 Transport 视觉位置；完整 Clip
+Viewport 没有横向滚动，因此 Clip Focus 不建立多余 Follow。Scope 与 Follow 都不是 Project
+Fact，不得进入 ProjectSession、History、dirty 或 Checkpoint。
 
 当前 Surface 已形成 Add、Cursor Move、Cursor / Pencil 单 Note Resize 与多选 Delete 写入
 闭环，但仍不能编辑 Velocity。默认 DOM Note Renderer 提供互不重叠的左右 Edge 热区；

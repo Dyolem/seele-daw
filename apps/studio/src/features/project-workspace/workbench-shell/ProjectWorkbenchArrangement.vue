@@ -14,12 +14,12 @@ import type { ProjectTrackPresentation } from '@/features/project-workspace/proj
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline-scale'
-import ArrangementPlayhead from '@/features/project-workspace/workbench-shell/arrangement/ArrangementPlayhead.vue'
 import {
   resolvePagedFollowScrollLeft,
   timelinePositionRatio,
-} from '@/features/project-workspace/workbench-shell/arrangement/timeline-layout'
+} from '@/features/project-workspace/timeline/layout'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
+import ArrangementPlayhead from '@/features/project-workspace/workbench-shell/arrangement/ArrangementPlayhead.vue'
 import {
   PROJECT_ADD_TRACK_TYPE,
   type ProjectAddTrackType,

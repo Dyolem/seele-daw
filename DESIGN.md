@@ -1062,12 +1062,13 @@ Arrangement 当前使用独立 DOM Playhead 子组件直接消费该投影，并
 `translate3d(...)`。Ruler、Lane、Clip Scene 不消费高频位置；分页 Follow 由 Arrangement 右侧
 滚动权威执行，手动横向导航会暂停当前播放轮次的自动滚动。
 
-Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。已交付的 Clip Focus Playhead 由 Studio
+Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。Clip Focus Playhead 由 Studio
 Presentation 显式携带 Project 身份和 Arrangement `clip.startTick`，子组件再映射到当前
-Clip-local Viewport。Track Surface 与双 Scope 切换已经可见，但 Track Playhead 尚未接入；后续
-Track Playhead 直接消费全局 Tick，并在自身横向权威上分页 Follow。静态 Canvas Grid、DOM Note
-Scene、Project Query 和 Editor Session 都不订阅高频 Transport 帧。当前可见的完整 Clip 视口
-没有 Zoom、横向滚动或 Follow。
+Clip-local Viewport。Track Playhead 直接消费全局 Tick，并只通过 `translate3d(...)` 在自身时间
+内容层移动；其独立横向滚动权威使用与 Arrangement 相同的分页算法，但拥有独立的瞬时 Follow
+状态。手动横向滚动、Pointer 或 Keyboard 时间轴操作会暂停该视图的 Follow，显式恢复按钮和每次
+重新进入 Playing 都会恢复跟随。静态 Canvas Grid、DOM Note Scene、Project Query 和 Editor
+Session 都不订阅高频 Transport 帧。当前完整 Clip 视口没有 Zoom、横向滚动或 Follow。
 
 ### 21.2 禁止项
 

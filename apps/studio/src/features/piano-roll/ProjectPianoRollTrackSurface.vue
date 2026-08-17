@@ -38,16 +38,20 @@ import {
 import CursorIcon from '~icons/fluent/cursor-20-regular'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import PenIcon from '~icons/fluent/pen-20-regular'
+import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import {
   computed,
+  nextTick,
   onMounted,
   onUnmounted,
   shallowRef,
   useTemplateRef,
+  watch,
   watchEffect,
   type StyleValue,
 } from 'vue'
 
+import TrackPlayhead from '@/features/piano-roll/playhead/TrackPlayhead.vue'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
 import {
@@ -55,11 +59,17 @@ import {
   usePianoRollPreferencesStore,
   type PianoRollTool,
 } from '@/features/piano-roll/piano-roll-preferences-store'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline-scale'
+import {
+  resolvePagedFollowScrollLeft,
+  timelinePositionRatio,
+} from '@/features/project-workspace/timeline/layout'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
+import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 
 interface ProjectPianoRollTrackSurfaceProps {
   readonly barSpanTick: Tick
@@ -75,6 +85,7 @@ interface TrackPlacementPreview {
 
 const props = defineProps<ProjectPianoRollTrackSurfaceProps>()
 const { projectMidiNotes } = useProjectMidiNotes()
+const { state: playbackState, visualPosition: playbackVisualPosition } = useProjectPlayback()
 const pianoRollPreferences = usePianoRollPreferencesStore()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const toasts = useUiToastStore()
@@ -86,13 +97,47 @@ const surfaceElement = useTemplateRef<HTMLElement>('surfaceElement')
 const canvasHost = useTemplateRef<HTMLElement>('canvasHost')
 const gridCanvas = useTemplateRef<HTMLCanvasElement>('gridCanvas')
 const noteHost = useTemplateRef<HTMLElement>('noteHost')
+const scrollViewport = useTemplateRef<HTMLElement>('scrollViewport')
 const viewport = shallowRef<PianoRollTimelineViewport | null>(null)
 const placementPreview = shallowRef<TrackPlacementPreview | null>(null)
 const failureMessage = shallowRef<string | null>(null)
 const gridRenderer = shallowRef<PianoRollGridCanvasRenderer | null>(null)
 const noteRenderer = shallowRef<PianoRollNoteRenderer | null>(null)
+const isTimelineFollowSuspended = shallowRef(false)
 let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
 let resizeObserver: ResizeObserver | null = null
+let observedScrollLeft = 0
+
+const TIMELINE_INTERACTION_KEYS = new Set([
+  ' ',
+  'ArrowLeft',
+  'ArrowRight',
+  'End',
+  'Enter',
+  'Home',
+  'PageDown',
+  'PageUp',
+])
+
+const isCurrentProjectPlaying = computed(
+  () =>
+    playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING &&
+    playbackState.value.projectId === props.presentation.projectId,
+)
+const isTimelineFollowActive = computed(
+  () => isCurrentProjectPlaying.value && !isTimelineFollowSuspended.value,
+)
+const timelineFollowLabel = computed(() => {
+  if (!isCurrentProjectPlaying.value) return 'Track timeline follow — starts with playback'
+  return isTimelineFollowSuspended.value
+    ? 'Resume Track timeline follow'
+    : 'Pause Track timeline follow'
+})
+const currentPlaybackPositionTick = computed(() =>
+  playbackVisualPosition.value.projectId === props.presentation.projectId
+    ? playbackVisualPosition.value.positionTick
+    : 0,
+)
 
 const pianoKeys = Object.freeze(
   Array.from({ length: INITIAL_MAXIMUM_PITCH - INITIAL_MINIMUM_PITCH + 1 }, (_, index) => {
@@ -492,11 +537,93 @@ function handlePointerInput(input: PianoRollPointerInput): void {
   }
 }
 
-function handleScroll(): void {
+function setScrollLeft(nextScrollLeft: number): void {
+  const element = scrollViewport.value
+  if (element === null) return
+
+  const maximumScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth)
+  element.scrollLeft = Math.min(maximumScrollLeft, Math.max(0, nextScrollLeft))
+  // Consume the ensuing native scroll event as this page jump, not as user navigation.
+  observedScrollLeft = element.scrollLeft
+}
+
+function followCurrentPlaybackPosition(): void {
+  const element = scrollViewport.value
+  if (element === null || !isTimelineFollowActive.value) return
+
+  setScrollLeft(
+    resolvePagedFollowScrollLeft({
+      clientWidth: element.clientWidth,
+      positionRatio: timelinePositionRatio(
+        currentPlaybackPositionTick.value,
+        props.timelineEndTick,
+      ),
+      scrollLeft: element.scrollLeft,
+      scrollWidth: element.scrollWidth,
+    }),
+  )
+}
+
+function suspendTimelineFollow(): void {
+  if (isCurrentProjectPlaying.value) isTimelineFollowSuspended.value = true
+}
+
+function toggleTimelineFollow(): void {
+  if (!isCurrentProjectPlaying.value) return
+
+  isTimelineFollowSuspended.value = !isTimelineFollowSuspended.value
+  if (!isTimelineFollowSuspended.value) void nextTick(followCurrentPlaybackPosition)
+}
+
+function isFollowControlTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('.project-piano-roll-track__follow-control') !== null
+  )
+}
+
+function handleTimelinePointerDown(event: PointerEvent): void {
+  if (!isFollowControlTarget(event.target)) suspendTimelineFollow()
+}
+
+function handleTimelineKeydown(event: KeyboardEvent): void {
+  if (!isFollowControlTarget(event.target) && TIMELINE_INTERACTION_KEYS.has(event.key)) {
+    suspendTimelineFollow()
+  }
+}
+
+function handleTimelineWheel(event: WheelEvent): void {
+  if (event.deltaX !== 0 || (event.shiftKey && event.deltaY !== 0)) suspendTimelineFollow()
+}
+
+function handleScroll(event: Event): void {
   placementPreview.value = null
+  const element = event.currentTarget as HTMLElement
+  if (element.scrollLeft === observedScrollLeft) return
+
+  observedScrollLeft = element.scrollLeft
+  suspendTimelineFollow()
 }
 
 watchEffect(render)
+
+watch(
+  isCurrentProjectPlaying,
+  (isPlaying, wasPlaying) => {
+    if (!isPlaying || wasPlaying) return
+
+    isTimelineFollowSuspended.value = false
+    void nextTick(followCurrentPlaybackPosition)
+  },
+  { immediate: true },
+)
+
+watch(currentPlaybackPositionTick, followCurrentPlaybackPosition, { flush: 'post' })
+
+watch(
+  () => props.timelineEndTick,
+  () => void nextTick(followCurrentPlaybackPosition),
+)
 
 onMounted(() => {
   const grid = gridCanvas.value
@@ -585,6 +712,15 @@ onUnmounted(() => {
         <span aria-hidden="true">{{ pianoRollPreferences.gridPreset }}</span>
       </div>
       <span class="project-piano-roll-track__scope-label">TRACK TIME</span>
+      <UiIconButton
+        class="project-piano-roll-track__follow-control"
+        :disabled="!isCurrentProjectPlaying"
+        :icon="TargetArrowIcon"
+        :label="timelineFollowLabel"
+        :pressed="isTimelineFollowActive"
+        size="small"
+        @click="toggleTimelineFollow"
+      />
       <label class="project-piano-roll-track__active-clip">
         <span>Active Clip</span>
         <select :value="activeClipId ?? ''" @change="handleActiveClipChange">
@@ -624,7 +760,10 @@ onUnmounted(() => {
     <div
       ref="scrollViewport"
       class="project-piano-roll-track__scroll-viewport"
+      @keydown.capture="handleTimelineKeydown"
+      @pointerdown.capture="handleTimelinePointerDown"
       @scroll.passive="handleScroll"
+      @wheel.passive="handleTimelineWheel"
     >
       <div class="project-piano-roll-track__timeline-content" :style="timelineContentStyle">
         <ol class="project-piano-roll-track__ruler" aria-label="Track timeline bars">
@@ -673,6 +812,11 @@ onUnmounted(() => {
             aria-hidden="true"
           ></div>
         </div>
+        <TrackPlayhead
+          :bar-span-tick="props.barSpanTick"
+          :project-id="props.presentation.projectId"
+          :timeline-end-tick="props.timelineEndTick"
+        />
       </div>
     </div>
 
@@ -842,6 +986,7 @@ onUnmounted(() => {
 }
 
 .project-piano-roll-track__timeline-content {
+  position: relative;
   display: grid;
   min-inline-size: 100%;
   block-size: 100%;

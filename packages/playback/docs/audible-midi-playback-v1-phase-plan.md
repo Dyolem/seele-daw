@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 阶段计划
 
-> Status: Batch 1–6 reviewed; Batch 7E.0 committed; Piano Roll dual-scope correction in progress
+> Status: Batch 1–6 and 7A–7E.4 reviewed; Batch 7E.5 implemented locally and awaiting review
 >
 > Date: 2026-08-10
 >
@@ -1210,10 +1210,11 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7E.1–7E.5：Piano Roll Track / Clip 双模式校准
 
-> Implementation status: Batch 7E.1–7E.3 were reviewed and committed as `5e50228`, `113aabb` and
-> `4d935fd`. Batch 7E.4 is implemented locally and awaiting review: the common MIDI Editor header
-> now exposes an application-lifetime `Track` / `Clip Focus` switch that remains available in empty
-> states and never writes Project facts. Dual-mode Playhead / Follow remains in Batch 7E.5.
+> Implementation status: Batch 7E.1–7E.4 were reviewed and committed as `5e50228`, `113aabb`,
+> `4d935fd` and `ea87d53`. Batch 7E.5 is implemented locally and awaiting review: Track mode projects
+> the shared global Transport Tick through a transform-only Playhead and independently pages its
+> horizontal viewport while Follow is active. Clip Focus retains its Clip-local projection and full
+> Clip viewport.
 
 一个 Project MIDI Clip 仍是唯一权威实体，Piano Roll 不创建第二份 Clip Fact。两种模式只是
 同一 Track / Clip / MidiSource 图的不同投影：

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   resolvePagedFollowScrollLeft,
   timelinePositionRatio,
-} from '@/features/project-workspace/workbench-shell/arrangement/timeline-layout'
+} from '@/features/project-workspace/timeline/layout'
 
 describe('Arrangement Timeline layout', () => {
   it('normalizes the visual position to the derived Timeline range', () => {

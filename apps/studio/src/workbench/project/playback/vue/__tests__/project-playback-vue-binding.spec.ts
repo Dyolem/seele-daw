@@ -207,6 +207,48 @@ describe('ProjectPlaybackVueBinding', () => {
     binding.dispose()
   })
 
+  it('resumes after background frame throttling at the latest authoritative position', () => {
+    const fixture = createCoordinatorFixture()
+    const visualFrame = new ManualProjectPlaybackVisualFrame()
+    const binding = createProjectPlaybackVueBinding(fixture.coordinator, visualFrame)
+    const playingState = Object.freeze<ProjectPlaybackState>({
+      ...INITIAL_STATE,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+    })
+    const firstVisiblePosition = Object.freeze<ProjectPlaybackVisualPosition>({
+      ...INITIAL_VISUAL_POSITION,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+      positionProjectSecond: 0.25,
+      positionTick: 480 as ProjectPlaybackVisualPosition['positionTick'],
+    })
+    fixture.setVisualPosition(firstVisiblePosition)
+    fixture.publish(playingState)
+
+    const latestBackgroundPosition = Object.freeze<ProjectPlaybackVisualPosition>({
+      ...firstVisiblePosition,
+      positionProjectSecond: 87.5,
+      positionTick: 168_000 as ProjectPlaybackVisualPosition['positionTick'],
+    })
+    fixture.setVisualPosition(
+      Object.freeze({
+        ...firstVisiblePosition,
+        positionProjectSecond: 32,
+        positionTick: 61_440 as ProjectPlaybackVisualPosition['positionTick'],
+      }),
+    )
+    fixture.setVisualPosition(latestBackgroundPosition)
+
+    // A hidden page may receive no animation frames; the binding must not invent elapsed time.
+    expect(binding.context.visualPosition.value).toBe(firstVisiblePosition)
+    expect(visualFrame.callbacks.size).toBe(1)
+
+    visualFrame.fire()
+
+    expect(binding.context.visualPosition.value).toBe(latestBackgroundPosition)
+    expect(visualFrame.callbacks.size).toBe(1)
+    binding.dispose()
+  })
+
   it('exposes observer delivery failures without replacing playback state', () => {
     const fixture = createCoordinatorFixture()
     const binding = createProjectPlaybackVueBinding(

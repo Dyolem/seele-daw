@@ -4,7 +4,7 @@
 > 产品定位：桌面浏览器优先、面向个人创作者的轻量 Web DAW  
 > 文档作用：回答系统如何拆分、模块如何依赖，以及从哪里开始开发  
 > 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3\
-> 最近校准：2026-08-14
+> 最近校准：2026-08-17
 
 ---
 
@@ -26,11 +26,12 @@
 为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
 架构文档的版本号。
 
-截至 2026-08-14，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
+截至 2026-08-17，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
 多选 Delete 已形成闭环；Studio 首次可听闭环已通过功能审核。Playback Batch 6 已增加完整 Plan
 Reconciliation、Transport 原位 handoff 和选择性 Voice 生命周期，播放中 Note / Track /
-Instrument 变化可以保留无关活动 Voice；该批次已完成本地验证和统一逐提交审核。当前切片继续
-实施 Batch 7 的时间轴范围、播放头与跟随视图；长期架构中的通用 Graph、RuntimeDelta、跨线程
+Instrument 变化可以保留无关活动 Voice；Batch 7A–7E 已交付派生 150 小节 Timeline、独立
+Arrangement 滚动权威、共享视觉位置，以及 Arrangement / Track / Clip Focus Playhead 和分页
+Follow；Batch 7F 加固与文档同步也已通过审核。长期架构中的通用 Graph、RuntimeDelta、跨线程
 ACK 和 AudioWorklet 路径仍不能反推为首版切片的必做范围。
 
 ---
@@ -391,6 +392,12 @@ Transport / Scheduler，并把冻结 Voice Plan 交给 Audio Web。Vue 只通过
 shallow frozen state；Timer、AudioContext、解码缓存和 Voice 都由应用生命周期释放，不进入
 Pinia 或 Project Core。
 
+Batch 7 的 `timelineEndTick` 由 Playback 从 Project Snapshot 派生，并同时约束 Studio Ruler 与
+Transport 自然结束。Studio 以一个帧采样绑定读取 Transport 权威位置；浏览器后台不触发动画帧
+时不累计时间，恢复后的首帧直接读取最新位置。Arrangement 与两种 Piano Roll 只移动独立
+transform-only Playhead 图层；Follow 是各时间视图自己的瞬时滚动状态，不进入 Project 或
+Playback Core。
+
 ## 14. 生命周期
 
 拥有外部资源的对象统一实现 Dispose：
@@ -565,7 +572,7 @@ TempoMap
 Transport
 Note Event Compiler
 Look-ahead Scheduler
-简单 Synth
+Manifest 驱动的 MIDISampleSynth Voice Runtime
 ```
 
 这一阶段不做通用 Device Graph。

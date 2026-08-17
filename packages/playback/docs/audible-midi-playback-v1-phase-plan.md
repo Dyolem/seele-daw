@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 阶段计划
 
-> Status: Batch 1–6 and 7A–7E.4 reviewed; Batch 7E.5 implemented locally and awaiting review
+> Status: Batch 1–6 and 7A–7F reviewed; implementation scope complete and awaiting a separate close / checkpoint decision
 >
 > Date: 2026-08-10
 >
@@ -1210,11 +1210,10 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7E.1–7E.5：Piano Roll Track / Clip 双模式校准
 
-> Implementation status: Batch 7E.1–7E.4 were reviewed and committed as `5e50228`, `113aabb`,
-> `4d935fd` and `ea87d53`. Batch 7E.5 is implemented locally and awaiting review: Track mode projects
-> the shared global Transport Tick through a transform-only Playhead and independently pages its
-> horizontal viewport while Follow is active. Clip Focus retains its Clip-local projection and full
-> Clip viewport.
+> Implementation status: Batch 7E.1–7E.5 were reviewed and committed as `5e50228`, `113aabb`,
+> `4d935fd`, `ea87d53` and `78ee8ea`. Track mode projects the shared global Transport Tick through a
+> transform-only Playhead and independently pages its horizontal viewport while Follow is active.
+> Clip Focus retains its Clip-local projection and full Clip viewport.
 
 一个 Project MIDI Clip 仍是唯一权威实体，Piano Roll 不创建第二份 Clip Fact。两种模式只是
 同一 Track / Clip / MidiSource 图的不同投影：
@@ -1270,11 +1269,29 @@ Track 模式 Pencil 在全局时间轴上的首版自动放置规则已经确认
 
 #### Batch 7F：加固与文档同步
 
+> Implementation status: reviewed on 2026-08-17. The coverage audit found direct existing
+> regressions for every listed lifecycle and Timeline boundary except explicit browser background
+> frame throttling. One Vue binding test now models a suspended animation-frame source and proves
+> that foreground recovery samples the latest authoritative Transport position without accumulating
+> frame time. No production API, Project fact or E2E scope was added.
+
 - 回归多 Track 行配对、150 小节最小范围、超长 Clip 扩展、自然结束与无残留 Voice；
 - 回归前台 / 后台视觉恢复、手动滚动暂停 Follow、Return、Pause、项目切换与 dispose；
 - 运行 lint、type-check、全部测试和 Studio production build；按约定不新增 E2E；
 - 同步 PRODUCT、DESIGN、Playback / Audio Web README 与架构校准；全部 Batch 7 提交经用户审核后，
   再单独决定 Audible MIDI Playback V1 是否封版和建立 checkpoint tag。
+
+当前自动化证据映射：
+
+| 验收场景                                       | 直接证据                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 多 Track 行配对、单一纵向滚动权威              | `ProjectWorkbenchArrangement.spec.ts`                                                       |
+| 150 小节最小范围、超长 Clip 精确扩展           | `audible-midi-timeline.spec.ts`、`ProjectWorkbenchArrangement.spec.ts`                      |
+| Timeline 自然结束与 Scheduler 停止唤醒         | `audible-midi-transport.spec.ts`、`audible-midi-scheduler.spec.ts`、Coordinator tests       |
+| `allNotesOff` / dispose 后无残留 Voice / Node  | `voice-runtime.spec.ts`、`audio-context-runtime.spec.ts`、Coordinator tests                 |
+| 后台帧停顿后恢复最新权威视觉位置               | `project-playback-vue-binding.spec.ts`                                                      |
+| 手动滚动暂停、显式恢复与新播放轮次重置 Follow  | `ProjectWorkbenchArrangement.spec.ts`、`ProjectPianoRollTrackSurface.spec.ts`               |
+| Pause、Return、项目切换、pending abort/dispose | Coordinator / Studio application、`resource-cache.spec.ts`、`audio-context-runtime.spec.ts` |
 
 ## 11. 测试与验收
 
@@ -1377,8 +1394,8 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 - 任一公开构建都不包含当前本地快照；若产品需要自带采样，替代资产或覆盖该用法的再分发范围
   已另行确认；
 - 自动化渲染、生产构建和真实浏览器听觉 smoke 通过；
-- Arrangement 单一纵向滚动权威与 Track 从视图、派生时间轴、两个 Playhead 与 Follow 通过
-  Batch 7 产品验收；
+- Arrangement 单一纵向滚动权威与 Track 从视图、派生时间轴、Arrangement / Track / Clip Focus
+  Playhead，以及 Arrangement / Track 各自的分页 Follow 通过 Batch 7 产品验收；
 - [产品功能手册](../../../PRODUCT.md)、[设计语言](../../../DESIGN.md)、
   [Playback README](../README.md) 与 [Audio Web README](../../audio-web/README.md) 已同步；
 - 用户逐批审阅通过；是否建立新的阶段 checkpoint 由 Batch 7 审核结束后的独立决定确认。

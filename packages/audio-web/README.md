@@ -5,9 +5,9 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 当前首个可听切片先建立通用 MIDISampleSynth Sample Voice，并以 Studio Grand 完成首次产品
 听觉验收。
 
-> 当前状态：Batch 4A.2、Batch 4B.1、Batch 4B.2、Studio Batch 5A 与 Batch 6 已通过功能审阅；
-> 截至 2026-08-14，选择性 Voice 生命周期与按 Soundbank 局部资源失败已经收口。当前已有用户
-> 激活的 AudioContext、最小 master output、Manifest
+> 当前状态：Batch 4A.2、Batch 4B.1、Batch 4B.2、Studio Batch 5A、Batch 6 与 Batch 7A–7F
+> 已通过功能审阅；截至 2026-08-17，实施范围已完成并等待独立封版决定。选择性 Voice 生命周期与按
+> Soundbank 局部资源失败已经收口；当前已有用户激活的 AudioContext、最小 master output、Manifest
 > 驱动的 Sample Voice、可重排 Note Off、loop / mutex、generation、选择性 cancel 与资源统计；
 > SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
 
@@ -84,6 +84,11 @@ Batch 6E 在同一资源边界增加显式失败策略，但没有把 Track 或 
   返回冻结的结构化 failure，同时保留成功准备的其他 Instrument；
 - Studio 根据 failure 决定受影响 Track 静音并显示 warning；Audio Web 只报告 Soundbank 与原因，
   不读取 Track、Commit 或 UI 状态，也不静默替换为 Studio Grand。
+
+Studio Batch 7 的派生 Timeline、Playhead 与 Follow 全部属于 View / Composition 行为，没有给
+Audio Web 增加第二套时钟或视图 API。Batch 7F 继续复用现有 Runtime 回归，确认自然结束、Pause、
+Return、项目切换与 dispose 分别经由 Voice `ended`、选择性 / 全局 `allNotesOff` 和幂等清理边界
+归零；本包仍不拥有 Scheduler Timer 或 Project 生命周期。
 
 当前 Sample Instrument 已形成三组不同变化原因，因此按职责分层；其中较短的文件名是这个模块
 在语义仍然明确时的局部选择，不构成禁止文件名重复目录上下文的全局规则：
@@ -178,8 +183,8 @@ Worklet entry 必须保持独立，只导入实时安全的协议和 DSP 代码�
 
 1. 已审阅 Batch 4B.1 资源准备层并确认加载策略。
 2. 已审阅 Batch 4B.2 的 Sample Voice、最小 master output、包络 / loop / mutex 与资源统计。
-3. 在 Studio Composition Root 实现 look-ahead native executor、可靠 `allNotesOff` 和 late-event
-   诊断，形成首次可听闭环。
+3. 已由 Studio Batch 5A / 6 组合 look-ahead native executor、可靠 `allNotesOff`、选择性 Voice
+   生命周期与失败诊断，形成首次可听闭环。
 4. 增加稳定 Graph Runtime、Gain/Pan/Meter 和 Device contract suite。
 5. 实现 Audio Clip voice 与 Worklet 消息协议；FM / VA Synth 按独立产品切片选择执行技术。
 6. 后续加入 PCM recording、复杂 DSP/WASM 和 OfflineAudioContext 导出。

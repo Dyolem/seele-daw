@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-17，代码基线 `5e50228`；Batch 7E.2 Project Core 原子 Clip / Note 放置正在审核
+> 最近更新：2026-08-17，生产代码基线 `78ee8ea`；Batch 7F 加固与文档同步已通过审核
 >
-> 当前阶段：Audible MIDI Playback V1 继续实施 Batch 7 Piano Roll Track / Clip 双模式校准
+> 当前阶段：Audible MIDI Playback V1 实施与加固已完成；等待独立封版决定，尚未建立阶段 checkpoint
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -847,16 +847,18 @@ Project Core 已具备：
 | 2026-08-14 | `PLAYBACK`                                                 | Studio 接入 Commit 顺序、Note / Track / Clip / Instrument 选择性生效、按 Soundbank 局部资源失败，以及 stale/gap/Pause/项目切换回归；Batch 6A–6F 已通过统一审核。 | `2729357`、`a730119`、`dfbddce`            |
 | 2026-08-14 | `WORKBENCH-SHELL`                                          | Arrangement Track 控制行与 Lane 改为单一纵向滚动权威，固定标题区并保持逐行水平对齐。                                                                             | `42e5a0b`                                  |
 | 2026-08-17 | `PIANO-ROLL`                                               | 建立 Track 全局 Read Model、原子 Clip / Note 放置、Track-time Surface，以及不写 Project Fact 的 Track / Clip Focus 可见切换。                                    | `5e50228`、`113aabb`、`4d935fd`、`ea87d53` |
+| 2026-08-17 | `PIANO-ROLL`、`PLAYBACK-VIEW`                              | Track 与 Clip Focus 共用权威 Transport 视觉位置；Track 增加 transform-only Playhead、独立分页 Follow 与手动导航暂停。                                            | `78ee8ea`                                  |
 
 ## 13. 当前验证基线
 
 Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、Batch 3B、Batch 4A、
-Batch 4B.1、Batch 4B.2、Batch 5A、Batch 6A–6F 与 Batch 7A–7E.4 已通过本地验证和功能审核；
-Batch 7E.5 已完成本地实现并等待功能审核。Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另
-通过浏览器布局 smoke。按约定没有新增 E2E：
+Batch 4B.1、Batch 4B.2、Batch 5A、Batch 6A–6F 与 Batch 7A–7F 已通过本地验证和功能审核。
+Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
+浏览器布局 smoke。按约定没有新增 E2E：
 
-- Batch 7E.5 当前定向验证覆盖 Track / Clip Focus Playhead、Track 与 Arrangement 分页 Follow、
-  手动导航暂停、显式恢复、播放轮次重置和 Project 身份隔离；完整工作区验证见下列最新基线。
+- Batch 7F 覆盖审计确认多 Track 配对、150 小节与超长 Clip、自然结束、Voice 清理、Pause / Return、
+  项目切换、dispose 及双视图 Follow 已有直接回归；新增后台帧停顿后读取最新权威 Transport 位置的
+  显式测试。完整工作区验证见下列最新基线。
 
 - Batch 7B 的 Playback、Audio Web 与 Studio 全包测试分别为 9 文件 / 93 项、16 / 110 与
   42 / 252；受影响包 type-check、架构检查与 Studio Production Build 通过。浏览器布局 smoke
@@ -872,7 +874,7 @@ Batch 7E.5 已完成本地实现并等待功能审核。Batch 5A 另通过浏览
 - editor：11 个测试文件，112 项测试。
 - playback：9 个测试文件，95 项测试。
 - audio-web：16 个测试文件，110 项测试。
-- Studio：46 个测试文件，272 项测试。
+- Studio：46 个测试文件，273 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

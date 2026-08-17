@@ -4,7 +4,7 @@
 > 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
-> 最近实现校准：2026-08-14\
+> 最近实现校准：2026-08-17\
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
@@ -63,6 +63,11 @@ Manifest 驱动 MIDISampleSynth Runtime，并以 Studio Grand 作为首次听觉
 Seele Supported SFZ Profile 声明公开 authoring 子集，各来源 Importer 消除自身语法、继承和
 私有默认值，规范化 Sample Instrument Manifest 才是内置 Runtime 的唯一输入。当前默认内置
 Mapping 的逆向推断只属于 Compatibility Adapter，不构成通用宿主规则。
+
+当前切片还由 Playback 从 Snapshot 派生至少 150 小节的 `timelineEndTick`，并由 Studio 将同一
+Transport 视觉位置投影到 Arrangement、Track-time Piano Roll 和 Clip Focus Piano Roll。动画帧
+只触发权威位置采样，不累计 UI elapsed time；各视图的 Scroll / Follow 属于 ViewState，不进入
+ProjectSession、Playback Plan 或 Audio Runtime。
 
 ---
 
@@ -781,6 +786,11 @@ PlaybackView
 ```
 
 ProjectModel 的变更频率是“事务级”，InteractionState 和 PlaybackView 的变更频率是“帧级”。二者不得经过同一响应式传播链。
+
+当前 Studio 的 PlaybackView 由应用生命周期绑定直接采样 Transport：Scheduler cadence 不驱动
+Vue，浏览器后台暂停动画帧也不暂停或重算 Transport；恢复后的首帧读取最新权威位置。
+Arrangement、Track Piano Roll 与 Clip Focus Piano Roll 消费同一位置，但分别完成全局或
+Clip-local 投影。分页 Follow 是 Arrangement / Track 视图各自的瞬时状态。
 
 ## 24. 输入归一化
 

@@ -4,8 +4,8 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：截至 2026-08-14，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
-> 5A 与 Batch 6A–6F 已通过功能审阅。本包已有通用
+> 当前状态：截至 2026-08-17，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
+> 5A、Batch 6A–6F 与 Batch 7A–7F 已通过功能审阅；实施范围已完成，等待独立封版决定。本包已有通用
 > Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
 > Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
 > Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
@@ -152,13 +152,19 @@ Studio Batch 7C 进一步把听觉调度 cadence 与视觉采样解耦：Schedul
 look-ahead 计划；应用级视觉位置源通过 Transport / Playback Clock 读取权威 Project Second 与
 continuous Tick。`requestAnimationFrame` 只决定视图何时读取，不累计 frame delta，因此后台
 降频后恢复也不会形成第二套时间。该投影属于 Studio Composition / View 生命周期，不进入本包、
-Project、Pinia、History、dirty 或 Commit Subscription；后续多个 Playhead 必须共享这一位置源。
+Project、Pinia、History、dirty 或 Commit Subscription；多个 Playhead 必须共享这一位置源。
 
 Studio Batch 7D 已让 Arrangement 从该位置源投影不可交互 Playhead，并用 transform-only 图层
 移动；分页 Follow 只滚动 Studio 的右侧时间视口。这些仍是 Studio View 行为，不扩展 Playback
-Core API，也不让 Scheduler cursor 冒充 Playhead。Studio Batch 7E 让 Piano Roll 也消费同一位置
-源，并用 Arrangement `clip.startTick` 转为 Clip-local Tick；Clip 外、Viewport 外或项目身份不匹配
-时不显示。两种 Playhead 都不向 Playback Core 添加视图状态。
+Core API，也不让 Scheduler cursor 冒充 Playhead。Studio Batch 7E 让 Piano Roll 的 Track / Clip
+Focus 两种模式也消费同一位置源：Track 直接投影全局 Tick，并在自身横向滚动权威上独立分页
+Follow；Clip Focus 用 Arrangement `clip.startTick` 转为 Clip-local Tick，Clip 外、Viewport 外或
+项目身份不匹配时不显示。Arrangement 与 Track Follow 都是 Studio 的瞬时视图状态，不向
+Playback Core 添加状态或 API。
+
+Batch 7F 只加固既有边界：自动化回归证明动画帧在浏览器后台长期不触发时不会累计第二套时间，
+恢复后的首帧直接读取 Transport 最新位置；多 Track、派生 Timeline、自然结束、Pause / Return、
+项目切换和资源清理继续由既有 Playback / Studio / Audio Web 测试共同覆盖。本批不改变包根 API。
 
 Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 

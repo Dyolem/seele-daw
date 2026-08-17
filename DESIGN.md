@@ -3,7 +3,7 @@
 > Status: Normative Draft  
 > Scope: Seele Studio editor and workbench  
 > Default theme: Piano Black  
-> Last updated: 2026-08-10
+> Last updated: 2026-08-17
 
 本文档定义 Seele Studio 编辑器的产品界面、交互模型与视觉语言。它是产品设计、前端实现、Canvas 渲染、主题开发和设计评审共同遵循的基线。
 

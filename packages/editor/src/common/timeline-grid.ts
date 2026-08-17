@@ -1,8 +1,4 @@
-import {
-  parsePositiveTick,
-  parseTick,
-  type Tick,
-} from '@seele-daw/project-core'
+import { parsePositiveTick, parseTick, type Tick } from '@seele-daw/project-core'
 
 import { TimelineGridError } from './timeline-grid-error'
 
@@ -32,11 +28,7 @@ export interface ResolveTimelineGridTickInput {
 }
 
 function requireTickPosition(value: number): number {
-  if (
-    !Number.isFinite(value) ||
-    value < 0 ||
-    value > Number.MAX_SAFE_INTEGER
-  ) {
+  if (!Number.isFinite(value) || value < 0 || value > Number.MAX_SAFE_INTEGER) {
     throw new TimelineGridError(
       'invalid-tick-position',
       'Timeline Grid Tick position must be a finite non-negative safe number',
@@ -56,9 +48,7 @@ function parseResolvedTick(value: number): Tick {
 }
 
 /** Creates the immutable time grid shared by visible divisions and interactions. */
-export function createTimelineGrid(
-  input: CreateTimelineGridInput,
-): TimelineGrid {
+export function createTimelineGrid(input: CreateTimelineGridInput): TimelineGrid {
   return Object.freeze({
     originTick: parseTick(input.originTick),
     subdivisionSpanTick: parsePositiveTick(input.subdivisionSpanTick),
@@ -73,9 +63,7 @@ export function createTimelineGrid(
  * the current subdivision's start. Disabled Snap preserves the position to the
  * nearest integer Tick.
  */
-export function resolveTimelineGridTick(
-  input: ResolveTimelineGridTickInput,
-): Tick {
+export function resolveTimelineGridTick(input: ResolveTimelineGridTickInput): Tick {
   const grid = createTimelineGrid(input.grid)
   const tickPosition = requireTickPosition(input.tickPosition)
 
@@ -90,13 +78,10 @@ export function resolveTimelineGridTick(
     return parseResolvedTick(Math.round(tickPosition))
   }
 
-  const snapPosition =
-    (tickPosition - grid.originTick) / grid.subdivisionSpanTick
+  const snapPosition = (tickPosition - grid.originTick) / grid.subdivisionSpanTick
   const subdivisionIndex =
     input.snapMode === TIMELINE_GRID_SNAP_MODE.FLOOR
       ? Math.floor(snapPosition)
       : Math.round(snapPosition)
-  return parseResolvedTick(
-    grid.originTick + subdivisionIndex * grid.subdivisionSpanTick,
-  )
+  return parseResolvedTick(grid.originTick + subdivisionIndex * grid.subdivisionSpanTick)
 }

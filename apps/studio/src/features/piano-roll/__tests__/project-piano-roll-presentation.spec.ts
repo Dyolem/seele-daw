@@ -28,9 +28,7 @@ function createFixture() {
     projectId,
     projectName: 'Piano Roll Presentation',
     tempoEventId: parseTempoEventId('piano-roll-presentation-tempo'),
-    timeSignatureEventId: parseTimeSignatureEventId(
-      'piano-roll-presentation-meter',
-    ),
+    timeSignatureEventId: parseTimeSignatureEventId('piano-roll-presentation-meter'),
   })
   const activeState: ReadyActiveProjectState = Object.freeze({
     contentStateId: session.contentStateId,
@@ -73,10 +71,7 @@ describe('Project Piano Roll Presentation', () => {
     const snapshot = fixture.session.getSnapshot()
     const track = snapshot.tracks.find(({ id }) => id === fixture.track.trackId)
 
-    const presentation = createProjectPianoRollPresentation(
-      snapshot,
-      fixture.clip.clipId,
-    )
+    const presentation = createProjectPianoRollPresentation(snapshot, fixture.clip.clipId)
 
     expect(presentation).toMatchObject({
       clipId: fixture.clip.clipId,
@@ -115,9 +110,7 @@ describe('Project Piano Roll Presentation', () => {
       ]),
     })
 
-    expect(
-      createProjectPianoRollPresentation(loopedSnapshot, fixture.clip.clipId),
-    ).toMatchObject({
+    expect(createProjectPianoRollPresentation(loopedSnapshot, fixture.clip.clipId)).toMatchObject({
       reason: 'looped-clip',
       status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED,
     })

@@ -103,10 +103,7 @@ function queryState(
   context: PianoRollClipContext,
   viewport: PianoRollViewport,
 ): PianoRollNoteReadModelState {
-  const queryStartTick = pianoRollClipTickToSourceTick(
-    context,
-    viewport.visibleStartTick,
-  )
+  const queryStartTick = pianoRollClipTickToSourceTick(context, viewport.visibleStartTick)
   const queryEndTick = pianoRollClipTickToSourceTick(context, viewport.visibleEndTick)
   const result = session.query(
     createMidiNotesIntersectingRangeQuery({
@@ -122,9 +119,7 @@ function queryState(
     clipId: context.clipId,
     modelRevision: result.modelRevision,
     notes: Object.freeze(
-      result.notes.map((note) =>
-        createVisibleNote(context, queryStartTick, queryEndTick, note),
-      ),
+      result.notes.map((note) => createVisibleNote(context, queryStartTick, queryEndTick, note)),
     ),
     sourceId: context.sourceId,
     viewport,
@@ -173,9 +168,7 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
     this.#notifyStateChange()
   }
 
-  subscribe(
-    observer: PianoRollNoteReadModelObserver,
-  ): PianoRollNoteReadModelUnsubscribe {
+  subscribe(observer: PianoRollNoteReadModelObserver): PianoRollNoteReadModelUnsubscribe {
     this.#requireActive()
     this.#observers.add(observer)
     let subscribed = true
@@ -196,14 +189,8 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
   }
 
   #subscribeToProject(viewport: PianoRollViewport): ProjectUnsubscribe {
-    const startTick = pianoRollClipTickToSourceTick(
-      this.#context,
-      viewport.visibleStartTick,
-    )
-    const endTick = pianoRollClipTickToSourceTick(
-      this.#context,
-      viewport.visibleEndTick,
-    )
+    const startTick = pianoRollClipTickToSourceTick(this.#context, viewport.visibleStartTick)
+    const endTick = pianoRollClipTickToSourceTick(this.#context, viewport.visibleEndTick)
 
     return this.#session.subscribe(
       createMidiNoteChangesSubscription({
@@ -247,9 +234,7 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
     }
   }
 
-  #notifyProjectSubscriptionFailure(
-    failure: ProjectSubscriptionDeliveryFailure,
-  ): void {
+  #notifyProjectSubscriptionFailure(failure: ProjectSubscriptionDeliveryFailure): void {
     if (this.#disposed) return
     this.#notifyFailure(createFailure('project-subscription', failure))
   }

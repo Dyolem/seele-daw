@@ -128,12 +128,12 @@ Action ID 在应用中唯一。Feature 注册返回幂等 disposer；最后一�
 
 ## 7. 首批 Action
 
-| Action ID | Binding | Scope | 当前 enabled 条件 |
-| --- | --- | --- | --- |
-| `project.save` | `Mod+S` | Workbench | Ready、dirty 且不在 Saving |
-| `history.undo` | `Mod+Z` | Workbench | 当前 Session 可以 Undo |
-| `history.redo` | `Mod+Shift+Z`、`Control+Y` | Workbench | 当前 Session 可以 Redo |
-| `piano-roll.selection.clear` | `Escape` | Piano Roll | 下一批：Piano Roll focused 且 Selection 非空 |
+| Action ID                    | Binding                    | Scope      | 当前 enabled 条件                            |
+| ---------------------------- | -------------------------- | ---------- | -------------------------------------------- |
+| `project.save`               | `Mod+S`                    | Workbench  | Ready、dirty 且不在 Saving                   |
+| `history.undo`               | `Mod+Z`                    | Workbench  | 当前 Session 可以 Undo                       |
+| `history.redo`               | `Mod+Shift+Z`、`Control+Y` | Workbench  | 当前 Session 可以 Redo                       |
+| `piano-roll.selection.clear` | `Escape`                   | Piano Roll | 下一批：Piano Roll focused 且 Selection 非空 |
 
 Piano Roll Action ID 和 Scope 已稳定，但本批不注册一个没有 Editor Session 权威的空 Handler。
 它与可见 Selection 一起在第三阶段 Batch 4 接入。

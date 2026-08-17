@@ -42,9 +42,7 @@ function openClip(): void {
     }"
     :style="clipStyle"
     type="button"
-    :aria-label="
-      `${props.clip.name} MIDI clip${props.clip.muted ? ', muted' : ''}. Double-click or press Enter to open.`
-    "
+    :aria-label="`${props.clip.name} MIDI clip${props.clip.muted ? ', muted' : ''}. Double-click or press Enter to open.`"
     :aria-pressed="props.selected"
     @click.stop="emit('select')"
     @dblclick.stop="openClip"
@@ -72,11 +70,7 @@ function openClip(): void {
   border: 1px solid color-mix(in srgb, var(--project-clip-color) 68%, transparent);
   border-radius: var(--sd-radius-xs);
   color: var(--sd-color-text-primary);
-  background: color-mix(
-    in srgb,
-    var(--project-clip-color) 24%,
-    var(--sd-color-surface-sunken)
-  );
+  background: color-mix(in srgb, var(--project-clip-color) 24%, var(--sd-color-surface-sunken));
   font: inherit;
   text-align: start;
   cursor: pointer;
@@ -88,11 +82,7 @@ function openClip(): void {
 
 .project-midi-clip:hover {
   border-color: color-mix(in srgb, var(--project-clip-color) 88%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--project-clip-color) 34%,
-    var(--sd-color-surface-sunken)
-  );
+  background: color-mix(in srgb, var(--project-clip-color) 34%, var(--sd-color-surface-sunken));
 }
 
 .project-midi-clip:focus-visible {
@@ -104,11 +94,7 @@ function openClip(): void {
   border-color: var(--sd-color-border-focus);
   outline: 1px solid var(--sd-color-border-focus);
   outline-offset: -2px;
-  background: color-mix(
-    in srgb,
-    var(--project-clip-color) 40%,
-    var(--sd-color-surface-sunken)
-  );
+  background: color-mix(in srgb, var(--project-clip-color) 40%, var(--sd-color-surface-sunken));
 }
 
 .project-midi-clip--muted {

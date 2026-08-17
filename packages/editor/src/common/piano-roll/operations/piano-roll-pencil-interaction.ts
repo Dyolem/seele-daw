@@ -1,8 +1,4 @@
-import {
-  parseTick,
-  type MidiPitch,
-  type Tick,
-} from '@seele-daw/project-core'
+import { parseTick, type MidiPitch, type Tick } from '@seele-daw/project-core'
 
 import {
   TIMELINE_GRID_SNAP_MODE,
@@ -55,9 +51,7 @@ function clampToClipInterior(
   const lastSubdivisionIndex = Math.floor(
     (lastInteriorTick - grid.originTick) / grid.subdivisionSpanTick,
   )
-  return parseTick(
-    grid.originTick + lastSubdivisionIndex * grid.subdivisionSpanTick,
-  )
+  return parseTick(grid.originTick + lastSubdivisionIndex * grid.subdivisionSpanTick)
 }
 
 /**
@@ -97,16 +91,8 @@ export function resolvePianoRollPencilNotePlacement(
   })
 
   return Object.freeze({
-    clipStartTick: clampToClipInterior(
-      input.context,
-      input.grid,
-      candidateTick,
-      input.snapEnabled,
-    ),
-    pitch: pianoRollCssPixelToMidiPitch(
-      input.viewport,
-      pointerInput.originPosition.yCssPixel,
-    ),
+    clipStartTick: clampToClipInterior(input.context, input.grid, candidateTick, input.snapEnabled),
+    pitch: pianoRollCssPixelToMidiPitch(input.viewport, pointerInput.originPosition.yCssPixel),
     requestedDurationTick: input.grid.subdivisionSpanTick,
   })
 }

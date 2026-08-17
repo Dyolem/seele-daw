@@ -1,10 +1,6 @@
 // @vitest-environment jsdom
 
-import {
-  parseMidiPitch,
-  parseNoteId,
-  parseTick,
-} from '@seele-daw/project-core'
+import { parseMidiPitch, parseNoteId, parseTick } from '@seele-daw/project-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -76,11 +72,9 @@ function installPointerCapture(surface: HTMLElement) {
   const setPointerCapture = vi.fn<(pointerId: number) => void>((pointerId) => {
     capturedPointerIds.add(pointerId)
   })
-  const releasePointerCapture = vi.fn<(pointerId: number) => void>(
-    (pointerId) => {
-      capturedPointerIds.delete(pointerId)
-    },
-  )
+  const releasePointerCapture = vi.fn<(pointerId: number) => void>((pointerId) => {
+    capturedPointerIds.delete(pointerId)
+  })
   const hasPointerCapture = vi.fn<(pointerId: number) => boolean>((pointerId) =>
     capturedPointerIds.has(pointerId),
   )
@@ -133,9 +127,7 @@ function createDomNoteFixture() {
   const startHandle = note.querySelector<HTMLElement>(
     '.sd-piano-roll-dom-note__resize-handle--start',
   )
-  const endHandle = note.querySelector<HTMLElement>(
-    '.sd-piano-roll-dom-note__resize-handle--end',
-  )
+  const endHandle = note.querySelector<HTMLElement>('.sd-piano-roll-dom-note__resize-handle--end')
   if (startHandle === null || endHandle === null) {
     throw new Error('Expected rendered DOM Note resize handles')
   }
@@ -258,11 +250,7 @@ describe('Piano Roll Pointer Input Adapter', () => {
       { xCssPixel: 14, yCssPixel: 20 },
       { xCssPixel: 15, yCssPixel: 18 },
     ])
-    expect(onInput.mock.calls.map(([input]) => input.modifiers.shift)).toEqual([
-      true,
-      false,
-      false,
-    ])
+    expect(onInput.mock.calls.map(([input]) => input.modifiers.shift)).toEqual([true, false, false])
     for (const [input] of onInput.mock.calls) {
       expect(input.hit).toEqual({
         noteId: fixture.noteId,
@@ -307,9 +295,7 @@ describe('Piano Roll Pointer Input Adapter', () => {
     })
 
     dispatchPointer(fixture.note, 'pointerdown', { pointerId: 12 })
-    window.dispatchEvent(
-      new KeyboardEvent('keydown', { altKey: true, key: 'Alt' }),
-    )
+    window.dispatchEvent(new KeyboardEvent('keydown', { altKey: true, key: 'Alt' }))
     window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }))
     dispatchPointer(fixture.surface, 'pointerup', { pointerId: 12 })
 
@@ -325,9 +311,12 @@ describe('Piano Roll Pointer Input Adapter', () => {
       false,
       false,
     ])
-    expect(
-      onInput.mock.calls.map(([input]) => input.originModifiers.alt),
-    ).toEqual([false, false, false, false])
+    expect(onInput.mock.calls.map(([input]) => input.originModifiers.alt)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ])
 
     adapter.dispose()
     fixture.renderer.dispose()
@@ -397,9 +386,12 @@ describe('Piano Roll Pointer Input Adapter', () => {
       clientY: 51,
     })
 
-    expect(
-      onInput.mock.calls.map(([input]) => input.hasExceededDragThreshold),
-    ).toEqual([false, true, true, true])
+    expect(onInput.mock.calls.map(([input]) => input.hasExceededDragThreshold)).toEqual([
+      false,
+      true,
+      true,
+      true,
+    ])
 
     adapter.dispose()
     fixture.renderer.dispose()
@@ -460,9 +452,7 @@ describe('Piano Roll Pointer Input Adapter', () => {
       PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
       PIANO_ROLL_POINTER_INPUT_PHASE.END,
     ])
-    expect(onInput.mock.calls.map(([input]) => input.pointerId)).toEqual([
-      5, 5, 6, 6,
-    ])
+    expect(onInput.mock.calls.map(([input]) => input.pointerId)).toEqual([5, 5, 6, 6])
 
     adapter.dispose()
     fixture.renderer.dispose()

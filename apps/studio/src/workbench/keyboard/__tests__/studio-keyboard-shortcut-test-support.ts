@@ -7,17 +7,12 @@ import type {
   StudioKeyboardBindingValidation,
 } from '@/workbench/keyboard/studio-keyboard-binding'
 
-export class TestStudioKeyboardBindingRegistry
-  implements StudioKeyboardBindingRegistry
-{
+export class TestStudioKeyboardBindingRegistry implements StudioKeyboardBindingRegistry {
   readonly listeners = new Map<string, (event: KeyboardEvent) => void>()
   readonly registrationCountByBinding = new Map<string, number>()
   readonly disposalCountByBinding = new Map<string, number>()
 
-  dispatch(
-    binding: string,
-    init: KeyboardEventInit = {},
-  ): KeyboardEvent {
+  dispatch(binding: string, init: KeyboardEventInit = {}): KeyboardEvent {
     const listener = this.listeners.get(binding)
     if (listener === undefined) {
       throw new Error(`No test keyboard listener is registered for ${binding}`)
@@ -53,10 +48,7 @@ export class TestStudioKeyboardBindingRegistry
       if (!active) return
       active = false
       this.listeners.delete(binding)
-      this.disposalCountByBinding.set(
-        binding,
-        (this.disposalCountByBinding.get(binding) ?? 0) + 1,
-      )
+      this.disposalCountByBinding.set(binding, (this.disposalCountByBinding.get(binding) ?? 0) + 1)
     }
   }
 

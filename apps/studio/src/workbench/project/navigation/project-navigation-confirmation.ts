@@ -192,16 +192,16 @@ function createFailedResult(
   })
 }
 
-class ProjectNavigationConfirmationCoordinatorImpl
-  implements ProjectNavigationConfirmationCoordinator
-{
+class ProjectNavigationConfirmationCoordinatorImpl implements ProjectNavigationConfirmationCoordinator {
   readonly #dependencies: ProjectNavigationConfirmationDependencies
 
   constructor(dependencies: ProjectNavigationConfirmationDependencies) {
     this.#dependencies = dependencies
   }
 
-  async confirm(intentInput: ProjectNavigationIntent): Promise<ProjectNavigationConfirmationResult> {
+  async confirm(
+    intentInput: ProjectNavigationIntent,
+  ): Promise<ProjectNavigationConfirmationResult> {
     const intent = normalizeIntent(intentInput)
 
     while (true) {
@@ -222,10 +222,7 @@ class ProjectNavigationConfirmationCoordinatorImpl
       }
 
       if (!decisionState.isDirty) {
-        return createProceedResult(
-          PROJECT_NAVIGATION_PROCEED_REASON.CLEAN,
-          decisionState.projectId,
-        )
+        return createProceedResult(PROJECT_NAVIGATION_PROCEED_REASON.CLEAN, decisionState.projectId)
       }
 
       const decisionRequest = createDecisionRequest(intent, decisionState)
@@ -284,10 +281,7 @@ class ProjectNavigationConfirmationCoordinatorImpl
         savedState.projectId === decisionState.projectId &&
         !savedState.isDirty
       ) {
-        return createProceedResult(
-          PROJECT_NAVIGATION_PROCEED_REASON.SAVED,
-          savedState.projectId,
-        )
+        return createProceedResult(PROJECT_NAVIGATION_PROCEED_REASON.SAVED, savedState.projectId)
       }
 
       // Editing may continue while Checkpoint persistence is in flight. Re-evaluate instead of

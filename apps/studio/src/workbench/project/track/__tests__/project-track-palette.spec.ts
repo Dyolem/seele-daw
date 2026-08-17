@@ -34,9 +34,7 @@ describe('Project Track Palette', () => {
     const adjacentColor = PROJECT_TRACK_PALETTE[0]!
 
     expect(selectProjectTrackColor(0, adjacentColor)).toBe(PROJECT_TRACK_PALETTE[1])
-    expect(selectProjectTrackColor(0, parseProjectColor('#000000'))).toBe(
-      PROJECT_TRACK_PALETTE[0],
-    )
+    expect(selectProjectTrackColor(0, parseProjectColor('#000000'))).toBe(PROJECT_TRACK_PALETTE[0])
     expect(PROJECT_TRACK_PALETTE[0]).toBe(adjacentColor)
   })
 

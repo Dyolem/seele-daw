@@ -251,9 +251,7 @@ describe('Piano Roll Browser Renderers', () => {
 
     renderer.render(fixture.noteScene)
 
-    expect(
-      container.querySelector('[data-piano-roll-note-id="renderer-note"]'),
-    ).toBe(firstElement)
+    expect(container.querySelector('[data-piano-roll-note-id="renderer-note"]')).toBe(firstElement)
     renderer.clear()
     expect(container.querySelector('.sd-piano-roll-dom-note')).toBeNull()
   })
@@ -316,9 +314,7 @@ describe('Piano Roll Browser Renderers', () => {
     const domRenderer = createPianoRollDomNoteRenderer({ container })
     domRenderer.render(selectedScene)
 
-    const selectedNote = container.querySelector<HTMLElement>(
-      '.sd-piano-roll-dom-note--selected',
-    )
+    const selectedNote = container.querySelector<HTMLElement>('.sd-piano-roll-dom-note--selected')
     expect(selectedScene.notes[0]).toEqual(
       expect.objectContaining({
         borderColor: '#f4e7b9',
@@ -330,9 +326,7 @@ describe('Piano Roll Browser Renderers', () => {
     expect(selectedNote?.style.boxShadow).toContain('rgb(232 217 168 / 58%)')
 
     const noteCanvas = createFakeCanvasFixture()
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      noteCanvas.context,
-    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(noteCanvas.context)
     const canvasContainer = document.createElement('div')
     const canvasRenderer = createPianoRollCanvasNoteRenderer({
       container: canvasContainer,
@@ -347,9 +341,7 @@ describe('Piano Roll Browser Renderers', () => {
   it('lets the Canvas Note adapter consume the same Note Scene', () => {
     const fixture = createRendererFixture()
     const noteCanvas = createFakeCanvasFixture()
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      noteCanvas.context,
-    )
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(noteCanvas.context)
     const container = document.createElement('div')
     const renderer = createPianoRollCanvasNoteRenderer({
       container,
@@ -388,10 +380,9 @@ describe('Piano Roll Browser Renderers', () => {
 
     renderer.render(mutedScene)
 
-    expect(
-      container.querySelector<HTMLElement>('.sd-piano-roll-dom-note')?.style
-        .opacity,
-    ).toBe('0.46')
+    expect(container.querySelector<HTMLElement>('.sd-piano-roll-dom-note')?.style.opacity).toBe(
+      '0.46',
+    )
   })
 
   it('disposes owned DOM and Canvas resources and rejects later rendering', () => {

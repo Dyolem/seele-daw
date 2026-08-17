@@ -32,16 +32,11 @@ function configureLayerRoot(root: HTMLDivElement): void {
   root.style.pointerEvents = 'none'
 }
 
-function createResizeHandle(
-  document: Document,
-  edge: PianoRollNoteResizeEdge,
-): HTMLDivElement {
+function createResizeHandle(document: Document, edge: PianoRollNoteResizeEdge): HTMLDivElement {
   const handle = document.createElement('div')
-  const edgeClass =
-    edge === PIANO_ROLL_HIT_ZONE.RESIZE_START ? 'start' : 'end'
+  const edgeClass = edge === PIANO_ROLL_HIT_ZONE.RESIZE_START ? 'start' : 'end'
   handle.className =
-    `sd-piano-roll-dom-note__resize-handle ` +
-    `sd-piano-roll-dom-note__resize-handle--${edgeClass}`
+    `sd-piano-roll-dom-note__resize-handle ` + `sd-piano-roll-dom-note__resize-handle--${edgeClass}`
   handle.setAttribute(PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE, edge)
   handle.style.position = 'absolute'
   handle.style.insetBlock = '0'
@@ -60,14 +55,8 @@ function createResizeHandle(
 
 function createNoteElements(document: Document): PianoRollDomNoteElements {
   const note = document.createElement('div')
-  const startHandle = createResizeHandle(
-    document,
-    PIANO_ROLL_HIT_ZONE.RESIZE_START,
-  )
-  const endHandle = createResizeHandle(
-    document,
-    PIANO_ROLL_HIT_ZONE.RESIZE_END,
-  )
+  const startHandle = createResizeHandle(document, PIANO_ROLL_HIT_ZONE.RESIZE_START)
+  const endHandle = createResizeHandle(document, PIANO_ROLL_HIT_ZONE.RESIZE_END)
   note.append(startHandle, endHandle)
   return { endHandle, note, startHandle }
 }
@@ -81,14 +70,8 @@ function configureNoteElements(
     ? 'sd-piano-roll-dom-note sd-piano-roll-dom-note--selected'
     : 'sd-piano-roll-dom-note'
   element.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
-  elements.startHandle.setAttribute(
-    PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE,
-    visual.noteId,
-  )
-  elements.endHandle.setAttribute(
-    PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE,
-    visual.noteId,
-  )
+  elements.startHandle.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
+  elements.endHandle.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
   const handleWidthCssPixel = Math.min(
     PIANO_ROLL_DOM_NOTE_RESIZE_HANDLE_WIDTH_CSS_PIXEL,
     visual.widthCssPixel / 2,

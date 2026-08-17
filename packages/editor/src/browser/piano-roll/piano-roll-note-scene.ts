@@ -13,12 +13,7 @@ import type {
   PianoRollNoteScene,
   PianoRollNoteVisual,
 } from '#internal/browser/piano-roll/piano-roll-note-renderer'
-import {
-  parseTick,
-  type MidiPitch,
-  type NoteId,
-  type Tick,
-} from '@seele-daw/project-core'
+import { parseTick, type MidiPitch, type NoteId, type Tick } from '@seele-daw/project-core'
 
 export interface PianoRollNoteSceneStyle {
   readonly borderColor: string
@@ -65,10 +60,7 @@ function requireOpacity(value: number): number {
 }
 
 function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
-  return (
-    viewport.heightCssPixel /
-    (viewport.maximumPitch - viewport.minimumPitch + 1)
-  )
+  return viewport.heightCssPixel / (viewport.maximumPitch - viewport.minimumPitch + 1)
 }
 
 function createSceneNotes(input: CreatePianoRollNoteSceneInput): readonly SceneNote[] {
@@ -132,19 +124,11 @@ function createSceneNotes(input: CreatePianoRollNoteSceneInput): readonly SceneN
 }
 
 /** Projects read-model Notes into renderer-neutral CSS Pixel geometry. */
-export function createPianoRollNoteScene(
-  input: CreatePianoRollNoteSceneInput,
-): PianoRollNoteScene {
+export function createPianoRollNoteScene(input: CreatePianoRollNoteSceneInput): PianoRollNoteScene {
   const borderColor = requireColor(input.style.borderColor, 'borderColor')
   const fillColor = requireColor(input.style.fillColor, 'fillColor')
-  const selectedBorderColor = requireColor(
-    input.style.selectedBorderColor,
-    'selectedBorderColor',
-  )
-  const selectedGlowColor = requireColor(
-    input.style.selectedGlowColor,
-    'selectedGlowColor',
-  )
+  const selectedBorderColor = requireColor(input.style.selectedBorderColor, 'selectedBorderColor')
+  const selectedGlowColor = requireColor(input.style.selectedGlowColor, 'selectedGlowColor')
   const opacity = requireOpacity(input.style.opacity)
   const selectedNoteIds = new Set([
     ...input.selectedNoteIds,
@@ -157,14 +141,8 @@ export function createPianoRollNoteScene(
   const inset = Math.min(1, rowHeight / 5)
   const notes = createSceneNotes(input).map((note): PianoRollNoteVisual => {
     const selected = selectedNoteIds.has(note.noteId)
-    const xCssPixel = pianoRollClipTickToCssPixel(
-      input.viewport,
-      note.visibleStartTick,
-    )
-    const endXCssPixel = pianoRollClipTickToCssPixel(
-      input.viewport,
-      note.visibleEndTick,
-    )
+    const xCssPixel = pianoRollClipTickToCssPixel(input.viewport, note.visibleStartTick)
+    const endXCssPixel = pianoRollClipTickToCssPixel(input.viewport, note.visibleEndTick)
 
     return Object.freeze({
       borderColor: selected ? selectedBorderColor : borderColor,
@@ -179,8 +157,7 @@ export function createPianoRollNoteScene(
       visibleStartTick: note.visibleStartTick,
       widthCssPixel: Math.max(1, endXCssPixel - xCssPixel),
       xCssPixel,
-      yCssPixel:
-        pianoRollMidiPitchToCssPixel(input.viewport, note.pitch) + inset,
+      yCssPixel: pianoRollMidiPitchToCssPixel(input.viewport, note.pitch) + inset,
     })
   })
 

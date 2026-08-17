@@ -118,8 +118,7 @@ function createReadyState(input: ReadyStateInput): ReadyActiveProjectState {
     contentStateId,
     savedRevision: input.savedRevision,
     savedContentStateId: input.savedContentStateId,
-    isDirty:
-      input.savedContentStateId === null || contentStateId !== input.savedContentStateId,
+    isDirty: input.savedContentStateId === null || contentStateId !== input.savedContentStateId,
     saveStatus: input.saveStatus,
     saveFailure: input.saveFailure,
     recoveryFailures: cloneRecoveryFailures(input.recoveryFailures),

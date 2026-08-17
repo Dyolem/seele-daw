@@ -1,7 +1,4 @@
-import {
-  parseTick,
-  type Tick,
-} from '@seele-daw/project-core'
+import { parseTick, type Tick } from '@seele-daw/project-core'
 
 import {
   clearPianoRollCanvasLayer,
@@ -60,10 +57,7 @@ function requireTheme(theme: PianoRollGridCanvasTheme): PianoRollGridCanvasTheme
 }
 
 function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
-  return (
-    viewport.heightCssPixel /
-    (viewport.maximumPitch - viewport.minimumPitch + 1)
-  )
+  return viewport.heightCssPixel / (viewport.maximumPitch - viewport.minimumPitch + 1)
 }
 
 function drawPitchRows(
@@ -75,11 +69,7 @@ function drawPitchRows(
   context.fillStyle = theme.background
   context.fillRect(0, 0, viewport.widthCssPixel, viewport.heightCssPixel)
 
-  for (
-    let pitch: number = viewport.maximumPitch;
-    pitch >= viewport.minimumPitch;
-    pitch -= 1
-  ) {
+  for (let pitch: number = viewport.maximumPitch; pitch >= viewport.minimumPitch; pitch -= 1) {
     const y = (viewport.maximumPitch - pitch) * rowHeight
     context.fillStyle = BLACK_PITCH_CLASSES.has(pitch % 12)
       ? theme.blackPitchRow
@@ -98,16 +88,9 @@ function drawPitchRows(
   context.stroke()
 }
 
-function firstGridTick(
-  visibleStartTick: Tick,
-  originTick: Tick,
-  spanTick: Tick,
-): Tick {
+function firstGridTick(visibleStartTick: Tick, originTick: Tick, spanTick: Tick): Tick {
   if (visibleStartTick <= originTick) return originTick
-  return parseTick(
-    originTick +
-      Math.ceil((visibleStartTick - originTick) / spanTick) * spanTick,
-  )
+  return parseTick(originTick + Math.ceil((visibleStartTick - originTick) / spanTick) * spanTick)
 }
 
 function drawVerticalGrid(
@@ -138,8 +121,7 @@ function drawVerticalGrid(
   ] as const
 
   for (const group of groups) {
-    const spacingCssPixel =
-      (group.spanTick / viewport.visibleSpanTick) * viewport.widthCssPixel
+    const spacingCssPixel = (group.spanTick / viewport.visibleSpanTick) * viewport.widthCssPixel
     if (spacingCssPixel < group.minimumSpacingCssPixel) continue
 
     context.beginPath()
@@ -147,11 +129,7 @@ function drawVerticalGrid(
     context.lineWidth = group.lineWidth
 
     for (
-      let tick: number = firstGridTick(
-        viewport.visibleStartTick,
-        grid.originTick,
-        group.spanTick,
-      );
+      let tick: number = firstGridTick(viewport.visibleStartTick, grid.originTick, group.spanTick);
       tick <= viewport.visibleEndTick;
       tick += group.spanTick
     ) {

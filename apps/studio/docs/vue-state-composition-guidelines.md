@@ -63,15 +63,15 @@ Store 或 Context。
 
 当前示例：
 
-| Context | 注入内容 | 原因 |
-| --- | --- | --- |
-| Active Project | Service + shallow Vue Binding | 权威在应用服务，Vue 只观察 |
-| Project Entry | Coordinator | 应用用例能力 |
-| Project Track | Coordinator | Project Command 能力 |
-| Project Clip | Coordinator | Project Command 能力 |
-| Project MIDI Note | Coordinator | Clip 目标校验与 Project Command 能力 |
-| Navigation Decision | pending binding + resolver | 一次性异步决策 Port |
-| Project Playback | Coordinator + shallow Vue Binding | 外部音频资源、Transport 命令与可丢弃状态投影 |
+| Context             | 注入内容                          | 原因                                         |
+| ------------------- | --------------------------------- | -------------------------------------------- |
+| Active Project      | Service + shallow Vue Binding     | 权威在应用服务，Vue 只观察                   |
+| Project Entry       | Coordinator                       | 应用用例能力                                 |
+| Project Track       | Coordinator                       | Project Command 能力                         |
+| Project Clip        | Coordinator                       | Project Command 能力                         |
+| Project MIDI Note   | Coordinator                       | Clip 目标校验与 Project Command 能力         |
+| Navigation Decision | pending binding + resolver        | 一次性异步决策 Port                          |
+| Project Playback    | Coordinator + shallow Vue Binding | 外部音频资源、Transport 命令与可丢弃状态投影 |
 
 Context 可以携带 `shallowRef`，但如果该对象开始拥有大量 UI 状态、派生值、协调动作、
 重置规则和多个跨分支消费者，它已经成为手写 Store，应重新评估 Pinia。
@@ -178,14 +178,14 @@ UI Store 的协调不得反向修改 Project facts。若用户操作需要修改
 
 ## 6. 快速选择表
 
-| 场景 | 默认工具 |
-| --- | --- |
-| 单组件开关、Hover、临时反馈 | Local Ref |
-| 明确父子数据与意图 | Props / Emits |
-| 应用服务、Coordinator、Port、Runtime Binding | Typed Context |
-| 跨分支、轻量、可重建的 UI 会话状态 | Pinia |
-| 应用级 Toast 命令与单一渲染槽 | Pinia |
-| Track、Clip、Note、dirty、History | 对应领域或应用权威，不进入上述 UI Store |
+| 场景                                         | 默认工具                                |
+| -------------------------------------------- | --------------------------------------- |
+| 单组件开关、Hover、临时反馈                  | Local Ref                               |
+| 明确父子数据与意图                           | Props / Emits                           |
+| 应用服务、Coordinator、Port、Runtime Binding | Typed Context                           |
+| 跨分支、轻量、可重建的 UI 会话状态           | Pinia                                   |
+| 应用级 Toast 命令与单一渲染槽                | Pinia                                   |
+| Track、Clip、Note、dirty、History            | 对应领域或应用权威，不进入上述 UI Store |
 
 当两个方案都可实现时，优先选择能最准确表达权威和生命周期的方案，而不是代码最少或
 最流行的方案。

@@ -1,9 +1,4 @@
-import type {
-  ClipId,
-  MidiSourceId,
-  Tick,
-  TrackId,
-} from '@seele-daw/project-core'
+import type { ClipId, MidiSourceId, Tick, TrackId } from '@seele-daw/project-core'
 
 export type ProjectMidiNoteErrorCode =
   | 'active-project-not-ready'

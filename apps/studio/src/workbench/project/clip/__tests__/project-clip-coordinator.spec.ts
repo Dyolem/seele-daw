@@ -155,9 +155,7 @@ describe('ProjectClipCoordinator', () => {
 
     expect(readyState.modelRevision).toBe(0)
     expect(session.modelRevision).toBe(3)
-    expect(
-      session.getSnapshot().clips.map(({ startTick }) => startTick),
-    ).toEqual([0, 0])
+    expect(session.getSnapshot().clips.map(({ startTick }) => startTick)).toEqual([0, 0])
   })
 
   it('rejects unavailable target state before consuming Clip identities', () => {

@@ -28,15 +28,12 @@ describe('Project Clip bar range', () => {
     { targetTick: 3_839, expectedStartTick: 0 },
     { targetTick: 3_840, expectedStartTick: 3_840 },
     { targetTick: 8_000, expectedStartTick: 7_680 },
-  ])(
-    'snaps Tick $targetTick to a one-bar 4/4 range',
-    ({ targetTick, expectedStartTick }) => {
-      expect(createProjectClipBarRange(createSnapshot(), parseTick(targetTick))).toEqual({
-        startTick: expectedStartTick,
-        spanTick: 3_840,
-      })
-    },
-  )
+  ])('snaps Tick $targetTick to a one-bar 4/4 range', ({ targetTick, expectedStartTick }) => {
+    expect(createProjectClipBarRange(createSnapshot(), parseTick(targetTick))).toEqual({
+      startTick: expectedStartTick,
+      spanTick: 3_840,
+    })
+  })
 
   it('derives the bar span from the initial numerator and denominator', () => {
     const snapshot = createSnapshot()

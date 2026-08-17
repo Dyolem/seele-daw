@@ -59,7 +59,11 @@ import {
   ProjectFileLoadError,
   type ProjectFileLoadPathSegment,
 } from '#internal/persistence/project-file-load-error'
-import { createTempoEventRecord, parseTempoBpm, type TempoEventRecord } from '#internal/time/tempo-event'
+import {
+  createTempoEventRecord,
+  parseTempoBpm,
+  type TempoEventRecord,
+} from '#internal/time/tempo-event'
 import {
   createTimeSignatureEventRecord,
   parseTimeSignatureDenominator,

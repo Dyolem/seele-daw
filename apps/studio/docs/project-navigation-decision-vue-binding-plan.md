@@ -34,10 +34,7 @@ interface PendingProjectNavigationDecision {
 
 interface ProjectNavigationDecisionVueContext {
   pendingDecision: Readonly<ShallowRef<PendingProjectNavigationDecision | null>>
-  resolve(
-    pending: PendingProjectNavigationDecision,
-    decision: ProjectNavigationDecision,
-  ): boolean
+  resolve(pending: PendingProjectNavigationDecision, decision: ProjectNavigationDecision): boolean
 }
 
 interface ProjectNavigationDecisionVueBinding {

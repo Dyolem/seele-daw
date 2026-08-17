@@ -31,14 +31,12 @@ interface ProjectPianoRollPresentationBase {
   readonly trackId: TrackId
 }
 
-export interface ReadyProjectPianoRollPresentation
-  extends ProjectPianoRollPresentationBase {
+export interface ReadyProjectPianoRollPresentation extends ProjectPianoRollPresentationBase {
   readonly context: PianoRollClipContext
   readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
 }
 
-export interface UnsupportedProjectPianoRollPresentation
-  extends ProjectPianoRollPresentationBase {
+export interface UnsupportedProjectPianoRollPresentation extends ProjectPianoRollPresentationBase {
   readonly reason: 'looped-clip'
   readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
 }
@@ -55,14 +53,12 @@ interface ProjectPianoRollTrackPresentationBase {
   readonly trackId: TrackId
 }
 
-export interface ReadyProjectPianoRollTrackPresentation
-  extends ProjectPianoRollTrackPresentationBase {
+export interface ReadyProjectPianoRollTrackPresentation extends ProjectPianoRollTrackPresentationBase {
   readonly readModel: PianoRollTrackReadModel
   readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
 }
 
-export interface UnsupportedProjectPianoRollTrackPresentation
-  extends ProjectPianoRollTrackPresentationBase {
+export interface UnsupportedProjectPianoRollTrackPresentation extends ProjectPianoRollTrackPresentationBase {
   readonly reason: 'non-instrument-track'
   readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
 }
@@ -98,9 +94,7 @@ export function createProjectPianoRollPresentation(
     })
   }
 
-  const source = snapshot.midiSources.find(
-    (candidate) => candidate.id === clip.sourceId,
-  )
+  const source = snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)
   if (source === undefined) {
     throw new Error(`MIDI Clip ${clip.id} references missing source ${clip.sourceId}`)
   }

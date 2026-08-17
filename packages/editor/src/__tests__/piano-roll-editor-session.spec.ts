@@ -41,8 +41,7 @@ describe('PianoRollEditorSession selection', () => {
       context: fixture.context,
       session: fixture.session,
     })
-    const onStateChange =
-      vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
+    const onStateChange = vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
     editorSession.subscribe({
       onError: vi.fn<PianoRollEditorSessionObserver['onError']>(),
       onStateChange,
@@ -67,9 +66,7 @@ describe('PianoRollEditorSession selection', () => {
     const selectedState = editorSession.state
     expect(editorSession.selectOnly(noteId)).toBe(false)
     expect(editorSession.selectOnly(parseNoteId('editor-note-missing'))).toBe(false)
-    expect(
-      editorSession.selectOnly(parseNoteId('editor-note-after-clip')),
-    ).toBe(false)
+    expect(editorSession.selectOnly(parseNoteId('editor-note-after-clip'))).toBe(false)
     expect(editorSession.state).toBe(selectedState)
     expect(onStateChange).toHaveBeenCalledOnce()
 
@@ -87,18 +84,13 @@ describe('PianoRollEditorSession selection', () => {
 
     expect(editorSession.toggleSelection(leadingNoteId)).toBe(true)
     expect(editorSession.toggleSelection(insideNoteId)).toBe(true)
-    expect(editorSession.state.selectedNoteIds).toEqual([
-      leadingNoteId,
-      insideNoteId,
-    ])
+    expect(editorSession.state.selectedNoteIds).toEqual([leadingNoteId, insideNoteId])
 
     expect(editorSession.toggleSelection(leadingNoteId)).toBe(true)
     expect(editorSession.state.selectedNoteIds).toEqual([insideNoteId])
     expect(editorSession.clearSelection()).toBe(true)
     expect(editorSession.clearSelection()).toBe(false)
-    expect(
-      editorSession.toggleSelection(parseNoteId('editor-note-missing')),
-    ).toBe(false)
+    expect(editorSession.toggleSelection(parseNoteId('editor-note-missing'))).toBe(false)
     expect(editorSession.state.selectedNoteIds).toEqual([])
 
     editorSession.dispose()
@@ -111,8 +103,7 @@ describe('PianoRollEditorSession selection', () => {
       session: fixture.session,
     })
     const noteId = parseNoteId('editor-note-inside')
-    const onStateChange =
-      vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
+    const onStateChange = vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
     editorSession.subscribe({
       onError: vi.fn<PianoRollEditorSessionObserver['onError']>(),
       onStateChange,
@@ -186,14 +177,12 @@ describe('PianoRollEditorSession selection', () => {
     const onError = vi.fn<PianoRollEditorSessionObserver['onError']>()
     editorSession.subscribe({
       onError,
-      onStateChange:
-        vi.fn<PianoRollEditorSessionObserver['onStateChange']>(),
+      onStateChange: vi.fn<PianoRollEditorSessionObserver['onStateChange']>(),
     })
     const noteId = parseNoteId('editor-note-inside')
     editorSession.selectOnly(noteId)
     const selectedState = editorSession.state
-    const subscribedProjectObserver =
-      projectObserver as ProjectSubscriptionObserver | null
+    const subscribedProjectObserver = projectObserver as ProjectSubscriptionObserver | null
     if (subscribedProjectObserver === null) {
       throw new Error('Expected Project subscription')
     }
@@ -223,8 +212,7 @@ describe('PianoRollEditorSession selection', () => {
       session: fixture.session,
     })
     const firstError = vi.fn<PianoRollEditorSessionObserver['onError']>()
-    const secondStateChange =
-      vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
+    const secondStateChange = vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
     editorSession.subscribe({
       onError: firstError,
       onStateChange: () => {
@@ -245,25 +233,21 @@ describe('PianoRollEditorSession selection', () => {
 
     editorSession.dispose()
     editorSession.dispose()
+    expect(requirePianoRollError(() => editorSession.clearSelection()).code).toBe(
+      'editor-session-disposed',
+    )
     expect(
-      requirePianoRollError(() => editorSession.clearSelection()).code,
+      requirePianoRollError(() => editorSession.selectOnly(parseNoteId('editor-note-inside'))).code,
     ).toBe('editor-session-disposed')
     expect(
-      requirePianoRollError(() =>
-        editorSession.selectOnly(parseNoteId('editor-note-inside')),
-      ).code,
-    ).toBe('editor-session-disposed')
-    expect(
-      requirePianoRollError(() =>
-        editorSession.toggleSelection(parseNoteId('editor-note-inside')),
-      ).code,
+      requirePianoRollError(() => editorSession.toggleSelection(parseNoteId('editor-note-inside')))
+        .code,
     ).toBe('editor-session-disposed')
     expect(
       requirePianoRollError(() =>
         editorSession.subscribe({
           onError: vi.fn<PianoRollEditorSessionObserver['onError']>(),
-          onStateChange:
-            vi.fn<PianoRollEditorSessionObserver['onStateChange']>(),
+          onStateChange: vi.fn<PianoRollEditorSessionObserver['onStateChange']>(),
         }),
       ).code,
     ).toBe('editor-session-disposed')

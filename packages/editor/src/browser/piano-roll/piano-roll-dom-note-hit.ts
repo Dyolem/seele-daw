@@ -20,10 +20,7 @@ function resolveHitZone(value: string | null): PianoRollHitZone | null {
   }
 }
 
-function isElement(
-  target: EventTarget,
-  surface: HTMLElement,
-): target is Element {
+function isElement(target: EventTarget, surface: HTMLElement): target is Element {
   const elementConstructor = surface.ownerDocument.defaultView?.Element
   return elementConstructor !== undefined && target instanceof elementConstructor
 }
@@ -47,9 +44,7 @@ export function resolvePianoRollDomNoteHit(
 
     const noteIdValue = target.getAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE)
     if (noteIdValue === null) continue
-    const zone = resolveHitZone(
-      target.getAttribute(PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE),
-    )
+    const zone = resolveHitZone(target.getAttribute(PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE))
     if (zone === null) return null
 
     try {

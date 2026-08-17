@@ -53,14 +53,8 @@ describe('BrowserTanStackHotkeyRegistry', () => {
     })
     const save = vi.fn<(event: KeyboardEvent) => void>()
     const escape = vi.fn<(event: KeyboardEvent) => void>()
-    const disposeSave = registry.register(
-      defineStudioKeyboardBinding('Mod+S'),
-      save,
-    )
-    const disposeEscape = registry.register(
-      defineStudioKeyboardBinding('Escape'),
-      escape,
-    )
+    const disposeSave = registry.register(defineStudioKeyboardBinding('Mod+S'), save)
+    const disposeEscape = registry.register(defineStudioKeyboardBinding('Escape'), escape)
     const input = document.createElement('input')
     document.body.append(input)
     input.focus()

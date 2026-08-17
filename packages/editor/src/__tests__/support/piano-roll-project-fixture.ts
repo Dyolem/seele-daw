@@ -123,14 +123,8 @@ export function createPianoRollProjectFixture() {
     )
   }
 
-  function moveNote(
-    noteId: NoteId,
-    nextStartTick: Tick,
-    nextPitch: MidiPitch,
-  ): void {
-    const before = session.query(
-      createMidiNoteByIdQuery({ sourceId, noteId }),
-    ).note
+  function moveNote(noteId: NoteId, nextStartTick: Tick, nextPitch: MidiPitch): void {
+    const before = session.query(createMidiNoteByIdQuery({ sourceId, noteId })).note
     if (before === undefined) throw new Error(`Expected MIDI Note ${noteId}`)
 
     executeCommitted(

@@ -9,11 +9,7 @@ import {
   type PianoRollResizeNoteIntent,
   type PianoRollResolveSelectionIntent,
 } from '@seele-daw/editor'
-import type {
-  ClipId,
-  ModelRevision,
-  NoteId,
-} from '@seele-daw/project-core'
+import type { ClipId, ModelRevision, NoteId } from '@seele-daw/project-core'
 
 import type { ProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 
@@ -23,10 +19,7 @@ export interface ProjectPianoRollIntentHandlerDependencies {
   readonly getEditorSession: () => PianoRollEditorSession | null
   readonly interactionSession: Pick<
     PianoRollInteractionSession,
-    | 'resolveMoveCommit'
-    | 'resolveResizeCommit'
-    | 'skipMoveCommit'
-    | 'skipResizeCommit'
+    'resolveMoveCommit' | 'resolveResizeCommit' | 'skipMoveCommit' | 'skipResizeCommit'
   >
   readonly projectMidiNotes: ProjectMidiNoteCoordinator
   readonly reportDanger: (title: string, description: string) => void
@@ -34,9 +27,7 @@ export interface ProjectPianoRollIntentHandlerDependencies {
   readonly setFailureMessage: (message: string | null) => void
 }
 
-export type ProjectPianoRollIntentHandler = (
-  intent: PianoRollInteractionIntent,
-) => void
+export type ProjectPianoRollIntentHandler = (intent: PianoRollInteractionIntent) => void
 
 function describeCause(cause: unknown, fallback: string): string {
   if (cause instanceof Error && cause.message.trim().length > 0) {
@@ -154,8 +145,7 @@ function handleMoveNotesIntent(
       dependencies.interactionSession.skipMoveCommit()
     } else {
       dependencies.interactionSession.resolveMoveCommit({
-        authorityRevision:
-          dependencies.getAuthorityRevision() ?? intent.gesture.baseRevision,
+        authorityRevision: dependencies.getAuthorityRevision() ?? intent.gesture.baseRevision,
         commitRevision: result.commit.modelRevision,
       })
       if (
@@ -206,8 +196,7 @@ function handleResizeNoteIntent(
       dependencies.interactionSession.skipResizeCommit()
     } else {
       dependencies.interactionSession.resolveResizeCommit({
-        authorityRevision:
-          dependencies.getAuthorityRevision() ?? intent.gesture.baseRevision,
+        authorityRevision: dependencies.getAuthorityRevision() ?? intent.gesture.baseRevision,
         commitRevision: result.commit.modelRevision,
       })
       if (

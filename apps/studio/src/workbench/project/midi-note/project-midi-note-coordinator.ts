@@ -151,11 +151,10 @@ function createEditableClipContext(
       )
     }
 
-    throw new ProjectMidiNoteError(
-      'target-clip-source-invalid',
-      cause.message,
-      { clipId: clip.id, sourceId: source.id },
-    )
+    throw new ProjectMidiNoteError('target-clip-source-invalid', cause.message, {
+      clipId: clip.id,
+      sourceId: source.id,
+    })
   }
 }
 
@@ -188,9 +187,7 @@ function requireEditableMidiNoteTarget(
     )
   }
 
-  const source = snapshot.midiSources.find(
-    (candidate) => candidate.id === clip.sourceId,
-  )
+  const source = snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)
   if (source === undefined) {
     throw new ProjectMidiNoteError(
       'target-midi-source-not-found',
@@ -224,10 +221,7 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   addMidiNote(input: AddMidiNoteInput): AddedMidiNoteResult {
-    const { context, session } = requireEditableMidiNoteTarget(
-      this.#dependencies,
-      input.clipId,
-    )
+    const { context, session } = requireEditableMidiNoteTarget(this.#dependencies, input.clipId)
     const clipStartTick = parseTick(input.clipStartTick)
     if (clipStartTick >= context.clipSpanTick) {
       throw new ProjectMidiNoteError(
@@ -243,16 +237,9 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
     }
 
     const requestedDurationTick = parsePositiveTick(input.requestedDurationTick)
-    const remainingDurationTick = parsePositiveTick(
-      context.clipSpanTick - clipStartTick,
-    )
-    const durationTick = parsePositiveTick(
-      Math.min(requestedDurationTick, remainingDurationTick),
-    )
-    const sourceStartTick = pianoRollClipTickToSourceTick(
-      context,
-      clipStartTick,
-    )
+    const remainingDurationTick = parsePositiveTick(context.clipSpanTick - clipStartTick)
+    const durationTick = parsePositiveTick(Math.min(requestedDurationTick, remainingDurationTick))
+    const sourceStartTick = pianoRollClipTickToSourceTick(context, clipStartTick)
     const pitch = parseMidiPitch(input.pitch)
     const noteId = parseNoteId(this.#dependencies.createUniqueId())
     const result = session.execute(
@@ -412,10 +399,7 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   removeMidiNotes(input: RemoveMidiNotesInput): RemovedMidiNotesResult {
-    const { context, session } = requireEditableMidiNoteTarget(
-      this.#dependencies,
-      input.clipId,
-    )
+    const { context, session } = requireEditableMidiNoteTarget(this.#dependencies, input.clipId)
     const command = createRemoveNotesCommand({
       baseRevision: session.modelRevision,
       sourceId: context.sourceId,
@@ -434,10 +418,7 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   moveMidiNotes(input: MoveMidiNotesInput): MovedMidiNotesResult | null {
-    const { context, session } = requireEditableMidiNoteTarget(
-      this.#dependencies,
-      input.clipId,
-    )
+    const { context, session } = requireEditableMidiNoteTarget(this.#dependencies, input.clipId)
     const command = createMoveNotesCommand({
       baseRevision: input.baseRevision,
       sourceId: context.sourceId,
@@ -458,10 +439,7 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   resizeMidiNote(input: ResizeMidiNoteInput): ResizedMidiNoteResult | null {
-    const { context, session } = requireEditableMidiNoteTarget(
-      this.#dependencies,
-      input.clipId,
-    )
+    const { context, session } = requireEditableMidiNoteTarget(this.#dependencies, input.clipId)
     const command = createResizeNoteCommand({
       baseRevision: input.baseRevision,
       sourceId: context.sourceId,

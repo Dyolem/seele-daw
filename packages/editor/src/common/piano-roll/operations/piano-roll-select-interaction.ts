@@ -10,11 +10,7 @@ export type PianoRollSelectionTarget = Pick<
 >
 
 function requestsSelectionToggle(input: PianoRollPointerInput): boolean {
-  return (
-    input.originModifiers.control ||
-    input.originModifiers.meta ||
-    input.originModifiers.shift
-  )
+  return input.originModifiers.control || input.originModifiers.meta || input.originModifiers.shift
 }
 
 /**
@@ -27,10 +23,7 @@ export function applyPianoRollSelectInteraction(
   target: PianoRollSelectionTarget,
   input: PianoRollPointerInput,
 ): boolean {
-  if (
-    input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.END ||
-    input.hasExceededDragThreshold
-  ) {
+  if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.END || input.hasExceededDragThreshold) {
     return false
   }
 

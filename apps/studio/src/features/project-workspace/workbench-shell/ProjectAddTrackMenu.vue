@@ -148,8 +148,7 @@ const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
   background: var(--sd-color-surface-overlay);
   box-shadow: var(--sd-shadow-overlay);
   outline: none;
-  animation: project-add-track-in var(--sd-motion-duration-normal)
-    var(--sd-motion-easing-standard);
+  animation: project-add-track-in var(--sd-motion-duration-normal) var(--sd-motion-easing-standard);
 }
 
 :global(.project-add-track__heading) {

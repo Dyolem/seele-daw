@@ -1,8 +1,4 @@
-import type {
-  MidiPitch,
-  NoteId,
-  Tick,
-} from '@seele-daw/project-core'
+import type { MidiPitch, NoteId, Tick } from '@seele-daw/project-core'
 
 export interface PianoRollNoteVisual {
   readonly borderColor: string

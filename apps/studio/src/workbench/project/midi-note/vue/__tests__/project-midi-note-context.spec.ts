@@ -23,12 +23,9 @@ describe('ProjectMidiNoteVueContext', () => {
   it('resolves the provided Coordinator and fails clearly without composition', () => {
     const addMidiNote = vi.fn<ProjectMidiNoteCoordinator['addMidiNote']>()
     const moveMidiNotes = vi.fn<ProjectMidiNoteCoordinator['moveMidiNotes']>()
-    const placeMidiNoteOnTrack =
-      vi.fn<ProjectMidiNoteCoordinator['placeMidiNoteOnTrack']>()
-    const removeMidiNotes =
-      vi.fn<ProjectMidiNoteCoordinator['removeMidiNotes']>()
-    const resizeMidiNote =
-      vi.fn<ProjectMidiNoteCoordinator['resizeMidiNote']>()
+    const placeMidiNoteOnTrack = vi.fn<ProjectMidiNoteCoordinator['placeMidiNoteOnTrack']>()
+    const removeMidiNotes = vi.fn<ProjectMidiNoteCoordinator['removeMidiNotes']>()
+    const resizeMidiNote = vi.fn<ProjectMidiNoteCoordinator['resizeMidiNote']>()
     const context: ProjectMidiNoteVueContext = Object.freeze({
       projectMidiNotes: Object.freeze({
         addMidiNote,

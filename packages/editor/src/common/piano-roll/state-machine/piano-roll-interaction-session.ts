@@ -1,14 +1,5 @@
-import type {
-  ModelRevision,
-  NoteId,
-  ProjectSession,
-} from '@seele-daw/project-core'
-import {
-  assign,
-  createActor,
-  createMachine,
-  type SnapshotFrom,
-} from 'xstate'
+import type { ModelRevision, NoteId, ProjectSession } from '@seele-daw/project-core'
+import { assign, createActor, createMachine, type SnapshotFrom } from 'xstate'
 
 import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
 import type { PianoRollGrid } from '#internal/common/piano-roll/piano-roll-grid'
@@ -249,8 +240,7 @@ function createActiveInteraction(
       session: configuration.session,
     })
     const moveGesture =
-      resizeGesture === null &&
-      configuration.tool === PIANO_ROLL_INTERACTION_TOOL.CURSOR
+      resizeGesture === null && configuration.tool === PIANO_ROLL_INTERACTION_TOOL.CURSOR
         ? createPianoRollNoteMoveGesture({
             context: configuration.context,
             pointerInput: input,
@@ -334,11 +324,7 @@ function resolveMove(
   createIntent: boolean,
 ): InteractionResolution {
   const active = context.active
-  if (
-    active === null ||
-    active.moveGesture === null ||
-    active.configuration.viewport === null
-  ) {
+  if (active === null || active.moveGesture === null || active.configuration.viewport === null) {
     return EMPTY_RESOLUTION
   }
   const gesture = active.moveGesture
@@ -382,11 +368,7 @@ function resolveResize(
   createIntent: boolean,
 ): InteractionResolution {
   const active = context.active
-  if (
-    active === null ||
-    active.resizeGesture === null ||
-    active.configuration.viewport === null
-  ) {
+  if (active === null || active.resizeGesture === null || active.configuration.viewport === null) {
     return EMPTY_RESOLUTION
   }
   const gesture = active.resizeGesture
@@ -508,9 +490,7 @@ const interactionMachine = createMachine({
     idle: {
       on: {
         'pointer.begin': {
-          actions: assign(({ event }) =>
-            beginInteraction(event.configuration, event.input),
-          ),
+          actions: assign(({ event }) => beginInteraction(event.configuration, event.input)),
           target: 'pressing',
         },
       },
@@ -519,60 +499,51 @@ const interactionMachine = createMachine({
       on: {
         'pointer.update': [
           {
-            guard: ({ context, event }) =>
-              canActivateNoteResize(context, event.input),
+            guard: ({ context, event }) => canActivateNoteResize(context, event.input),
             actions: assign(({ context, event }) =>
               assignResolution(resolveResize(context, event.input, false)),
             ),
             target: 'resizingNote',
           },
           {
-            guard: ({ context, event }) =>
-              canActivateNoteMove(context, event.input),
+            guard: ({ context, event }) => canActivateNoteMove(context, event.input),
             actions: assign(({ context, event }) =>
               assignResolution(resolveMove(context, event.input, false)),
             ),
             target: 'movingNote',
           },
           {
-            guard: ({ context, event }) =>
-              isMatchingPointer(context, event.input),
+            guard: ({ context, event }) => isMatchingPointer(context, event.input),
             actions: assign({ failure: null, intent: null }),
           },
         ],
         'pointer.end': [
           {
-            guard: ({ context, event }) =>
-              canActivateNoteResize(context, event.input),
+            guard: ({ context, event }) => canActivateNoteResize(context, event.input),
             actions: assign(({ context, event }) =>
               assignResolution(resolveResize(context, event.input, true)),
             ),
             target: 'committingNoteResize',
           },
           {
-            guard: ({ context, event }) =>
-              canActivateNoteMove(context, event.input),
+            guard: ({ context, event }) => canActivateNoteMove(context, event.input),
             actions: assign(({ context, event }) =>
               assignResolution(resolveMove(context, event.input, true)),
             ),
             target: 'committingNoteMove',
           },
           {
-            guard: ({ context, event }) =>
-              isMatchingPointer(context, event.input),
+            guard: ({ context, event }) => isMatchingPointer(context, event.input),
             actions: assign(({ context, event }) => ({
               active: null,
               pendingCommitRevision: null,
-              ...assignResolution(
-                resolveCompletedPress(context, event.input),
-              ),
+              ...assignResolution(resolveCompletedPress(context, event.input)),
             })),
             target: 'idle',
           },
         ],
         'pointer.cancel': {
-          guard: ({ context, event }) =>
-            isMatchingPointer(context, event.input),
+          guard: ({ context, event }) => isMatchingPointer(context, event.input),
           actions: assign(createEmptyInteractionContext),
           target: 'idle',
         },
@@ -585,23 +556,20 @@ const interactionMachine = createMachine({
     movingNote: {
       on: {
         'pointer.update': {
-          guard: ({ context, event }) =>
-            isMatchingPointer(context, event.input),
+          guard: ({ context, event }) => isMatchingPointer(context, event.input),
           actions: assign(({ context, event }) =>
             assignResolution(resolveMove(context, event.input, false)),
           ),
         },
         'pointer.end': {
-          guard: ({ context, event }) =>
-            isMatchingPointer(context, event.input),
+          guard: ({ context, event }) => isMatchingPointer(context, event.input),
           actions: assign(({ context, event }) =>
             assignResolution(resolveMove(context, event.input, true)),
           ),
           target: 'committingNoteMove',
         },
         'pointer.cancel': {
-          guard: ({ context, event }) =>
-            isMatchingPointer(context, event.input),
+          guard: ({ context, event }) => isMatchingPointer(context, event.input),
           actions: assign(createEmptyInteractionContext),
           target: 'idle',
         },
@@ -614,23 +582,20 @@ const interactionMachine = createMachine({
     resizingNote: {
       on: {
         'pointer.update': {
-          guard: ({ context, event }) =>
-            isMatchingPointer(context, event.input),
+          guard: ({ context, event }) => isMatchingPointer(context, event.input),
           actions: assign(({ context, event }) =>
             assignResolution(resolveResize(context, event.input, false)),
           ),
         },
         'pointer.end': {
-          guard: ({ context, event }) =>
-            isMatchingPointer(context, event.input),
+          guard: ({ context, event }) => isMatchingPointer(context, event.input),
           actions: assign(({ context, event }) =>
             assignResolution(resolveResize(context, event.input, true)),
           ),
           target: 'committingNoteResize',
         },
         'pointer.cancel': {
-          guard: ({ context, event }) =>
-            isMatchingPointer(context, event.input),
+          guard: ({ context, event }) => isMatchingPointer(context, event.input),
           actions: assign(createEmptyInteractionContext),
           target: 'idle',
         },
@@ -644,8 +609,7 @@ const interactionMachine = createMachine({
       on: {
         'move.commit.accepted': [
           {
-            guard: ({ event }) =>
-              event.authorityRevision >= event.commitRevision,
+            guard: ({ event }) => event.authorityRevision >= event.commitRevision,
             actions: assign(createEmptyInteractionContext),
             target: 'idle',
           },
@@ -673,8 +637,7 @@ const interactionMachine = createMachine({
       on: {
         'resize.commit.accepted': [
           {
-            guard: ({ event }) =>
-              event.authorityRevision >= event.commitRevision,
+            guard: ({ event }) => event.authorityRevision >= event.commitRevision,
             actions: assign(createEmptyInteractionContext),
             target: 'idle',
           },
@@ -712,9 +675,7 @@ const interactionMachine = createMachine({
           target: 'idle',
         },
         'pointer.begin': {
-          actions: assign(({ event }) =>
-            beginInteraction(event.configuration, event.input),
-          ),
+          actions: assign(({ event }) => beginInteraction(event.configuration, event.input)),
           target: 'pressing',
         },
       },
@@ -744,9 +705,7 @@ function mapStatus(snapshot: InteractionMachineSnapshot): PianoRollInteractionSt
   return PIANO_ROLL_INTERACTION_STATUS.IDLE
 }
 
-function createPublicState(
-  snapshot: InteractionMachineSnapshot,
-): PianoRollInteractionState {
+function createPublicState(snapshot: InteractionMachineSnapshot): PianoRollInteractionState {
   const moveGesture = snapshot.context.active?.moveGesture ?? null
   const resizeGesture = snapshot.context.active?.resizeGesture ?? null
   let activeGesture: PianoRollInteractionState['activeGesture'] = null
@@ -765,9 +724,7 @@ function createPublicState(
   })
 }
 
-function createOutcome(
-  snapshot: InteractionMachineSnapshot,
-): PianoRollInteractionOutcome {
+function createOutcome(snapshot: InteractionMachineSnapshot): PianoRollInteractionOutcome {
   return Object.freeze({
     failure: snapshot.context.failure,
     intent: snapshot.context.intent,
@@ -800,10 +757,7 @@ class PianoRollInteractionSessionImpl implements PianoRollInteractionSession {
   }
 
   cancel(): boolean {
-    if (
-      this.#disposed ||
-      this.#state.status === PIANO_ROLL_INTERACTION_STATUS.IDLE
-    ) {
+    if (this.#disposed || this.#state.status === PIANO_ROLL_INTERACTION_STATUS.IDLE) {
       return false
     }
     this.#actor.send({ type: 'cancel.requested' })

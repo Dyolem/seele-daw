@@ -66,8 +66,7 @@ describe('UiToastRegion', () => {
     const host = defineComponent({
       components: { UiToastRegion },
       setup: () => ({ toasts }),
-      template:
-        '<UiToastRegion :message="toasts.message" @dismiss="toasts.dismiss" />',
+      template: '<UiToastRegion :message="toasts.message" @dismiss="toasts.dismiss" />',
     })
     const wrapper = mount(host, {
       global: {

@@ -18,9 +18,7 @@ const emit = defineEmits<{
 const trackStyle = computed<StyleValue>(() => ({
   '--project-track-color': props.track.color ?? 'var(--sd-color-border-focus)',
 }))
-const trackKindLabel = computed(() =>
-  props.track.kind === 'instrument' ? 'Instrument' : 'Audio',
-)
+const trackKindLabel = computed(() => (props.track.kind === 'instrument' ? 'Instrument' : 'Audio'))
 </script>
 
 <template>
@@ -48,12 +46,7 @@ const trackKindLabel = computed(() =>
     <span class="project-track-row__controls">
       <button type="button" disabled aria-label="Mute — not available">M</button>
       <button type="button" disabled aria-label="Solo — not available">S</button>
-      <UiIconButton
-        disabled
-        :icon="MoreIcon"
-        label="Track options — not available"
-        size="small"
-      />
+      <UiIconButton disabled :icon="MoreIcon" label="Track options — not available" size="small" />
     </span>
   </article>
 </template>
@@ -80,13 +73,8 @@ const trackKindLabel = computed(() =>
 }
 
 .project-track-row--selected {
-  background: color-mix(
-    in srgb,
-    var(--project-track-color) 10%,
-    var(--sd-color-surface-panel)
-  );
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--project-track-color) 42%, transparent);
+  background: color-mix(in srgb, var(--project-track-color) 10%, var(--sd-color-surface-panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--project-track-color) 42%, transparent);
 }
 
 .project-track-row__color {
@@ -105,11 +93,7 @@ const trackKindLabel = computed(() =>
   border: 1px solid color-mix(in srgb, var(--project-track-color) 48%, transparent);
   border-radius: var(--sd-radius-md);
   color: var(--project-track-color);
-  background: color-mix(
-    in srgb,
-    var(--project-track-color) 14%,
-    var(--sd-color-surface-sunken)
-  );
+  background: color-mix(in srgb, var(--project-track-color) 14%, var(--sd-color-surface-sunken));
 }
 
 .project-track-row__select {

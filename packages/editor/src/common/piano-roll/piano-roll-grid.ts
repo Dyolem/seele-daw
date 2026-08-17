@@ -1,7 +1,4 @@
-import {
-  parsePositiveTick,
-  type Tick,
-} from '@seele-daw/project-core'
+import { parsePositiveTick, type Tick } from '@seele-daw/project-core'
 
 import {
   createTimelineGrid,
@@ -20,11 +17,7 @@ export interface CreatePianoRollGridInput extends CreateTimelineGridInput {
   readonly beatSpanTick: Tick
 }
 
-function requireGridNesting(
-  larger: Tick,
-  smaller: Tick,
-  relationship: string,
-): void {
+function requireGridNesting(larger: Tick, smaller: Tick, relationship: string): void {
   if (larger < smaller || larger % smaller !== 0) {
     throw new PianoRollError(
       'invalid-grid',
@@ -34,19 +27,13 @@ function requireGridNesting(
 }
 
 /** Creates the shared visual and interaction Grid for one Piano Roll. */
-export function createPianoRollGrid(
-  input: CreatePianoRollGridInput,
-): PianoRollGrid {
+export function createPianoRollGrid(input: CreatePianoRollGridInput): PianoRollGrid {
   const timelineGrid = createTimelineGrid(input)
   const barSpanTick = parsePositiveTick(input.barSpanTick)
   const beatSpanTick = parsePositiveTick(input.beatSpanTick)
 
   requireGridNesting(barSpanTick, beatSpanTick, 'bar and beat grid')
-  requireGridNesting(
-    beatSpanTick,
-    timelineGrid.subdivisionSpanTick,
-    'beat and subdivision grid',
-  )
+  requireGridNesting(beatSpanTick, timelineGrid.subdivisionSpanTick, 'beat and subdivision grid')
 
   return Object.freeze({
     ...timelineGrid,

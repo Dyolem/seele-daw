@@ -28,8 +28,6 @@ describe('ProjectClipVueContext', () => {
         code: 'missing-context',
       }),
     )
-    expect(() => missingApp.runWithContext(() => useProjectClips())).toThrow(
-      ProjectClipVueError,
-    )
+    expect(() => missingApp.runWithContext(() => useProjectClips())).toThrow(ProjectClipVueError)
   })
 })

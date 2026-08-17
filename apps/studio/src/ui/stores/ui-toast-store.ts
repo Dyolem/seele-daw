@@ -1,11 +1,7 @@
 import { defineStore } from 'pinia'
 import { shallowRef } from 'vue'
 
-import {
-  UI_TOAST_TONE,
-  type ShowUiToastInput,
-  type UiToastMessage,
-} from '@/ui/components/ui-toast'
+import { UI_TOAST_TONE, type ShowUiToastInput, type UiToastMessage } from '@/ui/components/ui-toast'
 
 /**
  * Owns the application-wide single-slot notification channel.

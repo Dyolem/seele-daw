@@ -185,7 +185,9 @@ describe('ProjectNavigationConfirmationCoordinator decisions', () => {
     store.saveFailure = saveFailure
     const saveResult = await createCoordinator(
       service,
-      vi.fn<ProjectNavigationDecisionRequester>().mockResolvedValue(PROJECT_NAVIGATION_DECISION.SAVE),
+      vi
+        .fn<ProjectNavigationDecisionRequester>()
+        .mockResolvedValue(PROJECT_NAVIGATION_DECISION.SAVE),
     ).confirm(LEAVE_PROJECT_INTENT)
 
     expect(saveResult).toMatchObject({

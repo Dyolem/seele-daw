@@ -1,6 +1,10 @@
 import { DomainValueError } from '#internal/model/domain-value-error'
 import { parseProjectId, type ProjectId } from '#internal/model/ids'
-import { ModelRevisionError, parseModelRevision, type ModelRevision } from '#internal/model/model-revision'
+import {
+  ModelRevisionError,
+  parseModelRevision,
+  type ModelRevision,
+} from '#internal/model/model-revision'
 import {
   PROJECT_CHECKPOINT_FORMAT_VERSION,
   parseProjectCheckpointId,

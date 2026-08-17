@@ -85,9 +85,7 @@ const noteHost = useTemplateRef<HTMLElement>('noteHost')
 const noteState = shallowRef<PianoRollNoteReadModelState | null>(null)
 const editorState = shallowRef<PianoRollEditorSessionState | null>(null)
 const interactionSession = createPianoRollInteractionSession()
-const interactionState = shallowRef<PianoRollInteractionState>(
-  interactionSession.state,
-)
+const interactionState = shallowRef<PianoRollInteractionState>(interactionSession.state)
 const interactionFailureMessage = shallowRef<string | null>(null)
 const readModelFailureMessage = shallowRef<string | null>(null)
 const renderFailureMessage = shallowRef<string | null>(null)
@@ -120,18 +118,15 @@ const movePreview = computed(() => interactionState.value.movePreview)
 const resizePreview = computed(() => interactionState.value.resizePreview)
 
 const pianoKeys = Object.freeze(
-  Array.from(
-    { length: INITIAL_MAXIMUM_PITCH - INITIAL_MINIMUM_PITCH + 1 },
-    (_, index) => {
-      const pitch = INITIAL_MAXIMUM_PITCH - index
-      const pitchClass = pitch % 12
-      return Object.freeze({
-        isBlack: [1, 3, 6, 8, 10].includes(pitchClass),
-        label: pitchClass === 0 ? `C${Math.floor(pitch / 12) - 1}` : '',
-        pitch,
-      })
-    },
-  ),
+  Array.from({ length: INITIAL_MAXIMUM_PITCH - INITIAL_MINIMUM_PITCH + 1 }, (_, index) => {
+    const pitch = INITIAL_MAXIMUM_PITCH - index
+    const pitchClass = pitch % 12
+    return Object.freeze({
+      isBlack: [1, 3, 6, 8, 10].includes(pitchClass),
+      label: pitchClass === 0 ? `C${Math.floor(pitch / 12) - 1}` : '',
+      pitch,
+    })
+  }),
 )
 const barLabels = computed(() => {
   const barCount = Math.max(
@@ -144,8 +139,7 @@ const rulerStyle = computed(() => ({
   gridTemplateColumns: `repeat(${barLabels.value.length}, minmax(0, 1fr))`,
 }))
 const snapGuideStyle = computed(() => {
-  const snapGuideTick =
-    resizePreview.value?.snapGuideTick ?? movePreview.value?.snapGuideTick
+  const snapGuideTick = resizePreview.value?.snapGuideTick ?? movePreview.value?.snapGuideTick
   const viewport = noteState.value?.viewport
   if (snapGuideTick === null || snapGuideTick === undefined || viewport === undefined) {
     return null
@@ -153,10 +147,7 @@ const snapGuideStyle = computed(() => {
 
   try {
     return Object.freeze({
-      transform: `translateX(${pianoRollClipTickToCssPixel(
-        viewport,
-        snapGuideTick,
-      )}px)`,
+      transform: `translateX(${pianoRollClipTickToCssPixel(viewport, snapGuideTick)}px)`,
     })
   } catch {
     return null
@@ -164,9 +155,7 @@ const snapGuideStyle = computed(() => {
 })
 const failureMessage = computed(
   () =>
-    interactionFailureMessage.value ??
-    readModelFailureMessage.value ??
-    renderFailureMessage.value,
+    interactionFailureMessage.value ?? readModelFailureMessage.value ?? renderFailureMessage.value,
 )
 const accessibleStatus = computed(() => {
   if (failureMessage.value !== null) return failureMessage.value
@@ -214,26 +203,16 @@ function createThemeSnapshot(): PianoRollSurfaceThemeSnapshot {
       whitePitchRow: readThemeColor(style, '--sd-editor-pitch-row-white'),
     }),
     noteBorderColor: readThemeColor(style, '--sd-editor-note-border'),
-    noteFillColor:
-      props.presentation.color ??
-      readThemeColor(style, '--sd-color-border-focus'),
-    selectedNoteBorderColor: readThemeColor(
-      style,
-      '--sd-editor-note-selected-border',
-    ),
-    selectedNoteGlowColor: readThemeColor(
-      style,
-      '--sd-editor-note-selected-glow',
-    ),
+    noteFillColor: props.presentation.color ?? readThemeColor(style, '--sd-color-border-focus'),
+    selectedNoteBorderColor: readThemeColor(style, '--sd-editor-note-selected-border'),
+    selectedNoteGlowColor: readThemeColor(style, '--sd-editor-note-selected-glow'),
   })
 }
 
 function createDisplayGrid() {
   return createPianoRollGrid({
     barSpanTick: props.barSpanTick,
-    beatSpanTick: parsePositiveTick(
-      props.barSpanTick / props.timeSignatureNumerator,
-    ),
+    beatSpanTick: parsePositiveTick(props.barSpanTick / props.timeSignatureNumerator),
     originTick: ZERO_TICK,
     subdivisionSpanTick: pianoRollPreferences.subdivisionSpanTick,
   })
@@ -273,14 +252,10 @@ function handlePointerInput(input: PianoRollPointerInput): void {
   )
 
   if (outcome.failure !== null) {
-    if (
-      interactionState.value.status ===
-      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE
-    ) {
+    if (interactionState.value.status === PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE) {
       interactionSession.skipMoveCommit()
     } else if (
-      interactionState.value.status ===
-      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE
+      interactionState.value.status === PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE
     ) {
       interactionSession.skipResizeCommit()
     }
@@ -299,11 +274,7 @@ function render(): void {
   const currentGridRenderer = gridRenderer.value
   const currentNoteRenderer = noteRenderer.value
   const state = noteState.value
-  if (
-    currentGridRenderer === null ||
-    currentNoteRenderer === null ||
-    state === null
-  ) {
+  if (currentGridRenderer === null || currentNoteRenderer === null || state === null) {
     return
   }
 
@@ -478,27 +449,20 @@ function hasCancellablePointerInteraction(): boolean {
 const disposeKeyboardShortcut = keyboardShortcuts.register([
   {
     actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE,
-    bindings: keyboardShortcuts.bindingsFor(
-      STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE,
-    ),
+    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE),
     description: 'Remove the selected Notes from the focused Piano Roll.',
-    isEnabled: () =>
-      isPianoRollFocused() &&
-      (editorState.value?.selectedNoteIds.length ?? 0) > 0,
+    isEnabled: () => isPianoRollFocused() && (editorState.value?.selectedNoteIds.length ?? 0) > 0,
     label: 'Remove selected Piano Roll notes',
     run: removeSelectedNotes,
     scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
   },
   {
     actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
-    bindings: keyboardShortcuts.bindingsFor(
-      STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
-    ),
+    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR),
     description: 'Cancel the active interaction or clear the Note selection.',
     isEnabled: () =>
       isPianoRollFocused() &&
-      (hasCancellablePointerInteraction() ||
-        (editorState.value?.selectedNoteIds.length ?? 0) > 0),
+      (hasCancellablePointerInteraction() || (editorState.value?.selectedNoteIds.length ?? 0) > 0),
     label: 'Clear Piano Roll selection',
     run: clearSelectionOrCancelInteraction,
     scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
@@ -599,11 +563,7 @@ onUnmounted(() => {
     tabindex="0"
   >
     <header class="project-piano-roll__toolbar" aria-label="Piano Roll controls">
-      <div
-        class="project-piano-roll__tool-group"
-        role="group"
-        aria-label="Editing tool"
-      >
+      <div class="project-piano-roll__tool-group" role="group" aria-label="Editing tool">
         <UiIconButton
           :icon="PenIcon"
           label="Pencil tool"
@@ -640,11 +600,7 @@ onUnmounted(() => {
     </div>
 
     <div class="project-piano-roll__keyboard" aria-label="Piano keyboard">
-      <div
-        v-for="key in pianoKeys"
-        :key="key.pitch"
-        class="project-piano-roll__key-row"
-      >
+      <div v-for="key in pianoKeys" :key="key.pitch" class="project-piano-roll__key-row">
         <span :class="{ 'project-piano-roll__key--black': key.isBlack }">
           {{ key.label }}
         </span>
@@ -673,12 +629,9 @@ onUnmounted(() => {
     </p>
     <ul v-if="noteState" class="project-piano-roll__accessible-status">
       <li v-for="visibleNote in noteState.notes" :key="visibleNote.note.id">
-        MIDI note {{ visibleNote.note.pitch }}, starts at
-        {{ visibleNote.visibleStartTick }} ticks, duration
-        {{ visibleNote.note.durationTick }} ticks{{
-          editorState?.selectedNoteIds.includes(visibleNote.note.id)
-            ? ', selected'
-            : ''
+        MIDI note {{ visibleNote.note.pitch }}, starts at {{ visibleNote.visibleStartTick }} ticks,
+        duration {{ visibleNote.note.durationTick }} ticks{{
+          editorState?.selectedNoteIds.includes(visibleNote.note.id) ? ', selected' : ''
         }}
       </li>
     </ul>

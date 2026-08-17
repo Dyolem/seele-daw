@@ -25,9 +25,7 @@ const NO_MODIFIERS = Object.freeze({
   shift: false,
 })
 
-function createPointerInput(
-  overrides: Partial<PianoRollPointerInput> = {},
-): PianoRollPointerInput {
+function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({
     xCssPixel: 240,
     yCssPixel: 64,

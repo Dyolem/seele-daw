@@ -61,9 +61,7 @@ describe('Piano Roll Preferences Store', () => {
     expect(nextClipConsumer.activeTool).toBe(PIANO_ROLL_TOOL.CURSOR)
     expect(nextClipConsumer.editingScope).toBe(PIANO_ROLL_EDITING_SCOPE.CLIP)
     expect(nextClipConsumer.snapEnabled).toBe(false)
-    expect(nextClipConsumer.gridPreset).toBe(
-      PIANO_ROLL_GRID_PRESET.SIXTEENTH,
-    )
+    expect(nextClipConsumer.gridPreset).toBe(PIANO_ROLL_GRID_PRESET.SIXTEENTH)
   })
 
   it('restores defaults only through an explicit reset', () => {
@@ -77,9 +75,7 @@ describe('Piano Roll Preferences Store', () => {
     expect(preferences.activeTool).toBe(PIANO_ROLL_TOOL.PENCIL)
     expect(preferences.editingScope).toBe(PIANO_ROLL_EDITING_SCOPE.TRACK)
     expect(preferences.snapEnabled).toBe(true)
-    expect(preferences.gridPreset).toBe(
-      PIANO_ROLL_GRID_PRESET.SIXTEENTH,
-    )
+    expect(preferences.gridPreset).toBe(PIANO_ROLL_GRID_PRESET.SIXTEENTH)
   })
 
   it('starts from defaults in a new Studio application Pinia instance', () => {
@@ -92,8 +88,6 @@ describe('Piano Roll Preferences Store', () => {
     expect(nextApplication.activeTool).toBe(PIANO_ROLL_TOOL.PENCIL)
     expect(nextApplication.editingScope).toBe(PIANO_ROLL_EDITING_SCOPE.TRACK)
     expect(nextApplication.snapEnabled).toBe(true)
-    expect(nextApplication.gridPreset).toBe(
-      PIANO_ROLL_GRID_PRESET.SIXTEENTH,
-    )
+    expect(nextApplication.gridPreset).toBe(PIANO_ROLL_GRID_PRESET.SIXTEENTH)
   })
 })

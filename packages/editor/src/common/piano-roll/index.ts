@@ -16,10 +16,7 @@ export type {
   PianoRollEditorSessionUnsubscribe,
 } from './piano-roll-editor-session'
 
-export {
-  PIANO_ROLL_HIT_ZONE,
-  PIANO_ROLL_POINTER_INPUT_PHASE,
-} from './piano-roll-input'
+export { PIANO_ROLL_HIT_ZONE, PIANO_ROLL_POINTER_INPUT_PHASE } from './piano-roll-input'
 export type {
   PianoRollCssPoint,
   PianoRollHit,
@@ -60,10 +57,7 @@ export { PianoRollError } from './piano-roll-error'
 export type { PianoRollErrorCode } from './piano-roll-error'
 
 export { createPianoRollGrid } from './piano-roll-grid'
-export type {
-  CreatePianoRollGridInput,
-  PianoRollGrid,
-} from './piano-roll-grid'
+export type { CreatePianoRollGridInput, PianoRollGrid } from './piano-roll-grid'
 
 export { resolvePianoRollPencilNotePlacement } from './operations/piano-roll-pencil-interaction'
 export type {

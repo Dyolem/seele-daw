@@ -19,15 +19,11 @@ function createSelectionTarget(): PianoRollSelectionTarget {
   return {
     clearSelection: vi.fn<PianoRollSelectionTarget['clearSelection']>(() => true),
     selectOnly: vi.fn<PianoRollSelectionTarget['selectOnly']>(() => true),
-    toggleSelection: vi.fn<PianoRollSelectionTarget['toggleSelection']>(
-      () => true,
-    ),
+    toggleSelection: vi.fn<PianoRollSelectionTarget['toggleSelection']>(() => true),
   }
 }
 
-function createPointerInput(
-  overrides: Partial<PianoRollPointerInput> = {},
-): PianoRollPointerInput {
+function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   return Object.freeze({
     hasExceededDragThreshold: false,
     hit: Object.freeze({
@@ -59,9 +55,7 @@ describe('Piano Roll Select Interaction', () => {
   it('selects only the hit Note after a completed plain click', () => {
     const target = createSelectionTarget()
 
-    expect(
-      applyPianoRollSelectInteraction(target, createPointerInput()),
-    ).toBe(true)
+    expect(applyPianoRollSelectInteraction(target, createPointerInput())).toBe(true)
     expect(target.selectOnly).toHaveBeenCalledWith(NOTE_ID)
     expect(target.toggleSelection).not.toHaveBeenCalled()
     expect(target.clearSelection).not.toHaveBeenCalled()
@@ -93,10 +87,7 @@ describe('Piano Roll Select Interaction', () => {
   it('clears selection after a completed blank-grid click', () => {
     const target = createSelectionTarget()
 
-    applyPianoRollSelectInteraction(
-      target,
-      createPointerInput({ hit: null }),
-    )
+    applyPianoRollSelectInteraction(target, createPointerInput({ hit: null }))
 
     expect(target.clearSelection).toHaveBeenCalledOnce()
     expect(target.selectOnly).not.toHaveBeenCalled()

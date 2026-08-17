@@ -130,9 +130,7 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
     return true
   }
 
-  subscribe(
-    observer: PianoRollEditorSessionObserver,
-  ): PianoRollEditorSessionUnsubscribe {
+  subscribe(observer: PianoRollEditorSessionObserver): PianoRollEditorSessionUnsubscribe {
     this.#requireActive()
     this.#observers.add(observer)
     let subscribed = true
@@ -163,8 +161,7 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
     if (note === undefined) return false
     const noteEndTick = addTicks(note.startTick, note.durationTick)
     return (
-      note.startTick < this.#context.sourceEndTick &&
-      this.#context.sourceStartTick < noteEndTick
+      note.startTick < this.#context.sourceEndTick && this.#context.sourceStartTick < noteEndTick
     )
   }
 
@@ -203,9 +200,7 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
     }
   }
 
-  #notifyProjectSubscriptionFailure(
-    failure: ProjectSubscriptionDeliveryFailure,
-  ): void {
+  #notifyProjectSubscriptionFailure(failure: ProjectSubscriptionDeliveryFailure): void {
     if (this.#disposed) return
     this.#notifyFailure(createFailure('project-subscription', failure))
   }

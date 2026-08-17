@@ -8,10 +8,7 @@ describe('UI Toast Store', () => {
   it('exposes semantic imperative commands over one declarative message slot', () => {
     const toasts = useUiToastStore(createPinia())
 
-    const infoId = toasts.info(
-      'Sampler is in development',
-      'This Track type will arrive later.',
-    )
+    const infoId = toasts.info('Sampler is in development', 'This Track type will arrive later.')
 
     expect(infoId).toBe(1)
     expect(toasts.message).toEqual({

@@ -93,17 +93,17 @@ describe('PianoRollClipContext', () => {
       id: parseMidiSourceId('piano-roll-context-mismatch'),
       lengthTick: source.lengthTick,
     })
-    expect(
-      requirePianoRollError(() => createPianoRollClipContext(clip, mismatch)).code,
-    ).toBe('clip-source-mismatch')
+    expect(requirePianoRollError(() => createPianoRollClipContext(clip, mismatch)).code).toBe(
+      'clip-source-mismatch',
+    )
 
     const shortSource = createMidiSourceRecord({
       id: source.id,
       lengthTick: parseTick(1_200),
     })
-    expect(
-      requirePianoRollError(() => createPianoRollClipContext(clip, shortSource)).code,
-    ).toBe('clip-source-range-invalid')
+    expect(requirePianoRollError(() => createPianoRollClipContext(clip, shortSource)).code).toBe(
+      'clip-source-range-invalid',
+    )
 
     const loopedClip = createMidiClipRecord({
       ...clip,
@@ -112,9 +112,9 @@ describe('PianoRollClipContext', () => {
         sourceSpanTick: parseTick(960),
       },
     })
-    expect(
-      requirePianoRollError(() => createPianoRollClipContext(loopedClip, source)).code,
-    ).toBe('looped-clip-unsupported')
+    expect(requirePianoRollError(() => createPianoRollClipContext(loopedClip, source)).code).toBe(
+      'looped-clip-unsupported',
+    )
   })
 
   it('rejects endpoint conversion outside the Clip window', () => {
@@ -122,14 +122,10 @@ describe('PianoRollClipContext', () => {
     const context = createPianoRollClipContext(clip, source)
 
     expect(
-      requirePianoRollError(() =>
-        pianoRollClipTickToSourceTick(context, parseTick(961)),
-      ).code,
+      requirePianoRollError(() => pianoRollClipTickToSourceTick(context, parseTick(961))).code,
     ).toBe('tick-outside-clip')
     expect(
-      requirePianoRollError(() =>
-        pianoRollSourceTickToClipTick(context, parseTick(479)),
-      ).code,
+      requirePianoRollError(() => pianoRollSourceTickToClipTick(context, parseTick(479))).code,
     ).toBe('tick-outside-clip')
   })
 })
@@ -213,14 +209,11 @@ describe('PianoRollViewport', () => {
 
     const viewport = createPianoRollViewport(context, baseInput)
     expect(
-      requirePianoRollError(() =>
-        pianoRollClipTickToCssPixel(viewport, parseTick(961)),
-      ).code,
+      requirePianoRollError(() => pianoRollClipTickToCssPixel(viewport, parseTick(961))).code,
     ).toBe('coordinate-outside-viewport')
     expect(
-      requirePianoRollError(() =>
-        pianoRollCssPixelToMidiPitch(viewport, viewport.heightCssPixel),
-      ).code,
+      requirePianoRollError(() => pianoRollCssPixelToMidiPitch(viewport, viewport.heightCssPixel))
+        .code,
     ).toBe('coordinate-outside-viewport')
   })
 })
@@ -246,10 +239,12 @@ describe('PianoRollNoteReadModel', () => {
       'editor-note-leading',
       'editor-note-inside',
     ])
-    expect(readModel.state.notes.map(({ visibleStartTick, visibleEndTick }) => [
-      visibleStartTick,
-      visibleEndTick,
-    ])).toEqual([
+    expect(
+      readModel.state.notes.map(({ visibleStartTick, visibleEndTick }) => [
+        visibleStartTick,
+        visibleEndTick,
+      ]),
+    ).toEqual([
       [0, 240],
       [480, 720],
     ])
@@ -275,8 +270,7 @@ describe('PianoRollNoteReadModel', () => {
       session: fixture.session,
       viewport,
     })
-    const onStateChange =
-      vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
+    const onStateChange = vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
     readModel.subscribe({
       onError: vi.fn<PianoRollNoteReadModelObserver['onError']>(),
       onStateChange,
@@ -290,9 +284,7 @@ describe('PianoRollNoteReadModel', () => {
     })
     await vi.waitFor(() => expect(onStateChange).toHaveBeenCalledOnce())
 
-    expect(readModel.state.notes.map(({ note }) => note.id)).toContain(
-      'editor-note-visible-added',
-    )
+    expect(readModel.state.notes.map(({ note }) => note.id)).toContain('editor-note-visible-added')
 
     fixture.addNote({
       noteId: parseNoteId('editor-note-outside-added'),
@@ -321,8 +313,7 @@ describe('PianoRollNoteReadModel', () => {
       session: fixture.session,
       viewport: firstViewport,
     })
-    const onStateChange =
-      vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
+    const onStateChange = vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
     readModel.subscribe({
       onError: vi.fn<PianoRollNoteReadModelObserver['onError']>(),
       onStateChange,
@@ -359,8 +350,7 @@ describe('PianoRollNoteReadModel', () => {
       viewport,
     })
     const firstError = vi.fn<PianoRollNoteReadModelObserver['onError']>()
-    const secondStateChange =
-      vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
+    const secondStateChange = vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
     readModel.subscribe({
       onError: firstError,
       onStateChange: () => {
@@ -385,15 +375,14 @@ describe('PianoRollNoteReadModel', () => {
     )
 
     readModel.dispose()
-    expect(
-      requirePianoRollError(() => readModel.setViewport(viewport)).code,
-    ).toBe('read-model-disposed')
+    expect(requirePianoRollError(() => readModel.setViewport(viewport)).code).toBe(
+      'read-model-disposed',
+    )
     expect(
       requirePianoRollError(() =>
         readModel.subscribe({
           onError: vi.fn<PianoRollNoteReadModelObserver['onError']>(),
-          onStateChange:
-            vi.fn<PianoRollNoteReadModelObserver['onStateChange']>(),
+          onStateChange: vi.fn<PianoRollNoteReadModelObserver['onStateChange']>(),
         }),
       ).code,
     ).toBe('read-model-disposed')
@@ -414,10 +403,7 @@ describe('PianoRollNoteReadModel', () => {
         if (failQuery) throw new Error('Query failed')
         return fixture.session.query(query)
       },
-      subscribe(
-        _subscription: ProjectSubscription,
-        observer: ProjectSubscriptionObserver,
-      ) {
+      subscribe(_subscription: ProjectSubscription, observer: ProjectSubscriptionObserver) {
         projectObserver = observer
         return () => undefined
       },
@@ -430,12 +416,10 @@ describe('PianoRollNoteReadModel', () => {
     const onError = vi.fn<PianoRollNoteReadModelObserver['onError']>()
     readModel.subscribe({
       onError,
-      onStateChange:
-        vi.fn<PianoRollNoteReadModelObserver['onStateChange']>(),
+      onStateChange: vi.fn<PianoRollNoteReadModelObserver['onStateChange']>(),
     })
     const initialState = readModel.state
-    const subscribedProjectObserver =
-      projectObserver as ProjectSubscriptionObserver | null
+    const subscribedProjectObserver = projectObserver as ProjectSubscriptionObserver | null
     if (subscribedProjectObserver === null) {
       throw new Error('Expected Project subscription')
     }

@@ -28,71 +28,60 @@ const GRID_PRESET_SUBDIVISION_SPAN_TICK = Object.freeze({
 }) satisfies Readonly<Record<PianoRollGridPreset, Tick>>
 
 export const PIANO_ROLL_DEFAULT_TOOL = PIANO_ROLL_TOOL.PENCIL
-export const PIANO_ROLL_DEFAULT_EDITING_SCOPE =
-  PIANO_ROLL_EDITING_SCOPE.TRACK
+export const PIANO_ROLL_DEFAULT_EDITING_SCOPE = PIANO_ROLL_EDITING_SCOPE.TRACK
 export const PIANO_ROLL_DEFAULT_SNAP_ENABLED = true
-export const PIANO_ROLL_DEFAULT_GRID_PRESET =
-  PIANO_ROLL_GRID_PRESET.SIXTEENTH
+export const PIANO_ROLL_DEFAULT_GRID_PRESET = PIANO_ROLL_GRID_PRESET.SIXTEENTH
 
 /**
  * Owns lightweight Piano Roll preferences for one Studio application lifetime.
  *
  * Project and Clip lifecycle changes intentionally do not reset this Store.
  */
-export const usePianoRollPreferencesStore = defineStore(
-  'piano-roll-preferences',
-  () => {
-    const activeTool = shallowRef<PianoRollTool>(PIANO_ROLL_DEFAULT_TOOL)
-    const editingScope = shallowRef<PianoRollEditingScope>(
-      PIANO_ROLL_DEFAULT_EDITING_SCOPE,
-    )
-    const snapEnabled = shallowRef(PIANO_ROLL_DEFAULT_SNAP_ENABLED)
-    const gridPreset = shallowRef<PianoRollGridPreset>(
-      PIANO_ROLL_DEFAULT_GRID_PRESET,
-    )
-    const subdivisionSpanTick = computed(
-      () => GRID_PRESET_SUBDIVISION_SPAN_TICK[gridPreset.value],
-    )
+export const usePianoRollPreferencesStore = defineStore('piano-roll-preferences', () => {
+  const activeTool = shallowRef<PianoRollTool>(PIANO_ROLL_DEFAULT_TOOL)
+  const editingScope = shallowRef<PianoRollEditingScope>(PIANO_ROLL_DEFAULT_EDITING_SCOPE)
+  const snapEnabled = shallowRef(PIANO_ROLL_DEFAULT_SNAP_ENABLED)
+  const gridPreset = shallowRef<PianoRollGridPreset>(PIANO_ROLL_DEFAULT_GRID_PRESET)
+  const subdivisionSpanTick = computed(() => GRID_PRESET_SUBDIVISION_SPAN_TICK[gridPreset.value])
 
-    function activateTool(tool: PianoRollTool): void {
-      activeTool.value = tool
-    }
+  function activateTool(tool: PianoRollTool): void {
+    activeTool.value = tool
+  }
 
-    function selectEditingScope(scope: PianoRollEditingScope): void {
-      editingScope.value = scope
-    }
+  function selectEditingScope(scope: PianoRollEditingScope): void {
+    editingScope.value = scope
+  }
 
-    function setSnapEnabled(enabled: boolean): void {
-      snapEnabled.value = enabled
-    }
+  function setSnapEnabled(enabled: boolean): void {
+    snapEnabled.value = enabled
+  }
 
-    function toggleSnap(): void {
-      snapEnabled.value = !snapEnabled.value
-    }
+  function toggleSnap(): void {
+    snapEnabled.value = !snapEnabled.value
+  }
 
-    function selectGridPreset(preset: PianoRollGridPreset): void {
-      gridPreset.value = preset
-    }
+  function selectGridPreset(preset: PianoRollGridPreset): void {
+    gridPreset.value = preset
+  }
 
-    function reset(): void {
-      activeTool.value = PIANO_ROLL_DEFAULT_TOOL
-      editingScope.value = PIANO_ROLL_DEFAULT_EDITING_SCOPE
-      snapEnabled.value = PIANO_ROLL_DEFAULT_SNAP_ENABLED
-      gridPreset.value = PIANO_ROLL_DEFAULT_GRID_PRESET
-    }
+  function reset(): void {
+    activeTool.value = PIANO_ROLL_DEFAULT_TOOL
+    editingScope.value = PIANO_ROLL_DEFAULT_EDITING_SCOPE
+    snapEnabled.value = PIANO_ROLL_DEFAULT_SNAP_ENABLED
+    gridPreset.value = PIANO_ROLL_DEFAULT_GRID_PRESET
+  }
 
-    return {
-      activeTool,
-      editingScope,
-      snapEnabled,
-      gridPreset,
-      subdivisionSpanTick,
-      activateTool,
-      selectEditingScope,
-      setSnapEnabled,
-      toggleSnap,
-      selectGridPreset,
-      reset,
-    }
-  },
-)
+  return {
+    activeTool,
+    editingScope,
+    snapEnabled,
+    gridPreset,
+    subdivisionSpanTick,
+    activateTool,
+    selectEditingScope,
+    setSnapEnabled,
+    toggleSnap,
+    selectGridPreset,
+    reset,
+  }
+})

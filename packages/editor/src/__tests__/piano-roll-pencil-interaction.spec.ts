@@ -57,9 +57,7 @@ function createFixture() {
   return { context, grid, viewport }
 }
 
-function createPointerInput(
-  overrides: Partial<PianoRollPointerInput> = {},
-): PianoRollPointerInput {
+function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({ xCssPixel: 130, yCssPixel: 8 })
 
   return Object.freeze({

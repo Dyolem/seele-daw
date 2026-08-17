@@ -30,9 +30,7 @@ const NO_MODIFIERS = Object.freeze({
   shift: false,
 })
 
-function createPointerInput(
-  overrides: Partial<PianoRollPointerInput> = {},
-): PianoRollPointerInput {
+function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({
     xCssPixel: 240,
     yCssPixel: 64,
@@ -55,9 +53,7 @@ function createPointerInput(
   })
 }
 
-function createFixture(
-  tool: PianoRollInteractionTool = PIANO_ROLL_INTERACTION_TOOL.CURSOR,
-) {
+function createFixture(tool: PianoRollInteractionTool = PIANO_ROLL_INTERACTION_TOOL.CURSOR) {
   const project = createPianoRollProjectFixture()
   const viewport = createPianoRollViewport(project.context, {
     heightCssPixel: 128,
@@ -94,12 +90,10 @@ describe('Piano Roll Interaction Session', () => {
     const fixture = createFixture()
     const session = createPianoRollInteractionSession()
 
-    expect(
-      session.handlePointerInput(
-        createPointerInput(),
-        fixture.configuration,
-      ),
-    ).toEqual({ failure: null, intent: null })
+    expect(session.handlePointerInput(createPointerInput(), fixture.configuration)).toEqual({
+      failure: null,
+      intent: null,
+    })
     expect(session.state).toMatchObject({
       activeGesture: 'note-move',
       status: PIANO_ROLL_INTERACTION_STATUS.PRESSING,
@@ -172,9 +166,7 @@ describe('Piano Roll Interaction Session', () => {
       },
       type: PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES,
     })
-    expect(session.state.status).toBe(
-      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE,
-    )
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE)
 
     const commitRevision = fixture.session.modelRevision
     session.resolveMoveCommit({
@@ -203,94 +195,90 @@ describe('Piano Roll Interaction Session', () => {
     session.dispose()
   })
 
-  it.each([
-    PIANO_ROLL_INTERACTION_TOOL.CURSOR,
-    PIANO_ROLL_INTERACTION_TOOL.PENCIL,
-  ])('previews and emits one Note Resize intent with the %s tool', (tool) => {
-    const fixture = createFixture(tool)
-    const session = createPianoRollInteractionSession()
-    const begin = createPointerInput({
-      hit: Object.freeze({
-        noteId: parseNoteId('editor-note-inside'),
-        zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
-      }),
-    })
-    session.handlePointerInput(begin, fixture.configuration)
+  it.each([PIANO_ROLL_INTERACTION_TOOL.CURSOR, PIANO_ROLL_INTERACTION_TOOL.PENCIL])(
+    'previews and emits one Note Resize intent with the %s tool',
+    (tool) => {
+      const fixture = createFixture(tool)
+      const session = createPianoRollInteractionSession()
+      const begin = createPointerInput({
+        hit: Object.freeze({
+          noteId: parseNoteId('editor-note-inside'),
+          zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
+        }),
+      })
+      session.handlePointerInput(begin, fixture.configuration)
 
-    session.handlePointerInput(
-      createPointerInput({
-        ...begin,
-        hasExceededDragThreshold: true,
-        phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
-        position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
-      }),
-    )
-    expect(session.state).toMatchObject({
-      activeGesture: 'note-resize',
-      movePreview: null,
-      resizePreview: {
-        durationTick: 480,
-        sourceStartTick: 720,
-      },
-      status: PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE,
-    })
+      session.handlePointerInput(
+        createPointerInput({
+          ...begin,
+          hasExceededDragThreshold: true,
+          phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+          position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
+        }),
+      )
+      expect(session.state).toMatchObject({
+        activeGesture: 'note-resize',
+        movePreview: null,
+        resizePreview: {
+          durationTick: 480,
+          sourceStartTick: 720,
+        },
+        status: PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE,
+      })
 
-    const outcome = session.handlePointerInput(
-      createPointerInput({
-        ...begin,
-        hasExceededDragThreshold: true,
-        phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
-        position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
-      }),
-    )
+      const outcome = session.handlePointerInput(
+        createPointerInput({
+          ...begin,
+          hasExceededDragThreshold: true,
+          phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
+          position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
+        }),
+      )
 
-    expect(outcome.intent).toMatchObject({
-      gesture: {
-        edge: PIANO_ROLL_HIT_ZONE.RESIZE_START,
-        note: { id: parseNoteId('editor-note-inside') },
-      },
-      preview: {
-        durationTick: 480,
-        sourceStartTick: 720,
-      },
-      type: PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE,
-    })
-    expect(session.state.status).toBe(
-      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE,
-    )
+      expect(outcome.intent).toMatchObject({
+        gesture: {
+          edge: PIANO_ROLL_HIT_ZONE.RESIZE_START,
+          note: { id: parseNoteId('editor-note-inside') },
+        },
+        preview: {
+          durationTick: 480,
+          sourceStartTick: 720,
+        },
+        type: PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE,
+      })
+      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
 
-    session.resolveMoveCommit({
-      authorityRevision: fixture.session.modelRevision,
-      commitRevision: fixture.session.modelRevision,
-    })
-    expect(session.state.status).toBe(
-      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE,
-    )
+      session.resolveMoveCommit({
+        authorityRevision: fixture.session.modelRevision,
+        commitRevision: fixture.session.modelRevision,
+      })
+      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
 
-    const commitRevision = fixture.session.modelRevision
-    session.resolveResizeCommit({
-      authorityRevision: (commitRevision - 1) as ModelRevision,
-      commitRevision,
-    })
-    expect(session.state).toMatchObject({
-      resizePreview: {
-        durationTick: 480,
-        sourceStartTick: 720,
-      },
-      status: PIANO_ROLL_INTERACTION_STATUS.AWAITING_AUTHORITY,
-    })
+      const commitRevision = fixture.session.modelRevision
+      session.resolveResizeCommit({
+        authorityRevision: (commitRevision - 1) as ModelRevision,
+        commitRevision,
+      })
+      expect(session.state).toMatchObject({
+        resizePreview: {
+          durationTick: 480,
+          sourceStartTick: 720,
+        },
+        status: PIANO_ROLL_INTERACTION_STATUS.AWAITING_AUTHORITY,
+      })
 
-    session.notifyAuthorityRevision(commitRevision)
-    expect(session.state).toEqual({
-      activeGesture: null,
-      movePreview: null,
-      pointerId: null,
-      resizePreview: null,
-      status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
-    })
+      session.notifyAuthorityRevision(commitRevision)
+      expect(session.state).toEqual({
+        activeGesture: null,
+        movePreview: null,
+        pointerId: null,
+        resizePreview: null,
+        status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+      })
 
-    session.dispose()
-  })
+      session.dispose()
+    },
+  )
 
   it('treats an edge press below the threshold as a Click rather than Resize', () => {
     const fixture = createFixture()
@@ -362,9 +350,7 @@ describe('Piano Roll Interaction Session', () => {
       position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
     })
     session.handlePointerInput(update)
-    expect(session.state.status).toBe(
-      PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE,
-    )
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE)
 
     expect(session.cancel()).toBe(true)
     expect(session.state).toEqual({
@@ -404,9 +390,7 @@ describe('Piano Roll Interaction Session', () => {
         position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
       }),
     )
-    expect(session.state.status).toBe(
-      PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE,
-    )
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
 
     session.skipResizeCommit()
     expect(session.state).toEqual({

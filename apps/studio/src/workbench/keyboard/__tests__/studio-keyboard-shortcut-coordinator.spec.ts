@@ -46,9 +46,9 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     ])
 
     expect(bindingRegistry.registrationCountByBinding.get('Mod+S')).toBe(1)
-    expect(
-      coordinator.bindingsFor(STUDIO_KEYBOARD_ACTION.PROJECT_SAVE),
-    ).toBe(STUDIO_DEFAULT_KEYMAP[STUDIO_KEYBOARD_ACTION.PROJECT_SAVE])
+    expect(coordinator.bindingsFor(STUDIO_KEYBOARD_ACTION.PROJECT_SAVE)).toBe(
+      STUDIO_DEFAULT_KEYMAP[STUDIO_KEYBOARD_ACTION.PROJECT_SAVE],
+    )
     expect(coordinator.validateBindingInput(' K ')).toEqual({
       binding: 'K',
       errors: [],
@@ -93,18 +93,14 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     const bindingRegistry = new TestStudioKeyboardBindingRegistry()
     const customSaveBinding = defineStudioKeyboardBinding('K')
     const keymap = createStudioKeyboardKeymap({
-      [STUDIO_KEYBOARD_ACTION.PROJECT_SAVE]: Object.freeze([
-        customSaveBinding,
-      ]),
+      [STUDIO_KEYBOARD_ACTION.PROJECT_SAVE]: Object.freeze([customSaveBinding]),
     })
     const coordinator = createStudioKeyboardShortcutCoordinator({
       bindingRegistry,
       keymap,
     })
 
-    const bindings = coordinator.bindingsFor(
-      STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
-    )
+    const bindings = coordinator.bindingsFor(STUDIO_KEYBOARD_ACTION.PROJECT_SAVE)
     coordinator.register([
       createDefinition({
         bindings,
@@ -112,9 +108,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
     ])
 
     expect(Object.isFrozen(STUDIO_DEFAULT_KEYMAP)).toBe(true)
-    expect(
-      Object.values(STUDIO_DEFAULT_KEYMAP).every(Object.isFrozen),
-    ).toBe(true)
+    expect(Object.values(STUDIO_DEFAULT_KEYMAP).every(Object.isFrozen)).toBe(true)
     expect(bindings).toEqual(['K'])
     expect(bindingRegistry.listeners.has('K')).toBe(true)
     expect(bindingRegistry.listeners.has('Mod+S')).toBe(false)
@@ -249,9 +243,7 @@ describe('StudioKeyboardShortcutCoordinator', () => {
           bindings: [defineStudioKeyboardBinding('Mod+S')],
         }),
       ]),
-    ).toThrowError(
-      expect.objectContaining({ code: 'scope-binding-conflict' }),
-    )
+    ).toThrowError(expect.objectContaining({ code: 'scope-binding-conflict' }))
 
     coordinator.dispose()
     expect(() =>

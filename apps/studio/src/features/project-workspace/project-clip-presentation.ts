@@ -1,10 +1,4 @@
-import type {
-  ClipId,
-  ProjectColor,
-  ProjectSnapshot,
-  Tick,
-  TrackId,
-} from '@seele-daw/project-core'
+import type { ClipId, ProjectColor, ProjectSnapshot, Tick, TrackId } from '@seele-daw/project-core'
 
 export interface ProjectMidiClipPresentation {
   readonly color: ProjectColor | null
@@ -30,9 +24,7 @@ function compareClipPresentations(
 export function createProjectMidiClipPresentations(
   snapshot: ProjectSnapshot,
 ): readonly ProjectMidiClipPresentation[] {
-  const trackColorById = new Map(
-    snapshot.tracks.map((track) => [track.id, track.color] as const),
-  )
+  const trackColorById = new Map(snapshot.tracks.map((track) => [track.id, track.color] as const))
   const clips = snapshot.clips.map((clip) =>
     Object.freeze<ProjectMidiClipPresentation>({
       color: clip.color ?? trackColorById.get(clip.trackId) ?? null,

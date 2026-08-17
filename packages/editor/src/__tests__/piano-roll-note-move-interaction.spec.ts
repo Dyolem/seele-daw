@@ -1,9 +1,4 @@
-import {
-  parseMidiPitch,
-  parseNoteId,
-  parsePositiveTick,
-  parseTick,
-} from '@seele-daw/project-core'
+import { parseMidiPitch, parseNoteId, parsePositiveTick, parseTick } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -17,9 +12,7 @@ import {
 } from '#internal/index'
 import { createPianoRollProjectFixture } from '#internal/__tests__/support/piano-roll-project-fixture'
 
-function createPointerInput(
-  overrides: Partial<PianoRollPointerInput> = {},
-): PianoRollPointerInput {
+function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({
     xCssPixel: 240,
     yCssPixel: 64,
@@ -263,10 +256,7 @@ describe('Piano Roll Note Move Interaction', () => {
     const gesture = createPianoRollNoteMoveGesture({
       context: fixture.context,
       pointerInput: createPointerInput(),
-      selectedNoteIds: [
-        parseNoteId('editor-note-leading'),
-        parseNoteId('editor-note-inside'),
-      ],
+      selectedNoteIds: [parseNoteId('editor-note-leading'), parseNoteId('editor-note-inside')],
       session: fixture.session,
     })
     if (gesture === null) throw new Error('Expected Note move gesture')

@@ -143,7 +143,9 @@ export class MutableTestProjectSession implements ProjectSession {
   }
 
   async emitCommit(
-    contentStateId: ProjectContentStateId = Symbol('TestProjectContentStateId') as ProjectContentStateId,
+    contentStateId: ProjectContentStateId = Symbol(
+      'TestProjectContentStateId',
+    ) as ProjectContentStateId,
   ): Promise<void> {
     this.#modelRevision = (this.#modelRevision + 1) as ModelRevision
     this.#contentStateId = contentStateId

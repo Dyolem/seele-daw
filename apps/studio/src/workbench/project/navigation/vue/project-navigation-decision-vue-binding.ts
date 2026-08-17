@@ -47,10 +47,8 @@ class ProjectNavigationDecisionVueBindingImpl implements ProjectNavigationDecisi
     this.requestDecision = (request) => this.#requestDecision(request)
     this.context = Object.freeze<ProjectNavigationDecisionVueContext>({
       pendingDecision: shallowReadonly(this.#pendingDecision),
-      resolve: (
-        pending: PendingProjectNavigationDecision,
-        decision: ProjectNavigationDecision,
-      ) => this.#resolve(pending, decision),
+      resolve: (pending: PendingProjectNavigationDecision, decision: ProjectNavigationDecision) =>
+        this.#resolve(pending, decision),
     })
   }
 
@@ -64,9 +62,7 @@ class ProjectNavigationDecisionVueBindingImpl implements ProjectNavigationDecisi
     currentEntry?.complete(PROJECT_NAVIGATION_DECISION.CANCEL)
   }
 
-  #requestDecision(
-    request: ProjectNavigationDecisionRequest,
-  ): Promise<ProjectNavigationDecision> {
+  #requestDecision(request: ProjectNavigationDecisionRequest): Promise<ProjectNavigationDecision> {
     if (this.#disposed) {
       return Promise.reject(
         new ProjectNavigationDecisionVueError(

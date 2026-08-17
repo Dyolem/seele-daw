@@ -19,11 +19,7 @@ export class ProjectClipError extends Error {
   readonly trackId: TrackId | null
   readonly trackKind: string | null
 
-  constructor(
-    code: ProjectClipErrorCode,
-    message: string,
-    details: ProjectClipErrorDetails = {},
-  ) {
+  constructor(code: ProjectClipErrorCode, message: string, details: ProjectClipErrorDetails = {}) {
     super(message)
     this.name = 'ProjectClipError'
     this.code = code

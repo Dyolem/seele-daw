@@ -104,10 +104,7 @@ describe('Project Workbench Selection Store', () => {
 
     store.activateProject(projectId)
     store.selectTrack(parseTrackId('selection-track-removed'))
-    store.reconcileProject(
-      projectId,
-      Object.freeze([parseTrackId('selection-track-remaining')]),
-    )
+    store.reconcileProject(projectId, Object.freeze([parseTrackId('selection-track-remaining')]))
 
     expect(store.selectedTrackId).toBeNull()
     expect(store.selectedClipId).toBeNull()
@@ -120,10 +117,7 @@ describe('Project Workbench Selection Store', () => {
 
     store.activateProject(firstProjectId)
     store.selectTrack(parseTrackId('selection-track-first'))
-    store.reconcileProject(
-      secondProjectId,
-      Object.freeze([parseTrackId('selection-track-second')]),
-    )
+    store.reconcileProject(secondProjectId, Object.freeze([parseTrackId('selection-track-second')]))
 
     expect(store.projectId).toBe(secondProjectId)
     expect(store.selectedTrackId).toBeNull()

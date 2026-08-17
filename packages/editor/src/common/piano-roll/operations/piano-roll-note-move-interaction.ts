@@ -69,10 +69,7 @@ export interface ResolvePianoRollNoteMovePreviewInput {
   readonly viewport: PianoRollViewport
 }
 
-function noteIntersectsClip(
-  context: PianoRollClipContext,
-  note: MidiNoteRecord,
-): boolean {
+function noteIntersectsClip(context: PianoRollClipContext, note: MidiNoteRecord): boolean {
   const noteEndTick = addTicks(note.startTick, note.durationTick)
   return note.startTick < context.sourceEndTick && context.sourceStartTick < noteEndTick
 }
@@ -94,9 +91,7 @@ export function createPianoRollNoteMoveGesture(
   }
 
   const hitIsSelected = input.selectedNoteIds.includes(pointerInput.hit.noteId)
-  const noteIds = hitIsSelected
-    ? input.selectedNoteIds
-    : [pointerInput.hit.noteId]
+  const noteIds = hitIsSelected ? input.selectedNoteIds : [pointerInput.hit.noteId]
   const notes: MidiNoteRecord[] = []
   let baseRevision: ModelRevision | null = null
 
@@ -144,8 +139,7 @@ function resolveTickDelta(
   const pointerDeltaCssPixel =
     input.pointerInput.position.xCssPixel - input.gesture.originPosition.xCssPixel
   const rawDelta =
-    (pointerDeltaCssPixel / input.viewport.widthCssPixel) *
-    input.viewport.visibleSpanTick
+    (pointerDeltaCssPixel / input.viewport.widthCssPixel) * input.viewport.visibleSpanTick
 
   if (!Number.isFinite(rawDelta)) {
     throw new PianoRollError(
@@ -158,12 +152,10 @@ function resolveTickDelta(
   if (!input.snapEnabled || input.pointerInput.modifiers.alt) {
     candidateDelta = Math.round(rawDelta)
   } else {
-    const anchorClipStartTick =
-      anchor.startTick - input.gesture.context.sourceStartTick
+    const anchorClipStartTick = anchor.startTick - input.gesture.context.sourceStartTick
     const rawTargetClipTick = anchorClipStartTick + rawDelta
     const targetSubdivision = Math.round(
-      (rawTargetClipTick - input.grid.originTick) /
-        input.grid.subdivisionSpanTick,
+      (rawTargetClipTick - input.grid.originTick) / input.grid.subdivisionSpanTick,
     )
 
     // Snap the absolute target coordinate so off-grid Notes join the active
@@ -177,31 +169,21 @@ function resolveTickDelta(
   const minimumDelta = Math.max(...input.gesture.notes.map((note) => -note.startTick))
   const maximumDelta = Math.min(
     ...input.gesture.notes.map(
-      (note) =>
-        input.gesture.context.sourceLengthTick -
-        (note.startTick + note.durationTick),
+      (note) => input.gesture.context.sourceLengthTick - (note.startTick + note.durationTick),
     ),
   )
   return parseTickDelta(clamp(candidateDelta, minimumDelta, maximumDelta))
 }
 
-function resolvePitchDelta(
-  input: ResolvePianoRollNoteMovePreviewInput,
-): MidiPitchDelta {
+function resolvePitchDelta(input: ResolvePianoRollNoteMovePreviewInput): MidiPitchDelta {
   const pitchRowHeight =
-    input.viewport.heightCssPixel /
-    (input.viewport.maximumPitch - input.viewport.minimumPitch + 1)
+    input.viewport.heightCssPixel / (input.viewport.maximumPitch - input.viewport.minimumPitch + 1)
   const rawDelta =
-    (input.gesture.originPosition.yCssPixel -
-      input.pointerInput.position.yCssPixel) /
+    (input.gesture.originPosition.yCssPixel - input.pointerInput.position.yCssPixel) /
     pitchRowHeight
   const candidateDelta = Math.round(rawDelta)
-  const minimumDelta = Math.max(
-    ...input.gesture.notes.map((note) => MIDI_PITCH_MIN - note.pitch),
-  )
-  const maximumDelta = Math.min(
-    ...input.gesture.notes.map((note) => MIDI_PITCH_MAX - note.pitch),
-  )
+  const minimumDelta = Math.max(...input.gesture.notes.map((note) => MIDI_PITCH_MIN - note.pitch))
+  const maximumDelta = Math.min(...input.gesture.notes.map((note) => MIDI_PITCH_MAX - note.pitch))
   return parseMidiPitchDelta(clamp(candidateDelta, minimumDelta, maximumDelta))
 }
 
@@ -225,9 +207,7 @@ function createPreviewNotes(
         noteId: note.id,
         pitch: parseMidiPitch(note.pitch + deltaPitch),
         visibleEndTick: parseTick(visibleSourceEndTick - context.sourceStartTick),
-        visibleStartTick: parseTick(
-          visibleSourceStartTick - context.sourceStartTick,
-        ),
+        visibleStartTick: parseTick(visibleSourceStartTick - context.sourceStartTick),
       }),
     )
   }
@@ -253,19 +233,14 @@ export function resolvePianoRollNoteMovePreview(
     return null
   }
 
-  if (
-    input.viewport.clipId !== input.gesture.context.clipId ||
-    input.gesture.notes.length === 0
-  ) {
+  if (input.viewport.clipId !== input.gesture.context.clipId || input.gesture.notes.length === 0) {
     throw new PianoRollError(
       'viewport-clip-mismatch',
       `Piano Roll Note move does not belong to Clip ${input.gesture.context.clipId}`,
     )
   }
 
-  const anchor = input.gesture.notes.find(
-    (note) => note.id === input.gesture.anchorNoteId,
-  )
+  const anchor = input.gesture.notes.find((note) => note.id === input.gesture.anchorNoteId)
   if (anchor === undefined) {
     throw new PianoRollError(
       'invalid-move-gesture',
@@ -288,12 +263,7 @@ export function resolvePianoRollNoteMovePreview(
     deltaPitch,
     deltaTick,
     movedNoteIds: input.gesture.noteIds,
-    notes: createPreviewNotes(
-      input.gesture.context,
-      input.gesture,
-      deltaTick,
-      deltaPitch,
-    ),
+    notes: createPreviewNotes(input.gesture.context, input.gesture, deltaTick, deltaPitch),
     snapGuideTick,
   })
 }

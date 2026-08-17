@@ -24,7 +24,10 @@ import {
   ProjectFileProjectionError,
   type ProjectFileProjectionErrorDetails,
 } from '#internal/persistence/project-file-projection-error'
-import type { MidiNotePartitionSnapshot, ProjectSnapshot } from '#internal/snapshots/project-snapshot'
+import type {
+  MidiNotePartitionSnapshot,
+  ProjectSnapshot,
+} from '#internal/snapshots/project-snapshot'
 import type { TempoEventRecord } from '#internal/time/tempo-event'
 import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 

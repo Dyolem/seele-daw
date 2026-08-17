@@ -14,9 +14,7 @@ const DEFAULT_KEYMAP = {
     defineStudioKeyboardBinding('Mod+Shift+Z'),
     defineStudioKeyboardBinding('Control+Y'),
   ]),
-  [STUDIO_KEYBOARD_ACTION.HISTORY_UNDO]: Object.freeze([
-    defineStudioKeyboardBinding('Mod+Z'),
-  ]),
+  [STUDIO_KEYBOARD_ACTION.HISTORY_UNDO]: Object.freeze([defineStudioKeyboardBinding('Mod+Z')]),
   [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE]: Object.freeze([
     defineStudioKeyboardBinding('Backspace'),
     defineStudioKeyboardBinding('Delete'),
@@ -24,12 +22,8 @@ const DEFAULT_KEYMAP = {
   [STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR]: Object.freeze([
     defineStudioKeyboardBinding('Escape'),
   ]),
-  [STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE]: Object.freeze([
-    defineStudioKeyboardBinding('Space'),
-  ]),
-  [STUDIO_KEYBOARD_ACTION.PROJECT_SAVE]: Object.freeze([
-    defineStudioKeyboardBinding('Mod+S'),
-  ]),
+  [STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE]: Object.freeze([defineStudioKeyboardBinding('Space')]),
+  [STUDIO_KEYBOARD_ACTION.PROJECT_SAVE]: Object.freeze([defineStudioKeyboardBinding('Mod+S')]),
 } satisfies StudioKeyboardKeymap<StudioKeyboardActionId>
 
 export type StudioKeyboardKeymapOverrides = Partial<

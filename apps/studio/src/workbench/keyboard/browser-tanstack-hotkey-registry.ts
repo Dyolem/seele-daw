@@ -26,9 +26,7 @@ export interface CreateBrowserTanStackHotkeyRegistryInput {
 }
 
 /** Validates dynamic Settings input without exposing TanStack result types to UI. */
-export function validateStudioKeyboardBinding(
-  input: string,
-): StudioKeyboardBindingValidation {
+export function validateStudioKeyboardBinding(input: string): StudioKeyboardBindingValidation {
   const normalizedInput = input.trim()
   const validation = validateHotkey(normalizedInput)
   const valid = validation.valid && normalizedInput.length > 0
@@ -43,9 +41,7 @@ export function validateStudioKeyboardBinding(
 }
 
 /** Parses dynamic input after a Settings UI has had a chance to show validation. */
-export function parseStudioKeyboardBinding(
-  input: string,
-): StudioKeyboardBinding {
+export function parseStudioKeyboardBinding(input: string): StudioKeyboardBinding {
   const validation = validateStudioKeyboardBinding(input)
   if (validation.binding !== null) return validation.binding
 
@@ -77,19 +73,15 @@ class BrowserTanStackHotkeyRegistry implements StudioKeyboardBindingRegistry {
     binding: StudioKeyboardBinding,
     listener: (event: KeyboardEvent) => void,
   ): StudioKeyboardShortcutDispose {
-    const handle = this.#manager.register(
-      binding as Hotkey,
-      (event) => listener(event),
-      {
-        conflictBehavior: 'error',
-        ignoreInputs: true,
-        platform: this.#platform,
-        // The Coordinator prevents only after an enabled Action reports handled.
-        preventDefault: false,
-        stopPropagation: false,
-        target: this.#target,
-      },
-    )
+    const handle = this.#manager.register(binding as Hotkey, (event) => listener(event), {
+      conflictBehavior: 'error',
+      ignoreInputs: true,
+      platform: this.#platform,
+      // The Coordinator prevents only after an enabled Action reports handled.
+      preventDefault: false,
+      stopPropagation: false,
+      target: this.#target,
+    })
     return () => handle.unregister()
   }
 

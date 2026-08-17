@@ -1,7 +1,4 @@
-import {
-  parsePositiveTick,
-  parseTick,
-} from '@seele-daw/project-core'
+import { parsePositiveTick, parseTick } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -31,21 +28,18 @@ describe('Timeline Grid', () => {
     { expected: 240, position: 239.999 },
     { expected: 240, position: 240 },
     { expected: 480, position: 360 },
-  ])(
-    'snaps Tick position $position to nearest Grid Tick $expected',
-    ({ expected, position }) => {
-      expect(
-        resolveTimelineGridTick({
-          grid: createTimelineGrid({
-            originTick: parseTick(0),
-            subdivisionSpanTick: parsePositiveTick(240),
-          }),
-          snapEnabled: true,
-          tickPosition: position,
+  ])('snaps Tick position $position to nearest Grid Tick $expected', ({ expected, position }) => {
+    expect(
+      resolveTimelineGridTick({
+        grid: createTimelineGrid({
+          originTick: parseTick(0),
+          subdivisionSpanTick: parsePositiveTick(240),
         }),
-      ).toBe(expected)
-    },
-  )
+        snapEnabled: true,
+        tickPosition: position,
+      }),
+    ).toBe(expected)
+  })
 
   it('resolves subdivisions relative to a non-zero Grid origin', () => {
     const grid = createTimelineGrid({

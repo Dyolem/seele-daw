@@ -92,19 +92,14 @@ function createMidiClipFixture(
   const readyState = createReadyState(session)
   const track = createProjectTrackCoordinator({
     activeProject: { state: readyState },
-    createUniqueId: createIdentitySource(
-      `track-midi-note-${suffix}`,
-      `device-midi-note-${suffix}`,
-    ),
+    createUniqueId: createIdentitySource(`track-midi-note-${suffix}`, `device-midi-note-${suffix}`),
     createRandomValue: () => 0,
   }).addInstrumentTrack()
   const clipId = parseClipId(`clip-midi-note-${suffix}`)
   const sourceId = parseMidiSourceId(`source-midi-note-${suffix}`)
   const spanTick = parsePositiveTick(options.spanTick ?? 960)
   const sourceOffsetTick = parseTick(options.sourceOffsetTick ?? 480)
-  const sourceLengthTick = parsePositiveTick(
-    options.looped ? 960 : sourceOffsetTick + spanTick,
-  )
+  const sourceLengthTick = parsePositiveTick(options.looped ? 960 : sourceOffsetTick + spanTick)
   const result = session.execute(
     createAddMidiClipCommand({
       baseRevision: session.modelRevision,
@@ -160,9 +155,7 @@ describe('ProjectMidiNoteCoordinator', () => {
       kind: 'command',
       commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
     })
-    expect(result.commit.delta.changes[0]?.type).toBe(
-      PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED,
-    )
+    expect(result.commit.delta.changes[0]?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED)
     expect(note).toEqual({
       id: 'note-midi-note-defaults',
       startTick: 600,
@@ -641,9 +634,11 @@ describe('ProjectMidiNoteCoordinator', () => {
     expect(noteRecords(fixture.session)).toEqual([])
 
     fixture.session.undo()
-    expect(noteRecords(fixture.session).map(({ id }) => id).sort()).toEqual(
-      [...noteIds].sort(),
-    )
+    expect(
+      noteRecords(fixture.session)
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual([...noteIds].sort())
     fixture.session.redo()
     expect(noteRecords(fixture.session)).toEqual([])
   })
@@ -675,9 +670,7 @@ describe('ProjectMidiNoteCoordinator', () => {
       }),
     )
     expect(fixture.session.modelRevision).toBe(revisionBeforeRemove)
-    expect(noteRecords(fixture.session).map(({ id }) => id)).toEqual([
-      existingNoteId,
-    ])
+    expect(noteRecords(fixture.session).map(({ id }) => id)).toEqual([existingNoteId])
   })
 
   it('uses the live Session revision for consecutive overlapping Notes', () => {
@@ -800,8 +793,7 @@ describe('ProjectMidiNoteCoordinator', () => {
     )
 
     const missingPartitionFixture = createMidiClipFixture('missing-partition')
-    const missingPartitionSnapshot =
-      missingPartitionFixture.session.getSnapshot()
+    const missingPartitionSnapshot = missingPartitionFixture.session.getSnapshot()
     vi.spyOn(missingPartitionFixture.session, 'getSnapshot').mockReturnValue(
       Object.freeze({
         ...missingPartitionSnapshot,

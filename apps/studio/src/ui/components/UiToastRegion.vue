@@ -49,11 +49,7 @@ function handleOpenChange(isOpen: boolean): void {
           <UiIconButton :icon="DismissIcon" label="Dismiss notification" size="small" />
         </ToastClose>
       </ToastRoot>
-      <ToastViewport
-        class="ui-toast-viewport"
-        :hotkey="['F8']"
-        label="Notifications ({hotkey})"
-      />
+      <ToastViewport class="ui-toast-viewport" :hotkey="['F8']" label="Notifications ({hotkey})" />
     </ToastPortal>
   </ToastProvider>
 </template>

@@ -69,16 +69,10 @@ export interface ResolvePianoRollNoteResizePreviewInput {
 }
 
 function isResizeEdge(zone: PianoRollHitZone): zone is PianoRollNoteResizeEdge {
-  return (
-    zone === PIANO_ROLL_HIT_ZONE.RESIZE_START ||
-    zone === PIANO_ROLL_HIT_ZONE.RESIZE_END
-  )
+  return zone === PIANO_ROLL_HIT_ZONE.RESIZE_START || zone === PIANO_ROLL_HIT_ZONE.RESIZE_END
 }
 
-function noteIntersectsClip(
-  context: PianoRollClipContext,
-  note: MidiNoteRecord,
-): boolean {
+function noteIntersectsClip(context: PianoRollClipContext, note: MidiNoteRecord): boolean {
   const noteEndTick = addTicks(note.startTick, note.durationTick)
   return note.startTick < context.sourceEndTick && context.sourceStartTick < noteEndTick
 }
@@ -120,14 +114,11 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
-function resolveRawTargetEdgeTick(
-  input: ResolvePianoRollNoteResizePreviewInput,
-): number {
+function resolveRawTargetEdgeTick(input: ResolvePianoRollNoteResizePreviewInput): number {
   const pointerDeltaCssPixel =
     input.pointerInput.position.xCssPixel - input.gesture.originPosition.xCssPixel
   const rawDelta =
-    (pointerDeltaCssPixel / input.viewport.widthCssPixel) *
-    input.viewport.visibleSpanTick
+    (pointerDeltaCssPixel / input.viewport.widthCssPixel) * input.viewport.visibleSpanTick
   if (!Number.isFinite(rawDelta)) {
     throw new PianoRollError(
       'coordinate-outside-viewport',
@@ -143,20 +134,16 @@ function resolveRawTargetEdgeTick(
   return originalEdgeTick + rawDelta
 }
 
-function resolveTargetEdgeTick(
-  input: ResolvePianoRollNoteResizePreviewInput,
-): Tick {
+function resolveTargetEdgeTick(input: ResolvePianoRollNoteResizePreviewInput): Tick {
   const rawTargetSourceTick = resolveRawTargetEdgeTick(input)
   let candidateTargetTick: number
 
   if (!input.snapEnabled || input.pointerInput.modifiers.alt) {
     candidateTargetTick = Math.round(rawTargetSourceTick)
   } else {
-    const rawTargetClipTick =
-      rawTargetSourceTick - input.gesture.context.sourceStartTick
+    const rawTargetClipTick = rawTargetSourceTick - input.gesture.context.sourceStartTick
     const targetSubdivision = Math.round(
-      (rawTargetClipTick - input.grid.originTick) /
-        input.grid.subdivisionSpanTick,
+      (rawTargetClipTick - input.grid.originTick) / input.grid.subdivisionSpanTick,
     )
     candidateTargetTick =
       input.gesture.context.sourceStartTick +
@@ -167,17 +154,13 @@ function resolveTargetEdgeTick(
   const note = input.gesture.note
   const noteEndTick = addTicks(note.startTick, note.durationTick)
   const minimumTargetTick =
-    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START
-      ? 0
-      : note.startTick + 1
+    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START ? 0 : note.startTick + 1
   const maximumTargetTick =
     input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START
       ? noteEndTick - 1
       : input.gesture.context.sourceLengthTick
 
-  return parseTick(
-    clamp(candidateTargetTick, minimumTargetTick, maximumTargetTick),
-  )
+  return parseTick(clamp(candidateTargetTick, minimumTargetTick, maximumTargetTick))
 }
 
 function createPreviewNote(
@@ -195,9 +178,7 @@ function createPreviewNote(
     noteId: note.id,
     pitch: note.pitch,
     visibleEndTick: parseTick(visibleSourceEndTick - context.sourceStartTick),
-    visibleStartTick: parseTick(
-      visibleSourceStartTick - context.sourceStartTick,
-    ),
+    visibleStartTick: parseTick(visibleSourceStartTick - context.sourceStartTick),
   })
 }
 
@@ -226,18 +207,12 @@ export function resolvePianoRollNoteResizePreview(
   const note = input.gesture.note
   const noteEndTick = addTicks(note.startTick, note.durationTick)
   const sourceStartTick =
-    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START
-      ? targetEdgeTick
-      : note.startTick
+    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START ? targetEdgeTick : note.startTick
   const sourceEndTick =
-    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START
-      ? noteEndTick
-      : targetEdgeTick
+    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START ? noteEndTick : targetEdgeTick
   const durationTick = parsePositiveTick(sourceEndTick - sourceStartTick)
   const draggedEdgeTick =
-    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START
-      ? sourceStartTick
-      : sourceEndTick
+    input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START ? sourceStartTick : sourceEndTick
   const snapGuideTick =
     input.snapEnabled &&
     !pointerInput.modifiers.alt &&
@@ -249,12 +224,7 @@ export function resolvePianoRollNoteResizePreview(
   return Object.freeze({
     durationTick,
     edge: input.gesture.edge,
-    note: createPreviewNote(
-      input.gesture.context,
-      note,
-      sourceStartTick,
-      durationTick,
-    ),
+    note: createPreviewNote(input.gesture.context, note, sourceStartTick, durationTick),
     resizedNoteId: note.id,
     snapGuideTick,
     sourceStartTick,

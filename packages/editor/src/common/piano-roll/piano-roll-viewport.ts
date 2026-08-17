@@ -158,8 +158,7 @@ export function pianoRollTimelineTickToCssPixel(
 ): number {
   const timelineTick = requireVisibleTick(viewport, timelineTickInput)
   return (
-    ((timelineTick - viewport.visibleStartTick) / viewport.visibleSpanTick) *
-    viewport.widthCssPixel
+    ((timelineTick - viewport.visibleStartTick) / viewport.visibleSpanTick) * viewport.widthCssPixel
   )
 }
 
@@ -184,17 +183,11 @@ export function pianoRollCssPixelToTimelineTickPosition(
     'horizontal',
     true,
   )
-  return (
-    viewport.visibleStartTick +
-    (xCssPixel / viewport.widthCssPixel) * viewport.visibleSpanTick
-  )
+  return viewport.visibleStartTick + (xCssPixel / viewport.widthCssPixel) * viewport.visibleSpanTick
 }
 
 function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
-  return (
-    viewport.heightCssPixel /
-    (viewport.maximumPitch - viewport.minimumPitch + 1)
-  )
+  return viewport.heightCssPixel / (viewport.maximumPitch - viewport.minimumPitch + 1)
 }
 
 export function pianoRollMidiPitchToCssPixel(

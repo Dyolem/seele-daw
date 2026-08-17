@@ -25,8 +25,7 @@ export const STUDIO_KEYBOARD_SCOPE = {
   MODAL: 300,
 } as const
 
-export type StudioKeyboardScope =
-  (typeof STUDIO_KEYBOARD_SCOPE)[keyof typeof STUDIO_KEYBOARD_SCOPE]
+export type StudioKeyboardScope = (typeof STUDIO_KEYBOARD_SCOPE)[keyof typeof STUDIO_KEYBOARD_SCOPE]
 
 export type StudioKeyboardShortcutDispose = () => void
 
@@ -58,9 +57,7 @@ export interface StudioKeyboardShortcutMetadata {
   readonly scope: StudioKeyboardScope
 }
 
-export type StudioKeyboardShortcutFailureOperation =
-  | 'enabled-check'
-  | 'handler'
+export type StudioKeyboardShortcutFailureOperation = 'enabled-check' | 'handler'
 
 export interface StudioKeyboardShortcutFailure {
   readonly actionId: StudioKeyboardActionId
@@ -77,9 +74,7 @@ export interface StudioKeyboardShortcutCoordinatorDependencies {
 export interface StudioKeyboardShortcutCoordinator {
   bindingsFor(actionId: StudioKeyboardActionId): readonly StudioKeyboardBinding[]
   listShortcuts(): readonly StudioKeyboardShortcutMetadata[]
-  register(
-    definitions: readonly StudioKeyboardShortcutDefinition[],
-  ): StudioKeyboardShortcutDispose
+  register(definitions: readonly StudioKeyboardShortcutDefinition[]): StudioKeyboardShortcutDispose
   validateBindingInput(input: string): StudioKeyboardBindingValidation
   dispose(): void
 }
@@ -93,9 +88,7 @@ interface PhysicalBinding {
   readonly dispose: StudioKeyboardShortcutDispose
 }
 
-const VALID_SCOPES = new Set<StudioKeyboardScope>(
-  Object.values(STUDIO_KEYBOARD_SCOPE),
-)
+const VALID_SCOPES = new Set<StudioKeyboardScope>(Object.values(STUDIO_KEYBOARD_SCOPE))
 
 function requireText(value: string, field: string, actionId: string): string {
   const normalized = value.trim()
@@ -116,9 +109,7 @@ function normalizeDefinition(
   const uniqueBindings = new Set<StudioKeyboardBinding>()
 
   for (const binding of definition.bindings) {
-    uniqueBindings.add(
-      requireText(binding, 'binding', actionId) as StudioKeyboardBinding,
-    )
+    uniqueBindings.add(requireText(binding, 'binding', actionId) as StudioKeyboardBinding)
   }
   if (uniqueBindings.size === 0) {
     throw new StudioKeyboardShortcutError(
@@ -154,13 +145,8 @@ function createFailure(
   return Object.freeze({ actionId, cause, operation })
 }
 
-class StudioKeyboardShortcutCoordinatorImpl
-  implements StudioKeyboardShortcutCoordinator
-{
-  readonly #actionsByBinding = new Map<
-    StudioKeyboardBinding,
-    RegisteredShortcut[]
-  >()
+class StudioKeyboardShortcutCoordinatorImpl implements StudioKeyboardShortcutCoordinator {
+  readonly #actionsByBinding = new Map<StudioKeyboardBinding, RegisteredShortcut[]>()
   readonly #actionsById = new Map<StudioKeyboardActionId, RegisteredShortcut>()
   readonly #bindingRegistry: StudioKeyboardBindingRegistry
   readonly #keymap: StudioKeyboardKeymap<StudioKeyboardActionId>
@@ -174,9 +160,7 @@ class StudioKeyboardShortcutCoordinatorImpl
     this.#onError = dependencies.onError
   }
 
-  bindingsFor(
-    actionId: StudioKeyboardActionId,
-  ): readonly StudioKeyboardBinding[] {
+  bindingsFor(actionId: StudioKeyboardActionId): readonly StudioKeyboardBinding[] {
     this.#requireActive()
     return this.#keymap[actionId]
   }
@@ -187,8 +171,7 @@ class StudioKeyboardShortcutCoordinatorImpl
       [...this.#actionsById.values()]
         .map(({ metadata }) => metadata)
         .sort(
-          (left, right) =>
-            right.scope - left.scope || left.actionId.localeCompare(right.actionId),
+          (left, right) => right.scope - left.scope || left.actionId.localeCompare(right.actionId),
         ),
     )
   }
@@ -205,9 +188,7 @@ class StudioKeyboardShortcutCoordinatorImpl
         bindings: definition.bindings,
         description: definition.description,
         displayBindings: Object.freeze(
-          definition.bindings.map((binding) =>
-            this.#bindingRegistry.formatForDisplay(binding),
-          ),
+          definition.bindings.map((binding) => this.#bindingRegistry.formatForDisplay(binding)),
         ),
         label: definition.label,
         scope: definition.scope,
@@ -245,8 +226,7 @@ class StudioKeyboardShortcutCoordinatorImpl
         this.#actionsByBinding.set(
           binding,
           [...actions, registered].sort(
-            (left, right) =>
-              right.definition.scope - left.definition.scope,
+            (left, right) => right.definition.scope - left.definition.scope,
           ),
         )
       }
@@ -277,17 +257,12 @@ class StudioKeyboardShortcutCoordinatorImpl
     this.#actionsById.clear()
   }
 
-  #validateRegistrations(
-    definitions: readonly StudioKeyboardShortcutDefinition[],
-  ): void {
+  #validateRegistrations(definitions: readonly StudioKeyboardShortcutDefinition[]): void {
     const actionIds = new Set<StudioKeyboardActionId>()
     const scopeBindings = new Set<string>()
 
     for (const definition of definitions) {
-      if (
-        actionIds.has(definition.actionId) ||
-        this.#actionsById.has(definition.actionId)
-      ) {
+      if (actionIds.has(definition.actionId) || this.#actionsById.has(definition.actionId)) {
         throw new StudioKeyboardShortcutError(
           'action-already-registered',
           `Keyboard shortcut Action is already registered: ${definition.actionId}`,
@@ -313,9 +288,7 @@ class StudioKeyboardShortcutCoordinatorImpl
     }
   }
 
-  #unregister(
-    definitions: readonly StudioKeyboardShortcutDefinition[],
-  ): void {
+  #unregister(definitions: readonly StudioKeyboardShortcutDefinition[]): void {
     if (this.#disposed) return
     const affectedBindings = new Set<StudioKeyboardBinding>()
 
@@ -325,9 +298,7 @@ class StudioKeyboardShortcutCoordinatorImpl
         affectedBindings.add(binding)
         const remaining = this.#actionsByBinding
           .get(binding)
-          ?.filter(
-            (action) => action.definition.actionId !== definition.actionId,
-          )
+          ?.filter((action) => action.definition.actionId !== definition.actionId)
         if (remaining === undefined || remaining.length === 0) {
           this.#actionsByBinding.delete(binding)
         } else {
@@ -344,12 +315,7 @@ class StudioKeyboardShortcutCoordinatorImpl
   }
 
   #dispatch(binding: StudioKeyboardBinding, event: KeyboardEvent): void {
-    if (
-      this.#disposed ||
-      event.defaultPrevented ||
-      event.isComposing ||
-      event.keyCode === 229
-    ) {
+    if (this.#disposed || event.defaultPrevented || event.isComposing || event.keyCode === 229) {
       return
     }
 
@@ -358,9 +324,7 @@ class StudioKeyboardShortcutCoordinatorImpl
       try {
         if (definition.isEnabled?.() === false) continue
       } catch (cause) {
-        this.#deliverFailure(
-          createFailure(definition.actionId, 'enabled-check', cause),
-        )
+        this.#deliverFailure(createFailure(definition.actionId, 'enabled-check', cause))
         return
       }
 
@@ -368,9 +332,7 @@ class StudioKeyboardShortcutCoordinatorImpl
       try {
         handled = definition.run()
       } catch (cause) {
-        this.#deliverFailure(
-          createFailure(definition.actionId, 'handler', cause),
-        )
+        this.#deliverFailure(createFailure(definition.actionId, 'handler', cause))
         return
       }
       if (!handled) continue

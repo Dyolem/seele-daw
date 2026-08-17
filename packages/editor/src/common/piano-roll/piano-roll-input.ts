@@ -6,8 +6,7 @@ export const PIANO_ROLL_HIT_ZONE = {
   RESIZE_START: 'resize-start',
 } as const
 
-export type PianoRollHitZone =
-  (typeof PIANO_ROLL_HIT_ZONE)[keyof typeof PIANO_ROLL_HIT_ZONE]
+export type PianoRollHitZone = (typeof PIANO_ROLL_HIT_ZONE)[keyof typeof PIANO_ROLL_HIT_ZONE]
 
 export interface PianoRollHit {
   readonly noteId: NoteId

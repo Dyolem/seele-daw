@@ -61,10 +61,12 @@ function mountInspector(options: MountInspectorOptions) {
       dockMode: PROJECT_WORKBENCH_DOCK_MODE.DOCKED,
       isMaximized: false,
       pianoRollPresentation: null,
+      pianoRollTrackPresentation: null,
       projectSession: createTestSession(parseProjectId('project-instrument-inspector')),
       selectedClip: options.selectedClip ?? null,
       selectedTrack: options.selectedTrack,
       timeSignatureNumerator: 4,
+      timelineEndTick: parsePositiveTick(576_000),
     },
     global: {
       plugins: [pinia],

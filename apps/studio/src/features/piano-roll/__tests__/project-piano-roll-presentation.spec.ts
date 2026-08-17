@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 import {
   PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
   createProjectPianoRollPresentation,
+  createProjectPianoRollTrackPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import {
   ACTIVE_PROJECT_PHASE,
@@ -119,6 +120,35 @@ describe('Project Piano Roll Presentation', () => {
     ).toMatchObject({
       reason: 'looped-clip',
       status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED,
+    })
+  })
+
+  it('projects the selected Instrument Track with one explicit Active Clip', () => {
+    const fixture = createFixture()
+    const snapshot = fixture.session.getSnapshot()
+    const presentation = createProjectPianoRollTrackPresentation(
+      snapshot,
+      fixture.track.trackId,
+      fixture.clip.clipId,
+    )
+
+    expect(presentation).toMatchObject({
+      projectId: snapshot.project.id,
+      status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
+      trackId: fixture.track.trackId,
+    })
+    if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected a ready Track Piano Roll presentation')
+    }
+    expect(presentation.readModel).toMatchObject({
+      activeClipId: fixture.clip.clipId,
+      modelRevision: snapshot.modelRevision,
+      trackId: fixture.track.trackId,
+    })
+    expect(presentation.readModel.clips[0]?.clip).toMatchObject({
+      clipId: fixture.clip.clipId,
+      endTick: 7_680,
+      startTick: 3_840,
     })
   })
 })

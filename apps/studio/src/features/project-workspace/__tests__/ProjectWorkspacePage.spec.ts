@@ -252,6 +252,9 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
     props: { projectId },
     global: {
       plugins: [pinia, router],
+      stubs: {
+        ProjectPianoRollTrackSurface: true,
+      },
       provide: {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,

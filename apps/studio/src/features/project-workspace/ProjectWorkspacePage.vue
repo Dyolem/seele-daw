@@ -15,7 +15,10 @@ import {
 import { computed, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { createProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
+import {
+  createProjectPianoRollPresentation,
+  createProjectPianoRollTrackPresentation,
+} from '@/features/piano-roll/project-piano-roll-presentation'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { createProjectMidiClipPresentations } from '@/features/project-workspace/project-clip-presentation'
 import {
@@ -118,6 +121,17 @@ const pianoRollPresentation = computed(() => {
   return snapshot === null || selectedClipId === null
     ? null
     : createProjectPianoRollPresentation(snapshot, selectedClipId)
+})
+const pianoRollTrackPresentation = computed(() => {
+  const snapshot = projectSnapshot.value
+  const selectedTrackId = workbenchSelection.selectedTrackId
+  return snapshot === null || selectedTrackId === null
+    ? null
+    : createProjectPianoRollTrackPresentation(
+        snapshot,
+        selectedTrackId,
+        workbenchSelection.selectedClipId,
+      )
 })
 const clipSelectionCandidates = computed((): readonly ProjectWorkbenchClipSelectionCandidate[] => {
   return Object.freeze(
@@ -369,6 +383,7 @@ onUnmounted(() => {
     :clips="clipPresentations"
     :is-dirty="readyProject.isDirty"
     :piano-roll-presentation="pianoRollPresentation"
+    :piano-roll-track-presentation="pianoRollTrackPresentation"
     :playback-can-toggle="playbackCanToggle"
     :playback-can-return-to-start="playbackCanReturnToStart"
     :playback-feedback="playbackState.feedback?.message ?? null"

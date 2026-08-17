@@ -13,9 +13,9 @@ import {
 import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import {
   createPianoRollGrid,
-  pianoRollClipTickToCssPixel,
+  pianoRollTimelineTickToCssPixel,
   type PianoRollGrid,
-  type PianoRollViewport,
+  type PianoRollTimelineViewport,
 } from '#internal/common/piano-roll/index'
 
 export interface PianoRollGridCanvasTheme {
@@ -31,7 +31,7 @@ export interface PianoRollGridCanvasTheme {
 export interface PianoRollGridCanvasRenderInput {
   readonly grid: PianoRollGrid
   readonly theme: PianoRollGridCanvasTheme
-  readonly viewport: PianoRollViewport
+  readonly viewport: PianoRollTimelineViewport
 }
 
 export interface CreatePianoRollGridCanvasRendererInput {
@@ -59,7 +59,7 @@ function requireTheme(theme: PianoRollGridCanvasTheme): PianoRollGridCanvasTheme
   return theme
 }
 
-function pitchRowHeight(viewport: PianoRollViewport): number {
+function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
   return (
     viewport.heightCssPixel /
     (viewport.maximumPitch - viewport.minimumPitch + 1)
@@ -68,7 +68,7 @@ function pitchRowHeight(viewport: PianoRollViewport): number {
 
 function drawPitchRows(
   context: CanvasRenderingContext2D,
-  viewport: PianoRollViewport,
+  viewport: PianoRollTimelineViewport,
   theme: PianoRollGridCanvasTheme,
 ): void {
   const rowHeight = pitchRowHeight(viewport)
@@ -112,7 +112,7 @@ function firstGridTick(
 
 function drawVerticalGrid(
   context: CanvasRenderingContext2D,
-  viewport: PianoRollViewport,
+  viewport: PianoRollTimelineViewport,
   grid: PianoRollGrid,
   theme: PianoRollGridCanvasTheme,
 ): void {
@@ -155,7 +155,7 @@ function drawVerticalGrid(
       tick <= viewport.visibleEndTick;
       tick += group.spanTick
     ) {
-      const x = pianoRollClipTickToCssPixel(viewport, parseTick(tick))
+      const x = pianoRollTimelineTickToCssPixel(viewport, parseTick(tick))
       context.moveTo(x, 0)
       context.lineTo(x, viewport.heightCssPixel)
     }

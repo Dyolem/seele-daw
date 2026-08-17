@@ -17,11 +17,15 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import {
+  PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION,
+  PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON,
+  PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
   PIANO_ROLL_TRACK_CLIP_STATUS,
   PianoRollError,
   createPianoRollTrackReadModel,
   pianoRollTrackProjectTickToSourceTick,
   pianoRollTrackSourceTickToProjectTick,
+  resolvePianoRollTrackNotePlacement,
 } from '#internal/index'
 import { createPianoRollProjectFixture } from '#internal/__tests__/support/piano-roll-project-fixture'
 
@@ -246,5 +250,173 @@ describe('Piano Roll Track Read Model', () => {
         }),
       ).code,
     ).toBe('track-not-instrument')
+  })
+})
+
+describe('Piano Roll Track Note placement', () => {
+  it('adds inside one Clip and atomically extends a Note tail beyond its right edge', () => {
+    const fixture = createPianoRollProjectFixture()
+    const readModel = createPianoRollTrackReadModel({
+      activeClipId: fixture.clip.id,
+      snapshot: fixture.session.getSnapshot(),
+      trackId: fixture.clip.trackId,
+    })
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(240),
+        projectStartTick: parseTick(960),
+        readModel,
+      }),
+    ).toMatchObject({
+      action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.ADD_TO_CLIP,
+      clipId: fixture.clip.id,
+      sourceStartTick: 1_440,
+      status: PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.READY,
+    })
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(480),
+        projectStartTick: parseTick(1_800),
+        readModel,
+      }),
+    ).toMatchObject({
+      action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.EXTEND_CLIP,
+      clipId: fixture.clip.id,
+      projectEndTick: 2_280,
+      sourceStartTick: 2_280,
+      targetClipSpanTick: 2_280,
+    })
+  })
+
+  it('extends the nearest left Clip within one bar but creates a bar Clip farther away', () => {
+    const fixture = createPianoRollProjectFixture()
+    const readModel = createPianoRollTrackReadModel({
+      activeClipId: fixture.clip.id,
+      snapshot: fixture.session.getSnapshot(),
+      trackId: fixture.clip.trackId,
+    })
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(240),
+        projectStartTick: parseTick(2_160),
+        readModel,
+      }),
+    ).toMatchObject({
+      action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.EXTEND_CLIP,
+      sourceStartTick: 2_640,
+      targetClipSpanTick: 2_400,
+    })
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(240),
+        projectStartTick: parseTick(6_000),
+        readModel,
+      }),
+    ).toMatchObject({
+      action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.CREATE_CLIP,
+      clipSpanTick: 3_840,
+      clipStartTick: 3_840,
+      sourceStartTick: 2_160,
+    })
+  })
+
+  it('requires Active Clip for overlaps and rejects looped targets', () => {
+    const fixture = createPianoRollProjectFixture()
+    const overlapping = addClip(fixture.session, {
+      clipId: 'track-placement-overlapping-clip',
+      sourceId: 'track-placement-overlapping-source',
+      startTick: 960,
+    })
+    const looped = addClip(fixture.session, {
+      clipId: 'track-placement-looped-clip',
+      looped: true,
+      sourceId: 'track-placement-looped-source',
+      startTick: 3_840,
+    })
+    const snapshot = fixture.session.getSnapshot()
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(240),
+        projectStartTick: parseTick(1_200),
+        readModel: createPianoRollTrackReadModel({
+          snapshot,
+          trackId: fixture.clip.trackId,
+        }),
+      }),
+    ).toMatchObject({
+      candidateClipIds: [fixture.clip.id, overlapping.clipId],
+      reason: PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON.AMBIGUOUS_CLIP_TARGET,
+      status: PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED,
+    })
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(240),
+        projectStartTick: parseTick(1_200),
+        readModel: createPianoRollTrackReadModel({
+          activeClipId: overlapping.clipId,
+          snapshot,
+          trackId: fixture.clip.trackId,
+        }),
+      }),
+    ).toMatchObject({
+      action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.ADD_TO_CLIP,
+      clipId: overlapping.clipId,
+    })
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(240),
+        projectStartTick: parseTick(4_080),
+        readModel: createPianoRollTrackReadModel({
+          activeClipId: looped.clipId,
+          snapshot,
+          trackId: fixture.clip.trackId,
+        }),
+      }),
+    ).toMatchObject({
+      candidateClipIds: [looped.clipId],
+      reason: PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON.LOOPED_CLIP_TARGET,
+      status: PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED,
+    })
+  })
+
+  it('blocks an automatic extension that would cross the next Clip', () => {
+    const fixture = createPianoRollProjectFixture()
+    const next = addClip(fixture.session, {
+      clipId: 'track-placement-next-clip',
+      sourceId: 'track-placement-next-source',
+      startTick: 2_400,
+    })
+    const readModel = createPianoRollTrackReadModel({
+      activeClipId: fixture.clip.id,
+      snapshot: fixture.session.getSnapshot(),
+      trackId: fixture.clip.trackId,
+    })
+
+    expect(
+      resolvePianoRollTrackNotePlacement({
+        barSpanTick: parseTick(3_840),
+        noteDurationTick: parseTick(720),
+        projectStartTick: parseTick(1_800),
+        readModel,
+      }),
+    ).toMatchObject({
+      candidateClipIds: [fixture.clip.id, next.clipId],
+      reason: PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON.EXTENSION_CROSSES_NEXT_CLIP,
+      status: PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED,
+    })
   })
 })

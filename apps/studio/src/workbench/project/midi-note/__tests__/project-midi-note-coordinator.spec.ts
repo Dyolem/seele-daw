@@ -1,3 +1,4 @@
+import { PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION } from '@seele-daw/editor'
 import {
   PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
@@ -175,6 +176,112 @@ describe('ProjectMidiNoteCoordinator', () => {
     expect(noteRecords(fixture.session)).toEqual([])
     fixture.session.redo()
     expect(noteRecords(fixture.session)).toEqual([note])
+  })
+
+  it('places Track Notes through one atomic add, extension or new-Clip command', () => {
+    const fixture = createMidiClipFixture('track-placement')
+    const trackId = fixture.session.getSnapshot().tracks[0]?.id
+    if (trackId === undefined) throw new Error('Expected an Instrument Track')
+    const addCoordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: () => 'note-midi-note-track-placement-add',
+    })
+    const addRevision = fixture.session.modelRevision
+    const added = addCoordinator.placeMidiNoteOnTrack({
+      activeClipId: fixture.clipId,
+      barSpanTick: parsePositiveTick(3_840),
+      baseRevision: addRevision,
+      noteDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(60),
+      projectStartTick: parseTick(120),
+      trackId,
+    })
+
+    expect(added).toMatchObject({
+      action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.ADD_TO_CLIP,
+      clipId: fixture.clipId,
+      noteId: 'note-midi-note-track-placement-add',
+    })
+    expect(added.commit.origin).toEqual({
+      kind: 'command',
+      commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
+    })
+    expect(fixture.session.modelRevision).toBe(addRevision + 1)
+
+    const extendCoordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: () => 'note-midi-note-track-placement-extend',
+    })
+    const extendRevision = fixture.session.modelRevision
+    const extended = extendCoordinator.placeMidiNoteOnTrack({
+      activeClipId: fixture.clipId,
+      barSpanTick: parsePositiveTick(3_840),
+      baseRevision: extendRevision,
+      noteDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(64),
+      projectStartTick: parseTick(900),
+      trackId,
+    })
+
+    expect(extended.action).toBe(PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.EXTEND_CLIP)
+    expect(extended.commit.origin).toEqual({
+      kind: 'command',
+      commandType: PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE,
+    })
+    expect(
+      fixture.session.getSnapshot().clips.find(({ id }) => id === fixture.clipId),
+    ).toMatchObject({ spanTick: 1_140 })
+    expect(noteRecords(fixture.session)).toContainEqual(
+      expect.objectContaining({
+        id: 'note-midi-note-track-placement-extend',
+        durationTick: 240,
+        startTick: 1_380,
+      }),
+    )
+    expect(fixture.session.modelRevision).toBe(extendRevision + 1)
+
+    const createCoordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: createIdentitySource(
+        'note-midi-note-track-placement-create',
+        'clip-midi-note-track-placement-create',
+        'source-midi-note-track-placement-create',
+      ),
+    })
+    const createRevision = fixture.session.modelRevision
+    const created = createCoordinator.placeMidiNoteOnTrack({
+      activeClipId: fixture.clipId,
+      barSpanTick: parsePositiveTick(3_840),
+      baseRevision: createRevision,
+      noteDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(67),
+      projectStartTick: parseTick(6_000),
+      trackId,
+    })
+
+    expect(created).toMatchObject({
+      action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.CREATE_CLIP,
+      clipId: 'clip-midi-note-track-placement-create',
+      noteId: 'note-midi-note-track-placement-create',
+    })
+    expect(created.commit.origin).toEqual({
+      kind: 'command',
+      commandType: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE,
+    })
+    expect(
+      fixture.session.getSnapshot().clips.find(({ id }) => id === created.clipId),
+    ).toMatchObject({
+      sourceId: 'source-midi-note-track-placement-create',
+      spanTick: 3_840,
+      startTick: 3_840,
+    })
+    expect(noteRecords(fixture.session)).toContainEqual(
+      expect.objectContaining({
+        id: 'note-midi-note-track-placement-create',
+        startTick: 2_160,
+      }),
+    )
+    expect(fixture.session.modelRevision).toBe(createRevision + 1)
   })
 
   it('shortens the desired duration to the positive time remaining in the Clip', () => {

@@ -1210,11 +1210,11 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7E.1–7E.5：Piano Roll Track / Clip 双模式校准
 
-> Implementation status: Batch 7E.1 was reviewed and committed as `5e50228`. Batch 7E.2 is
-> implemented locally and awaiting review; it adds Project Core facts and contracts plus the minimum
-> exhaustive Playback / Studio reconciliation adaptation, but does not change the visible Piano Roll
-> Surface. Project Core 28 files / 409 tests, Playback 9 / 95 and Studio 45 / 267 pass; repository
-> `pnpm lint` and `pnpm check` pass.
+> Implementation status: Batch 7E.1 and 7E.2 were reviewed and committed as `5e50228` and
+> `113aabb`. Batch 7E.3 is implemented locally and awaiting review: the default Track-time Surface
+> now composes the shared Track Read Model, global Ruler and horizontal viewport, explicit Active
+> Clip, visible Clip windows and atomic Pencil placement Preview. The visible Scope switch and
+> dual-mode Playhead / Follow remain in Batch 7E.4 and 7E.5.
 
 一个 Project MIDI Clip 仍是唯一权威实体，Piano Roll 不创建第二份 Clip Fact。两种模式只是
 同一 Track / Clip / MidiSource 图的不同投影：

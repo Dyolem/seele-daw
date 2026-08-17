@@ -6,7 +6,7 @@ import type {
 import {
   pianoRollClipTickToCssPixel,
   pianoRollMidiPitchToCssPixel,
-  type PianoRollViewport,
+  type PianoRollTimelineViewport,
 } from '#internal/common/piano-roll/index'
 import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import type {
@@ -34,7 +34,7 @@ export interface CreatePianoRollNoteSceneInput {
   readonly resizePreview?: PianoRollNoteResizePreview | null
   readonly selectedNoteIds: readonly NoteId[]
   readonly style: PianoRollNoteSceneStyle
-  readonly viewport: PianoRollViewport
+  readonly viewport: PianoRollTimelineViewport
 }
 
 interface SceneNote {
@@ -64,7 +64,7 @@ function requireOpacity(value: number): number {
   return value
 }
 
-function pitchRowHeight(viewport: PianoRollViewport): number {
+function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
   return (
     viewport.heightCssPixel /
     (viewport.maximumPitch - viewport.minimumPitch + 1)

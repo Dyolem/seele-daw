@@ -5,6 +5,7 @@ import {
   type MidiClipRecord,
   type MidiSourceId,
   type MidiSourceRecord,
+  type ProjectColor,
   type Tick,
   type TrackId,
 } from '@seele-daw/project-core'
@@ -24,6 +25,7 @@ export const PIANO_ROLL_TRACK_CLIP_STATUS = Object.freeze({
 
 interface PianoRollTrackClipProjectionBase {
   readonly clipId: ClipId
+  readonly color: ProjectColor | null
   readonly endTick: Tick
   readonly muted: boolean
   readonly name: string
@@ -61,6 +63,7 @@ export function createPianoRollTrackClipProjection(
 
   const base = Object.freeze({
     clipId: clip.id,
+    color: clip.color,
     endTick: addTicks(clip.startTick, clip.spanTick),
     muted: clip.muted,
     name: clip.name,

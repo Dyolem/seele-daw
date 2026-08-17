@@ -1,17 +1,27 @@
 import {
+  PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION,
+  PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
   PianoRollError,
   createPianoRollClipContext,
+  createPianoRollTrackReadModel,
   pianoRollClipTickToSourceTick,
+  resolvePianoRollTrackNotePlacement,
   type PianoRollClipContext,
+  type PianoRollTrackNotePlacementAction,
 } from '@seele-daw/editor'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
+  ZERO_TICK,
+  createAddMidiClipWithNoteCommand,
   createAddNoteCommand,
+  createExtendMidiClipWithNoteCommand,
   createMoveNotesCommand,
   createRemoveNotesCommand,
   createResizeNoteCommand,
+  parseClipId,
   parseMidiChannel,
   parseMidiPitch,
+  parseMidiSourceId,
   parseMidiVelocity,
   parseNoteId,
   parsePositiveTick,
@@ -24,9 +34,11 @@ import {
   type ModelRevision,
   type NoteId,
   type ProjectCommit,
+  type ProjectCommandExecutionResult,
   type ProjectSession,
   type Tick,
   type TickDelta,
+  type TrackId,
 } from '@seele-daw/project-core'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -97,9 +109,27 @@ export interface ResizedMidiNoteResult {
   readonly sourceStartTick: Tick
 }
 
+export interface PlaceMidiNoteOnTrackInput {
+  readonly activeClipId: ClipId | null
+  readonly barSpanTick: Tick
+  readonly baseRevision: ModelRevision
+  readonly noteDurationTick: Tick
+  readonly pitch: MidiPitch
+  readonly projectStartTick: Tick
+  readonly trackId: TrackId
+}
+
+export interface PlacedMidiNoteOnTrackResult {
+  readonly action: PianoRollTrackNotePlacementAction
+  readonly clipId: ClipId
+  readonly commit: ProjectCommit
+  readonly noteId: NoteId
+}
+
 export interface ProjectMidiNoteCoordinator {
   addMidiNote(input: AddMidiNoteInput): AddedMidiNoteResult
   moveMidiNotes(input: MoveMidiNotesInput): MovedMidiNotesResult | null
+  placeMidiNoteOnTrack(input: PlaceMidiNoteOnTrackInput): PlacedMidiNoteOnTrackResult
   removeMidiNotes(input: RemoveMidiNotesInput): RemovedMidiNotesResult
   resizeMidiNote(input: ResizeMidiNoteInput): ResizedMidiNoteResult | null
 }
@@ -243,6 +273,139 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
     }
 
     return Object.freeze({
+      commit: result.commit,
+      noteId,
+    })
+  }
+
+  placeMidiNoteOnTrack(input: PlaceMidiNoteOnTrackInput): PlacedMidiNoteOnTrackResult {
+    const activeState = this.#dependencies.activeProject.state
+    if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
+      throw new ProjectMidiNoteError(
+        'active-project-not-ready',
+        `Cannot place a Track MIDI Note while the Active Project is ${activeState.phase}`,
+        { phase: activeState.phase, trackId: input.trackId },
+      )
+    }
+
+    const session = activeState.session
+    const snapshot = session.getSnapshot()
+    if (snapshot.modelRevision !== input.baseRevision) {
+      throw new ProjectMidiNoteError(
+        'track-note-placement-stale',
+        'The Track changed before the MIDI Note could be placed. Try the gesture again.',
+        { trackId: input.trackId },
+      )
+    }
+
+    const readModel = createPianoRollTrackReadModel({
+      activeClipId: input.activeClipId,
+      snapshot,
+      trackId: input.trackId,
+    })
+    const placement = resolvePianoRollTrackNotePlacement({
+      barSpanTick: input.barSpanTick,
+      noteDurationTick: input.noteDurationTick,
+      projectStartTick: input.projectStartTick,
+      readModel,
+    })
+    if (placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED) {
+      throw new ProjectMidiNoteError('track-note-placement-blocked', placement.message, {
+        trackId: input.trackId,
+      })
+    }
+
+    const track = snapshot.tracks.find((candidate) => candidate.id === input.trackId)
+    if (track === undefined || track.kind !== 'instrument') {
+      throw new ProjectMidiNoteError(
+        'track-note-placement-blocked',
+        `Cannot place a MIDI Note on missing or non-Instrument Track ${input.trackId}`,
+        { trackId: input.trackId },
+      )
+    }
+
+    const noteId = parseNoteId(this.#dependencies.createUniqueId())
+    const notePitch = parseMidiPitch(input.pitch)
+    let clipId: ClipId
+    let result: ProjectCommandExecutionResult
+
+    switch (placement.action) {
+      case PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.ADD_TO_CLIP: {
+        const clip = snapshot.clips.find((candidate) => candidate.id === placement.clipId)
+        if (clip === undefined) {
+          throw new ProjectMidiNoteError(
+            'target-clip-not-found',
+            `Cannot place a MIDI Note because Clip ${placement.clipId} does not exist`,
+            { clipId: placement.clipId, trackId: input.trackId },
+          )
+        }
+        clipId = clip.id
+        result = session.execute(
+          createAddNoteCommand({
+            baseRevision: input.baseRevision,
+            channel: PROJECT_MIDI_NOTE_DEFAULT_CHANNEL,
+            durationTick: placement.noteDurationTick,
+            noteId,
+            pitch: notePitch,
+            sourceId: clip.sourceId,
+            startTick: placement.sourceStartTick,
+            velocity: PROJECT_MIDI_NOTE_DEFAULT_VELOCITY,
+          }),
+        )
+        break
+      }
+      case PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.CREATE_CLIP: {
+        clipId = parseClipId(this.#dependencies.createUniqueId())
+        const sourceId = parseMidiSourceId(this.#dependencies.createUniqueId())
+        result = session.execute(
+          createAddMidiClipWithNoteCommand({
+            baseRevision: input.baseRevision,
+            clipId,
+            color: null,
+            loop: null,
+            muted: false,
+            name: track.name,
+            noteChannel: PROJECT_MIDI_NOTE_DEFAULT_CHANNEL,
+            noteDurationTick: placement.noteDurationTick,
+            noteId,
+            notePitch,
+            noteStartTick: placement.sourceStartTick,
+            noteVelocity: PROJECT_MIDI_NOTE_DEFAULT_VELOCITY,
+            sourceId,
+            sourceLengthTick: placement.clipSpanTick,
+            sourceOffsetTick: ZERO_TICK,
+            spanTick: placement.clipSpanTick,
+            startTick: placement.clipStartTick,
+            trackId: track.id,
+          }),
+        )
+        break
+      }
+      case PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.EXTEND_CLIP:
+        clipId = placement.clipId
+        result = session.execute(
+          createExtendMidiClipWithNoteCommand({
+            baseRevision: input.baseRevision,
+            clipId,
+            noteChannel: PROJECT_MIDI_NOTE_DEFAULT_CHANNEL,
+            noteDurationTick: placement.noteDurationTick,
+            noteId,
+            notePitch,
+            noteStartTick: placement.sourceStartTick,
+            noteVelocity: PROJECT_MIDI_NOTE_DEFAULT_VELOCITY,
+            spanTick: placement.targetClipSpanTick,
+          }),
+        )
+        break
+    }
+
+    if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      throw new Error('Track MIDI Note placement unexpectedly produced no Project change')
+    }
+
+    return Object.freeze({
+      action: placement.action,
+      clipId,
       commit: result.commit,
       noteId,
     })

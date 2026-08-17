@@ -2,7 +2,10 @@
 import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 
-import type { ProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
+import type {
+  ProjectPianoRollPresentation,
+  ProjectPianoRollTrackPresentation,
+} from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
@@ -24,6 +27,7 @@ const props = defineProps<{
   readonly barSpanTick: Tick
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
   readonly projectId: string
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly timeSignatureNumerator: number
@@ -259,11 +263,13 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       :dock-mode="dockMode"
       :is-maximized="isDockMaximized"
       :piano-roll-presentation="props.pianoRollPresentation"
+      :piano-roll-track-presentation="props.pianoRollTrackPresentation"
       :project-session="props.projectSession"
       :selected-clip="selectedClip"
       :selected-track="selectedTrack"
       :bar-span-tick="props.barSpanTick"
       :time-signature-numerator="props.timeSignatureNumerator"
+      :timeline-end-tick="props.timelineEndTick"
       @close="closeDock"
       @minimize="minimizeDock"
       @toggle-fullscreen="toggleDockFullscreen"

@@ -49,6 +49,7 @@ import {
 import type {
   AddMidiNoteInput,
   MoveMidiNotesInput,
+  PlaceMidiNoteOnTrackInput,
   ProjectMidiNoteCoordinator,
   RemoveMidiNotesInput,
   ResizeMidiNoteInput,
@@ -385,10 +386,16 @@ describe('ProjectPianoRollSurface', () => {
     >(() => {
       throw new Error('The selection-only Cursor test must not resize a MIDI Note')
     })
+    const placeMidiNoteOnTrack = vi.fn<
+      ProjectMidiNoteCoordinator['placeMidiNoteOnTrack']
+    >(() => {
+      throw new Error('The Clip surface test must not place a Track MIDI Note')
+    })
     const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
       projectMidiNotes: Object.freeze({
         addMidiNote,
         moveMidiNotes,
+        placeMidiNoteOnTrack,
         removeMidiNotes,
         resizeMidiNote,
       }),
@@ -987,6 +994,8 @@ describe('ProjectPianoRollSurface', () => {
         fixture.projectMidiNotes.addMidiNote(input),
       moveMidiNotes: (input: MoveMidiNotesInput) =>
         fixture.projectMidiNotes.moveMidiNotes(input),
+      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
+        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
       removeMidiNotes: (input: RemoveMidiNotesInput) =>
         fixture.projectMidiNotes.removeMidiNotes(input),
       resizeMidiNote: () => {
@@ -1342,6 +1351,8 @@ describe('ProjectPianoRollSurface', () => {
         fixture.projectMidiNotes.addMidiNote(input),
       moveMidiNotes: (input: MoveMidiNotesInput) =>
         fixture.projectMidiNotes.moveMidiNotes(input),
+      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
+        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
       removeMidiNotes: () => {
         throw new Error('Test Project rejected the Note removal')
       },
@@ -1414,6 +1425,8 @@ describe('ProjectPianoRollSurface', () => {
       },
       moveMidiNotes: (input: MoveMidiNotesInput) =>
         fixture.projectMidiNotes.moveMidiNotes(input),
+      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
+        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
       removeMidiNotes: (input: RemoveMidiNotesInput) =>
         fixture.projectMidiNotes.removeMidiNotes(input),
       resizeMidiNote: (input: ResizeMidiNoteInput) =>
@@ -1495,6 +1508,8 @@ describe('ProjectPianoRollSurface', () => {
       },
       moveMidiNotes: (input: MoveMidiNotesInput) =>
         fixture.projectMidiNotes.moveMidiNotes(input),
+      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
+        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
       removeMidiNotes: (input: RemoveMidiNotesInput) =>
         fixture.projectMidiNotes.removeMidiNotes(input),
       resizeMidiNote: (input: ResizeMidiNoteInput) =>

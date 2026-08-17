@@ -14,9 +14,9 @@ import type { ProjectTrackPresentation } from '@/features/project-workspace/proj
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline-scale'
 import ArrangementPlayhead from '@/features/project-workspace/workbench-shell/arrangement/ArrangementPlayhead.vue'
 import {
-  TIMELINE_BAR_INLINE_SIZE_REM,
   resolvePagedFollowScrollLeft,
   timelinePositionRatio,
 } from '@/features/project-workspace/workbench-shell/arrangement/timeline-layout'
@@ -105,7 +105,7 @@ const timelineBars = computed((): readonly TimelineBarPresentation[] => {
         startTick,
         style: {
           '--project-workbench-bar-inline-size': `${
-            (spanTick / props.barSpanTick) * TIMELINE_BAR_INLINE_SIZE_REM
+            (spanTick / props.barSpanTick) * PROJECT_TIMELINE_BAR_INLINE_SIZE_REM
           }rem`,
         } as StyleValue,
       })
@@ -116,7 +116,7 @@ const timelineStyle = computed(
   (): StyleValue =>
     ({
       '--project-workbench-timeline-inline-size': `${
-        (props.timelineEndTick / props.barSpanTick) * TIMELINE_BAR_INLINE_SIZE_REM
+        (props.timelineEndTick / props.barSpanTick) * PROJECT_TIMELINE_BAR_INLINE_SIZE_REM
       }rem`,
     }) as StyleValue,
 )

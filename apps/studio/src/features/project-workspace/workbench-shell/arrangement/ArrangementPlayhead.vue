@@ -2,10 +2,8 @@
 import type { Tick } from '@seele-daw/project-core'
 import { computed, type StyleValue } from 'vue'
 
-import {
-  TIMELINE_BAR_INLINE_SIZE_REM,
-  timelinePositionRatio,
-} from '@/features/project-workspace/workbench-shell/arrangement/timeline-layout'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline-scale'
+import { timelinePositionRatio } from '@/features/project-workspace/workbench-shell/arrangement/timeline-layout'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 
 const props = defineProps<{
@@ -22,7 +20,7 @@ const playheadStyle = computed((): StyleValue => {
   const inlineOffsetRem =
     timelinePositionRatio(positionTick, props.timelineEndTick) *
     timelineBarCount *
-    TIMELINE_BAR_INLINE_SIZE_REM
+    PROJECT_TIMELINE_BAR_INLINE_SIZE_REM
 
   // Transform-only movement keeps high-frequency position updates out of layout.
   return { transform: `translate3d(${inlineOffsetRem}rem, 0, 0)` }

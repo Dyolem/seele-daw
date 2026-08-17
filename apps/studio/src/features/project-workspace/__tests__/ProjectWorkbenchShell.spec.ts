@@ -144,6 +144,7 @@ function mountShell(options: MountShellOptions = {}) {
       clips: options.clips ?? Object.freeze([]),
       isDirty: options.isDirty ?? false,
       pianoRollPresentation: null,
+      pianoRollTrackPresentation: null,
       playbackCanToggle: true,
       playbackCanReturnToStart: false,
       playbackFeedback: null,
@@ -373,7 +374,7 @@ describe('ProjectWorkbenchShell', () => {
 
     expect(wrapper.get('.project-workbench__inspector').text()).toContain('Clip inspector')
     expect(wrapper.get('.project-workbench__inspector').text()).toContain('Midnight Keys')
-    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Midnight Keys')
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Instrument 1')
     expect(wrapper.get('.project-workbench__context-host').text()).toContain(
       'Piano Roll context is unavailable',
     )

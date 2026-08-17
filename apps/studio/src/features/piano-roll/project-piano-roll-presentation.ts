@@ -1,6 +1,8 @@
 import {
   createPianoRollClipContext,
+  createPianoRollTrackReadModel,
   type PianoRollClipContext,
+  type PianoRollTrackReadModel,
 } from '@seele-daw/editor'
 import type {
   ClipId,
@@ -45,6 +47,30 @@ export type ProjectPianoRollPresentation =
   | ReadyProjectPianoRollPresentation
   | UnsupportedProjectPianoRollPresentation
 
+interface ProjectPianoRollTrackPresentationBase {
+  readonly color: ProjectColor | null
+  readonly muted: boolean
+  readonly name: string
+  readonly projectId: ProjectId
+  readonly trackId: TrackId
+}
+
+export interface ReadyProjectPianoRollTrackPresentation
+  extends ProjectPianoRollTrackPresentationBase {
+  readonly readModel: PianoRollTrackReadModel
+  readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+}
+
+export interface UnsupportedProjectPianoRollTrackPresentation
+  extends ProjectPianoRollTrackPresentationBase {
+  readonly reason: 'non-instrument-track'
+  readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
+}
+
+export type ProjectPianoRollTrackPresentation =
+  | ReadyProjectPianoRollTrackPresentation
+  | UnsupportedProjectPianoRollTrackPresentation
+
 /** Projects the selected Clip into the Studio-to-Editor composition boundary. */
 export function createProjectPianoRollPresentation(
   snapshot: ProjectSnapshot,
@@ -82,6 +108,41 @@ export function createProjectPianoRollPresentation(
   return Object.freeze({
     ...base,
     context: createPianoRollClipContext(clip, source),
+    status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
+  })
+}
+
+/** Projects the selected Track into the global-time Piano Roll composition boundary. */
+export function createProjectPianoRollTrackPresentation(
+  snapshot: ProjectSnapshot,
+  trackId: TrackId,
+  activeClipId: ClipId | null = null,
+): ProjectPianoRollTrackPresentation | null {
+  const track = snapshot.tracks.find((candidate) => candidate.id === trackId)
+  if (track === undefined) return null
+
+  const base = {
+    color: track.color,
+    muted: track.channel.muted,
+    name: track.name,
+    projectId: snapshot.project.id,
+    trackId: track.id,
+  }
+  if (track.kind !== 'instrument') {
+    return Object.freeze({
+      ...base,
+      reason: 'non-instrument-track',
+      status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED,
+    })
+  }
+
+  return Object.freeze({
+    ...base,
+    readModel: createPianoRollTrackReadModel({
+      activeClipId,
+      snapshot,
+      trackId: track.id,
+    }),
     status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
   })
 }

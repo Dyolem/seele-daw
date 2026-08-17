@@ -3,7 +3,10 @@ import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import OptionsIcon from '~icons/fluent/options-20-regular'
 import { shallowRef } from 'vue'
 
-import type { ProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
+import type {
+  ProjectPianoRollPresentation,
+  ProjectPianoRollTrackPresentation,
+} from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
@@ -21,6 +24,7 @@ interface ProjectWorkbenchShellProps {
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly isDirty: boolean
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
   readonly playbackCanToggle: boolean
   readonly playbackCanReturnToStart: boolean
   readonly playbackFeedback: string | null
@@ -102,6 +106,7 @@ function openContextEditor(): void {
         :bar-span-tick="props.barSpanTick"
         :clips="props.clips"
         :piano-roll-presentation="props.pianoRollPresentation"
+        :piano-roll-track-presentation="props.pianoRollTrackPresentation"
         :project-id="props.projectId"
         :project-session="props.projectSession"
         :time-signature-numerator="props.timeSignatureNumerator"

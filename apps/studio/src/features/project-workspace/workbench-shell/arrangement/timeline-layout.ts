@@ -1,5 +1,3 @@
-export const TIMELINE_BAR_INLINE_SIZE_REM = 5
-
 export function timelinePositionRatio(positionTick: number, timelineEndTick: number): number {
   if (!Number.isFinite(positionTick) || !Number.isFinite(timelineEndTick) || timelineEndTick <= 0) {
     return 0

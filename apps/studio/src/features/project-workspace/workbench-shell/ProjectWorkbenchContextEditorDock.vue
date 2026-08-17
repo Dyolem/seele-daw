@@ -10,10 +10,16 @@ import MinimizeIcon from '~icons/fluent/subtract-16-regular'
 import { computed } from 'vue'
 
 import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
+import ProjectPianoRollTrackSurface from '@/features/piano-roll/ProjectPianoRollTrackSurface.vue'
 import {
   PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
   type ProjectPianoRollPresentation,
+  type ProjectPianoRollTrackPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
+import {
+  PIANO_ROLL_EDITING_SCOPE,
+  usePianoRollPreferencesStore,
+} from '@/features/piano-roll/piano-roll-preferences-store'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import {
   PROJECT_TRACK_INSTRUMENT_STATUS,
@@ -34,14 +40,17 @@ interface ProjectWorkbenchContextEditorDockProps {
   readonly dockMode: ProjectWorkbenchDockMode
   readonly isMaximized: boolean
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly selectedClip: ProjectMidiClipPresentation | null
   readonly selectedTrack: ProjectTrackPresentation | null
   readonly timeSignatureNumerator: number
+  readonly timelineEndTick: Tick
 }
 
 const props = defineProps<ProjectWorkbenchContextEditorDockProps>()
 const { projectTracks } = useProjectTracks()
+const pianoRollPreferences = usePianoRollPreferencesStore()
 const toasts = useUiToastStore()
 const emit = defineEmits<{
   close: []
@@ -56,7 +65,10 @@ const inspectorTitle = computed(() => {
   return 'Editor tools'
 })
 const selectedContextName = computed(
-  () => props.selectedClip?.name ?? props.selectedTrack?.name ?? 'No selection',
+  () =>
+    (pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK
+      ? props.selectedTrack?.name
+      : (props.selectedClip?.name ?? props.selectedTrack?.name)) ?? 'No selection',
 )
 const selectedInstrument = computed(() => props.selectedTrack?.instrument ?? null)
 const contextEmptyTitle = computed(() => {
@@ -198,8 +210,20 @@ function useStudioGrand(): void {
         v-if="props.dockMode !== PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED"
         class="project-workbench__context-host"
       >
-        <ProjectPianoRollSurface
+        <ProjectPianoRollTrackSurface
           v-if="
+            pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK &&
+            props.pianoRollTrackPresentation?.status ===
+              PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+          "
+          :bar-span-tick="props.barSpanTick"
+          :presentation="props.pianoRollTrackPresentation"
+          :timeline-end-tick="props.timelineEndTick"
+          :time-signature-numerator="props.timeSignatureNumerator"
+        />
+        <ProjectPianoRollSurface
+          v-else-if="
+            pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.CLIP &&
             props.pianoRollPresentation?.status === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
           "
           :bar-span-tick="props.barSpanTick"
@@ -212,11 +236,17 @@ function useStudioGrand(): void {
           <strong>{{ contextEmptyTitle }}</strong>
           <p
             v-if="
-              props.pianoRollPresentation?.status ===
+              (pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK
+                ? props.pianoRollTrackPresentation?.status
+                : props.pianoRollPresentation?.status) ===
               PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
             "
           >
-            Looped MIDI clips are not supported by the first Piano Roll slice.
+            {{
+              pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK
+                ? 'Track Piano Roll is available for Instrument Tracks.'
+                : 'Looped MIDI clips are not supported by Clip Focus.'
+            }}
           </p>
           <p v-else-if="props.selectedClip">
             This MIDI clip is selected, but its Piano Roll context is unavailable.

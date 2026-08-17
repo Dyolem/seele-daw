@@ -156,7 +156,9 @@ Project、Pinia、History、dirty 或 Commit Subscription；后续多个 Playhea
 
 Studio Batch 7D 已让 Arrangement 从该位置源投影不可交互 Playhead，并用 transform-only 图层
 移动；分页 Follow 只滚动 Studio 的右侧时间视口。这些仍是 Studio View 行为，不扩展 Playback
-Core API，也不让 Scheduler cursor 冒充 Playhead。Piano Roll 将在后续批次消费同一位置源。
+Core API，也不让 Scheduler cursor 冒充 Playhead。Studio Batch 7E 让 Piano Roll 也消费同一位置
+源，并用 Arrangement `clip.startTick` 转为 Clip-local Tick；Clip 外、Viewport 外或项目身份不匹配
+时不显示。两种 Playhead 都不向 Playback Core 添加视图状态。
 
 Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 

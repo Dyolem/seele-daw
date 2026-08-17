@@ -5,7 +5,9 @@ import {
 import type {
   ClipId,
   ProjectColor,
+  ProjectId,
   ProjectSnapshot,
+  Tick,
   TrackId,
 } from '@seele-daw/project-core'
 
@@ -22,6 +24,8 @@ interface ProjectPianoRollPresentationBase {
   readonly color: ProjectColor | null
   readonly muted: boolean
   readonly name: string
+  readonly projectId: ProjectId
+  readonly startTick: Tick
   readonly trackId: TrackId
 }
 
@@ -55,6 +59,8 @@ export function createProjectPianoRollPresentation(
     color: clip.color ?? track?.color ?? null,
     muted: clip.muted,
     name: clip.name,
+    projectId: snapshot.project.id,
+    startTick: clip.startTick,
     trackId: clip.trackId,
   }
 

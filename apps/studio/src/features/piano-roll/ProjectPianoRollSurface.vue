@@ -44,6 +44,7 @@ import {
   watchEffect,
 } from 'vue'
 
+import PianoRollPlayhead from '@/features/piano-roll/playhead/PianoRollPlayhead.vue'
 import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollIntentHandler } from '@/features/piano-roll/project-piano-roll-intent-handler'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
@@ -661,6 +662,12 @@ onUnmounted(() => {
       <div ref="noteHost" class="project-piano-roll__note-host"></div>
     </div>
 
+    <PianoRollPlayhead
+      v-if="noteState"
+      :presentation="props.presentation"
+      :viewport="noteState.viewport"
+    />
+
     <p class="project-piano-roll__accessible-status" aria-live="polite">
       {{ accessibleStatus }}
     </p>
@@ -683,6 +690,7 @@ onUnmounted(() => {
   --project-piano-roll-keyboard-width: 4.5rem;
   --project-piano-roll-ruler-height: 1.625rem;
   --project-piano-roll-toolbar-height: 2.25rem;
+  position: relative;
   display: grid;
   min-inline-size: 0;
   min-block-size: 0;

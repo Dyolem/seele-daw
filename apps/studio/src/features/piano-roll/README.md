@@ -25,6 +25,9 @@
 - 聚焦 Piano Roll 时使用 `Delete` / `Backspace` 原子删除完整 Note Selection；成功后由
   权威 Subscription 清理 Selection，失败保留 Project 与 Selection 并显示 Toast；
 - looped Clip 的明确不支持状态。
+- 与 Arrangement 共用 Transport 视觉位置的不可交互 Playhead；Studio Presentation 提供 Project
+  身份与 Arrangement Clip 起点，独立子组件将全局 Tick 投影到当前完整 Clip Viewport，并只用
+  `translate3d(...)` 移动；Clip 外、项目切换或编辑器退出时不保留旧投影。
 
 当前 Surface 已形成 Add、Cursor Move、Cursor / Pencil 单 Note Resize 与多选 Delete 写入
 闭环，但仍不能编辑 Velocity。默认 DOM Note Renderer 提供互不重叠的左右 Edge 热区；

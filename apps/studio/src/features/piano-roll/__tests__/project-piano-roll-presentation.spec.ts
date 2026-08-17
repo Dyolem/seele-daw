@@ -59,7 +59,7 @@ function createFixture() {
       return () => ids.shift() ?? 'unused-piano-roll-presentation-clip-id'
     })(),
   }).addEmptyMidiClip({
-    targetTick: parseTick(0),
+    targetTick: parseTick(3_840),
     trackId: track.trackId,
   })
 
@@ -80,6 +80,8 @@ describe('Project Piano Roll Presentation', () => {
     expect(presentation).toMatchObject({
       clipId: fixture.clip.clipId,
       color: track?.color,
+      projectId: snapshot.project.id,
+      startTick: 3_840,
       status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
       trackId: fixture.track.trackId,
     })

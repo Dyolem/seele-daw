@@ -23,10 +23,10 @@ import {
   type ProjectQueryResult,
   type ProjectSession,
 } from '@seele-daw/project-core'
-import { mount } from '@vue/test-utils'
+import { config, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { markRaw, nextTick } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
 import {
@@ -141,6 +141,8 @@ function createPresentation(
     context: createPianoRollClipContext(clip, source),
     muted: clip.muted,
     name: clip.name,
+    projectId: parseProjectId(`${identity}-project`),
+    startTick: clip.startTick,
     status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
     trackId: clip.trackId,
   })
@@ -308,7 +310,12 @@ function restorePrototypeProperty(
   Object.defineProperty(HTMLElement.prototype, property, descriptor)
 }
 
+beforeEach(() => {
+  config.global.stubs.PianoRollPlayhead = true
+})
+
 afterEach(() => {
+  Reflect.deleteProperty(config.global.stubs, 'PianoRollPlayhead')
   vi.restoreAllMocks()
   restorePrototypeProperty('hasPointerCapture')
   restorePrototypeProperty('releasePointerCapture')

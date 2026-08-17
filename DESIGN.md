@@ -369,6 +369,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - Arrangement Playhead MUST 位于不接收 Pointer 命中的独立轻量图层，并用
   `transform: translate3d(...)` 移动；高频更新不得修改 `left`、`inset-inline-start` 或其他触发布局
   的动态位置属性。Follow 只分页滚动右侧时间视口，左侧 Track 控制列保持固定。
+- Piano Roll Playhead MUST 用 `globalTick - clip.startTick` 投影同一位置，只在 Clip 与当前 Viewport
+  范围内显示，并通过独立 transform-only 图层移动。`sourceStartTick` 表示 MIDI Source 读取偏移，
+  MUST NOT 被当作 Clip 在 Arrangement 的起点。
 - 用户主动横向滚动或操作时间轴时，本次 Follow 暂停；可见 Follow 控制 MUST 能立即恢复。该状态
   是当前视图的瞬时产品状态，不属于 Project Fact。
 - 横向滚动和缩放的具体修饰键必须由 Keybinding 层统一定义，并允许平台适配。
@@ -1035,6 +1038,11 @@ Scheduler cadence 只负责音频 look-ahead，不是 UI 刷新源。后续 DOM 
 Arrangement 当前使用独立 DOM Playhead 子组件直接消费该投影，并只更新一个合成层的
 `translate3d(...)`。Ruler、Lane、Clip Scene 不消费高频位置；分页 Follow 由 Arrangement 右侧
 滚动权威执行，手动横向导航会暂停当前播放轮次的自动滚动。
+
+Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。Studio Presentation 显式携带 Project
+身份和 Arrangement `clip.startTick`，子组件再映射到当前 Clip-local Viewport；静态 Canvas Grid、
+DOM Note Scene、Project Query 和 Editor Session 都不订阅高频 Transport 帧。当前完整 Clip 视口
+没有 Zoom、横向滚动或 Follow。
 
 ### 21.2 禁止项
 

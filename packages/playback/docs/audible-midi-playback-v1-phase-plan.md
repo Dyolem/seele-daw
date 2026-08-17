@@ -1173,9 +1173,9 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7D：Arrangement Playhead 与 Follow
 
-> Implementation status: reviewed and approved for commit on 2026-08-17. The Playhead updates one
-> transform-only layer. Architecture lint, affected ESLint / Oxlint, Studio type-check, Studio 43
-> files / 262 tests and the Studio production build pass.
+> Implementation status: reviewed and committed as `3571acd` on 2026-08-17. The Playhead updates
+> one transform-only layer. Architecture lint, affected ESLint / Oxlint, Studio type-check, Studio
+> 43 files / 262 tests and the Studio production build pass.
 
 - Ruler 与 Lane 上显示同一条不可交互 Playhead，使用独立轻量图层移动；
 - Follow 只驱动 Batch 7B 已建立的 Ruler / Lane 横向滚动，左侧 Track 控制列继续保持固定；
@@ -1190,10 +1190,19 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 #### Batch 7E：Piano Roll Playhead
 
+> Implementation status: reviewed and approved for commit on 2026-08-17. The Piano Roll reads the
+> shared visual position through one transform-only child layer. Architecture lint, affected
+> ESLint / Oxlint, Studio type-check, Studio 45 files / 266 tests and the Studio production build
+> pass.
+
 - 当前 Piano Roll 读取与 Arrangement 相同的全局 Transport Tick；
 - 用 `globalTick - clip.startTick` 投影为 Clip 局部位置，只在 `[0, clip.spanTick]` 范围显示；
 - 切换 Selection、Clip、项目或退出编辑器时更新 / 清理投影；
 - 当前完整 Clip 视口不增加 Zoom、Scroll 或自动跟随，也不改变 Note 编辑手势。
+- 高频位置只更新独立 Playhead 子组件的 `translate3d(...)`；Canvas Grid、DOM Note Scene 与
+  Editor Session 不消费 Transport 视觉帧；
+- `clip.startTick` 由 Studio Presentation 显式提供，不能用代表 MIDI Source 读取偏移的
+  `sourceStartTick` 代替。项目身份不匹配、全局位置位于 Clip 外或编辑器卸载时不保留旧投影。
 
 #### Batch 7F：加固与文档同步
 

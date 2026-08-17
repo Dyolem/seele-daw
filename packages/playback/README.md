@@ -2,16 +2,17 @@
 
 `playback` 是浏览器无关的播放编译核心。长期会把项目快照和增量变化解释为图计划、时间线
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
-AudioNode。当前首个可听切片只输出阶段计划定义的具体播放计划。
+AudioNode。已完成的首个可听切片只输出阶段计划定义的具体播放计划。
 
 > 当前状态：截至 2026-08-17，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
-> 5A、Batch 6A–6F 与 Batch 7A–7F 已通过功能审阅；实施范围已完成，等待独立封版决定。本包已有通用
+> 5A、Batch 6A–6F 与 Batch 7A–7F 已通过功能审阅；Audible MIDI Playback V1 已按验收基线
+> `f1d0298` 完成，尚未创建阶段 checkpoint。本包已有通用
 > Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
 > Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
 > Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
 > 长期架构中的名称 `playback-core` 对应当前包。
 
-当前阶段实施计划见
+已完成阶段的范围、证据和延期记录见
 [Audible MIDI Playback V1 阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
 Compiler、Transport 与 Scheduler 的协作和术语另见
 [Audible MIDI Scheduler 工作原理](./docs/audible-midi-scheduler-primer.md)。
@@ -26,8 +27,8 @@ Compiler、Transport 与 Scheduler 的协作和术语另见
 审阅，首版只建立具体的内置 Device Definition、Track Playback Plan、MIDI Note Span、
 Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect Graph、RuntimeDelta、
 跨线程 ACK 或 Loop / Seek 协议。Compiler unsupported content、Transport Mapping 与 Scheduler
-late / drop policy 已按批次收敛；资产加载与浏览器矩阵仍按阶段计划中的 Decision Gate 逐批
-确认。
+late / drop policy、资产加载和首个浏览器听觉验收均已按阶段 Decision Gate 收敛；更广的浏览器
+兼容矩阵仍属于后续专项范围。
 
 ## 当前已实现
 

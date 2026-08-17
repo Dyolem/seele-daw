@@ -8,9 +8,10 @@
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
-> [Web DAW 简洁架构总纲](./web-daw-architecture-brief.md)，当前第一版可听产品切片见
+> [Web DAW 简洁架构总纲](./web-daw-architecture-brief.md)，已完成的第一版可听产品切片见
 > [Audible MIDI Playback V1 阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)。
-> 后者的 `V1` 不是本文档版本；本文中的通用 Graph、RuntimeDelta、ACK 与 AudioWorklet
+> 该切片已于 2026-08-17 按验收基线 `f1d0298` 完成，尚未创建阶段 checkpoint tag。后者的 `V1`
+> 不是本文档版本；本文中的通用 Graph、RuntimeDelta、ACK 与 AudioWorklet
 > 仍是长期能力，除非阶段计划明确纳入，否则不能作为首版可听切片的验收要求。
 > 本文其余未加 `Audible MIDI Playback` 限定的 `V1` 是 2026-07-09 长期基线中的“首版产品 /
 > 模型”简称，同样不是文档版本；落地时仍须由对应专项计划重新确认。
@@ -56,7 +57,7 @@ Browser Infrastructure：存储、文件、Worker、权限和设备
 Vue Studio：界面与组合根
 ```
 
-当前首个可听切片把 `Playback Core` 收窄为具体 Track Playback Plan、MIDI Note Span、TempoMap、
+已完成的首个可听切片把 `Playback Core` 收窄为具体 Track Playback Plan、MIDI Note Span、TempoMap、
 Transport Mapping 与 Scheduler Plan；把 `Web Audio Backend` 收窄为主线程原生 Web Audio 的
 Manifest 驱动 MIDISampleSynth Runtime，并以 Studio Grand 作为首次听觉验收资产。长期职责不
 要求一次性预建对应通用 Graph 或 Synth 框架。Sample Instrument 的交换与执行进一步分层：
@@ -64,7 +65,7 @@ Seele Supported SFZ Profile 声明公开 authoring 子集，各来源 Importer �
 私有默认值，规范化 Sample Instrument Manifest 才是内置 Runtime 的唯一输入。当前默认内置
 Mapping 的逆向推断只属于 Compatibility Adapter，不构成通用宿主规则。
 
-当前切片还由 Playback 从 Snapshot 派生至少 150 小节的 `timelineEndTick`，并由 Studio 将同一
+该切片还由 Playback 从 Snapshot 派生至少 150 小节的 `timelineEndTick`，并由 Studio 将同一
 Transport 视觉位置投影到 Arrangement、Track-time Piano Roll 和 Clip Focus Piano Roll。动画帧
 只触发权威位置采样，不累计 UI elapsed time；各视图的 Scroll / Follow 属于 ViewState，不进入
 ProjectSession、Playback Plan 或 Audio Runtime。

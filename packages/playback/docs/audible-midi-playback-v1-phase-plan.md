@@ -1,6 +1,6 @@
 # Audible MIDI Playback V1 阶段计划
 
-> Status: Batch 1–6 and 7A–7F reviewed; implementation scope complete and awaiting a separate close / checkpoint decision
+> Status: Completed on 2026-08-17; Batch 1–6 and 7A–7F reviewed; accepted implementation baseline `f1d0298`; no checkpoint tag created
 >
 > Date: 2026-08-10
 >
@@ -10,11 +10,12 @@
 
 本文中的 `V1` 指 **Audible MIDI Playback 的第一版产品纵向切片**，不是长期架构文档的
 旧版本。长期架构仍以 `web-daw-long-term-architecture-v3.md` 为基线；本文只把当前阶段需要
-落地和继续确认的细节收敛成可执行边界。
+落地和继续确认的细节收敛成可执行边界。阶段收口后，本文作为已完成实现、验收证据、明确延期
+与架构决定的历史记录；新增播放能力必须进入新的产品切片，而不是继续扩大本 V1。
 
 ## 阶段目标
 
-本阶段把已经完成的 MIDI 编辑闭环推进为第一条真正可听见、可观察播放位置的产品纵向切片：
+本阶段已把 MIDI 编辑闭环推进为第一条真正可听见、可观察播放位置的产品纵向切片：
 
 ```text
 创建默认 Studio Grand Instrument Track
@@ -41,7 +42,7 @@
 unsupported content 行为已经按批次确认；资产加载和真实声音策略仍通过下文 Decision Gate
 单独确认。
 
-阶段完成时，当前最小 MIDI 工作流应第一次满足架构总纲中的“写 Note 后能够播放”。
+阶段完成后，当前最小 MIDI 工作流已第一次满足架构总纲中的“写 Note 后能够播放”。
 
 ## 1. 已确认边界与 Decision Gate
 
@@ -1279,7 +1280,7 @@ Track 模式 Pencil 在全局时间轴上的首版自动放置规则已经确认
 - 回归前台 / 后台视觉恢复、手动滚动暂停 Follow、Return、Pause、项目切换与 dispose；
 - 运行 lint、type-check、全部测试和 Studio production build；按约定不新增 E2E；
 - 同步 PRODUCT、DESIGN、Playback / Audio Web README 与架构校准；全部 Batch 7 提交经用户审核后，
-  再单独决定 Audible MIDI Playback V1 是否封版和建立 checkpoint tag。
+  Audible MIDI Playback V1 已按第 13 节完成收口，checkpoint tag 仍保持独立且尚未创建。
 
 当前自动化证据映射：
 
@@ -1356,7 +1357,8 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 
 ## 12. 明确延期
 
-本阶段不实现：
+本阶段不实现以下能力。它们是已知且已接受的 V1 边界，不是阻塞本次收口的缺陷；后续必须由
+独立产品目标、交互语义和技术 Gate 驱动：
 
 - 完整 Soundbank Catalog、搜索、分类、收藏和最近使用；
 - 任意 ZIP / 上游 schema 扫描、M4A / WAV 自动协商或全量 2.2 GB 资源索引；
@@ -1379,9 +1381,9 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
 
 这些能力必须由后续真实产品切片驱动，不能借 Playback V1 名义预建通用音频工作站框架。
 
-## 13. 完成定义
+## 13. 完成定义与收口结论
 
-只有同时满足以下条件，Audible MIDI Playback V1 才可候选封版：
+Audible MIDI Playback V1 已于 2026-08-17 完成收口，以下条件均已满足：
 
 - 用户能够从 Project Fact 确认 Track 使用 Studio Grand；
 - 用户创建的 MIDI Note 能按 Project 时间和 Pitch 发声；
@@ -1398,7 +1400,20 @@ Batch 5A 已完成人工听觉 smoke。Batch 6 不新增 E2E 或把人工浏览�
   Playhead，以及 Arrangement / Track 各自的分页 Follow 通过 Batch 7 产品验收；
 - [产品功能手册](../../../PRODUCT.md)、[设计语言](../../../DESIGN.md)、
   [Playback README](../README.md) 与 [Audio Web README](../../audio-web/README.md) 已同步；
-- 用户逐批审阅通过；是否建立新的阶段 checkpoint 由 Batch 7 审核结束后的独立决定确认。
+- 用户逐批审阅通过；阶段完成不依赖 checkpoint tag，当前未创建新的 tag。
+
+阶段收口记录：
+
+| 项目              | 结论                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| 实现与验收基线    | `f1d0298`，包含 Batch 7F 最终加固；Batch 1–6 与 7A–7F 均已审核                             |
+| 自动化验证        | 113 个测试文件 / 1019 项测试，Workspace Type Check、Studio Production Build 与资产边界通过 |
+| 浏览器验证        | Chrome 首次可听闭环人工 smoke 通过；Batch 7 未新增 E2E                                     |
+| 本地采样分发边界  | 开发资源不进入 Studio Production Build；公开采样仍需独立资产或再分发授权                   |
+| Checkpoint / Push | 未创建阶段 checkpoint tag，也未因文档收口自动推送                                          |
+
+因此本阶段状态为 **Completed**。这一结论只确认本文定义的第一版可听 MIDI 纵向切片，不表示第 12 节
+的延期能力或长期通用 Audio Graph / Worklet 架构已经完成。
 
 ## 参考
 

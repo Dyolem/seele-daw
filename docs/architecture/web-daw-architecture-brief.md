@@ -21,7 +21,7 @@
 ### 0.1 当前实现校准
 
 本文描述长期稳定边界，不是“所有方框均已实现”的状态清单。当前真实能力以
-[产品功能手册](../../PRODUCT.md)为准；当前 Playback 工作以
+[产品功能手册](../../PRODUCT.md)为准；已完成的首个 Playback 切片以
 [Audible MIDI Playback V1 阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)
 为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
 架构文档的版本号。
@@ -31,8 +31,9 @@
 Reconciliation、Transport 原位 handoff 和选择性 Voice 生命周期，播放中 Note / Track /
 Instrument 变化可以保留无关活动 Voice；Batch 7A–7E 已交付派生 150 小节 Timeline、独立
 Arrangement 滚动权威、共享视觉位置，以及 Arrangement / Track / Clip Focus Playhead 和分页
-Follow；Batch 7F 加固与文档同步也已通过审核。长期架构中的通用 Graph、RuntimeDelta、跨线程
-ACK 和 AudioWorklet 路径仍不能反推为首版切片的必做范围。
+Follow；Batch 7F 加固与文档同步也已通过审核。Audible MIDI Playback V1 已在验收基线
+`f1d0298` 完成；阶段 checkpoint tag 尚未创建。长期架构中的通用 Graph、RuntimeDelta、跨线程
+ACK 和 AudioWorklet 路径仍不能反推为该已完成切片的必做范围。
 
 ---
 

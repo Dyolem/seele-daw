@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/type-utils/tsconfig.json" },
+    { "path": "./packages/midi-file/tsconfig.json" },
     { "path": "./apps/studio/tsconfig.node.json" },
     { "path": "./apps/studio/tsconfig.app.json" },
     { "path": "./apps/studio/tsconfig.vitest.json" },

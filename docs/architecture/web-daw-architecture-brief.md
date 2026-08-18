@@ -26,7 +26,7 @@
 为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
 架构文档的版本号。
 
-截至 2026-08-17，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
+截至 2026-08-18，Project / Studio / Persistence 与 Piano Roll Add、Move、单 Note Resize、
 多选 Delete 已形成闭环；Studio 首次可听闭环已通过功能审核。Playback Batch 6 已增加完整 Plan
 Reconciliation、Transport 原位 handoff 和选择性 Voice 生命周期，播放中 Note / Track /
 Instrument 变化可以保留无关活动 Voice；Batch 7A–7E 已交付派生 150 小节 Timeline、独立
@@ -43,6 +43,11 @@ Return Anchor；Studio Coordinator 拥有静默事务、generation / Voice 失�
 Arrangement 只拥有 Pointer / Keyboard、Preview、边缘滚动与 Follow。该切片不重新打开 Audible
 MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase。阶段 checkpoint 为
 `checkpoint/manual-timeline-locate-2026-08-18`。
+
+当前下一条纵向切片是
+[Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)。
+新建的 `midi-file` 只拥有中立 SMF Document 与可替换 Decoder / Encoder Adapter，不依赖 Project
+Core 或 Browser；Project 映射、项目创建事务和 Studio 导入导出入口按独立批次接入。
 
 ---
 
@@ -445,6 +450,7 @@ web-daw/
 │               └── piano-roll/
 ├── packages/
 │   ├── type-utils/
+│   ├── midi-file/
 │   ├── project-core/
 │   ├── editor/
 │   │   ├── common/
@@ -457,7 +463,9 @@ web-daw/
     └── adr/
 ```
 
-初期业务边界保持这五个 package，另设一个不产生运行时代码的 `type-utils` 基础叶子包。Asset、Persistence、Renderer 等先作为所属 package 的内部模块，边界稳定后再拆。
+当前业务边界包含六个 package，另设一个不产生运行时代码的 `type-utils` 基础叶子包。新增的
+`midi-file` 隔离 Standard MIDI File Codec 与第三方实现；Asset、Persistence、Renderer 等仍先
+作为所属 package 的内部模块，边界稳定后再拆。
 
 ## 16. 依赖规则
 
@@ -465,6 +473,10 @@ web-daw/
 type-utils
   只提供纯编译期、跨领域的 TypeScript 类型工具
   不依赖任何业务 package
+
+midi-file
+  提供与 Project 无关的 Standard MIDI File 中立契约与可替换 Codec Adapter
+  不依赖 Project、Vue、DOM、Web Audio 或浏览器文件 API
 
 project-core
   只依赖 type-utils
@@ -520,9 +532,10 @@ studio
 
 ## 18. 开发顺序
 
-以下顺序是依赖基线，不再代表当前完成度。截至 2026-08-10，骨架、Project Kernel、
-Workbench、Piano Roll 与 Persistence 已完成当前纵向切片；下一项是经过独立阶段计划与逐批
-审阅的 Playback。不能因为下文历史编号把已经交付的 Persistence 当成 Playback 之后才开始。
+以下顺序是依赖基线，不再代表当前完成度。截至 2026-08-18，骨架、Project Kernel、
+Workbench、Piano Roll、Persistence、Audible MIDI Playback 与 Manual Timeline Locate 已完成对应
+切片；当前进入经过独立阶段计划与逐批审阅的 Standard MIDI File Import / Export。不能因为下文
+历史编号把已经交付的能力当成尚未开始。
 
 ### 第一步：搭骨架
 

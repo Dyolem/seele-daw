@@ -6,6 +6,7 @@ const root = process.cwd()
 const packageRoot = path.join(root, 'packages')
 const packageNames = [
   'type-utils',
+  'midi-file',
   'project-core',
   'editor',
   'playback',
@@ -18,6 +19,7 @@ const workspaceDirectories = [
 ]
 const allowedWorkspaceImports = new Map([
   ['type-utils', new Set()],
+  ['midi-file', new Set()],
   ['project-core', new Set(['type-utils'])],
   ['editor', new Set(['project-core', 'type-utils'])],
   ['playback', new Set(['project-core', 'type-utils'])],
@@ -27,6 +29,7 @@ const allowedWorkspaceImports = new Map([
 
 const bannedExternalImports = new Map([
   ['type-utils', new Set(['vue', 'pinia', 'vue-router'])],
+  ['midi-file', new Set(['vue', 'pinia', 'vue-router'])],
   ['project-core', new Set(['vue', 'pinia', 'vue-router'])],
   ['editor', new Set(['vue', 'pinia', 'vue-router'])],
   ['playback', new Set(['vue', 'pinia', 'vue-router'])],

@@ -4,7 +4,7 @@
 > 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
-> 最近实现校准：2026-08-17\
+> 最近实现校准：2026-08-18\
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
@@ -15,6 +15,9 @@
 > 仍是长期能力，除非阶段计划明确纳入，否则不能作为首版可听切片的验收要求。
 > 本文其余未加 `Audible MIDI Playback` 限定的 `V1` 是 2026-07-09 长期基线中的“首版产品 /
 > 模型”简称，同样不是文档版本；落地时仍须由对应专项计划重新确认。
+> Manual Timeline Locate 已通过 `checkpoint/manual-timeline-locate-2026-08-18` 收口；当前实施中的
+> [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)
+> 以独立 `midi-file` Codec 边界开始，不把第三方 Parser 类型或文件 I/O 反向带入 Project Core。
 
 ---
 
@@ -272,6 +275,7 @@ web-daw/
 │   └── studio/                    Vue 3 应用与 Composition Root
 ├── packages/
 │   ├── type-utils/                纯编译期、跨领域 TypeScript 类型工具
+│   ├── midi-file/                 Standard MIDI File 中立契约与可替换 Codec Adapter
 │   ├── project-core/              模型、时间、命令、事务、历史、查询端口
 │   ├── editor/                    common Tool / Interaction 与 browser Renderer
 │   ├── playback/                  Compiler、Transport、Scheduler 契约、RuntimePlan
@@ -290,9 +294,11 @@ web-daw/
 ```mermaid
 flowchart TD
   TU["type-utils"]
+  MF["midi-file"]
   APP["studio"] --> ED["editor"]
   APP --> AW["audio-web"]
   APP --> BR["platform-browser"]
+  APP --> MF
   ED --> PC["project-core"]
   PB["playback"] --> PC
   AW --> PB
@@ -306,6 +312,10 @@ flowchart TD
 `platform-browser` 由 studio 组合根注入各核心端口。它可以 import 端口类型，但任何核心包都
 不能 import `platform-browser`。Canvas、Viewport、DisplayList 与 Hit Test 当前留在
 `@seele-daw/editor/browser`；只有真实消费者证明需要独立发布时才拆 Renderer package。
+
+`midi-file` 是无浏览器依赖的格式叶子包，只把 Standard MIDI File 字节转换为中立 MIDI
+Document，或执行反向编码。第三方 Parser / Writer 类型不得穿过 package root；Project Track、
+Clip、默认音源与 PPQ 960 换算由上层 MIDI / Project bridge 负责，不能反向进入 Codec。
 
 ### 8.2 拆包规则
 

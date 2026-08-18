@@ -1,7 +1,7 @@
 # Manual Timeline Locate V1 阶段记录
 
-> Status: Implemented on 2026-08-18; awaiting unified user review and user-owned browser
-> validation; no checkpoint tag created
+> Status: Accepted and closed on 2026-08-18; user-owned browser validation passed;
+> checkpoint `checkpoint/manual-timeline-locate-2026-08-18`
 >
 > Date: 2026-08-18
 >
@@ -59,6 +59,8 @@ Ruler 使用水平 Slider 可访问性语义，并公开当前 Tick、最小 Tic
 - 成功的 Playing 定位恢复 Arrangement Follow；取消恢复手势开始前的 Arrangement Follow
   开关状态。
 - Track Piano Roll Follow 继续拥有独立的瞬时状态，不被 Arrangement Locate 改写。
+- Arrangement Playhead 与静默 Preview 的横向位置继续由 transform-only 图层承担；纵向线段
+  以 CSS 粘附当前 Arrangement 视口，纵向滚动时三角柄保持可见，二者共用相同线宽。
 
 边缘滚动由 `requestAnimationFrame` 驱动，只改变 Arrangement 的既有横向滚动权威。帧间隔被
 限制以避免后台恢复产生大跳跃；Transport Position 仍由 Playback Clock 决定，视觉帧不是第二套
@@ -81,11 +83,13 @@ Ruler 使用水平 Slider 可访问性语义，并公开当前 Tick、最小 Tic
 | TL1  | Playback Transport Locate、Return Anchor 与 Plan clamp   | `2b89595` |
 | TL2  | Studio Coordinator、Loading / Empty、Runtime 保留与取消  | `228a832` |
 | TL3  | Arrangement Ruler 点击 / 拖动、静默 Preview 与单次提交   | `74b286b` |
-| TL4  | 连续边缘滚动、Follow、键盘 / ARIA、Return 命名与文档收口 | 本次提交  |
+| TL4  | 连续边缘滚动、Follow、键盘 / ARIA、Return 命名与文档收口 | `3883ca4` |
+| UX   | Playhead / Preview 纵向视口粘附与一致线宽                | `f4cb601` |
 
-按约定四个批次连续实施并分别提交，之后统一审核；本切片不新增 E2E，也不由实现方执行浏览器人工
-手测。用户人工验证重点是点击 / 拖动定位、左右边缘滚动、播放中继续、取消恢复、Return Anchor 和
-到达 Timeline End 停止。
+四个主批次按约定连续实施并分别提交，统一审核后另完成一个纵向可见性 UX 修正。本切片没有新增
+E2E，也没有由实现方执行浏览器人工手测；用户已完成代码审核和浏览器功能验证，确认点击 / 拖动
+定位、左右边缘滚动、播放中继续、取消恢复、Return Anchor、Timeline End 停止与 Playhead 纵向
+可见性符合当前产品范围。
 
 ## 6. 明确延期
 

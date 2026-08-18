@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-18，Manual Timeline Locate V1 四批实现完成，等待统一审核
+> 最近更新：2026-08-18，Manual Timeline Locate V1 已完成并通过验收
 >
-> 当前阶段：Audible MIDI Playback V1 已完成；Manual Timeline Locate V1 待统一审核；尚未建立阶段 checkpoint
+> 当前阶段：Manual Timeline Locate V1 已完成；checkpoint 为 `checkpoint/manual-timeline-locate-2026-08-18`
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -302,7 +302,9 @@ Transport 是当前播放位置的唯一运行时权威。Studio 已建立共享
 直接读取最新 Transport Position。Scheduler 的 `25 ms` 唤醒只负责安排声音，不再把每次唤醒都
 发布为普通 Vue 状态；高频位置不会进入 Project、Pinia、History、dirty 或 Commit Subscription。
 
-Arrangement 在 Ruler 和 Track Lane 上显示同一条 transform-only Playhead。Ruler 单击定位到
+Arrangement 在 Ruler 和 Track Lane 上显示同一条 transform-only Playhead。其纵向线段由 CSS
+粘附当前 Arrangement 视口，纵向滚动不隐藏顶部三角柄；Playhead 与 Locate Preview 使用相同
+线宽。Ruler 单击定位到
 最近整数 Project Tick；拖动显示独立静默 Preview，松开只提交一次权威定位，拖到左右边缘时按
 靠近程度连续滚动。Track Lane、Clip 与 Piano Roll 当前不响应直接定位。Follow 在每次普通进入
 Playing 时默认开启，并只分页滚动右侧 Arrangement 时间视口；Playing Locate 成功后恢复 Follow，
@@ -866,7 +868,7 @@ Project Core 已具备：
 | 2026-08-17 | `PIANO-ROLL`                                               | 建立 Track 全局 Read Model、原子 Clip / Note 放置、Track-time Surface，以及不写 Project Fact 的 Track / Clip Focus 可见切换。                                    | `5e50228`、`113aabb`、`4d935fd`、`ea87d53` |
 | 2026-08-17 | `PIANO-ROLL`、`PLAYBACK-VIEW`                              | Track 与 Clip Focus 共用权威 Transport 视觉位置；Track 增加 transform-only Playhead、独立分页 Follow 与手动导航暂停。                                            | `78ee8ea`                                  |
 | 2026-08-17 | `PLAYBACK`、`PLAYBACK-VIEW`                                | 完成后台视觉恢复、Timeline / Transport、生命周期与资源清理证据审计；Audible MIDI Playback V1 全部批次通过审核并收口。                                            | `f1d0298`                                  |
-| 2026-08-18 | `TIMELINE-LOCATE`、`PLAYBACK`                              | 建立 Ruler 点击 / 静默拖动、连续边缘滚动、键盘 / ARIA、播放中安全重调度、Return Anchor 与 Follow 恢复；四批实现完成，等待统一审核。                              | `2b89595`、`228a832`、`74b286b` 与本次 TL4 |
+| 2026-08-18 | `TIMELINE-LOCATE`、`PLAYBACK`                              | 建立 Ruler 点击 / 静默拖动、连续边缘滚动、键盘 / ARIA、播放中安全重调度、Return Anchor、Follow 恢复及纵向可见 Playhead；已通过统一审核与用户浏览器验证。         | `2b89595..f4cb601`                         |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -875,15 +877,16 @@ Audible MIDI Playback V1 已于 2026-08-17 按
 `f1d0298`。阶段完成与 Git checkpoint 相互独立；当前未创建新的 checkpoint tag。
 
 其后的 [Manual Timeline Locate V1](./packages/playback/docs/manual-timeline-locate-v1-phase-plan.md)
-已于 2026-08-18 完成四个独立实现批次，当前等待用户统一代码审核与用户负责的浏览器人工验证；它不
-改变 Audible MIDI Playback V1 的已完成状态，也尚未形成 checkpoint。
+已于 2026-08-18 完成四个独立主批次和一个 Playhead 纵向可见性 UX 修正，并通过用户统一代码
+审核与浏览器功能验证；它不改变 Audible MIDI Playback V1 的已完成状态。阶段 checkpoint 为
+`checkpoint/manual-timeline-locate-2026-08-18`。
 
 Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、Batch 3B、Batch 4A、
 Batch 4B.1、Batch 4B.2、Batch 5A、Batch 6A–6F 与 Batch 7A–7F 已通过本地验证和功能审核。
 Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 浏览器布局 smoke。按约定没有新增 E2E：
 
-- Manual Timeline Locate V1 四批实现通过 2026-08-18 完整 `pnpm check`；Playback 为 9 文件 /
+- Manual Timeline Locate V1 最终实现通过 2026-08-18 完整 `pnpm check`；Playback 为 9 文件 /
   100 项，Studio 为 46 / 284，并通过 Architecture、Workspace Type Check、Studio Production
   Build 与 soundbank dist boundary。按用户约定没有新增 E2E，也未由实现方执行浏览器人工手测。
 

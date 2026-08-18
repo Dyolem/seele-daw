@@ -7,7 +7,8 @@ AudioNode。已完成的首个可听切片只输出阶段计划定义的具体�
 > 当前状态：截至 2026-08-18，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
 > 5A、Batch 6A–6F 与 Batch 7A–7F 已通过功能审阅；Audible MIDI Playback V1 已按验收基线
 > `f1d0298` 完成，尚未创建阶段 checkpoint。后续独立的 Manual Timeline Locate V1 已完成四个
-> 实施批次，等待统一审核与用户浏览器验证。本包已有通用
+> 主批次与纵向 Playhead UX 修正，并通过统一审核和用户浏览器验证；阶段 checkpoint 为
+> `checkpoint/manual-timeline-locate-2026-08-18`。本包已有通用
 > Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
 > Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
 > Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
@@ -15,7 +16,7 @@ AudioNode。已完成的首个可听切片只输出阶段计划定义的具体�
 
 已完成阶段的范围、证据和延期记录见
 [Audible MIDI Playback V1 阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
-手动时间线定位的产品语义、实现边界与待验收项见
+手动时间线定位的产品语义、实现边界与验收记录见
 [Manual Timeline Locate V1 阶段记录](./docs/manual-timeline-locate-v1-phase-plan.md)。
 Compiler、Transport 与 Scheduler 的协作和术语另见
 [Audible MIDI Scheduler 工作原理](./docs/audible-midi-scheduler-primer.md)。

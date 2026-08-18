@@ -37,10 +37,12 @@ ACK 和 AudioWorklet 路径仍不能反推为该已完成切片的必做范围�
 
 后续独立的
 [Manual Timeline Locate V1](../../packages/playback/docs/manual-timeline-locate-v1-phase-plan.md)
-已完成四个实施批次，等待统一审核：Playback Transport 拥有浏览器无关的 Tick Locate 与运行时
+已完成四个主批次和一个 Playhead 纵向可见性 UX 修正，并通过统一审核与用户浏览器验证：
+Playback Transport 拥有浏览器无关的 Tick Locate 与运行时
 Return Anchor；Studio Coordinator 拥有静默事务、generation / Voice 失效和 Runtime 保留；
 Arrangement 只拥有 Pointer / Keyboard、Preview、边缘滚动与 Follow。该切片不重新打开 Audible
-MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase。
+MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase。阶段 checkpoint 为
+`checkpoint/manual-timeline-locate-2026-08-18`。
 
 ---
 

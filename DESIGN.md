@@ -369,7 +369,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
   高频视觉位置不得进入 Project、Pinia、History、dirty 或 Commit Subscription。
 - Arrangement Playhead MUST 位于不接收 Pointer 命中的独立轻量图层，并用
   `transform: translate3d(...)` 移动；高频更新不得修改 `left`、`inset-inline-start` 或其他触发布局
-  的动态位置属性。Follow 只分页滚动右侧时间视口，左侧 Track 控制列保持固定。
+  的动态位置属性。其纵向线段 MUST 覆盖当前可见 Arrangement 视口，纵向滚动不得隐藏顶部拖动
+  柄；Playhead 与 Locate Preview MUST 使用同一线宽。Follow 只分页滚动右侧时间视口，左侧
+  Track 控制列保持固定。
 - Arrangement Ruler MUST 是 Manual Locate 的唯一当前 Pointer 命中面；单击映射到最近整数 Project
   Tick，拖动只移动独立 transform-only 静默 Preview，Pointer Up 只提交一次。Track Lane、Clip 与
   Piano Roll 当前不得借冒泡事件隐式定位。
@@ -1069,7 +1071,9 @@ Scheduler cadence 只负责音频 look-ahead，不是 UI 刷新源。后续 DOM 
 这份投影，并只更新独立轻量图层，不能各自维护计时器或累计时间。
 
 Arrangement 当前使用独立 DOM Playhead 子组件直接消费该投影，并只更新一个合成层的
-`translate3d(...)`。Ruler Locate Preview 是另一条只在手势期间存在的 transform-only 图层；
+`translate3d(...)`。横向锚点留在时间内容中，纵向线段通过容器尺寸查询与 CSS Sticky 覆盖当前
+可见 Arrangement 高度，不维护第二个滚动状态。Ruler Locate Preview 是另一条只在手势期间存在、
+与 Playhead 等宽的 transform-only 图层；
 Ruler、Lane、Clip Scene 不消费高频播放位置。分页 Follow 与 Locate 边缘自动滚动都由
 Arrangement 右侧同一滚动权威执行，但前者跟随 Transport，后者只跟随 Pointer；取消手势必须
 恢复先前 Follow 状态。

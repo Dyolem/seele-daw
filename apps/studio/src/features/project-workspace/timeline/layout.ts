@@ -1,9 +1,38 @@
+import { parseTick, type Tick } from '@seele-daw/project-core'
+
 export function timelinePositionRatio(positionTick: number, timelineEndTick: number): number {
   if (!Number.isFinite(positionTick) || !Number.isFinite(timelineEndTick) || timelineEndTick <= 0) {
     return 0
   }
 
   return Math.min(1, Math.max(0, positionTick / timelineEndTick))
+}
+
+interface TimelineLocateTickInput {
+  readonly clientX: number
+  readonly scrollLeft: number
+  readonly scrollWidth: number
+  readonly timelineEndTick: Tick
+  readonly viewportLeft: number
+}
+
+/** Maps a Ruler pointer through the horizontal viewport to the nearest integer Project Tick. */
+export function resolveTimelineLocateTick(input: TimelineLocateTickInput): Tick {
+  if (
+    !Number.isFinite(input.clientX) ||
+    !Number.isFinite(input.scrollLeft) ||
+    !Number.isFinite(input.scrollWidth) ||
+    !Number.isFinite(input.viewportLeft) ||
+    input.scrollWidth <= 0
+  ) {
+    return parseTick(0)
+  }
+
+  const contentInlineOffset = Math.min(
+    input.scrollWidth,
+    Math.max(0, input.scrollLeft + input.clientX - input.viewportLeft),
+  )
+  return parseTick(Math.round((contentInlineOffset / input.scrollWidth) * input.timelineEndTick))
 }
 
 interface PagedFollowScrollInput {

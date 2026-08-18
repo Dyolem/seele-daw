@@ -24,7 +24,10 @@ import {
   PROJECT_CLIP_CONTEXT_KEY,
   type ProjectClipVueContext,
 } from '@/workbench/project/clip/vue/project-clip-context'
-import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
+import type {
+  ProjectPlaybackCoordinator,
+  ProjectPlaybackLocateSession,
+} from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
@@ -56,6 +59,11 @@ interface ArrangementFixture {
   readonly toasts: ReturnType<typeof useUiToastStore>
   readonly playbackState: ShallowRef<ProjectPlaybackState>
   readonly playbackVisualPosition: ShallowRef<ProjectPlaybackVisualPosition>
+  readonly beginTimelineLocate: ReturnType<
+    typeof vi.fn<ProjectPlaybackCoordinator['beginTimelineLocate']>
+  >
+  readonly cancelTimelineLocate: ReturnType<typeof vi.fn<ProjectPlaybackLocateSession['cancel']>>
+  readonly commitTimelineLocate: ReturnType<typeof vi.fn<ProjectPlaybackLocateSession['commit']>>
   readonly wrapper: VueWrapper
 }
 
@@ -120,8 +128,17 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       projectId,
     }),
   )
+  const cancelTimelineLocate = vi.fn<ProjectPlaybackLocateSession['cancel']>(() => true)
+  const commitTimelineLocate = vi.fn<ProjectPlaybackLocateSession['commit']>(() => true)
+  const beginTimelineLocate = vi.fn<ProjectPlaybackCoordinator['beginTimelineLocate']>(() =>
+    Object.freeze({
+      cancel: cancelTimelineLocate,
+      commit: commitTimelineLocate,
+      startedWhilePlaying: playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING,
+    }),
+  )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
-    beginTimelineLocate: () => null,
+    beginTimelineLocate,
     state: playbackState.value,
     locateAtTick: () => false,
     pause: () => false,
@@ -160,6 +177,9 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   return {
     addEmptyMidiClip,
     addInstrumentTrack,
+    beginTimelineLocate,
+    cancelTimelineLocate,
+    commitTimelineLocate,
     selection,
     toasts,
     playbackState,
@@ -183,6 +203,30 @@ function setPlaybackPosition(fixture: ArrangementFixture, positionTick: number):
 
 function setPlaybackPhase(fixture: ArrangementFixture, phase: ProjectPlaybackState['phase']): void {
   fixture.playbackState.value = Object.freeze({ ...fixture.playbackState.value, phase })
+}
+
+async function dispatchPointerEvent(
+  element: Element,
+  type: string,
+  input: {
+    readonly button?: number
+    readonly clientX?: number
+    readonly isPrimary?: boolean
+    readonly pointerId: number
+  },
+): Promise<void> {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    button: input.button ?? 0,
+    cancelable: true,
+    clientX: input.clientX ?? 0,
+  })
+  Object.defineProperties(event, {
+    isPrimary: { value: input.isPrimary ?? true },
+    pointerId: { value: input.pointerId },
+  })
+  element.dispatchEvent(event)
+  await nextTick()
 }
 
 afterEach(() => {
@@ -249,6 +293,97 @@ describe('ProjectWorkbenchArrangement', () => {
     await nextTick()
 
     expect(playhead.attributes('style')).toContain('transform: translate3d(0rem, 0, 0)')
+  })
+
+  it('commits a Ruler click at the nearest Project Tick without locating from a lane', async () => {
+    const fixture = mountArrangement()
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+      .element as HTMLElement
+    viewport.scrollLeft = 400
+    Object.defineProperty(viewport, 'scrollWidth', { configurable: true, value: 1_600 })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 500,
+      left: 100,
+      right: 500,
+      toJSON: () => ({}),
+      top: 100,
+      width: 400,
+      x: 100,
+      y: 100,
+    })
+    const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface')
+
+    await dispatchPointerEvent(ruler.element, 'pointerdown', {
+      button: 0,
+      clientX: 300,
+      isPrimary: true,
+      pointerId: 7,
+    })
+    expect(fixture.beginTimelineLocate).toHaveBeenCalledOnce()
+    expect(
+      fixture.wrapper.get('.project-workbench__arrangement-locate-preview').attributes('style'),
+    ).toContain('transform: translate3d(15rem, 0, 0)')
+
+    await dispatchPointerEvent(ruler.element, 'pointerup', {
+      button: 0,
+      clientX: 300,
+      pointerId: 7,
+    })
+    expect(fixture.commitTimelineLocate).toHaveBeenCalledWith(parseTick(11_520))
+    expect(fixture.wrapper.find('.project-workbench__arrangement-locate-preview').exists()).toBe(
+      false,
+    )
+
+    await dispatchPointerEvent(
+      fixture.wrapper.get('.project-workbench__surface-empty').element,
+      'pointerdown',
+      {
+        button: 0,
+        clientX: 300,
+        pointerId: 8,
+      },
+    )
+    expect(fixture.beginTimelineLocate).toHaveBeenCalledOnce()
+  })
+
+  it('updates only the silent preview while dragging and cancels the gesture safely', async () => {
+    const fixture = mountArrangement()
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+      .element as HTMLElement
+    Object.defineProperty(viewport, 'scrollWidth', { configurable: true, value: 1_600 })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 500,
+      left: 100,
+      right: 500,
+      toJSON: () => ({}),
+      top: 100,
+      width: 400,
+      x: 100,
+      y: 100,
+    })
+    const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface')
+
+    await dispatchPointerEvent(ruler.element, 'pointerdown', {
+      button: 0,
+      clientX: 100,
+      isPrimary: true,
+      pointerId: 9,
+    })
+    await dispatchPointerEvent(ruler.element, 'pointermove', { clientX: 500, pointerId: 9 })
+
+    expect(
+      fixture.wrapper.get('.project-workbench__arrangement-locate-preview').attributes('style'),
+    ).toContain('transform: translate3d(10rem, 0, 0)')
+    expect(fixture.commitTimelineLocate).not.toHaveBeenCalled()
+
+    await dispatchPointerEvent(ruler.element, 'pointercancel', { pointerId: 9 })
+    expect(fixture.cancelTimelineLocate).toHaveBeenCalledOnce()
+    expect(fixture.commitTimelineLocate).not.toHaveBeenCalled()
+    expect(fixture.wrapper.find('.project-workbench__arrangement-locate-preview').exists()).toBe(
+      false,
+    )
   })
 
   it('follows the playing position by discrete Arrangement viewport pages', async () => {

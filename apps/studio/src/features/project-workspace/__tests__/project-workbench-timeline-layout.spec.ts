@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   resolvePagedFollowScrollLeft,
+  resolveTimelineLocateTick,
   timelinePositionRatio,
 } from '@/features/project-workspace/timeline/layout'
+import { parseTick } from '@seele-daw/project-core'
 
 describe('Arrangement Timeline layout', () => {
   it('normalizes the visual position to the derived Timeline range', () => {
@@ -63,5 +65,19 @@ describe('Arrangement Timeline layout', () => {
         scrollWidth: 1_600,
       }),
     ).toBe(160)
+  })
+
+  it('maps a scrolled Ruler pointer to the nearest bounded Project Tick', () => {
+    const input = {
+      scrollLeft: 400,
+      scrollWidth: 1_600,
+      timelineEndTick: parseTick(30_720),
+      viewportLeft: 100,
+    }
+
+    expect(resolveTimelineLocateTick({ ...input, clientX: 300 })).toBe(11_520)
+    expect(resolveTimelineLocateTick({ ...input, clientX: -1_000 })).toBe(0)
+    expect(resolveTimelineLocateTick({ ...input, clientX: 2_000 })).toBe(30_720)
+    expect(resolveTimelineLocateTick({ ...input, clientX: 300.027 })).toBe(11_521)
   })
 })

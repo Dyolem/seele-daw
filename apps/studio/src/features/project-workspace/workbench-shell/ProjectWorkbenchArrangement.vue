@@ -6,7 +6,7 @@ import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
-import { computed, nextTick, shallowRef, type StyleValue, watch } from 'vue'
+import { computed, nextTick, onUnmounted, shallowRef, type StyleValue, watch } from 'vue'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
@@ -16,10 +16,12 @@ import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-she
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
 import {
   resolvePagedFollowScrollLeft,
+  resolveTimelineLocateTick,
   timelinePositionRatio,
 } from '@/features/project-workspace/timeline/layout'
 import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
 import ArrangementPlayhead from '@/features/project-workspace/workbench-shell/arrangement/ArrangementPlayhead.vue'
+import LocatePreview from '@/features/project-workspace/workbench-shell/arrangement/LocatePreview.vue'
 import {
   PROJECT_ADD_TRACK_TYPE,
   type ProjectAddTrackType,
@@ -29,6 +31,7 @@ import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { useProjectClips } from '@/workbench/project/clip/vue/project-clip-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackLocateSession } from '@/workbench/project/playback/project-playback-coordinator'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
 
@@ -53,6 +56,12 @@ interface TimelineBarPresentation {
   readonly style: StyleValue
 }
 
+interface ActiveTimelineLocateGesture {
+  readonly pointerId: number
+  readonly session: ProjectPlaybackLocateSession
+  readonly surface: HTMLElement
+}
+
 const props = defineProps<{
   readonly barSpanTick: Tick
   readonly clips: readonly ProjectMidiClipPresentation[]
@@ -65,7 +74,11 @@ const emit = defineEmits<{
 }>()
 
 const { projectClips } = useProjectClips()
-const { state: playbackState, visualPosition: playbackVisualPosition } = useProjectPlayback()
+const {
+  projectPlayback,
+  state: playbackState,
+  visualPosition: playbackVisualPosition,
+} = useProjectPlayback()
 const { projectTracks } = useProjectTracks()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const toasts = useUiToastStore()
@@ -73,7 +86,9 @@ const arrangementViewportElement = shallowRef<HTMLElement | null>(null)
 const trackViewportElement = shallowRef<HTMLElement | null>(null)
 const trackFollowerElement = shallowRef<HTMLElement | null>(null)
 const isTimelineFollowSuspended = shallowRef(false)
+const locatePreviewTick = shallowRef<Tick | null>(null)
 let observedArrangementScrollLeft = 0
+let activeTimelineLocateGesture: ActiveTimelineLocateGesture | null = null
 
 const isCurrentProjectPlaying = computed(
   () =>
@@ -277,11 +292,94 @@ function isFollowControlTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest('.project-workbench__follow-control') !== null
 }
 
+function locateTickAtClientX(clientX: number): Tick {
+  const viewport = arrangementViewportElement.value
+  if (viewport === null) return parseTick(0)
+
+  return resolveTimelineLocateTick({
+    clientX,
+    scrollLeft: viewport.scrollLeft,
+    scrollWidth: viewport.scrollWidth,
+    timelineEndTick: props.timelineEndTick,
+    viewportLeft: viewport.getBoundingClientRect().left,
+  })
+}
+
+function releaseTimelineLocateGesture(
+  gesture: ActiveTimelineLocateGesture,
+): ActiveTimelineLocateGesture | null {
+  if (activeTimelineLocateGesture !== gesture) return null
+  activeTimelineLocateGesture = null
+  locatePreviewTick.value = null
+  if (
+    typeof gesture.surface.hasPointerCapture === 'function' &&
+    gesture.surface.hasPointerCapture(gesture.pointerId)
+  ) {
+    gesture.surface.releasePointerCapture(gesture.pointerId)
+  }
+  return gesture
+}
+
+function beginTimelineLocate(event: PointerEvent): void {
+  if (activeTimelineLocateGesture !== null || event.isPrimary === false || event.button !== 0) {
+    return
+  }
+
+  const session = projectPlayback.beginTimelineLocate()
+  if (session === null) return
+  const surface = event.currentTarget as HTMLElement
+  const gesture = Object.freeze({ pointerId: event.pointerId, session, surface })
+  activeTimelineLocateGesture = gesture
+  locatePreviewTick.value = locateTickAtClientX(event.clientX)
+  if (typeof surface.setPointerCapture === 'function') surface.setPointerCapture(event.pointerId)
+  event.preventDefault()
+}
+
+function updateTimelineLocate(event: PointerEvent): void {
+  const gesture = activeTimelineLocateGesture
+  if (gesture === null || gesture.pointerId !== event.pointerId) return
+
+  locatePreviewTick.value = locateTickAtClientX(event.clientX)
+  event.preventDefault()
+}
+
+function commitTimelineLocate(event: PointerEvent): void {
+  const gesture = activeTimelineLocateGesture
+  if (gesture === null || gesture.pointerId !== event.pointerId) return
+
+  const targetTick = locateTickAtClientX(event.clientX)
+  if (releaseTimelineLocateGesture(gesture) === null) return
+  gesture.session.commit(targetTick)
+  event.preventDefault()
+}
+
+function cancelTimelineLocate(event?: PointerEvent): void {
+  const gesture = activeTimelineLocateGesture
+  if (gesture === null || (event !== undefined && gesture.pointerId !== event.pointerId)) return
+
+  if (releaseTimelineLocateGesture(gesture) === null) return
+  gesture.session.cancel()
+  event?.preventDefault()
+}
+
+function handleTimelineLocateCaptureLoss(event: PointerEvent): void {
+  const gesture = activeTimelineLocateGesture
+  if (gesture?.pointerId !== event.pointerId) return
+  activeTimelineLocateGesture = null
+  locatePreviewTick.value = null
+  gesture.session.cancel()
+}
+
 function handleTimelinePointerDown(event: PointerEvent): void {
   if (!isFollowControlTarget(event.target)) suspendTimelineFollow()
 }
 
 function handleTimelineKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && activeTimelineLocateGesture !== null) {
+    cancelTimelineLocate()
+    event.preventDefault()
+    return
+  }
   if (!isFollowControlTarget(event.target) && TIMELINE_INTERACTION_KEYS.has(event.key)) {
     suspendTimelineFollow()
   }
@@ -366,6 +464,8 @@ watch(
   () => props.timelineEndTick,
   () => void nextTick(followCurrentPlaybackPosition),
 )
+
+onUnmounted(() => cancelTimelineLocate())
 </script>
 
 <template>
@@ -440,7 +540,15 @@ watch(
       <div class="project-workbench__arrangement-content">
         <div class="project-workbench__arrangement">
           <header class="project-workbench__ruler">
-            <ol aria-label="Timeline bars">
+            <ol
+              class="project-workbench__ruler-locate-surface"
+              aria-label="Timeline bars"
+              @lostpointercapture="handleTimelineLocateCaptureLoss"
+              @pointercancel="cancelTimelineLocate"
+              @pointerdown="beginTimelineLocate"
+              @pointermove="updateTimelineLocate"
+              @pointerup="commitTimelineLocate"
+            >
               <li v-for="bar in timelineBars" :key="bar.number" :style="bar.style">
                 {{ bar.number }}
               </li>
@@ -534,6 +642,12 @@ watch(
         <ArrangementPlayhead
           :bar-span-tick="props.barSpanTick"
           :project-id="props.projectId"
+          :timeline-end-tick="props.timelineEndTick"
+        />
+        <LocatePreview
+          v-if="locatePreviewTick !== null"
+          :bar-span-tick="props.barSpanTick"
+          :position-tick="locatePreviewTick"
           :timeline-end-tick="props.timelineEndTick"
         />
       </div>
@@ -724,6 +838,12 @@ watch(
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.project-workbench__ruler-locate-surface {
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
 }
 
 .project-workbench__ruler li {

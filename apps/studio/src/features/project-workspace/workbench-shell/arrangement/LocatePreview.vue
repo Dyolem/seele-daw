@@ -27,7 +27,9 @@ const previewStyle = computed((): StyleValue => {
     class="project-workbench__arrangement-locate-preview"
     :style="previewStyle"
     aria-hidden="true"
-  ></div>
+  >
+    <span class="project-workbench__arrangement-locate-preview-line"></span>
+  </div>
 </template>
 
 <style scoped>
@@ -36,7 +38,17 @@ const previewStyle = computed((): StyleValue => {
   z-index: var(--sd-layer-sticky-raised);
   inset-block: 0;
   inset-inline-start: 0;
-  inline-size: 2px;
+  inline-size: var(--project-workbench-timeline-marker-inline-size);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.project-workbench__arrangement-locate-preview-line {
+  position: sticky;
+  inset-block-start: 0;
+  display: block;
+  inline-size: var(--project-workbench-timeline-marker-inline-size);
+  block-size: 100cqb;
   background: repeating-linear-gradient(
     to bottom,
     var(--sd-editor-playhead) 0,
@@ -45,11 +57,9 @@ const previewStyle = computed((): StyleValue => {
     transparent var(--sd-space-3)
   );
   opacity: 0.72;
-  pointer-events: none;
-  will-change: transform;
 }
 
-.project-workbench__arrangement-locate-preview::before {
+.project-workbench__arrangement-locate-preview-line::before {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: 50%;

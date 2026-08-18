@@ -282,6 +282,7 @@ describe('ProjectWorkbenchArrangement', () => {
     const playhead = fixture.wrapper.get('.project-workbench__arrangement-playhead')
 
     expect(playhead.attributes('aria-hidden')).toBe('true')
+    expect(playhead.find('.project-workbench__arrangement-playhead-line').exists()).toBe(true)
     expect(playhead.attributes('style')).toContain('transform: translate3d(5rem, 0, 0)')
     expect(playhead.attributes('style')).not.toContain('left')
 
@@ -329,6 +330,12 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(
       fixture.wrapper.get('.project-workbench__arrangement-locate-preview').attributes('style'),
     ).toContain('transform: translate3d(15rem, 0, 0)')
+    expect(
+      fixture.wrapper
+        .get('.project-workbench__arrangement-locate-preview')
+        .find('.project-workbench__arrangement-locate-preview-line')
+        .exists(),
+    ).toBe(true)
 
     await dispatchPointerEvent(ruler.element, 'pointerup', {
       button: 0,

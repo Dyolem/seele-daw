@@ -28,11 +28,9 @@ const playheadStyle = computed((): StyleValue => {
 </script>
 
 <template>
-  <div
-    class="project-workbench__arrangement-playhead"
-    :style="playheadStyle"
-    aria-hidden="true"
-  ></div>
+  <div class="project-workbench__arrangement-playhead" :style="playheadStyle" aria-hidden="true">
+    <span class="project-workbench__arrangement-playhead-line"></span>
+  </div>
 </template>
 
 <style scoped>
@@ -41,13 +39,21 @@ const playheadStyle = computed((): StyleValue => {
   z-index: var(--sd-layer-sticky-raised);
   inset-block: 0;
   inset-inline-start: 0;
-  inline-size: 1px;
-  background: var(--sd-editor-playhead);
+  inline-size: var(--project-workbench-timeline-marker-inline-size);
   pointer-events: none;
   will-change: transform;
 }
 
-.project-workbench__arrangement-playhead::before {
+.project-workbench__arrangement-playhead-line {
+  position: sticky;
+  inset-block-start: 0;
+  display: block;
+  inline-size: var(--project-workbench-timeline-marker-inline-size);
+  block-size: 100cqb;
+  background: var(--sd-editor-playhead);
+}
+
+.project-workbench__arrangement-playhead-line::before {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: 50%;

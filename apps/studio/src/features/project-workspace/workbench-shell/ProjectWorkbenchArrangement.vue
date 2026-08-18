@@ -836,6 +836,7 @@ onUnmounted(() => cancelTimelineLocate())
       var(--sd-control-height-sm) + var(--sd-space-0-5) + var(--sd-space-0-5) +
       var(--sd-space-0-5) + 2px
   );
+  --project-workbench-timeline-marker-inline-size: 1px;
   display: grid;
   min-inline-size: 0;
   min-block-size: 0;
@@ -955,6 +956,7 @@ onUnmounted(() => cancelTimelineLocate())
 }
 
 .project-workbench__arrangement-scroll-viewport {
+  container-type: size;
   min-inline-size: 0;
   min-block-size: 0;
   grid-column: 2;

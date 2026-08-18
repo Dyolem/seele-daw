@@ -68,8 +68,9 @@ Batch 3B 完成的是“可靠排期”，不是“已经能听见声音”。
 第一次 Play       generation 1
 Pause             generation 2
 Resume            generation 3
-Return to Start   generation 4
-再次 Play         generation 5
+Manual Locate     generation 4
+Return to Anchor  generation 5
+再次 Play         generation 6
 ```
 
 本文使用“新 generation 重置 Planner”时，不是把 generation 数字清零。实际含义是：
@@ -349,12 +350,21 @@ Playing generation 3 with a new Anchor
 
 Scheduler 清除旧代 cursor 和已处理 occurrence，从 generation 3 的新 Anchor 开始规划。
 
-### 7.4 Return to Start
+### 7.4 Manual Locate
 
-Return to Start 产生新 generation 并把 Transport 放回 Stopped / Tick `0`。Planner 返回
-`inactive`；下一次 Play 再产生更新的 generation 和新的 Tick `0` Anchor。
+Manual Locate 把 Project Tick 映射成新的 Project Second / Playback Clock Anchor，并产生新
+generation。Playing 下 Planner 从目标后的新窗口继续；Stopped / Paused 下 Planner 保持
+`inactive`。当前不执行 Note Chase，因此目标之前已经开始的长 Note 不会补触发。每次成功定位
+同时替换运行时 `returnAnchorTick`。
 
-### 7.5 Natural End
+### 7.5 Return to Last Start Position
+
+Return to Last Start Position 产生新 generation，并把 Transport 放回 Stopped /
+`returnAnchorTick`。初始 Anchor 是 Tick `0`，但成功 Manual Locate 后它是最后一次定位目标；
+下一次 Play 从该位置建立新 Playback Clock Anchor。重复在 Stopped / Return Anchor 状态执行是
+No-change。
+
+### 7.6 Natural End
 
 自然到达 Timeline End 时 Transport 进入 Stopped，但不额外增加 generation。Planner 停止生成
 窗口。下一次 Play 会增加 generation 并从 Tick `0` 建立新 Anchor。Timeline End 至少为项目起始

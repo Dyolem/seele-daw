@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   resolvePagedFollowScrollLeft,
+  resolveTimelineEdgeScrollVelocity,
   resolveTimelineLocateTick,
   timelinePositionRatio,
 } from '@/features/project-workspace/timeline/layout'
@@ -79,5 +80,20 @@ describe('Arrangement Timeline layout', () => {
     expect(resolveTimelineLocateTick({ ...input, clientX: -1_000 })).toBe(0)
     expect(resolveTimelineLocateTick({ ...input, clientX: 2_000 })).toBe(30_720)
     expect(resolveTimelineLocateTick({ ...input, clientX: 300.027 })).toBe(11_521)
+  })
+
+  it('ramps continuous locate scrolling toward either viewport edge', () => {
+    const input = {
+      edgeInlineSize: 48,
+      maximumVelocity: 960,
+      viewportLeft: 100,
+      viewportRight: 500,
+    }
+
+    expect(resolveTimelineEdgeScrollVelocity({ ...input, clientX: 300 })).toBe(0)
+    expect(resolveTimelineEdgeScrollVelocity({ ...input, clientX: 124 })).toBe(-480)
+    expect(resolveTimelineEdgeScrollVelocity({ ...input, clientX: 476 })).toBe(480)
+    expect(resolveTimelineEdgeScrollVelocity({ ...input, clientX: 90 })).toBe(-960)
+    expect(resolveTimelineEdgeScrollVelocity({ ...input, clientX: 510 })).toBe(960)
   })
 })

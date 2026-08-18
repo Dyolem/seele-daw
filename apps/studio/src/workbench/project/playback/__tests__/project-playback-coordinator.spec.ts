@@ -372,12 +372,14 @@ describe('ProjectPlaybackCoordinator', () => {
     })
 
     expect(coordinator.state.phase).toBe('stopped')
+    expect(coordinator.canReturnToLastStartPosition()).toBe(false)
     const play = coordinator.play()
     expect(coordinator.state.phase).toBe('loading')
     await expect(play).resolves.toBe(true)
 
     const prepared = runtime.prepared[0]!
     expect(coordinator.state.phase).toBe('playing')
+    expect(coordinator.canReturnToLastStartPosition()).toBe(true)
     expect(prepared.generations).toEqual([1])
     expect(prepared.scheduled).toHaveLength(1)
     expect(timer.intervals).toEqual([25])
@@ -400,6 +402,7 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(coordinator.state).toMatchObject({ phase: 'stopped', positionProjectSecond: 0 })
     expect(prepared.generations).toEqual([1, 2, 3])
     expect(prepared.allNotesOffCount).toBe(2)
+    expect(coordinator.canReturnToLastStartPosition()).toBe(false)
     coordinator.dispose()
     expect(runtime.disposeCount).toBe(1)
   })
@@ -1407,7 +1410,7 @@ describe('ProjectPlaybackCoordinator', () => {
     coordinator.dispose()
   })
 
-  it('aborts a pending load when Return to Start wins the request race', async () => {
+  it('aborts a pending load when Return to Last Start Position wins the request race', async () => {
     const projectId = parseProjectId('project-playback-loading-return')
     const session = createPlayableSession(projectId)
     const activeProject = createActiveProjectHarness(createReadyState(projectId, session))

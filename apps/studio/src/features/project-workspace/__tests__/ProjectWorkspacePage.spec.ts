@@ -226,6 +226,9 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
     beginTimelineLocate: vi.fn<ProjectPlaybackCoordinator['beginTimelineLocate']>(() => null),
+    canReturnToLastStartPosition: vi.fn<ProjectPlaybackCoordinator['canReturnToLastStartPosition']>(
+      () => false,
+    ),
     get state() {
       return playbackState.value
     },
@@ -238,7 +241,6 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
     returnToLastStartPosition: vi.fn<ProjectPlaybackCoordinator['returnToLastStartPosition']>(
       () => false,
     ),
-    returnToStart: vi.fn<ProjectPlaybackCoordinator['returnToStart']>(() => false),
     subscribe: vi.fn<ProjectPlaybackCoordinator['subscribe']>(() => () => undefined),
     togglePlayPause: vi.fn<ProjectPlaybackCoordinator['togglePlayPause']>(() => true),
     dispose: vi.fn<ProjectPlaybackCoordinator['dispose']>(),

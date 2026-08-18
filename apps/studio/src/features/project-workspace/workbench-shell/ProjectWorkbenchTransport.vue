@@ -19,7 +19,7 @@ interface ProjectWorkbenchTransportProps {
   readonly canUndo: boolean
   readonly isContextEditorOpen: boolean
   readonly playbackCanToggle: boolean
-  readonly playbackCanReturnToStart: boolean
+  readonly playbackCanReturnToLastStartPosition: boolean
   readonly playbackFeedback: string | null
   readonly playbackPhase: 'failed' | 'loading' | 'paused' | 'playing' | 'stopped' | 'unavailable'
   readonly playbackTime: string
@@ -31,7 +31,7 @@ interface ProjectWorkbenchTransportProps {
 const props = defineProps<ProjectWorkbenchTransportProps>()
 const emit = defineEmits<{
   openContextEditor: []
-  playbackReturnToStart: []
+  playbackReturnToLastStartPosition: []
   playbackToggle: []
   redo: []
   undo: []
@@ -86,10 +86,10 @@ const playbackLabel = computed(() => {
 
     <div class="project-workbench__playback-group" aria-label="Playback controls">
       <UiIconButton
-        :disabled="!props.playbackCanReturnToStart"
+        :disabled="!props.playbackCanReturnToLastStartPosition"
         :icon="PreviousIcon"
-        label="Return to start"
-        @click="emit('playbackReturnToStart')"
+        label="Return to last start position"
+        @click="emit('playbackReturnToLastStartPosition')"
       />
       <UiIconButton
         :disabled="!props.playbackCanToggle"

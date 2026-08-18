@@ -16,10 +16,15 @@ import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-she
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
 import {
   resolvePagedFollowScrollLeft,
+  resolveTimelineEdgeScrollVelocity,
   resolveTimelineLocateTick,
   timelinePositionRatio,
 } from '@/features/project-workspace/timeline/layout'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
+import {
+  PROJECT_TIMELINE_BAR_INLINE_SIZE_REM,
+  PROJECT_TIMELINE_LOCATE_EDGE_INLINE_SIZE_PX,
+  PROJECT_TIMELINE_LOCATE_MAXIMUM_SCROLL_VELOCITY_PX_PER_SECOND,
+} from '@/features/project-workspace/timeline/scale'
 import ArrangementPlayhead from '@/features/project-workspace/workbench-shell/arrangement/ArrangementPlayhead.vue'
 import LocatePreview from '@/features/project-workspace/workbench-shell/arrangement/LocatePreview.vue'
 import {
@@ -38,6 +43,7 @@ import { useProjectTracks } from '@/workbench/project/track/vue/project-track-co
 const WHEEL_DELTA_MODE_LINE = 1
 const WHEEL_DELTA_MODE_PAGE = 2
 const WHEEL_LINE_BLOCK_SIZE_PX = 16
+const MAXIMUM_LOCATE_EDGE_SCROLL_FRAME_DURATION_SECOND = 0.05
 const EMPTY_CLIPS: readonly ProjectMidiClipPresentation[] = Object.freeze([])
 const TIMELINE_INTERACTION_KEYS = new Set([
   ' ',
@@ -60,12 +66,14 @@ interface ActiveTimelineLocateGesture {
   readonly pointerId: number
   readonly session: ProjectPlaybackLocateSession
   readonly surface: HTMLElement
+  readonly wasTimelineFollowSuspended: boolean
 }
 
 const props = defineProps<{
   readonly barSpanTick: Tick
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly projectId: string
+  readonly timeSignatureNumerator: number
   readonly timelineEndTick: Tick
   readonly tracks: readonly ProjectTrackPresentation[]
 }>()
@@ -89,6 +97,10 @@ const isTimelineFollowSuspended = shallowRef(false)
 const locatePreviewTick = shallowRef<Tick | null>(null)
 let observedArrangementScrollLeft = 0
 let activeTimelineLocateGesture: ActiveTimelineLocateGesture | null = null
+let locateEdgeScrollFrameHandle: number | null = null
+let locateEdgeScrollPreviousTimestamp: number | null = null
+let locatePointerClientX = 0
+let pendingPlaybackStartFollowSuspension: boolean | null = null
 
 const isCurrentProjectPlaying = computed(
   () =>
@@ -106,6 +118,14 @@ const currentPlaybackPositionTick = computed(() =>
   playbackVisualPosition.value.projectId === props.projectId
     ? playbackVisualPosition.value.positionTick
     : 0,
+)
+const rulerPositionTick = computed(() =>
+  Math.round(
+    Math.min(
+      props.timelineEndTick,
+      Math.max(0, locatePreviewTick.value ?? currentPlaybackPositionTick.value),
+    ),
+  ),
 )
 
 const timelineBars = computed((): readonly TimelineBarPresentation[] => {
@@ -250,14 +270,16 @@ function handleArrangementScroll(event: Event): void {
   suspendTimelineFollow()
 }
 
-function setArrangementScrollLeft(nextScrollLeft: number): void {
+function setArrangementScrollLeft(nextScrollLeft: number): boolean {
   const viewport = arrangementViewportElement.value
-  if (viewport === null) return
+  if (viewport === null) return false
 
   const maximumScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
+  const previousScrollLeft = viewport.scrollLeft
   viewport.scrollLeft = Math.min(maximumScrollLeft, Math.max(0, nextScrollLeft))
   // Consume the ensuing native scroll event as this page jump, not as user navigation.
   observedArrangementScrollLeft = viewport.scrollLeft
+  return viewport.scrollLeft !== previousScrollLeft
 }
 
 function followCurrentPlaybackPosition(): void {
@@ -292,6 +314,12 @@ function isFollowControlTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest('.project-workbench__follow-control') !== null
 }
 
+function isTimelineLocateTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element && target.closest('.project-workbench__ruler-locate-surface') !== null
+  )
+}
+
 function locateTickAtClientX(clientX: number): Tick {
   const viewport = arrangementViewportElement.value
   if (viewport === null) return parseTick(0)
@@ -305,12 +333,75 @@ function locateTickAtClientX(clientX: number): Tick {
   })
 }
 
+function edgeScrollVelocity(clientX: number, viewport: HTMLElement): number {
+  const bounds = viewport.getBoundingClientRect()
+  return resolveTimelineEdgeScrollVelocity({
+    clientX,
+    edgeInlineSize: PROJECT_TIMELINE_LOCATE_EDGE_INLINE_SIZE_PX,
+    maximumVelocity: PROJECT_TIMELINE_LOCATE_MAXIMUM_SCROLL_VELOCITY_PX_PER_SECOND,
+    viewportLeft: bounds.left,
+    viewportRight: bounds.right,
+  })
+}
+
+function stopTimelineLocateEdgeScroll(): void {
+  if (locateEdgeScrollFrameHandle !== null) {
+    window.cancelAnimationFrame(locateEdgeScrollFrameHandle)
+    locateEdgeScrollFrameHandle = null
+  }
+  locateEdgeScrollPreviousTimestamp = null
+}
+
+function requestTimelineLocateEdgeScroll(): void {
+  const viewport = arrangementViewportElement.value
+  if (
+    activeTimelineLocateGesture === null ||
+    viewport === null ||
+    edgeScrollVelocity(locatePointerClientX, viewport) === 0
+  ) {
+    stopTimelineLocateEdgeScroll()
+    return
+  }
+  if (locateEdgeScrollFrameHandle !== null) return
+
+  locateEdgeScrollFrameHandle = window.requestAnimationFrame((timestamp) => {
+    locateEdgeScrollFrameHandle = null
+    const activeViewport = arrangementViewportElement.value
+    if (activeTimelineLocateGesture === null || activeViewport === null) {
+      locateEdgeScrollPreviousTimestamp = null
+      return
+    }
+
+    const velocity = edgeScrollVelocity(locatePointerClientX, activeViewport)
+    if (velocity === 0) {
+      locateEdgeScrollPreviousTimestamp = null
+      return
+    }
+    const elapsedSecond =
+      locateEdgeScrollPreviousTimestamp === null
+        ? 1 / 60
+        : Math.min(
+            MAXIMUM_LOCATE_EDGE_SCROLL_FRAME_DURATION_SECOND,
+            Math.max(0, (timestamp - locateEdgeScrollPreviousTimestamp) / 1_000),
+          )
+    locateEdgeScrollPreviousTimestamp = timestamp
+    const didScroll = setArrangementScrollLeft(activeViewport.scrollLeft + velocity * elapsedSecond)
+    locatePreviewTick.value = locateTickAtClientX(locatePointerClientX)
+    if (didScroll) {
+      requestTimelineLocateEdgeScroll()
+    } else {
+      locateEdgeScrollPreviousTimestamp = null
+    }
+  })
+}
+
 function releaseTimelineLocateGesture(
   gesture: ActiveTimelineLocateGesture,
 ): ActiveTimelineLocateGesture | null {
   if (activeTimelineLocateGesture !== gesture) return null
   activeTimelineLocateGesture = null
   locatePreviewTick.value = null
+  stopTimelineLocateEdgeScroll()
   if (
     typeof gesture.surface.hasPointerCapture === 'function' &&
     gesture.surface.hasPointerCapture(gesture.pointerId)
@@ -328,10 +419,18 @@ function beginTimelineLocate(event: PointerEvent): void {
   const session = projectPlayback.beginTimelineLocate()
   if (session === null) return
   const surface = event.currentTarget as HTMLElement
-  const gesture = Object.freeze({ pointerId: event.pointerId, session, surface })
+  const gesture = Object.freeze({
+    pointerId: event.pointerId,
+    session,
+    surface,
+    wasTimelineFollowSuspended: isTimelineFollowSuspended.value,
+  })
   activeTimelineLocateGesture = gesture
+  locatePointerClientX = event.clientX
   locatePreviewTick.value = locateTickAtClientX(event.clientX)
+  if (session.startedWhilePlaying) isTimelineFollowSuspended.value = true
   if (typeof surface.setPointerCapture === 'function') surface.setPointerCapture(event.pointerId)
+  requestTimelineLocateEdgeScroll()
   event.preventDefault()
 }
 
@@ -339,7 +438,9 @@ function updateTimelineLocate(event: PointerEvent): void {
   const gesture = activeTimelineLocateGesture
   if (gesture === null || gesture.pointerId !== event.pointerId) return
 
+  locatePointerClientX = event.clientX
   locatePreviewTick.value = locateTickAtClientX(event.clientX)
+  requestTimelineLocateEdgeScroll()
   event.preventDefault()
 }
 
@@ -349,7 +450,15 @@ function commitTimelineLocate(event: PointerEvent): void {
 
   const targetTick = locateTickAtClientX(event.clientX)
   if (releaseTimelineLocateGesture(gesture) === null) return
-  gesture.session.commit(targetTick)
+  if (gesture.session.startedWhilePlaying) pendingPlaybackStartFollowSuspension = false
+  const committed = gesture.session.commit(targetTick)
+  if (!committed) {
+    pendingPlaybackStartFollowSuspension = null
+    isTimelineFollowSuspended.value = gesture.wasTimelineFollowSuspended
+  } else if (gesture.session.startedWhilePlaying) {
+    isTimelineFollowSuspended.value = false
+    void nextTick(followCurrentPlaybackPosition)
+  }
   event.preventDefault()
 }
 
@@ -358,20 +467,26 @@ function cancelTimelineLocate(event?: PointerEvent): void {
   if (gesture === null || (event !== undefined && gesture.pointerId !== event.pointerId)) return
 
   if (releaseTimelineLocateGesture(gesture) === null) return
-  gesture.session.cancel()
+  if (gesture.session.startedWhilePlaying) {
+    pendingPlaybackStartFollowSuspension = gesture.wasTimelineFollowSuspended
+  }
+  const cancelled = gesture.session.cancel()
+  if (!cancelled) pendingPlaybackStartFollowSuspension = null
+  isTimelineFollowSuspended.value = gesture.wasTimelineFollowSuspended
+  if (cancelled && gesture.session.startedWhilePlaying && !gesture.wasTimelineFollowSuspended) {
+    void nextTick(followCurrentPlaybackPosition)
+  }
   event?.preventDefault()
 }
 
 function handleTimelineLocateCaptureLoss(event: PointerEvent): void {
-  const gesture = activeTimelineLocateGesture
-  if (gesture?.pointerId !== event.pointerId) return
-  activeTimelineLocateGesture = null
-  locatePreviewTick.value = null
-  gesture.session.cancel()
+  cancelTimelineLocate(event)
 }
 
 function handleTimelinePointerDown(event: PointerEvent): void {
-  if (!isFollowControlTarget(event.target)) suspendTimelineFollow()
+  if (!isFollowControlTarget(event.target) && !isTimelineLocateTarget(event.target)) {
+    suspendTimelineFollow()
+  }
 }
 
 function handleTimelineKeydown(event: KeyboardEvent): void {
@@ -380,9 +495,53 @@ function handleTimelineKeydown(event: KeyboardEvent): void {
     event.preventDefault()
     return
   }
-  if (!isFollowControlTarget(event.target) && TIMELINE_INTERACTION_KEYS.has(event.key)) {
+  if (
+    !isFollowControlTarget(event.target) &&
+    !isTimelineLocateTarget(event.target) &&
+    TIMELINE_INTERACTION_KEYS.has(event.key)
+  ) {
     suspendTimelineFollow()
   }
+}
+
+function handleRulerKeydown(event: KeyboardEvent): void {
+  const currentTick = Math.round(currentPlaybackPositionTick.value)
+  const beatSpanTick = Math.max(1, Math.round(props.barSpanTick / props.timeSignatureNumerator))
+  let targetTick: number
+
+  switch (event.key) {
+    case 'ArrowLeft':
+      targetTick = currentTick - beatSpanTick
+      break
+    case 'ArrowRight':
+      targetTick = currentTick + beatSpanTick
+      break
+    case 'End':
+      targetTick = props.timelineEndTick
+      break
+    case 'Home':
+      targetTick = 0
+      break
+    case 'PageDown':
+      targetTick = currentTick + props.barSpanTick
+      break
+    case 'PageUp':
+      targetTick = currentTick - props.barSpanTick
+      break
+    default:
+      return
+  }
+
+  const startedWhilePlaying = isCurrentProjectPlaying.value
+  const located = projectPlayback.locateAtTick(
+    parseTick(Math.min(props.timelineEndTick, Math.max(0, targetTick))),
+  )
+  if (located && startedWhilePlaying) {
+    isTimelineFollowSuspended.value = false
+    void nextTick(followCurrentPlaybackPosition)
+  }
+  event.preventDefault()
+  event.stopPropagation()
 }
 
 function handleArrangementWheel(event: WheelEvent): void {
@@ -452,8 +611,9 @@ watch(
   (isPlaying, wasPlaying) => {
     if (!isPlaying || wasPlaying) return
 
-    isTimelineFollowSuspended.value = false
-    void nextTick(followCurrentPlaybackPosition)
+    isTimelineFollowSuspended.value = pendingPlaybackStartFollowSuspension ?? false
+    pendingPlaybackStartFollowSuspension = null
+    if (!isTimelineFollowSuspended.value) void nextTick(followCurrentPlaybackPosition)
   },
   { immediate: true },
 )
@@ -542,14 +702,28 @@ onUnmounted(() => cancelTimelineLocate())
           <header class="project-workbench__ruler">
             <ol
               class="project-workbench__ruler-locate-surface"
-              aria-label="Timeline bars"
+              role="slider"
+              aria-label="Timeline play position"
+              aria-orientation="horizontal"
+              :aria-valuemax="props.timelineEndTick"
+              aria-valuemin="0"
+              :aria-valuenow="rulerPositionTick"
+              :aria-valuetext="`Project Tick ${rulerPositionTick}`"
+              tabindex="0"
+              title="Click or drag to locate. Arrow keys move by beat; Page keys move by bar."
+              @keydown="handleRulerKeydown"
               @lostpointercapture="handleTimelineLocateCaptureLoss"
               @pointercancel="cancelTimelineLocate"
               @pointerdown="beginTimelineLocate"
               @pointermove="updateTimelineLocate"
               @pointerup="commitTimelineLocate"
             >
-              <li v-for="bar in timelineBars" :key="bar.number" :style="bar.style">
+              <li
+                v-for="bar in timelineBars"
+                :key="bar.number"
+                :style="bar.style"
+                role="presentation"
+              >
                 {{ bar.number }}
               </li>
             </ol>

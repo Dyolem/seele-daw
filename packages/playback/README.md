@@ -4,9 +4,10 @@
 事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
 AudioNode。已完成的首个可听切片只输出阶段计划定义的具体播放计划。
 
-> 当前状态：截至 2026-08-17，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
+> 当前状态：截至 2026-08-18，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
 > 5A、Batch 6A–6F 与 Batch 7A–7F 已通过功能审阅；Audible MIDI Playback V1 已按验收基线
-> `f1d0298` 完成，尚未创建阶段 checkpoint。本包已有通用
+> `f1d0298` 完成，尚未创建阶段 checkpoint。后续独立的 Manual Timeline Locate V1 已完成四个
+> 实施批次，等待统一审核与用户浏览器验证。本包已有通用
 > Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
 > Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
 > Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
@@ -14,6 +15,8 @@ AudioNode。已完成的首个可听切片只输出阶段计划定义的具体�
 
 已完成阶段的范围、证据和延期记录见
 [Audible MIDI Playback V1 阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
+手动时间线定位的产品语义、实现边界与待验收项见
+[Manual Timeline Locate V1 阶段记录](./docs/manual-timeline-locate-v1-phase-plan.md)。
 Compiler、Transport 与 Scheduler 的协作和术语另见
 [Audible MIDI Scheduler 工作原理](./docs/audible-midi-scheduler-primer.md)。
 默认内置 MIDISampleSynth 数据的证据与兼容推断见
@@ -26,7 +29,7 @@ Compiler、Transport 与 Scheduler 的协作和术语另见
 这里的 `V1` 指第一版可听 MIDI 产品纵向切片，不是长期架构文档版本。经 2026-08-10 范围
 审阅，首版只建立具体的内置 Device Definition、Track Playback Plan、MIDI Note Span、
 Transport / Scheduler 规划与 generation 失效；不提前公开通用 Effect Graph、RuntimeDelta、
-跨线程 ACK 或 Loop / Seek 协议。Compiler unsupported content、Transport Mapping 与 Scheduler
+跨线程 ACK 或 Loop / 完整 Seek 协议。Compiler unsupported content、Transport Mapping 与 Scheduler
 late / drop policy、资产加载和首个浏览器听觉验收均已按阶段 Decision Gate 收敛；更广的浏览器
 兼容矩阵仍属于后续专项范围。
 
@@ -120,8 +123,10 @@ Batch 3A 进一步建立了浏览器无关的 Transport Mapping：
   BPM、累计 Project time 与 Segment 顺序；
 - `createAudibleMidiTransport(plan, clock)` 拥有 stopped / playing / paused、连续 Project / Tick
   位置、映射 anchors 与独立 `engineGeneration`；
-- Play / Resume、Pause 与 Return to Start 按已确认规则更新 generation；重复 No-change、Blocked
-  或 Empty Plan 拒绝不更新；
+- Play / Resume、Pause、整数 Tick Locate 与 Return to Last Start Position 按已确认规则更新
+  generation；重复 No-change、Blocked 或 Empty Plan 的 Play 拒绝不更新；
+- 每次成功 Locate 替换运行时 `returnAnchorTick`；Plan 缩短时 Position 与 Anchor 都夹取到新的
+  Timeline End。Anchor 不属于 Project Fact 或持久化数据；
 - Partial 与 Playable Plan 可播放；自然结束采用派生的 `timelineEndTick`，进入 Stopped、
   保留 End，下一次 Play 从 Tick `0` 开始；
 - Transport 集中提供 Tick → PlaybackClockSecond 与 PlaybackClockSecond → continuous Tick
@@ -166,6 +171,11 @@ Playback Core 添加状态或 API。
 Batch 7F 只加固既有边界：自动化回归证明动画帧在浏览器后台长期不触发时不会累计第二套时间，
 恢复后的首帧直接读取 Transport 最新位置；多 Track、派生 Timeline、自然结束、Pause / Return、
 项目切换和资源清理继续由既有 Playback / Studio / Audio Web 测试共同覆盖。本批不改变包根 API。
+
+Manual Timeline Locate V1 在该已验收基线之后扩展了 Transport 的最小定位表面：浏览器无关层只
+接受整数 Tick、替换 Return Anchor 并使旧 generation 失效；Studio 用事务化 Locate Session
+组合静默 Preview、Runtime 保留、旧 Voice 清理、Ruler Pointer / Keyboard、边缘滚动与 Follow。
+这项扩展不增加 Note Chase、可听 Scrub、Loop、持久 Marker 或 Project Command。
 
 Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 

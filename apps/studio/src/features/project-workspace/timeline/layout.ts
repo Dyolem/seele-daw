@@ -35,6 +35,46 @@ export function resolveTimelineLocateTick(input: TimelineLocateTickInput): Tick 
   return parseTick(Math.round((contentInlineOffset / input.scrollWidth) * input.timelineEndTick))
 }
 
+interface TimelineEdgeScrollVelocityInput {
+  readonly clientX: number
+  readonly edgeInlineSize: number
+  readonly maximumVelocity: number
+  readonly viewportLeft: number
+  readonly viewportRight: number
+}
+
+/** Resolves signed continuous scroll velocity from pointer penetration into viewport edges. */
+export function resolveTimelineEdgeScrollVelocity(input: TimelineEdgeScrollVelocityInput): number {
+  if (
+    !Number.isFinite(input.clientX) ||
+    !Number.isFinite(input.edgeInlineSize) ||
+    !Number.isFinite(input.maximumVelocity) ||
+    !Number.isFinite(input.viewportLeft) ||
+    !Number.isFinite(input.viewportRight) ||
+    input.edgeInlineSize <= 0 ||
+    input.maximumVelocity <= 0 ||
+    input.viewportRight <= input.viewportLeft
+  ) {
+    return 0
+  }
+
+  const leftDistance = input.clientX - input.viewportLeft
+  if (leftDistance < input.edgeInlineSize) {
+    return (
+      -input.maximumVelocity * Math.min(1, Math.max(0, 1 - leftDistance / input.edgeInlineSize))
+    )
+  }
+
+  const rightDistance = input.viewportRight - input.clientX
+  if (rightDistance < input.edgeInlineSize) {
+    return (
+      input.maximumVelocity * Math.min(1, Math.max(0, 1 - rightDistance / input.edgeInlineSize))
+    )
+  }
+
+  return 0
+}
+
 interface PagedFollowScrollInput {
   readonly clientWidth: number
   readonly positionRatio: number

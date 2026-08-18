@@ -308,8 +308,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - Play 在 Playing 时必须切换成 Pause 图标、pressed 状态和可访问名称；
 - 首播资源准备期间保持按钮原尺寸，以旋转状态图标和 `Loading instrument…` 命名表达 Busy，
   并阻止重复请求；Reduced Motion 下只降低转速，不移除必要状态区别；
-- Return to Start 只在 Loading、Playing 或当前位置非零时可用；Record 与 Loop 在能力接通前继续
-  Disabled；
+- Return to Last Start Position 只在 Loading、Playing、Paused 或当前位置不等于运行时 Return
+  Anchor 时可用；Anchor 初始为 Tick `0`，每次成功 Manual Locate 替换它；Record 与 Loop 在能力
+  接通前继续 Disabled；
 - 时间使用稳定的 `mm:ss.mmm`，由 Transport 权威位置投影，不能累计视觉帧差；
 - 没有真实 Meter 数据时显示 `Meter —`，不得用 `0.0 dB` 暗示已有实时测量；
 - Empty 通过 disabled reason 安静反馈；Blocked、Partial 与 Runtime Failure 必须通过邻近 title
@@ -369,12 +370,21 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - Arrangement Playhead MUST 位于不接收 Pointer 命中的独立轻量图层，并用
   `transform: translate3d(...)` 移动；高频更新不得修改 `left`、`inset-inline-start` 或其他触发布局
   的动态位置属性。Follow 只分页滚动右侧时间视口，左侧 Track 控制列保持固定。
+- Arrangement Ruler MUST 是 Manual Locate 的唯一当前 Pointer 命中面；单击映射到最近整数 Project
+  Tick，拖动只移动独立 transform-only 静默 Preview，Pointer Up 只提交一次。Track Lane、Clip 与
+  Piano Roll 当前不得借冒泡事件隐式定位。
+- Ruler Locate 拖到时间视口左右边缘时 MUST 通过 `requestAnimationFrame` 连续滚动同一个横向
+  权威，并按进入边缘区域的程度调速；每帧时长必须限幅，位置必须夹取到既有 Timeline End，不得
+  因拖动扩展时间轴。
+- Ruler MUST 提供水平 Slider 语义、当前 / 首尾 Tick，并支持 Arrow 逐拍、Page 逐小节、Home /
+  End 首尾定位。键盘定位与 Pointer 定位使用同一 Transport 能力，不读取 Piano Roll Snap。
 - Piano Roll Playhead MUST 按当前编辑 Scope 投影同一位置：`Track` 模式直接使用全局 Tick；
   `Clip Focus` 模式使用 `globalTick - clip.startTick`，并只在 Clip 与当前 Viewport 范围内显示。
   两种模式都通过独立 transform-only 图层移动。`sourceStartTick` 表示 MIDI Source 读取偏移，
   MUST NOT 被当作 Clip 在 Arrangement 的起点。
-- 用户主动横向滚动或操作时间轴时，本次 Follow 暂停；可见 Follow 控制 MUST 能立即恢复。该状态
-  是当前视图的瞬时产品状态，不属于 Project Fact。
+- 用户主动横向滚动或操作时间轴时，本次 Follow 暂停；成功的 Playing Locate MUST 恢复
+  Arrangement Follow，取消 MUST 恢复手势开始前的 Arrangement Follow 状态。Track Piano Roll
+  Follow 保持独立。可见 Follow 控制 MUST 能立即恢复；这些状态不属于 Project Fact。
 - 横向滚动和缩放的具体修饰键必须由 Keybinding 层统一定义，并允许平台适配。
 - Zoom 应围绕指针、播放头或明确焦点稳定缩放，不能无缘由跳回时间零点。
 - Arrangement 与 Piano Roll 可以分别保存 Zoom；“同步视图”应是显式选项。
@@ -1046,8 +1056,8 @@ SHOULD 使用 Canvas 的区域：
 
 Canvas 不是绕开可访问性和状态边界的理由。DOM 与 Canvas 必须读取同一 Editor state 和 Project Query，不得各自维护业务副本。
 
-当前至少 150 小节、少量 Clip、尚无 Zoom / Drag 的 Arrangement 纵向切片 MAY
-继续使用 DOM，以验证真实创建、选择、打开、横向滚动和可访问交互。Track 控制行与 Lane 已经
+当前至少 150 小节、少量 Clip、尚无 Zoom / Clip Drag 的 Arrangement 纵向切片 MAY
+继续使用 DOM，以验证真实创建、选择、打开、Ruler Locate、横向滚动和可访问交互。Track 控制行与 Lane 已经
 消费同一排序和行高；右侧 Arrangement 是唯一二维滚动视口，左侧 Track 列以裁切的合成层从
 视图跟随其纵向位置。Ruler 与 Lane 共享横向滚动，原生横向滚动条只属于 Arrangement；引入
 可变 Zoom、大量 Clip、高频播放图层或拖动预览前，必须以性能数据和交互需求重新评估 Canvas /
@@ -1059,8 +1069,10 @@ Scheduler cadence 只负责音频 look-ahead，不是 UI 刷新源。后续 DOM 
 这份投影，并只更新独立轻量图层，不能各自维护计时器或累计时间。
 
 Arrangement 当前使用独立 DOM Playhead 子组件直接消费该投影，并只更新一个合成层的
-`translate3d(...)`。Ruler、Lane、Clip Scene 不消费高频位置；分页 Follow 由 Arrangement 右侧
-滚动权威执行，手动横向导航会暂停当前播放轮次的自动滚动。
+`translate3d(...)`。Ruler Locate Preview 是另一条只在手势期间存在的 transform-only 图层；
+Ruler、Lane、Clip Scene 不消费高频播放位置。分页 Follow 与 Locate 边缘自动滚动都由
+Arrangement 右侧同一滚动权威执行，但前者跟随 Transport，后者只跟随 Pointer；取消手势必须
+恢复先前 Follow 状态。
 
 Piano Roll 同样由独立 Playhead 子组件直接消费视觉位置。Clip Focus Playhead 由 Studio
 Presentation 显式携带 Project 身份和 Arrangement `clip.startTick`，子组件再映射到当前

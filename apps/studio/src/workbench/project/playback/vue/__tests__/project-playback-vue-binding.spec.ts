@@ -66,13 +66,13 @@ function createCoordinatorFixture() {
   const readVisualPosition = vi.fn<() => ProjectPlaybackVisualPosition>(() => visualPosition)
   const coordinator: ProjectPlaybackCoordinator = Object.freeze({
     beginTimelineLocate: () => null,
+    canReturnToLastStartPosition: () => false,
     state: INITIAL_STATE,
     locateAtTick: () => false,
     pause: () => false,
     play: async () => false,
     readVisualPosition,
     returnToLastStartPosition: () => false,
-    returnToStart: () => false,
     subscribe(input: ProjectPlaybackStateObserver) {
       observer = input
       return unsubscribe

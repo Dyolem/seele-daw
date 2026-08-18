@@ -122,13 +122,13 @@ function mountShell(options: MountShellOptions = {}) {
   )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
     beginTimelineLocate: () => null,
+    canReturnToLastStartPosition: () => false,
     state: playbackState.value,
     locateAtTick: () => false,
     pause: () => false,
     play: async () => false,
     readVisualPosition: () => playbackVisualPosition.value,
     returnToLastStartPosition: () => false,
-    returnToStart: () => false,
     subscribe: () => () => {},
     togglePlayPause: () => false,
     dispose() {},
@@ -149,7 +149,7 @@ function mountShell(options: MountShellOptions = {}) {
       pianoRollPresentation: null,
       pianoRollTrackPresentation: null,
       playbackCanToggle: true,
-      playbackCanReturnToStart: false,
+      playbackCanReturnToLastStartPosition: false,
       playbackFeedback: null,
       playbackPhase: 'stopped',
       playbackTime: '00:00.000',
@@ -201,7 +201,9 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('button[aria-label="Undo"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('button[aria-label="Redo"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('button[aria-label="Play"]').attributes('disabled')).toBeUndefined()
-    expect(wrapper.get('button[aria-label="Return to start"]').attributes('disabled')).toBeDefined()
+    expect(
+      wrapper.get('button[aria-label="Return to last start position"]').attributes('disabled'),
+    ).toBeDefined()
     expect(wrapper.get('.project-workbench__output-level').text()).toContain('Meter —')
     expect(
       wrapper.get('.project-workbench__track-actions button').attributes('disabled'),
@@ -222,7 +224,7 @@ describe('ProjectWorkbenchShell', () => {
     const wrapper = mountShell()
 
     await wrapper.setProps({
-      playbackCanReturnToStart: true,
+      playbackCanReturnToLastStartPosition: true,
       playbackFeedback: 'Some content will be skipped.',
       playbackPhase: 'playing',
       playbackTime: '01:02.345',
@@ -234,10 +236,10 @@ describe('ProjectWorkbenchShell', () => {
       'Some content will be skipped.',
     )
     await wrapper.get('button[aria-label="Pause"]').trigger('click')
-    await wrapper.get('button[aria-label="Return to start"]').trigger('click')
+    await wrapper.get('button[aria-label="Return to last start position"]').trigger('click')
 
     expect(wrapper.emitted('playbackToggle')).toHaveLength(1)
-    expect(wrapper.emitted('playbackReturnToStart')).toHaveLength(1)
+    expect(wrapper.emitted('playbackReturnToLastStartPosition')).toHaveLength(1)
   })
 
   it('renders the Project menu through its portal with the styled overlay classes', async () => {

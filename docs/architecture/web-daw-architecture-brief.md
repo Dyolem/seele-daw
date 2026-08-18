@@ -4,7 +4,7 @@
 > 产品定位：桌面浏览器优先、面向个人创作者的轻量 Web DAW  
 > 文档作用：回答系统如何拆分、模块如何依赖，以及从哪里开始开发  
 > 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3\
-> 最近校准：2026-08-17
+> 最近校准：2026-08-18
 
 ---
 
@@ -34,6 +34,13 @@ Arrangement 滚动权威、共享视觉位置，以及 Arrangement / Track / Cli
 Follow；Batch 7F 加固与文档同步也已通过审核。Audible MIDI Playback V1 已在验收基线
 `f1d0298` 完成；阶段 checkpoint tag 尚未创建。长期架构中的通用 Graph、RuntimeDelta、跨线程
 ACK 和 AudioWorklet 路径仍不能反推为该已完成切片的必做范围。
+
+后续独立的
+[Manual Timeline Locate V1](../../packages/playback/docs/manual-timeline-locate-v1-phase-plan.md)
+已完成四个实施批次，等待统一审核：Playback Transport 拥有浏览器无关的 Tick Locate 与运行时
+Return Anchor；Studio Coordinator 拥有静默事务、generation / Voice 失效和 Runtime 保留；
+Arrangement 只拥有 Pointer / Keyboard、Preview、边缘滚动与 Follow。该切片不重新打开 Audible
+MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase。
 
 ---
 
@@ -398,6 +405,11 @@ Transport 自然结束。Studio 以一个帧采样绑定读取 Transport 权威�
 时不累计时间，恢复后的首帧直接读取最新位置。Arrangement 与两种 Piano Roll 只移动独立
 transform-only Playhead 图层；Follow 是各时间视图自己的瞬时滚动状态，不进入 Project 或
 Playback Core。
+
+Manual Timeline Locate 延续同一分层：Ruler 把 Pointer / Keyboard 映射为整数 Project Tick，
+Coordinator 使旧 Scheduler / Voice generation 失效，Transport 重新建立时间映射并替换 Return
+Anchor。拖动 Preview 与边缘自动滚动都属于 Arrangement ViewState；只有松开产生一次运行时
+定位，整个链路不产生 Project Command、History、dirty 或持久化写入。
 
 ## 14. 生命周期
 

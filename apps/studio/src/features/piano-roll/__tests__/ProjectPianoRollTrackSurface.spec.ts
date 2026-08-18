@@ -230,13 +230,13 @@ function createSurfaceFixture() {
   )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
     beginTimelineLocate: () => null,
+    canReturnToLastStartPosition: () => false,
     dispose() {},
     locateAtTick: () => false,
     pause: () => false,
     play: async () => false,
     readVisualPosition: () => playbackVisualPosition.value,
     returnToLastStartPosition: () => false,
-    returnToStart: () => false,
     state: playbackState.value,
     subscribe: () => () => undefined,
     togglePlayPause: () => false,

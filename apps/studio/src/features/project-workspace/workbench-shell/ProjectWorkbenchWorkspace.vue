@@ -234,6 +234,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       :bar-span-tick="props.barSpanTick"
       :clips="props.clips"
       :project-id="props.projectId"
+      :time-signature-numerator="props.timeSignatureNumerator"
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
       @open-midi-clip="openContextEditor"

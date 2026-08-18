@@ -70,6 +70,11 @@ Transport 视觉位置投影到 Arrangement、Track-time Piano Roll 和 Clip Foc
 只触发权威位置采样，不累计 UI elapsed time；各视图的 Scroll / Follow 属于 ViewState，不进入
 ProjectSession、Playback Plan 或 Audio Runtime。
 
+后续 Manual Timeline Locate V1 已把 Arrangement Ruler 的整数 Tick 定位接到同一 Transport：
+Transport 保存不持久化的 Return Anchor，Studio Coordinator 使旧 generation / Voice 失效并保留
+已准备资源，View 只管理静默 Preview、边缘滚动和 Follow。完整 Seek 范围、可听 Scrub、Note
+Chase、Marker 与 Loop 仍属于后续切片。
+
 ---
 
 # 第一部分：目标与非目标
@@ -792,6 +797,8 @@ ProjectModel 的变更频率是“事务级”，InteractionState 和 PlaybackVi
 Vue，浏览器后台暂停动画帧也不暂停或重算 Transport；恢复后的首帧读取最新权威位置。
 Arrangement、Track Piano Roll 与 Clip Focus Piano Roll 消费同一位置，但分别完成全局或
 Clip-local 投影。分页 Follow 是 Arrangement / Track 视图各自的瞬时状态。
+Arrangement 的 Manual Locate Preview 和边缘自动滚动同样属于 ViewState；松开后只向应用层提交
+一次 Tick，不能让 Pointer frame 或 scrollLeft 成为第二套 Transport Position。
 
 ## 24. 输入归一化
 
@@ -1036,6 +1043,7 @@ interface TransportMapping {
   state: 'stopped' | 'playing' | 'paused' | 'recording'
   engineGeneration: number
   anchorTick: Tick
+  returnAnchorTick: Tick
   anchorPlaybackClockSecond: PlaybackClockSecond
   loop?: TickRange
 }
@@ -1064,6 +1072,10 @@ latency 信息做视觉补偿，但这些估计不改变调度时间。
 - Seek 后旧事件如何失效；
 - Tempo change 从哪个边界生效；
 - 浏览器 suspend / resume 后是否继续或暂停。
+
+当前 Manual Timeline Locate V1 已固定首个子集：Ruler Locate 替换运行时 `returnAnchorTick`；
+Playing Locate 增加 generation、清理旧 future event / Voice 并从目标继续；Return 停止到最后一次
+Anchor；定位中不 Note Chase。该 Anchor 不进入 Project Fact 或持久化协议。
 
 ## 32. 两级 Scheduler
 
@@ -1130,7 +1142,8 @@ AudioContext latency
 ## 33. 播放中编辑语义
 
 下表既是长期细粒度方向，也是 Audible MIDI Playback V1 Batch 6 已采用的 Note / Track /
-Instrument 选择性语义；其中 Clip Gain ramp、Tempo 编辑与 Seek 仍属于后续能力：
+Instrument 选择性语义；其中 Clip Gain ramp、Tempo 编辑与完整 Seek / 可听 Scrub 仍属于后续能力，
+Arrangement Ruler 的单点 Manual Locate 已采用 Seek 行的安全失效子集：
 
 | 变化位置 / 类型                  | 长期目标策略                                              |
 | -------------------------------- | --------------------------------------------------------- |

@@ -38,8 +38,6 @@ export const AUDIBLE_MIDI_TRANSPORT_OUTCOME = Object.freeze({
   PLAN_EMPTY: 'plan-empty',
   PLAYED: 'played',
   RETURNED_TO_LAST_START_POSITION: 'returned-to-last-start-position',
-  /** @deprecated Use RETURNED_TO_LAST_START_POSITION. */
-  RETURNED_TO_START: 'returned-to-last-start-position',
 } as const)
 
 export type AudibleMidiTransportOutcome =
@@ -110,8 +108,6 @@ export interface AudibleMidiTransport {
   play(): AudibleMidiTransportTransition
   playbackClockSecondAtTick(tick: Tick): PlaybackClockSecond
   returnToLastStartPosition(): AudibleMidiTransportTransition
-  /** @deprecated Use returnToLastStartPosition. */
-  returnToStart(): AudibleMidiTransportTransition
   tickPositionAtPlaybackClockSecond(
     playbackClockSecond: PlaybackClockSecond,
   ): ContinuousTickPosition
@@ -459,11 +455,6 @@ export function createAudibleMidiTransport(
     )
   }
 
-  /** @deprecated Compatibility alias until Studio adopts the new product command. */
-  function returnToStart(): AudibleMidiTransportTransition {
-    return returnToLastStartPosition()
-  }
-
   function playbackClockSecondAtTick(tick: Tick): PlaybackClockSecond {
     const mapping = requireActiveMapping()
     const targetTick = parseTick(tick)
@@ -513,7 +504,6 @@ export function createAudibleMidiTransport(
     play,
     playbackClockSecondAtTick,
     returnToLastStartPosition,
-    returnToStart,
     tickPositionAtPlaybackClockSecond,
   })
 }

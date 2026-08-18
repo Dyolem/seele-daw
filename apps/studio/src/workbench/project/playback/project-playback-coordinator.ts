@@ -107,13 +107,12 @@ export interface ProjectPlaybackCoordinatorDependencies {
 export interface ProjectPlaybackCoordinator {
   readonly state: ProjectPlaybackState
   beginTimelineLocate(): ProjectPlaybackLocateSession | null
+  canReturnToLastStartPosition(): boolean
   locateAtTick(tick: Tick): boolean
   pause(): boolean
   play(): Promise<boolean>
   readVisualPosition(): ProjectPlaybackVisualPosition
   returnToLastStartPosition(): boolean
-  /** @deprecated Use returnToLastStartPosition. */
-  returnToStart(): boolean
   subscribe(observer: ProjectPlaybackStateObserver): ProjectPlaybackUnsubscribe
   togglePlayPause(): boolean
   dispose(): void
@@ -381,6 +380,24 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     return this.#locateAtTick(tick)
   }
 
+  canReturnToLastStartPosition(): boolean {
+    this.#assertLive()
+    if (
+      this.#activeLocateSession !== null ||
+      this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING ||
+      this.#state.phase === PROJECT_PLAYBACK_PHASE.PAUSED ||
+      this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
+    ) {
+      return true
+    }
+    if (this.#state.phase !== PROJECT_PLAYBACK_PHASE.STOPPED) return false
+
+    const snapshot = this.#transport?.getSnapshot()
+    return (
+      snapshot !== undefined && Number(snapshot.positionTick) !== Number(snapshot.returnAnchorTick)
+    )
+  }
+
   async play(): Promise<boolean> {
     this.#assertLive()
     const plan = this.#requirePlayablePlan()
@@ -623,12 +640,6 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   }
 
   returnToLastStartPosition(): boolean {
-    this.#assertLive()
-    return this.#returnToLastStartPosition()
-  }
-
-  /** @deprecated Compatibility alias until the Workbench control adopts the product term. */
-  returnToStart(): boolean {
     this.#assertLive()
     return this.#returnToLastStartPosition()
   }

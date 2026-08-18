@@ -144,12 +144,13 @@ const clipSelectionCandidates = computed((): readonly ProjectWorkbenchClipSelect
 const playbackTime = computed(() =>
   formatPlaybackTime(playbackVisualPosition.value.positionProjectSecond),
 )
-const playbackCanReturnToStart = computed(
-  () =>
-    playbackState.value.phase === PROJECT_PLAYBACK_PHASE.LOADING ||
-    playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING ||
-    playbackVisualPosition.value.positionProjectSecond > 0,
-)
+const playbackCanReturnToLastStartPosition = computed(() => {
+  // These projections make the Coordinator-owned capability reactive without duplicating its
+  // Return Anchor in component state.
+  void playbackState.value
+  void playbackVisualPosition.value
+  return projectPlayback.canReturnToLastStartPosition()
+})
 const playbackCanToggle = computed(
   () =>
     playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.LOADING &&
@@ -365,7 +366,9 @@ watch(
 )
 
 onUnmounted(() => {
-  if (playbackCanReturnToStart.value) projectPlayback.returnToStart()
+  if (playbackCanReturnToLastStartPosition.value) {
+    projectPlayback.returnToLastStartPosition()
+  }
   disposeKeyboardShortcuts()
   isUnmounted = true
   requestGeneration += 1
@@ -385,7 +388,7 @@ onUnmounted(() => {
     :piano-roll-presentation="pianoRollPresentation"
     :piano-roll-track-presentation="pianoRollTrackPresentation"
     :playback-can-toggle="playbackCanToggle"
-    :playback-can-return-to-start="playbackCanReturnToStart"
+    :playback-can-return-to-last-start-position="playbackCanReturnToLastStartPosition"
     :playback-feedback="playbackState.feedback?.message ?? null"
     :playback-phase="playbackState.phase"
     :playback-time="playbackTime"
@@ -400,7 +403,7 @@ onUnmounted(() => {
     :timeline-end-tick="timelineEndTick"
     :tracks="trackPresentations"
     @leave-project="router.push(createProjectEntryLocation())"
-    @playback-return-to-start="projectPlayback.returnToStart()"
+    @playback-return-to-last-start-position="projectPlayback.returnToLastStartPosition()"
     @playback-toggle="projectPlayback.togglePlayPause()"
     @redo="redoProject"
     @save="saveProject"

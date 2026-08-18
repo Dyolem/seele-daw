@@ -64,6 +64,7 @@ interface ArrangementFixture {
   >
   readonly cancelTimelineLocate: ReturnType<typeof vi.fn<ProjectPlaybackLocateSession['cancel']>>
   readonly commitTimelineLocate: ReturnType<typeof vi.fn<ProjectPlaybackLocateSession['commit']>>
+  readonly locateAtTick: ReturnType<typeof vi.fn<ProjectPlaybackCoordinator['locateAtTick']>>
   readonly wrapper: VueWrapper
 }
 
@@ -137,15 +138,16 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       startedWhilePlaying: playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING,
     }),
   )
+  const locateAtTick = vi.fn<ProjectPlaybackCoordinator['locateAtTick']>(() => true)
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
     beginTimelineLocate,
+    canReturnToLastStartPosition: () => false,
     state: playbackState.value,
-    locateAtTick: () => false,
+    locateAtTick,
     pause: () => false,
     play: async () => false,
     readVisualPosition: () => playbackVisualPosition.value,
     returnToLastStartPosition: () => false,
-    returnToStart: () => false,
     subscribe: () => () => {},
     togglePlayPause: () => false,
     dispose() {},
@@ -160,6 +162,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       barSpanTick: parsePositiveTick(3_840),
       clips: options.clips ?? Object.freeze([]),
       projectId,
+      timeSignatureNumerator: 4,
       timelineEndTick: options.timelineEndTick ?? parseTick(3_840 * 8),
       tracks: options.tracks ?? Object.freeze([]),
     },
@@ -180,6 +183,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     beginTimelineLocate,
     cancelTimelineLocate,
     commitTimelineLocate,
+    locateAtTick,
     selection,
     toasts,
     playbackState,
@@ -232,6 +236,7 @@ async function dispatchPointerEvent(
 afterEach(() => {
   for (const wrapper of mountedWrappers.splice(0)) wrapper.unmount()
   document.body.innerHTML = ''
+  vi.restoreAllMocks()
 })
 
 describe('ProjectWorkbenchArrangement', () => {
@@ -386,6 +391,127 @@ describe('ProjectWorkbenchArrangement', () => {
     )
   })
 
+  it('continuously scrolls a captured locate drag near the Arrangement edge', async () => {
+    const frameCallbacks: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frameCallbacks.push(callback)
+      return frameCallbacks.length
+    })
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const fixture = mountArrangement()
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+      .element as HTMLElement
+    viewport.scrollLeft = 400
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1_600 },
+    })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 500,
+      left: 100,
+      right: 500,
+      toJSON: () => ({}),
+      top: 100,
+      width: 400,
+      x: 100,
+      y: 100,
+    })
+    const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface')
+
+    await dispatchPointerEvent(ruler.element, 'pointerdown', {
+      clientX: 490,
+      pointerId: 10,
+    })
+    const firstFrame = frameCallbacks.shift()
+    if (firstFrame === undefined) throw new Error('Expected locate edge-scroll frame')
+    firstFrame(16)
+    await nextTick()
+
+    expect(viewport.scrollLeft).toBeGreaterThan(400)
+    expect(frameCallbacks).toHaveLength(1)
+
+    await dispatchPointerEvent(ruler.element, 'pointerup', {
+      clientX: 490,
+      pointerId: 10,
+    })
+    expect(cancelFrame).toHaveBeenCalled()
+    expect(fixture.commitTimelineLocate).toHaveBeenCalledOnce()
+  })
+
+  it('restores Follow after a successful Playing locate and restores prior suspension on cancel', async () => {
+    const fixture = mountArrangement({ playbackPhase: PROJECT_PLAYBACK_PHASE.PLAYING })
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+    const viewportElement = viewport.element as HTMLElement
+    Object.defineProperties(viewportElement, {
+      clientWidth: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1_600 },
+    })
+    vi.spyOn(viewportElement, 'getBoundingClientRect').mockReturnValue({
+      bottom: 600,
+      height: 500,
+      left: 100,
+      right: 500,
+      toJSON: () => ({}),
+      top: 100,
+      width: 400,
+      x: 100,
+      y: 100,
+    })
+    const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface')
+    const followControl = fixture.wrapper.get('.project-workbench__follow-control')
+
+    viewportElement.scrollLeft = 160
+    await viewport.trigger('scroll')
+    expect(followControl.attributes('aria-pressed')).toBe('false')
+
+    await dispatchPointerEvent(ruler.element, 'pointerdown', {
+      clientX: 300,
+      pointerId: 11,
+    })
+    await dispatchPointerEvent(ruler.element, 'pointerup', {
+      clientX: 300,
+      pointerId: 11,
+    })
+    await nextTick()
+    expect(followControl.attributes('aria-pressed')).toBe('true')
+
+    viewportElement.scrollLeft = 160
+    await viewport.trigger('scroll')
+    await dispatchPointerEvent(ruler.element, 'pointerdown', {
+      clientX: 300,
+      pointerId: 12,
+    })
+    await dispatchPointerEvent(ruler.element, 'pointercancel', { pointerId: 12 })
+    expect(followControl.attributes('aria-pressed')).toBe('false')
+  })
+
+  it('exposes the Ruler as a keyboard-locatable Timeline slider', async () => {
+    const fixture = mountArrangement({ playbackPositionTick: 3_840 })
+    const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface')
+
+    expect(ruler.attributes()).toMatchObject({
+      'aria-orientation': 'horizontal',
+      'aria-valuemax': '30720',
+      'aria-valuemin': '0',
+      'aria-valuenow': '3840',
+      role: 'slider',
+      tabindex: '0',
+    })
+
+    await ruler.trigger('keydown', { key: 'ArrowRight' })
+    await ruler.trigger('keydown', { key: 'PageDown' })
+    await ruler.trigger('keydown', { key: 'Home' })
+    await ruler.trigger('keydown', { key: 'End' })
+
+    expect(fixture.locateAtTick.mock.calls.map(([tick]) => tick)).toEqual([
+      parseTick(4_800),
+      parseTick(7_680),
+      parseTick(0),
+      parseTick(30_720),
+    ])
+  })
+
   it('follows the playing position by discrete Arrangement viewport pages', async () => {
     const fixture = mountArrangement({ playbackPhase: PROJECT_PLAYBACK_PHASE.PLAYING })
     const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
@@ -440,7 +566,7 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(viewportElement.scrollLeft).toBe(1_200)
     expect(followControl.attributes('aria-pressed')).toBe('true')
 
-    await fixture.wrapper.get('.project-workbench__ruler li').trigger('pointerdown')
+    await fixture.wrapper.get('.project-workbench__surface-empty').trigger('pointerdown')
     expect(followControl.attributes('aria-label')).toBe('Resume timeline follow')
 
     setPlaybackPhase(fixture, PROJECT_PLAYBACK_PHASE.PAUSED)

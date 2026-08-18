@@ -27,6 +27,7 @@ import {
   type ProjectCommit,
   type ProjectId,
   type ProjectSession,
+  type Tick,
 } from '@seele-daw/project-core'
 
 import type {
@@ -105,13 +106,24 @@ export interface ProjectPlaybackCoordinatorDependencies {
 
 export interface ProjectPlaybackCoordinator {
   readonly state: ProjectPlaybackState
+  beginTimelineLocate(): ProjectPlaybackLocateSession | null
+  locateAtTick(tick: Tick): boolean
   pause(): boolean
   play(): Promise<boolean>
   readVisualPosition(): ProjectPlaybackVisualPosition
+  returnToLastStartPosition(): boolean
+  /** @deprecated Use returnToLastStartPosition. */
   returnToStart(): boolean
   subscribe(observer: ProjectPlaybackStateObserver): ProjectPlaybackUnsubscribe
   togglePlayPause(): boolean
   dispose(): void
+}
+
+/** Owns one silent Ruler locate gesture without exposing audio runtime state to Vue. */
+export interface ProjectPlaybackLocateSession {
+  readonly startedWhilePlaying: boolean
+  cancel(): boolean
+  commit(tick: Tick): boolean
 }
 
 interface StateSubscriptionEntry {
@@ -129,6 +141,12 @@ interface ScheduledVoiceEntry {
   readonly handle: ProjectPlaybackVoiceHandle
   readonly plan: ScheduledSampleVoicePlan
   readonly runtime: ProjectPlaybackPreparedRuntime
+}
+
+interface ActiveLocateSession {
+  readonly modelRevision: ModelRevision
+  readonly projectId: ProjectId
+  readonly startedWhilePlaying: boolean
 }
 
 const SCHEDULER_WAKE_CADENCE_SECOND = parsePlaybackClockDurationSecond(0.025)
@@ -257,6 +275,18 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   readonly #unsubscribeActiveProjectCommits: ProjectPlaybackUnsubscribe
   readonly #retiredRuntimes = new Set<ProjectPlaybackPreparedRuntime>()
   readonly #scheduledVoices = new Set<ScheduledVoiceEntry>()
+  readonly #playbackClock = Object.freeze({
+    now: () => {
+      const runtime = this.#preparedRuntime
+      if (runtime === null) {
+        throw new ProjectPlaybackError(
+          'playback-unavailable',
+          'Project Playback has no active audio clock',
+        )
+      }
+      return runtime.now()
+    },
+  })
   #activePlanIdentity: ActivePlanIdentity | null = null
   #plan: AudibleMidiProjectPlan | null = null
   #preparedRuntime: ProjectPlaybackPreparedRuntime | null = null
@@ -271,10 +301,12 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #pendingCommitFlushQueued = false
   #pendingCommitChainBroken = false
   #pendingPlan: AudibleMidiProjectPlan | null = null
+  #pendingStartLocatedDuringLoading = false
   #runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
   #suppressedOccurrenceKeys = new Set<ScheduledSampleVoicePlan['occurrenceKey']>()
   #suppressedTrackIds = new Set<ScheduledSampleVoicePlan['trackId']>()
   #state: ProjectPlaybackState = UNAVAILABLE_STATE
+  #activeLocateSession: ActiveLocateSession | null = null
   #disposed = false
 
   constructor(dependencies: ProjectPlaybackCoordinatorDependencies) {
@@ -320,14 +352,56 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     }
   }
 
+  beginTimelineLocate(): ProjectPlaybackLocateSession | null {
+    this.#assertLive()
+    if (this.#transport === null || this.#activeLocateSession !== null) return null
+
+    const identity = this.#activePlanIdentity
+    if (identity === null) return null
+    const startedWhilePlaying = this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
+    if (startedWhilePlaying && !this.#pauseForLocatePreview()) return null
+
+    const activeSession = Object.freeze<ActiveLocateSession>({
+      modelRevision: identity.modelRevision,
+      projectId: identity.projectId,
+      startedWhilePlaying,
+    })
+    this.#activeLocateSession = activeSession
+
+    return Object.freeze({
+      startedWhilePlaying,
+      cancel: () => this.#cancelTimelineLocate(activeSession),
+      commit: (tick: Tick) => this.#commitTimelineLocate(activeSession, tick),
+    })
+  }
+
+  locateAtTick(tick: Tick): boolean {
+    this.#assertLive()
+    if (this.#activeLocateSession !== null) return false
+    return this.#locateAtTick(tick)
+  }
+
   async play(): Promise<boolean> {
     this.#assertLive()
     const plan = this.#requirePlayablePlan()
     if (
+      this.#activeLocateSession !== null ||
       this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING ||
       this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
     ) {
       return false
+    }
+
+    if (this.#transport === null || this.#scheduler === null) {
+      this.#installPlanControls(plan)
+    }
+
+    if (
+      this.#preparedRuntime?.modelRevision === plan.modelRevision &&
+      this.#transport !== null &&
+      this.#scheduler !== null
+    ) {
+      return this.#resumePreparedPlayback()
     }
 
     const projectId = this.#requireProjectId()
@@ -335,6 +409,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     const abortController = new AbortController()
     this.#preparationAbortController?.abort()
     this.#preparationAbortController = abortController
+    this.#pendingStartLocatedDuringLoading = false
     this.#publish(
       createState({
         diagnostics: plan.diagnostics,
@@ -365,26 +440,25 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
       this.#preparedRuntime = preparedRuntime
       this.#runtimePreparationFailures = preparedRuntime.preparationFailures
-      if (this.#transport === null || this.#scheduler === null) {
-        this.#transport = createAudibleMidiTransport(plan, {
-          now: () => {
-            const currentRuntime = this.#preparedRuntime
-            if (currentRuntime === null) {
-              throw new ProjectPlaybackError(
-                'playback-unavailable',
-                'Project Playback has no active audio clock',
-              )
-            }
-            return currentRuntime.now()
-          },
-        })
-        this.#scheduler = createAudibleMidiSchedulerPlanner(plan, {
-          lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
-          wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,
-        })
+      const transport = this.#transport
+      if (transport === null || this.#scheduler === null) {
+        throw new ProjectPlaybackError(
+          'playback-unavailable',
+          'Project Playback has no Transport for the active Plan',
+        )
       }
 
-      const transition = this.#transport.play()
+      const pendingSnapshot = transport.getSnapshot()
+      if (
+        this.#pendingStartLocatedDuringLoading &&
+        Number(pendingSnapshot.positionTick) === pendingSnapshot.timelineEndTick
+      ) {
+        this.#pendingStartLocatedDuringLoading = false
+        this.#publishTransportState(pendingSnapshot)
+        return true
+      }
+
+      const transition = transport.play()
       if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) {
         throw new ProjectPlaybackError(
           'playback-unavailable',
@@ -395,6 +469,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       this.#scheduleNextWindow(transition.snapshot)
       this.#startTimer()
       this.#publishTransportState(transition.snapshot)
+      this.#pendingStartLocatedDuringLoading = false
       return true
     } catch (cause) {
       if (!this.#isCurrentRequest(requestSequence, plan, abortController)) return false
@@ -409,6 +484,15 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
   pause(): boolean {
     this.#assertLive()
+    if (this.#activeLocateSession !== null) return false
+    return this.#pauseTransport()
+  }
+
+  #pauseForLocatePreview(): boolean {
+    return this.#pauseTransport()
+  }
+
+  #pauseTransport(): boolean {
     const transport = this.#transport
     if (transport === null) return false
     try {
@@ -427,12 +511,130 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     }
   }
 
-  returnToStart(): boolean {
-    this.#assertLive()
-    return this.#returnToStart()
+  #cancelTimelineLocate(session: ActiveLocateSession): boolean {
+    if (!this.#claimLocateSession(session)) return false
+    if (!session.startedWhilePlaying) return true
+    return this.#resumePreparedPlayback()
   }
 
-  #returnToStart(): boolean {
+  #commitTimelineLocate(session: ActiveLocateSession, tick: Tick): boolean {
+    if (!this.#claimLocateSession(session)) return false
+    return session.startedWhilePlaying
+      ? this.#resumeAndLocateAtTick(tick)
+      : this.#locateAtTick(tick)
+  }
+
+  #claimLocateSession(session: ActiveLocateSession): boolean {
+    if (this.#disposed || this.#activeLocateSession !== session) return false
+    const identity = this.#activePlanIdentity
+    this.#activeLocateSession = null
+    return (
+      identity !== null &&
+      identity.projectId === session.projectId &&
+      identity.modelRevision === session.modelRevision
+    )
+  }
+
+  #invalidateLocateSession(): void {
+    this.#activeLocateSession = null
+  }
+
+  #locateAtTick(tick: Tick): boolean {
+    const transport = this.#transport
+    if (transport === null) return false
+    const wasLoading = this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING
+
+    try {
+      const transition = transport.locateAtTick(tick)
+      if (wasLoading) {
+        this.#pendingStartLocatedDuringLoading = true
+        this.#publishLoadingPosition(transition.snapshot)
+        return true
+      }
+
+      if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE) return true
+      this.#stopTimer()
+      this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
+      this.#allNotesOffRuntimes()
+      this.#collectFinishedVoicesAndRuntimes()
+      if (transition.snapshot.state === 'playing') {
+        this.#scheduleNextWindow(transition.snapshot)
+        this.#startTimer()
+      } else {
+        this.#startRetiredRuntimeCleanup()
+      }
+      this.#publishTransportState(transition.snapshot)
+      return true
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return false
+    }
+  }
+
+  #resumeAndLocateAtTick(tick: Tick): boolean {
+    const transport = this.#transport
+    const runtime = this.#preparedRuntime
+    if (transport === null || runtime === null || this.#scheduler === null) return false
+
+    try {
+      const played = transport.play()
+      if (played.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) {
+        throw new ProjectPlaybackError(
+          'playback-unavailable',
+          `Transport rejected locate resume with outcome ${played.outcome}`,
+        )
+      }
+      const located = transport.locateAtTick(tick)
+      runtime.advanceGeneration(located.snapshot.engineGeneration)
+      this.#collectFinishedVoicesAndRuntimes()
+      if (located.snapshot.state === 'playing') {
+        this.#scheduleNextWindow(located.snapshot)
+        this.#startTimer()
+      } else {
+        this.#stopTimer()
+        this.#startRetiredRuntimeCleanup()
+      }
+      this.#publishTransportState(located.snapshot)
+      return true
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return false
+    }
+  }
+
+  #resumePreparedPlayback(): boolean {
+    const transport = this.#transport
+    const runtime = this.#preparedRuntime
+    if (transport === null || runtime === null || this.#scheduler === null) return false
+
+    try {
+      const transition = transport.play()
+      if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) return false
+      runtime.advanceGeneration(transition.snapshot.engineGeneration)
+      this.#collectFinishedVoicesAndRuntimes()
+      this.#scheduleNextWindow(transition.snapshot)
+      this.#startTimer()
+      this.#publishTransportState(transition.snapshot)
+      return true
+    } catch (cause) {
+      this.#failCurrentPlan(cause)
+      return false
+    }
+  }
+
+  returnToLastStartPosition(): boolean {
+    this.#assertLive()
+    return this.#returnToLastStartPosition()
+  }
+
+  /** @deprecated Compatibility alias until the Workbench control adopts the product term. */
+  returnToStart(): boolean {
+    this.#assertLive()
+    return this.#returnToLastStartPosition()
+  }
+
+  #returnToLastStartPosition(): boolean {
+    this.#invalidateLocateSession()
     const wasLoading = this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING
     this.#cancelPreparation()
     this.#stopTimer()
@@ -445,8 +647,8 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         return wasLoading
       }
 
-      const transition = transport.returnToStart()
-      if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START) {
+      const transition = transport.returnToLastStartPosition()
+      if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION) {
         this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
         this.#allNotesOffRuntimes()
       } else {
@@ -454,7 +656,10 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       }
       this.#startRetiredRuntimeCleanup()
       this.#publishTransportState(transition.snapshot)
-      return wasLoading || transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START
+      return (
+        wasLoading ||
+        transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION
+      )
     } catch (cause) {
       this.#failCurrentPlan(cause)
       return false
@@ -620,6 +825,23 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     )
   }
 
+  #publishLoadingPosition(snapshot: AudibleMidiTransportSnapshot): void {
+    const plan = this.#plan
+    const projectId = this.#activePlanIdentity?.projectId
+    if (plan === null || projectId === undefined) return
+    this.#publish(
+      createState({
+        diagnostics: plan.diagnostics,
+        failureCause: this.#state.failureCause,
+        feedback: this.#state.feedback,
+        phase: PROJECT_PLAYBACK_PHASE.LOADING,
+        plan,
+        positionProjectSecond: snapshot.positionProjectSecond,
+        projectId,
+      }),
+    )
+  }
+
   #publishTransportState(snapshot: AudibleMidiTransportSnapshot): void {
     const plan = this.#plan
     const projectId = this.#activePlanIdentity?.projectId
@@ -651,6 +873,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   }
 
   #releasePlanRuntime(): void {
+    this.#invalidateLocateSession()
     this.#cancelPreparation()
     this.#stopTimer()
     this.#stopRetiredRuntimeCleanup()
@@ -670,11 +893,20 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#pendingCommitFlushQueued = false
     this.#pendingCommitChainBroken = false
     this.#pendingPlan = null
+    this.#pendingStartLocatedDuringLoading = false
     this.#runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
     this.#suppressedOccurrenceKeys.clear()
     this.#suppressedTrackIds.clear()
     this.#transport = null
     this.#scheduler = null
+  }
+
+  #installPlanControls(plan: AudibleMidiProjectPlan): void {
+    this.#transport = createAudibleMidiTransport(plan, this.#playbackClock)
+    this.#scheduler = createAudibleMidiSchedulerPlanner(plan, {
+      lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
+      wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,
+    })
   }
 
   #allNotesOffRuntimes(): void {
@@ -1009,6 +1241,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     nextPlan: AudibleMidiProjectPlan,
     nextRuntime: ProjectPlaybackPreparedRuntime,
   ): void {
+    this.#invalidateLocateSession()
     const transport = this.#transport
     const previousRuntime = this.#preparedRuntime
     if (transport === null || previousRuntime === null) {
@@ -1063,6 +1296,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       session: event.session,
     })
     this.#plan = nextPlan
+    this.#installPlanControls(nextPlan)
     this.#publish(
       createState({
         diagnostics: nextPlan.diagnostics,
@@ -1099,6 +1333,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     try {
       const plan = compileAudibleMidiProject(state.session.getSnapshot())
       this.#plan = plan
+      this.#installPlanControls(plan)
       this.#publish(
         createState({
           diagnostics: plan.diagnostics,

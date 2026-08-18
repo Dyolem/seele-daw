@@ -174,12 +174,15 @@ function createProjectPlaybackContext(): ProjectPlaybackVueContext {
     }),
   )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
+    beginTimelineLocate: () => null,
     get state() {
       return state.value
     },
+    locateAtTick: () => false,
     pause: () => false,
     play: async () => false,
     readVisualPosition: () => visualPosition.value,
+    returnToLastStartPosition: () => false,
     returnToStart: () => false,
     subscribe: () => () => undefined,
     togglePlayPause: () => false,

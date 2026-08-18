@@ -88,10 +88,13 @@ function createFixture() {
   )
   const state = shallowRef(INITIAL_STATE)
   const coordinator: ProjectPlaybackCoordinator = Object.freeze({
+    beginTimelineLocate: () => null,
     dispose() {},
+    locateAtTick: () => false,
     pause: () => false,
     play: async () => false,
     readVisualPosition: () => visualPosition.value,
+    returnToLastStartPosition: () => false,
     returnToStart: () => false,
     state: INITIAL_STATE,
     subscribe: () => () => undefined,

@@ -121,10 +121,13 @@ function mountShell(options: MountShellOptions = {}) {
     }),
   )
   const projectPlayback: ProjectPlaybackCoordinator = Object.freeze({
+    beginTimelineLocate: () => null,
     state: playbackState.value,
+    locateAtTick: () => false,
     pause: () => false,
     play: async () => false,
     readVisualPosition: () => playbackVisualPosition.value,
+    returnToLastStartPosition: () => false,
     returnToStart: () => false,
     subscribe: () => () => {},
     togglePlayPause: () => false,

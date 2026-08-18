@@ -396,12 +396,135 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(prepared.allNotesOffCount).toBe(1)
     expect(timer.callbacks.size).toBe(0)
 
-    expect(coordinator.returnToStart()).toBe(true)
+    expect(coordinator.returnToLastStartPosition()).toBe(true)
     expect(coordinator.state).toMatchObject({ phase: 'stopped', positionProjectSecond: 0 })
     expect(prepared.generations).toEqual([1, 2, 3])
     expect(prepared.allNotesOffCount).toBe(2)
     coordinator.dispose()
     expect(runtime.disposeCount).toBe(1)
+  })
+
+  it('silently previews a Playing locate and resumes from the committed target', async () => {
+    const projectId = parseProjectId('project-playback-locate-playing')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const timer = new ManualProjectPlaybackTimer()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer,
+    })
+
+    await coordinator.play()
+    const prepared = runtime.prepared[0]!
+    prepared.currentTime = parsePlaybackClockSecond(0.25)
+    const locate = coordinator.beginTimelineLocate()
+
+    expect(locate?.startedWhilePlaying).toBe(true)
+    expect(coordinator.state.phase).toBe('paused')
+    expect(prepared.generations).toEqual([1, 2])
+    expect(prepared.allNotesOffCount).toBe(1)
+    expect(timer.callbacks.size).toBe(0)
+
+    expect(locate?.commit(parseTick(1_920))).toBe(true)
+    expect(runtime.plans).toHaveLength(1)
+    expect(coordinator.state).toMatchObject({
+      phase: 'playing',
+      positionProjectSecond: 1,
+    })
+    expect(coordinator.readVisualPosition().positionTick).toBe(1_920)
+    expect(prepared.generations).toEqual([1, 2, 4])
+    expect(prepared.scheduled).toHaveLength(1)
+
+    expect(coordinator.returnToLastStartPosition()).toBe(true)
+    expect(coordinator.state).toMatchObject({ phase: 'stopped', positionProjectSecond: 1 })
+    coordinator.dispose()
+  })
+
+  it('cancels a Playing locate preview at its frozen position without changing the return anchor', async () => {
+    const projectId = parseProjectId('project-playback-locate-cancel')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+
+    await coordinator.play()
+    const prepared = runtime.prepared[0]!
+    prepared.currentTime = parsePlaybackClockSecond(0.25)
+    const locate = coordinator.beginTimelineLocate()
+
+    expect(locate?.cancel()).toBe(true)
+    expect(locate?.cancel()).toBe(false)
+    expect(runtime.plans).toHaveLength(1)
+    expect(coordinator.state).toMatchObject({
+      phase: 'playing',
+      positionProjectSecond: 0.25,
+    })
+    expect(prepared.generations).toEqual([1, 2, 3])
+    expect(coordinator.returnToLastStartPosition()).toBe(true)
+    expect(coordinator.state.positionProjectSecond).toBe(0)
+    coordinator.dispose()
+  })
+
+  it('updates a pending Loading start and does not chase a Note active before the target', async () => {
+    const projectId = parseProjectId('project-playback-locate-loading')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new DeferredProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+
+    const play = coordinator.play()
+    expect(coordinator.state.phase).toBe('loading')
+    expect(coordinator.locateAtTick(parseTick(480))).toBe(true)
+    expect(coordinator.state).toMatchObject({
+      phase: 'loading',
+      positionProjectSecond: 0.25,
+    })
+
+    const prepared = runtime.resolve(0, parsePlaybackClockSecond(10))
+    await expect(play).resolves.toBe(true)
+    expect(coordinator.state).toMatchObject({
+      phase: 'playing',
+      positionProjectSecond: 0.25,
+    })
+    expect(prepared.scheduled).toHaveLength(0)
+    coordinator.dispose()
+  })
+
+  it('locates an Empty Plan without preparing the audio runtime', () => {
+    const projectId = parseProjectId('project-playback-locate-empty')
+    const session = createInitialProjectSession({
+      projectId,
+      projectName: 'Empty locate Project',
+      tempoEventId: parseTempoEventId('tempo-playback-locate-empty'),
+      timeSignatureEventId: parseTimeSignatureEventId('meter-playback-locate-empty'),
+    })
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+
+    expect(coordinator.state.planStatus).toBe('empty')
+    expect(coordinator.locateAtTick(parseTick(1_920))).toBe(true)
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'stopped',
+      positionProjectSecond: 1,
+      positionTick: 1_920,
+    })
+    expect(runtime.plans).toEqual([])
+    coordinator.dispose()
   })
 
   it('hands off a far-future Note addition without interrupting the active Voice', async () => {
@@ -1092,8 +1215,11 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(firstRuntime.disposeCount).toBe(1)
     expect(timer.callbacks.size).toBe(0)
 
+    const handedOffRuntime = runtime.prepared.at(-1)
     await expect(coordinator.play()).resolves.toBe(true)
-    expect(runtime.prepared.at(-1)?.generations).toEqual([4])
+    expect(runtime.prepared).toHaveLength(2)
+    expect(runtime.prepared.at(-1)).toBe(handedOffRuntime)
+    expect(handedOffRuntime?.generations).toEqual([3, 4])
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -1311,7 +1437,7 @@ describe('ProjectPlaybackCoordinator', () => {
 
     const play = coordinator.play()
     expect(coordinator.state.phase).toBe('loading')
-    expect(coordinator.returnToStart()).toBe(true)
+    expect(coordinator.returnToLastStartPosition()).toBe(true)
     expect(baseRuntime.signals[0]?.aborted).toBe(true)
     const staleRuntime = new ManualPreparedPlaybackRuntime(session.modelRevision)
     const resolvePending = pendingPreparation.resolve

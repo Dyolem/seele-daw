@@ -73,6 +73,7 @@ describe('Audible MIDI Transport', () => {
       planStatus: AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE,
       positionProjectSecond: 0,
       positionTick: 0,
+      returnAnchorTick: 0,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
       timelineEndProjectSecond: 300,
       timelineEndTick: 576_000,
@@ -185,6 +186,118 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
+  it('locates while Stopped or Paused and makes the latest target the return anchor', () => {
+    const clock = new ManualPlaybackClock(10)
+    const transport = createAudibleMidiTransport(createFixturePlan(), clock)
+
+    expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
+      snapshot: {
+        engineGeneration: 1,
+        positionProjectSecond: 1,
+        positionTick: 1_920,
+        returnAnchorTick: 1_920,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+      },
+    })
+    expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
+      snapshot: { engineGeneration: 1 },
+    })
+
+    transport.play()
+    clock.advanceBy(0.25)
+    transport.pause()
+    expect(transport.locateAtTick(parseTick(3_840))).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
+      snapshot: {
+        engineGeneration: 4,
+        positionProjectSecond: 2,
+        positionTick: 3_840,
+        returnAnchorTick: 3_840,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.PAUSED,
+      },
+    })
+    expect(transport.returnToLastStartPosition()).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION,
+      snapshot: {
+        engineGeneration: 5,
+        positionTick: 3_840,
+        returnAnchorTick: 3_840,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+      },
+    })
+  })
+
+  it('re-anchors Playing at each locate and returns to the latest successful target', () => {
+    const clock = new ManualPlaybackClock(20)
+    const transport = createAudibleMidiTransport(createFixturePlan(), clock)
+
+    transport.play()
+    clock.advanceBy(0.25)
+    expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
+      snapshot: {
+        anchorPlaybackClockSecond: 20.25,
+        anchorProjectSecond: 1,
+        engineGeneration: 2,
+        positionTick: 1_920,
+        returnAnchorTick: 1_920,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+      },
+    })
+
+    clock.advanceBy(0.25)
+    expect(transport.locateAtTick(parseTick(5_760))).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
+      snapshot: {
+        anchorPlaybackClockSecond: 20.5,
+        anchorProjectSecond: 3,
+        engineGeneration: 3,
+        positionTick: 5_760,
+        returnAnchorTick: 5_760,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+      },
+    })
+
+    clock.advanceBy(0.5)
+    expect(transport.returnToLastStartPosition()).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION,
+      snapshot: {
+        engineGeneration: 4,
+        positionProjectSecond: 3,
+        positionTick: 5_760,
+        returnAnchorTick: 5_760,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+      },
+    })
+  })
+
+  it('allows an Empty Plan to locate without making it playable', () => {
+    const plan = createFixturePlan()
+    const transport = createAudibleMidiTransport(
+      replacePlan(plan, {
+        midiNoteSpans: Object.freeze([]),
+        status: AUDIBLE_MIDI_PLAN_STATUS.EMPTY,
+      }),
+      new ManualPlaybackClock(),
+    )
+
+    expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
+      snapshot: {
+        engineGeneration: 1,
+        positionTick: 1_920,
+        returnAnchorTick: 1_920,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+      },
+    })
+    expect(transport.play()).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_EMPTY,
+      snapshot: { engineGeneration: 1, positionTick: 1_920 },
+    })
+  })
+
   it('hands a Playing transport to a newer Plan without losing its clock position', () => {
     const plan = createFixturePlan()
     const nextPlan = replacePlan(plan, { modelRevision: nextModelRevision(plan) })
@@ -263,9 +376,35 @@ describe('Audible MIDI Transport', () => {
       engineGeneration: 2,
       positionProjectSecond: 0.125,
       positionTick: 240,
+      returnAnchorTick: 0,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
       timelineEndProjectSecond: 0.125,
       timelineEndTick: 240,
+    })
+  })
+
+  it('clamps the return anchor when a newer Plan shortens the Timeline', () => {
+    const plan = createFixturePlan()
+    const transport = createAudibleMidiTransport(plan, new ManualPlaybackClock())
+    transport.locateAtTick(parseTick(1_920))
+
+    const handedOff = transport.handoffPlan(
+      replacePlan(plan, {
+        arrangementEndTick: parseTick(240),
+        modelRevision: nextModelRevision(plan),
+        timelineEndTick: parseTick(240),
+      }),
+    )
+
+    expect(handedOff.snapshot).toMatchObject({
+      engineGeneration: 2,
+      positionTick: 240,
+      returnAnchorTick: 240,
+      state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+    })
+    expect(transport.returnToLastStartPosition()).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
+      snapshot: { engineGeneration: 2, positionTick: 240 },
     })
   })
 
@@ -310,16 +449,16 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
-  it('returns to start once and keeps repeated commands generation-neutral', () => {
+  it('returns to the initial anchor once and keeps repeated commands generation-neutral', () => {
     const clock = new ManualPlaybackClock(5)
     const transport = createAudibleMidiTransport(createFixturePlan(), clock)
 
     transport.play()
     clock.advanceBy(0.25)
-    const returned = transport.returnToStart()
+    const returned = transport.returnToLastStartPosition()
 
     expect(returned).toMatchObject({
-      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START,
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION,
       snapshot: {
         engineGeneration: 2,
         positionProjectSecond: 0,
@@ -327,7 +466,7 @@ describe('Audible MIDI Transport', () => {
         state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
       },
     })
-    expect(transport.returnToStart()).toMatchObject({
+    expect(transport.returnToLastStartPosition()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
       snapshot: { engineGeneration: 2 },
     })
@@ -363,6 +502,33 @@ describe('Audible MIDI Transport', () => {
         anchorProjectSecond: 0,
         engineGeneration: 2,
         positionProjectSecond: 0,
+        returnAnchorTick: 0,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+      },
+    })
+  })
+
+  it('stops a Playing locate at Timeline End and resets its return anchor on restart', () => {
+    const clock = new ManualPlaybackClock(20)
+    const plan = replacePlan(createFixturePlan(), { timelineEndTick: parseTick(1_920) })
+    const transport = createAudibleMidiTransport(plan, clock)
+    transport.play()
+
+    expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
+      snapshot: {
+        engineGeneration: 2,
+        positionTick: 1_920,
+        returnAnchorTick: 1_920,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+      },
+    })
+    expect(transport.play()).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED,
+      snapshot: {
+        engineGeneration: 3,
+        positionTick: 0,
+        returnAnchorTick: 0,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
       },
     })

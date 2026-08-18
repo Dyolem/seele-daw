@@ -31,12 +31,15 @@ export type AudibleMidiTransportState =
 
 export const AUDIBLE_MIDI_TRANSPORT_OUTCOME = Object.freeze({
   HANDED_OFF: 'handed-off',
+  LOCATED: 'located',
   NO_CHANGE: 'no-change',
   PAUSED: 'paused',
   PLAN_BLOCKED: 'plan-blocked',
   PLAN_EMPTY: 'plan-empty',
   PLAYED: 'played',
-  RETURNED_TO_START: 'returned-to-start',
+  RETURNED_TO_LAST_START_POSITION: 'returned-to-last-start-position',
+  /** @deprecated Use RETURNED_TO_LAST_START_POSITION. */
+  RETURNED_TO_START: 'returned-to-last-start-position',
 } as const)
 
 export type AudibleMidiTransportOutcome =
@@ -73,6 +76,7 @@ interface AudibleMidiTransportSnapshotBase {
   readonly planStatus: AudibleMidiPlanStatus
   readonly positionProjectSecond: ProjectSecond
   readonly positionTick: ContinuousTickPosition
+  readonly returnAnchorTick: Tick
   readonly timelineEndProjectSecond: ProjectSecond
   readonly timelineEndTick: Tick
 }
@@ -101,9 +105,12 @@ export interface AudibleMidiTransportTransition {
 export interface AudibleMidiTransport {
   getSnapshot(): AudibleMidiTransportSnapshot
   handoffPlan(plan: AudibleMidiProjectPlan): AudibleMidiTransportTransition
+  locateAtTick(tick: Tick): AudibleMidiTransportTransition
   pause(): AudibleMidiTransportTransition
   play(): AudibleMidiTransportTransition
   playbackClockSecondAtTick(tick: Tick): PlaybackClockSecond
+  returnToLastStartPosition(): AudibleMidiTransportTransition
+  /** @deprecated Use returnToLastStartPosition. */
   returnToStart(): AudibleMidiTransportTransition
   tickPositionAtPlaybackClockSecond(
     playbackClockSecond: PlaybackClockSecond,
@@ -158,7 +165,8 @@ export function createAudibleMidiTransport(
   let tempoMap: TempoMap = createTempoMapFromSegments(plan.tempoSegments)
   let timelineEndProjectSecond = tempoMap.projectSecondAtTick(timelineEndTick)
   const zeroProjectSecond = parseProjectSecond(0)
-  const zeroTickPosition = parseContinuousTickPosition(0)
+  const zeroTick = parseTick(0)
+  const zeroTickPosition = parseContinuousTickPosition(zeroTick)
   let timelineEndTickPosition = parseContinuousTickPosition(timelineEndTick)
 
   let state: AudibleMidiTransportState = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
@@ -166,6 +174,7 @@ export function createAudibleMidiTransport(
   let anchorProjectSecond = zeroProjectSecond
   let anchorPlaybackClockSecond: PlaybackClockSecond | null = null
   let lastObservedPlaybackClockSecond: PlaybackClockSecond | null = null
+  let returnAnchorTick = zeroTick
 
   function readPlaybackClock(): PlaybackClockSecond {
     const current = parsePlaybackClockSecond(clock.now())
@@ -194,6 +203,7 @@ export function createAudibleMidiTransport(
       planStatus,
       positionProjectSecond,
       positionTick: positionTickAtProjectSecond(positionProjectSecond),
+      returnAnchorTick,
       timelineEndProjectSecond,
       timelineEndTick,
     }
@@ -289,14 +299,14 @@ export function createAudibleMidiTransport(
       }
     }
 
-    const startProjectSecond =
+    const restartsFromTimelineStart =
       state === AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED &&
       anchorProjectSecond === timelineEndProjectSecond
-        ? zeroProjectSecond
-        : anchorProjectSecond
+    const startProjectSecond = restartsFromTimelineStart ? zeroProjectSecond : anchorProjectSecond
     const startPlaybackClockSecond = readPlaybackClock()
 
     engineGeneration = incrementEngineGeneration(engineGeneration)
+    if (restartsFromTimelineStart) returnAnchorTick = zeroTick
     state = AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
     anchorProjectSecond = startProjectSecond
     anchorPlaybackClockSecond = startPlaybackClockSecond
@@ -348,6 +358,7 @@ export function createAudibleMidiTransport(
     tempoMap = nextTempoMap
     timelineEndProjectSecond = nextTimelineEndProjectSecond
     timelineEndTickPosition = nextTimelineEndTickPosition
+    returnAnchorTick = parseTick(Math.min(returnAnchorTick, nextTimelineEndTick))
     engineGeneration = nextGeneration
 
     const handoffProjectSecond = parseProjectSecond(
@@ -382,20 +393,75 @@ export function createAudibleMidiTransport(
     return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.HANDED_OFF, handoffProjectSecond)
   }
 
-  function returnToStart(): AudibleMidiTransportTransition {
+  function locateAtTick(tick: Tick): AudibleMidiTransportTransition {
+    const targetTick = parseTick(tick)
+    if (targetTick > timelineEndTick) {
+      throw new AudibleMidiTransportError(
+        'target-tick-after-timeline-end',
+        `Target Tick ${targetTick} is after Timeline End ${timelineEndTick}`,
+      )
+    }
+
+    const wasPlaying = state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
+    const currentProjectSecond = synchronizePlayingPosition()
+    const currentTick = positionTickAtProjectSecond(currentProjectSecond)
+    if (
+      currentTick === parseContinuousTickPosition(targetTick) &&
+      returnAnchorTick === targetTick
+    ) {
+      return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE, currentProjectSecond)
+    }
+
+    const targetProjectSecond = tempoMap.projectSecondAtTick(targetTick)
+    const continuesPlaying =
+      wasPlaying && state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING && targetTick < timelineEndTick
+    const locatePlaybackClockSecond = continuesPlaying ? lastObservedPlaybackClockSecond : null
+
+    engineGeneration = incrementEngineGeneration(engineGeneration)
+    returnAnchorTick = targetTick
+    anchorProjectSecond = targetProjectSecond
+    if (continuesPlaying) {
+      if (locatePlaybackClockSecond === null) {
+        throw new AudibleMidiTransportError(
+          'transport-not-playing',
+          'Playing Transport locate has no observed Playback Clock position',
+        )
+      }
+      anchorPlaybackClockSecond = locatePlaybackClockSecond
+    } else {
+      if (state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING) {
+        state = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
+      }
+      anchorPlaybackClockSecond = null
+    }
+
+    return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED, targetProjectSecond)
+  }
+
+  function returnToLastStartPosition(): AudibleMidiTransportTransition {
+    const currentProjectSecond = synchronizePlayingPosition()
+    const returnProjectSecond = tempoMap.projectSecondAtTick(returnAnchorTick)
     if (
       state === AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED &&
-      anchorProjectSecond === zeroProjectSecond
+      currentProjectSecond === returnProjectSecond
     ) {
-      return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE, zeroProjectSecond)
+      return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE, returnProjectSecond)
     }
 
     engineGeneration = incrementEngineGeneration(engineGeneration)
     state = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
-    anchorProjectSecond = zeroProjectSecond
+    anchorProjectSecond = returnProjectSecond
     anchorPlaybackClockSecond = null
 
-    return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_START, zeroProjectSecond)
+    return createTransition(
+      AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION,
+      returnProjectSecond,
+    )
+  }
+
+  /** @deprecated Compatibility alias until Studio adopts the new product command. */
+  function returnToStart(): AudibleMidiTransportTransition {
+    return returnToLastStartPosition()
   }
 
   function playbackClockSecondAtTick(tick: Tick): PlaybackClockSecond {
@@ -442,9 +508,11 @@ export function createAudibleMidiTransport(
   return Object.freeze({
     getSnapshot,
     handoffPlan,
+    locateAtTick,
     pause,
     play,
     playbackClockSecondAtTick,
+    returnToLastStartPosition,
     returnToStart,
     tickPositionAtPlaybackClockSecond,
   })

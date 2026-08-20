@@ -14,6 +14,8 @@ describe('ProjectMidiImportVueContext', () => {
     const context = Object.freeze<ProjectMidiImportVueContext>({
       projectMidiImport: Object.freeze({
         importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
+        importLocalFileReplacingActiveProject:
+          vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>(),
       }),
     })
     const providedApp = createApp({ render: () => null })

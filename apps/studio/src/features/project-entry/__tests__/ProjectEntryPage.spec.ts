@@ -85,7 +85,11 @@ function createFixture(
       projectEntry: Object.freeze({ resolve }),
     }),
     projectMidiImportContext: Object.freeze({
-      projectMidiImport: Object.freeze({ importLocalFile }),
+      projectMidiImport: Object.freeze({
+        importLocalFile,
+        importLocalFileReplacingActiveProject:
+          vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>(),
+      }),
     }),
     resolve,
   }

@@ -115,6 +115,8 @@ function createProjectMidiImportContext(): ProjectMidiImportVueContext {
   return Object.freeze({
     projectMidiImport: Object.freeze({
       importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
+      importLocalFileReplacingActiveProject:
+        vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>(),
     }),
   })
 }

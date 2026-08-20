@@ -23,20 +23,27 @@ interface DockResizeInteraction {
   readonly startHeight: number
 }
 
-const props = defineProps<{
-  readonly barSpanTick: Tick
-  readonly clips: readonly ProjectMidiClipPresentation[]
-  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
-  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
-  readonly projectId: string
-  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
-  readonly timeSignatureNumerator: number
-  readonly timelineEndTick: Tick
-  readonly tracks: readonly ProjectTrackPresentation[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    readonly barSpanTick: Tick
+    readonly clips: readonly ProjectMidiClipPresentation[]
+    readonly isMidiImporting?: boolean
+    readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+    readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
+    readonly projectId: string
+    readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
+    readonly timeSignatureNumerator: number
+    readonly timelineEndTick: Tick
+    readonly tracks: readonly ProjectTrackPresentation[]
+  }>(),
+  {
+    isMidiImporting: false,
+  },
+)
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const emit = defineEmits<{
   contextEditorOpenChange: [isOpen: boolean]
+  importMidi: []
 }>()
 
 const workspaceElement = shallowRef<HTMLElement | null>(null)
@@ -233,10 +240,12 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN"
       :bar-span-tick="props.barSpanTick"
       :clips="props.clips"
+      :is-midi-importing="props.isMidiImporting"
       :project-id="props.projectId"
       :time-signature-numerator="props.timeSignatureNumerator"
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
+      @import-midi="emit('importMidi')"
       @open-midi-clip="openContextEditor"
     />
 

@@ -250,8 +250,17 @@ describe('ProjectWorkbenchShell', () => {
 
     const menu = document.body.querySelector('.project-workbench__menu')
     expect(menu).not.toBeNull()
-    expect(menu?.querySelectorAll('.project-workbench__menu-item')).toHaveLength(3)
+    const menuItems = [
+      ...(menu?.querySelectorAll<HTMLElement>('.project-workbench__menu-item') ?? []),
+    ]
+    expect(menuItems).toHaveLength(4)
     expect(menu?.querySelectorAll('.project-workbench__menu-separator')).toHaveLength(1)
+
+    const importMidi = menuItems.find((item) => item.textContent?.includes('Import MIDI'))
+    if (importMidi === undefined) throw new Error('Expected the Project MIDI import menu item')
+    importMidi.click()
+    await nextTick()
+    expect(wrapper.emitted('importMidi')).toHaveLength(1)
 
     wrapper.unmount()
   })

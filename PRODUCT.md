@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-18，Manual Timeline Locate V1 已完成并通过验收
+> 最近更新：2026-08-20，Standard MIDI File Import / Export V1 MI5 已完成并通过审核
 >
-> 当前阶段：Manual Timeline Locate V1 已完成；checkpoint 为 `checkpoint/manual-timeline-locate-2026-08-18`
+> 当前阶段：Standard MIDI File Import / Export V1；MI1–MI5 已完成
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -56,7 +56,7 @@ Studio 会明确失败，不静默替换声音。
 | 编号                   | 功能                      | 状态         | 当前边界                                                                                                                          |
 | ---------------------- | ------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | `PROJECT-ENTRY`        | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                                              |
-| `MIDI-IMPORT`          | Standard MIDI File 导入   | **用户可用** | 从 `.mid` / `.midi` 创建独立 clean 项目；阻断错误与非阻断诊断均有反馈。                                                           |
+| `MIDI-IMPORT`          | Standard MIDI File 导入   | **用户可用** | 从 Project Entry 或 Workbench 选择 `.mid` / `.midi`，创建独立 clean 项目；阻断错误与非阻断诊断均有反馈。                          |
 | `PROJECT-LIFECYCLE`    | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                                   |
 | `PROJECT-NAVIGATION`   | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                                          |
 | `WORKBENCH-SHELL`      | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                                    |
@@ -99,6 +99,10 @@ Project Entry 是当前启动页，提供：
   静默选择尚未支持的音源。
 - 导入成功后项目已有首个 Checkpoint，进入 Workbench 时为 clean；不能精确表示的来源事实以
   非阻断诊断摘要呈现。
+- Workbench 的项目菜单与 Arrangement 末尾提供 `Import MIDI as new project`；两处都复用上述
+  单文件导入流程，不把来源 Track 合并到当前项目。
+- Workbench 先只读并完整验证所选文件，再针对此时最新的 dirty 项目完成 Save / Discard / Cancel
+  确认。Cancel 或 Save 失败时保持当前项目，不产生 Catalog、Checkpoint 或活动 Session 的部分状态。
 - 项目入口当前使用 Piano Black 外观，但它不是编辑器核心体验的最终设计承诺。
 
 ### 3.2 `PROJECT-LIFECYCLE` 当前项目生命周期
@@ -194,7 +198,7 @@ Route 只负责表达产品意图；Create、Open、Leave 的具体生命周期�
 
 Workbench 已建立真实项目状态驱动的布局：
 
-- Global Bar：项目菜单、品牌、项目名称、保存状态与 Save。
+- Global Bar：项目菜单、品牌、项目名称、保存状态、Save 与导入为新项目入口。
 - Transport Bar：Undo / Redo、Tempo、拍号、播放区和 MIDI Editor 开关。
 - Arrangement：Track 控制区、时间标尺、Track Lane 和 Add Track；右侧时间内容持有唯一真实
   纵向 / 横向滚动状态，左侧 Track 控制列以裁切从视图保持行对齐。至少 150 小节的 Ruler /
@@ -205,7 +209,12 @@ Workbench 已建立真实项目状态驱动的布局：
 
 - `Projects`：返回项目入口，dirty 时触发导航确认。
 - `Save` / `Retry save`：与全局 Save 使用同一保存能力。
+- `Import MIDI as new project…`：选择单个 MIDI 文件并创建独立项目；dirty 时先完成导航确认。
 - `MIDI editor`：重新打开已关闭或最小化的 Context Editor Dock。
+
+Arrangement 在最后一个 Track Lane 下方提供同一导入操作；它是独立动作行，不代表额外 Track，
+也不破坏 Track 控制行与真实 Lane 的一一对应。空 Arrangement 的空状态同样提供该入口。菜单与
+动作行共享同一个文件选择和 Busy 状态，避免并发启动两次导入。
 
 桌面布局要求至少 900 px 宽。更窄的视口显示说明与 `Back to projects`，不展示编辑工作区。
 
@@ -809,7 +818,9 @@ File 导入是独立交换格式入口，不替代 Project File。
 9. 新 Instrument Track 默认持久化 Studio Grand；旧空 Slot 只能由用户通过可见 UI 显式选择，
    不能在打开或播放时自动迁移。
 10. Standard MIDI File 导入必须先完整读取、解码和验证，再创建独立项目与首个 Checkpoint；导入
-    Track 默认持久化 Studio Grand，来源 Program 不静默替换音源。
+    Track 默认持久化 Studio Grand，来源 Program 不静默替换音源。Workbench 内导入必须明确创建
+    新项目，并在文件验证后、项目生命周期写入前，以最新项目状态完成 dirty 的 Save / Discard /
+    Cancel 确认。
 11. Project Tempo 的可表示范围是 `5..999 BPM`；MIDI 导入保留范围内的完整浮点值和所有有效
     Tempo Event，不静默 clamp、倍增或按密度删除。
 12. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。
@@ -886,6 +897,7 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-17 | `PIANO-ROLL`、`PLAYBACK-VIEW`                              | Track 与 Clip Focus 共用权威 Transport 视觉位置；Track 增加 transform-only Playhead、独立分页 Follow 与手动导航暂停。                                            | `78ee8ea`                                  |
 | 2026-08-17 | `PLAYBACK`、`PLAYBACK-VIEW`                                | 完成后台视觉恢复、Timeline / Transport、生命周期与资源清理证据审计；Audible MIDI Playback V1 全部批次通过审核并收口。                                            | `f1d0298`                                  |
 | 2026-08-18 | `TIMELINE-LOCATE`、`PLAYBACK`                              | 建立 Ruler 点击 / 静默拖动、连续边缘滚动、键盘 / ARIA、播放中安全重调度、Return Anchor、Follow 恢复及纵向可见 Playhead；已通过统一审核与用户浏览器验证。         | `2b89595..f4cb601`                         |
+| 2026-08-20 | `MIDI-IMPORT`                                              | 完成 Project Entry 导入纵向切片，并在 Workbench 项目菜单与 Arrangement 末尾增加明确的“导入为新项目”入口及 dirty 导航保护。                                       | `fca1c49`、MI5 本次提交                    |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -902,6 +914,11 @@ Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、
 Batch 4B.1、Batch 4B.2、Batch 5A、Batch 6A–6F 与 Batch 7A–7F 已通过本地验证和功能审核。
 Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 浏览器布局 smoke。按约定没有新增 E2E：
+
+- Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
+  Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist
+  boundary；Studio 为 48 个测试文件 / 306 项测试。按阶段约定未新增 E2E，也未由实现方执行
+  浏览器人工测试。
 
 - Manual Timeline Locate V1 最终实现通过 2026-08-18 完整 `pnpm check`；Playback 为 9 文件 /
   100 项，Studio 为 46 / 284，并通过 Architecture、Workspace Type Check、Studio Production
@@ -920,14 +937,16 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 - Batch 4B.2 已通过完整 `pnpm check`（Architecture、Workspace Type Check、全部测试、
   Studio Production Build 与 soundbank dist boundary），并通过改动范围的 Oxlint / ESLint 与格式检查。
 - Project Core：28 个测试文件，409 项测试。
-- platform-browser：2 个测试文件，18 项测试。
+- midi-file：3 个测试文件，14 项测试。
+- project-midi：2 个测试文件，16 项测试。
+- platform-browser：3 个测试文件，23 项测试。
 - editor：11 个测试文件，112 项测试。
-- playback：9 个测试文件，100 项测试。
+- playback：9 个测试文件，101 项测试。
 - audio-web：16 个测试文件，110 项测试。
-- Studio：46 个测试文件，284 项测试。
+- Studio：48 个测试文件，306 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
-合计 113 个测试文件、1035 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace Type
+合计 121 个测试文件、1093 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace Type
 Check、Studio Production Build 与 soundbank dist boundary。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

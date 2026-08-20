@@ -3,7 +3,7 @@
 > Status: Normative Draft  
 > Scope: Seele Studio editor and workbench  
 > Default theme: Piano Black  
-> Last updated: 2026-08-17
+> Last updated: 2026-08-20
 
 本文档定义 Seele Studio 编辑器的产品界面、交互模型与视觉语言。它是产品设计、前端实现、Canvas 渲染、主题开发和设计评审共同遵循的基线。
 
@@ -95,7 +95,7 @@ Hover、Pressed、Selected、Focused、Disabled、Busy 和 Error 在所有组件
 | ------------------- | -------------------------------------- | ------------------------ | ----------------------- |
 | Project Entry       | 新建、MIDI 导入、打开、最近项目、反馈  | 启动页                   | Piano Black 首批入口    |
 | Project Lifecycle   | 当前项目、保存、dirty、离开确认        | 全局状态与对话框         | 已有应用服务，UI 待完善 |
-| Global Bar          | 品牌入口、项目名、保存状态、全局菜单   | 顶部全局区               | 首批外壳已实现          |
+| Global Bar          | 品牌入口、项目名、保存状态、全局菜单   | 顶部全局区               | 含导入为新项目入口      |
 | Transport           | 播放、暂停、返回开头、时间、速度、拍号 | 顶部全局区或独立控制行   | 首次可听切片已接入      |
 | Workbench Shell     | 区域布局、面板生命周期、焦点与尺寸     | 整个编辑器框架           | 首批外壳已实现          |
 | Track List          | 轨道身份、颜色、静音、独奏、音量等     | Arrangement 左列         | Arrangement 切片        |
@@ -244,6 +244,10 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 打开项目只打开已有项目；找不到、损坏或恢复失败必须给出明确结果。
 - Project Entry 应保持一个清晰的 New Project 主操作，并把最近项目作为本地资源库呈现。
 - Import MIDI 是 New Project 下方的次要入口；它创建独立本地项目，不与已有项目合并。
+- Workbench 项目菜单与 Arrangement 最后一个 Track Lane 下方 MUST 提供同一“导入为新项目”
+  操作；文案不能让用户误以为会把 MIDI Track 合并到当前项目。
+- Workbench MUST 先只读并完整验证 MIDI，再根据最新当前项目状态复用 Save / Discard / Cancel
+  导航确认；Cancel 或 Save 失败后保持当前 Workbench，不开始项目生命周期写入，也不显示伪成功反馈。
 - Project Entry 的 Loading、Empty、Route notice 与恢复错误使用局部反馈，不阻塞无关信息。
 - MIDI 导入的阻断错误留在入口局部显示；成功与非阻断诊断使用可跨路由保留的 Toast 摘要。
 - Global Bar 应持续显示项目名与保存状态，但不使用频繁跳动的通知。
@@ -360,6 +364,8 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
   Track 控制区是裁切的从视图，只按该位置执行合成层位移，不得维护第二个可漂移的滚动状态。
 - Track 控制行与对应 Lane MUST 消费同一排序和固定行高来源。Track 区域的纵向滚轮输入应转发
   给 Arrangement；键盘焦点进入被裁切的 Track 控件时，必须通过 Arrangement 权威使该行可见。
+- Arrangement MAY 在全部真实 Track Lane 之后放置不对应 Track 的动作行；MIDI 导入入口属于该
+  例外，必须与 Track Lane 有清晰的动作语义区别，且不能进入 Track Selection。
 - Arrangement Ruler 与全部 Lane MUST 共用同一个横向滚动权威；横向移动时间内容时，左侧
   Track 标题、操作区和控制行保持固定，原生横向滚动轨道不得延伸到 Track 控制列下方。
 - 默认时间轴至少覆盖项目起始拍号的 150 小节，并由最远 Clip 末端精确扩展；Ruler、Lane、

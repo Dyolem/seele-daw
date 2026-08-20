@@ -2,6 +2,7 @@
 import { parseTick, type Tick, type TrackId } from '@seele-daw/project-core'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
+import MidiIcon from '~icons/fluent/midi-20-regular'
 import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
@@ -32,6 +33,7 @@ import {
   type ProjectAddTrackType,
 } from '@/features/project-workspace/workbench-shell/project-add-track-option'
 import UiIcon from '@/ui/components/UiIcon.vue'
+import UiButton from '@/ui/components/UiButton.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { useProjectClips } from '@/workbench/project/clip/vue/project-clip-context'
@@ -69,15 +71,22 @@ interface ActiveTimelineLocateGesture {
   readonly wasTimelineFollowSuspended: boolean
 }
 
-const props = defineProps<{
-  readonly barSpanTick: Tick
-  readonly clips: readonly ProjectMidiClipPresentation[]
-  readonly projectId: string
-  readonly timeSignatureNumerator: number
-  readonly timelineEndTick: Tick
-  readonly tracks: readonly ProjectTrackPresentation[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    readonly barSpanTick: Tick
+    readonly clips: readonly ProjectMidiClipPresentation[]
+    readonly isMidiImporting?: boolean
+    readonly projectId: string
+    readonly timeSignatureNumerator: number
+    readonly timelineEndTick: Tick
+    readonly tracks: readonly ProjectTrackPresentation[]
+  }>(),
+  {
+    isMidiImporting: false,
+  },
+)
 const emit = defineEmits<{
+  importMidi: []
   openMidiClip: []
 }>()
 
@@ -767,6 +776,16 @@ onUnmounted(() => cancelTimelineLocate())
             <span><UiIcon :icon="GridIcon" :size="24" /></span>
             <strong>Arrangement</strong>
             <p>Add a Track to prepare the Arrangement surface.</p>
+            <UiButton
+              class="project-workbench__empty-midi-import"
+              size="small"
+              variant="secondary"
+              :busy="props.isMidiImporting"
+              @click="emit('importMidi')"
+            >
+              <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
+              {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new project' }}
+            </UiButton>
           </div>
         </div>
         <div
@@ -811,6 +830,20 @@ onUnmounted(() => cancelTimelineLocate())
               @open="emit('openMidiClip')"
               @select="selectClip(clip)"
             />
+          </div>
+          <div class="project-workbench__midi-import-lane" role="listitem">
+            <div class="project-workbench__midi-import-lane-content">
+              <UiButton
+                size="small"
+                variant="secondary"
+                :busy="props.isMidiImporting"
+                @click="emit('importMidi')"
+              >
+                <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
+                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new project' }}
+              </UiButton>
+              <span>Creates a separate local project</span>
+            </div>
           </div>
         </div>
         <ArrangementPlayhead
@@ -1071,6 +1104,28 @@ onUnmounted(() => cancelTimelineLocate())
   grid-row: 2;
 }
 
+.project-workbench__midi-import-lane {
+  display: flex;
+  block-size: var(--project-workbench-track-row-height);
+  align-items: center;
+  border-block-end: 1px solid var(--sd-color-border-subtle);
+  background: color-mix(in srgb, var(--sd-color-surface-panel) 54%, transparent);
+}
+
+.project-workbench__midi-import-lane-content {
+  position: sticky;
+  inset-inline-start: var(--sd-space-3);
+  display: flex;
+  inline-size: max-content;
+  align-items: center;
+  gap: var(--sd-space-3);
+}
+
+.project-workbench__midi-import-lane-content > span {
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+}
+
 .project-workbench__arrangement-lane {
   position: relative;
   block-size: var(--project-workbench-track-row-height);
@@ -1164,5 +1219,9 @@ onUnmounted(() => cancelTimelineLocate())
   place-items: center;
   align-content: center;
   padding: var(--sd-space-6);
+}
+
+.project-workbench__empty-midi-import {
+  margin-block-start: var(--sd-space-4);
 }
 </style>

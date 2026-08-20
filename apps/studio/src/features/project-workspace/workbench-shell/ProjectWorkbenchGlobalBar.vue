@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import FolderOpenIcon from '~icons/fluent/folder-open-20-regular'
 import MenuIcon from '~icons/fluent/line-horizontal-3-20-regular'
+import MidiIcon from '~icons/fluent/midi-20-regular'
 import PanelBottomIcon from '~icons/fluent/panel-bottom-20-regular'
 import SaveIcon from '~icons/fluent/save-20-regular'
 import { computed } from 'vue'
@@ -24,6 +25,7 @@ import {
 
 interface ProjectWorkbenchGlobalBarProps {
   readonly isDirty: boolean
+  readonly isMidiImporting?: boolean
   readonly projectId: string
   readonly projectName: string
   readonly saveFailureMessage?: string | null
@@ -31,9 +33,11 @@ interface ProjectWorkbenchGlobalBarProps {
 }
 
 const props = withDefaults(defineProps<ProjectWorkbenchGlobalBarProps>(), {
+  isMidiImporting: false,
   saveFailureMessage: null,
 })
 const emit = defineEmits<{
+  importMidi: []
   leaveProject: []
   openContextEditor: []
   save: []
@@ -75,6 +79,16 @@ const saveStatusTitle = computed(
             >
               <UiIcon :icon="SaveIcon" :size="20" />
               <span>{{ saveActionLabel }}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              class="project-workbench__menu-item"
+              :disabled="props.isMidiImporting"
+              @select="emit('importMidi')"
+            >
+              <UiIcon :icon="MidiIcon" :size="20" />
+              <span>
+                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new project…' }}
+              </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator class="project-workbench__menu-separator" />
             <DropdownMenuLabel class="project-workbench__menu-label"> View </DropdownMenuLabel>

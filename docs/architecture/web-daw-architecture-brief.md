@@ -4,7 +4,7 @@
 > 产品定位：桌面浏览器优先、面向个人创作者的轻量 Web DAW  
 > 文档作用：回答系统如何拆分、模块如何依赖，以及从哪里开始开发  
 > 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3\
-> 最近校准：2026-08-18
+> 最近校准：2026-08-20
 
 ---
 
@@ -49,9 +49,11 @@ MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase�
 新建的 `midi-file` 只拥有中立 SMF Document 与可替换 Decoder / Encoder Adapter，不依赖 Project
 Core 或 Browser；`project-midi` 独立拥有 MIDI Document 与 Project Model 的双向映射，不拥有项目
 生命周期或默认音源选择。`ActiveProjectService` 能把调用方验证过的 Session 作为新项目保存并激活，
-`platform-browser` 提供本地 Blob 字节读取；Studio 当前已在 Project Entry 组合文件选择、Codec、
-Bridge、默认 Studio Grand 与项目生命周期，阻断失败不写入项目，非阻断诊断通过摘要反馈。MIDI
-Export 仍留在后续批次。
+`platform-browser` 提供本地 Blob 字节读取；Studio 当前已在 Project Entry 和 Workbench 组合文件
+选择、Codec、Bridge、默认 Studio Grand 与项目生命周期。Workbench 菜单和 Arrangement 末尾
+入口明确创建独立项目；文件通过 Codec / Bridge 验证后，以最新 Active Project 状态复用 dirty 导航
+确认，再进入项目生命周期写入。阻断失败不写入项目，非阻断诊断通过共享摘要反馈。MIDI Export
+仍留在后续批次。
 
 ---
 

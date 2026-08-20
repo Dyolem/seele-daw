@@ -23,7 +23,7 @@ import {
   type ProjectSelectionRequiredResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
-import type { ProjectMidiImportResult } from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import { reportProjectMidiImportSuccess } from '@/workbench/project/midi-import/project-midi-import-feedback'
 import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import type { RecentProjectSummary } from '@/workbench/project/project-catalog-reader'
 
@@ -84,28 +84,6 @@ function describeFailure(
 
   if (cause instanceof Error && cause.message.trim().length > 0) return cause.message
   return fallback
-}
-
-function describeImportSummary(result: ProjectMidiImportResult): string {
-  const { importedNoteCount, importedTrackCount } = result.summary
-  const trackLabel = importedTrackCount === 1 ? 'track' : 'tracks'
-  const noteLabel = importedNoteCount === 1 ? 'note' : 'notes'
-  return `${importedTrackCount} ${trackLabel} and ${importedNoteCount} ${noteLabel} imported.`
-}
-
-function reportImportSuccess(result: ProjectMidiImportResult): void {
-  const summary = describeImportSummary(result)
-  const noticeCount = result.diagnostics.length
-  if (noticeCount === 0) {
-    toasts.success('MIDI imported', summary)
-    return
-  }
-
-  const noticeLabel = noticeCount === 1 ? 'notice was' : 'notices were'
-  toasts.warning(
-    'MIDI imported with notices',
-    `${summary} ${noticeCount} import ${noticeLabel} reported.`,
-  )
 }
 
 function formatLastSaved(timestamp: number): string {
@@ -173,7 +151,7 @@ async function importSelectedMidiFile(): Promise<void> {
     const result = await projectMidiImport.importLocalFile(file)
     if (isUnmounted || generation !== requestGeneration) return
 
-    reportImportSuccess(result)
+    reportProjectMidiImportSuccess(toasts, result)
     await router.push(createProjectWorkspaceLocation(result.projectId))
   } catch (failureCause) {
     if (!isUnmounted && generation === requestGeneration) {

@@ -23,6 +23,7 @@ interface ProjectWorkbenchShellProps {
   readonly canUndo: boolean
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly isDirty: boolean
+  readonly isMidiImporting?: boolean
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
   readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
   readonly playbackCanToggle: boolean
@@ -43,9 +44,11 @@ interface ProjectWorkbenchShellProps {
 }
 
 const props = withDefaults(defineProps<ProjectWorkbenchShellProps>(), {
+  isMidiImporting: false,
   saveFailureMessage: null,
 })
 const emit = defineEmits<{
+  importMidi: []
   leaveProject: []
   playbackReturnToLastStartPosition: []
   playbackToggle: []
@@ -66,11 +69,13 @@ function openContextEditor(): void {
   <div class="project-workbench">
     <ProjectWorkbenchGlobalBar
       :is-dirty="props.isDirty"
+      :is-midi-importing="props.isMidiImporting"
       :project-id="props.projectId"
       :project-name="props.projectName"
       :save-failure-message="props.saveFailureMessage"
       :save-status="props.saveStatus"
       @leave-project="emit('leaveProject')"
+      @import-midi="emit('importMidi')"
       @open-context-editor="openContextEditor"
       @save="emit('save')"
     />
@@ -105,6 +110,7 @@ function openContextEditor(): void {
         ref="workspace"
         :bar-span-tick="props.barSpanTick"
         :clips="props.clips"
+        :is-midi-importing="props.isMidiImporting"
         :piano-roll-presentation="props.pianoRollPresentation"
         :piano-roll-track-presentation="props.pianoRollTrackPresentation"
         :project-id="props.projectId"
@@ -113,6 +119,7 @@ function openContextEditor(): void {
         :timeline-end-tick="props.timelineEndTick"
         :tracks="props.tracks"
         @context-editor-open-change="isContextEditorOpen = $event"
+        @import-midi="emit('importMidi')"
       />
     </main>
   </div>

@@ -4,7 +4,7 @@
 > 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
-> 最近实现校准：2026-08-18\
+> 最近实现校准：2026-08-20\
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
@@ -19,8 +19,8 @@
 > [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)
 > 以独立 `midi-file` Codec 和 `project-midi` 映射边界开始，不把第三方 Parser 类型、格式规则或
 > 文件 I/O 反向带入 Project Core。当前已完成调用方验证 Session 的新项目生命周期入口、本地 Blob
-> 字节读取 Adapter，以及 Studio Project Entry 的文件选择、Codec / Bridge 组合与导入反馈；MIDI
-> Export 仍属于后续批次。
+> 字节读取 Adapter，以及 Studio Project Entry / Workbench 的文件选择、Codec / Bridge 组合、
+> dirty 导航确认与共享导入反馈；MIDI Export 仍属于后续批次。
 
 ---
 

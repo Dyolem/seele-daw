@@ -653,6 +653,32 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(wrapper.find('.project-workbench__track-empty').exists()).toBe(false)
   })
 
+  it('exposes MIDI import immediately after the final Track lane and in an empty Arrangement', async () => {
+    const withTrack = mountArrangement({
+      tracks: Object.freeze([
+        Object.freeze({
+          color: parseProjectColor('#4F8CFF'),
+          id: parseTrackId('track-before-midi-import'),
+          instrument: STUDIO_GRAND_INSTRUMENT,
+          kind: 'instrument',
+          name: 'Last Track',
+        }),
+      ]),
+    }).wrapper
+    const laneList = withTrack.get('.project-workbench__arrangement-lane-list')
+    const laneChildren = [...laneList.element.children]
+
+    expect(laneChildren[0]?.classList.contains('project-workbench__arrangement-lane')).toBe(true)
+    expect(laneChildren[1]?.classList.contains('project-workbench__midi-import-lane')).toBe(true)
+    expect(laneChildren[1]?.textContent).toContain('Creates a separate local project')
+    await withTrack.get('.project-workbench__midi-import-lane button').trigger('click')
+    expect(withTrack.emitted('importMidi')).toHaveLength(1)
+
+    const empty = mountArrangement().wrapper
+    await empty.get('.project-workbench__empty-midi-import').trigger('click')
+    expect(empty.emitted('importMidi')).toHaveLength(1)
+  })
+
   it('keeps ordered Track and Lane pairs under one Arrangement scroll authority', () => {
     const { wrapper } = mountArrangement({
       tracks: Object.freeze([

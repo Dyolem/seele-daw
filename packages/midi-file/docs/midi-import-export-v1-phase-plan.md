@@ -4,15 +4,15 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI3 accepted and committed; MI4 implemented, review pending
+> Current checkpoint: MI5 completed and accepted
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
 ## 1. 产品结果
 
-V1 允许用户从 Project Entry 选择 `.mid` / `.midi` 文件并创建一个新的本地项目，也允许从当前
-项目菜单把全部已创作 MIDI 事实下载为 `.mid`。MIDI 文件是交换格式，不替代 Seele Project File
-与 Checkpoint。
+V1 允许用户从 Project Entry、Workbench 项目菜单或 Arrangement 末尾入口选择 `.mid` / `.midi`
+文件并创建一个新的本地项目，也允许从当前项目菜单把全部已创作 MIDI 事实下载为 `.mid`。MIDI
+文件是交换格式，不替代 Seele Project File 与 Checkpoint。
 
 导入必须先完整解析和验证，再原子创建项目与首个 Checkpoint；失败不能留下 Project Catalog、
 Checkpoint 或活动会话的部分状态。导出读取当前内存 Snapshot，不要求先保存，也不修改 dirty、
@@ -22,6 +22,8 @@ History 或 Playback Runtime。
 
 - V1 接受 SMF Type 0 / Type 1 与 PPQ time division；Type 2 和 SMPTE division 返回明确错误；
 - 导入创建新项目，不在 V1 合并到当前项目；
+- Workbench 内的导入入口必须明确表达“创建新项目”；文件完整读取、解码和映射后，以最新当前
+  项目状态复用 Save / Discard / Cancel 导航确认，再开始新项目生命周期写入；
 - `@seele-daw/midi-file` 不依赖 Project Core，拥有中立 `MidiFileDocument` 与可替换 Codec Port；
 - Decoder 采用封装后的 `@tonejs/midi`；其类型和对象不得穿过 package root；
 - Encoder 与 Decoder 独立替换。V1 Writer 固定输出 Type 1，以确定性规则排列同 tick 事件；
@@ -81,7 +83,7 @@ save-point 语义；IndexedDB Store 继续在同一事务中提交 Checkpoint、
 
 已由提交 `88da6fc` 完成并通过审核。
 
-### MI4：Studio 导入体验（已实现，待审核）
+### MI4：Studio Project Entry 导入体验（已完成）
 
 - Project Entry 增加 Import MIDI；
 - 展示阻断错误和非阻断诊断摘要；
@@ -92,6 +94,26 @@ Browser 字节读取、SMF 解码、Project Import Draft 验证、`createFromSes
 SMF 内嵌名称优先，缺失时使用文件名；导入 Track 持久化 Studio Grand。阻断失败留在 Project
 Entry，非阻断诊断以导入摘要 Toast 呈现，成功后进入首个 Checkpoint 已保存的 clean Workbench。
 本批次不增加拖放、批量导入、容量加固或 E2E。
+
+已由提交 `fca1c49` 完成并通过审核。
+
+### MI5：Studio Workbench 导入入口（已完成）
+
+- Workbench 项目菜单增加 `Import MIDI as new project…`；
+- Arrangement 在最后一个 Track Lane 下方增加同语义入口；空 Arrangement 也保留可发现入口；
+- 两处入口共用 Project Workspace 拥有的单文件选择、Busy 状态、失败反馈与导入摘要；
+- 文件完整验证后，以最新当前项目状态复用既有 Save / Discard / Cancel 确认。Cancel 或 Save
+  失败不得创建 Project Catalog、Checkpoint 或活动 Session；
+- 成功后打开独立的 clean 项目；不把 MIDI Track 合并到当前 Project，也不修改被替换项目的事实。
+
+实施边界：MI5 只增加 Workbench 内现有“导入为独立项目”能力的入口，不增加拖放、批量导入、
+导入到当前项目、Track Merge 或 E2E。Project Entry 与 Workbench 继续复用同一 Import
+Coordinator 和结果摘要，浏览器文件选择仍由页面拥有。
+
+实现验证：`pnpm lint`、Studio type-check、Studio 48 个测试文件 / 306 项测试与完整
+`pnpm check` 均通过；按阶段约定未新增 E2E，也未由实现方执行浏览器人工测试。
+
+已由本次提交完成并通过审核。
 
 ### ME1：Project Export Bridge
 

@@ -63,6 +63,14 @@ import {
   PROJECT_ENTRY_CONTEXT_KEY,
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'
+import type {
+  ProjectMidiImportCoordinator,
+  ProjectMidiImportResult,
+} from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import {
+  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
+  type ProjectMidiImportVueContext,
+} from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   PROJECT_NAVIGATION_INTENT_KIND,
   type ProjectNavigationDecisionRequest,
@@ -95,6 +103,10 @@ import {
 
 interface PageFixture {
   readonly activeProjectContext: ActiveProjectVueContext
+  readonly importLocalFileReplacingActiveProject: ReturnType<
+    typeof vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>
+  >
+  readonly projectMidiImportContext: ProjectMidiImportVueContext
   readonly resolve: ReturnType<typeof vi.fn<ProjectEntryCoordinator['resolve']>>
   readonly save: ReturnType<typeof vi.fn<ActiveProjectService['save']>>
   readonly projectEntryContext: ProjectEntryVueContext
@@ -158,6 +170,9 @@ function createFixture(
   const state = shallowRef(initialState)
   const resolve = vi.fn<ProjectEntryCoordinator['resolve']>(resolveImplementation)
   const save = vi.fn<ActiveProjectService['save']>(async () => undefined)
+  const importLocalFileReplacingActiveProject = vi.fn<
+    ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']
+  >(async () => null)
   const activeProject: ActiveProjectService = {
     get state() {
       return state.value
@@ -178,6 +193,13 @@ function createFixture(
     }),
     projectEntryContext: Object.freeze({
       projectEntry: Object.freeze({ resolve }),
+    }),
+    importLocalFileReplacingActiveProject,
+    projectMidiImportContext: Object.freeze({
+      projectMidiImport: Object.freeze({
+        importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
+        importLocalFileReplacingActiveProject,
+      }),
     }),
     resolve,
     save,
@@ -270,6 +292,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
+        [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: fixture.projectMidiImportContext,
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]: projectNavigationDecisionContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: projectPlaybackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
@@ -357,6 +380,79 @@ describe('ProjectWorkspacePage', () => {
     const rulerBars = wrapper.findAll('.project-workbench__ruler li')
     expect(rulerBars).toHaveLength(151)
     expect(rulerBars[150]?.text()).toBe('151')
+  })
+
+  it('imports a new Project from the Arrangement entry and reports the shared summary', async () => {
+    const projectId = parseProjectId('project-workspace-page-midi-import-source')
+    const importedProjectId = parseProjectId('project-workspace-page-midi-import-target')
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId),
+    )
+    const importResult: ProjectMidiImportResult = Object.freeze({
+      diagnostics: Object.freeze([]),
+      projectId: importedProjectId,
+      summary: Object.freeze({
+        importedNoteCount: 32,
+        importedTrackCount: 2,
+        sourceFormat: 1,
+        sourcePpq: 480,
+        sourceTrackCount: 2,
+      }),
+    })
+    fixture.importLocalFileReplacingActiveProject.mockResolvedValueOnce(importResult)
+    const { router, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
+    const requestFile = vi.spyOn(input.element, 'click').mockImplementation(() => undefined)
+
+    await wrapper.get('.project-workbench__empty-midi-import').trigger('click')
+    expect(requestFile).toHaveBeenCalledOnce()
+    requestFile.mockRestore()
+
+    const file = new File([], 'arrangement-import.mid', { type: 'audio/midi' })
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: {
+        item: (index: number) => (index === 0 ? file : null),
+        length: 1,
+      },
+    })
+    await input.trigger('change')
+    await flushPromises()
+
+    expect(fixture.importLocalFileReplacingActiveProject).toHaveBeenCalledExactlyOnceWith(file)
+    expect(router.currentRoute.value.params.projectId).toBe(importedProjectId)
+    expect(useUiToastStore().message).toMatchObject({
+      description: '2 tracks and 32 notes imported.',
+      title: 'MIDI imported',
+      tone: 'success',
+    })
+  })
+
+  it('keeps the current Workbench and stays quiet when MIDI replacement is cancelled', async () => {
+    const projectId = parseProjectId('project-workspace-page-midi-import-cancelled')
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId),
+    )
+    const { router, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
+    const file = new File([], 'cancelled.mid', { type: 'audio/midi' })
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: {
+        item: (index: number) => (index === 0 ? file : null),
+        length: 1,
+      },
+    })
+
+    await input.trigger('change')
+    await flushPromises()
+
+    expect(router.currentRoute.value.params.projectId).toBe(projectId)
+    expect(useUiToastStore().message).toBeNull()
   })
 
   it('renders Transport time from the shared visual position source', async () => {

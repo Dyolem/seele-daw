@@ -1,4 +1,5 @@
 import type { MidiFileDecoder, MidiFileDocument } from '@seele-daw/midi-file'
+import { parseProjectId } from '@seele-daw/project-core'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
 import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 import type {
@@ -11,6 +12,13 @@ import {
   createProjectMidiImportCoordinator,
   type ProjectMidiImportCoordinatorDependencies,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import {
+  PROJECT_NAVIGATION_CONFIRMATION_FAILURE_OPERATION,
+  PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
+  PROJECT_NAVIGATION_INTENT_KIND,
+  PROJECT_NAVIGATION_PROCEED_REASON,
+  type ProjectNavigationConfirmationCoordinator,
+} from '@/workbench/project/navigation/project-navigation-confirmation'
 
 function createMidiDocument(overrides: Partial<MidiFileDocument> = {}): MidiFileDocument {
   return {
@@ -46,15 +54,32 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
   const createFromSession = vi.fn<
     ProjectMidiImportCoordinatorDependencies['activeProject']['createFromSession']
   >(async (session) => session.getSnapshot().project.id)
+  const confirm = vi.fn<ProjectNavigationConfirmationCoordinator['confirm']>(async () =>
+    Object.freeze({
+      activeProjectId: null,
+      kind: PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.PROCEED,
+      reason: PROJECT_NAVIGATION_PROCEED_REASON.NOT_READY,
+    }),
+  )
   const coordinator = createProjectMidiImportCoordinator({
     activeProject: { createFromSession },
     createId,
     createInstrumentDevice,
     decoder: { decode },
     fileReader: { read },
+    navigationConfirmation: { confirm },
   })
 
-  return { bytes, coordinator, createFromSession, createId, createInstrumentDevice, decode, read }
+  return {
+    bytes,
+    confirm,
+    coordinator,
+    createFromSession,
+    createId,
+    createInstrumentDevice,
+    decode,
+    read,
+  }
 }
 
 describe('ProjectMidiImportCoordinator', () => {
@@ -67,6 +92,7 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(fixture.read).toHaveBeenCalledExactlyOnceWith(file)
     expect(fixture.decode).toHaveBeenCalledExactlyOnceWith(fixture.bytes)
     expect(fixture.createFromSession).toHaveBeenCalledOnce()
+    expect(fixture.confirm).not.toHaveBeenCalled()
     const session = fixture.createFromSession.mock.calls[0]?.[0]
     expect(session?.getSnapshot().project).toMatchObject({ id: 'project-0', name: 'Long Song' })
     expect(session?.modelRevision).toBe(0)
@@ -88,6 +114,75 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(fixture.decode.mock.invocationCallOrder[0]).toBeLessThan(
       fixture.createFromSession.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     )
+  })
+
+  it('validates the file before confirming the latest active Project and replacing it', async () => {
+    const fixture = createFixture()
+    const file = new File([fixture.bytes], 'Workbench Song.mid', { type: 'audio/midi' })
+
+    const result = await fixture.coordinator.importLocalFileReplacingActiveProject(file)
+
+    expect(fixture.confirm).toHaveBeenCalledExactlyOnceWith({
+      kind: PROJECT_NAVIGATION_INTENT_KIND.CREATE_PROJECT,
+    })
+    expect(result?.projectId).toBe('project-0')
+    expect(fixture.decode.mock.invocationCallOrder[0]).toBeLessThan(
+      fixture.confirm.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    )
+    expect(fixture.confirm.mock.invocationCallOrder[0]).toBeLessThan(
+      fixture.createFromSession.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    )
+  })
+
+  it('does not create a Project when validated Workbench replacement is cancelled', async () => {
+    const fixture = createFixture()
+    fixture.confirm.mockResolvedValueOnce(
+      Object.freeze({
+        activeProjectId: parseProjectId('current-project'),
+        kind: PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.CANCELLED,
+      }),
+    )
+
+    await expect(
+      fixture.coordinator.importLocalFileReplacingActiveProject(new File([], 'cancelled.mid')),
+    ).resolves.toBeNull()
+    expect(fixture.read).toHaveBeenCalledOnce()
+    expect(fixture.decode).toHaveBeenCalledOnce()
+    expect(fixture.createFromSession).not.toHaveBeenCalled()
+  })
+
+  it('propagates a failed Workbench navigation decision without creating a Project', async () => {
+    const fixture = createFixture()
+    const failureCause = new Error('current Project could not be saved')
+    fixture.confirm.mockResolvedValueOnce(
+      Object.freeze({
+        activeProjectId: parseProjectId('current-project'),
+        failureCause,
+        kind: PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.FAILED,
+        operation: PROJECT_NAVIGATION_CONFIRMATION_FAILURE_OPERATION.SAVE_PROJECT,
+      }),
+    )
+
+    await expect(
+      fixture.coordinator.importLocalFileReplacingActiveProject(new File([], 'failed.mid')),
+    ).rejects.toBe(failureCause)
+    expect(fixture.read).toHaveBeenCalledOnce()
+    expect(fixture.decode).toHaveBeenCalledOnce()
+    expect(fixture.createFromSession).not.toHaveBeenCalled()
+  })
+
+  it('does not request abandonment permission for an invalid Workbench MIDI file', async () => {
+    const fixture = createFixture()
+    const decodeFailure = new Error('malformed SMF')
+    fixture.decode.mockImplementationOnce(() => {
+      throw decodeFailure
+    })
+
+    await expect(
+      fixture.coordinator.importLocalFileReplacingActiveProject(new File([], 'broken.mid')),
+    ).rejects.toBe(decodeFailure)
+    expect(fixture.confirm).not.toHaveBeenCalled()
+    expect(fixture.createFromSession).not.toHaveBeenCalled()
   })
 
   it('prefers an embedded MIDI project name over the local file name', async () => {

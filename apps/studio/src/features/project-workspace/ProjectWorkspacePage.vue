@@ -26,7 +26,11 @@ import {
   type ProjectWorkbenchClipSelectionCandidate,
 } from '@/features/project-workspace/project-workbench-selection-store'
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
-import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
+import {
+  createProjectEntryLocation,
+  createProjectWorkspaceLocation,
+  PROJECT_ROUTE_QUERY,
+} from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
@@ -44,6 +48,8 @@ import {
   type FailedProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
+import { reportProjectMidiImportSuccess } from '@/workbench/project/midi-import/project-midi-import-feedback'
+import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
@@ -69,6 +75,7 @@ interface ProjectPresentation {
 
 const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
+const { projectMidiImport } = useProjectMidiImport()
 const projectNavigationDecision = useProjectNavigationDecision()
 const { keyboardShortcuts } = useStudioKeyboardShortcuts()
 const {
@@ -82,6 +89,8 @@ const router = useRouter()
 const requestedProjectId = shallowRef<ProjectId | null>(null)
 const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
+const isImportingMidi = shallowRef(false)
+const midiFileInput = shallowRef<HTMLInputElement | null>(null)
 const projectPresentation = shallowRef<ProjectPresentation>({
   barSpanTick: DEFAULT_BAR_SPAN_TICK,
   projectId: null,
@@ -91,6 +100,7 @@ const projectPresentation = shallowRef<ProjectPresentation>({
   timeSignatureNumerator: 4,
 })
 let requestGeneration = 0
+let midiImportGeneration = 0
 let isUnmounted = false
 
 const readyProject = computed(() => {
@@ -214,6 +224,41 @@ async function openRequestedProject(projectIdInput: string): Promise<void> {
 
 function retry(): void {
   void openRequestedProject(props.projectId)
+}
+
+function describeMidiImportFailure(failureCause: unknown): string {
+  if (failureCause instanceof Error && failureCause.message.trim().length > 0) {
+    return failureCause.message
+  }
+  return 'The MIDI file could not be imported. Please try another file.'
+}
+
+function requestMidiFile(): void {
+  if (readyProject.value === null || isImportingMidi.value) return
+  midiFileInput.value?.click()
+}
+
+async function importSelectedMidiFile(): Promise<void> {
+  const input = midiFileInput.value
+  const file = input?.files?.item(0) ?? null
+  if (input !== null) input.value = ''
+  if (file === null || readyProject.value === null || isImportingMidi.value) return
+
+  const generation = ++midiImportGeneration
+  isImportingMidi.value = true
+  try {
+    const result = await projectMidiImport.importLocalFileReplacingActiveProject(file)
+    if (isUnmounted || generation !== midiImportGeneration || result === null) return
+
+    reportProjectMidiImportSuccess(toasts, result)
+    await router.push(createProjectWorkspaceLocation(result.projectId))
+  } catch (failureCause) {
+    if (!isUnmounted && generation === midiImportGeneration) {
+      toasts.danger('MIDI could not be imported', describeMidiImportFailure(failureCause))
+    }
+  } finally {
+    if (!isUnmounted && generation === midiImportGeneration) isImportingMidi.value = false
+  }
 }
 
 async function saveProject(): Promise<void> {
@@ -372,12 +417,23 @@ onUnmounted(() => {
   disposeKeyboardShortcuts()
   isUnmounted = true
   requestGeneration += 1
+  midiImportGeneration += 1
   const projectId = requestedProjectId.value
   if (projectId !== null) workbenchSelection.leaveProject(projectId)
 })
 </script>
 
 <template>
+  <input
+    ref="midiFileInput"
+    class="project-workspace__midi-file-input"
+    type="file"
+    accept=".mid,.midi,audio/midi,audio/x-midi"
+    tabindex="-1"
+    aria-hidden="true"
+    @change="importSelectedMidiFile"
+  />
+
   <ProjectWorkbenchShell
     v-if="readyProject"
     :bar-span-tick="projectPresentation.barSpanTick"
@@ -385,6 +441,7 @@ onUnmounted(() => {
     :can-undo="readyProject.session.canUndo"
     :clips="clipPresentations"
     :is-dirty="readyProject.isDirty"
+    :is-midi-importing="isImportingMidi"
     :piano-roll-presentation="pianoRollPresentation"
     :piano-roll-track-presentation="pianoRollTrackPresentation"
     :playback-can-toggle="playbackCanToggle"
@@ -402,6 +459,7 @@ onUnmounted(() => {
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
     :timeline-end-tick="timelineEndTick"
     :tracks="trackPresentations"
+    @import-midi="requestMidiFile"
     @leave-project="router.push(createProjectEntryLocation())"
     @playback-return-to-last-start-position="projectPlayback.returnToLastStartPosition()"
     @playback-toggle="projectPlayback.togglePlayPause()"
@@ -432,6 +490,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.project-workspace__midi-file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .project-route-state {
   display: grid;
   min-height: 100vh;

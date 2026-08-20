@@ -234,16 +234,17 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       projectCatalog: projectRuntime.projectCatalog,
     })
+    const projectNavigationConfirmation = createProjectNavigationConfirmationCoordinator({
+      activeProject: projectRuntime.activeProject,
+      requestDecision: projectNavigationDecisionBinding.requestDecision,
+    })
     const projectMidiImport = createProjectMidiImportCoordinator({
       activeProject: projectRuntime.activeProject,
       createId: composition.createProjectMidiImportId ?? (() => createBrowserProjectEntityId()),
       createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
       decoder: composition.midiFileDecoder ?? new ToneJsMidiFileDecoder(),
       fileReader: composition.midiFileReader ?? new BrowserLocalFileByteReader(),
-    })
-    const projectNavigationConfirmation = createProjectNavigationConfirmationCoordinator({
-      activeProject: projectRuntime.activeProject,
-      requestDecision: projectNavigationDecisionBinding.requestDecision,
+      navigationConfirmation: projectNavigationConfirmation,
     })
     const projectTracks = createProjectTrackCoordinator({
       activeProject: projectRuntime.activeProject,

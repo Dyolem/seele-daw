@@ -42,12 +42,12 @@ describe('Project MIDI import failures', () => {
     )
   })
 
-  it('rejects tempos outside the current Project model range', () => {
+  it.each([4.99, 999.01])('rejects tempo %s outside the current Project model range', (bpm) => {
     expect.hasAssertions()
     expectImportError(
       () =>
         createProjectMidiImportDraft(
-          createImportInput(createMidiDocument({ tempos: [{ tick: 0, bpm: 401 }] })),
+          createImportInput(createMidiDocument({ tempos: [{ tick: 0, bpm }] })),
         ),
       'unsupported-tempo',
     )

@@ -35,6 +35,8 @@ History 或 Playback Runtime。
 
 - Import 保留 Note、Channel、Program、Tempo、Time Signature 与 Track Name，并把来源 PPQ 换算到
   Project PPQ 960；
+- Project 保留 `5..999 BPM` 内 Tempo 的完整浮点精度；导入不静默 clamp、倍增或删除有效的密集
+  Tempo Event，同一 Project tick 的碰撞仍保留来源时间上最后生效的一枚；
 - 一个来源 Track 包含多个 Channel / Program 时，允许 Codec 输出多个 normalized Track；
 - Meta-only conductor Track 不创建空 Instrument Track；
 - 导入 Track V1 持久化选择 Studio Grand；Program / Bank 先用于名称和诊断，不静默替换为未准备

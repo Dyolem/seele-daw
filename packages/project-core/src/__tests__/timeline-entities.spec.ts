@@ -25,9 +25,10 @@ import {
 
 describe('TempoBpm', () => {
   it('accepts inclusive boundaries and fractional BPM values', () => {
-    expect(parseTempoBpm(TEMPO_BPM_MIN)).toBe(20)
+    expect(parseTempoBpm(TEMPO_BPM_MIN)).toBe(5)
+    expect(parseTempoBpm(15.545455040082661)).toBe(15.545455040082661)
     expect(parseTempoBpm(120.5)).toBe(120.5)
-    expect(parseTempoBpm(TEMPO_BPM_MAX)).toBe(400)
+    expect(parseTempoBpm(TEMPO_BPM_MAX)).toBe(999)
     expectTypeOf(parseTempoBpm(120)).toEqualTypeOf<TempoBpm>()
   })
 
@@ -114,7 +115,7 @@ describe('TempoEventRecord', () => {
       createTempoEventRecord({
         id: parseTempoEventId('tempo-1'),
         tick: ZERO_TICK,
-        bpm: 401 as never,
+        bpm: (TEMPO_BPM_MAX + 1) as never,
       }),
     ).toThrow(DomainValueError)
   })

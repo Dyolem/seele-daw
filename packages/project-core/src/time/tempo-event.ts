@@ -5,8 +5,8 @@ import { parseTick, type Tick } from './tick'
 
 export type TempoBpm = Brand<number, 'TempoBpm'>
 
-export const TEMPO_BPM_MIN = 20
-export const TEMPO_BPM_MAX = 400
+export const TEMPO_BPM_MIN = 5
+export const TEMPO_BPM_MAX = 999
 
 export interface TempoEventRecord {
   readonly id: TempoEventId

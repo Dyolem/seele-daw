@@ -425,7 +425,7 @@ interface TimeSignatureEventRecord {
 - Tick 0 必须恰好存在一个 Tempo Event 和一个 Time Signature Event；
 - 同类事件在同一 Tick 最多存在一个；
 - V1 Tempo 只支持 step change，不支持 ramp；
-- BPM 必须是有限数，产品范围为 `20..400`；
+- BPM 必须是有限数，产品范围为 `5..999`；
 - `numerator` 是整数，范围 `1..32`；
 - `denominator` 只能是 `1、2、4、8、16、32`；
 - 时间顺序由 `tick` 推导，不保存额外的顺序 ID 数组；

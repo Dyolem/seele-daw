@@ -155,6 +155,26 @@ describe('createProjectMidiImportDraft', () => {
     expect(createInstrumentDevice).not.toHaveBeenCalled()
   })
 
+  it('preserves low fractional and multiple Tempo Events within the Project range', () => {
+    const projectFile = projectFileFor(
+      createImportInput(
+        createMidiDocument({
+          tempos: [
+            { tick: 0, bpm: 15.545455040082661 },
+            { tick: 480, bpm: 120.5 },
+            { tick: 960, bpm: 999 },
+          ],
+        }),
+      ),
+    )
+
+    expect(Object.values(projectFile.tempoEvents)).toEqual([
+      expect.objectContaining({ tick: 0, bpm: 15.545455040082661 }),
+      expect.objectContaining({ tick: 960, bpm: 120.5 }),
+      expect.objectContaining({ tick: 1_920, bpm: 999 }),
+    ])
+  })
+
   it('rounds absolute endpoints, expands zero-tick notes, and collapses timeline collisions', () => {
     const draft = createProjectMidiImportDraft(
       createImportInput(

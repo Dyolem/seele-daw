@@ -810,10 +810,12 @@ File 导入是独立交换格式入口，不替代 Project File。
    不能在打开或播放时自动迁移。
 10. Standard MIDI File 导入必须先完整读取、解码和验证，再创建独立项目与首个 Checkpoint；导入
     Track 默认持久化 Studio Grand，来源 Program 不静默替换音源。
-11. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。
-12. 普通 Clip 复制的长期产品语义是创建独立 MIDI Source 与新 Note 身份。
-13. Move、Resize、Split 等编辑算法必须在对应 Command 实现前确定产品边界。
-14. 未接通的控制必须禁用或明确提示不可用，不能制造功能已存在的错觉。
+11. Project Tempo 的可表示范围是 `5..999 BPM`；MIDI 导入保留范围内的完整浮点值和所有有效
+    Tempo Event，不静默 clamp、倍增或按密度删除。
+12. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。
+13. 普通 Clip 复制的长期产品语义是创建独立 MIDI Source 与新 Note 身份。
+14. Move、Resize、Split 等编辑算法必须在对应 Command 实现前确定产品边界。
+15. 未接通的控制必须禁用或明确提示不可用，不能制造功能已存在的错觉。
 
 ## 11. 功能交付与文档维护规则
 

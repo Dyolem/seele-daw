@@ -201,11 +201,11 @@ V1 中每个 MidiClip 独占一个 MidiSource，每个 MidiSource 被且仅被�
 
 TempoEventDTO 只包含：
 
-| Property | JSON 类型               |
-| -------- | ----------------------- |
-| `id`     | string                  |
-| `tick`   | non-negative integer    |
-| `bpm`    | finite number `20..400` |
+| Property | JSON 类型              |
+| -------- | ---------------------- |
+| `id`     | string                 |
+| `tick`   | non-negative integer   |
+| `bpm`    | finite number `5..999` |
 
 TimeSignatureEventDTO 只包含：
 

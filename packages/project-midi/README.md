@@ -14,7 +14,8 @@ Model invariant 校验、但尚未进入 Studio 项目生命周期的 fresh `Pro
 - Source 内 Note tick 改为相对 Clip 起点，Channel、Pitch 和 Velocity 保留；
 - Tempo 与 Time Signature 按换算后的 Project tick 去重；碰撞时保留来源时间上最后生效的事件并
   产生诊断；tick 0 缺失时分别补 120 BPM 与 4/4；
-- Project V1 无法表示的 Tempo / Time Signature 值会阻止导入，不执行静默 clamp；
+- Project V1 保留 `5..999 BPM` 范围内的完整浮点 Tempo；范围外 Tempo 或无法表示的 Time
+  Signature 会阻止导入，不执行静默 clamp；
 - CC64 不烘焙进 Note 长度。它与其他 CC、Pitch Bend、非零 Release Velocity、非默认 Program、
   Key Signature 和文本事件都产生非阻断诊断；
 - `@tonejs/midi` 在 Codec 边界已经完成 Note On / Off 配对。中立 Document 当前不携带原始孤立

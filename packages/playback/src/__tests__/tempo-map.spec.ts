@@ -115,6 +115,17 @@ describe('TempoMap', () => {
     expect(input).toEqual([later, initial, middle])
   })
 
+  it('maps the expanded Project Tempo boundaries', () => {
+    const tempoMap = createTempoMap([
+      tempoEvent('tempo-minimum', 0, 5),
+      tempoEvent('tempo-maximum', 960, 999),
+    ])
+
+    expect(tempoMap.projectSecondAtTick(parseTick(960))).toBe(12)
+    expect(tempoMap.projectSecondAtTick(parseTick(1_920))).toBeCloseTo(12 + 60 / 999, 12)
+    expect(tempoMap.tickPositionAtProjectSecond(parseProjectSecond(12))).toBe(960)
+  })
+
   it('does not retain the caller array or its Tempo Event records', () => {
     const initial = tempoEvent('tempo-isolated-initial', 0, 120)
     const later = tempoEvent('tempo-isolated-later', 1_920, 60)
@@ -186,11 +197,11 @@ describe('TempoMap', () => {
   })
 
   it('computes a short duration without subtracting large absolute Project times', () => {
-    const tempoMap = createTempoMap([tempoEvent('tempo-large-tick-duration', 0, 400)])
+    const tempoMap = createTempoMap([tempoEvent('tempo-large-tick-duration', 0, 999)])
     const endTick = parseTick(Number.MAX_SAFE_INTEGER)
     const startTick = parseTick(Number.MAX_SAFE_INTEGER - 1)
 
-    expect(tempoMap.durationBetweenTicks(startTick, endTick)).toBeCloseTo(60 / (400 * 960), 12)
+    expect(tempoMap.durationBetweenTicks(startTick, endTick)).toBeCloseTo(60 / (999 * 960), 12)
   })
 
   it.each([

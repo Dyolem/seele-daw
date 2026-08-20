@@ -48,7 +48,9 @@ MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase�
 [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)。
 新建的 `midi-file` 只拥有中立 SMF Document 与可替换 Decoder / Encoder Adapter，不依赖 Project
 Core 或 Browser；`project-midi` 独立拥有 MIDI Document 与 Project Model 的双向映射，不拥有项目
-生命周期或默认音源选择；项目创建事务和 Studio 导入导出入口按独立批次接入。
+生命周期或默认音源选择。当前 `ActiveProjectService` 已能把调用方验证过的 Session 作为新项目原子
+保存并激活，`platform-browser` 已提供本地 Blob 字节读取；文件选择、Codec/Bridge 组合和 Studio
+导入反馈仍留在后续 UI 批次。
 
 ---
 

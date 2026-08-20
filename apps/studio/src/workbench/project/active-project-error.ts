@@ -4,6 +4,7 @@ export type ActiveProjectErrorCode =
   | 'invalid-observer'
   | 'generated-project-id-conflict'
   | 'new-session-project-id-mismatch'
+  | 'project-id-conflict'
   | 'project-not-found'
   | 'project-not-ready'
   | 'save-in-progress'

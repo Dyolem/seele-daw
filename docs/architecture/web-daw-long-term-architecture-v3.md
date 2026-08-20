@@ -18,7 +18,8 @@
 > Manual Timeline Locate 已通过 `checkpoint/manual-timeline-locate-2026-08-18` 收口；当前实施中的
 > [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)
 > 以独立 `midi-file` Codec 和 `project-midi` 映射边界开始，不把第三方 Parser 类型、格式规则或
-> 文件 I/O 反向带入 Project Core。
+> 文件 I/O 反向带入 Project Core。当前已完成调用方验证 Session 的新项目生命周期入口和本地 Blob
+> 字节读取 Adapter；Studio 文件选择与导入反馈仍属于后续 UI 批次。
 
 ---
 

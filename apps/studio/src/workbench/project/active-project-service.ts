@@ -36,6 +36,8 @@ export interface ActiveProjectService {
   readonly state: ActiveProjectState
 
   create(): Promise<ProjectId>
+  /** Persists and activates a caller-constructed, already validated Project Session. */
+  createFromSession(session: ProjectSession): Promise<ProjectId>
   open(projectId: ProjectId): Promise<void>
   save(): Promise<void>
   subscribe(observer: ActiveProjectStateObserver): ActiveProjectUnsubscribe
@@ -179,37 +181,47 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
 
     try {
       projectId = parseProjectId(this.#dependencies.createProjectId())
-      this.#setState(Object.freeze({ phase: ACTIVE_PROJECT_PHASE.CREATING, projectId }))
+      const expectedProjectId = projectId
+      await this.#persistAndActivateNewProject(
+        expectedProjectId,
+        () => this.#createAndValidateNewSession(expectedProjectId),
+        generation,
+        'generated-project-id-conflict',
+      )
 
-      const existing = await restoreProjectCheckpoint(this.#dependencies.checkpointStore, projectId)
-      if (existing !== null) {
-        throw new ActiveProjectError(
-          'generated-project-id-conflict',
-          `Generated Project ID ${projectId} already has a saved Checkpoint`,
-          { projectId },
-        )
-      }
-
-      const session = this.#createAndValidateNewSession(projectId)
-      const receipt = await saveProjectCheckpoint(this.#dependencies.checkpointStore, session, {
-        checkpointId: this.#dependencies.createCheckpointId(),
-      })
-
+      return projectId
+    } catch (failureCause) {
       if (this.#isCurrent(generation)) {
-        this.#attachSession(projectId, session, generation)
+        this.#detachSession()
         this.#setState(
-          createReadyState({
+          Object.freeze({
+            phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
             projectId,
-            session,
-            savedRevision: receipt.sourceModelRevision,
-            savedContentStateId: receipt.sourceContentStateId,
-            saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
-            saveFailure: null,
-            recoveryFailures: [],
+            failureCause,
           }),
         )
       }
 
+      throw failureCause
+    }
+  }
+
+  async createFromSession(session: ProjectSession): Promise<ProjectId> {
+    this.#assertLive()
+    const generation = ++this.#generation
+    let projectId: ProjectId | null = null
+
+    this.#detachSession()
+
+    try {
+      projectId = parseProjectId(session.getSnapshot().project.id)
+      const expectedProjectId = projectId
+      await this.#persistAndActivateNewProject(
+        expectedProjectId,
+        () => this.#validateSessionProjectId(session, expectedProjectId),
+        generation,
+        'project-id-conflict',
+      )
       return projectId
     } catch (failureCause) {
       if (this.#isCurrent(generation)) {
@@ -430,12 +442,16 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
 
   #createAndValidateNewSession(expectedProjectId: ProjectId): ProjectSession {
     const session = this.#dependencies.createNewSession(expectedProjectId)
+    return this.#validateSessionProjectId(session, expectedProjectId)
+  }
+
+  #validateSessionProjectId(session: ProjectSession, expectedProjectId: ProjectId): ProjectSession {
     const actualProjectId = session.getSnapshot().project.id
 
     if (actualProjectId !== expectedProjectId) {
       throw new ActiveProjectError(
         'new-session-project-id-mismatch',
-        `New Project Session ${actualProjectId} does not match requested Project ${expectedProjectId}`,
+        `Project Session ${actualProjectId} does not match requested Project ${expectedProjectId}`,
         {
           actualProjectId,
           expectedProjectId,
@@ -445,6 +461,44 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
     }
 
     return session
+  }
+
+  async #persistAndActivateNewProject(
+    projectId: ProjectId,
+    createSession: () => ProjectSession,
+    generation: number,
+    conflictCode: 'generated-project-id-conflict' | 'project-id-conflict',
+  ): Promise<void> {
+    this.#setState(Object.freeze({ phase: ACTIVE_PROJECT_PHASE.CREATING, projectId }))
+
+    const existing = await restoreProjectCheckpoint(this.#dependencies.checkpointStore, projectId)
+    if (existing !== null) {
+      throw new ActiveProjectError(
+        conflictCode,
+        `Project ID ${projectId} already has a saved Checkpoint`,
+        { projectId },
+      )
+    }
+
+    const session = createSession()
+    const receipt = await saveProjectCheckpoint(this.#dependencies.checkpointStore, session, {
+      checkpointId: this.#dependencies.createCheckpointId(),
+    })
+
+    if (!this.#isCurrent(generation)) return
+
+    this.#attachSession(projectId, session, generation)
+    this.#setState(
+      createReadyState({
+        projectId,
+        session,
+        savedRevision: receipt.sourceModelRevision,
+        savedContentStateId: receipt.sourceContentStateId,
+        saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+        saveFailure: null,
+        recoveryFailures: [],
+      }),
+    )
   }
 
   #handleSessionSubscriptionFailure(

@@ -175,6 +175,7 @@ describe('ActiveProjectVueBinding', () => {
     const activeProject: ActiveProjectService = {
       state,
       create: () => Promise.resolve(createTestProjectId('vue-stub')),
+      createFromSession: (session) => Promise.resolve(session.getSnapshot().project.id),
       open: () => Promise.resolve(),
       save: () => Promise.resolve(),
       subscribe(observer) {

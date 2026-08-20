@@ -102,6 +102,7 @@ function createRuntimeFixture(
   const activeProject: ActiveProjectService = {
     state,
     create: () => Promise.resolve(parseProjectId('studio-created-project')),
+    createFromSession: (session) => Promise.resolve(session.getSnapshot().project.id),
     open,
     save,
     subscribe: () => {

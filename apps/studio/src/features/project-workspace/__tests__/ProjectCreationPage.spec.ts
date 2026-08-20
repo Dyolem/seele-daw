@@ -46,6 +46,7 @@ function createActiveProjectContext(
       return state.value
     },
     create,
+    createFromSession: async (session) => session.getSnapshot().project.id,
     open: async () => undefined,
     save: async () => undefined,
     subscribe: () => () => undefined,

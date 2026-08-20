@@ -1,6 +1,12 @@
 import 'fake-indexeddb/auto'
 
-import { DomainValueError, parseProjectId } from '@seele-daw/project-core'
+import {
+  DomainValueError,
+  createInitialProjectSession,
+  parseProjectId,
+  parseTempoEventId,
+  parseTimeSignatureEventId,
+} from '@seele-daw/project-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -55,6 +61,15 @@ function requireReady(state: ActiveProjectState): ReadyActiveProjectState {
   }
 
   return state
+}
+
+function createProvidedSession(projectId: ReturnType<typeof parseProjectId>, name: string) {
+  return createInitialProjectSession({
+    projectId,
+    projectName: name,
+    tempoEventId: parseTempoEventId(`tempo-${projectId}`),
+    timeSignatureEventId: parseTimeSignatureEventId(`meter-${projectId}`),
+  })
 }
 
 function deleteDatabase(databaseName: string): Promise<void> {
@@ -126,6 +141,49 @@ describe('BrowserActiveProjectRuntime', () => {
     })
     expect(restored.session.getSnapshot()).toEqual(initialSnapshot)
     expect(restoredIds).not.toHaveBeenCalled()
+  })
+
+  it('atomically catalogs and activates a caller-provided validated Session', async () => {
+    const databaseName = createDatabaseName('provided-session')
+    const createUniqueId = createSequentialUniqueId('provided-checkpoint')
+    const runtime = createRuntime(databaseName, createUniqueId)
+    const projectId = parseProjectId('provided-session-project')
+    const session = createProvidedSession(projectId, 'Imported MIDI Session')
+
+    await expect(runtime.activeProject.createFromSession(session)).resolves.toBe(projectId)
+
+    expect(requireReady(runtime.activeProject.state)).toMatchObject({
+      projectId,
+      session,
+      savedRevision: 0,
+      isDirty: false,
+    })
+    expect(createUniqueId).toHaveBeenCalledOnce()
+    await expect(runtime.projectCatalog.listRecentProjects()).resolves.toEqual([
+      {
+        projectId,
+        name: 'Imported MIDI Session',
+        lastCheckpointSavedAt: 1_000,
+      },
+    ])
+  })
+
+  it('does not catalog or activate a provided Session when initial persistence cannot start', async () => {
+    const databaseName = createDatabaseName('provided-session-failure')
+    const createInvalidCheckpointId = vi.fn<() => string>(() => '')
+    const runtime = createRuntime(databaseName, createInvalidCheckpointId)
+    const projectId = parseProjectId('provided-session-failure-project')
+    const session = createProvidedSession(projectId, 'Must Not Be Cataloged')
+
+    await expect(runtime.activeProject.createFromSession(session)).rejects.toBeInstanceOf(
+      DomainValueError,
+    )
+
+    expect(runtime.activeProject.state).toMatchObject({
+      phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
+      projectId,
+    })
+    await expect(runtime.projectCatalog.listRecentProjects()).resolves.toEqual([])
   })
 
   it('closes its IndexedDB connection when disposed', async () => {

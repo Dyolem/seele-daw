@@ -160,6 +160,7 @@ function createFixture(
       return state.value
     },
     create: async () => parseProjectId('workspace-created-project'),
+    createFromSession: async (session) => session.getSnapshot().project.id,
     open: async () => undefined,
     save,
     subscribe: () => () => undefined,

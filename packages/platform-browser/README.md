@@ -2,7 +2,7 @@
 
 `platform-browser` 封装浏览器基础设施，为项目内核、编辑器和播放系统定义的服务端口提供 IndexedDB、OPFS、文件、权限、Worker、设备与运行能力实现。
 
-> 当前状态：已完成基于 `idb` 的 Project Checkpoint + Project Catalog IndexedDB V1 适配器并接入 Studio Browser Runtime；Journal、OPFS 和其他浏览器能力尚未开始。长期架构中的 `browser-infra` 对应当前包。
+> 当前状态：已完成基于 `idb` 的 Project Checkpoint + Project Catalog IndexedDB V1 适配器并接入 Studio Browser Runtime，同时提供本地 `File` / `Blob` 到独立 `Uint8Array` 的读取 Adapter；Journal、OPFS 和其他浏览器能力尚未开始。长期架构中的 `browser-infra` 对应当前包。
 
 ## 包定位
 
@@ -96,7 +96,7 @@ src/
 
 ## 测试与验收
 
-当前基线为 2 个测试文件、18 项测试，覆盖完整 Physical Schema V1、Checkpoint/Catalog 原子事务、最近项目排序、失败回滚、候选回退、项目隔离、并发写入和连接重开。
+当前基线为 3 个测试文件、23 项测试，覆盖完整 Physical Schema V1、Checkpoint/Catalog 原子事务、最近项目排序、失败回滚、候选回退、项目隔离、并发写入、连接重开，以及本地文件读取的复制、空文件和失败诊断。
 
 - IndexedDB transaction abort、quota failure 和 crash injection；
 - snapshot + 连续 journal 恢复到最后一致 `modelRevision`；

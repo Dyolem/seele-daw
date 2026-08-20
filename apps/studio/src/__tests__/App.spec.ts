@@ -73,6 +73,7 @@ function createActiveProjectContext(state: ActiveProjectState): ActiveProjectVue
       return stateRef.value
     },
     create: async () => parseProjectId('app-created-project'),
+    createFromSession: async (session) => session.getSnapshot().project.id,
     open: async () => undefined,
     save: async () => undefined,
     subscribe: () => () => undefined,

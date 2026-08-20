@@ -27,6 +27,7 @@ Model invariant 校验、但尚未进入 Studio 项目生命周期的 fresh `Pro
 `createStudioGrandDeviceDescriptor` 组合该端口，从而落实“导入 Track 默认持久化 Studio Grand”
 的产品规则。不同宿主或测试可以提供其他合法 Device Descriptor，而无需修改 MIDI 映射。
 
-导入成功只返回 `ProjectMidiImportDraft`：其中 Session revision 为 0、History 为空。创建 Catalog
-记录、首个 Checkpoint、切换 Active Project 和失败原子性属于 MI3 的 `ActiveProjectService` 生命周期
-批次；Browser File / Blob 与 Studio UI 同样不属于本包。
+导入成功只返回 `ProjectMidiImportDraft`：其中 Session revision 为 0、History 为空。调用方现在可以用
+`ActiveProjectService.createFromSession` 原子保存首个 Checkpoint 并切换 Active Project；Catalog 与
+Checkpoint 的一致性仍由 Studio 生命周期及其持久化 Adapter 拥有。Browser File / Blob 与 Studio UI
+不属于本包。

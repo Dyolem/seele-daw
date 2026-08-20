@@ -74,6 +74,75 @@ describe('ActiveProjectService creation and opening', () => {
     expect(store.saved[0]).toMatchObject({ projectId, sourceModelRevision: 0 })
   })
 
+  it('persists and activates a caller-validated Session without rebuilding it', async () => {
+    const projectId = createTestProjectId('provided-session')
+    const providedSession = createTestSession(projectId)
+    const createProjectId = vi.fn<() => ProjectId>(() => createTestProjectId('unused'))
+    const { createNewSession, service, store } = createServiceFixture(
+      undefined,
+      undefined,
+      createProjectId,
+    )
+
+    await expect(service.createFromSession(providedSession)).resolves.toBe(projectId)
+
+    const state = requireReady(service.state)
+    expect(createProjectId).not.toHaveBeenCalled()
+    expect(createNewSession).not.toHaveBeenCalled()
+    expect(store.readProjectIds).toEqual([projectId])
+    expect(store.saved).toEqual([
+      expect.objectContaining({ projectId, sourceModelRevision: providedSession.modelRevision }),
+    ])
+    expect(state).toMatchObject({
+      projectId,
+      session: providedSession,
+      savedRevision: providedSession.modelRevision,
+      isDirty: false,
+      saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    })
+    expect(state.contentStateId).toBe(state.savedContentStateId)
+  })
+
+  it('does not replace an existing Project when a provided Session reuses its ID', async () => {
+    const projectId = createTestProjectId('provided-conflict')
+    const store = new ControlledProjectCheckpointStore()
+    store.candidatesByProject.set(projectId, [
+      createTestCheckpoint(projectId, 'checkpoint-provided-conflict'),
+    ])
+    const { service } = createServiceFixture(store)
+
+    await expect(service.createFromSession(createTestSession(projectId))).rejects.toMatchObject({
+      code: 'project-id-conflict',
+      projectId,
+    })
+
+    expect(store.saved).toEqual([])
+    expect(service.state).toMatchObject({
+      phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
+      projectId,
+      failureCause: expect.objectContaining({ code: 'project-id-conflict' }),
+    })
+  })
+
+  it('does not activate a provided Session when its initial Checkpoint save fails', async () => {
+    const projectId = createTestProjectId('provided-save-failure')
+    const cause = new Error('provided session transaction aborted')
+    const store = new ControlledProjectCheckpointStore()
+    store.saveFailure = cause
+    const { service } = createServiceFixture(store)
+
+    await expect(service.createFromSession(createTestSession(projectId))).rejects.toMatchObject({
+      code: 'store-write-failed',
+      failureCause: cause,
+    })
+
+    expect(service.state).toMatchObject({
+      phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
+      projectId,
+      failureCause: expect.objectContaining({ failureCause: cause }),
+    })
+  })
+
   it('fails Open explicitly when no Checkpoint exists and never creates a Project', async () => {
     const projectId = createTestProjectId('missing')
     const { createNewSession, service } = createServiceFixture()

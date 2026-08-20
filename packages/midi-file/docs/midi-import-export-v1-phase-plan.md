@@ -4,7 +4,7 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI1 accepted and committed; MI2 implemented, review pending
+> Current checkpoint: MI2 accepted and committed; MI3 implemented, review pending
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
@@ -58,18 +58,24 @@ History 或 Playback Runtime。
 
 已由提交 `d944a60` 完成并通过审核。
 
-### MI2：Project Import Bridge（已实现，待审核）
+### MI2：Project Import Bridge（已完成）
 
 - 建立不依赖 Browser / Vue 的 MIDI → Project Import Draft 映射；
 - 实现有理数 PPQ 换算、Note 范围与配对结果处理、Tempo / 拍号去重、Track / Clip 布局；
 - 生成稳定诊断，并通过 Project File 加载边界验证完整项目不变量。
 - 默认 Device 通过工厂注入；MI2 不依赖 Playback，也不创建 Catalog、Checkpoint 或 Active Project。
 
-### MI3：项目生命周期与浏览器读取
+已由提交 `144fddc` 完成并通过审核。
+
+### MI3：项目生命周期与浏览器读取（已实现，待审核）
 
 - 为 `ActiveProjectService` 增加通用的 validated-session 创建路径；
 - 在 `platform-browser` 增加本地文件读取 Adapter；
 - 保证失败无 Project Catalog / Checkpoint 部分写入。
+
+实施边界：`ActiveProjectService.createFromSession` 复用新项目的冲突检查、首个 Checkpoint 和 clean
+save-point 语义；IndexedDB Store 继续在同一事务中提交 Checkpoint、Head 与 Catalog。本批次只增加
+`Blob -> Uint8Array` 读取能力，不提前创建文件选择 UI、Decoder / Bridge Composition 或路由跳转。
 
 ### MI4：Studio 导入体验
 

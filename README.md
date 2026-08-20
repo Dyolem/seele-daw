@@ -21,6 +21,7 @@ seele-daw/
 │   ├── type-utils/          纯编译期、跨领域的共享 TypeScript 类型工具
 │   ├── midi-file/           标准 MIDI 文件中立契约与可替换 Codec Adapter
 │   ├── project-core/        项目模型、命令、事务、历史与查询端口
+│   ├── project-midi/        MIDI Document 与 Project Model 的可替换映射桥接层
 │   ├── editor/              Tool、Interaction、Selection 与编辑器浏览器层
 │   ├── playback/            Transport、Compiler、Scheduler 契约与播放计划
 │   ├── audio-web/           Web Audio Backend 与 AudioWorklet
@@ -35,7 +36,7 @@ seele-daw/
     └── adr/                 Architecture Decision Records
 ```
 
-当前采用六个业务硬边界包，并增加一个无运行时代码的 `type-utils` 基础叶子包；`editor-renderer`、Asset 和 Persistence 等边界稳定后再拆包。
+当前采用七个业务硬边界包，并增加一个无运行时代码的 `type-utils` 基础叶子包；`editor-renderer`、Asset 和 Persistence 等边界稳定后再拆包。
 
 ## 工具链
 

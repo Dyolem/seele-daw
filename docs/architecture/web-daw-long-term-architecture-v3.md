@@ -17,7 +17,8 @@
 > 模型”简称，同样不是文档版本；落地时仍须由对应专项计划重新确认。
 > Manual Timeline Locate 已通过 `checkpoint/manual-timeline-locate-2026-08-18` 收口；当前实施中的
 > [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)
-> 以独立 `midi-file` Codec 边界开始，不把第三方 Parser 类型或文件 I/O 反向带入 Project Core。
+> 以独立 `midi-file` Codec 和 `project-midi` 映射边界开始，不把第三方 Parser 类型、格式规则或
+> 文件 I/O 反向带入 Project Core。
 
 ---
 
@@ -277,6 +278,7 @@ web-daw/
 │   ├── type-utils/                纯编译期、跨领域 TypeScript 类型工具
 │   ├── midi-file/                 Standard MIDI File 中立契约与可替换 Codec Adapter
 │   ├── project-core/              模型、时间、命令、事务、历史、查询端口
+│   ├── project-midi/              MIDI Document 与 Project Model 的双向映射和诊断
 │   ├── editor/                    common Tool / Interaction 与 browser Renderer
 │   ├── playback/                  Compiler、Transport、Scheduler 契约、RuntimePlan
 │   ├── audio-web/                 Web Audio 图、设备、Worklet、录音、离线渲染
@@ -295,11 +297,14 @@ web-daw/
 flowchart TD
   TU["type-utils"]
   MF["midi-file"]
+  PM["project-midi"] --> MF
+  PM --> PC["project-core"]
   APP["studio"] --> ED["editor"]
   APP --> AW["audio-web"]
   APP --> BR["platform-browser"]
   APP --> MF
-  ED --> PC["project-core"]
+  APP --> PM
+  ED --> PC
   PB["playback"] --> PC
   AW --> PB
   APP --> PB
@@ -315,7 +320,9 @@ flowchart TD
 
 `midi-file` 是无浏览器依赖的格式叶子包，只把 Standard MIDI File 字节转换为中立 MIDI
 Document，或执行反向编码。第三方 Parser / Writer 类型不得穿过 package root；Project Track、
-Clip、默认音源与 PPQ 960 换算由上层 MIDI / Project bridge 负责，不能反向进入 Codec。
+Clip 与 PPQ 960 换算由 `project-midi` 负责，不能反向进入 Codec。`project-midi` 只依赖中立
+Document 与 Project Core 公开边界，不拥有 Browser File、Active Project 生命周期或 Studio Grand
+选择；Studio Composition Root 注入默认 Device 工厂。
 
 ### 8.2 拆包规则
 
@@ -323,7 +330,7 @@ Clip、默认音源与 PPQ 960 换算由上层 MIDI / Project bridge 负责，�
 
 - 有清晰、稳定的依赖方向；
 - 可以单独测试且不需要应用全局；
-- 至少两个上层模块需要它，或它必须隔离平台代码；
+- 至少两个上层模块需要它，或它必须隔离平台 / 第三方实现、阻断既有硬领域之间的错误依赖方向；
 - 拆分后不会产生大量双向 DTO 与 re-export。
 
 禁止建立 shared、utils、common 这类无语义收容包。共享代码必须有领域名称和所有者。`type-utils` 只拥有不产生运行时代码、与业务领域无关且经过实际复用验证的 TypeScript 类型代数，不是该规则的例外收容箱。

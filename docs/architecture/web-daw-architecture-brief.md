@@ -47,7 +47,8 @@ MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase�
 当前下一条纵向切片是
 [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)。
 新建的 `midi-file` 只拥有中立 SMF Document 与可替换 Decoder / Encoder Adapter，不依赖 Project
-Core 或 Browser；Project 映射、项目创建事务和 Studio 导入导出入口按独立批次接入。
+Core 或 Browser；`project-midi` 独立拥有 MIDI Document 与 Project Model 的双向映射，不拥有项目
+生命周期或默认音源选择；项目创建事务和 Studio 导入导出入口按独立批次接入。
 
 ---
 
@@ -452,6 +453,7 @@ web-daw/
 │   ├── type-utils/
 │   ├── midi-file/
 │   ├── project-core/
+│   ├── project-midi/
 │   ├── editor/
 │   │   ├── common/
 │   │   └── browser/
@@ -463,9 +465,9 @@ web-daw/
     └── adr/
 ```
 
-当前业务边界包含六个 package，另设一个不产生运行时代码的 `type-utils` 基础叶子包。新增的
-`midi-file` 隔离 Standard MIDI File Codec 与第三方实现；Asset、Persistence、Renderer 等仍先
-作为所属 package 的内部模块，边界稳定后再拆。
+当前业务边界包含七个 package，另设一个不产生运行时代码的 `type-utils` 基础叶子包。`midi-file`
+隔离 Standard MIDI File Codec 与第三方实现，`project-midi` 隔离交换 Document 与 Project Model
+映射；Asset、Persistence、Renderer 等仍先作为所属 package 的内部模块，边界稳定后再拆。
 
 ## 16. 依赖规则
 
@@ -481,6 +483,10 @@ midi-file
 project-core
   只依赖 type-utils
   不依赖 Vue、DOM、Web Audio、IndexedDB
+
+project-midi
+  依赖 midi-file 与 project-core
+  只拥有双向映射和诊断，不拥有 Browser I/O、项目生命周期或默认音源产品选择
 
 editor
   依赖 project-core

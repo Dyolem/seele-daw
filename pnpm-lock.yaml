@@ -197,6 +197,15 @@ importers:
         specifier: workspace:*
         version: link:../type-utils
 
+  packages/project-midi:
+    dependencies:
+      '@seele-daw/midi-file':
+        specifier: workspace:*
+        version: link:../midi-file
+      '@seele-daw/project-core':
+        specifier: workspace:*
+        version: link:../project-core
+
   packages/type-utils: {}
 
 packages:

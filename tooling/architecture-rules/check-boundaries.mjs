@@ -8,6 +8,7 @@ const packageNames = [
   'type-utils',
   'midi-file',
   'project-core',
+  'project-midi',
   'editor',
   'playback',
   'audio-web',
@@ -21,6 +22,7 @@ const allowedWorkspaceImports = new Map([
   ['type-utils', new Set()],
   ['midi-file', new Set()],
   ['project-core', new Set(['type-utils'])],
+  ['project-midi', new Set(['midi-file', 'project-core'])],
   ['editor', new Set(['project-core', 'type-utils'])],
   ['playback', new Set(['project-core', 'type-utils'])],
   ['audio-web', new Set(['playback', 'type-utils'])],
@@ -31,6 +33,7 @@ const bannedExternalImports = new Map([
   ['type-utils', new Set(['vue', 'pinia', 'vue-router'])],
   ['midi-file', new Set(['vue', 'pinia', 'vue-router'])],
   ['project-core', new Set(['vue', 'pinia', 'vue-router'])],
+  ['project-midi', new Set(['vue', 'pinia', 'vue-router'])],
   ['editor', new Set(['vue', 'pinia', 'vue-router'])],
   ['playback', new Set(['vue', 'pinia', 'vue-router'])],
 ])

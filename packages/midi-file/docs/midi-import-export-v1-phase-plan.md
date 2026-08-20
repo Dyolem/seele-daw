@@ -4,7 +4,7 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI1 implemented, review pending
+> Current checkpoint: MI1 accepted and committed; MI2 implemented, review pending
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
@@ -25,7 +25,8 @@ History 或 Playback Runtime。
 - `@seele-daw/midi-file` 不依赖 Project Core，拥有中立 `MidiFileDocument` 与可替换 Codec Port；
 - Decoder 采用封装后的 `@tonejs/midi`；其类型和对象不得穿过 package root；
 - Encoder 与 Decoder 独立替换。V1 Writer 固定输出 Type 1，以确定性规则排列同 tick 事件；
-- Project / MIDI bridge 才负责 PPQ 960、Track / Clip / Note、Studio Grand 默认 Device 与诊断；
+- Project / MIDI bridge 负责 PPQ 960、Track / Clip / Note 与诊断，并持久化 Composition Root 提供
+  的默认 Instrument Device；Studio Grand 选择本身不反向进入 bridge；
 - Studio 是唯一 Composition Root；浏览器 File / Blob / Download 能力归 `platform-browser`；
 - 导入不通过成千上万次 Project Command 模拟编辑；它是经过完整验证的文档加载边界；
 - 不为该阶段编写 E2E；完成 UI 后由用户使用真实 MIDI 文件手动验证。
@@ -46,7 +47,7 @@ History 或 Playback Runtime。
 
 ## 4. 批次
 
-### MI1：Codec 契约与第三方隔离（已实现，待审核）
+### MI1：Codec 契约与第三方隔离（已完成）
 
 - 新建 `@seele-daw/midi-file`；
 - 定义中立 Document、Decoder / Encoder Port 与稳定错误；
@@ -55,13 +56,14 @@ History 或 Playback Runtime。
   Pitch Bend 和编码顺序契约；
 - 纳入 workspace 类型、测试、质量与架构检查。
 
-完成后停止，等待审核。
+已由提交 `d944a60` 完成并通过审核。
 
-### MI2：Project Import Bridge
+### MI2：Project Import Bridge（已实现，待审核）
 
 - 建立不依赖 Browser / Vue 的 MIDI → Project Import Draft 映射；
 - 实现有理数 PPQ 换算、Note 范围与配对结果处理、Tempo / 拍号去重、Track / Clip 布局；
 - 生成稳定诊断，并通过 Project File 加载边界验证完整项目不变量。
+- 默认 Device 通过工厂注入；MI2 不依赖 Playback，也不创建 Catalog、Checkpoint 或 Active Project。
 
 ### MI3：项目生命周期与浏览器读取
 

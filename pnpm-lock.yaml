@@ -110,6 +110,9 @@ importers:
       '@seele-daw/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@seele-daw/midi-file':
+        specifier: workspace:*
+        version: link:../../packages/midi-file
       '@seele-daw/platform-browser':
         specifier: workspace:*
         version: link:../../packages/platform-browser
@@ -119,6 +122,9 @@ importers:
       '@seele-daw/project-core':
         specifier: workspace:*
         version: link:../../packages/project-core
+      '@seele-daw/project-midi':
+        specifier: workspace:*
+        version: link:../../packages/project-midi
       '@seele-daw/type-utils':
         specifier: workspace:*
         version: link:../../packages/type-utils

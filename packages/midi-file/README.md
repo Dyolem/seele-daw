@@ -26,7 +26,7 @@ Note Off 配对为 Note。`MidiFileDocument.tracks` 明确表示这种规范化�
 ## 边界
 
 - 本包不依赖 `project-core`，也不包含 Track、Clip、Project ID、默认音源或 PPQ 960 产品规则；
-- Project 导入与导出映射属于后续独立 bridge 批次；
+- Project 导入与导出映射属于独立 `project-midi` bridge，不进入本包；
 - Studio / Browser 负责读取或下载字节，本包不访问 DOM、File、Blob 或 URL；
 - `Midi`、`Track`、`Note` 等 `@tonejs/midi` 类型不得从公开入口导出。
 
@@ -34,7 +34,7 @@ Note Off 配对为 Note。`MidiFileDocument.tracks` 明确表示这种规范化�
 Uint8Array
   -> MidiFileDecoder
   -> MidiFileDocument
-  -> Project MIDI bridge（后续批次）
+  -> Project MIDI bridge
 ```
 
 Encoder 采用相反方向。未来的低层 TypeScript、WASM 或 Worker Codec 只需实现同一契约，不要求上层

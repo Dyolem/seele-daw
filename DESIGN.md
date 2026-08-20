@@ -93,7 +93,7 @@ Hover、Pressed、Selected、Focused、Disabled、Busy 和 Error 在所有组件
 
 | 模块                | 主要职责                               | 主要表面                 | 当前定位                |
 | ------------------- | -------------------------------------- | ------------------------ | ----------------------- |
-| Project Entry       | 新建、打开、最近项目、失败反馈         | 启动页                   | Piano Black 首批入口    |
+| Project Entry       | 新建、MIDI 导入、打开、最近项目、反馈  | 启动页                   | Piano Black 首批入口    |
 | Project Lifecycle   | 当前项目、保存、dirty、离开确认        | 全局状态与对话框         | 已有应用服务，UI 待完善 |
 | Global Bar          | 品牌入口、项目名、保存状态、全局菜单   | 顶部全局区               | 首批外壳已实现          |
 | Transport           | 播放、暂停、返回开头、时间、速度、拍号 | 顶部全局区或独立控制行   | 首次可听切片已接入      |
@@ -243,7 +243,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 新建项目成功前，应先建立可恢复的最小 Checkpoint。
 - 打开项目只打开已有项目；找不到、损坏或恢复失败必须给出明确结果。
 - Project Entry 应保持一个清晰的 New Project 主操作，并把最近项目作为本地资源库呈现。
+- Import MIDI 是 New Project 下方的次要入口；它创建独立本地项目，不与已有项目合并。
 - Project Entry 的 Loading、Empty、Route notice 与恢复错误使用局部反馈，不阻塞无关信息。
+- MIDI 导入的阻断错误留在入口局部显示；成功与非阻断诊断使用可跨路由保留的 Toast 摘要。
 - Global Bar 应持续显示项目名与保存状态，但不使用频繁跳动的通知。
 - 保存进行中使用短暂的 Busy 状态；成功后回到安静状态。
 - 保存失败必须保留 dirty，并提供可重试动作。

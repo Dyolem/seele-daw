@@ -30,4 +30,5 @@ Model invariant 校验、但尚未进入 Studio 项目生命周期的 fresh `Pro
 导入成功只返回 `ProjectMidiImportDraft`：其中 Session revision 为 0、History 为空。调用方现在可以用
 `ActiveProjectService.createFromSession` 原子保存首个 Checkpoint 并切换 Active Project；Catalog 与
 Checkpoint 的一致性仍由 Studio 生命周期及其持久化 Adapter 拥有。Browser File / Blob 与 Studio UI
-不属于本包。
+不属于本包。Studio 当前已在 Composition Root 中组合本包、SMF Decoder、浏览器文件读取和默认
+Studio Grand，并从 Project Entry 提供单文件导入入口。

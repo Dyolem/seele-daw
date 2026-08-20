@@ -4,7 +4,7 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI2 accepted and committed; MI3 implemented, review pending
+> Current checkpoint: MI3 accepted and committed; MI4 implemented, review pending
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
@@ -67,7 +67,7 @@ History 或 Playback Runtime。
 
 已由提交 `144fddc` 完成并通过审核。
 
-### MI3：项目生命周期与浏览器读取（已实现，待审核）
+### MI3：项目生命周期与浏览器读取（已完成）
 
 - 为 `ActiveProjectService` 增加通用的 validated-session 创建路径；
 - 在 `platform-browser` 增加本地文件读取 Adapter；
@@ -77,11 +77,19 @@ History 或 Playback Runtime。
 save-point 语义；IndexedDB Store 继续在同一事务中提交 Checkpoint、Head 与 Catalog。本批次只增加
 `Blob -> Uint8Array` 读取能力，不提前创建文件选择 UI、Decoder / Bridge Composition 或路由跳转。
 
-### MI4：Studio 导入体验
+已由提交 `88da6fc` 完成并通过审核。
+
+### MI4：Studio 导入体验（已实现，待审核）
 
 - Project Entry 增加 Import MIDI；
 - 展示阻断错误和非阻断诊断摘要；
 - 成功后打开干净项目，并覆盖长歌曲自动扩展 Ruler / Arrangement 的集成测试。
+
+实施边界：Project Entry 以次要操作选择单个 `.mid` / `.midi` 文件；Studio Coordinator 严格按
+Browser 字节读取、SMF 解码、Project Import Draft 验证、`createFromSession` 持久化的顺序组合。
+SMF 内嵌名称优先，缺失时使用文件名；导入 Track 持久化 Studio Grand。阻断失败留在 Project
+Entry，非阻断诊断以导入摘要 Toast 呈现，成功后进入首个 Checkpoint 已保存的 clean Workbench。
+本批次不增加拖放、批量导入、容量加固或 E2E。
 
 ### ME1：Project Export Bridge
 

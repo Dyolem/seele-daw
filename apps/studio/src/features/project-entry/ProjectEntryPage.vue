@@ -17,24 +17,32 @@ import {
 } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   type ProjectSelectionRequiredResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
+import type { ProjectMidiImportResult } from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import type { RecentProjectSummary } from '@/workbench/project/project-catalog-reader'
 
 type ProjectEntryAction =
   | { readonly kind: 'create' }
+  | { readonly kind: 'import-midi' }
   | { readonly kind: 'open'; readonly projectId: ProjectId }
   | null
 
 const { projectEntry } = useProjectEntry()
+const { projectMidiImport } = useProjectMidiImport()
 const route = useRoute()
 const router = useRouter()
+const toasts = useUiToastStore()
 const selection = shallowRef<ProjectSelectionRequiredResolution | null>(null)
 const failureMessage = shallowRef<string | null>(null)
+const failureCanRefresh = shallowRef(false)
 const activeAction = shallowRef<ProjectEntryAction>(null)
+const midiFileInput = shallowRef<HTMLInputElement | null>(null)
 const isLoadingProjects = shallowRef(true)
 let requestGeneration = 0
 let isUnmounted = false
@@ -60,16 +68,44 @@ const recentProjects = computed(
     ) ?? [],
 )
 const displayedFailureMessage = computed(() => failureMessage.value ?? routeNotice.value)
+const displayedFailureCanRefresh = computed(() =>
+  failureMessage.value === null ? routeNotice.value !== null : failureCanRefresh.value,
+)
 const isBusy = computed(() => isLoadingProjects.value || activeAction.value !== null)
 
-function describeFailure(failure: unknown): string {
+function describeFailure(
+  failure: unknown,
+  fallback = 'The project could not be opened. Please try again.',
+): string {
   const cause =
     typeof failure === 'object' && failure !== null && 'failureCause' in failure
       ? failure.failureCause
       : failure
 
   if (cause instanceof Error && cause.message.trim().length > 0) return cause.message
-  return 'The project could not be opened. Please try again.'
+  return fallback
+}
+
+function describeImportSummary(result: ProjectMidiImportResult): string {
+  const { importedNoteCount, importedTrackCount } = result.summary
+  const trackLabel = importedTrackCount === 1 ? 'track' : 'tracks'
+  const noteLabel = importedNoteCount === 1 ? 'note' : 'notes'
+  return `${importedTrackCount} ${trackLabel} and ${importedNoteCount} ${noteLabel} imported.`
+}
+
+function reportImportSuccess(result: ProjectMidiImportResult): void {
+  const summary = describeImportSummary(result)
+  const noticeCount = result.diagnostics.length
+  if (noticeCount === 0) {
+    toasts.success('MIDI imported', summary)
+    return
+  }
+
+  const noticeLabel = noticeCount === 1 ? 'notice was' : 'notices were'
+  toasts.warning(
+    'MIDI imported with notices',
+    `${summary} ${noticeCount} import ${noticeLabel} reported.`,
+  )
 }
 
 function formatLastSaved(timestamp: number): string {
@@ -83,6 +119,7 @@ async function loadRecentProjects(): Promise<void> {
   const generation = ++requestGeneration
   isLoadingProjects.value = true
   failureMessage.value = null
+  failureCanRefresh.value = false
 
   const resolution = await projectEntry.resolve(null)
   if (isUnmounted || generation !== requestGeneration) return
@@ -95,6 +132,7 @@ async function loadRecentProjects(): Promise<void> {
 
   if (resolution.kind === PROJECT_ENTRY_RESOLUTION_KIND.FAILED) {
     failureMessage.value = describeFailure(resolution)
+    failureCanRefresh.value = true
   }
 }
 
@@ -104,11 +142,45 @@ async function createProject(): Promise<void> {
   const generation = ++requestGeneration
   activeAction.value = Object.freeze({ kind: 'create' })
   failureMessage.value = null
+  failureCanRefresh.value = false
   try {
     await router.push(createProjectCreationLocation())
   } catch (failureCause) {
     if (!isUnmounted && generation === requestGeneration) {
       failureMessage.value = describeFailure(failureCause)
+    }
+  } finally {
+    if (!isUnmounted && generation === requestGeneration) activeAction.value = null
+  }
+}
+
+function requestMidiFile(): void {
+  if (isBusy.value) return
+  midiFileInput.value?.click()
+}
+
+async function importSelectedMidiFile(): Promise<void> {
+  const input = midiFileInput.value
+  const file = input?.files?.item(0) ?? null
+  if (input !== null) input.value = ''
+  if (file === null || isBusy.value) return
+
+  const generation = ++requestGeneration
+  activeAction.value = Object.freeze({ kind: 'import-midi' })
+  failureMessage.value = null
+  failureCanRefresh.value = false
+  try {
+    const result = await projectMidiImport.importLocalFile(file)
+    if (isUnmounted || generation !== requestGeneration) return
+
+    reportImportSuccess(result)
+    await router.push(createProjectWorkspaceLocation(result.projectId))
+  } catch (failureCause) {
+    if (!isUnmounted && generation === requestGeneration) {
+      failureMessage.value = describeFailure(
+        failureCause,
+        'The MIDI file could not be imported. Please try another file.',
+      )
     }
   } finally {
     if (!isUnmounted && generation === requestGeneration) activeAction.value = null
@@ -121,6 +193,7 @@ async function openProject(project: RecentProjectSummary): Promise<void> {
   const generation = ++requestGeneration
   activeAction.value = Object.freeze({ kind: 'open', projectId: project.projectId })
   failureMessage.value = null
+  failureCanRefresh.value = false
   try {
     await router.push(createProjectWorkspaceLocation(project.projectId))
   } catch (failureCause) {
@@ -196,18 +269,38 @@ onUnmounted(() => {
           <p class="project-entry__start-copy">
             Create a minimal project and its first recoverable checkpoint.
           </p>
-          <UiButton
-            class="project-entry__create"
-            variant="primary"
-            :busy="activeAction?.kind === 'create'"
-            :disabled="isBusy"
-            @click="createProject"
-          >
-            {{ activeAction?.kind === 'create' ? 'Creating project…' : 'Create new project' }}
-          </UiButton>
+          <div class="project-entry__start-actions">
+            <UiButton
+              class="project-entry__create"
+              variant="primary"
+              :busy="activeAction?.kind === 'create'"
+              :disabled="isBusy"
+              @click="createProject"
+            >
+              {{ activeAction?.kind === 'create' ? 'Creating project…' : 'Create new project' }}
+            </UiButton>
+            <UiButton
+              class="project-entry__import"
+              variant="secondary"
+              :busy="activeAction?.kind === 'import-midi'"
+              :disabled="isBusy"
+              @click="requestMidiFile"
+            >
+              {{ activeAction?.kind === 'import-midi' ? 'Importing MIDI…' : 'Import MIDI file' }}
+            </UiButton>
+            <input
+              ref="midiFileInput"
+              class="project-entry__file-input"
+              type="file"
+              accept=".mid,.midi,audio/midi,audio/x-midi"
+              tabindex="-1"
+              aria-hidden="true"
+              @change="importSelectedMidiFile"
+            />
+          </div>
           <p class="project-entry__local-note">
             <UiIcon :icon="LockClosedIcon" :size="16" />
-            Projects stay in this browser.
+            New and imported projects stay in this browser.
           </p>
         </aside>
       </section>
@@ -233,6 +326,7 @@ onUnmounted(() => {
           <UiIcon class="project-entry__error-icon" :icon="ErrorCircleIcon" :size="20" />
           <span>{{ displayedFailureMessage }}</span>
           <UiButton
+            v-if="displayedFailureCanRefresh"
             class="project-entry__retry"
             size="small"
             variant="ghost"
@@ -514,9 +608,24 @@ onUnmounted(() => {
   line-height: var(--sd-line-height-relaxed);
 }
 
-.project-entry__create {
+.project-entry__start-actions {
+  display: grid;
+  gap: var(--sd-space-2);
+}
+
+.project-entry__create,
+.project-entry__import {
   inline-size: 100%;
   min-block-size: calc(var(--sd-control-height-md) + var(--sd-space-2));
+}
+
+.project-entry__file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .project-entry__local-note {

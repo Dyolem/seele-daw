@@ -42,6 +42,11 @@ import {
   PROJECT_ENTRY_CONTEXT_KEY,
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'
+import type { ProjectMidiImportCoordinator } from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import {
+  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
+  type ProjectMidiImportVueContext,
+} from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
   type ProjectNavigationDecisionVueContext,
@@ -102,6 +107,14 @@ function createProjectEntryContext(readyProjectId: ProjectId | null): ProjectEnt
           recentProjects: Object.freeze([]),
         })
       }),
+    }),
+  })
+}
+
+function createProjectMidiImportContext(): ProjectMidiImportVueContext {
+  return Object.freeze({
+    projectMidiImport: Object.freeze({
+      importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
     }),
   })
 }
@@ -212,6 +225,7 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
         [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(state),
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: createProjectClipContext(),
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
+        [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: createProjectMidiImportContext(),
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
           createProjectNavigationDecisionContext(),
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: createProjectPlaybackContext(),

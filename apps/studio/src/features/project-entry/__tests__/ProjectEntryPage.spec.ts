@@ -1,10 +1,12 @@
 import { parseProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import ProjectEntryPage from '@/features/project-entry/ProjectEntryPage.vue'
 import { PROJECT_ROUTE_NAME, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   PROJECT_ENTRY_FAILURE_OPERATION,
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -16,11 +18,40 @@ import {
   PROJECT_ENTRY_CONTEXT_KEY,
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'
+import type {
+  ProjectMidiImportCoordinator,
+  ProjectMidiImportResult,
+} from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import {
+  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
+  type ProjectMidiImportVueContext,
+} from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import type { RecentProjectSummary } from '@/workbench/project/project-catalog-reader'
 
 interface PageFixture {
+  readonly importLocalFile: ReturnType<
+    typeof vi.fn<ProjectMidiImportCoordinator['importLocalFile']>
+  >
   readonly projectEntryContext: ProjectEntryVueContext
+  readonly projectMidiImportContext: ProjectMidiImportVueContext
   readonly resolve: ReturnType<typeof vi.fn<ProjectEntryCoordinator['resolve']>>
+}
+
+function createImportResult(
+  overrides: Partial<ProjectMidiImportResult> = {},
+): ProjectMidiImportResult {
+  return Object.freeze({
+    projectId: parseProjectId('project-entry-imported-midi'),
+    diagnostics: Object.freeze([]),
+    summary: Object.freeze({
+      sourceFormat: 1,
+      sourcePpq: 480,
+      sourceTrackCount: 2,
+      importedTrackCount: 2,
+      importedNoteCount: 24,
+    }),
+    ...overrides,
+  })
 }
 
 function createProject(suffix: string, lastCheckpointSavedAt: number): RecentProjectSummary {
@@ -44,10 +75,17 @@ function createFixture(
   initialResolution: ProjectEntryResolution = createSelection([]),
 ): PageFixture {
   const resolve = vi.fn<ProjectEntryCoordinator['resolve']>(async () => initialResolution)
+  const importLocalFile = vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(async () =>
+    createImportResult(),
+  )
 
   return {
+    importLocalFile,
     projectEntryContext: Object.freeze({
       projectEntry: Object.freeze({ resolve }),
+    }),
+    projectMidiImportContext: Object.freeze({
+      projectMidiImport: Object.freeze({ importLocalFile }),
     }),
     resolve,
   }
@@ -81,16 +119,33 @@ async function createPageRouter(initialLocation = '/'): Promise<Router> {
 
 async function mountPage(fixture: PageFixture, initialLocation = '/') {
   const router = await createPageRouter(initialLocation)
+  const pinia = createPinia()
   const wrapper = mount(ProjectEntryPage, {
     global: {
-      plugins: [router],
+      plugins: [pinia, router],
       provide: {
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
+        [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: fixture.projectMidiImportContext,
       },
     },
   })
 
-  return { router, wrapper }
+  return { pinia, router, wrapper }
+}
+
+async function selectMidiFile(
+  wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'],
+  file: File,
+): Promise<void> {
+  const input = wrapper.get<HTMLInputElement>('.project-entry__file-input')
+  Object.defineProperty(input.element, 'files', {
+    configurable: true,
+    value: {
+      item: (index: number) => (index === 0 ? file : null),
+      length: 1,
+    },
+  })
+  await input.trigger('change')
 }
 
 describe('ProjectEntryPage', () => {
@@ -117,6 +172,62 @@ describe('ProjectEntryPage', () => {
 
     expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.CREATE)
     expect(fixture.resolve).toHaveBeenCalledExactlyOnceWith(null)
+  })
+
+  it('imports one selected MIDI file, opens its clean Project, and summarizes diagnostics', async () => {
+    const fixture = createFixture()
+    fixture.importLocalFile.mockResolvedValueOnce(
+      createImportResult({
+        diagnostics: Object.freeze([
+          Object.freeze({
+            code: 'program-not-applied',
+            message: 'The source program was retained only as an import diagnostic.',
+            sourceTrackIndex: 0,
+            sourceProgramNumber: 40,
+          }),
+        ]),
+      }),
+    )
+    const { pinia, router, wrapper } = await mountPage(fixture)
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('.project-entry__file-input')
+    const clickFileInput = vi.spyOn(input.element, 'click').mockImplementation(() => undefined)
+
+    expect(input.attributes('accept')).toBe('.mid,.midi,audio/midi,audio/x-midi')
+    await wrapper.get('.project-entry__import').trigger('click')
+    expect(clickFileInput).toHaveBeenCalledOnce()
+    clickFileInput.mockRestore()
+
+    const file = new File([new Uint8Array([0x4d, 0x54, 0x68, 0x64])], 'song.mid', {
+      type: 'audio/midi',
+    })
+    await selectMidiFile(wrapper, file)
+    await flushPromises()
+
+    expect(fixture.importLocalFile).toHaveBeenCalledExactlyOnceWith(file)
+    expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.WORKSPACE)
+    expect(router.currentRoute.value.params.projectId).toBe('project-entry-imported-midi')
+    expect(useUiToastStore(pinia).message).toMatchObject({
+      tone: 'warning',
+      title: 'MIDI imported with notices',
+      description: '2 tracks and 24 notes imported. 1 import notice was reported.',
+    })
+  })
+
+  it('keeps a blocking MIDI import failure on Project Entry without creating a success notice', async () => {
+    const fixture = createFixture()
+    fixture.importLocalFile.mockRejectedValueOnce(new Error('SMF Type 2 is not supported.'))
+    const { pinia, router, wrapper } = await mountPage(fixture)
+    await flushPromises()
+
+    await selectMidiFile(wrapper, new File([], 'unsupported.mid', { type: 'audio/midi' }))
+    await flushPromises()
+
+    expect(wrapper.get('.project-entry__error > span').text()).toBe('SMF Type 2 is not supported.')
+    expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.ENTRY)
+    expect(wrapper.get('.project-entry__import').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('.project-entry__retry').exists()).toBe(false)
+    expect(useUiToastStore(pinia).message).toBeNull()
   })
 
   it('renders recent Projects and navigates to the selected Project Route', async () => {

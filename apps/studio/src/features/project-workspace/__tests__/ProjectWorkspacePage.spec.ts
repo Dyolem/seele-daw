@@ -1,3 +1,5 @@
+import type { MidiFileDocument } from '@seele-daw/midi-file'
+import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 import {
   createInitialProjectSession,
   parseClipId,
@@ -10,6 +12,7 @@ import {
   type ProjectId,
   type ProjectSession,
 } from '@seele-daw/project-core'
+import { createProjectMidiImportDraft } from '@seele-daw/project-midi'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowReadonly, shallowRef, type ShallowRef } from 'vue'
@@ -306,6 +309,54 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
     expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_000)
+  })
+
+  it('extends the Ruler and Arrangement to the exact end of a long imported MIDI song', async () => {
+    const document: MidiFileDocument = {
+      format: 1,
+      name: 'Long Imported Song',
+      ppq: 960,
+      tempos: [{ tick: 0, bpm: 120 }],
+      timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
+      keySignatures: [],
+      textEvents: [],
+      tracks: [
+        {
+          name: 'Piano',
+          channel: 0,
+          programNumber: 0,
+          notes: [
+            {
+              tick: 576_000,
+              durationTicks: 960,
+              pitch: 60,
+              velocity: 100,
+              releaseVelocity: 0,
+            },
+          ],
+          controlChanges: [],
+          pitchBends: [],
+        },
+      ],
+    }
+    const imported = createProjectMidiImportDraft({
+      document,
+      createId: ({ kind, ordinal }) => `long-import-${kind}-${ordinal}`,
+      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+    })
+    const projectId = imported.session.getSnapshot().project.id
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId, imported.session),
+    )
+
+    const { wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+
+    expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_960)
+    const rulerBars = wrapper.findAll('.project-workbench__ruler li')
+    expect(rulerBars).toHaveLength(151)
+    expect(rulerBars[150]?.text()).toBe('151')
   })
 
   it('renders Transport time from the shared visual position source', async () => {

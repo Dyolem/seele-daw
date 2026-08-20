@@ -1,3 +1,7 @@
+import { ToneJsMidiFileDecoder, type MidiFileDecoder } from '@seele-daw/midi-file'
+import { BrowserLocalFileByteReader, type LocalFileByteReader } from '@seele-daw/platform-browser'
+import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
+import type { ProjectMidiImportIdFactory } from '@seele-daw/project-midi'
 import { createPinia } from 'pinia'
 import {
   createApp,
@@ -33,6 +37,11 @@ import {
 import { PROJECT_ENTRY_CONTEXT_KEY } from '@/workbench/project/entry/vue/project-entry-context'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import { PROJECT_MIDI_NOTE_CONTEXT_KEY } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import {
+  createProjectMidiImportCoordinator,
+  type ProjectMidiImportCoordinator,
+} from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import { PROJECT_MIDI_IMPORT_CONTEXT_KEY } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   createProjectNavigationConfirmationCoordinator,
   type ProjectNavigationConfirmationCoordinator,
@@ -77,8 +86,11 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
   /** Ownership transfers to the composed application. */
   readonly projectRuntime: BrowserActiveProjectRuntime
   readonly createProjectEntityId?: () => string
+  readonly createProjectMidiImportId?: ProjectMidiImportIdFactory
   readonly createRandomValue?: () => number
   readonly keyboardBindingRegistry?: StudioKeyboardBindingRegistry
+  readonly midiFileDecoder?: MidiFileDecoder
+  readonly midiFileReader?: LocalFileByteReader
   readonly projectPlaybackRuntime?: ProjectPlaybackRuntimePort
   readonly projectPlaybackTimer?: ProjectPlaybackTimerPort
   readonly projectPlaybackVisualFrame?: ProjectPlaybackVisualFramePort
@@ -86,6 +98,7 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
 
 export interface StudioApplication {
   readonly projectEntry: ProjectEntryCoordinator
+  readonly projectMidiImport: ProjectMidiImportCoordinator
   readonly projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator
   mount(rootContainer: Element | string): ComponentPublicInstance
   dispose(): void
@@ -93,6 +106,7 @@ export interface StudioApplication {
 
 class StudioApplicationImpl implements StudioApplication {
   readonly projectEntry: ProjectEntryCoordinator
+  readonly projectMidiImport: ProjectMidiImportCoordinator
   readonly projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator
   readonly #vueApplication: VueApplication
   readonly #projectRuntime: BrowserActiveProjectRuntime
@@ -116,6 +130,7 @@ class StudioApplicationImpl implements StudioApplication {
     projectNavigationGuardDispose: ProjectNavigationGuardDispose,
     keyboardShortcuts: StudioKeyboardShortcutCoordinator,
     projectEntry: ProjectEntryCoordinator,
+    projectMidiImport: ProjectMidiImportCoordinator,
     projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator,
   ) {
     this.#vueApplication = vueApplication
@@ -127,6 +142,7 @@ class StudioApplicationImpl implements StudioApplication {
     this.#projectNavigationGuardDispose = projectNavigationGuardDispose
     this.#keyboardShortcuts = keyboardShortcuts
     this.projectEntry = projectEntry
+    this.projectMidiImport = projectMidiImport
     this.projectNavigationConfirmation = projectNavigationConfirmation
   }
 
@@ -218,6 +234,13 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       projectCatalog: projectRuntime.projectCatalog,
     })
+    const projectMidiImport = createProjectMidiImportCoordinator({
+      activeProject: projectRuntime.activeProject,
+      createId: composition.createProjectMidiImportId ?? (() => createBrowserProjectEntityId()),
+      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      decoder: composition.midiFileDecoder ?? new ToneJsMidiFileDecoder(),
+      fileReader: composition.midiFileReader ?? new BrowserLocalFileByteReader(),
+    })
     const projectNavigationConfirmation = createProjectNavigationConfirmationCoordinator({
       activeProject: projectRuntime.activeProject,
       requestDecision: projectNavigationDecisionBinding.requestDecision,
@@ -266,6 +289,7 @@ export function composeStudioApplication(
 
     vueApplication.provide(ACTIVE_PROJECT_CONTEXT_KEY, activeProjectBinding.context)
     vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
+    vueApplication.provide(PROJECT_MIDI_IMPORT_CONTEXT_KEY, Object.freeze({ projectMidiImport }))
     vueApplication.provide(PROJECT_TRACK_CONTEXT_KEY, Object.freeze({ projectTracks }))
     vueApplication.provide(PROJECT_CLIP_CONTEXT_KEY, Object.freeze({ projectClips }))
     vueApplication.provide(PROJECT_MIDI_NOTE_CONTEXT_KEY, Object.freeze({ projectMidiNotes }))
@@ -292,6 +316,7 @@ export function composeStudioApplication(
       projectNavigationGuardDispose,
       keyboardShortcuts,
       projectEntry,
+      projectMidiImport,
       projectNavigationConfirmation,
     )
   } catch (failureCause) {

@@ -1,7 +1,10 @@
+import type { MidiFileDecoder, MidiFileDocument } from '@seele-daw/midi-file'
+import type { LocalFileByteReader } from '@seele-daw/platform-browser'
 import { defineStore } from 'pinia'
 import { defineComponent, h, onUnmounted } from 'vue'
 import { createMemoryHistory, createRouter, useRouter, type Router } from 'vue-router'
 import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
+import { decodeStudioGrandDeviceState } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
@@ -31,6 +34,10 @@ import {
   useProjectMidiNotes,
   type ProjectMidiNoteVueContext,
 } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import {
+  useProjectMidiImport,
+  type ProjectMidiImportVueContext,
+} from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import type {
   ProjectPlaybackRuntimePort,
   ProjectPlaybackTimerPort,
@@ -57,6 +64,7 @@ import {
 import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
 interface RuntimeFixture {
+  readonly createFromSession: ReturnType<typeof vi.fn<ActiveProjectService['createFromSession']>>
   readonly runtime: BrowserActiveProjectRuntime
   readonly open: ReturnType<typeof vi.fn<(projectId: ProjectId) => Promise<void>>>
   readonly listRecentProjects: ReturnType<
@@ -99,10 +107,13 @@ function createRuntimeFixture(
     BrowserActiveProjectRuntime['projectCatalog']['listRecentProjects']
   >(() => Promise.resolve([]))
   const save = vi.fn<() => Promise<void>>(() => Promise.resolve())
+  const createFromSession = vi.fn<ActiveProjectService['createFromSession']>((session) =>
+    Promise.resolve(session.getSnapshot().project.id),
+  )
   const activeProject: ActiveProjectService = {
     state,
     create: () => Promise.resolve(parseProjectId('studio-created-project')),
-    createFromSession: (session) => Promise.resolve(session.getSnapshot().project.id),
+    createFromSession,
     open,
     save,
     subscribe: () => {
@@ -120,6 +131,7 @@ function createRuntimeFixture(
   })
 
   return {
+    createFromSession,
     runtime: {
       activeProject,
       projectCatalog: { listRecentProjects },
@@ -186,6 +198,15 @@ function requireProjectMidiNoteContext(
   return context
 }
 
+function requireProjectMidiImportContext(
+  context: ProjectMidiImportVueContext | null,
+): ProjectMidiImportVueContext {
+  if (context === null) {
+    throw new Error('Expected the Project MIDI Import Context')
+  }
+  return context
+}
+
 function requireKeyboardShortcutContext(
   context: StudioKeyboardShortcutVueContext | null,
 ): StudioKeyboardShortcutVueContext {
@@ -226,6 +247,7 @@ describe('StudioApplication', () => {
     })
     let projectEntryContext: ProjectEntryVueContext | null = null
     let projectClipContext: ProjectClipVueContext | null = null
+    let projectMidiImportContext: ProjectMidiImportVueContext | null = null
     let projectMidiNoteContext: ProjectMidiNoteVueContext | null = null
     let projectTrackContext: ProjectTrackVueContext | null = null
     let keyboardShortcutContext: StudioKeyboardShortcutVueContext | null = null
@@ -235,6 +257,7 @@ describe('StudioApplication', () => {
         const activeProject = useActiveProject()
         projectEntryContext = useProjectEntry()
         projectClipContext = useProjectClips()
+        projectMidiImportContext = useProjectMidiImport()
         projectMidiNoteContext = useProjectMidiNotes()
         projectTrackContext = useProjectTracks()
         keyboardShortcutContext = useStudioKeyboardShortcuts()
@@ -267,6 +290,9 @@ describe('StudioApplication', () => {
       application.projectEntry,
     )
     expect(Object.isFrozen(requireProjectClipContext(projectClipContext).projectClips)).toBe(true)
+    expect(requireProjectMidiImportContext(projectMidiImportContext).projectMidiImport).toBe(
+      application.projectMidiImport,
+    )
     expect(
       Object.isFrozen(requireProjectMidiNoteContext(projectMidiNoteContext).projectMidiNotes),
     ).toBe(true)
@@ -413,6 +439,57 @@ describe('StudioApplication', () => {
     expect(resolution).toEqual({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId })
     expect(fixture.open).toHaveBeenCalledExactlyOnceWith(projectId)
     expect(fixture.listRecentProjects).not.toHaveBeenCalled()
+    application.dispose()
+  })
+
+  it('composes local MIDI bytes into a validated Project with the default Studio Grand', async () => {
+    const fixture = createRuntimeFixture()
+    const bytes = new Uint8Array([0x4d, 0x54, 0x68, 0x64])
+    const document: MidiFileDocument = {
+      format: 1,
+      name: 'Composed Import',
+      ppq: 960,
+      tempos: [{ tick: 0, bpm: 120 }],
+      timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
+      keySignatures: [],
+      textEvents: [],
+      tracks: [
+        {
+          name: 'Piano',
+          channel: 0,
+          programNumber: 0,
+          notes: [{ tick: 0, durationTicks: 960, pitch: 60, velocity: 100, releaseVelocity: 0 }],
+          controlChanges: [],
+          pitchBends: [],
+        },
+      ],
+    }
+    const read = vi.fn<LocalFileByteReader['read']>(async () => bytes)
+    const decode = vi.fn<MidiFileDecoder['decode']>(() => document)
+    const application = composeStudioApplication({
+      rootComponent: { render: () => null },
+      router: createTestRouter(),
+      projectRuntime: fixture.runtime,
+      createProjectMidiImportId: ({ kind, ordinal }) => `composed-import-${kind}-${ordinal}`,
+      midiFileDecoder: { decode },
+      midiFileReader: { read },
+      ...createCompositionOptions(),
+    })
+    const file = new File([bytes], 'composition.mid', { type: 'audio/midi' })
+
+    const result = await application.projectMidiImport.importLocalFile(file)
+
+    expect(read).toHaveBeenCalledExactlyOnceWith(file)
+    expect(decode).toHaveBeenCalledExactlyOnceWith(bytes)
+    expect(result.projectId).toBe('composed-import-project-0')
+    expect(fixture.createFromSession).toHaveBeenCalledOnce()
+    const importedSession = fixture.createFromSession.mock.calls[0]?.[0]
+    if (importedSession === undefined) throw new Error('Expected the imported Project Session')
+    const importedDevice = importedSession.getSnapshot().devices[0]
+    if (importedDevice === undefined) throw new Error('Expected the imported Instrument Device')
+    expect(decodeStudioGrandDeviceState(importedDevice)).toEqual({
+      soundbankId: 'studio-grand',
+    })
     application.dispose()
   })
 

@@ -22,9 +22,11 @@
   "dependencies": {
     "@seele-daw/audio-web": "workspace:*",
     "@seele-daw/editor": "workspace:*",
+    "@seele-daw/midi-file": "workspace:*",
     "@seele-daw/platform-browser": "workspace:*",
     "@seele-daw/playback": "workspace:*",
     "@seele-daw/project-core": "workspace:*",
+    "@seele-daw/project-midi": "workspace:*",
     "@seele-daw/type-utils": "workspace:*",
     "@tanstack/hotkeys": "0.8.0",
     "pinia": "^3.0.4",

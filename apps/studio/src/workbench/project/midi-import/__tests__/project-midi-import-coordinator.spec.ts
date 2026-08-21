@@ -1,5 +1,10 @@
 import type { MidiFileDecoder, MidiFileDocument } from '@seele-daw/midi-file'
-import { parseProjectId } from '@seele-daw/project-core'
+import {
+  createInitialProjectSession,
+  parseProjectId,
+  parseTempoEventId,
+  parseTimeSignatureEventId,
+} from '@seele-daw/project-core'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
 import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 import type {
@@ -12,6 +17,16 @@ import {
   createProjectMidiImportCoordinator,
   type ProjectMidiImportCoordinatorDependencies,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import {
+  ControlledProjectCheckpointStore,
+  createCheckpointIdFactory,
+} from '@/workbench/project/__tests__/active-project-test-support'
+import { createActiveProjectService } from '@/workbench/project/active-project-service'
+import {
+  ACTIVE_PROJECT_PHASE,
+  ACTIVE_PROJECT_SAVE_STATUS,
+  type ActiveProjectState,
+} from '@/workbench/project/active-project-state'
 import {
   PROJECT_NAVIGATION_CONFIRMATION_FAILURE_OPERATION,
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
@@ -54,6 +69,25 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
   const createFromSession = vi.fn<
     ProjectMidiImportCoordinatorDependencies['activeProject']['createFromSession']
   >(async (session) => session.getSnapshot().project.id)
+  const activeSession = createInitialProjectSession({
+    projectId: parseProjectId('current-project'),
+    projectName: 'Current Project',
+    tempoEventId: parseTempoEventId('current-tempo'),
+    timeSignatureEventId: parseTimeSignatureEventId('current-meter'),
+  })
+  let activeState: ActiveProjectState = Object.freeze({
+    phase: ACTIVE_PROJECT_PHASE.READY,
+    projectId: activeSession.getSnapshot().project.id,
+    session: activeSession,
+    modelRevision: activeSession.modelRevision,
+    contentStateId: activeSession.contentStateId,
+    savedRevision: activeSession.modelRevision,
+    savedContentStateId: activeSession.contentStateId,
+    isDirty: false,
+    saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    saveFailure: null,
+    recoveryFailures: Object.freeze([]),
+  })
   const confirm = vi.fn<ProjectNavigationConfirmationCoordinator['confirm']>(async () =>
     Object.freeze({
       activeProjectId: null,
@@ -62,7 +96,12 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
     }),
   )
   const coordinator = createProjectMidiImportCoordinator({
-    activeProject: { createFromSession },
+    activeProject: {
+      get state() {
+        return activeState
+      },
+      createFromSession,
+    },
     createId,
     createInstrumentDevice,
     decoder: { decode },
@@ -71,6 +110,7 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
   })
 
   return {
+    activeSession,
     bytes,
     confirm,
     coordinator,
@@ -79,6 +119,9 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
     createInstrumentDevice,
     decode,
     read,
+    setActiveState(nextState: ActiveProjectState) {
+      activeState = nextState
+    },
   }
 }
 
@@ -132,6 +175,95 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(fixture.confirm.mock.invocationCallOrder[0]).toBeLessThan(
       fixture.createFromSession.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     )
+  })
+
+  it('appends imported Tracks to the ready Session without replacing its timeline or lifecycle', async () => {
+    const fixture = createFixture()
+    const before = fixture.activeSession.getSnapshot()
+    const file = new File([fixture.bytes], 'Current Tracks.mid', { type: 'audio/midi' })
+
+    const result = await fixture.coordinator.importLocalFileAsNewTracks(file)
+    const after = fixture.activeSession.getSnapshot()
+
+    expect(fixture.read).toHaveBeenCalledExactlyOnceWith(file)
+    expect(fixture.decode).toHaveBeenCalledExactlyOnceWith(fixture.bytes)
+    expect(fixture.createFromSession).not.toHaveBeenCalled()
+    expect(fixture.confirm).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      projectId: before.project.id,
+      importedTrackIds: ['track-0'],
+      summary: { importedTrackCount: 1, importedNoteCount: 1 },
+    })
+    expect(after.project).toBe(before.project)
+    expect(after.tempoEvents).toEqual(before.tempoEvents)
+    expect(after.timeSignatureEvents).toEqual(before.timeSignatureEvents)
+    expect(after.trackOrder).toEqual(['track-0'])
+    expect(after.modelRevision).toBe(before.modelRevision + 1)
+    expect(fixture.activeSession.canUndo).toBe(true)
+
+    fixture.activeSession.undo()
+    expect(fixture.activeSession.getSnapshot().trackOrder).toEqual([])
+  })
+
+  it('lets ActiveProject derive dirty and return to its save point after one Undo', async () => {
+    const session = createInitialProjectSession({
+      projectId: parseProjectId('active-current-project'),
+      projectName: 'Active Current Project',
+      tempoEventId: parseTempoEventId('active-current-tempo'),
+      timeSignatureEventId: parseTimeSignatureEventId('active-current-meter'),
+    })
+    const activeProject = createActiveProjectService({
+      checkpointStore: new ControlledProjectCheckpointStore(),
+      createCheckpointId: createCheckpointIdFactory('midi-track-import-checkpoint'),
+      createNewSession: () => session,
+      createProjectId: () => parseProjectId('unused-created-project'),
+    })
+    await activeProject.createFromSession(session)
+    const document = createMidiDocument()
+    const bytes = new Uint8Array([0x4d, 0x54, 0x68, 0x64])
+    const coordinator = createProjectMidiImportCoordinator({
+      activeProject,
+      createId: ({ kind, ordinal }) => `active-import-${kind}-${ordinal}`,
+      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      decoder: { decode: () => document },
+      fileReader: { read: async () => bytes },
+      navigationConfirmation: {
+        confirm: vi.fn<ProjectNavigationConfirmationCoordinator['confirm']>(),
+      },
+    })
+
+    await coordinator.importLocalFileAsNewTracks(new File([bytes], 'active-tracks.mid'))
+    await Promise.resolve()
+
+    expect(activeProject.state).toMatchObject({
+      phase: ACTIVE_PROJECT_PHASE.READY,
+      isDirty: true,
+      modelRevision: 1,
+    })
+    expect(session.canUndo).toBe(true)
+
+    session.undo()
+    await Promise.resolve()
+    expect(activeProject.state).toMatchObject({
+      phase: ACTIVE_PROJECT_PHASE.READY,
+      isDirty: false,
+      modelRevision: 2,
+    })
+    activeProject.dispose()
+  })
+
+  it('rechecks the latest Active Project after file decoding before appending Tracks', async () => {
+    const fixture = createFixture()
+    fixture.read.mockImplementationOnce(async () => {
+      fixture.setActiveState(Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE }))
+      return fixture.bytes
+    })
+
+    await expect(
+      fixture.coordinator.importLocalFileAsNewTracks(new File([], 'stale-target.mid')),
+    ).rejects.toThrow('only be imported while a Project is ready')
+    expect(fixture.decode).toHaveBeenCalledOnce()
+    expect(fixture.activeSession.getSnapshot().trackOrder).toEqual([])
   })
 
   it('does not create a Project when validated Workbench replacement is cancelled', async () => {

@@ -1,5 +1,12 @@
 import type { MidiFileDocument, MidiFileTrack } from '@seele-daw/midi-file'
-import type { DeviceDescriptor, DeviceId, ProjectSession } from '@seele-daw/project-core'
+import type {
+  AddInstrumentTrackCollectionCommand,
+  DeviceDescriptor,
+  DeviceId,
+  ModelRevision,
+  ProjectSession,
+  TrackId,
+} from '@seele-daw/project-core'
 
 export const PROJECT_MIDI_IMPORT_ENTITY_KIND = {
   PROJECT: 'project',
@@ -88,6 +95,22 @@ export interface ProjectMidiImportDraft {
 export interface CreateProjectMidiImportDraftInput {
   readonly document: MidiFileDocument
   readonly projectName?: string
+  readonly createId: ProjectMidiImportIdFactory
+  readonly createInstrumentDevice: ProjectMidiInstrumentDeviceFactory
+}
+
+/** A pending atomic append operation for an already active Project Session. */
+export interface ProjectMidiTrackImportDraft {
+  readonly command: AddInstrumentTrackCollectionCommand
+  readonly importedTrackIds: readonly TrackId[]
+  readonly diagnostics: readonly ProjectMidiImportDiagnostic[]
+  readonly summary: ProjectMidiImportSummary
+}
+
+export interface CreateProjectMidiTrackImportDraftInput {
+  readonly document: MidiFileDocument
+  readonly baseRevision: ModelRevision
+  readonly insertAt: number
   readonly createId: ProjectMidiImportIdFactory
   readonly createInstrumentDevice: ProjectMidiInstrumentDeviceFactory
 }

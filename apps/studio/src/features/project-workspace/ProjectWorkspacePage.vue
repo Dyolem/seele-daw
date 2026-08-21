@@ -48,7 +48,10 @@ import {
   type FailedProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
-import { reportProjectMidiImportSuccess } from '@/workbench/project/midi-import/project-midi-import-feedback'
+import {
+  reportProjectMidiImportSuccess,
+  reportProjectMidiTrackImportSuccess,
+} from '@/workbench/project/midi-import/project-midi-import-feedback'
 import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
@@ -91,6 +94,7 @@ const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
 const isImportingMidi = shallowRef(false)
 const midiFileInput = shallowRef<HTMLInputElement | null>(null)
+const midiImportTarget = shallowRef<'new-project' | 'new-tracks' | null>(null)
 const projectPresentation = shallowRef<ProjectPresentation>({
   barSpanTick: DEFAULT_BAR_SPAN_TICK,
   projectId: null,
@@ -233,25 +237,39 @@ function describeMidiImportFailure(failureCause: unknown): string {
   return 'The MIDI file could not be imported. Please try another file.'
 }
 
-function requestMidiFile(): void {
+function requestMidiFile(target: 'new-project' | 'new-tracks'): void {
   if (readyProject.value === null || isImportingMidi.value) return
+  midiImportTarget.value = target
   midiFileInput.value?.click()
 }
 
 async function importSelectedMidiFile(): Promise<void> {
   const input = midiFileInput.value
   const file = input?.files?.item(0) ?? null
+  const target = midiImportTarget.value
+  midiImportTarget.value = null
   if (input !== null) input.value = ''
-  if (file === null || readyProject.value === null || isImportingMidi.value) return
+  if (file === null || target === null || readyProject.value === null || isImportingMidi.value) {
+    return
+  }
 
   const generation = ++midiImportGeneration
   isImportingMidi.value = true
   try {
-    const result = await projectMidiImport.importLocalFileReplacingActiveProject(file)
-    if (isUnmounted || generation !== midiImportGeneration || result === null) return
+    if (target === 'new-project') {
+      const result = await projectMidiImport.importLocalFileReplacingActiveProject(file)
+      if (isUnmounted || generation !== midiImportGeneration || result === null) return
 
-    reportProjectMidiImportSuccess(toasts, result)
-    await router.push(createProjectWorkspaceLocation(result.projectId))
+      reportProjectMidiImportSuccess(toasts, result)
+      await router.push(createProjectWorkspaceLocation(result.projectId))
+    } else {
+      const result = await projectMidiImport.importLocalFileAsNewTracks(file)
+      if (isUnmounted || generation !== midiImportGeneration) return
+
+      const firstTrackId = result.importedTrackIds[0]
+      if (firstTrackId !== undefined) workbenchSelection.selectTrack(firstTrackId)
+      reportProjectMidiTrackImportSuccess(toasts, result)
+    }
   } catch (failureCause) {
     if (!isUnmounted && generation === midiImportGeneration) {
       toasts.danger('MIDI could not be imported', describeMidiImportFailure(failureCause))
@@ -418,6 +436,7 @@ onUnmounted(() => {
   isUnmounted = true
   requestGeneration += 1
   midiImportGeneration += 1
+  midiImportTarget.value = null
   const projectId = requestedProjectId.value
   if (projectId !== null) workbenchSelection.leaveProject(projectId)
 })
@@ -459,7 +478,8 @@ onUnmounted(() => {
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
     :timeline-end-tick="timelineEndTick"
     :tracks="trackPresentations"
-    @import-midi="requestMidiFile"
+    @import-midi-as-new-project="requestMidiFile('new-project')"
+    @import-midi-as-new-tracks="requestMidiFile('new-tracks')"
     @leave-project="router.push(createProjectEntryLocation())"
     @playback-return-to-last-start-position="projectPlayback.returnToLastStartPosition()"
     @playback-toggle="projectPlayback.togglePlayPause()"

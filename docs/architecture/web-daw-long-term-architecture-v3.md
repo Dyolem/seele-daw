@@ -4,7 +4,7 @@
 > 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
-> 最近实现校准：2026-08-20\
+> 最近实现校准：2026-08-21\
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
@@ -324,7 +324,9 @@ flowchart TD
 Document，或执行反向编码。第三方 Parser / Writer 类型不得穿过 package root；Project Track、
 Clip 与 PPQ 960 换算由 `project-midi` 负责，不能反向进入 Codec。`project-midi` 只依赖中立
 Document 与 Project Core 公开边界，不拥有 Browser File、Active Project 生命周期或 Studio Grand
-选择；Studio Composition Root 注入默认 Device 工厂。
+选择；Studio Composition Root 注入默认 Device 工厂。新项目导入由 bridge 产出可加载 Session；
+当前项目 Track 导入由 bridge 产出一个通用 Project Core 集合 Command。后者只携带 Track 内容图，
+不读取或替换目标 Project 的身份、Tempo 与拍号。
 
 ### 8.2 拆包规则
 

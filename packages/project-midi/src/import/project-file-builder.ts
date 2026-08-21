@@ -1,10 +1,8 @@
 import {
   PROJECT_FILE_FORMAT_VERSION,
-  parseDeviceId,
   type DeviceDTO,
-  type DeviceDescriptor,
+  type InstrumentTrackCollectionEntry,
   type JsonValue,
-  type MidiNoteDTO,
   type ProjectFileDTO,
 } from '@seele-daw/project-core'
 import {
@@ -13,7 +11,6 @@ import {
   type CreateProjectMidiImportDraftInput,
   type ProjectMidiImportDiagnostic,
 } from '#internal/import/project-midi-import-contract'
-import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 import {
   createDiagnostic,
   createRecordTable,
@@ -22,6 +19,7 @@ import {
   setRecord,
 } from '#internal/import/import-support'
 import { createTempoEvents, createTimeSignatureEvents } from '#internal/import/timeline-mapper'
+import { createImportedTrackCollection } from '#internal/import/track-collection-builder'
 import type { MappedTrack } from '#internal/import/track-mapper'
 
 const DEFAULT_PROJECT_NAME = 'Imported MIDI'
@@ -46,51 +44,13 @@ function selectProjectName(
   return importedName
 }
 
-function copyDeviceParameters(descriptor: DeviceDescriptor): Readonly<Record<string, JsonValue>> {
+function copyDeviceParameters(descriptor: DeviceDTO): Readonly<Record<string, JsonValue>> {
   const parameters = createRecordTable<JsonValue>()
   for (const [id, value] of Object.entries(descriptor.parameters)) setRecord(parameters, id, value)
   return parameters
 }
 
-function createInstrumentDevice(
-  input: CreateProjectMidiImportDraftInput,
-  mappedTrack: MappedTrack,
-  deviceId: string,
-): DeviceDTO {
-  const parsedDeviceId = parseDeviceId(deviceId)
-  let descriptor: DeviceDescriptor
-  try {
-    descriptor = input.createInstrumentDevice(
-      Object.freeze({
-        id: parsedDeviceId,
-        sourceTrack: mappedTrack.sourceTrack,
-        sourceTrackIndex: mappedTrack.sourceTrackIndex,
-        importedTrackIndex: mappedTrack.importedTrackIndex,
-      }),
-    )
-    if (descriptor === null || typeof descriptor !== 'object') {
-      throw new TypeError('Instrument device factory must return a DeviceDescriptor')
-    }
-  } catch (cause) {
-    throw new ProjectMidiImportError(
-      'instrument-device-factory-failed',
-      `The instrument device factory failed for MIDI track ${mappedTrack.sourceTrackIndex}.`,
-      { sourceTrackIndex: mappedTrack.sourceTrackIndex },
-      { cause },
-    )
-  }
-
-  if (descriptor.id !== parsedDeviceId) {
-    throw new ProjectMidiImportError(
-      'instrument-device-factory-failed',
-      'The instrument device factory returned a descriptor with a different ID.',
-      {
-        entityKind: PROJECT_MIDI_IMPORT_ENTITY_KIND.DEVICE,
-        sourceTrackIndex: mappedTrack.sourceTrackIndex,
-        value: descriptor.id,
-      },
-    )
-  }
+function createInstrumentDeviceDto(descriptor: DeviceDTO): DeviceDTO {
   return {
     id: descriptor.id,
     typeId: descriptor.typeId,
@@ -109,65 +69,29 @@ interface ProjectFileCollections {
   readonly devices: Record<string, ProjectFileDTO['devices'][string]>
 }
 
-function addMappedTracks(
-  input: CreateProjectMidiImportDraftInput,
-  mappedTracks: readonly MappedTrack[],
-  allocator: ImportIdAllocator,
+function addTrackCollection(
+  entries: readonly InstrumentTrackCollectionEntry[],
   collections: ProjectFileCollections,
 ): void {
-  for (const mappedTrack of mappedTracks) {
-    const context = { sourceTrackIndex: mappedTrack.sourceTrackIndex }
-    const trackId = allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.TRACK, context)
-    const deviceId = allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.DEVICE, context)
-    const clipId = allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.CLIP, context)
-    const sourceId = allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SOURCE, context)
-    const notes = createRecordTable<MidiNoteDTO>()
+  for (const entry of entries) {
+    collections.trackOrder.push(entry.track.id)
+    setRecord(collections.tracks, entry.track.id, entry.track)
+    setRecord(
+      collections.devices,
+      entry.instrumentDevice.id,
+      createInstrumentDeviceDto(entry.instrumentDevice),
+    )
 
-    for (const note of mappedTrack.notes) {
-      const noteId = allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_NOTE, {
-        sourceTrackIndex: mappedTrack.sourceTrackIndex,
-        sourceNoteIndex: note.sourceNoteIndex,
-      })
-      setRecord(notes, noteId, {
-        id: noteId,
-        startTick: note.startTick - mappedTrack.startTick,
-        durationTick: note.endTick - note.startTick,
-        pitch: note.pitch,
-        velocity: note.velocity,
-        channel: note.channel,
+    for (const clipGraph of entry.clips) {
+      const notes = createRecordTable<ProjectFileDTO['midiSources'][string]['notes'][string]>()
+      for (const note of clipGraph.notes) setRecord(notes, note.id, note)
+
+      setRecord(collections.clips, clipGraph.clip.id, clipGraph.clip)
+      setRecord(collections.midiSources, clipGraph.source.id, {
+        ...clipGraph.source,
+        notes,
       })
     }
-
-    collections.trackOrder.push(trackId)
-    setRecord(collections.tracks, trackId, {
-      id: trackId,
-      kind: 'instrument',
-      name: mappedTrack.name,
-      color: null,
-      channel: { gain: 1, pan: 0, muted: false, soloed: false },
-      audioEffectIds: [],
-      midiEffectIds: [],
-      instrumentDeviceId: deviceId,
-    })
-    setRecord(collections.clips, clipId, {
-      id: clipId,
-      kind: 'midi',
-      trackId,
-      name: mappedTrack.name,
-      color: null,
-      muted: false,
-      startTick: mappedTrack.startTick,
-      spanTick: mappedTrack.spanTick,
-      sourceId,
-      sourceOffsetTick: 0,
-      loop: null,
-    })
-    setRecord(collections.midiSources, sourceId, {
-      id: sourceId,
-      lengthTick: mappedTrack.spanTick,
-      notes,
-    })
-    setRecord(collections.devices, deviceId, createInstrumentDevice(input, mappedTrack, deviceId))
   }
 }
 
@@ -181,6 +105,11 @@ export function createImportedProjectFile(
   const projectName = selectProjectName(input, diagnostics)
   const tempoEvents = createTempoEvents(input.document, allocator, diagnostics)
   const timeSignatureEvents = createTimeSignatureEvents(input.document, allocator, diagnostics)
+  const entries = createImportedTrackCollection(
+    input.createInstrumentDevice,
+    mappedTracks,
+    allocator,
+  )
   const collections: ProjectFileCollections = {
     trackOrder: [],
     tracks: createRecordTable(),
@@ -188,7 +117,7 @@ export function createImportedProjectFile(
     midiSources: createRecordTable(),
     devices: createRecordTable(),
   }
-  addMappedTracks(input, mappedTracks, allocator, collections)
+  addTrackCollection(entries, collections)
   return {
     formatVersion: PROJECT_FILE_FORMAT_VERSION,
     requiredFeatures: [],

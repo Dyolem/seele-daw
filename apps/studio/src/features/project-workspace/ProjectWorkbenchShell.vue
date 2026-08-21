@@ -48,7 +48,8 @@ const props = withDefaults(defineProps<ProjectWorkbenchShellProps>(), {
   saveFailureMessage: null,
 })
 const emit = defineEmits<{
-  importMidi: []
+  importMidiAsNewProject: []
+  importMidiAsNewTracks: []
   leaveProject: []
   playbackReturnToLastStartPosition: []
   playbackToggle: []
@@ -75,7 +76,8 @@ function openContextEditor(): void {
       :save-failure-message="props.saveFailureMessage"
       :save-status="props.saveStatus"
       @leave-project="emit('leaveProject')"
-      @import-midi="emit('importMidi')"
+      @import-midi-as-new-project="emit('importMidiAsNewProject')"
+      @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
       @open-context-editor="openContextEditor"
       @save="emit('save')"
     />
@@ -119,7 +121,7 @@ function openContextEditor(): void {
         :timeline-end-tick="props.timelineEndTick"
         :tracks="props.tracks"
         @context-editor-open-change="isContextEditorOpen = $event"
-        @import-midi="emit('importMidi')"
+        @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
       />
     </main>
   </div>

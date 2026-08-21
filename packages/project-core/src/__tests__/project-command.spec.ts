@@ -19,6 +19,7 @@ import {
   parseTick,
   parseTickDelta,
   type AddNoteCommand,
+  type AddInstrumentTrackCollectionCommand,
   type AddInstrumentTrackCommand,
   type AddMidiClipCommand,
   type AddMidiClipWithNoteCommand,
@@ -180,6 +181,7 @@ describe('ProjectCommand public contract', () => {
     expectTypeOf(remove).toEqualTypeOf<RemoveNotesCommand>()
     expectTypeOf(resize).toEqualTypeOf<ResizeNoteCommand>()
     expectTypeOf<ProjectCommand>().toEqualTypeOf<
+      | AddInstrumentTrackCollectionCommand
       | AddInstrumentTrackCommand
       | AddMidiClipCommand
       | AddMidiClipWithNoteCommand

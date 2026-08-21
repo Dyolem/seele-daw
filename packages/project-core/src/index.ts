@@ -2,6 +2,7 @@
 export {
   PROJECT_COMMAND_TYPE,
   createAddInstrumentTrackCommand,
+  createAddInstrumentTrackCollectionCommand,
   createAddMidiClipCommand,
   createAddMidiClipWithNoteCommand,
   createAddNoteCommand,
@@ -13,10 +14,12 @@ export {
 } from './commands/protocol/project-command'
 export type {
   AddInstrumentTrackCommand,
+  AddInstrumentTrackCollectionCommand,
   AddMidiClipCommand,
   AddMidiClipWithNoteCommand,
   AddNoteCommand,
   CreateAddInstrumentTrackCommandInput,
+  CreateAddInstrumentTrackCollectionCommandInput,
   CreateAddMidiClipCommandInput,
   CreateAddMidiClipWithNoteCommandInput,
   CreateAddNoteCommandInput,
@@ -26,6 +29,8 @@ export type {
   CreateReplaceInstrumentDeviceCommandInput,
   CreateResizeNoteCommandInput,
   ExtendMidiClipWithNoteCommand,
+  InstrumentTrackCollectionClip,
+  InstrumentTrackCollectionEntry,
   MoveNotesCommand,
   ProjectCommand,
   ProjectCommandType,

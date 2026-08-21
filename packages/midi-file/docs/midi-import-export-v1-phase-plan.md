@@ -4,41 +4,47 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI5 completed and accepted
+> Current checkpoint: MI6 implemented, pending review
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
 ## 1. 产品结果
 
-V1 允许用户从 Project Entry、Workbench 项目菜单或 Arrangement 末尾入口选择 `.mid` / `.midi`
-文件并创建一个新的本地项目，也允许从当前项目菜单把全部已创作 MIDI 事实下载为 `.mid`。MIDI
-文件是交换格式，不替代 Seele Project File 与 Checkpoint。
+V1 允许用户从 Project Entry 或 Workbench 项目菜单选择 `.mid` / `.midi` 文件并创建一个新的
+本地项目，也允许从 Workbench 项目菜单或 Arrangement 末尾把来源内容作为新的 Instrument Track
+追加到当前项目。后续 Export 从当前项目菜单把全部已创作 MIDI 事实下载为 `.mid`。MIDI 文件是
+交换格式，不替代 Seele Project File 与 Checkpoint。
 
-导入必须先完整解析和验证，再原子创建项目与首个 Checkpoint；失败不能留下 Project Catalog、
-Checkpoint 或活动会话的部分状态。导出读取当前内存 Snapshot，不要求先保存，也不修改 dirty、
-History 或 Playback Runtime。
+导入必须先完整解析和验证：新项目模式再原子创建项目与首个 Checkpoint，当前项目模式则用一个
+Project Command 原子追加全部新 Track。失败不能留下 Project Catalog、Checkpoint、活动会话或
+Track 图的部分状态。导出读取当前内存 Snapshot，不要求先保存，也不修改 dirty、History 或
+Playback Runtime。
 
 ## 2. 已确定边界
 
 - V1 接受 SMF Type 0 / Type 1 与 PPQ time division；Type 2 和 SMPTE division 返回明确错误；
-- 导入创建新项目，不在 V1 合并到当前项目；
-- Workbench 内的导入入口必须明确表达“创建新项目”；文件完整读取、解码和映射后，以最新当前
-  项目状态复用 Save / Discard / Cancel 导航确认，再开始新项目生命周期写入；
+- V1 提供“创建新项目”和“作为新 Track 追加到当前项目”两个显式意图；后者不把内容合并进
+  既有 Track / Clip，也不导入来源 Tempo 或拍号；
+- Workbench 内的两种导入入口必须明确表达目标；“创建新项目”在文件完整读取、解码和映射后，
+  以最新当前项目状态复用 Save / Discard / Cancel 导航确认，再开始新项目生命周期写入；
 - `@seele-daw/midi-file` 不依赖 Project Core，拥有中立 `MidiFileDocument` 与可替换 Codec Port；
 - Decoder 采用封装后的 `@tonejs/midi`；其类型和对象不得穿过 package root；
 - Encoder 与 Decoder 独立替换。V1 Writer 固定输出 Type 1，以确定性规则排列同 tick 事件；
 - Project / MIDI bridge 负责 PPQ 960、Track / Clip / Note 与诊断，并持久化 Composition Root 提供
   的默认 Instrument Device；Studio Grand 选择本身不反向进入 bridge；
 - Studio 是唯一 Composition Root；浏览器 File / Blob / Download 能力归 `platform-browser`；
-- 导入不通过成千上万次 Project Command 模拟编辑；它是经过完整验证的文档加载边界；
+- 新项目导入不通过成千上万次 Project Command 模拟编辑，而是经过完整验证的文档加载边界；
+  当前项目 Track 导入使用一个携带完整所有权图的原子 Project Command；
 - 不为该阶段编写 E2E；完成 UI 后由用户使用真实 MIDI 文件手动验证。
 
 ## 3. V1 交换语义
 
-- Import 保留 Note、Channel、Program、Tempo、Time Signature 与 Track Name，并把来源 PPQ 换算到
-  Project PPQ 960；
+- 新项目 Import 保留 Note、Channel、Program、Tempo、Time Signature 与 Track Name，并把来源 PPQ
+  换算到 Project PPQ 960；当前项目 Track Import 保留 Track 内容子集；
 - Project 保留 `5..999 BPM` 内 Tempo 的完整浮点精度；导入不静默 clamp、倍增或删除有效的密集
   Tempo Event，同一 Project tick 的碰撞仍保留来源时间上最后生效的一枚；
+- “作为新 Track”导入只做 PPQ 与 Track 内容映射，来源 Tempo / Time Signature 不参与校验或写入，
+  当前项目的时间轴事实继续生效；
 - 一个来源 Track 包含多个 Channel / Program 时，允许 Codec 输出多个 normalized Track；
 - Meta-only conductor Track 不创建空 Instrument Track；
 - 导入 Track V1 持久化选择 Studio Grand；Program / Bank 先用于名称和诊断，不静默替换为未准备
@@ -113,7 +119,30 @@ Coordinator 和结果摘要，浏览器文件选择仍由页面拥有。
 实现验证：`pnpm lint`、Studio type-check、Studio 48 个测试文件 / 306 项测试与完整
 `pnpm check` 均通过；按阶段约定未新增 E2E，也未由实现方执行浏览器人工测试。
 
-已由本次提交完成并通过审核。
+已由提交 `2b95ee9` 完成并通过审核。MI6 随后替换了 Arrangement 入口语义，但保留项目菜单中的
+该动作。
+
+### MI6：导入为当前项目的新 Track（已实施，待审核）
+
+- Project Core 增加通用的原子 Instrument Track 集合 Command，一次携带每条 Track 的 Device、
+  Clip、MIDI Source 与 Note 所有权图；成功只形成一个 revision 和一个 History 步骤；
+- `project-midi` 复用同一 Track 映射建立 Track Import Draft，不创建替代 Session，不读取或替换
+  目标 Project 的 Project ID、名称、Tempo、拍号与既有内容；
+- Workbench 项目菜单同时保留 `Import MIDI as new project…` 并新增
+  `Import MIDI as new tracks…`；Arrangement 末尾和空态入口改为后者；
+- 文件完成读取与解码后，对最新 READY Active Project 的 Session 追加新 Track。成功后停留在
+  当前路由、项目变为 dirty，并选中第一条导入 Track；Undo 一次移除整个导入批次；
+- 无 Note 的来源不产生空 Track，也不提交空 History；ID 冲突、所有权错误或 Project 范围错误在
+  写入前整体失败；来源 Program 继续只产生诊断，默认 Device 仍由 Studio 注入为 Studio Grand；
+- 两种导入共享文件选择 Busy 与错误反馈，但只有“新项目”流程需要 Save / Discard / Cancel 导航
+  确认。“新 Track”流程不创建 Catalog 或首个 Checkpoint，也不自动保存。
+
+实施边界：MI6 不增加拖放、批量文件导入、把来源内容合并进既有 Track / Clip、来源 Tempo / 拍号
+合并策略或 E2E；真实浏览器功能测试仍由用户执行。
+
+实现验证：根级 lint、workspace type-check、全部 workspace 测试、Studio production build 与
+soundbank dist boundary 均通过；Project Core 为 29 个测试文件 / 415 项测试，`project-midi` 为
+3 / 20，Studio 为 48 / 310。按约定未新增 E2E，也未执行浏览器人工测试。
 
 ### ME1：Project Export Bridge
 
@@ -136,7 +165,7 @@ Coordinator 和结果摘要，浏览器文件选择仍由页面拥有。
 
 ## 5. 明确延期
 
-- 合并导入当前项目、拖放导入与批量导入；
+- 把来源内容合并进既有 Track / Clip、拖放导入与批量文件导入；
 - SMF Type 2、SMPTE time division 与 Web MIDI 硬件 I/O；
 - 完整 General MIDI 音源映射；
 - MIDI CC / Pitch Bend / Aftertouch / MPE / SysEx Project Facts 与编辑 UI；

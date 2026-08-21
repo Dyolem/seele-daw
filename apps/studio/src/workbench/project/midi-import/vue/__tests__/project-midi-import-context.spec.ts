@@ -14,6 +14,8 @@ describe('ProjectMidiImportVueContext', () => {
     const context = Object.freeze<ProjectMidiImportVueContext>({
       projectMidiImport: Object.freeze({
         importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
+        importLocalFileAsNewTracks:
+          vi.fn<ProjectMidiImportCoordinator['importLocalFileAsNewTracks']>(),
         importLocalFileReplacingActiveProject:
           vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>(),
       }),

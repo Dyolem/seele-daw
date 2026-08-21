@@ -1,10 +1,13 @@
 import {
   PROJECT_COMMAND_TYPE,
+  type AddInstrumentTrackCollectionCommand,
   type AddInstrumentTrackCommand,
   type AddMidiClipCommand,
   type AddMidiClipWithNoteCommand,
   type AddNoteCommand,
   type ExtendMidiClipWithNoteCommand,
+  type InstrumentTrackCollectionClip,
+  type InstrumentTrackCollectionEntry,
   type MoveNotesCommand,
   type ProjectCommand,
   type ProjectCommandType,
@@ -417,16 +420,17 @@ function createProjectChanges(mutations: readonly ProjectMutation[]): readonly P
   return Object.freeze(changes)
 }
 
-function matchesAddedInstrumentTrack(
-  command: AddInstrumentTrackCommand,
+function matchesInstrumentTrackInsertion(
+  entry: Pick<InstrumentTrackCollectionEntry, 'track' | 'instrumentDevice'>,
+  insertAt: number,
   mutations: readonly ProjectMutation[],
+  mutationIndex: number,
 ): boolean {
-  const deviceMutation = mutations[0]
-  const trackMutation = mutations[1]
-  const orderMutation = mutations[2]
+  const deviceMutation = mutations[mutationIndex]
+  const trackMutation = mutations[mutationIndex + 1]
+  const orderMutation = mutations[mutationIndex + 2]
 
   if (
-    mutations.length !== 3 ||
     deviceMutation?.type !== PROJECT_MUTATION_TYPE.DEVICE.INSERT ||
     trackMutation?.type !== PROJECT_MUTATION_TYPE.TRACK.INSERT ||
     trackMutation.after.kind !== 'instrument' ||
@@ -436,11 +440,21 @@ function matchesAddedInstrumentTrack(
   }
 
   return (
-    trackMutation.after === command.track &&
-    deviceMutation.after === command.instrumentDevice &&
+    trackMutation.after === entry.track &&
+    deviceMutation.after === entry.instrumentDevice &&
     trackMutation.after.instrumentDeviceId === deviceMutation.after.id &&
     orderMutation.trackId === trackMutation.after.id &&
-    orderMutation.index === command.insertAt
+    orderMutation.index === insertAt
+  )
+}
+
+function matchesAddedInstrumentTrack(
+  command: AddInstrumentTrackCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  return (
+    mutations.length === 3 &&
+    matchesInstrumentTrackInsertion(command, command.insertAt, mutations, 0)
   )
 }
 
@@ -456,16 +470,16 @@ function matchesReplacedInstrumentDevice(
   )
 }
 
-function matchesAddedMidiClip(
-  command: AddMidiClipCommand,
+function matchesMidiClipInsertion(
+  graph: InstrumentTrackCollectionClip,
   mutations: readonly ProjectMutation[],
+  mutationIndex: number,
 ): boolean {
-  const sourceMutation = mutations[0]
-  const partitionMutation = mutations[1]
-  const clipMutation = mutations[2]
+  const sourceMutation = mutations[mutationIndex]
+  const partitionMutation = mutations[mutationIndex + 1]
+  const clipMutation = mutations[mutationIndex + 2]
 
   if (
-    mutations.length !== 3 ||
     sourceMutation?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT ||
     partitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT ||
     clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT
@@ -474,12 +488,55 @@ function matchesAddedMidiClip(
   }
 
   return (
-    sourceMutation.after === command.source &&
-    clipMutation.after === command.clip &&
+    sourceMutation.after === graph.source &&
+    clipMutation.after === graph.clip &&
     partitionMutation.sourceId === sourceMutation.after.id &&
-    partitionMutation.after.length === 0 &&
+    partitionMutation.after.length === graph.notes.length &&
+    partitionMutation.after.every((note, index) => note === graph.notes[index]) &&
     clipMutation.after.sourceId === sourceMutation.after.id
   )
+}
+
+function matchesAddedMidiClip(
+  command: AddMidiClipCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  return (
+    mutations.length === 3 &&
+    matchesMidiClipInsertion(
+      { clip: command.clip, source: command.source, notes: [] },
+      mutations,
+      0,
+    )
+  )
+}
+
+function matchesAddedInstrumentTrackCollection(
+  command: AddInstrumentTrackCollectionCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  let mutationIndex = 0
+
+  for (const [trackIndex, entry] of command.entries.entries()) {
+    if (
+      !matchesInstrumentTrackInsertion(
+        entry,
+        command.insertAt + trackIndex,
+        mutations,
+        mutationIndex,
+      )
+    ) {
+      return false
+    }
+    mutationIndex += 3
+
+    for (const clipGraph of entry.clips) {
+      if (!matchesMidiClipInsertion(clipGraph, mutations, mutationIndex)) return false
+      mutationIndex += 3
+    }
+  }
+
+  return mutationIndex === mutations.length
 }
 
 function matchesAddedMidiClipWithNote(
@@ -685,6 +742,8 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
       matchesReplacedInstrumentDevice(command, mutation)
   } else if (command.type === PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD) {
     matches = matchesAddedInstrumentTrack(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION) {
+    matches = matchesAddedInstrumentTrackCollection(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD) {
     matches = matchesAddedMidiClip(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE) {

@@ -670,13 +670,14 @@ describe('ProjectWorkbenchArrangement', () => {
 
     expect(laneChildren[0]?.classList.contains('project-workbench__arrangement-lane')).toBe(true)
     expect(laneChildren[1]?.classList.contains('project-workbench__midi-import-lane')).toBe(true)
-    expect(laneChildren[1]?.textContent).toContain('Creates a separate local project')
+    expect(laneChildren[1]?.textContent).toContain('Import MIDI as new tracks')
+    expect(laneChildren[1]?.textContent).not.toContain('Creates a separate local project')
     await withTrack.get('.project-workbench__midi-import-lane button').trigger('click')
-    expect(withTrack.emitted('importMidi')).toHaveLength(1)
+    expect(withTrack.emitted('importMidiAsNewTracks')).toHaveLength(1)
 
     const empty = mountArrangement().wrapper
     await empty.get('.project-workbench__empty-midi-import').trigger('click')
-    expect(empty.emitted('importMidi')).toHaveLength(1)
+    expect(empty.emitted('importMidiAsNewTracks')).toHaveLength(1)
   })
 
   it('keeps ordered Track and Lane pairs under one Arrangement scroll authority', () => {

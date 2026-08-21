@@ -86,7 +86,7 @@ const props = withDefaults(
   },
 )
 const emit = defineEmits<{
-  importMidi: []
+  importMidiAsNewTracks: []
   openMidiClip: []
 }>()
 
@@ -781,10 +781,10 @@ onUnmounted(() => cancelTimelineLocate())
               size="small"
               variant="secondary"
               :busy="props.isMidiImporting"
-              @click="emit('importMidi')"
+              @click="emit('importMidiAsNewTracks')"
             >
               <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
-              {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new project' }}
+              {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new tracks' }}
             </UiButton>
           </div>
         </div>
@@ -837,12 +837,11 @@ onUnmounted(() => cancelTimelineLocate())
                 size="small"
                 variant="secondary"
                 :busy="props.isMidiImporting"
-                @click="emit('importMidi')"
+                @click="emit('importMidiAsNewTracks')"
               >
                 <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
-                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new project' }}
+                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new tracks' }}
               </UiButton>
-              <span>Creates a separate local project</span>
             </div>
           </div>
         </div>
@@ -1119,11 +1118,6 @@ onUnmounted(() => cancelTimelineLocate())
   inline-size: max-content;
   align-items: center;
   gap: var(--sd-space-3);
-}
-
-.project-workbench__midi-import-lane-content > span {
-  color: var(--sd-color-text-muted);
-  font-size: var(--sd-font-size-xs);
 }
 
 .project-workbench__arrangement-lane {

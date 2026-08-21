@@ -37,7 +37,8 @@ const props = withDefaults(defineProps<ProjectWorkbenchGlobalBarProps>(), {
   saveFailureMessage: null,
 })
 const emit = defineEmits<{
-  importMidi: []
+  importMidiAsNewProject: []
+  importMidiAsNewTracks: []
   leaveProject: []
   openContextEditor: []
   save: []
@@ -83,11 +84,21 @@ const saveStatusTitle = computed(
             <DropdownMenuItem
               class="project-workbench__menu-item"
               :disabled="props.isMidiImporting"
-              @select="emit('importMidi')"
+              @select="emit('importMidiAsNewProject')"
             >
               <UiIcon :icon="MidiIcon" :size="20" />
               <span>
                 {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new project…' }}
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              class="project-workbench__menu-item"
+              :disabled="props.isMidiImporting"
+              @select="emit('importMidiAsNewTracks')"
+            >
+              <UiIcon :icon="MidiIcon" :size="20" />
+              <span>
+                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new tracks…' }}
               </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator class="project-workbench__menu-separator" />

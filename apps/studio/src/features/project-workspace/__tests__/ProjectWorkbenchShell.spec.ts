@@ -253,14 +253,33 @@ describe('ProjectWorkbenchShell', () => {
     const menuItems = [
       ...(menu?.querySelectorAll<HTMLElement>('.project-workbench__menu-item') ?? []),
     ]
-    expect(menuItems).toHaveLength(4)
+    expect(menuItems).toHaveLength(5)
     expect(menu?.querySelectorAll('.project-workbench__menu-separator')).toHaveLength(1)
 
-    const importMidi = menuItems.find((item) => item.textContent?.includes('Import MIDI'))
-    if (importMidi === undefined) throw new Error('Expected the Project MIDI import menu item')
-    importMidi.click()
+    const importAsProject = menuItems.find((item) =>
+      item.textContent?.includes('Import MIDI as new project'),
+    )
+    const importAsTracks = menuItems.find((item) =>
+      item.textContent?.includes('Import MIDI as new tracks'),
+    )
+    if (importAsProject === undefined || importAsTracks === undefined) {
+      throw new Error('Expected both Project MIDI import menu items')
+    }
+    importAsProject.click()
     await nextTick()
-    expect(wrapper.emitted('importMidi')).toHaveLength(1)
+    expect(wrapper.emitted('importMidiAsNewProject')).toHaveLength(1)
+
+    await wrapper.get('button[aria-label="Open project menu"]').trigger('click')
+    await nextTick()
+    const reopenedImportAsTracks = [
+      ...(document.body.querySelectorAll<HTMLElement>('.project-workbench__menu-item') ?? []),
+    ].find((item) => item.textContent?.includes('Import MIDI as new tracks'))
+    if (reopenedImportAsTracks === undefined) {
+      throw new Error('Expected the reopened current-Project MIDI import menu item')
+    }
+    reopenedImportAsTracks.click()
+    await nextTick()
+    expect(wrapper.emitted('importMidiAsNewTracks')).toHaveLength(1)
 
     wrapper.unmount()
   })

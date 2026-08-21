@@ -10,6 +10,7 @@ import {
 import type { ProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
 import { prepareReplaceInstrumentDeviceCommand } from '#internal/commands/instrument-device/command-handler'
 import { prepareAddInstrumentTrackCommand } from '#internal/commands/instrument-track/command-handler'
+import { prepareAddInstrumentTrackCollectionCommand } from '#internal/commands/instrument-track/collection-command-handler'
 import { prepareAddMidiClipCommand } from '#internal/commands/midi-clip/command-handler'
 import { prepareAddMidiClipWithNoteCommand } from '#internal/commands/midi-clip-note-placement/add-command-handler'
 import { prepareExtendMidiClipWithNoteCommand } from '#internal/commands/midi-clip-note-placement/extend-command-handler'
@@ -42,6 +43,11 @@ function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
       return {
         deviceId: command.instrumentDevice.id,
         trackId: command.track.id,
+      }
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION:
+      return {
+        insertAt: command.insertAt,
+        trackId: command.entries[0]?.track.id,
       }
     case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
       return {
@@ -105,6 +111,8 @@ export function prepareProjectCommand(
       return prepareReplaceInstrumentDeviceCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
       return prepareAddInstrumentTrackCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION:
+      return prepareAddInstrumentTrackCollectionCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
       return prepareAddMidiClipCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE:

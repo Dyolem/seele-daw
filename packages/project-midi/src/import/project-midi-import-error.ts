@@ -5,6 +5,7 @@ export type ProjectMidiImportErrorCode =
   | 'identity-factory-failed'
   | 'instrument-device-factory-failed'
   | 'invalid-midi-document'
+  | 'no-importable-tracks'
   | 'project-validation-failed'
   | 'tick-conversion-overflow'
   | 'unsupported-tempo'

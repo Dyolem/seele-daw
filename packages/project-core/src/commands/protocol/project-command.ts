@@ -53,6 +53,7 @@ export const PROJECT_COMMAND_TYPE = {
   },
   INSTRUMENT_TRACK: {
     ADD: 'instrument-track.add',
+    ADD_COLLECTION: 'instrument-track.add-collection',
   },
   MIDI_CLIP: {
     ADD: 'midi-clip.add',
@@ -93,6 +94,27 @@ export interface AddInstrumentTrackCommand extends ProjectCommandBase<
 > {
   readonly track: InstrumentTrackRecord
   readonly instrumentDevice: DeviceDescriptor
+  readonly insertAt: number
+}
+
+/** One owned MIDI Clip graph carried by an atomic Instrument Track collection command. */
+export interface InstrumentTrackCollectionClip {
+  readonly clip: MidiClipRecord
+  readonly source: MidiSourceRecord
+  readonly notes: readonly MidiNoteRecord[]
+}
+
+/** One complete Instrument Track graph, including every newly owned MIDI Clip. */
+export interface InstrumentTrackCollectionEntry {
+  readonly track: InstrumentTrackRecord
+  readonly instrumentDevice: DeviceDescriptor
+  readonly clips: readonly InstrumentTrackCollectionClip[]
+}
+
+export interface AddInstrumentTrackCollectionCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION
+> {
+  readonly entries: readonly InstrumentTrackCollectionEntry[]
   readonly insertAt: number
 }
 
@@ -157,6 +179,7 @@ export interface ResizeNoteCommand extends MidiNoteCommandBase<
 
 export type ProjectCommand =
   | AddInstrumentTrackCommand
+  | AddInstrumentTrackCollectionCommand
   | ReplaceInstrumentDeviceCommand
   | AddMidiClipCommand
   | AddMidiClipWithNoteCommand
@@ -173,6 +196,12 @@ export interface CreateAddInstrumentTrackCommandInput {
   readonly color: ProjectColor | null
   readonly channel: CreateChannelStripDescriptorInput
   readonly instrumentDevice: CreateDeviceDescriptorInput
+  readonly insertAt: number
+}
+
+export interface CreateAddInstrumentTrackCollectionCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly entries: readonly InstrumentTrackCollectionEntry[]
   readonly insertAt: number
 }
 
@@ -270,7 +299,7 @@ function parseTrackOrderIndex(value: number): number {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new ProjectCommandError(
       'invalid-track-order-index',
-      'AddInstrumentTrackCommand.insertAt must be a non-negative safe integer',
+      'Instrument Track command insertAt must be a non-negative safe integer',
       { insertAt: value },
     )
   }
@@ -297,6 +326,45 @@ export function createAddInstrumentTrackCommand(
     baseRevision: parseCommandBaseRevision(input.baseRevision),
     track,
     instrumentDevice,
+    insertAt: parseTrackOrderIndex(input.insertAt),
+  }
+}
+
+function normalizeInstrumentTrackCollectionClip(
+  input: InstrumentTrackCollectionClip,
+): InstrumentTrackCollectionClip {
+  return Object.freeze({
+    clip: createMidiClipRecord(input.clip),
+    source: createMidiSourceRecord(input.source),
+    notes: Object.freeze(input.notes.map((note) => createMidiNoteRecord(note))),
+  })
+}
+
+function normalizeInstrumentTrackCollectionEntry(
+  input: InstrumentTrackCollectionEntry,
+): InstrumentTrackCollectionEntry {
+  return Object.freeze({
+    track: createInstrumentTrackRecord(input.track),
+    instrumentDevice: createDeviceDescriptor(input.instrumentDevice),
+    clips: Object.freeze(input.clips.map(normalizeInstrumentTrackCollectionClip)),
+  })
+}
+
+export function createAddInstrumentTrackCollectionCommand(
+  input: CreateAddInstrumentTrackCollectionCommandInput,
+): AddInstrumentTrackCollectionCommand {
+  if (!Array.isArray(input.entries) || input.entries.length === 0) {
+    throw new ProjectCommandError(
+      'empty-instrument-track-collection',
+      'AddInstrumentTrackCollectionCommand.entries must contain at least one Track graph',
+      { baseRevision: input.baseRevision },
+    )
+  }
+
+  return {
+    type: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    entries: Object.freeze(input.entries.map(normalizeInstrumentTrackCollectionEntry)),
     insertAt: parseTrackOrderIndex(input.insertAt),
   }
 }
@@ -503,6 +571,12 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
         color: command.track.color,
         channel: command.track.channel,
         instrumentDevice: command.instrumentDevice,
+        insertAt: command.insertAt,
+      })
+    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION:
+      return createAddInstrumentTrackCollectionCommand({
+        baseRevision: command.baseRevision,
+        entries: command.entries,
         insertAt: command.insertAt,
       })
     case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:

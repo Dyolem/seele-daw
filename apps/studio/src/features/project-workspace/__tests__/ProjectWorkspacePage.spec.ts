@@ -66,6 +66,7 @@ import {
 import type {
   ProjectMidiImportCoordinator,
   ProjectMidiImportResult,
+  ProjectMidiTrackImportResult,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
 import {
   PROJECT_MIDI_IMPORT_CONTEXT_KEY,
@@ -103,6 +104,9 @@ import {
 
 interface PageFixture {
   readonly activeProjectContext: ActiveProjectVueContext
+  readonly importLocalFileAsNewTracks: ReturnType<
+    typeof vi.fn<ProjectMidiImportCoordinator['importLocalFileAsNewTracks']>
+  >
   readonly importLocalFileReplacingActiveProject: ReturnType<
     typeof vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>
   >
@@ -173,6 +177,8 @@ function createFixture(
   const importLocalFileReplacingActiveProject = vi.fn<
     ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']
   >(async () => null)
+  const importLocalFileAsNewTracks =
+    vi.fn<ProjectMidiImportCoordinator['importLocalFileAsNewTracks']>()
   const activeProject: ActiveProjectService = {
     get state() {
       return state.value
@@ -194,10 +200,12 @@ function createFixture(
     projectEntryContext: Object.freeze({
       projectEntry: Object.freeze({ resolve }),
     }),
+    importLocalFileAsNewTracks,
     importLocalFileReplacingActiveProject,
     projectMidiImportContext: Object.freeze({
       projectMidiImport: Object.freeze({
         importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
+        importLocalFileAsNewTracks,
         importLocalFileReplacingActiveProject,
       }),
     }),
@@ -382,16 +390,20 @@ describe('ProjectWorkspacePage', () => {
     expect(rulerBars[150]?.text()).toBe('151')
   })
 
-  it('imports a new Project from the Arrangement entry and reports the shared summary', async () => {
+  it('imports Arrangement MIDI as current-Project Tracks and selects the first Track', async () => {
     const projectId = parseProjectId('project-workspace-page-midi-import-source')
-    const importedProjectId = parseProjectId('project-workspace-page-midi-import-target')
+    const firstTrackId = parseTrackId('project-workspace-page-midi-import-first-track')
     const fixture = createFixture(
       async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
       createReadyState(projectId),
     )
-    const importResult: ProjectMidiImportResult = Object.freeze({
+    const importResult: ProjectMidiTrackImportResult = Object.freeze({
       diagnostics: Object.freeze([]),
-      projectId: importedProjectId,
+      importedTrackIds: Object.freeze([
+        firstTrackId,
+        parseTrackId('project-workspace-page-midi-import-second-track'),
+      ]),
+      projectId,
       summary: Object.freeze({
         importedNoteCount: 32,
         importedTrackCount: 2,
@@ -400,7 +412,7 @@ describe('ProjectWorkspacePage', () => {
         sourceTrackCount: 2,
       }),
     })
-    fixture.importLocalFileReplacingActiveProject.mockResolvedValueOnce(importResult)
+    fixture.importLocalFileAsNewTracks.mockResolvedValueOnce(importResult)
     const { router, wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
     const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
@@ -421,10 +433,59 @@ describe('ProjectWorkspacePage', () => {
     await input.trigger('change')
     await flushPromises()
 
+    expect(fixture.importLocalFileAsNewTracks).toHaveBeenCalledExactlyOnceWith(file)
+    expect(fixture.importLocalFileReplacingActiveProject).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.params.projectId).toBe(projectId)
+    expect(useProjectWorkbenchSelectionStore().selectedTrackId).toBe(firstTrackId)
+    expect(useUiToastStore().message).toMatchObject({
+      description:
+        '2 tracks and 32 notes imported. Current Project tempo and time signatures were kept.',
+      title: 'MIDI tracks imported',
+      tone: 'success',
+    })
+  })
+
+  it('keeps the menu action that imports MIDI as a separate Project', async () => {
+    const projectId = parseProjectId('project-workspace-page-midi-import-menu-source')
+    const importedProjectId = parseProjectId('project-workspace-page-midi-import-menu-target')
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId),
+    )
+    const importResult: ProjectMidiImportResult = Object.freeze({
+      diagnostics: Object.freeze([]),
+      projectId: importedProjectId,
+      summary: Object.freeze({
+        importedNoteCount: 12,
+        importedTrackCount: 1,
+        sourceFormat: 1,
+        sourcePpq: 480,
+        sourceTrackCount: 1,
+      }),
+    })
+    fixture.importLocalFileReplacingActiveProject.mockResolvedValueOnce(importResult)
+    const { router, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
+
+    wrapper.getComponent(ProjectWorkbenchShell).vm.$emit('importMidiAsNewProject')
+    await nextTick()
+    const file = new File([], 'new-project.mid', { type: 'audio/midi' })
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: {
+        item: (index: number) => (index === 0 ? file : null),
+        length: 1,
+      },
+    })
+    await input.trigger('change')
+    await flushPromises()
+
     expect(fixture.importLocalFileReplacingActiveProject).toHaveBeenCalledExactlyOnceWith(file)
+    expect(fixture.importLocalFileAsNewTracks).not.toHaveBeenCalled()
     expect(router.currentRoute.value.params.projectId).toBe(importedProjectId)
     expect(useUiToastStore().message).toMatchObject({
-      description: '2 tracks and 32 notes imported.',
+      description: '1 track and 12 notes imported.',
       title: 'MIDI imported',
       tone: 'success',
     })
@@ -439,6 +500,8 @@ describe('ProjectWorkspacePage', () => {
     const { router, wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
     const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
+    wrapper.getComponent(ProjectWorkbenchShell).vm.$emit('importMidiAsNewProject')
+    await nextTick()
     const file = new File([], 'cancelled.mid', { type: 'audio/midi' })
     Object.defineProperty(input.element, 'files', {
       configurable: true,
@@ -451,6 +514,7 @@ describe('ProjectWorkspacePage', () => {
     await input.trigger('change')
     await flushPromises()
 
+    expect(fixture.importLocalFileReplacingActiveProject).toHaveBeenCalledExactlyOnceWith(file)
     expect(router.currentRoute.value.params.projectId).toBe(projectId)
     expect(useUiToastStore().message).toBeNull()
   })

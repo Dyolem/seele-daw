@@ -43,7 +43,7 @@ const props = withDefaults(
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const emit = defineEmits<{
   contextEditorOpenChange: [isOpen: boolean]
-  importMidi: []
+  importMidiAsNewTracks: []
 }>()
 
 const workspaceElement = shallowRef<HTMLElement | null>(null)
@@ -245,7 +245,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       :time-signature-numerator="props.timeSignatureNumerator"
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
-      @import-midi="emit('importMidi')"
+      @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
       @open-midi-clip="openContextEditor"
     />
 

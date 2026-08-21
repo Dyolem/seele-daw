@@ -8,6 +8,7 @@ import type {
   ProjectPianoRollTrackPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
+import type { ProjectTempoControlMode } from '@/features/project-workspace/tempo/tempo-control'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
@@ -36,7 +37,9 @@ interface ProjectWorkbenchShellProps {
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly saveFailureMessage?: string | null
   readonly saveStatus: ActiveProjectSaveStatus
-  readonly tempo: number
+  readonly tempoDisplayBpm: string
+  readonly tempoEditable: boolean
+  readonly tempoMode: ProjectTempoControlMode
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
   readonly timelineEndTick: Tick
@@ -55,6 +58,8 @@ const emit = defineEmits<{
   playbackToggle: []
   redo: []
   save: []
+  tempoCommit: [input: string]
+  tempoEditStart: []
   undo: []
 }>()
 
@@ -91,13 +96,17 @@ function openContextEditor(): void {
       :playback-feedback="props.playbackFeedback"
       :playback-phase="props.playbackPhase"
       :playback-time="props.playbackTime"
-      :tempo="props.tempo"
+      :tempo-display-bpm="props.tempoDisplayBpm"
+      :tempo-editable="props.tempoEditable"
+      :tempo-mode="props.tempoMode"
       :time-signature-denominator="props.timeSignatureDenominator"
       :time-signature-numerator="props.timeSignatureNumerator"
       @open-context-editor="openContextEditor"
       @playback-return-to-last-start-position="emit('playbackReturnToLastStartPosition')"
       @playback-toggle="emit('playbackToggle')"
       @redo="emit('redo')"
+      @tempo-commit="emit('tempoCommit', $event)"
+      @tempo-edit-start="emit('tempoEditStart')"
       @undo="emit('undo')"
     />
 

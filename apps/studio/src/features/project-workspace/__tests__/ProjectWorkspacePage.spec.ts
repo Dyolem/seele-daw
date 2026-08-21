@@ -2,8 +2,10 @@ import type { MidiFileDocument } from '@seele-daw/midi-file'
 import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 import {
   createInitialProjectSession,
+  createReplaceTempoEventBpmCommand,
   parseClipId,
   parseProjectId,
+  parseTempoBpm,
   parseTempoEventId,
   parseTick,
   parseTimeSignatureEventId,
@@ -340,6 +342,138 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
     expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_000)
+  })
+
+  it('preserves hidden Tempo precision until the user enters a visibly different value', async () => {
+    const projectId = parseProjectId('project-workspace-page-tempo-edit')
+    const session = createInitialProjectSession({
+      projectId,
+      projectName: 'Tempo Editing Project',
+      tempoEventId: parseTempoEventId('project-workspace-page-tempo-edit-event'),
+      timeSignatureEventId: parseTimeSignatureEventId('project-workspace-page-tempo-edit-meter'),
+    })
+    const tempoEvent = session.getSnapshot().tempoEvents[0]!
+    session.execute(
+      createReplaceTempoEventBpmCommand({
+        baseRevision: session.modelRevision,
+        bpm: parseTempoBpm(143.999_884_800_092_16),
+        tempoEventId: tempoEvent.id,
+      }),
+    )
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId, session),
+    )
+    const { playbackState, projectPlayback, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('input[aria-label="Project tempo (BPM)"]')
+
+    expect(input.element.value).toBe('144')
+    const preciseRevision = session.modelRevision
+    await input.trigger('focus')
+    await input.trigger('keydown', { key: 'Enter' })
+    expect(session.modelRevision).toBe(preciseRevision)
+    expect(session.getSnapshot().tempoEvents[0]?.bpm).toBe(143.999_884_800_092_16)
+
+    playbackState.value = Object.freeze({
+      ...STOPPED_PLAYBACK_STATE,
+      modelRevision: session.modelRevision,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+      planStatus: 'playable',
+      projectId,
+    })
+    vi.mocked(projectPlayback.pause).mockImplementation(() => {
+      playbackState.value = Object.freeze({
+        ...playbackState.value,
+        phase: PROJECT_PLAYBACK_PHASE.PAUSED,
+      })
+      return true
+    })
+    await nextTick()
+
+    await input.trigger('focus')
+    await input.setValue('121.25')
+    await input.trigger('keydown', { key: 'Enter' })
+
+    expect(projectPlayback.pause).toHaveBeenCalledOnce()
+    expect(playbackState.value.phase).toBe(PROJECT_PLAYBACK_PHASE.PAUSED)
+    expect(session.getSnapshot().tempoEvents[0]?.bpm).toBe(121.25)
+    expect(session.modelRevision).toBe(preciseRevision + 1)
+  })
+
+  it('rejects Tempo input outside the two-decimal editing surface', async () => {
+    const projectId = parseProjectId('project-workspace-page-tempo-invalid')
+    const session = createTestSession(projectId)
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId, session),
+    )
+    const { wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('input[aria-label="Project tempo (BPM)"]')
+    const revision = session.modelRevision
+
+    await input.trigger('focus')
+    await input.setValue('120.125')
+    await input.trigger('keydown', { key: 'Enter' })
+
+    expect(session.modelRevision).toBe(revision)
+    expect(useUiToastStore().message).toMatchObject({
+      description: 'Tempo supports at most two decimal places.',
+      title: 'Tempo was not changed',
+      tone: 'warning',
+    })
+  })
+
+  it('shows the current Playhead Tempo for multi-Tempo projects without allowing edits', async () => {
+    const document: MidiFileDocument = {
+      format: 1,
+      name: 'Tempo Map Project',
+      ppq: 960,
+      tempos: [
+        { tick: 0, bpm: 120 },
+        { tick: 960, bpm: 90.25 },
+      ],
+      timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
+      keySignatures: [],
+      textEvents: [],
+      tracks: [],
+    }
+    const imported = createProjectMidiImportDraft({
+      document,
+      createId: ({ kind, ordinal }) => `tempo-map-${kind}-${ordinal}`,
+      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createTrackColor: () => null,
+    })
+    const session = imported.session
+    const projectId = session.getSnapshot().project.id
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId, session),
+    )
+    const { playbackVisualPosition, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const input = wrapper.get<HTMLInputElement>('input[aria-label="Current Tempo Map value (BPM)"]')
+
+    expect(input.attributes('readonly')).toBeDefined()
+    expect(input.element.value).toBe('120')
+    expect(wrapper.text()).toContain('MAP')
+
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      positionTick: 960 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId: parseProjectId('stale-tempo-map-project'),
+    })
+    await nextTick()
+    expect(input.element.value).toBe('120')
+
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      positionTick: 960 as ProjectPlaybackVisualPosition['positionTick'],
+      projectId,
+    })
+    await nextTick()
+    expect(input.element.value).toBe('90.25')
   })
 
   it('extends a long imported MIDI song through eight complete Timeline tail bars', async () => {

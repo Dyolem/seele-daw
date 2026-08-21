@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-21，Standard MIDI File Import / Export V1 MI7 Timeline Tail 已实施，待审核
+> 最近更新：2026-08-21，Project Tempo Control V1 已实施，待审核
 >
-> 当前阶段：Standard MIDI File Import / Export V1；MI1–MI6 已完成，MI7 分批实施中
+> 当前阶段：Project Tempo Control V1；Project Core、Tempo handoff Runtime 与 Studio 主控已接通
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -43,9 +43,11 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
    缩放、删除操作。
 7. 在 Vite 本地开发环境点击 Play 或按 `Space`，加载当前计划所需的 Studio Grand 采样并听见
    Note；可 Pause、继续、从 Arrangement Ruler 手动定位，并返回最后一次手动起始位置。
-8. 显式保存项目。
-9. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
-10. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
+8. 在 Transport 查看最多两位小数的 BPM；单 Tempo 项目可直接输入新 BPM，多 Tempo 项目显示
+   Playhead 所在段的当前值并保持只读。
+9. 显式保存项目。
+10. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
+11. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
 当前可听闭环使用 `apps/studio/public/soundbanks` 中开发者本机的 Studio Grand 验证资产；Vite
 production build 仍禁止复制整棵 public，因此这个资产映射不是公开构建的可分发内置内容。没有
@@ -71,6 +73,7 @@ Studio 会明确失败，不静默替换声音。
 | `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                      |
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                   |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return；播放中相关编辑按 Note / Track 选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
+| `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                             |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                |
 | `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、原子 Pencil 放置、Clip 内完整 Note 编辑、Snap 与 Undo / Redo 已接入。                   |
 
@@ -228,7 +231,19 @@ Arrangement 在最后一个 Track Lane 下方提供“导入为新 Track”操�
 
 Transport 当前接通 Play / Pause、Return to Last Start Position 与 `mm:ss.mmm` 当前项目时间；
 Arrangement Ruler 可点击或静默拖动定位，拖到视口边缘会连续滚动。资源 Loading 期间显示 Busy，
-失败或部分支持状态提供 disabled reason / Toast。以下控件仍只是诚实占位：
+失败或部分支持状态提供 disabled reason / Toast。Tempo 主控遵循以下规则：
+
+- Project 保存和 Playback 始终使用完整精度 BPM；Transport 只把显示值舍入到最多两位小数，并
+  省略无意义的尾随零；仅聚焦、按 Enter 或输入与当前显示等价的数字不会反向归一化精确值；
+- 单 Tempo 项目允许输入 `5..999 BPM`，输入面只接受最多两位小数；成功修改形成一个 Project
+  Command / History 步骤，可 Undo / Redo；
+- Playing 时开始编辑先自动 Pause，在同一连续音乐 Tick 上安装新 Tempo Map；提交后保持 Paused，
+  不自动恢复。Stopped / Paused 修改同样保留 Tick，只重算对应 ProjectSecond；
+- 多 Tempo 项目在主控显示 Playhead 所在 step event 的当前 BPM，并以 `MAP` 标记只读；当前不会
+  flatten、缩放、删除或合并 Tempo Map，完整编辑等待专用 Tempo Map 编辑器；
+- Playback Loading 期间主控暂时只读。
+
+以下控件仍只是诚实占位：
 
 - Record、Loop；
 - 输出电平显示 `Meter —`，不代表真实运行状态；
@@ -388,8 +403,8 @@ Track Piano Roll 直接把同一全局 Tick 投影到 150 小节最小全局时�
 - Undo / Redo 按其最终恢复出来的 Project Fact 变化应用同一套规则。
 - Pause、Manual Locate、Return to Last Start Position、项目切换、全局时间映射变化或无法证明
   局部更新安全时，允许停止全部声音。
-- Velocity、Channel、Tempo 与全局路由的可见编辑入口尚未交付；表中对应行只约束这些能力未来接入
-  后的产品行为，不改变它们当前的功能状态。
+- Tempo 主控已经按全局时间映射规则接入；Velocity、Channel 与全局路由的可见编辑入口仍未交付，
+  表中对应行只约束这些能力未来接入后的产品行为。
 
 ## 6. Track
 
@@ -839,10 +854,13 @@ File 导入是独立交换格式入口，不替代 Project File。
     Track 同色，批次内相邻 Track 继续避重，Clip 保持 `null` 以继承 Track 颜色。
 11. Project Tempo 的可表示范围是 `5..999 BPM`；MIDI 导入保留范围内的完整浮点值和所有有效
     Tempo Event，不静默 clamp、倍增或按密度删除。
-12. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。
-13. 普通 Clip 复制的长期产品语义是创建独立 MIDI Source 与新 Note 身份。
-14. Move、Resize、Split 等编辑算法必须在对应 Command 实现前确定产品边界。
-15. 未接通的控制必须禁用或明确提示不可用，不能制造功能已存在的错觉。
+12. Tempo 主控只舍入显示，不修改隐藏精度。单 Tempo 项目可编辑；多 Tempo 项目主控显示
+    Playhead 当前值但只读。Playing 编辑必须先 Pause，并在新 Tempo Map 下保留连续 Tick；不得
+    自动恢复播放或把 Tempo Map 隐式压平。
+13. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。
+14. 普通 Clip 复制的长期产品语义是创建独立 MIDI Source 与新 Note 身份。
+15. Move、Resize、Split 等编辑算法必须在对应 Command 实现前确定产品边界。
+16. 未接通的控制必须禁用或明确提示不可用，不能制造功能已存在的错觉。
 
 ## 11. 功能交付与文档维护规则
 

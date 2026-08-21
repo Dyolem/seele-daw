@@ -11,6 +11,8 @@ import SpeakerIcon from '~icons/fluent/speaker-2-20-regular'
 import SpinnerIcon from '~icons/fluent/spinner-ios-20-regular'
 import { computed } from 'vue'
 
+import ProjectTempoControl from '@/features/project-workspace/tempo/ProjectTempoControl.vue'
+import type { ProjectTempoControlMode } from '@/features/project-workspace/tempo/tempo-control'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
@@ -23,7 +25,9 @@ interface ProjectWorkbenchTransportProps {
   readonly playbackFeedback: string | null
   readonly playbackPhase: 'failed' | 'loading' | 'paused' | 'playing' | 'stopped' | 'unavailable'
   readonly playbackTime: string
-  readonly tempo: number
+  readonly tempoDisplayBpm: string
+  readonly tempoEditable: boolean
+  readonly tempoMode: ProjectTempoControlMode
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
 }
@@ -34,6 +38,8 @@ const emit = defineEmits<{
   playbackReturnToLastStartPosition: []
   playbackToggle: []
   redo: []
+  tempoCommit: [input: string]
+  tempoEditStart: []
   undo: []
 }>()
 
@@ -72,10 +78,13 @@ const playbackLabel = computed(() => {
       </div>
 
       <div class="project-workbench__meter-group" aria-label="Project meter">
-        <span>
-          <strong>{{ props.tempo }}</strong>
-          BPM
-        </span>
+        <ProjectTempoControl
+          :display-bpm="props.tempoDisplayBpm"
+          :editable="props.tempoEditable"
+          :mode="props.tempoMode"
+          @commit="emit('tempoCommit', $event)"
+          @edit-start="emit('tempoEditStart')"
+        />
         <span aria-label="Time signature">
           <strong>{{ props.timeSignatureNumerator }}</strong>
           /
@@ -185,7 +194,7 @@ const playbackLabel = computed(() => {
   font-size: var(--sd-font-size-xs);
 }
 
-.project-workbench__meter-group > span + span {
+.project-workbench__meter-group > * + * {
   border-inline-start: 1px solid var(--sd-color-border-subtle);
 }
 

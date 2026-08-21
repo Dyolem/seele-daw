@@ -2,10 +2,13 @@
 import {
   PROJECT_PPQ,
   ZERO_TICK,
+  createReplaceTempoEventBpmCommand,
+  parseTempoBpm,
   parsePositiveTick,
   parseProjectId,
   parseTick,
   type ProjectId,
+  type TempoBpm,
   type Tick,
 } from '@seele-daw/project-core'
 import {
@@ -21,6 +24,13 @@ import {
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { createProjectMidiClipPresentations } from '@/features/project-workspace/project-clip-presentation'
+import {
+  PROJECT_TEMPO_CONTROL_MODE,
+  createProjectTempoControlPresentation,
+  formatProjectTempoBpm,
+  parseProjectTempoInput,
+  type ProjectTempoControlPresentation,
+} from '@/features/project-workspace/tempo/tempo-control'
 import {
   useProjectWorkbenchSelectionStore,
   type ProjectWorkbenchClipSelectionCandidate,
@@ -55,6 +65,7 @@ import {
 import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
+import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
@@ -66,15 +77,21 @@ const DEFAULT_BAR_SPAN_TICK = parsePositiveTick(PROJECT_PPQ * 4)
 const DEFAULT_TIMELINE_END_TICK = parseTick(
   DEFAULT_BAR_SPAN_TICK * AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
 )
+const ZERO_VISUAL_POSITION_TICK = 0 as ProjectPlaybackVisualPosition['positionTick']
 
 interface ProjectPresentation {
   readonly barSpanTick: Tick
   readonly projectId: ProjectId | null
   readonly projectName: string
-  readonly tempo: number
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
 }
+
+const DEFAULT_TEMPO_CONTROL_PRESENTATION = Object.freeze<ProjectTempoControlPresentation>({
+  bpm: parseTempoBpm(120),
+  displayBpm: '120',
+  mode: PROJECT_TEMPO_CONTROL_MODE.SINGLE,
+})
 
 const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
@@ -103,7 +120,6 @@ const projectPresentation = shallowRef<ProjectPresentation>({
   barSpanTick: DEFAULT_BAR_SPAN_TICK,
   projectId: null,
   projectName: 'Untitled Project',
-  tempo: 120,
   timeSignatureDenominator: 4,
   timeSignatureNumerator: 4,
 })
@@ -119,6 +135,22 @@ const readyProject = computed(() => {
     : null
 })
 const projectSnapshot = computed(() => readyProject.value?.session.getSnapshot() ?? null)
+const tempoControlPresentation = computed(() => {
+  const snapshot = projectSnapshot.value
+  if (snapshot === null) return DEFAULT_TEMPO_CONTROL_PRESENTATION
+  const visualPosition = playbackVisualPosition.value
+  return createProjectTempoControlPresentation(
+    snapshot.tempoEvents,
+    visualPosition.projectId === snapshot.project.id
+      ? visualPosition.positionTick
+      : ZERO_VISUAL_POSITION_TICK,
+  )
+})
+const tempoEditable = computed(
+  () =>
+    tempoControlPresentation.value.mode === PROJECT_TEMPO_CONTROL_MODE.SINGLE &&
+    playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.LOADING,
+)
 const timelineEndTick = computed(() => {
   const snapshot = projectSnapshot.value
   return snapshot === null
@@ -319,6 +351,73 @@ function redoProject(): boolean {
   return ready.session.redo() !== null
 }
 
+function beginTempoEdit(): void {
+  if (playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING) {
+    projectPlayback.pause()
+  }
+}
+
+function describeTempoEditFailure(cause: unknown): string {
+  if (cause instanceof Error && cause.message.trim().length > 0) return cause.message
+  return 'The Project tempo could not be changed.'
+}
+
+function ensureTempoPlaybackIsInactive(): boolean {
+  if (playbackState.value.phase === PROJECT_PLAYBACK_PHASE.LOADING) return false
+  if (playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.PLAYING) return true
+
+  projectPlayback.pause()
+  return playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.PLAYING
+}
+
+function replaceSingleTempoBpm(bpm: TempoBpm): void {
+  const ready = readyProject.value
+  if (ready === null) return
+  const tempoEvents = ready.session.getSnapshot().tempoEvents
+  if (tempoEvents.length !== 1) {
+    toasts.info(
+      'Tempo Map is read-only',
+      'Multi-Tempo projects require a dedicated Tempo Map editor.',
+    )
+    return
+  }
+
+  const tempoEvent = tempoEvents[0]
+  if (
+    tempoEvent === undefined ||
+    formatProjectTempoBpm(tempoEvent.bpm) === formatProjectTempoBpm(bpm)
+  ) {
+    return
+  }
+
+  ready.session.execute(
+    createReplaceTempoEventBpmCommand({
+      baseRevision: ready.session.modelRevision,
+      bpm,
+      tempoEventId: tempoEvent.id,
+    }),
+  )
+}
+
+function commitTempoInput(input: string): void {
+  const parsed = parseProjectTempoInput(input)
+  if (parsed.status === 'rejected') {
+    toasts.warning('Tempo was not changed', parsed.message)
+    return
+  }
+  if (formatProjectTempoBpm(parsed.bpm) === tempoControlPresentation.value.displayBpm) return
+  if (!ensureTempoPlaybackIsInactive()) {
+    toasts.danger('Tempo could not be changed', 'Playback could not be paused safely.')
+    return
+  }
+
+  try {
+    replaceSingleTempoBpm(parsed.bpm)
+  } catch (cause) {
+    toasts.danger('Tempo could not be changed', describeTempoEditFailure(cause))
+  }
+}
+
 function describeSaveFailure(saveFailure: unknown): string | null {
   if (saveFailure instanceof Error && saveFailure.message.trim().length > 0) {
     return saveFailure.message
@@ -407,7 +506,6 @@ watch(
         barSpanTick: DEFAULT_BAR_SPAN_TICK,
         projectId: null,
         projectName: 'Untitled Project',
-        tempo: 120,
         timeSignatureDenominator: 4,
         timeSignatureNumerator: 4,
       }
@@ -415,13 +513,11 @@ watch(
     }
 
     const snapshot = ready.session.getSnapshot()
-    const tempo = snapshot.tempoEvents[0]
     const timeSignature = snapshot.timeSignatureEvents[0]
     projectPresentation.value = {
       barSpanTick: createProjectClipBarRange(snapshot, ZERO_TICK).spanTick,
       projectId,
       projectName: snapshot.project.name,
-      tempo: tempo?.bpm ?? 120,
       timeSignatureDenominator: timeSignature?.denominator ?? 4,
       timeSignatureNumerator: timeSignature?.numerator ?? 4,
     }
@@ -488,7 +584,9 @@ onUnmounted(() => {
     :project-session="readyProject.session"
     :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
     :save-status="readyProject.saveStatus"
-    :tempo="projectPresentation.tempo"
+    :tempo-display-bpm="tempoControlPresentation.displayBpm"
+    :tempo-editable="tempoEditable"
+    :tempo-mode="tempoControlPresentation.mode"
     :time-signature-denominator="projectPresentation.timeSignatureDenominator"
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
     :timeline-end-tick="timelineEndTick"
@@ -500,6 +598,8 @@ onUnmounted(() => {
     @playback-toggle="projectPlayback.togglePlayPause()"
     @redo="redoProject"
     @save="saveProject"
+    @tempo-commit="commitTempoInput"
+    @tempo-edit-start="beginTempoEdit"
     @undo="undoProject"
   />
 

@@ -4,6 +4,7 @@ import type {
   CreateProjectMidiImportDraftInput,
   ProjectMidiImportIdFactory,
   ProjectMidiInstrumentDeviceFactory,
+  ProjectMidiTrackColorFactory,
 } from '#internal/index'
 
 export function createMidiNote(overrides: Partial<MidiFileNote> = {}): MidiFileNote {
@@ -56,6 +57,8 @@ export const createTestInstrumentDevice: ProjectMidiInstrumentDeviceFactory = ({
     opaqueState: { presetId: 'test-default' },
   })
 
+export const createTestTrackColor: ProjectMidiTrackColorFactory = () => null
+
 export function createInstrumentDeviceWithId(
   id: DeviceId,
 ): ReturnType<typeof createDeviceDescriptor> {
@@ -77,6 +80,7 @@ export function createImportInput(
     document,
     createId: createDeterministicImportId,
     createInstrumentDevice: createTestInstrumentDevice,
+    createTrackColor: createTestTrackColor,
     ...overrides,
   }
 }

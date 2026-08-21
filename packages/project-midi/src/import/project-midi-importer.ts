@@ -22,7 +22,7 @@ import { mapTracks } from '#internal/import/track-mapper'
 
 type ProjectMidiImportSourceInput = Pick<
   CreateProjectMidiTrackImportDraftInput,
-  'document' | 'createId' | 'createInstrumentDevice'
+  'document' | 'createId' | 'createInstrumentDevice' | 'createTrackColor'
 >
 
 interface PreparedProjectMidiImportMapping {
@@ -35,10 +35,14 @@ function prepareProjectMidiImportMapping(
   input: ProjectMidiImportSourceInput,
 ): PreparedProjectMidiImportMapping {
   requireNormalizedMidiDocument(input.document)
-  if (typeof input.createId !== 'function' || typeof input.createInstrumentDevice !== 'function') {
+  if (
+    typeof input.createId !== 'function' ||
+    typeof input.createInstrumentDevice !== 'function' ||
+    typeof input.createTrackColor !== 'function'
+  ) {
     throw new ProjectMidiImportError(
       'invalid-midi-document',
-      'Project MIDI import requires identity and instrument device factories.',
+      'Project MIDI import requires identity, instrument device, and Track color factories.',
     )
   }
 
@@ -105,6 +109,7 @@ export function createProjectMidiTrackImportDraft(
 
   const entries = createImportedTrackCollection(
     input.createInstrumentDevice,
+    input.createTrackColor,
     mappedTracks,
     allocator,
     input.placementTick,

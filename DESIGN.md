@@ -256,6 +256,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - “导入为新 Track”在触发文件选择时把连续 Playhead 位置转换为最近的整数 Project Tick，来源文件
   tick 0 映射到这个 Import Anchor；文件读取或播放推进不能漂移落点，整数表示转换不等同于按拍或
   小节 Snap，不丢弃来源前导空白或跨 Track 相对偏移。“导入为新项目”仍从 Project tick 0 开始。
+- Standard MIDI File 不提供本产品可依赖的可移植 Track 颜色。两种导入模式都由 Studio 注入既有
+  Palette 创建策略：Track 保存非空颜色，相邻新 Track 避免同色；Clip 保持 `color: null` 并由
+  Presentation 继承 Track，`project-midi` 不得依赖 Studio 调色板。
 - Project Entry 的 Loading、Empty、Route notice 与恢复错误使用局部反馈，不阻塞无关信息。
 - MIDI 导入的阻断错误留在入口局部显示；成功与非阻断诊断使用可跨路由保留的 Toast 摘要。
 - Global Bar 应持续显示项目名与保存状态，但不使用频繁跳动的通知。

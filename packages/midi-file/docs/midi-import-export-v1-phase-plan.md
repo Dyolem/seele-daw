@@ -4,7 +4,7 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI7 Batch 2 implemented, pending review
+> Current checkpoint: MI7 Batch 3 implemented, pending review
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
@@ -166,6 +166,16 @@ soundbank dist boundary 均通过；Project Core 为 29 个测试文件 / 415 �
   新项目”仍把文件 tick 0 映射到 Project tick 0；
 - Anchor 加来源位置若超出安全 Tick 范围，则在 Project 写入前整体失败，不形成部分 Track 或
   History。
+
+#### Batch 3：Track Palette（已实施，待审核）
+
+- Standard MIDI File 不提供当前产品可以依赖的可移植 Track 颜色；两种导入模式统一由 Studio
+  Composition Root 注入 Track Color Factory，`project-midi` 不依赖 Studio Palette；
+- 第一条当前项目导入 Track 避免与目标 Project 最后一条既有 Track 同色，批次后续 Track 继续使用
+  手动 Add Track 已有的随机 Palette 与相邻避重策略；新项目从空相邻色开始；
+- Track 颜色在创建 Command / Session Draft 时成为持久化 Project Fact；Clip 保持 `color: null`，
+  继续由现有 Presentation 明确继承 Track 颜色；
+- Palette 或 Factory 失败在 Project 写入前整体失败，不能产生无色的部分导入。
 
 ### ME1：Project Export Bridge
 

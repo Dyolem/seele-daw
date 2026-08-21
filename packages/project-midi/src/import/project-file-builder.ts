@@ -107,6 +107,7 @@ export function createImportedProjectFile(
   const timeSignatureEvents = createTimeSignatureEvents(input.document, allocator, diagnostics)
   const entries = createImportedTrackCollection(
     input.createInstrumentDevice,
+    input.createTrackColor,
     mappedTracks,
     allocator,
   )

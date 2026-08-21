@@ -1,7 +1,9 @@
 import type { MidiFileDecoder, MidiFileDocument } from '@seele-daw/midi-file'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
+  type ProjectColor,
   type ProjectId,
+  type ProjectSnapshot,
   type Tick,
   type TrackId,
 } from '@seele-daw/project-core'
@@ -14,6 +16,7 @@ import {
   type ProjectMidiImportIdFactory,
   type ProjectMidiImportSummary,
   type ProjectMidiInstrumentDeviceFactory,
+  type ProjectMidiTrackColorFactory,
 } from '@seele-daw/project-midi'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -23,6 +26,7 @@ import {
   PROJECT_NAVIGATION_INTENT_KIND,
   type ProjectNavigationConfirmationCoordinator,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
+import { selectProjectTrackColor } from '@/workbench/project/track/project-track-palette'
 
 export interface ProjectMidiImportResult {
   readonly diagnostics: readonly ProjectMidiImportDiagnostic[]
@@ -41,6 +45,7 @@ export interface ProjectMidiImportCoordinatorDependencies {
   readonly activeProject: Pick<ActiveProjectService, 'createFromSession' | 'state'>
   readonly createId: ProjectMidiImportIdFactory
   readonly createInstrumentDevice: ProjectMidiInstrumentDeviceFactory
+  readonly createRandomValue: () => number
   readonly decoder: MidiFileDecoder
   readonly fileReader: LocalFileByteReader
   readonly navigationConfirmation: Pick<ProjectNavigationConfirmationCoordinator, 'confirm'>
@@ -53,6 +58,12 @@ export interface ProjectMidiImportCoordinator {
 }
 
 const MIDI_FILE_EXTENSION_PATTERN = /\.(?:mid|midi)$/iu
+
+function lastOrderedTrackColor(snapshot: ProjectSnapshot): ProjectColor | null {
+  const lastTrackId = snapshot.trackOrder.at(-1)
+  if (lastTrackId === undefined) return null
+  return snapshot.tracks.find((track) => track.id === lastTrackId)?.color ?? null
+}
 
 function readLocalFileName(file: Blob): string | null {
   const name = (file as Blob & { readonly name?: unknown }).name
@@ -73,6 +84,18 @@ function selectFallbackProjectName(document: MidiFileDocument, file: Blob): stri
 export function createProjectMidiImportCoordinator(
   dependencies: ProjectMidiImportCoordinatorDependencies,
 ): ProjectMidiImportCoordinator {
+  function createTrackColorFactory(
+    initialAdjacentColor: ProjectColor | null,
+  ): ProjectMidiTrackColorFactory {
+    let adjacentColor = initialAdjacentColor
+
+    return () => {
+      const color = selectProjectTrackColor(dependencies.createRandomValue(), adjacentColor)
+      adjacentColor = color
+      return color
+    }
+  }
+
   async function decodeLocalFile(file: Blob): Promise<MidiFileDocument> {
     const bytes = await dependencies.fileReader.read(file)
     return dependencies.decoder.decode(bytes)
@@ -87,6 +110,7 @@ export function createProjectMidiImportCoordinator(
       document,
       createId: dependencies.createId,
       createInstrumentDevice: dependencies.createInstrumentDevice,
+      createTrackColor: createTrackColorFactory(null),
       ...(projectName === undefined ? {} : { projectName }),
     })
   }
@@ -117,13 +141,15 @@ export function createProjectMidiImportCoordinator(
       throw new Error('MIDI Tracks can only be imported while a Project is ready.')
     }
 
+    const snapshot = activeState.session.getSnapshot()
     const draft = createProjectMidiTrackImportDraft({
       document,
       baseRevision: activeState.session.modelRevision,
-      insertAt: activeState.session.getSnapshot().trackOrder.length,
+      insertAt: snapshot.trackOrder.length,
       placementTick,
       createId: dependencies.createId,
       createInstrumentDevice: dependencies.createInstrumentDevice,
+      createTrackColor: createTrackColorFactory(lastOrderedTrackColor(snapshot)),
     })
     const execution = activeState.session.execute(draft.command)
     if (execution.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {

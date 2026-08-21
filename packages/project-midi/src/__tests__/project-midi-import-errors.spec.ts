@@ -123,6 +123,21 @@ describe('Project MIDI import failures', () => {
     )
   })
 
+  it('wraps Track color factory failures', () => {
+    expect.hasAssertions()
+    expectImportError(
+      () =>
+        createProjectMidiImportDraft(
+          createImportInput(createMidiDocument(), {
+            createTrackColor: () => {
+              throw new Error('palette unavailable')
+            },
+          }),
+        ),
+      'track-color-factory-failed',
+    )
+  })
+
   it('wraps values rejected by the complete Project loading boundary', () => {
     expect.hasAssertions()
     expectImportError(

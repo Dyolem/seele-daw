@@ -20,6 +20,8 @@ export type {
   ProjectMidiTrackImportDraft,
   ProjectMidiInstrumentDeviceFactory,
   ProjectMidiInstrumentDeviceFactoryInput,
+  ProjectMidiTrackColorFactory,
+  ProjectMidiTrackColorFactoryInput,
 } from './import/project-midi-import-contract'
 export { ProjectMidiImportError } from './import/project-midi-import-error'
 export type {

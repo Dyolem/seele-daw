@@ -35,6 +35,8 @@ import {
   PROJECT_NAVIGATION_PROCEED_REASON,
   type ProjectNavigationConfirmationCoordinator,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
+import { PROJECT_TRACK_PALETTE } from '@/workbench/project/track/project-track-palette'
+import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 
 function createMidiDocument(overrides: Partial<MidiFileDocument> = {}): MidiFileDocument {
   return {
@@ -67,6 +69,7 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
   const createInstrumentDevice = vi.fn<ProjectMidiInstrumentDeviceFactory>(({ id }) =>
     createStudioGrandDeviceDescriptor(id),
   )
+  const createRandomValue = vi.fn<() => number>(() => 0)
   const createFromSession = vi.fn<
     ProjectMidiImportCoordinatorDependencies['activeProject']['createFromSession']
   >(async (session) => session.getSnapshot().project.id)
@@ -105,6 +108,7 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
     },
     createId,
     createInstrumentDevice,
+    createRandomValue,
     decoder: { decode },
     fileReader: { read },
     navigationConfirmation: { confirm },
@@ -118,6 +122,7 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
     createFromSession,
     createId,
     createInstrumentDevice,
+    createRandomValue,
     decode,
     read,
     setActiveState(nextState: ActiveProjectState) {
@@ -139,6 +144,8 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(fixture.confirm).not.toHaveBeenCalled()
     const session = fixture.createFromSession.mock.calls[0]?.[0]
     expect(session?.getSnapshot().project).toMatchObject({ id: 'project-0', name: 'Long Song' })
+    expect(session?.getSnapshot().tracks[0]?.color).toBe(PROJECT_TRACK_PALETTE[0])
+    expect(session?.getSnapshot().clips[0]?.color).toBeNull()
     expect(session?.modelRevision).toBe(0)
     expect(result).toEqual({
       projectId: 'project-0',
@@ -227,6 +234,7 @@ describe('ProjectMidiImportCoordinator', () => {
       activeProject,
       createId: ({ kind, ordinal }) => `active-import-${kind}-${ordinal}`,
       createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createRandomValue: () => 0,
       decoder: { decode: () => document },
       fileReader: { read: async () => bytes },
       navigationConfirmation: {
@@ -255,6 +263,53 @@ describe('ProjectMidiImportCoordinator', () => {
       modelRevision: 2,
     })
     activeProject.dispose()
+  })
+
+  it('uses the Studio palette for a batch while avoiding each adjacent Track color', async () => {
+    const fixture = createFixture(
+      createMidiDocument({
+        tracks: [
+          createMidiDocument().tracks[0]!,
+          { ...createMidiDocument().tracks[0]!, name: 'Strings', channel: 1 },
+        ],
+      }),
+    )
+    const existingTrack = createProjectTrackCoordinator({
+      activeProject: {
+        get state() {
+          return {
+            phase: ACTIVE_PROJECT_PHASE.READY,
+            projectId: fixture.activeSession.getSnapshot().project.id,
+            session: fixture.activeSession,
+            modelRevision: fixture.activeSession.modelRevision,
+            contentStateId: fixture.activeSession.contentStateId,
+            savedRevision: fixture.activeSession.modelRevision,
+            savedContentStateId: fixture.activeSession.contentStateId,
+            isDirty: false,
+            saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+            saveFailure: null,
+            recoveryFailures: Object.freeze([]),
+          }
+        },
+      },
+      createRandomValue: () => 0,
+      createUniqueId: (() => {
+        const ids = ['existing-track', 'existing-device']
+        return () => ids.shift() ?? 'unused-existing-id'
+      })(),
+    }).addInstrumentTrack()
+
+    await fixture.coordinator.importLocalFileAsNewTracks(new File([], 'palette.mid'), parseTick(0))
+
+    const snapshot = fixture.activeSession.getSnapshot()
+    expect(existingTrack.trackId).toBe('existing-track')
+    expect(snapshot.trackOrder).toEqual(['existing-track', 'track-0', 'track-1'])
+    expect(snapshot.tracks.map((track) => track.color)).toEqual([
+      PROJECT_TRACK_PALETTE[0],
+      PROJECT_TRACK_PALETTE[1],
+      PROJECT_TRACK_PALETTE[0],
+    ])
+    expect(snapshot.clips.map((clip) => clip.color)).toEqual([null, null])
   })
 
   it('rechecks the latest Active Project after file decoding before appending Tracks', async () => {

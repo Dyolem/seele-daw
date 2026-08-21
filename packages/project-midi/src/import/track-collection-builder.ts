@@ -15,15 +15,18 @@ import {
   parseMidiSourceId,
   parseMidiVelocity,
   parseNoteId,
+  parseProjectColor,
   parseTick,
   parseTrackId,
   type DeviceDescriptor,
   type InstrumentTrackCollectionEntry,
+  type ProjectColor,
   type Tick,
 } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_IMPORT_ENTITY_KIND,
   type ProjectMidiInstrumentDeviceFactory,
+  type ProjectMidiTrackColorFactory,
 } from '#internal/import/project-midi-import-contract'
 import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 import type { ImportIdAllocator } from '#internal/import/import-support'
@@ -72,9 +75,33 @@ function createInstrumentDevice(
   return createDeviceDescriptor(descriptor)
 }
 
+function createTrackColor(
+  factory: ProjectMidiTrackColorFactory,
+  mappedTrack: MappedTrack,
+): ProjectColor | null {
+  try {
+    const color = factory(
+      Object.freeze({
+        sourceTrack: mappedTrack.sourceTrack,
+        sourceTrackIndex: mappedTrack.sourceTrackIndex,
+        importedTrackIndex: mappedTrack.importedTrackIndex,
+      }),
+    )
+    return color === null ? null : parseProjectColor(color)
+  } catch (cause) {
+    throw new ProjectMidiImportError(
+      'track-color-factory-failed',
+      `The Track color factory failed for MIDI track ${mappedTrack.sourceTrackIndex}.`,
+      { sourceTrackIndex: mappedTrack.sourceTrackIndex },
+      { cause },
+    )
+  }
+}
+
 /** Builds normalized Project ownership graphs shared by both MIDI import products. */
 export function createImportedTrackCollection(
   createDevice: ProjectMidiInstrumentDeviceFactory,
+  createColor: ProjectMidiTrackColorFactory,
   mappedTracks: readonly MappedTrack[],
   allocator: ImportIdAllocator,
   placementTick: Tick = ZERO_TICK,
@@ -126,10 +153,11 @@ export function createImportedTrackCollection(
         loop: null,
       })
       const instrumentDevice = createInstrumentDevice(createDevice, mappedTrack, deviceId)
+      const color = createTrackColor(createColor, mappedTrack)
       const track = createInstrumentTrackRecord({
         id: trackId,
         name: mappedTrack.name,
-        color: null,
+        color,
         channel: {
           gain: parseLinearGain(1),
           pan: parseBipolarValue(0),

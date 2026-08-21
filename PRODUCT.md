@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-21，Standard MIDI File Import / Export V1 MI7 Import Anchor 已实施，待审核
+> 最近更新：2026-08-21，Standard MIDI File Import / Export V1 MI7 导入颜色已实施，待审核
 >
 > 当前阶段：Standard MIDI File Import / Export V1；MI1–MI6 已完成，MI7 分批实施中
 >
@@ -834,6 +834,8 @@ File 导入是独立交换格式入口，不替代 Project File。
     “新 Track”入口打开文件选择器时把连续 Playhead 位置转换为最近的整数 Project Tick 并冻结；
     来源文件 tick 0 映射到该位置，不再按拍或小节二次吸附，并保留各 Track 的前导空白和相互时间
     偏移。
+    两种 MIDI 导入模式都由 Studio 使用现有 Track Palette 分配持久化颜色；首条避免与前一条既有
+    Track 同色，批次内相邻 Track 继续避重，Clip 保持 `null` 以继承 Track 颜色。
 11. Project Tempo 的可表示范围是 `5..999 BPM`；MIDI 导入保留范围内的完整浮点值和所有有效
     Tempo Event，不静默 clamp、倍增或按密度删除。
 12. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。

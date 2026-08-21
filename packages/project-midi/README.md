@@ -28,10 +28,11 @@ File V1 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
 
 ## 默认音源与生命周期边界
 
-本包不会 import Playback，也不认识 `studio-grand`。调用方必须提供
-`createInstrumentDevice` 工厂；Studio Composition Root 在后续批次用
+本包不会 import Playback，也不认识 `studio-grand` 或 Studio 调色板。调用方必须提供
+`createInstrumentDevice` 与 `createTrackColor` 工厂；Studio Composition Root 用
 `createStudioGrandDeviceDescriptor` 组合该端口，从而落实“导入 Track 默认持久化 Studio Grand”
-的产品规则。不同宿主或测试可以提供其他合法 Device Descriptor，而无需修改 MIDI 映射。
+的产品规则，并用当前 Track 创建调色板落实宿主视觉策略。不同宿主或测试可以提供其他合法 Device
+Descriptor 与 Project Color，而无需修改 MIDI 映射；Clip `color: null` 保持“继承 Track”的语义。
 
 新项目导入返回的 `ProjectMidiImportDraft` 中 Session revision 为 0、History 为空；调用方可以用
 `ActiveProjectService.createFromSession` 原子保存首个 Checkpoint 并切换 Active Project。当前项目

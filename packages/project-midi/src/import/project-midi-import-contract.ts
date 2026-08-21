@@ -4,6 +4,7 @@ import type {
   DeviceDescriptor,
   DeviceId,
   ModelRevision,
+  ProjectColor,
   ProjectSession,
   Tick,
   TrackId,
@@ -42,6 +43,17 @@ export interface ProjectMidiInstrumentDeviceFactoryInput {
 export type ProjectMidiInstrumentDeviceFactory = (
   input: ProjectMidiInstrumentDeviceFactoryInput,
 ) => DeviceDescriptor
+
+export interface ProjectMidiTrackColorFactoryInput {
+  readonly sourceTrack: MidiFileTrack
+  readonly sourceTrackIndex: number
+  readonly importedTrackIndex: number
+}
+
+/** Lets the composition host apply its creation-time Track palette without coupling this package to UI. */
+export type ProjectMidiTrackColorFactory = (
+  input: ProjectMidiTrackColorFactoryInput,
+) => ProjectColor | null
 
 export const PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE = {
   CONTROL_CHANGES_NOT_IMPORTED: 'control-changes-not-imported',
@@ -100,6 +112,7 @@ export interface CreateProjectMidiImportDraftInput {
   readonly projectName?: string
   readonly createId: ProjectMidiImportIdFactory
   readonly createInstrumentDevice: ProjectMidiInstrumentDeviceFactory
+  readonly createTrackColor: ProjectMidiTrackColorFactory
 }
 
 /** A pending atomic append operation for an already active Project Session. */
@@ -118,4 +131,5 @@ export interface CreateProjectMidiTrackImportDraftInput {
   readonly placementTick: Tick
   readonly createId: ProjectMidiImportIdFactory
   readonly createInstrumentDevice: ProjectMidiInstrumentDeviceFactory
+  readonly createTrackColor: ProjectMidiTrackColorFactory
 }

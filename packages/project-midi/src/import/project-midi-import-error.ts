@@ -7,6 +7,7 @@ export type ProjectMidiImportErrorCode =
   | 'invalid-midi-document'
   | 'no-importable-tracks'
   | 'project-validation-failed'
+  | 'track-color-factory-failed'
   | 'tick-conversion-overflow'
   | 'unsupported-tempo'
   | 'unsupported-time-signature'

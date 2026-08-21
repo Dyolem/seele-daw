@@ -374,6 +374,7 @@ describe('ProjectWorkspacePage', () => {
       document,
       createId: ({ kind, ordinal }) => `long-import-${kind}-${ordinal}`,
       createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createTrackColor: () => null,
     })
     const projectId = imported.session.getSnapshot().project.id
     const fixture = createFixture(

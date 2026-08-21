@@ -242,6 +242,7 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       createId: composition.createProjectMidiImportId ?? (() => createBrowserProjectEntityId()),
       createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createRandomValue: composition.createRandomValue ?? Math.random,
       decoder: composition.midiFileDecoder ?? new ToneJsMidiFileDecoder(),
       fileReader: composition.midiFileReader ?? new BrowserLocalFileByteReader(),
       navigationConfirmation: projectNavigationConfirmation,

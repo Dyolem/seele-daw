@@ -1,10 +1,11 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_HISTORY_DIRECTION,
   createInitialProjectSession,
   parseProjectId,
+  parseProjectColor,
   parseTick,
   parseTempoEventId,
   parseTimeSignatureEventId,
@@ -14,6 +15,7 @@ import {
   ProjectMidiImportError,
   createProjectMidiTrackImportDraft,
   type ProjectMidiImportIdRequest,
+  type ProjectMidiTrackColorFactory,
   type ProjectMidiTrackImportDraft,
 } from '#internal/index'
 import {
@@ -36,6 +38,7 @@ function createTrackImportInput(
     placementTick: parseTick(0),
     createId: shared.createId,
     createInstrumentDevice: shared.createInstrumentDevice,
+    createTrackColor: shared.createTrackColor,
     ...overrides,
   }
 }
@@ -46,6 +49,7 @@ function expectImportError(run: () => unknown, code: ProjectMidiImportError['cod
 
 describe('createProjectMidiTrackImportDraft', () => {
   it('maps note-bearing source Tracks into one atomic collection command', () => {
+    const createTrackColor = vi.fn<ProjectMidiTrackColorFactory>(() => parseProjectColor('#4F8CFF'))
     const draft = createProjectMidiTrackImportDraft(
       createTrackImportInput(
         createMidiDocument({
@@ -62,7 +66,7 @@ describe('createProjectMidiTrackImportDraft', () => {
             }),
           ],
         }),
-        { insertAt: 2 },
+        { insertAt: 2, createTrackColor },
       ),
     )
     const entry = draft.command.entries[0]
@@ -80,7 +84,7 @@ describe('createProjectMidiTrackImportDraft', () => {
       baseRevision: 0,
       insertAt: 2,
     })
-    expect(entry?.track).toMatchObject({ id: 'track-0', name: 'Lead' })
+    expect(entry?.track).toMatchObject({ color: '#4F8CFF', id: 'track-0', name: 'Lead' })
     expect(entry?.instrumentDevice.id).toBe('device-0')
     expect(clipGraph?.clip).toMatchObject({
       id: 'clip-0',
@@ -88,6 +92,7 @@ describe('createProjectMidiTrackImportDraft', () => {
       startTick: 960,
       spanTick: 2_880,
       sourceId: 'midi-source-0',
+      color: null,
     })
     expect(clipGraph?.source).toEqual({ id: 'midi-source-0', lengthTick: 2_880 })
     expect(clipGraph?.notes).toEqual([
@@ -95,6 +100,12 @@ describe('createProjectMidiTrackImportDraft', () => {
       expect.objectContaining({ id: 'midi-note-1', startTick: 960, durationTick: 960 }),
     ])
     expect(draft.importedTrackIds).toEqual(['track-0'])
+    expect(createTrackColor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        importedTrackIndex: 0,
+        sourceTrackIndex: 0,
+      }),
+    )
     expect(Object.isFrozen(draft.importedTrackIds)).toBe(true)
     expectTypeOf(draft).toEqualTypeOf<ProjectMidiTrackImportDraft>()
   })

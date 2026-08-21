@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createProjectFileDTO,
   createProjectSessionFromProjectFile,
+  parseProjectColor,
   type ProjectFileDTO,
 } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   createProjectMidiImportDraft,
   type ProjectMidiImportDiagnosticCode,
+  type ProjectMidiTrackColorFactory,
 } from '#internal/index'
 import {
   createDeterministicImportId,
@@ -51,8 +53,13 @@ describe('createProjectMidiImportDraft', () => {
     const createInstrumentDevice = vi.fn<typeof createTestInstrumentDevice>(
       createTestInstrumentDevice,
     )
+    const createTrackColor = vi.fn<ProjectMidiTrackColorFactory>(() => parseProjectColor('#23B26D'))
     const draft = createProjectMidiImportDraft(
-      createImportInput(document, { projectName: 'Imported Lead', createInstrumentDevice }),
+      createImportInput(document, {
+        projectName: 'Imported Lead',
+        createInstrumentDevice,
+        createTrackColor,
+      }),
     )
     const projectFile = createProjectFileDTO(draft.session.getSnapshot())
 
@@ -72,6 +79,7 @@ describe('createProjectMidiImportDraft', () => {
     expect(projectFile.tracks['track-0']).toMatchObject({
       kind: 'instrument',
       name: 'Lead',
+      color: '#23B26D',
       instrumentDeviceId: 'device-0',
     })
     expect(projectFile.clips['clip-0']).toMatchObject({
@@ -80,6 +88,7 @@ describe('createProjectMidiImportDraft', () => {
       spanTick: 2880,
       sourceId: 'midi-source-0',
       loop: null,
+      color: null,
     })
     expect(projectFile.midiSources['midi-source-0']).toEqual({
       id: 'midi-source-0',
@@ -116,6 +125,13 @@ describe('createProjectMidiImportDraft', () => {
     expect(createInstrumentDevice).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'device-0',
+        sourceTrack: document.tracks[0],
+        sourceTrackIndex: 0,
+        importedTrackIndex: 0,
+      }),
+    )
+    expect(createTrackColor).toHaveBeenCalledWith(
+      expect.objectContaining({
         sourceTrack: document.tracks[0],
         sourceTrackIndex: 0,
         importedTrackIndex: 0,

@@ -1,4 +1,6 @@
 import {
+  ZERO_TICK,
+  addTicks,
   createDeviceDescriptor,
   createInstrumentTrackRecord,
   createMidiClipRecord,
@@ -17,6 +19,7 @@ import {
   parseTrackId,
   type DeviceDescriptor,
   type InstrumentTrackCollectionEntry,
+  type Tick,
 } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_IMPORT_ENTITY_KIND,
@@ -74,6 +77,7 @@ export function createImportedTrackCollection(
   createDevice: ProjectMidiInstrumentDeviceFactory,
   mappedTracks: readonly MappedTrack[],
   allocator: ImportIdAllocator,
+  placementTick: Tick = ZERO_TICK,
 ): readonly InstrumentTrackCollectionEntry[] {
   try {
     return mappedTracks.map((mappedTrack) => {
@@ -113,7 +117,9 @@ export function createImportedTrackCollection(
         name: mappedTrack.name,
         color: null,
         muted: false,
-        startTick: parseTick(mappedTrack.startTick),
+        // Source file tick zero maps to the caller-owned placement anchor. Per-Track leading
+        // silence therefore remains intact instead of collapsing every Clip onto its first Note.
+        startTick: addTicks(placementTick, parseTick(mappedTrack.startTick)),
         spanTick: parseTick(mappedTrack.spanTick),
         sourceId,
         sourceOffsetTick: parseTick(0),

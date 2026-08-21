@@ -94,7 +94,11 @@ const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
 const isImportingMidi = shallowRef(false)
 const midiFileInput = shallowRef<HTMLInputElement | null>(null)
-const midiImportTarget = shallowRef<'new-project' | 'new-tracks' | null>(null)
+interface PendingMidiImport {
+  readonly placementTick: Tick | null
+  readonly target: 'new-project' | 'new-tracks'
+}
+const pendingMidiImport = shallowRef<PendingMidiImport | null>(null)
 const projectPresentation = shallowRef<ProjectPresentation>({
   barSpanTick: DEFAULT_BAR_SPAN_TICK,
   projectId: null,
@@ -239,31 +243,42 @@ function describeMidiImportFailure(failureCause: unknown): string {
 
 function requestMidiFile(target: 'new-project' | 'new-tracks'): void {
   if (readyProject.value === null || isImportingMidi.value) return
-  midiImportTarget.value = target
-  midiFileInput.value?.click()
+  const input = midiFileInput.value
+  if (input === null) return
+  pendingMidiImport.value = Object.freeze({
+    // The visual playhead is continuous, while authored Project facts use integer ticks. This
+    // nearest-tick conversion is representation normalization, not musical grid snapping.
+    placementTick:
+      target === 'new-tracks'
+        ? parseTick(Math.round(playbackVisualPosition.value.positionTick))
+        : null,
+    target,
+  })
+  input.click()
 }
 
 async function importSelectedMidiFile(): Promise<void> {
   const input = midiFileInput.value
   const file = input?.files?.item(0) ?? null
-  const target = midiImportTarget.value
-  midiImportTarget.value = null
+  const request = pendingMidiImport.value
+  pendingMidiImport.value = null
   if (input !== null) input.value = ''
-  if (file === null || target === null || readyProject.value === null || isImportingMidi.value) {
+  if (file === null || request === null || readyProject.value === null || isImportingMidi.value) {
     return
   }
 
   const generation = ++midiImportGeneration
   isImportingMidi.value = true
   try {
-    if (target === 'new-project') {
+    if (request.target === 'new-project') {
       const result = await projectMidiImport.importLocalFileReplacingActiveProject(file)
       if (isUnmounted || generation !== midiImportGeneration || result === null) return
 
       reportProjectMidiImportSuccess(toasts, result)
       await router.push(createProjectWorkspaceLocation(result.projectId))
     } else {
-      const result = await projectMidiImport.importLocalFileAsNewTracks(file)
+      if (request.placementTick === null) return
+      const result = await projectMidiImport.importLocalFileAsNewTracks(file, request.placementTick)
       if (isUnmounted || generation !== midiImportGeneration) return
 
       const firstTrackId = result.importedTrackIds[0]
@@ -436,7 +451,7 @@ onUnmounted(() => {
   isUnmounted = true
   requestGeneration += 1
   midiImportGeneration += 1
-  midiImportTarget.value = null
+  pendingMidiImport.value = null
   const projectId = requestedProjectId.value
   if (projectId !== null) workbenchSelection.leaveProject(projectId)
 })

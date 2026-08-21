@@ -413,14 +413,23 @@ describe('ProjectWorkspacePage', () => {
       }),
     })
     fixture.importLocalFileAsNewTracks.mockResolvedValueOnce(importResult)
-    const { router, wrapper } = await mountPage(fixture, projectId)
+    const { playbackVisualPosition, router, wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
     const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
     const requestFile = vi.spyOn(input.element, 'click').mockImplementation(() => undefined)
 
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      positionTick: 7_680.4 as ProjectPlaybackVisualPosition['positionTick'],
+    })
     await wrapper.get('.project-workbench__empty-midi-import').trigger('click')
     expect(requestFile).toHaveBeenCalledOnce()
     requestFile.mockRestore()
+
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      positionTick: 11_520.2 as ProjectPlaybackVisualPosition['positionTick'],
+    })
 
     const file = new File([], 'arrangement-import.mid', { type: 'audio/midi' })
     Object.defineProperty(input.element, 'files', {
@@ -433,7 +442,10 @@ describe('ProjectWorkspacePage', () => {
     await input.trigger('change')
     await flushPromises()
 
-    expect(fixture.importLocalFileAsNewTracks).toHaveBeenCalledExactlyOnceWith(file)
+    expect(fixture.importLocalFileAsNewTracks).toHaveBeenCalledExactlyOnceWith(
+      file,
+      parseTick(7_680),
+    )
     expect(fixture.importLocalFileReplacingActiveProject).not.toHaveBeenCalled()
     expect(router.currentRoute.value.params.projectId).toBe(projectId)
     expect(useProjectWorkbenchSelectionStore().selectedTrackId).toBe(firstTrackId)

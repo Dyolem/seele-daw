@@ -253,6 +253,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
   保留当前 Project Tempo / 拍号并选中首条导入 Track；来源 Note 的音乐 Tick 位置服从当前 Project
   Tempo Map，来源 Tempo / 拍号只形成预期所有权诊断，不能静默改写全局时间轴；失败不能留下部分
   Track 图或 History。
+- “导入为新 Track”在触发文件选择时把连续 Playhead 位置转换为最近的整数 Project Tick，来源文件
+  tick 0 映射到这个 Import Anchor；文件读取或播放推进不能漂移落点，整数表示转换不等同于按拍或
+  小节 Snap，不丢弃来源前导空白或跨 Track 相对偏移。“导入为新项目”仍从 Project tick 0 开始。
 - Project Entry 的 Loading、Empty、Route notice 与恢复错误使用局部反馈，不阻塞无关信息。
 - MIDI 导入的阻断错误留在入口局部显示；成功与非阻断诊断使用可跨路由保留的 Toast 摘要。
 - Global Bar 应持续显示项目名与保存状态，但不使用频繁跳动的通知。

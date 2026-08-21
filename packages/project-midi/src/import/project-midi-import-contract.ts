@@ -5,6 +5,7 @@ import type {
   DeviceId,
   ModelRevision,
   ProjectSession,
+  Tick,
   TrackId,
 } from '@seele-daw/project-core'
 
@@ -113,6 +114,8 @@ export interface CreateProjectMidiTrackImportDraftInput {
   readonly document: MidiFileDocument
   readonly baseRevision: ModelRevision
   readonly insertAt: number
+  /** Destination Project tick corresponding to source MIDI file tick zero. */
+  readonly placementTick: Tick
   readonly createId: ProjectMidiImportIdFactory
   readonly createInstrumentDevice: ProjectMidiInstrumentDeviceFactory
 }

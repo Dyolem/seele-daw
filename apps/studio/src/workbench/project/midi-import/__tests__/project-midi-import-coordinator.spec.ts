@@ -3,6 +3,7 @@ import {
   createInitialProjectSession,
   parseProjectId,
   parseTempoEventId,
+  parseTick,
   parseTimeSignatureEventId,
 } from '@seele-daw/project-core'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
@@ -182,7 +183,7 @@ describe('ProjectMidiImportCoordinator', () => {
     const before = fixture.activeSession.getSnapshot()
     const file = new File([fixture.bytes], 'Current Tracks.mid', { type: 'audio/midi' })
 
-    const result = await fixture.coordinator.importLocalFileAsNewTracks(file)
+    const result = await fixture.coordinator.importLocalFileAsNewTracks(file, parseTick(7_680))
     const after = fixture.activeSession.getSnapshot()
 
     expect(fixture.read).toHaveBeenCalledExactlyOnceWith(file)
@@ -198,6 +199,7 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(after.tempoEvents).toEqual(before.tempoEvents)
     expect(after.timeSignatureEvents).toEqual(before.timeSignatureEvents)
     expect(after.trackOrder).toEqual(['track-0'])
+    expect(after.clips).toEqual([expect.objectContaining({ startTick: 7_680, trackId: 'track-0' })])
     expect(after.modelRevision).toBe(before.modelRevision + 1)
     expect(fixture.activeSession.canUndo).toBe(true)
 
@@ -232,7 +234,10 @@ describe('ProjectMidiImportCoordinator', () => {
       },
     })
 
-    await coordinator.importLocalFileAsNewTracks(new File([bytes], 'active-tracks.mid'))
+    await coordinator.importLocalFileAsNewTracks(
+      new File([bytes], 'active-tracks.mid'),
+      parseTick(0),
+    )
     await Promise.resolve()
 
     expect(activeProject.state).toMatchObject({
@@ -260,7 +265,10 @@ describe('ProjectMidiImportCoordinator', () => {
     })
 
     await expect(
-      fixture.coordinator.importLocalFileAsNewTracks(new File([], 'stale-target.mid')),
+      fixture.coordinator.importLocalFileAsNewTracks(
+        new File([], 'stale-target.mid'),
+        parseTick(0),
+      ),
     ).rejects.toThrow('only be imported while a Project is ready')
     expect(fixture.decode).toHaveBeenCalledOnce()
     expect(fixture.activeSession.getSnapshot().trackOrder).toEqual([])

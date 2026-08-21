@@ -2,6 +2,7 @@ import type { MidiFileDecoder, MidiFileDocument } from '@seele-daw/midi-file'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   type ProjectId,
+  type Tick,
   type TrackId,
 } from '@seele-daw/project-core'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
@@ -47,7 +48,7 @@ export interface ProjectMidiImportCoordinatorDependencies {
 
 export interface ProjectMidiImportCoordinator {
   importLocalFile(file: Blob): Promise<ProjectMidiImportResult>
-  importLocalFileAsNewTracks(file: Blob): Promise<ProjectMidiTrackImportResult>
+  importLocalFileAsNewTracks(file: Blob, placementTick: Tick): Promise<ProjectMidiTrackImportResult>
   importLocalFileReplacingActiveProject(file: Blob): Promise<ProjectMidiImportResult | null>
 }
 
@@ -104,7 +105,10 @@ export function createProjectMidiImportCoordinator(
     return activateDraft(await prepareLocalFile(file))
   }
 
-  async function importLocalFileAsNewTracks(file: Blob): Promise<ProjectMidiTrackImportResult> {
+  async function importLocalFileAsNewTracks(
+    file: Blob,
+    placementTick: Tick,
+  ): Promise<ProjectMidiTrackImportResult> {
     const document = await decodeLocalFile(file)
     // Resolve the destination only after asynchronous file work so the command targets the
     // latest authoritative Session and revision rather than a stale page projection.
@@ -117,6 +121,7 @@ export function createProjectMidiImportCoordinator(
       document,
       baseRevision: activeState.session.modelRevision,
       insertAt: activeState.session.getSnapshot().trackOrder.length,
+      placementTick,
       createId: dependencies.createId,
       createInstrumentDevice: dependencies.createInstrumentDevice,
     })

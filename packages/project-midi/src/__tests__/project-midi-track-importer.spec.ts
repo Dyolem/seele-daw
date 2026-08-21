@@ -5,6 +5,7 @@ import {
   PROJECT_HISTORY_DIRECTION,
   createInitialProjectSession,
   parseProjectId,
+  parseTick,
   parseTempoEventId,
   parseTimeSignatureEventId,
 } from '@seele-daw/project-core'
@@ -32,6 +33,7 @@ function createTrackImportInput(
     document,
     baseRevision: 0 as Parameters<typeof createProjectMidiTrackImportDraft>[0]['baseRevision'],
     insertAt: 0,
+    placementTick: parseTick(0),
     createId: shared.createId,
     createInstrumentDevice: shared.createInstrumentDevice,
     ...overrides,
@@ -134,6 +136,33 @@ describe('createProjectMidiTrackImportDraft', () => {
         }),
       ]),
     )
+  })
+
+  it('maps source file tick zero to one placement anchor without collapsing Track offsets', () => {
+    const draft = createProjectMidiTrackImportDraft(
+      createTrackImportInput(
+        createMidiDocument({
+          tracks: [
+            createMidiTrack({
+              name: 'Early',
+              notes: [createMidiNote({ tick: 480 })],
+            }),
+            createMidiTrack({
+              name: 'Late',
+              notes: [createMidiNote({ tick: 1_440 })],
+            }),
+          ],
+        }),
+        { placementTick: parseTick(7_680) },
+      ),
+    )
+
+    expect(draft.command.entries.map((entry) => entry.clips[0]?.clip.startTick)).toEqual([
+      8_640, 10_560,
+    ])
+    expect(draft.command.entries.map((entry) => entry.clips[0]?.notes[0]?.startTick)).toEqual([
+      0, 0,
+    ])
   })
 
   it('rejects a document without note-bearing Tracks', () => {

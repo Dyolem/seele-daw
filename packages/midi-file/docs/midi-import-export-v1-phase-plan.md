@@ -4,7 +4,7 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI7 Batch 1 implemented, pending review
+> Current checkpoint: MI7 Batch 2 implemented, pending review
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
@@ -155,6 +155,17 @@ soundbank dist boundary 均通过；Project Core 为 29 个测试文件 / 415 �
 - 来源 Tempo 与拍号不缩放 Note Tick、不覆盖或合并当前时间轴，并产生可机读的非阻断所有权诊断；
 - Studio 的成功反馈明确说明保留当前 Tempo / 拍号，但不把这两项预期诊断升级成警告；来源
   Program、CC 等其他未支持事实仍按原规则产生 warning。
+
+#### Batch 2：Import Anchor（已实施，待审核）
+
+- Track 本身没有时间起点；Studio 在触发“导入为当前项目的新 Track”文件选择时把连续 Playhead
+  位置转换为最近的整数 Project Tick，并把它作为来源文件 tick 0 的 Import Anchor；
+- 文件读取期间 Playhead 即使继续移动也不改变已冻结 Anchor；整数表示转换不等同于按拍或小节二次
+  吸附，现有 Locator / Snap 行为拥有用户选择的位置；
+- 每条 Clip 在 Anchor 基础上保留来源 Track 的首 Note 偏移、前导空白和跨 Track 相对位置；“导入为
+  新项目”仍把文件 tick 0 映射到 Project tick 0；
+- Anchor 加来源位置若超出安全 Tick 范围，则在 Project 写入前整体失败，不形成部分 Track 或
+  History。
 
 ### ME1：Project Export Bridge
 

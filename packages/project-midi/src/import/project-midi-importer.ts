@@ -107,6 +107,7 @@ export function createProjectMidiTrackImportDraft(
     input.createInstrumentDevice,
     mappedTracks,
     allocator,
+    input.placementTick,
   )
   let command
 

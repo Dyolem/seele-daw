@@ -12,7 +12,9 @@ File V1 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
 - 四舍五入后为零长度的 Note 扩为一个 Project tick，并产生汇总诊断；
 - 一个含 Note 的 normalized MIDI Track 创建一个 Instrument Track、一个非循环 Clip 和一个独占
   MIDI Source；空 Track（包括 conductor Track）不创建 Project Track；
-- Clip 从第一枚 Note 的全局位置开始，结束位置取最后一枚 Note 终点和 End of Track 中的较大值；
+- Clip 从第一枚 Note 的文件内全局位置开始，结束位置取最后一枚 Note 终点和 End of Track 中的较大
+  值；“新项目”把文件 tick 0 放在 Project tick 0，“新 Track”由调用方传入 `placementTick`，把文件
+  tick 0 映射到该 Project tick，所有 Track 的前导空白与相对位置保持不变；
 - Source 内 Note tick 改为相对 Clip 起点，Channel、Pitch 和 Velocity 保留；
 - Tempo 与 Time Signature 按换算后的 Project tick 去重；碰撞时保留来源时间上最后生效的事件并
   产生诊断；tick 0 缺失时分别补 120 BPM 与 4/4；
@@ -42,3 +44,7 @@ Tempo 不是 Track 级事实。“新项目”导入可以用来源 MIDI 的 Tem
 导入只保留 Note 的音乐 Tick 位置，来源 Tempo 即使与当前 Project 不同也不会缩放 Tick、覆盖或合并
 Project Tempo Map。调用方应把这项预期语义与其他未支持来源事实区分展示，不能把正常的 Project
 Tempo 所有权误报成导入失败。
+
+`placementTick` 是调用方已经确定的导入锚点，本包不会再次 Snap 或读取 Transport。Studio 在打开
+文件选择器时把连续 Playhead 位置转换为最近的整数 Project Tick 并冻结，从而避免文件读取期间移动
+的播放位置改变最终落点；整数表示转换不等同于按拍或小节吸附。

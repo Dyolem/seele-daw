@@ -249,6 +249,8 @@ function isPlayablePlan(plan: AudibleMidiProjectPlan): boolean {
 
 function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
   switch (commit.origin.commandType) {
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM:
+      return false
     case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION:

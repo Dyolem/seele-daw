@@ -10,6 +10,7 @@ export {
   createMoveNotesCommand,
   createRemoveNotesCommand,
   createReplaceInstrumentDeviceCommand,
+  createReplaceTempoEventBpmCommand,
   createResizeNoteCommand,
 } from './commands/protocol/project-command'
 export type {
@@ -27,6 +28,7 @@ export type {
   CreateMoveNotesCommandInput,
   CreateRemoveNotesCommandInput,
   CreateReplaceInstrumentDeviceCommandInput,
+  CreateReplaceTempoEventBpmCommandInput,
   CreateResizeNoteCommandInput,
   ExtendMidiClipWithNoteCommand,
   InstrumentTrackCollectionClip,
@@ -36,6 +38,7 @@ export type {
   ProjectCommandType,
   RemoveNotesCommand,
   ReplaceInstrumentDeviceCommand,
+  ReplaceTempoEventBpmCommand,
   ResizeNoteCommand,
 } from './commands/protocol/project-command'
 export { ProjectCommandError } from './commands/protocol/project-command-error'
@@ -61,6 +64,7 @@ export type {
   MidiNoteUpdatedChange,
   ProjectChange,
   ProjectChangeType,
+  TempoEventUpdatedChange,
 } from './commit/project-change'
 export { PROJECT_COMMIT_ORIGIN_KIND, PROJECT_HISTORY_DIRECTION } from './commit/project-commit'
 export type {

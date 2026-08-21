@@ -1,9 +1,17 @@
 import type { DeviceDescriptor } from '#internal/model/device'
-import type { ClipId, DeviceId, MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
+import type {
+  ClipId,
+  DeviceId,
+  MidiSourceId,
+  NoteId,
+  TempoEventId,
+  TrackId,
+} from '#internal/model/ids'
 import type { MidiClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { InstrumentTrackRecord } from '#internal/model/track'
+import type { TempoEventRecord } from '#internal/time/tempo-event'
 import type { Tick } from '#internal/time/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
 
@@ -25,6 +33,9 @@ export const PROJECT_CHANGE_TYPE = {
     ADDED: 'midi-note.added',
     REMOVED: 'midi-note.removed',
     UPDATED: 'midi-note.updated',
+  },
+  TEMPO_EVENT: {
+    UPDATED: 'tempo-event.updated',
   },
 } as const
 
@@ -137,6 +148,13 @@ export interface MidiNoteUpdatedChange extends MidiNoteChangeBase<
   readonly after: MidiNoteRecord
 }
 
+export interface TempoEventUpdatedChange {
+  readonly type: typeof PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED
+  readonly tempoEventId: TempoEventId
+  readonly before: TempoEventRecord
+  readonly after: TempoEventRecord
+}
+
 export type ProjectChange =
   | InstrumentDeviceUpdatedChange
   | InstrumentTrackAddedChange
@@ -147,3 +165,4 @@ export type ProjectChange =
   | MidiNoteAddedChange
   | MidiNoteRemovedChange
   | MidiNoteUpdatedChange
+  | TempoEventUpdatedChange

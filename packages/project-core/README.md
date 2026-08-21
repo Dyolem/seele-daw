@@ -2,7 +2,7 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Replace Instrument Device、Add MIDI Clip、原子 Add / Extend Clip with Note 与 Add / Move / Remove / Resize MIDI Note Command、Instrument Device / Track / Clip / Note 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
+> 当前状态：MIDI V1 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Add Instrument Track、Replace Instrument Device / Tempo Event BPM、Add MIDI Clip、原子 Add / Extend Clip with Note 与 Add / Move / Remove / Resize MIDI Note Command、Instrument Device / Track / Clip / Note / Tempo Event 级 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、ProjectFileDTO V1 完整内存往返，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成，JSON codec、迁移与 Journal 尚未开始。
 
 ## 包定位
 
@@ -257,6 +257,19 @@ Project Core 不生成 Track ID、默认名称或随机颜色，也不选择 Sou
 成功执行发布一条 `instrument-device.updated` change，携带 Track / Device 身份与 before / after Descriptor，只形成一次 revision、内容状态和 History 推进。Undo / Redo 复用相同 Record 与 Device ID；目标 Descriptor 深层值相等时返回 `no-change`，不产生 Commit、History、QueryIndex root 或通知。MIDI Note QueryIndex 只推进 revision，MIDI Note 局部订阅不接收该 change，`project-commit.all` 仍会收到提交。
 
 Project Core 继续只验证通用 Device 外壳，不识别 `Studio Grand`、`soundbankId` 或浏览器资产。未知合法 Descriptor 会通过 Snapshot、Project File V1 与 Checkpoint V1 完整往返。新 Track 默认选择什么声音、旧空 Slot 的可见修复入口以及内置 Device Definition 所有权属于后续 Studio / Playback 批次；完整阶段边界见 [Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
+
+### Replace Tempo Event BPM 纵向切片
+
+`ReplaceTempoEventBpmCommand` 表达一次已存在 Tempo Event 的 BPM 替换。公开 Command 使用
+`tempo-event.replace-bpm` 判别字段，并携带 `baseRevision`、目标 `tempoEventId` 和经过领域范围
+验证的完整精度 BPM；handler 从权威模型重新读取 Event，只替换 BPM 并强制保留 Event ID 与
+Tick，目标不存在时整次拒绝。
+
+成功执行发布一条 `tempo-event.updated` change，携带 Event 身份与 before / after Record，只形成
+一次 revision、内容状态与 History 推进。Undo / Redo 精确恢复或重放原始浮点值；目标 BPM 与
+当前事实严格相等时返回 `no-change`。MIDI Note QueryIndex 只推进 revision，MIDI Note 局部订阅
+不接收该 change，`project-commit.all` 仍会收到提交。显示舍入、多 Tempo Map 的只读策略以及
+播放状态协调属于后续 Studio / Playback 批次，不进入 Project Core。
 
 ### Add MIDI Clip 纵向切片
 

@@ -430,7 +430,8 @@ interface TimeSignatureEventRecord {
 - `denominator` 只能是 `1、2、4、8、16、32`；
 - 时间顺序由 `tick` 推导，不保存额外的顺序 ID 数组；
 - Tempo Event 和 Time Signature Event 保留独立 ID，以支持选择、移动和 Undo；
-- V1 UI 可以只开放 Tick 0 的编辑，存储结构允许以后加入多个 step event；
+- `ReplaceTempoEventBpmCommand` 只替换已存在 Event 的 BPM，保留其 ID 与 Tick，并支持精确
+  Undo / Redo；是否允许当前 UI 编辑由 Tempo Map 与 Transport 产品状态决定；
 - TempoMap 的有序段、累计秒数和查找缓存是 QueryIndex，不进入项目文件。
 
 Timeline 当前不是包含事件数组的大型 Record。两类事件分别进入规范化实体表，时间顺序由 `tick` 派生；项目不保存重复的事件顺序数组或固定的 Timeline 结束 Tick。

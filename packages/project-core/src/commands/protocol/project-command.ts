@@ -3,10 +3,12 @@ import {
   parseClipId,
   parseMidiSourceId,
   parseNoteId,
+  parseTempoEventId,
   parseTrackId,
   type ClipId,
   type MidiSourceId,
   type NoteId,
+  type TempoEventId,
   type TrackId,
 } from '#internal/model/ids'
 import {
@@ -45,6 +47,7 @@ import {
   type Tick,
   type TickDelta,
 } from '#internal/time/tick'
+import { parseTempoBpm, type TempoBpm } from '#internal/time/tempo-event'
 
 /** Canonical runtime discriminants for product-level project commands. */
 export const PROJECT_COMMAND_TYPE = {
@@ -65,6 +68,9 @@ export const PROJECT_COMMAND_TYPE = {
     MOVE: 'midi-note.move',
     REMOVE: 'midi-note.remove',
     RESIZE: 'midi-note.resize',
+  },
+  TEMPO_EVENT: {
+    REPLACE_BPM: 'tempo-event.replace-bpm',
   },
 } as const
 
@@ -87,6 +93,13 @@ interface MidiNoteCollectionCommandBase<
 > extends ProjectCommandBase<Type> {
   readonly sourceId: MidiSourceId
   readonly noteIds: readonly NoteId[]
+}
+
+export interface ReplaceTempoEventBpmCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM
+> {
+  readonly tempoEventId: TempoEventId
+  readonly bpm: TempoBpm
 }
 
 export interface AddInstrumentTrackCommand extends ProjectCommandBase<
@@ -188,6 +201,13 @@ export type ProjectCommand =
   | MoveNotesCommand
   | RemoveNotesCommand
   | ResizeNoteCommand
+  | ReplaceTempoEventBpmCommand
+
+export interface CreateReplaceTempoEventBpmCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly tempoEventId: TempoEventId
+  readonly bpm: TempoBpm
+}
 
 export interface CreateAddInstrumentTrackCommandInput {
   readonly baseRevision: ModelRevision
@@ -305,6 +325,17 @@ function parseTrackOrderIndex(value: number): number {
   }
 
   return value
+}
+
+export function createReplaceTempoEventBpmCommand(
+  input: CreateReplaceTempoEventBpmCommandInput,
+): ReplaceTempoEventBpmCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    tempoEventId: parseTempoEventId(input.tempoEventId),
+    bpm: parseTempoBpm(input.bpm),
+  }
 }
 
 export function createAddInstrumentTrackCommand(
@@ -561,6 +592,8 @@ function rejectUnknownCommand(command: never): never {
 /** @internal Revalidates structurally supplied commands before they read model state. */
 export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand {
   switch (command.type) {
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM:
+      return createReplaceTempoEventBpmCommand(command)
     case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
       return createReplaceInstrumentDeviceCommand(command)
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:

@@ -364,6 +364,7 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
       case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED:
       case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
       case PROJECT_CHANGE_TYPE.MIDI_CLIP.UPDATED:
+      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED:
         break
 
       case PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED:

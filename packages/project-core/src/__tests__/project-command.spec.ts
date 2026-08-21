@@ -29,6 +29,7 @@ import {
   type ProjectCommand,
   type RemoveNotesCommand,
   type ReplaceInstrumentDeviceCommand,
+  type ReplaceTempoEventBpmCommand,
   type ResizeNoteCommand,
 } from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
@@ -190,6 +191,7 @@ describe('ProjectCommand public contract', () => {
       | MoveNotesCommand
       | RemoveNotesCommand
       | ReplaceInstrumentDeviceCommand
+      | ReplaceTempoEventBpmCommand
       | ResizeNoteCommand
     >()
   })

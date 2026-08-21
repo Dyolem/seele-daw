@@ -1,4 +1,11 @@
-import type { ClipId, DeviceId, MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
+import type {
+  ClipId,
+  DeviceId,
+  MidiSourceId,
+  NoteId,
+  TempoEventId,
+  TrackId,
+} from '#internal/model/ids'
 import type { Tick } from '#internal/time/tick'
 import type { ModelRevision } from '#internal/model/model-revision'
 
@@ -33,6 +40,7 @@ export type ProjectCommandErrorCode =
   | 'note-out-of-clip-range'
   | 'note-out-of-source-range'
   | 'note-pitch-out-of-range'
+  | 'tempo-event-not-found'
   | 'track-id-already-exists'
   | 'track-not-found'
   | 'track-order-index-out-of-bounds'
@@ -56,6 +64,7 @@ export interface ProjectCommandErrorDetails {
   readonly sourceReadEndTick?: Tick
   readonly sourceReadStartTick?: Tick
   readonly targetSpanTick?: Tick
+  readonly tempoEventId?: TempoEventId
   readonly trackId?: TrackId
   readonly trackKind?: string
   readonly trackOrderLength?: number
@@ -81,6 +90,7 @@ export class ProjectCommandError extends Error {
   readonly sourceReadEndTick: Tick | null
   readonly sourceReadStartTick: Tick | null
   readonly targetSpanTick: Tick | null
+  readonly tempoEventId: TempoEventId | null
   readonly trackId: TrackId | null
   readonly trackKind: string | null
   readonly trackOrderLength: number | null
@@ -110,6 +120,7 @@ export class ProjectCommandError extends Error {
     this.sourceReadEndTick = details.sourceReadEndTick ?? null
     this.sourceReadStartTick = details.sourceReadStartTick ?? null
     this.targetSpanTick = details.targetSpanTick ?? null
+    this.tempoEventId = details.tempoEventId ?? null
     this.trackId = details.trackId ?? null
     this.trackKind = details.trackKind ?? null
     this.trackOrderLength = details.trackOrderLength ?? null

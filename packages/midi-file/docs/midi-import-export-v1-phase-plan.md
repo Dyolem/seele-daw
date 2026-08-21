@@ -4,7 +4,7 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI6 implemented, pending review
+> Current checkpoint: MI7 Batch 1 implemented, pending review
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
@@ -122,7 +122,7 @@ Coordinator 和结果摘要，浏览器文件选择仍由页面拥有。
 已由提交 `2b95ee9` 完成并通过审核。MI6 随后替换了 Arrangement 入口语义，但保留项目菜单中的
 该动作。
 
-### MI6：导入为当前项目的新 Track（已实施，待审核）
+### MI6：导入为当前项目的新 Track（已完成）
 
 - Project Core 增加通用的原子 Instrument Track 集合 Command，一次携带每条 Track 的 Device、
   Clip、MIDI Source 与 Note 所有权图；成功只形成一个 revision 和一个 History 步骤；
@@ -143,6 +143,18 @@ Coordinator 和结果摘要，浏览器文件选择仍由页面拥有。
 实现验证：根级 lint、workspace type-check、全部 workspace 测试、Studio production build 与
 soundbank dist boundary 均通过；Project Core 为 29 个测试文件 / 415 项测试，`project-midi` 为
 3 / 20，Studio 为 48 / 310。按约定未新增 E2E，也未执行浏览器人工测试。
+
+已由提交 `4697c48` 完成并通过审核。
+
+### MI7：当前项目 MIDI 导入语义加固（分批实施中）
+
+#### Batch 1：Tempo 与拍号所有权（已实施，待审核）
+
+- Tempo 是 Project 全局事实，不是 Track 属性；“导入为当前项目的新 Track”保留来源 Note 的音乐
+  Tick 位置，并始终按目标 Project Tempo Map 播放；
+- 来源 Tempo 与拍号不缩放 Note Tick、不覆盖或合并当前时间轴，并产生可机读的非阻断所有权诊断；
+- Studio 的成功反馈明确说明保留当前 Tempo / 拍号，但不把这两项预期诊断升级成警告；来源
+  Program、CC 等其他未支持事实仍按原规则产生 warning。
 
 ### ME1：Project Export Bridge
 

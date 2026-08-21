@@ -14,7 +14,10 @@ import { ProjectMidiImportError } from '#internal/import/project-midi-import-err
 import { ImportIdAllocator, requireNormalizedMidiDocument } from '#internal/import/import-support'
 import { createImportedProjectFile } from '#internal/import/project-file-builder'
 import { createImportedTrackCollection } from '#internal/import/track-collection-builder'
-import { addGlobalUnsupportedFactDiagnostics } from '#internal/import/timeline-mapper'
+import {
+  addCurrentProjectTimelineDiagnostics,
+  addGlobalUnsupportedFactDiagnostics,
+} from '#internal/import/timeline-mapper'
 import { mapTracks } from '#internal/import/track-mapper'
 
 type ProjectMidiImportSourceInput = Pick<
@@ -98,6 +101,7 @@ export function createProjectMidiTrackImportDraft(
       'The MIDI document has no note-bearing Tracks to add to the current Project.',
     )
   }
+  addCurrentProjectTimelineDiagnostics(input.document, diagnostics)
 
   const entries = createImportedTrackCollection(
     input.createInstrumentDevice,

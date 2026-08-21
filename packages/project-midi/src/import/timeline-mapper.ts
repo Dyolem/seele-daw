@@ -198,3 +198,30 @@ export function addGlobalUnsupportedFactDiagnostics(
     )
   }
 }
+
+/** Reports source timeline facts deliberately left under the destination Project's authority. */
+export function addCurrentProjectTimelineDiagnostics(
+  document: MidiFileDocument,
+  diagnostics: ProjectMidiImportDiagnostic[],
+): void {
+  if (document.tempos.length > 0) {
+    diagnostics.push(
+      createDiagnostic({
+        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.TEMPO_EVENTS_NOT_IMPORTED,
+        message:
+          'Source Tempo Events were not imported because new Tracks follow the current Project Tempo Map.',
+        eventCount: document.tempos.length,
+      }),
+    )
+  }
+  if (document.timeSignatures.length > 0) {
+    diagnostics.push(
+      createDiagnostic({
+        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.TIME_SIGNATURE_EVENTS_NOT_IMPORTED,
+        message:
+          'Source time-signature Events were not imported because new Tracks follow the current Project timeline.',
+        eventCount: document.timeSignatures.length,
+      }),
+    )
+  }
+}

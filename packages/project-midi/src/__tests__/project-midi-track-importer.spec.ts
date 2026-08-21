@@ -9,6 +9,7 @@ import {
   parseTimeSignatureEventId,
 } from '@seele-daw/project-core'
 import {
+  PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   ProjectMidiImportError,
   createProjectMidiTrackImportDraft,
   type ProjectMidiImportIdRequest,
@@ -121,6 +122,18 @@ describe('createProjectMidiTrackImportDraft', () => {
       'midi-source',
       'midi-note',
     ])
+    expect(draft.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.TEMPO_EVENTS_NOT_IMPORTED,
+          eventCount: 1,
+        }),
+        expect.objectContaining({
+          code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.TIME_SIGNATURE_EVENTS_NOT_IMPORTED,
+          eventCount: 1,
+        }),
+      ]),
+    )
   })
 
   it('rejects a document without note-bearing Tracks', () => {

@@ -1,3 +1,7 @@
+import {
+  PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
+  type ProjectMidiImportDiagnostic,
+} from '@seele-daw/project-midi'
 import type {
   ProjectMidiImportResult,
   ProjectMidiTrackImportResult,
@@ -20,9 +24,9 @@ function reportImportResult(
   result: ProjectMidiImportResult | ProjectMidiTrackImportResult,
   titles: { readonly success: string; readonly warning: string },
   suffix = '',
+  noticeCount = result.diagnostics.length,
 ): void {
   const summary = `${describeImportSummary(result)}${suffix}`
-  const noticeCount = result.diagnostics.length
   if (noticeCount === 0) {
     feedback.success(titles.success, summary)
     return
@@ -30,6 +34,15 @@ function reportImportResult(
 
   const noticeLabel = noticeCount === 1 ? 'notice was' : 'notices were'
   feedback.warning(titles.warning, `${summary} ${noticeCount} import ${noticeLabel} reported.`)
+}
+
+function isExpectedCurrentProjectTimelineDiagnostic(
+  diagnostic: ProjectMidiImportDiagnostic,
+): boolean {
+  return (
+    diagnostic.code === PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.TEMPO_EVENTS_NOT_IMPORTED ||
+    diagnostic.code === PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.TIME_SIGNATURE_EVENTS_NOT_IMPORTED
+  )
 }
 
 /** Reports the one shared success summary used by every local MIDI import entry point. */
@@ -48,6 +61,9 @@ export function reportProjectMidiTrackImportSuccess(
   feedback: ProjectMidiImportFeedbackSink,
   result: ProjectMidiTrackImportResult,
 ): void {
+  const noticeCount = result.diagnostics.filter(
+    (diagnostic) => !isExpectedCurrentProjectTimelineDiagnostic(diagnostic),
+  ).length
   reportImportResult(
     feedback,
     result,
@@ -56,5 +72,6 @@ export function reportProjectMidiTrackImportSuccess(
       warning: 'MIDI tracks imported with notices',
     },
     ' Current Project tempo and time signatures were kept.',
+    noticeCount,
   )
 }

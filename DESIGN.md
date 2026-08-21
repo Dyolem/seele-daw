@@ -250,7 +250,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
   Cancel 导航确认；Cancel 或 Save 失败后保持当前 Workbench，不开始项目生命周期写入，也不显示
   伪成功反馈。
 - “导入为新 Track”停留在当前 Workbench，以一个 Project Command 追加所有来源 Note Track，
-  保留当前 Project Tempo / 拍号并选中首条导入 Track；失败不能留下部分 Track 图或 History。
+  保留当前 Project Tempo / 拍号并选中首条导入 Track；来源 Note 的音乐 Tick 位置服从当前 Project
+  Tempo Map，来源 Tempo / 拍号只形成预期所有权诊断，不能静默改写全局时间轴；失败不能留下部分
+  Track 图或 History。
 - Project Entry 的 Loading、Empty、Route notice 与恢复错误使用局部反馈，不阻塞无关信息。
 - MIDI 导入的阻断错误留在入口局部显示；成功与非阻断诊断使用可跨路由保留的 Toast 摘要。
 - Global Bar 应持续显示项目名与保存状态，但不使用频繁跳动的通知。

@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-21，Standard MIDI File Import / Export V1 MI6 已实施，待审核
+> 最近更新：2026-08-21，Standard MIDI File Import / Export V1 MI7 Tempo 语义已实施，待审核
 >
-> 当前阶段：Standard MIDI File Import / Export V1；MI1–MI5 已完成，MI6 已实施
+> 当前阶段：Standard MIDI File Import / Export V1；MI1–MI6 已完成，MI7 分批实施中
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -828,7 +828,9 @@ File 导入是独立交换格式入口，不替代 Project File。
 10. Standard MIDI File 导入必须先完整读取、解码和验证。创建独立项目时原子写入首个
     Checkpoint，并在 Workbench 中先按最新项目状态完成 dirty 的 Save / Discard / Cancel 确认；
     导入为当前项目新 Track 时使用一个原子 Project Command，保留当前 Tempo / 拍号，不导航、
-    不自动保存。两种模式的导入 Track 都默认持久化 Studio Grand，来源 Program 不静默替换音源。
+    不自动保存。Tempo 是 Project 全局事实而不是 Track 属性：来源 Note 保持音乐 Tick 位置并按
+    当前 Project Tempo Map 播放，来源 Tempo / 拍号不得静默覆盖或合并；两种模式的导入 Track 都
+    默认持久化 Studio Grand，来源 Program 不静默替换音源。
 11. Project Tempo 的可表示范围是 `5..999 BPM`；MIDI 导入保留范围内的完整浮点值和所有有效
     Tempo Event，不静默 clamp、倍增或按密度删除。
 12. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。

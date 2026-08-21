@@ -18,7 +18,7 @@ File V1 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
   产生诊断；tick 0 缺失时分别补 120 BPM 与 4/4；
 - Project V1 保留 `5..999 BPM` 范围内的完整浮点 Tempo；范围外 Tempo 或无法表示的 Time
   Signature 会阻止“新项目”导入，不执行静默 clamp；“新 Track”导入不消费来源 Tempo 或拍号，
-  因而保留当前 Project 的时间轴事实；
+  因而让导入 Note 按当前 Project Tempo Map 播放，并分别产生非阻断的时间轴所有权诊断；
 - CC64 不烘焙进 Note 长度。它与其他 CC、Pitch Bend、非零 Release Velocity、非默认 Program、
   Key Signature 和文本事件都产生非阻断诊断；
 - `@tonejs/midi` 在 Codec 边界已经完成 Note On / Off 配对。中立 Document 当前不携带原始孤立
@@ -37,3 +37,8 @@ File V1 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
 必须针对最新 READY Session 执行它，成功只产生一个 revision / History 步骤，并由现有
 ActiveProject 订阅派生 dirty。Catalog 与 Checkpoint 的一致性仍由 Studio 生命周期及其持久化
 Adapter 拥有。Browser File / Blob 与 Studio UI 不属于本包。
+
+Tempo 不是 Track 级事实。“新项目”导入可以用来源 MIDI 的 Tempo Map 建立时间轴；“新 Track”
+导入只保留 Note 的音乐 Tick 位置，来源 Tempo 即使与当前 Project 不同也不会缩放 Tick、覆盖或合并
+Project Tempo Map。调用方应把这项预期语义与其他未支持来源事实区分展示，不能把正常的 Project
+Tempo 所有权误报成导入失败。

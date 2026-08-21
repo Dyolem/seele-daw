@@ -52,8 +52,10 @@ export const PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE = {
   PROJECT_NAME_ADJUSTED: 'project-name-adjusted',
   RELEASE_VELOCITIES_NOT_IMPORTED: 'release-velocities-not-imported',
   SUSTAIN_PEDAL_NOT_IMPORTED: 'sustain-pedal-not-imported',
+  TEMPO_EVENTS_NOT_IMPORTED: 'tempo-events-not-imported',
   TEMPO_EVENTS_COLLAPSED: 'tempo-events-collapsed',
   TEXT_EVENTS_NOT_IMPORTED: 'text-events-not-imported',
+  TIME_SIGNATURE_EVENTS_NOT_IMPORTED: 'time-signature-events-not-imported',
   TIME_SIGNATURE_EVENTS_COLLAPSED: 'time-signature-events-collapsed',
   TRACK_NAME_ADJUSTED: 'track-name-adjusted',
 } as const

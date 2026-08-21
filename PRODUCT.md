@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-21，Standard MIDI File Import / Export V1 MI7 导入颜色已实施，待审核
+> 最近更新：2026-08-21，Standard MIDI File Import / Export V1 MI7 Timeline Tail 已实施，待审核
 >
 > 当前阶段：Standard MIDI File Import / Export V1；MI1–MI6 已完成，MI7 分批实施中
 >
@@ -318,9 +318,10 @@ Studio 当前使用 `200 ms` look-ahead 提前安排即将发声的 Note。它�
 可见的编辑冻结区，也不决定一项编辑是否生效。产品行为取决于 Commit 到达时，一次 Note 发声
 处于以下哪个阶段：
 
-主时间轴是从 Project Fact 派生的视图与播放范围：至少显示项目起始拍号的 150 小节，Clip 内容
-超过该范围时精确扩展。短项目播放完已有 Note 后继续静音推进到时间轴末端再自然停止；完全没有
-可听 Note 的 Empty Plan 仍不能启动。该范围不写入 Project File，也不会使新旧项目产生 dirty。
+主时间轴是从 Project Fact 派生的视图与播放范围：至少显示项目起始拍号的 150 小节；内容接近或
+超过该范围时，最远 Clip 末端先向上补齐到完整小节，再保留 8 个完整尾部小节。短项目播放完已有
+Note 后继续静音推进到时间轴末端再自然停止；完全没有可听 Note 的 Empty Plan 仍不能启动。
+精确内容末端与派生时间轴末端保持分离，该范围不写入 Project File，也不会使新旧项目产生 dirty。
 
 Transport 是当前播放位置的唯一运行时权威。Studio 已建立共享视觉位置源，现有 Transport 时间
 显示、Arrangement Playhead 与 Piano Roll Playhead 都从该来源读取同一 Project Second / Tick；
@@ -465,8 +466,8 @@ V1 当前只有这一个显式选择动作，不伪装成完整 Instrument Brows
 
 在 Instrument Track 的 Arrangement Lane 中创建空 MIDI Clip：
 
-- Arrangement 按项目起始拍号展示至少 150 小节；Clip 内容超过该范围时，时间轴精确扩展到
-  最远 Clip 末端。
+- Arrangement 按项目起始拍号展示至少 150 小节；内容接近或超过该范围时，时间轴从最远 Clip
+  末端向上补齐到完整小节，并额外保留 8 个完整尾部小节。
 - 右侧 Arrangement 是唯一真实纵向滚动权威；左侧 Track 控制列没有独立 `scrollTop`，按
   Arrangement 的位置执行裁切位移，并与对应 Lane 消费相同排序和固定行高。
 - 滚轮位于 Track 控制行或 Lane 时都会移动 Arrangement 权威；键盘焦点进入被裁切的 Track
@@ -940,6 +941,11 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   测试文件 / 415 项测试，`project-midi` 为 3 / 20，Studio 为 48 / 310。按约定未新增 E2E，也未
   执行浏览器人工测试；代码与功能仍待用户审核。
 
+- MI7 当前项目导入语义加固 Batch 1–4 已于 2026-08-21 通过完整 `pnpm check`，包括 Architecture、
+  Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist boundary；
+  `project-midi` 为 3 / 22，Playback 为 9 / 101，Studio 为 49 / 313。按约定未新增 E2E，也未由
+  实现方执行浏览器人工测试；四个批次仍待用户统一审核。
+
 - Manual Timeline Locate V1 最终实现通过 2026-08-18 完整 `pnpm check`；Playback 为 9 文件 /
   100 项，Studio 为 46 / 284，并通过 Architecture、Workspace Type Check、Studio Production
   Build 与 soundbank dist boundary。按用户约定没有新增 E2E，也未由实现方执行浏览器人工手测。
@@ -956,17 +962,17 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   与 soundbank dist boundary；Batch 6 按约定未新增 E2E。
 - Batch 4B.2 已通过完整 `pnpm check`（Architecture、Workspace Type Check、全部测试、
   Studio Production Build 与 soundbank dist boundary），并通过改动范围的 Oxlint / ESLint 与格式检查。
-- Project Core：28 个测试文件，409 项测试。
+- Project Core：29 个测试文件，415 项测试。
 - midi-file：3 个测试文件，14 项测试。
-- project-midi：2 个测试文件，16 项测试。
+- project-midi：3 个测试文件，22 项测试。
 - platform-browser：3 个测试文件，23 项测试。
 - editor：11 个测试文件，112 项测试。
 - playback：9 个测试文件，101 项测试。
 - audio-web：16 个测试文件，110 项测试。
-- Studio：48 个测试文件，306 项测试。
+- Studio：49 个测试文件，313 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
-合计 121 个测试文件、1093 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace Type
+合计 124 个测试文件、1112 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace Type
 Check、Studio Production Build 与 soundbank dist boundary。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

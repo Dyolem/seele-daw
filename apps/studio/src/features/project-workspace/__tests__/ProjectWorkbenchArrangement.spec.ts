@@ -265,15 +265,15 @@ describe('ProjectWorkbenchArrangement', () => {
     )
   })
 
-  it('preserves an exact partial final bar when authored content extends the minimum', () => {
-    const { wrapper } = mountArrangement({ timelineEndTick: parseTick(577_920) })
+  it('renders an extended Timeline as complete bars', () => {
+    const { wrapper } = mountArrangement({ timelineEndTick: parseTick(610_560) })
     const bars = wrapper.findAll('.project-workbench__ruler li')
 
-    expect(bars).toHaveLength(151)
-    expect(bars[150]?.text()).toBe('151')
-    expect(bars[150]?.attributes('style')).toContain('--project-workbench-bar-inline-size: 2.5rem')
+    expect(bars).toHaveLength(159)
+    expect(bars[158]?.text()).toBe('159')
+    expect(bars[158]?.attributes('style')).toContain('--project-workbench-bar-inline-size: 5rem')
     expect(wrapper.get('.project-workbench__arrangement-layout').attributes('style')).toContain(
-      '--project-workbench-timeline-inline-size: 752.5rem',
+      '--project-workbench-timeline-inline-size: 795rem',
     )
   })
 

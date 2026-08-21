@@ -368,7 +368,8 @@ No-change。
 
 自然到达 Timeline End 时 Transport 进入 Stopped，但不额外增加 generation。Planner 停止生成
 窗口。下一次 Play 会增加 generation 并从 Tick `0` 建立新 Anchor。Timeline End 至少为项目起始
-拍号的 150 小节，并在 Clip 内容更长时精确扩展，因此它可能晚于 `arrangementEndTick`。
+拍号的 150 小节；内容接近或超过该范围时，它从精确 `arrangementEndTick` 向上补齐完整小节，再
+保留 8 个完整尾部小节，因此可能晚于 `arrangementEndTick`。
 
 ## 8. Resume 为什么不追赶 Anchor 之前的长 Note
 

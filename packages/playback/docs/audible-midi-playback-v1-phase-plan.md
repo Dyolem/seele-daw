@@ -316,9 +316,9 @@ V1 不因未来 Seek 或 Transport Loop 预建公共协议；Paused 位置已经
   `playable` Plan 可以 Play；
 - Return to Start 使当前 generation 失效并回到 Stopped / Tick `0`；已在该状态时是幂等
   No-change；实际 `allNotesOff` 由后续 Scheduler / Audio Runtime 执行；
-- 自然结束采用 Compiler 的派生 `timelineEndTick`；它至少覆盖 150 个起始拍号小节，并由包含
-  Muted 或 Unsupported Clip 在内的中性内容末端继续扩展；到达末尾后进入 Stopped 并保留 End
-  位置，再次 Play 从 Tick `0` 开始；
+- 自然结束采用 Compiler 的派生 `timelineEndTick`；它至少覆盖 150 个起始拍号小节，并根据包含
+  Muted 或 Unsupported Clip 在内的中性内容末端扩展；MI7 Batch 4 后，扩展范围向上补齐完整小节
+  并保留 8 个尾部小节。到达末尾后进入 Stopped 并保留 End 位置，再次 Play 从 Tick `0` 开始；
 - 有效 Play / Resume、Pause 与 Return to Start 分别更新 generation；被拒绝或重复的 No-change
   操作不更新；自然结束关闭当前播放但不额外更新，下一次 Play 再建立新 generation；
 - Transport 到达逻辑末尾时不等待 Sample release tail。真实尾音能否继续、如何结束及再次 Play
@@ -725,8 +725,9 @@ Batch 5A 已按以下 UI 契约实现并通过功能审核；进一步优化留�
 - 右侧 Arrangement 时间内容持有唯一真实纵向滚动权威和唯一 `scrollTop`；左侧 Track 控制列
   是裁切的合成层从视图，不维护第二套滚动状态。横向滚动只作用于 Ruler 与 Lane，原生滚动轨道
   不延伸到 Track 控制列下方；
-- 当前项目时间轴至少覆盖 150 个初始拍号小节；内容超过该范围时扩展到最远 Clip End。该范围
-  是从 Project Facts 派生的 View / Playback 边界，不写入 Project File，也不使旧项目变 dirty；
+- 当前项目时间轴至少覆盖 150 个初始拍号小节；MI7 Batch 4 后，内容接近或超过该范围时从最远
+  Clip End 向上补齐完整小节，并保留 8 个尾部小节。该范围是从 Project Facts 派生的 View /
+  Playback 边界，不写入 Project File，也不使旧项目变 dirty；
 - Transport 到达派生时间轴末端时自然停止；没有可听 Note 的 Empty Plan 仍保持不可播放；
 - Arrangement Follow 默认开启并采用分页式自动滚动。用户主动横向滚动或进行时间轴编辑时，
   当前播放轮次暂停 Follow，用户可通过可见控制重新启用；
@@ -1146,8 +1147,10 @@ Batch 7B 的可视布局审核发现，共用二维滚动容器会让原生横�
 
 - 定义 `minimumTimelineEndTick = initialBarSpanTick * 150`；默认 4/4、PPQ 960 项目对应
   `576000` Tick；
-- 定义 `contentEndTick = max(clip.startTick + clip.spanTick)`，并以
+- 定义 `contentEndTick = max(clip.startTick + clip.spanTick)`。Batch 7B 当时以
   `timelineEndTick = max(minimumTimelineEndTick, contentEndTick)` 作为 Ruler 与 Lane 的共同末端；
+- MI7 Batch 4 后续保留精确 `contentEndTick`，并把共同末端修订为至少 150 小节、向上补齐完整
+  内容小节后再增加 8 个尾部小节；
 - 该最小范围适用于新旧项目，是确定性的派生规则，不写入 Project、不给旧项目制造迁移或 dirty；
 - 空项目与短项目仍显示至少 150 小节；内容越过该位置时自动扩展，不裁剪 Project Fact；
 - 右侧 Arrangement 成为唯一真实二维滚动容器；Ruler 与全部 Lane 使用同一横向位置，原生
@@ -1291,7 +1294,7 @@ Track 模式 Pencil 在全局时间轴上的首版自动放置规则已经确认
 | 验收场景                                       | 直接证据                                                                                    |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 多 Track 行配对、单一纵向滚动权威              | `ProjectWorkbenchArrangement.spec.ts`                                                       |
-| 150 小节最小范围、超长 Clip 精确扩展           | `audible-midi-timeline.spec.ts`、`ProjectWorkbenchArrangement.spec.ts`                      |
+| 150 小节最小范围、超长 Clip 完整小节与尾部扩展 | `audible-midi-timeline.spec.ts`、`ProjectWorkbenchArrangement.spec.ts`                      |
 | Timeline 自然结束与 Scheduler 停止唤醒         | `audible-midi-transport.spec.ts`、`audible-midi-scheduler.spec.ts`、Coordinator tests       |
 | `allNotesOff` / dispose 后无残留 Voice / Node  | `voice-runtime.spec.ts`、`audio-context-runtime.spec.ts`、Coordinator tests                 |
 | 后台帧停顿后恢复最新权威视觉位置               | `project-playback-vue-binding.spec.ts`                                                      |
@@ -1342,7 +1345,8 @@ Audio Runtime 单元 / 集成测试可通过 `OfflineAudioContext` 或等价可�
 - Instrument Replace 只释放目标 Track；缺失新 Soundbank 显示 warning，其他 Track 继续；
 - stale preparation、Commit gap、Pause / Resume、项目切换与 retired Runtime 回收可重复验证；
 - Batch 7 的两个 Playhead 使用同一 Transport Position，编排 Track / Lane 纵向滚动不漂移；
-- 时间轴至少覆盖 150 个初始拍号小节，超长 Clip 扩展共同末端，Transport 在该末端停止；
+- 时间轴至少覆盖 150 个初始拍号小节；超长 Clip 末端向上补齐并保留 8 个完整尾部小节，Transport
+  在该共同末端停止；
 - Arrangement 手动横向滚动暂停当前轮次 Follow，Pause / Return / 后台恢复不产生第二套时间；
 - Record、Loop 和 Output Meter 不伪装为已接通。
 

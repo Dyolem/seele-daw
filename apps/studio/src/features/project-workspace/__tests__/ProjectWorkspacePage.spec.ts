@@ -342,7 +342,7 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_000)
   })
 
-  it('extends the Ruler and Arrangement to the exact end of a long imported MIDI song', async () => {
+  it('extends a long imported MIDI song through eight complete Timeline tail bars', async () => {
     const document: MidiFileDocument = {
       format: 1,
       name: 'Long Imported Song',
@@ -385,10 +385,10 @@ describe('ProjectWorkspacePage', () => {
     const { wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
 
-    expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_960)
+    expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(610_560)
     const rulerBars = wrapper.findAll('.project-workbench__ruler li')
-    expect(rulerBars).toHaveLength(151)
-    expect(rulerBars[150]?.text()).toBe('151')
+    expect(rulerBars).toHaveLength(159)
+    expect(rulerBars[158]?.text()).toBe('159')
   })
 
   it('imports Arrangement MIDI as current-Project Tracks and selects the first Track', async () => {

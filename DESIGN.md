@@ -379,8 +379,9 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
   例外，必须明确表达“导入为新 Track”、与 Track Lane 有清晰区别，且不能进入 Track Selection。
 - Arrangement Ruler 与全部 Lane MUST 共用同一个横向滚动权威；横向移动时间内容时，左侧
   Track 标题、操作区和控制行保持固定，原生横向滚动轨道不得延伸到 Track 控制列下方。
-- 默认时间轴至少覆盖项目起始拍号的 150 小节，并由最远 Clip 末端精确扩展；Ruler、Lane、
-  Clip 定位与 Transport 自然结束必须消费同一派生范围。
+- 默认时间轴至少覆盖项目起始拍号的 150 小节；内容接近或超过最小范围时，最远 Clip 末端必须
+  向上补齐到完整小节并保留 8 个完整尾部小节。Ruler、Lane、Clip 定位与 Transport 自然结束必须
+  消费同一派生范围，而精确内容末端继续独立保留。
 - Transport Position MUST 是播放期间视觉位置的唯一运行时权威。视图 MAY 使用
   `requestAnimationFrame` 决定采样时机，但不得累计 frame delta 形成第二套播放时钟；后台恢复、
   Pause、Return、自然结束和项目切换后必须重新读取权威位置。

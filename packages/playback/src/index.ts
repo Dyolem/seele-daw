@@ -55,6 +55,7 @@ export { parsePlaybackClockDurationSecond, parsePlaybackClockSecond } from './ti
 export type { PlaybackClockDurationSecond, PlaybackClockSecond } from './time/project-time'
 export {
   AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
+  AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT,
   AudibleMidiTimelineError,
   deriveAudibleMidiTimelineRange,
 } from './timeline/audible-midi-timeline'

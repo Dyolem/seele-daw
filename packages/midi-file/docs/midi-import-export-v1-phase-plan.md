@@ -4,7 +4,7 @@
 >
 > Started: 2026-08-18
 >
-> Current checkpoint: MI7 Batch 3 implemented, pending review
+> Current checkpoint: MI7 Batch 4 implemented, pending review
 >
 > Scope: SMF Codec、Project 映射、浏览器文件边界与 Studio 导入导出纵向切片
 
@@ -176,6 +176,20 @@ soundbank dist boundary 均通过；Project Core 为 29 个测试文件 / 415 �
 - Track 颜色在创建 Command / Session Draft 时成为持久化 Project Fact；Clip 保持 `color: null`，
   继续由现有 Presentation 明确继承 Track 颜色；
 - Palette 或 Factory 失败在 Project 写入前整体失败，不能产生无色的部分导入。
+
+#### Batch 4：Timeline Tail（已实施，待审核）
+
+- `contentEndTick` 继续精确描述最远 Clip 末端，不修改 Clip 长度，也不成为新的持久化 Project Fact；
+- 共享 `timelineEndTick` 至少为项目起始拍号的 `150` 小节；内容接近或超过最小范围时，先向上
+  补齐到完整小节，再保留 `8` 个完整尾部小节，避免 Ruler 紧贴曲目末音或停在部分小节；
+- Ruler、Arrangement Lane 与 Playback 自然结束继续消费同一派生末端，因此当前 Transport 会在
+  尾部空间末端停止。未来若增加可编辑 Project End Marker，可再把视觉尾部与播放末端拆分；
+- V1 仍按项目起始拍号计算固定小节宽度；本批次不提前实现随拍号事件变化的 meter-aware Ruler。
+
+MI7 Batch 1–4 已于 2026-08-21 通过完整 `pnpm check`：Architecture、Workspace Type Check、全部
+workspace 测试、Studio Production Build 与 soundbank dist boundary 均通过；`project-midi` 为
+3 个测试文件 / 22 项测试，Playback 为 9 / 101，Studio 为 49 / 313。按约定未新增 E2E，也未由
+实现方执行浏览器人工测试；四个批次仍待用户统一审核。
 
 ### ME1：Project Export Bridge
 

@@ -106,9 +106,9 @@ Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
 Batch 7B 增加了共享时间轴范围派生：
 
 - `deriveAudibleMidiTimelineRange(snapshot)` 以项目起始拍号的小节长度乘以 `150` 得到最小时间轴
-  末端，并在任意 Clip 内容超过该范围时精确扩展；
+  末端；内容接近或超过该范围时，先向上补齐到完整小节，再保留 `8` 个完整尾部小节；
 - `contentEndTick` / `arrangementEndTick` 仍只描述全部原始 Clip 的内容范围；
-  `timelineEndTick = max(minimumTimelineEndTick, contentEndTick)` 同时约束 Studio Ruler / Lane 与
+  `timelineEndTick` 是完整小节对齐的派生视图 / 播放末端，同时约束 Studio Ruler / Lane 与
   Playback 自然结束；
 - 该范围完全派生，不写入 Project File、不触发迁移或 dirty。没有可听 Note Span 的 Empty Plan
   即使拥有时间轴范围也仍不可播放。

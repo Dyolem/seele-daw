@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
+  AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT,
   AudibleMidiTimelineError,
   deriveAudibleMidiTimelineRange,
 } from '#internal/timeline/audible-midi-timeline'
@@ -72,7 +73,7 @@ describe('Audible MIDI Timeline', () => {
     })
   })
 
-  it('extends to the exact furthest Clip end and reports a final partial bar', () => {
+  it('keeps the exact content end while extending through eight complete tail bars', () => {
     const { records, snapshot } = createAudibleMidiProjectFixture()
     const extendedClip = createMidiClipRecord({
       ...records.pianoClip,
@@ -88,8 +89,8 @@ describe('Audible MIDI Timeline', () => {
     expect(range).toMatchObject({
       contentEndTick: 577_920,
       minimumTimelineEndTick: 576_000,
-      timelineBarCount: 151,
-      timelineEndTick: 577_920,
+      timelineBarCount: 151 + AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT,
+      timelineEndTick: 610_560,
     })
   })
 

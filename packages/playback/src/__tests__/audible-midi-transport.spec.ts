@@ -331,6 +331,50 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
+  it('preserves continuous musical Tick when a newer Plan changes the Tempo Map', () => {
+    const { snapshot } = createAudibleMidiProjectFixture()
+    const plan = compileAudibleMidiProject(snapshot)
+    const nextPlan = compileAudibleMidiProject(
+      replaceCompilerFixtureSnapshot(snapshot, {
+        modelRevision: nextModelRevision(plan),
+        tempoEvents: [
+          createTempoEventRecord({
+            bpm: parseTempoBpm(60),
+            id: parseTempoEventId('tempo-transport-replacement'),
+            tick: parseTick(0),
+          }),
+        ],
+      }),
+    )
+    const clock = new ManualPlaybackClock(10)
+    const transport = createAudibleMidiTransport(plan, clock)
+
+    transport.play()
+    clock.advanceBy(0.25)
+    const handedOff = transport.handoffPlan(nextPlan)
+
+    expect(handedOff).toMatchObject({
+      outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.HANDED_OFF,
+      snapshot: {
+        anchorPlaybackClockSecond: 10.25,
+        anchorProjectSecond: 0.5,
+        engineGeneration: 2,
+        modelRevision: 1,
+        positionProjectSecond: 0.5,
+        positionTick: 480,
+        state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+        timelineEndProjectSecond: 600,
+      },
+    })
+
+    clock.advanceBy(0.25)
+    expect(transport.getSnapshot()).toMatchObject({
+      positionProjectSecond: 0.75,
+      positionTick: 720,
+      state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
+    })
+  })
+
   it('hands off Paused state without consuming Playback Clock time', () => {
     const plan = createFixturePlan()
     const clock = new ManualPlaybackClock(30)

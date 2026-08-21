@@ -54,6 +54,7 @@ interface LocatedTempoSegment {
 export interface TempoMap {
   readonly segments: readonly TempoSegmentPlan[]
   projectSecondAtTick(tick: Tick): ProjectSecond
+  projectSecondAtTickPosition(tickPosition: ContinuousTickPosition): ProjectSecond
   tickPositionAtProjectSecond(projectSecond: ProjectSecond): ContinuousTickPosition
   durationBetweenTicks(startTick: Tick, endTick: Tick): ProjectDurationSecond
 }
@@ -299,21 +300,32 @@ function findSegmentAtOrBefore(
 }
 
 function createTempoMapFromNormalizedSegments(segments: readonly TempoSegmentPlan[]): TempoMap {
-  function projectSecondAtTick(tick: Tick): ProjectSecond {
-    const parsedTick = parseTick(tick)
-    const { segment } = findSegmentAtOrBefore(segments, parsedTick, ({ startTick }) => startTick)
-    const elapsedTick = parsedTick - segment.startTick
+  function projectSecondAtTickPosition(tickPosition: ContinuousTickPosition): ProjectSecond {
+    const parsedPosition = parseContinuousTickPosition(tickPosition)
+    const { segment } = findSegmentAtOrBefore(
+      segments,
+      parsedPosition,
+      ({ startTick }) => startTick,
+    )
+    const elapsedTick = parsedPosition - segment.startTick
     const calculatedSecond = segment.startProjectSecond + elapsedTick * segment.secondsPerTick
-    const projectSecond = parseCalculatedProjectSecond(calculatedSecond, `Tick ${parsedTick}`)
+    const projectSecond = parseCalculatedProjectSecond(
+      calculatedSecond,
+      `Tick position ${parsedPosition}`,
+    )
 
     if (elapsedTick > 0 && projectSecond <= segment.startProjectSecond) {
       throw new TempoMapError(
         'numeric-result-out-of-range',
-        `Tick ${parsedTick} cannot be represented after its Tempo Segment boundary`,
+        `Tick position ${parsedPosition} cannot be represented after its Tempo Segment boundary`,
       )
     }
 
     return projectSecond
+  }
+
+  function projectSecondAtTick(tick: Tick): ProjectSecond {
+    return projectSecondAtTickPosition(parseContinuousTickPosition(parseTick(tick)))
   }
 
   function tickPositionAtProjectSecond(projectSecond: ProjectSecond): ContinuousTickPosition {
@@ -391,6 +403,7 @@ function createTempoMapFromNormalizedSegments(segments: readonly TempoSegmentPla
   return Object.freeze({
     durationBetweenTicks,
     projectSecondAtTick,
+    projectSecondAtTickPosition,
     segments,
     tickPositionAtProjectSecond,
   })

@@ -265,6 +265,10 @@ function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
   }
 }
 
+function replacesTempoEventBpm(commit: ProjectCommit): boolean {
+  return commit.origin.commandType === PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM
+}
+
 /**
  * Owns the Studio use case that joins Project facts, browser-independent playback planning, audio
  * resource preparation, native scheduling, user commands, and project/application cleanup.
@@ -1095,6 +1099,11 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       return
     }
 
+    if (this.#pendingCommits.some(replacesTempoEventBpm)) {
+      this.#installTempoMapHandoff(event, nextPlan)
+      return
+    }
+
     let reconciliation: AudibleMidiReconciliationPlan
     try {
       reconciliation = createAudibleMidiReconciliationPlan({
@@ -1319,6 +1328,60 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         projectId: event.projectId,
       }),
     )
+  }
+
+  /**
+   * Replaces the wall-clock mapping without replacing the musical position. A live Transport is
+   * first made inactive, then the old Runtime is retired so Tempo edits never resume implicitly.
+   */
+  #installTempoMapHandoff(event: ActiveProjectCommitEvent, nextPlan: AudibleMidiProjectPlan): void {
+    this.#invalidateLocateSession()
+    this.#cancelPreparation()
+    this.#stopTimer()
+    this.#stopRetiredRuntimeCleanup()
+
+    const transport = this.#transport
+    if (transport === null) {
+      this.#installStoppedPlan(event, nextPlan)
+      return
+    }
+
+    try {
+      const startedPlaying = transport.getSnapshot().state === 'playing'
+      if (startedPlaying) transport.pause()
+
+      const transition = transport.handoffPlan(nextPlan)
+      const previousRuntime = this.#preparedRuntime
+      previousRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
+      if (startedPlaying) this.#allNotesOffRuntimes()
+      if (previousRuntime !== null) this.#retiredRuntimes.add(previousRuntime)
+
+      this.#preparedRuntime = null
+      this.#runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
+      this.#scheduler = createAudibleMidiSchedulerPlanner(nextPlan, {
+        lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
+        wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,
+      })
+      this.#plan = nextPlan
+      this.#activePlanIdentity = Object.freeze({
+        modelRevision: nextPlan.modelRevision,
+        projectId: event.projectId,
+        session: event.session,
+      })
+      this.#pendingCommits = []
+      this.#pendingCommitEvent = null
+      this.#pendingCommitChainBroken = false
+      this.#pendingPlan = null
+      this.#pendingStartLocatedDuringLoading = false
+      this.#suppressedOccurrenceKeys.clear()
+      this.#suppressedTrackIds.clear()
+
+      this.#publishTransportState(transition.snapshot)
+      this.#startRetiredRuntimeCleanup()
+      this.#collectFinishedVoicesAndRuntimes()
+    } catch (cause) {
+      this.#failReconciledPlan(event, nextPlan, cause)
+    }
   }
 
   #synchronizeActiveProject(state: ActiveProjectState): void {

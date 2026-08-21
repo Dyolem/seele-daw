@@ -10,6 +10,7 @@ import {
   createMoveNotesCommand,
   createRemoveNotesCommand,
   createReplaceInstrumentDeviceCommand,
+  createReplaceTempoEventBpmCommand,
   createResizeNoteCommand,
   parseBipolarValue,
   parseClipId,
@@ -24,6 +25,7 @@ import {
   parseNoteId,
   parsePositiveTick,
   parseProjectId,
+  parseTempoBpm,
   parseTempoEventId,
   parseTick,
   parseTickDelta,
@@ -141,6 +143,7 @@ const LIFECYCLE_SOURCE_ID = parseMidiSourceId('source-playback-coordinator-lifec
 const REPLACEMENT_FUTURE_NOTE_ID = parseNoteId('note-playback-coordinator-replacement')
 const RAPID_NOTE_ID = parseNoteId('note-playback-coordinator-rapid')
 const LATEST_NOTE_ID = parseNoteId('note-playback-coordinator-latest')
+const TEMPO_EVENT_ID = parseTempoEventId('tempo-playback-coordinator')
 
 interface PlayableTrackFixture {
   readonly clipId: ClipId
@@ -231,7 +234,7 @@ function createPlayableSession(projectId: ProjectId): ProjectSession {
   const session = createInitialProjectSession({
     projectId,
     projectName: 'Audible Project',
-    tempoEventId: parseTempoEventId('tempo-playback-coordinator'),
+    tempoEventId: TEMPO_EVENT_ID,
     timeSignatureEventId: parseTimeSignatureEventId('meter-playback-coordinator'),
   })
   addPlayableTrack(session, {
@@ -1224,6 +1227,95 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(runtime.prepared.at(-1)).toBe(handedOffRuntime)
     expect(handedOffRuntime?.generations).toEqual([3, 4])
     expect(coordinator.state.phase).toBe('playing')
+    coordinator.dispose()
+  })
+
+  it('keeps a stopped musical position when a Tempo commit changes its Project time', async () => {
+    const projectId = parseProjectId('project-playback-tempo-stopped')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    expect(coordinator.locateAtTick(parseTick(1_920))).toBe(true)
+
+    const commit = requireCommitted(
+      session,
+      createReplaceTempoEventBpmCommand({
+        baseRevision: session.modelRevision,
+        bpm: parseTempoBpm(60),
+        tempoEventId: TEMPO_EVENT_ID,
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
+
+    expect(coordinator.state).toMatchObject({
+      phase: 'stopped',
+      positionProjectSecond: 2,
+    })
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'stopped',
+      positionProjectSecond: 2,
+      positionTick: 1_920,
+    })
+    expect(runtime.plans).toEqual([])
+    coordinator.dispose()
+  })
+
+  it('pauses a Playing Tempo commit at the same Tick and waits for an explicit resume', async () => {
+    const projectId = parseProjectId('project-playback-tempo-playing')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const timer = new ManualProjectPlaybackTimer()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer,
+    })
+    await coordinator.play()
+    const previousRuntime = runtime.prepared[0]!
+    previousRuntime.currentTime = parsePlaybackClockSecond(0.25)
+    runtime.currentTime = parsePlaybackClockSecond(0.25)
+
+    const commit = requireCommitted(
+      session,
+      createReplaceTempoEventBpmCommand({
+        baseRevision: session.modelRevision,
+        bpm: parseTempoBpm(60),
+        tempoEventId: TEMPO_EVENT_ID,
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
+
+    expect(coordinator.state).toMatchObject({
+      phase: 'paused',
+      positionProjectSecond: 0.5,
+    })
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'paused',
+      positionProjectSecond: 0.5,
+      positionTick: 480,
+    })
+    expect(previousRuntime.generations).toEqual([1, 3])
+    expect(previousRuntime.allNotesOffCount).toBe(1)
+    expect(previousRuntime.disposeCount).toBe(1)
+    expect(runtime.plans).toHaveLength(1)
+    expect(timer.callbacks.size).toBe(0)
+
+    await expect(coordinator.play()).resolves.toBe(true)
+    expect(runtime.plans).toHaveLength(2)
+    expect(runtime.prepared[1]?.generations).toEqual([4])
+    expect(coordinator.readVisualPosition()).toMatchObject({
+      phase: 'playing',
+      positionProjectSecond: 0.5,
+      positionTick: 480,
+    })
     coordinator.dispose()
   })
 

@@ -182,12 +182,17 @@ Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 
 - `createAudibleMidiReconciliationPlan` 验证连续 Commit 链，并对完整新旧 Plan 输出 occurrence /
   Track 变化、失效 key、受影响 Track 与全局 reset 原因；
-- Transport `handoffPlan` 保留当前位置与单调 Playback Clock anchor，在原位递增
-  `engineGeneration`，不把 generation 变化等同于 `allNotesOff`；
+- Transport `handoffPlan` 保留连续音乐 Tick 与单调 Playback Clock anchor；Tempo Map 变化只会
+  重算该 Tick 对应的 ProjectSecond，不会移动 Playhead。handoff 在原位递增 `engineGeneration`，
+  不把 generation 变化等同于 `allNotesOff`；
 - Note / Clip / Track / Instrument 的活动 Voice 语义由 Studio 按操作执行；Scheduler 只从新
   anchor 规划尚未越过起点的事件，不执行 Note Chase；
 - Tempo、Master route、Commit gap 或不可播放目标仍明确要求全局安全兜底。Playback 不拥有
   AudioContext、Voice handle、资源准备或 UI warning。
+
+Studio 对 `tempo-event.replace-bpm` 使用保留连续 Tick 的完整 Runtime handoff：若 Commit 到达时
+仍在 Playing，先停止 Scheduler、释放全部旧 Voice 并进入 Paused；Stopped / Paused 位置也按新
+Tempo Map 重算 ProjectSecond。新计划安装后不会自动恢复，只有下一次显式 Play 才准备新 Runtime。
 
 ## 长期包定位
 

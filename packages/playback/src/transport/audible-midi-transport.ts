@@ -345,6 +345,7 @@ export function createAudibleMidiTransport(
     const nextGeneration = incrementEngineGeneration(engineGeneration)
     const wasPlaying = state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
     const currentProjectSecond = synchronizePlayingPosition()
+    const currentTickPosition = positionTickAtProjectSecond(currentProjectSecond)
     const continuesPlaying = wasPlaying && state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
     const handoffPlaybackClockSecond = continuesPlaying ? lastObservedPlaybackClockSecond : null
 
@@ -357,9 +358,12 @@ export function createAudibleMidiTransport(
     returnAnchorTick = parseTick(Math.min(returnAnchorTick, nextTimelineEndTick))
     engineGeneration = nextGeneration
 
-    const handoffProjectSecond = parseProjectSecond(
-      Math.min(currentProjectSecond, timelineEndProjectSecond),
+    // Musical position owns the handoff. A Tempo Map replacement may change the
+    // corresponding ProjectSecond, but it must not move the Playhead to another Tick.
+    const handoffTickPosition = parseContinuousTickPosition(
+      Math.min(currentTickPosition, nextTimelineEndTickPosition),
     )
+    const handoffProjectSecond = tempoMap.projectSecondAtTickPosition(handoffTickPosition)
     const nextPlanIsPlayable =
       planStatus === AUDIBLE_MIDI_PLAN_STATUS.PARTIAL ||
       planStatus === AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE

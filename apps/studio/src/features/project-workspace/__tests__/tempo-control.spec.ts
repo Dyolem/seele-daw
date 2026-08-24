@@ -7,10 +7,12 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import {
+  PROJECT_TEMPO_EDITING_FRACTION_DIGITS,
   PROJECT_TEMPO_CONTROL_MODE,
   createProjectTempoControlPresentation,
   formatProjectTempoBpm,
   parseProjectTempoInput,
+  roundProjectTempoBpmForEditing,
 } from '@/features/project-workspace/tempo/tempo-control'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 
@@ -19,6 +21,12 @@ function positionTick(value: number): ProjectPlaybackVisualPosition['positionTic
 }
 
 describe('Project Tempo control projection', () => {
+  it('shares one Studio precision rule across formatting, input, and graphical editing', () => {
+    expect(PROJECT_TEMPO_EDITING_FRACTION_DIGITS).toBe(2)
+    expect(roundProjectTempoBpmForEditing(143.999_884_800_092_16)).toBe(144)
+    expect(roundProjectTempoBpmForEditing(120.125)).toBe(120.13)
+  })
+
   it.each([
     [143.999_884_800_092_16, '144'],
     [120, '120'],

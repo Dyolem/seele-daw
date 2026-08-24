@@ -8,15 +8,22 @@ import {
   type Tick,
 } from '@seele-daw/project-core'
 
-const DEFAULT_VISIBLE_MINIMUM_BPM = 40
-const DEFAULT_VISIBLE_MAXIMUM_BPM = 240
-const SCALE_PADDING_BPM = 20
+import { roundProjectTempoBpmForEditing } from '@/features/project-workspace/tempo/tempo-control'
+
+export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM = 40
+export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MAXIMUM_BPM = 240
+export const PROJECT_TEMPO_TRACK_VISIBLE_SCALE_PADDING_BPM = 20
 export const PROJECT_TEMPO_TRACK_DRAG_THRESHOLD_PX = 4
 
 export interface ProjectTempoTrackScale {
   readonly maximumBpm: number
   readonly minimumBpm: number
 }
+
+export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_SCALE = Object.freeze<ProjectTempoTrackScale>({
+  maximumBpm: PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MAXIMUM_BPM,
+  minimumBpm: PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM,
+})
 
 export type ProjectTempoTrackDragAxis = 'blocked-tick' | 'bpm' | 'tick'
 
@@ -56,21 +63,41 @@ export function orderProjectTempoEvents(
   )
 }
 
-/** Keeps ordinary musical tempos legible while expanding to include valid extreme Project facts. */
-export function deriveProjectTempoTrackScale(
+/** Creates the transient view scale for a Project without treating presentation as a Project fact. */
+export function createInitialProjectTempoTrackScale(
   tempoEvents: readonly TempoEventRecord[],
 ): ProjectTempoTrackScale {
-  let observedMinimum = DEFAULT_VISIBLE_MINIMUM_BPM
-  let observedMaximum = DEFAULT_VISIBLE_MAXIMUM_BPM
+  return expandProjectTempoTrackScale(PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_SCALE, tempoEvents)
+}
+
+/** Expands an existing view to reveal new facts without contracting or moving the current scale. */
+export function expandProjectTempoTrackScale(
+  scale: ProjectTempoTrackScale,
+  tempoEvents: readonly TempoEventRecord[],
+): ProjectTempoTrackScale {
+  let nextMinimum = scale.minimumBpm
+  let nextMaximum = scale.maximumBpm
 
   for (const tempoEvent of tempoEvents) {
-    observedMinimum = Math.min(observedMinimum, tempoEvent.bpm - SCALE_PADDING_BPM)
-    observedMaximum = Math.max(observedMaximum, tempoEvent.bpm + SCALE_PADDING_BPM)
+    if (tempoEvent.bpm < nextMinimum) {
+      nextMinimum = Math.max(
+        TEMPO_BPM_MIN,
+        Math.floor(tempoEvent.bpm - PROJECT_TEMPO_TRACK_VISIBLE_SCALE_PADDING_BPM),
+      )
+    }
+    if (tempoEvent.bpm > nextMaximum) {
+      nextMaximum = Math.min(
+        TEMPO_BPM_MAX,
+        Math.ceil(tempoEvent.bpm + PROJECT_TEMPO_TRACK_VISIBLE_SCALE_PADDING_BPM),
+      )
+    }
   }
 
+  if (nextMinimum === scale.minimumBpm && nextMaximum === scale.maximumBpm) return scale
+
   return Object.freeze({
-    maximumBpm: Math.min(TEMPO_BPM_MAX, Math.ceil(observedMaximum)),
-    minimumBpm: Math.max(TEMPO_BPM_MIN, Math.floor(observedMinimum)),
+    maximumBpm: nextMaximum,
+    minimumBpm: nextMinimum,
   })
 }
 
@@ -112,7 +139,7 @@ export function resolveProjectTempoTrackBpm(input: ResolveProjectTempoTrackBpmIn
   }
 
   const ratio = Math.min(1, Math.max(0, (input.clientY - input.laneTop) / input.laneHeight))
-  return parseTempoBpm(roundTempoTrackBpm(input.scale.maximumBpm - ratio * span))
+  return parseTempoBpm(roundProjectTempoBpmForEditing(input.scale.maximumBpm - ratio * span))
 }
 
 /** Applies vertical pointer delta without making an off-center grab jump to a new BPM. */
@@ -130,7 +157,9 @@ export function resolveDraggedProjectTempoBpm(input: ResolveDraggedProjectTempoB
 
   const bpm =
     input.startBpm + ((input.startClientY - input.currentClientY) / input.laneHeight) * span
-  return parseTempoBpm(roundTempoTrackBpm(Math.min(TEMPO_BPM_MAX, Math.max(TEMPO_BPM_MIN, bpm))))
+  return parseTempoBpm(
+    roundProjectTempoBpmForEditing(Math.min(TEMPO_BPM_MAX, Math.max(TEMPO_BPM_MIN, bpm))),
+  )
 }
 
 /** Locks a point gesture to its dominant axis after a small click-tolerance threshold. */
@@ -144,8 +173,4 @@ export function resolveProjectTempoTrackDragAxis(
   }
   if (Math.abs(deltaX) > Math.abs(deltaY)) return canMoveTick ? 'tick' : 'blocked-tick'
   return 'bpm'
-}
-
-function roundTempoTrackBpm(bpm: number): number {
-  return Math.round(bpm * 100) / 100
 }

@@ -8,6 +8,9 @@ import {
 
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 
+export const PROJECT_TEMPO_EDITING_FRACTION_DIGITS = 2
+const PROJECT_TEMPO_EDITING_ROUNDING_FACTOR = 10 ** PROJECT_TEMPO_EDITING_FRACTION_DIGITS
+
 export const PROJECT_TEMPO_CONTROL_MODE = Object.freeze({
   SINGLE: 'single',
   TEMPO_MAP: 'tempo-map',
@@ -35,8 +38,15 @@ export type ProjectTempoInputResult =
 /** Formats Project precision for a compact DAW control without mutating the stored BPM. */
 export function formatProjectTempoBpm(bpm: TempoBpm): string {
   return parseTempoBpm(bpm)
-    .toFixed(2)
+    .toFixed(PROJECT_TEMPO_EDITING_FRACTION_DIGITS)
     .replace(/\.?0+$/, '')
+}
+
+/** Applies the shared Studio editing precision without changing the Project BPM domain range. */
+export function roundProjectTempoBpmForEditing(bpm: number): number {
+  return (
+    Math.round(bpm * PROJECT_TEMPO_EDITING_ROUNDING_FACTOR) / PROJECT_TEMPO_EDITING_ROUNDING_FACTOR
+  )
 }
 
 /** Selects the step Tempo Event active at the continuous Transport position. */
@@ -82,7 +92,7 @@ export function parseProjectTempoInput(input: string): ProjectTempoInputResult {
   }
 
   const fraction = candidate.split('.')[1]
-  if (fraction !== undefined && fraction.length > 2) {
+  if (fraction !== undefined && fraction.length > PROJECT_TEMPO_EDITING_FRACTION_DIGITS) {
     return Object.freeze({
       status: 'rejected',
       message: 'Tempo supports at most two decimal places.',

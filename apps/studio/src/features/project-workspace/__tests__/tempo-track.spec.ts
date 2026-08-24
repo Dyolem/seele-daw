@@ -7,7 +7,8 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import {
-  deriveProjectTempoTrackScale,
+  createInitialProjectTempoTrackScale,
+  expandProjectTempoTrackScale,
   orderProjectTempoEvents,
   projectTempoTrackBpmPositionRatio,
   resolveDraggedProjectTempoBpm,
@@ -30,7 +31,7 @@ describe('Tempo Track projection', () => {
     const initial = tempoEvent('tempo-initial', 0, 120)
 
     expect(orderProjectTempoEvents([later, initial])).toEqual([initial, later])
-    expect(deriveProjectTempoTrackScale([later, initial])).toEqual({
+    expect(createInitialProjectTempoTrackScale([later, initial])).toEqual({
       maximumBpm: 240,
       minimumBpm: 40,
     })
@@ -40,11 +41,30 @@ describe('Tempo Track projection', () => {
 
   it('expands the scale to retain legal imported extreme values', () => {
     expect(
-      deriveProjectTempoTrackScale([
+      createInitialProjectTempoTrackScale([
         tempoEvent('tempo-minimum', 0, 5),
         tempoEvent('tempo-maximum', 960, 999),
       ]),
     ).toEqual({ maximumBpm: 999, minimumBpm: 5 })
+  })
+
+  it('fits imported low tempos while keeping the ordinary upper view boundary', () => {
+    expect(
+      createInitialProjectTempoTrackScale([
+        tempoEvent('tempo-imported-low', 0, 15.545_455_040_082_661),
+      ]),
+    ).toEqual({ maximumBpm: 240, minimumBpm: 5 })
+  })
+
+  it('expands a transient view without contracting it when facts later disappear', () => {
+    const expanded = expandProjectTempoTrackScale({ maximumBpm: 240, minimumBpm: 40 }, [
+      tempoEvent('tempo-expanded', 960, 300),
+    ])
+
+    expect(expanded).toEqual({ maximumBpm: 320, minimumBpm: 40 })
+    expect(expandProjectTempoTrackScale(expanded, [tempoEvent('tempo-ordinary', 0, 120)])).toBe(
+      expanded,
+    )
   })
 
   it('maps pointer coordinates to integer Tick and two-decimal BPM values', () => {

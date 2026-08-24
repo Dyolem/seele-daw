@@ -10,7 +10,8 @@ import { computed, onMounted, onUnmounted, shallowRef, type StyleValue, watch } 
 
 import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-control'
 import {
-  deriveProjectTempoTrackScale,
+  createInitialProjectTempoTrackScale,
+  expandProjectTempoTrackScale,
   orderProjectTempoEvents,
   projectTempoTrackBpmPositionRatio,
   resolveDraggedProjectTempoBpm,
@@ -50,6 +51,7 @@ interface TempoPointPreview {
 const props = defineProps<{
   readonly barSpanTick: Tick
   readonly editingDisabled: boolean
+  readonly projectId: string
   readonly selectedTempoEventId: TempoEventId | null
   readonly tempoEvents: readonly TempoEventRecord[]
   readonly timelineEndTick: Tick
@@ -68,7 +70,9 @@ const plotElement = shallowRef<HTMLElement | null>(null)
 // semantic intent for the Page-owned command coordinator; cancellation discards the preview.
 const activeGesture = shallowRef<ActiveTempoPointGesture | null>(null)
 const pointPreview = shallowRef<TempoPointPreview | null>(null)
-const tempoScale = computed(() => deriveProjectTempoTrackScale(props.tempoEvents))
+const tempoScale = shallowRef<ProjectTempoTrackScale>(
+  createInitialProjectTempoTrackScale(props.tempoEvents),
+)
 const renderedEvents = computed(() => {
   const preview = pointPreview.value
   return orderProjectTempoEvents(
@@ -269,6 +273,18 @@ function handleWindowKeydown(event: KeyboardEvent): void {
 function handleWindowBlur(): void {
   cancelPointGesture()
 }
+
+watch(
+  [() => props.projectId, () => props.tempoEvents],
+  ([projectId, tempoEvents], [previousProjectId]) => {
+    if (projectId !== previousProjectId) {
+      tempoScale.value = createInitialProjectTempoTrackScale(tempoEvents)
+      return
+    }
+
+    tempoScale.value = expandProjectTempoTrackScale(tempoScale.value, tempoEvents)
+  },
+)
 
 watch(
   () => props.tempoEvents.some(({ id }) => id === activeGesture.value?.tempoEventId),

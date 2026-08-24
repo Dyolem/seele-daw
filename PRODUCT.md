@@ -4,10 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-24，Project Tempo Track V1 MT3 已实施，待审核
+> 最近更新：2026-08-24，Project Tempo Track V1 MT3 已通过审核并提交，MT4A 已实施，待审核
 >
-> 当前阶段：Project Tempo Control V1；Tempo Event 生命周期、Playback handoff、主控与专用
-> Tempo Track 已接通
+> 当前阶段：Project Tempo Control V1；正在收紧 Tempo 编辑精度与可视比例的产品边界
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -76,7 +75,7 @@ Studio 会明确失败，不静默替换声音。
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                   |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return；播放中相关编辑按 Note / Track 选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                             |
-| `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；每个完成手势只提交一个 Command。                             |
+| `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                             |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                |
 | `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、原子 Pencil 放置、Clip 内完整 Note 编辑、Snap 与 Undo / Redo 已接入。                   |
 
@@ -254,8 +253,12 @@ Arrangement 的 Tempo Track 遵循以下规则：
   `5..999 BPM` 的新值；选择和 Drag Preview 是页面级瞬态状态，不写入 Project、History 或文件；
 - 双击 Tempo Track 空白处创建一个 step Tempo Event。横坐标转换为最近的整数 Project Tick，
   不做拍、小节或其他音乐 Grid 吸附；纵坐标按照当前可见 BPM 标尺转换为最多两位小数的值；
-- 默认可见标尺覆盖 `40..240 BPM`；只有现有 Project 事实超出该区间时才向 `5..999 BPM` 领域边界
-  扩展并保留上下余量，不能为了显示而 clamp 或修改导入值；
+- Project BPM 的合法事实范围始终是 `5..999`，Studio 的统一编辑精度是最多两位小数；Tempo Track
+  默认可见标尺 `40..240 BPM` 只是瞬态视图预设，不是第二套 BPM 校验边界；
+- 首次显示一个 Project 时，可视标尺从默认预设向外扩展并保留余量，以包含已有合法事实；同一
+  Project 内新事实超出范围时继续扩展，但删除、Undo 或 Drag Preview 不自动收缩标尺，避免编辑中
+  纵轴跳动；切换 Project 时重新建立视图。可视标尺不写入 Project、History 或 Project File，也
+  不能为了显示而 clamp 或修改导入值；
 - 拖动超过 click tolerance 后按主导方向锁定单一轴：横向只移动 Tick，纵向只调整 BPM，锁定后不在
   同一手势中切换；拖动期间只移动本地 Preview，Pointer Up 才形成一个 Move 或 Replace BPM
   Command / History 步骤，Pointer Cancel、Capture Loss 或 Escape 不提交；
@@ -957,7 +960,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-20 | `MIDI-IMPORT`                                              | 完成 Project Entry 导入纵向切片，并在 Workbench 项目菜单与 Arrangement 末尾增加明确的“导入为新项目”入口及 dirty 导航保护。                                       | `fca1c49`、`2b95ee9`                       |
 | 2026-08-24 | `TEMPO-CONTROL`                                            | Studio 接通单 Tempo 主控精度显示、数值编辑、播放中自动 Pause、History 与多 Tempo 当前值只读投影。                                                                | `554c2f9`                                  |
 | 2026-08-24 | `TEMPO-TRACK`                                              | Project Core 完成 Tempo Event Add / Move / Remove 生命周期；Playback 对全部 Tempo Change 使用保留连续 Tick 的完整 handoff。                                      | `003b557`、`a2a2092`                       |
-| 2026-08-24 | `TEMPO-TRACK`                                              | Studio 增加固定 Tempo Track、事件选择、双击新增、单轴拖动、精确数值编辑、删除、失败反馈与 Composition Root ID 协调。                                             | 本次提交                                   |
+| 2026-08-24 | `TEMPO-TRACK`                                              | Studio 增加固定 Tempo Track、事件选择、双击新增、单轴拖动、精确数值编辑、删除、失败反馈与 Composition Root ID 协调。                                             | `f62f384`                                  |
+| 2026-08-24 | `TEMPO-TRACK`                                              | MT4A 区分 `5..999` 领域范围与 `40..240` 默认视图，统一 Studio 编辑精度，并建立按 Project 重置、同一 Project 内只扩不缩的瞬态纵轴。                               | 本次提交                                   |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -977,7 +981,12 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 
 - Project Tempo Control V1 MT3 已于 2026-08-24 通过完整 `pnpm check`，包括 Architecture、
   Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist boundary；Studio
-  为 56 个测试文件 / 359 项测试。未执行浏览器人工测试，代码与功能待用户审核。
+  为 56 个测试文件 / 359 项测试。未执行浏览器人工测试，代码与功能已通过用户审核并提交为
+  `f62f384`。
+
+- Project Tempo Control V1 MT4A 已于 2026-08-24 通过根级 `pnpm lint`、Studio Type Check、
+  56 个测试文件 / 363 项测试、Production Build 与 soundbank dist boundary。未执行浏览器人工
+  测试，代码与功能待用户审核。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

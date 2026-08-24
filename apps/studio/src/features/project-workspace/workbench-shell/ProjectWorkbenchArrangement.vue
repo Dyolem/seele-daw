@@ -804,6 +804,7 @@ onUnmounted(() => cancelTimelineLocate())
           <TempoTrackLane
             :bar-span-tick="props.barSpanTick"
             :editing-disabled="props.tempoEditingDisabled"
+            :project-id="props.projectId"
             :selected-tempo-event-id="props.selectedTempoEventId"
             :tempo-events="props.tempoEvents"
             :timeline-end-tick="props.timelineEndTick"

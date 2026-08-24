@@ -27,15 +27,18 @@ const LATER_EVENT = tempoEvent('tempo-track-lane-later', 960, 100)
 function mountLane(
   input: {
     readonly editingDisabled?: boolean
+    readonly projectId?: string
     readonly selectedTempoEventId?: TempoEventRecord['id'] | null
+    readonly tempoEvents?: readonly TempoEventRecord[]
   } = {},
 ) {
   const wrapper = mount(TempoTrackLane, {
     props: {
       barSpanTick: parsePositiveTick(3_840),
       editingDisabled: input.editingDisabled ?? false,
+      projectId: input.projectId ?? 'tempo-track-project',
       selectedTempoEventId: input.selectedTempoEventId ?? null,
-      tempoEvents: Object.freeze([INITIAL_EVENT, LATER_EVENT]),
+      tempoEvents: input.tempoEvents ?? Object.freeze([INITIAL_EVENT, LATER_EVENT]),
       timelineEndTick: parseTick(3_840),
     },
   })
@@ -96,6 +99,24 @@ describe('TempoTrackLane', () => {
     expect(points[0]?.attributes('style')).toContain('translate3d(0rem, -50%, 0)')
     expect(points[1]?.attributes('style')).toContain('translate3d(1.25rem, -50%, 0)')
     expect(points[1]?.classes()).toContain('tempo-track-lane__point--selected')
+  })
+
+  it('keeps an expanded view stable within one Project and resets it for another Project', async () => {
+    const extremeEvent = tempoEvent('tempo-track-lane-extreme', 1_920, 999)
+    const { wrapper } = mountLane()
+
+    await wrapper.setProps({ tempoEvents: Object.freeze([INITIAL_EVENT, extremeEvent]) })
+    expect(wrapper.get('.tempo-track-lane__scale--maximum').text()).toBe('999')
+
+    await wrapper.setProps({ tempoEvents: Object.freeze([INITIAL_EVENT, LATER_EVENT]) })
+    expect(wrapper.get('.tempo-track-lane__scale--maximum').text()).toBe('999')
+
+    await wrapper.setProps({
+      projectId: 'tempo-track-other-project',
+      tempoEvents: Object.freeze([INITIAL_EVENT, LATER_EVENT]),
+    })
+    expect(wrapper.get('.tempo-track-lane__scale--maximum').text()).toBe('240')
+    expect(wrapper.get('.tempo-track-lane__scale--minimum').text()).toBe('40')
   })
 
   it('maps a blank-lane double-click to one Add intent', async () => {

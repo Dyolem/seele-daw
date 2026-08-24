@@ -47,7 +47,12 @@ import {
   type Tick,
   type TickDelta,
 } from '#internal/time/tick'
-import { parseTempoBpm, type TempoBpm } from '#internal/time/tempo-event'
+import {
+  createTempoEventRecord,
+  parseTempoBpm,
+  type TempoBpm,
+  type TempoEventRecord,
+} from '#internal/time/tempo-event'
 
 /** Canonical runtime discriminants for product-level project commands. */
 export const PROJECT_COMMAND_TYPE = {
@@ -70,6 +75,9 @@ export const PROJECT_COMMAND_TYPE = {
     RESIZE: 'midi-note.resize',
   },
   TEMPO_EVENT: {
+    ADD: 'tempo-event.add',
+    MOVE: 'tempo-event.move',
+    REMOVE: 'tempo-event.remove',
     REPLACE_BPM: 'tempo-event.replace-bpm',
   },
 } as const
@@ -100,6 +108,25 @@ export interface ReplaceTempoEventBpmCommand extends ProjectCommandBase<
 > {
   readonly tempoEventId: TempoEventId
   readonly bpm: TempoBpm
+}
+
+export interface AddTempoEventCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD
+> {
+  readonly tempoEvent: TempoEventRecord
+}
+
+export interface MoveTempoEventCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE
+> {
+  readonly tempoEventId: TempoEventId
+  readonly tick: Tick
+}
+
+export interface RemoveTempoEventCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE
+> {
+  readonly tempoEventId: TempoEventId
 }
 
 export interface AddInstrumentTrackCommand extends ProjectCommandBase<
@@ -191,6 +218,10 @@ export interface ResizeNoteCommand extends MidiNoteCommandBase<
 }
 
 export type ProjectCommand =
+  | AddTempoEventCommand
+  | MoveTempoEventCommand
+  | RemoveTempoEventCommand
+  | ReplaceTempoEventBpmCommand
   | AddInstrumentTrackCommand
   | AddInstrumentTrackCollectionCommand
   | ReplaceInstrumentDeviceCommand
@@ -201,7 +232,24 @@ export type ProjectCommand =
   | MoveNotesCommand
   | RemoveNotesCommand
   | ResizeNoteCommand
-  | ReplaceTempoEventBpmCommand
+
+export interface CreateAddTempoEventCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly tempoEventId: TempoEventId
+  readonly tick: Tick
+  readonly bpm: TempoBpm
+}
+
+export interface CreateMoveTempoEventCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly tempoEventId: TempoEventId
+  readonly tick: Tick
+}
+
+export interface CreateRemoveTempoEventCommandInput {
+  readonly baseRevision: ModelRevision
+  readonly tempoEventId: TempoEventId
+}
 
 export interface CreateReplaceTempoEventBpmCommandInput {
   readonly baseRevision: ModelRevision
@@ -335,6 +383,41 @@ export function createReplaceTempoEventBpmCommand(
     baseRevision: parseCommandBaseRevision(input.baseRevision),
     tempoEventId: parseTempoEventId(input.tempoEventId),
     bpm: parseTempoBpm(input.bpm),
+  }
+}
+
+export function createAddTempoEventCommand(
+  input: CreateAddTempoEventCommandInput,
+): AddTempoEventCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    tempoEvent: createTempoEventRecord({
+      id: input.tempoEventId,
+      tick: input.tick,
+      bpm: input.bpm,
+    }),
+  }
+}
+
+export function createMoveTempoEventCommand(
+  input: CreateMoveTempoEventCommandInput,
+): MoveTempoEventCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    tempoEventId: parseTempoEventId(input.tempoEventId),
+    tick: parseTick(input.tick),
+  }
+}
+
+export function createRemoveTempoEventCommand(
+  input: CreateRemoveTempoEventCommandInput,
+): RemoveTempoEventCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    tempoEventId: parseTempoEventId(input.tempoEventId),
   }
 }
 
@@ -592,6 +675,17 @@ function rejectUnknownCommand(command: never): never {
 /** @internal Revalidates structurally supplied commands before they read model state. */
 export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand {
   switch (command.type) {
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD:
+      return createAddTempoEventCommand({
+        baseRevision: command.baseRevision,
+        tempoEventId: command.tempoEvent.id,
+        tick: command.tempoEvent.tick,
+        bpm: command.tempoEvent.bpm,
+      })
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE:
+      return createMoveTempoEventCommand(command)
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE:
+      return createRemoveTempoEventCommand(command)
     case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM:
       return createReplaceTempoEventBpmCommand(command)
     case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:

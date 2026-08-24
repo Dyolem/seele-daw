@@ -213,6 +213,10 @@ function commandTypesForOccurrence(
           case 'instrument-track.added':
           case 'instrument-track.removed':
             return change.trackId === trackId
+          case 'tempo-event.added':
+          case 'tempo-event.removed':
+          case 'tempo-event.updated':
+            return false
         }
       })
     ) {
@@ -243,6 +247,9 @@ function commandTypesForTrack(
           case 'midi-note.added':
           case 'midi-note.removed':
           case 'midi-note.updated':
+          case 'tempo-event.added':
+          case 'tempo-event.removed':
+          case 'tempo-event.updated':
             return false
         }
       })

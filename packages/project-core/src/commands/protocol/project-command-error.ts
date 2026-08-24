@@ -40,7 +40,11 @@ export type ProjectCommandErrorCode =
   | 'note-out-of-clip-range'
   | 'note-out-of-source-range'
   | 'note-pitch-out-of-range'
+  | 'initial-tempo-event-cannot-move'
+  | 'initial-tempo-event-cannot-remove'
+  | 'tempo-event-id-already-exists'
   | 'tempo-event-not-found'
+  | 'tempo-event-tick-already-exists'
   | 'track-id-already-exists'
   | 'track-not-found'
   | 'track-order-index-out-of-bounds'
@@ -48,6 +52,7 @@ export type ProjectCommandErrorCode =
 
 export interface ProjectCommandErrorDetails {
   readonly baseRevision?: number
+  readonly blockingTempoEventId?: TempoEventId
   readonly blockingClipId?: ClipId
   readonly clipEndTick?: Tick
   readonly clipId?: ClipId
@@ -65,6 +70,7 @@ export interface ProjectCommandErrorDetails {
   readonly sourceReadStartTick?: Tick
   readonly targetSpanTick?: Tick
   readonly tempoEventId?: TempoEventId
+  readonly tempoEventTick?: Tick
   readonly trackId?: TrackId
   readonly trackKind?: string
   readonly trackOrderLength?: number
@@ -74,6 +80,7 @@ export interface ProjectCommandErrorDetails {
 export class ProjectCommandError extends Error {
   readonly code: ProjectCommandErrorCode
   readonly baseRevision: number | null
+  readonly blockingTempoEventId: TempoEventId | null
   readonly blockingClipId: ClipId | null
   readonly clipEndTick: Tick | null
   readonly clipId: ClipId | null
@@ -91,6 +98,7 @@ export class ProjectCommandError extends Error {
   readonly sourceReadStartTick: Tick | null
   readonly targetSpanTick: Tick | null
   readonly tempoEventId: TempoEventId | null
+  readonly tempoEventTick: Tick | null
   readonly trackId: TrackId | null
   readonly trackKind: string | null
   readonly trackOrderLength: number | null
@@ -104,6 +112,7 @@ export class ProjectCommandError extends Error {
     this.name = 'ProjectCommandError'
     this.code = code
     this.baseRevision = details.baseRevision ?? null
+    this.blockingTempoEventId = details.blockingTempoEventId ?? null
     this.blockingClipId = details.blockingClipId ?? null
     this.clipEndTick = details.clipEndTick ?? null
     this.clipId = details.clipId ?? null
@@ -121,6 +130,7 @@ export class ProjectCommandError extends Error {
     this.sourceReadStartTick = details.sourceReadStartTick ?? null
     this.targetSpanTick = details.targetSpanTick ?? null
     this.tempoEventId = details.tempoEventId ?? null
+    this.tempoEventTick = details.tempoEventTick ?? null
     this.trackId = details.trackId ?? null
     this.trackKind = details.trackKind ?? null
     this.trackOrderLength = details.trackOrderLength ?? null

@@ -1,5 +1,6 @@
 import {
   PROJECT_COMMAND_TYPE,
+  type AddTempoEventCommand,
   type AddInstrumentTrackCollectionCommand,
   type AddInstrumentTrackCommand,
   type AddMidiClipCommand,
@@ -8,9 +9,11 @@ import {
   type ExtendMidiClipWithNoteCommand,
   type InstrumentTrackCollectionClip,
   type InstrumentTrackCollectionEntry,
+  type MoveTempoEventCommand,
   type MoveNotesCommand,
   type ProjectCommand,
   type ProjectCommandType,
+  type RemoveTempoEventCommand,
   type RemoveNotesCommand,
   type ReplaceInstrumentDeviceCommand,
   type ReplaceTempoEventBpmCommand,
@@ -31,6 +34,8 @@ import {
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
   type ProjectChange,
+  type TempoEventAddedChange,
+  type TempoEventRemovedChange,
   type TempoEventUpdatedChange,
 } from '#internal/commit/project-change'
 import {
@@ -53,7 +58,11 @@ import { nextModelRevision } from '#internal/model/model-revision'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import { ownPropertiesHaveSameValues } from '#internal/model/value-equality'
 import { assertCreatedMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
-import type { DeviceReplaceMutation, ProjectMutation } from '#internal/mutation/project-mutation'
+import type {
+  DeviceReplaceMutation,
+  ProjectMutation,
+  TempoEventMutation,
+} from '#internal/mutation/project-mutation'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { addTicks, parseTick } from '#internal/time/tick'
 import { createTempoEventRecord } from '#internal/time/tempo-event'
@@ -137,18 +146,28 @@ function mapUpdatedInstrumentDevice(
   })
 }
 
-type TempoEventReplaceMutation = Extract<
-  ProjectMutation,
-  { readonly type: typeof PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE }
->
-
-function mapUpdatedTempoEvent(mutation: TempoEventReplaceMutation): TempoEventUpdatedChange {
-  return Object.freeze({
-    type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED,
-    tempoEventId: mutation.after.id,
-    before: mutation.before,
-    after: mutation.after,
-  })
+function mapTempoEventMutationToChange(mutation: TempoEventMutation): ProjectChange {
+  switch (mutation.type) {
+    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
+      return Object.freeze<TempoEventAddedChange>({
+        type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED,
+        tempoEventId: mutation.after.id,
+        after: mutation.after,
+      })
+    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
+      return Object.freeze<TempoEventRemovedChange>({
+        type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED,
+        tempoEventId: mutation.before.id,
+        before: mutation.before,
+      })
+    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
+      return Object.freeze<TempoEventUpdatedChange>({
+        type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED,
+        tempoEventId: mutation.after.id,
+        before: mutation.before,
+        after: mutation.after,
+      })
+  }
 }
 
 function mapNoteMutationToChange(mutation: ProjectMutation, mutationIndex: number): ProjectChange {
@@ -379,8 +398,10 @@ function createProjectChanges(mutations: readonly ProjectMutation[]): readonly P
     const mutation = mutations[mutationIndex]!
 
     switch (mutation.type) {
+      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
+      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
       case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
-        changes.push(mapUpdatedTempoEvent(mutation))
+        changes.push(mapTempoEventMutationToChange(mutation))
         break
 
       case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
@@ -769,11 +790,60 @@ function matchesReplacedTempoEventBpm(
   return ownPropertiesHaveSameValues(mutation.after, expectedAfter)
 }
 
+function matchesAddedTempoEvent(command: AddTempoEventCommand, mutation: ProjectMutation): boolean {
+  return (
+    mutation.type === PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT &&
+    mutation.after === command.tempoEvent
+  )
+}
+
+function matchesMovedTempoEvent(
+  command: MoveTempoEventCommand,
+  mutation: ProjectMutation,
+): boolean {
+  if (
+    mutation.type !== PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE ||
+    mutation.before.id !== command.tempoEventId ||
+    mutation.after.id !== command.tempoEventId ||
+    mutation.before.tick === command.tick
+  ) {
+    return false
+  }
+
+  const expectedAfter = createTempoEventRecord({ ...mutation.before, tick: command.tick })
+  return ownPropertiesHaveSameValues(mutation.after, expectedAfter)
+}
+
+function matchesRemovedTempoEvent(
+  command: RemoveTempoEventCommand,
+  mutation: ProjectMutation,
+): boolean {
+  return (
+    mutation.type === PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE &&
+    mutation.before.id === command.tempoEventId
+  )
+}
+
 function assertCommandPlanCorrespondence(command: ProjectCommand, plan: MutationPlan): void {
   const mutation = plan.forward[0]
   let matches = false
 
-  if (command.type === PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM) {
+  if (command.type === PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD) {
+    matches =
+      plan.forward.length === 1 &&
+      mutation !== undefined &&
+      matchesAddedTempoEvent(command, mutation)
+  } else if (command.type === PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE) {
+    matches =
+      plan.forward.length === 1 &&
+      mutation !== undefined &&
+      matchesMovedTempoEvent(command, mutation)
+  } else if (command.type === PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE) {
+    matches =
+      plan.forward.length === 1 &&
+      mutation !== undefined &&
+      matchesRemovedTempoEvent(command, mutation)
+  } else if (command.type === PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM) {
     matches =
       plan.forward.length === 1 &&
       mutation !== undefined &&

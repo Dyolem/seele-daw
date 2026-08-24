@@ -35,6 +35,8 @@ export const PROJECT_CHANGE_TYPE = {
     UPDATED: 'midi-note.updated',
   },
   TEMPO_EVENT: {
+    ADDED: 'tempo-event.added',
+    REMOVED: 'tempo-event.removed',
     UPDATED: 'tempo-event.updated',
   },
 } as const
@@ -148,9 +150,26 @@ export interface MidiNoteUpdatedChange extends MidiNoteChangeBase<
   readonly after: MidiNoteRecord
 }
 
-export interface TempoEventUpdatedChange {
-  readonly type: typeof PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED
+interface TempoEventChangeBase<Type extends ProjectChangeType> {
+  readonly type: Type
   readonly tempoEventId: TempoEventId
+}
+
+export interface TempoEventAddedChange extends TempoEventChangeBase<
+  typeof PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED
+> {
+  readonly after: TempoEventRecord
+}
+
+export interface TempoEventRemovedChange extends TempoEventChangeBase<
+  typeof PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED
+> {
+  readonly before: TempoEventRecord
+}
+
+export interface TempoEventUpdatedChange extends TempoEventChangeBase<
+  typeof PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED
+> {
   readonly before: TempoEventRecord
   readonly after: TempoEventRecord
 }
@@ -165,4 +184,6 @@ export type ProjectChange =
   | MidiNoteAddedChange
   | MidiNoteRemovedChange
   | MidiNoteUpdatedChange
+  | TempoEventAddedChange
+  | TempoEventRemovedChange
   | TempoEventUpdatedChange

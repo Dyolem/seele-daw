@@ -1,6 +1,7 @@
 /** Public API for the framework-agnostic project kernel. */
 export {
   PROJECT_COMMAND_TYPE,
+  createAddTempoEventCommand,
   createAddInstrumentTrackCommand,
   createAddInstrumentTrackCollectionCommand,
   createAddMidiClipCommand,
@@ -8,12 +9,15 @@ export {
   createAddNoteCommand,
   createExtendMidiClipWithNoteCommand,
   createMoveNotesCommand,
+  createMoveTempoEventCommand,
   createRemoveNotesCommand,
+  createRemoveTempoEventCommand,
   createReplaceInstrumentDeviceCommand,
   createReplaceTempoEventBpmCommand,
   createResizeNoteCommand,
 } from './commands/protocol/project-command'
 export type {
+  AddTempoEventCommand,
   AddInstrumentTrackCommand,
   AddInstrumentTrackCollectionCommand,
   AddMidiClipCommand,
@@ -24,9 +28,12 @@ export type {
   CreateAddMidiClipCommandInput,
   CreateAddMidiClipWithNoteCommandInput,
   CreateAddNoteCommandInput,
+  CreateAddTempoEventCommandInput,
   CreateExtendMidiClipWithNoteCommandInput,
   CreateMoveNotesCommandInput,
+  CreateMoveTempoEventCommandInput,
   CreateRemoveNotesCommandInput,
+  CreateRemoveTempoEventCommandInput,
   CreateReplaceInstrumentDeviceCommandInput,
   CreateReplaceTempoEventBpmCommandInput,
   CreateResizeNoteCommandInput,
@@ -34,9 +41,11 @@ export type {
   InstrumentTrackCollectionClip,
   InstrumentTrackCollectionEntry,
   MoveNotesCommand,
+  MoveTempoEventCommand,
   ProjectCommand,
   ProjectCommandType,
   RemoveNotesCommand,
+  RemoveTempoEventCommand,
   ReplaceInstrumentDeviceCommand,
   ReplaceTempoEventBpmCommand,
   ResizeNoteCommand,
@@ -64,6 +73,8 @@ export type {
   MidiNoteUpdatedChange,
   ProjectChange,
   ProjectChangeType,
+  TempoEventAddedChange,
+  TempoEventRemovedChange,
   TempoEventUpdatedChange,
 } from './commit/project-change'
 export { PROJECT_COMMIT_ORIGIN_KIND, PROJECT_HISTORY_DIRECTION } from './commit/project-commit'

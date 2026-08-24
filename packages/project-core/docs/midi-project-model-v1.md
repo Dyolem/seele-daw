@@ -430,8 +430,16 @@ interface TimeSignatureEventRecord {
 - `denominator` 只能是 `1、2、4、8、16、32`；
 - 时间顺序由 `tick` 推导，不保存额外的顺序 ID 数组；
 - Tempo Event 和 Time Signature Event 保留独立 ID，以支持选择、移动和 Undo；
+- `AddTempoEventCommand` 在未占用的绝对 Tick 创建一个 ID 唯一的 step Event；重复 ID 或同
+  Tick Event 会在写入前被拒绝；
+- `MoveTempoEventCommand` 将已有 Event 移至未占用的绝对 Tick，保留其 ID 与 BPM；相同 Tick
+  是 no-change，Tick 0 的初始 Event 不可移走；
+- `RemoveTempoEventCommand` 只删除非初始 Event；Tick 0 的初始 Event 不可删除，因此任何合法
+  Commit 后仍恰好存在一个初始 Tempo Event；
 - `ReplaceTempoEventBpmCommand` 只替换已存在 Event 的 BPM，保留其 ID 与 Tick，并支持精确
   Undo / Redo；是否允许当前 UI 编辑由 Tempo Map 与 Transport 产品状态决定；
+- 上述每个 Tempo Event 意图各形成一个 Project Command / History 步骤，并分别发布
+  `tempo-event.added`、`tempo-event.updated` 或 `tempo-event.removed` 语义 Change；
 - TempoMap 的有序段、累计秒数和查找缓存是 QueryIndex，不进入项目文件。
 
 Timeline 当前不是包含事件数组的大型 Record。两类事件分别进入规范化实体表，时间顺序由 `tick` 派生；项目不保存重复的事件顺序数组或固定的 Timeline 结束 Tick。

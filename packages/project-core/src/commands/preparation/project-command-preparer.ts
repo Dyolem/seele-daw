@@ -20,7 +20,12 @@ import {
   prepareRemoveNotesCommand,
   prepareResizeNoteCommand,
 } from '#internal/commands/midi-note/command-handler'
-import { prepareReplaceTempoEventBpmCommand } from '#internal/commands/tempo-event/command-handler'
+import {
+  prepareAddTempoEventCommand,
+  prepareMoveTempoEventCommand,
+  prepareRemoveTempoEventCommand,
+  prepareReplaceTempoEventBpmCommand,
+} from '#internal/commands/tempo-event/command-handler'
 import type { ModelStoreReader } from '#internal/model/model-store'
 
 function rejectUnknownCommand(command: never): never {
@@ -35,6 +40,17 @@ function rejectUnknownCommand(command: never): never {
 
 function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
   switch (command.type) {
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD:
+      return {
+        tempoEventId: command.tempoEvent.id,
+        tempoEventTick: command.tempoEvent.tick,
+      }
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE:
+      return {
+        tempoEventId: command.tempoEventId,
+        tempoEventTick: command.tick,
+      }
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE:
     case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM:
       return {
         tempoEventId: command.tempoEventId,
@@ -112,6 +128,12 @@ export function prepareProjectCommand(
   }
 
   switch (normalizedCommand.type) {
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD:
+      return prepareAddTempoEventCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE:
+      return prepareMoveTempoEventCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE:
+      return prepareRemoveTempoEventCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM:
       return prepareReplaceTempoEventBpmCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:

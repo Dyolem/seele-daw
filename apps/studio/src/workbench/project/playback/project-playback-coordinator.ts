@@ -22,6 +22,7 @@ import {
   type SoundbankId,
 } from '@seele-daw/playback'
 import {
+  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_TYPE,
   type ModelRevision,
   type ProjectCommit,
@@ -268,8 +269,18 @@ function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
   }
 }
 
-function replacesTempoEventBpm(commit: ProjectCommit): boolean {
-  return commit.origin.commandType === PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM
+/** Routes command and History commits by their semantic Tempo Delta, not their origin label. */
+function changesTempoMap(commit: ProjectCommit): boolean {
+  return commit.delta.changes.some((change) => {
+    switch (change.type) {
+      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED:
+      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED:
+      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED:
+        return true
+      default:
+        return false
+    }
+  })
 }
 
 /**
@@ -1102,7 +1113,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       return
     }
 
-    if (this.#pendingCommits.some(replacesTempoEventBpm)) {
+    if (this.#pendingCommits.some(changesTempoMap)) {
       this.#installTempoMapHandoff(event, nextPlan)
       return
     }

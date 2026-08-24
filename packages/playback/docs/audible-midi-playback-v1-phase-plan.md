@@ -773,6 +773,11 @@ Batch 5A 已按以下 UI 契约实现并通过功能审核；进一步优化留�
 必须按 occurrence / Track 选择性保留或结束。已经开始由声卡渲染的结果无法倒放撤回，极靠近
 当前时刻的取消是 best effort。Undo / Redo 使用其还原操作的同一语义。
 
+Tempo Map 属于全局时间映射，Studio 以 Commit Delta 中的 Tempo Event added / updated / removed
+Change 识别变化。Add、Move、Remove、Replace BPM 及其 History 回放共用完整 handoff：Stopped /
+Paused 保持状态，Playing 先 Pause 并允许全局 `allNotesOff`；三种状态都保留连续音乐 Tick，只按
+新 Tempo Map 重算 ProjectSecond，且不会自动恢复播放。
+
 Gain / Pan / Mute 最终应通过持久 Track Bus 实时作用于持续声音；当前没有对应 Project Command
 和 Track Bus，本阶段不脱离真实编辑能力提前建设 Mixer Graph。
 
@@ -789,8 +794,8 @@ Gain / Pan / Mute 最终应通过持久 Track Bus 实时作用于持续声音；
 首次 Play 的资源准备继续 fail-fast。只有已经安装安全旧 Runtime 的连续选择性 handoff 才允许
 按 Soundbank 跳过不可用 Instrument：目标 Track 立即停止旧 Voice、后续保持静音并显示明确
 warning，其他已准备 Track 与活动 Voice 继续；不得把缺失音源静默替换成 Studio Grand。结构性
-Plan 错误、Commit gap、Tempo / 全局路由变化和无法归属到单一 Instrument 的失败仍走全局安全
-兜底。
+Plan 错误、Commit gap、全局路由变化和无法归属到单一 Instrument 的失败仍走全局安全兜底；
+Tempo Map 变化使用上述保留 Tick、停止旧 Voice 且保持 Paused 的完整 handoff。
 
 ### 8.4 交互 Preview
 

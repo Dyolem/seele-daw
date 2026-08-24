@@ -190,9 +190,12 @@ Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 - Tempo、Master route、Commit gap 或不可播放目标仍明确要求全局安全兜底。Playback 不拥有
   AudioContext、Voice handle、资源准备或 UI warning。
 
-Studio 对 `tempo-event.replace-bpm` 使用保留连续 Tick 的完整 Runtime handoff：若 Commit 到达时
-仍在 Playing，先停止 Scheduler、释放全部旧 Voice 并进入 Paused；Stopped / Paused 位置也按新
-Tempo Map 重算 ProjectSecond。新计划安装后不会自动恢复，只有下一次显式 Play 才准备新 Runtime。
+Studio 根据 Commit Delta 中的 `tempo-event.added`、`tempo-event.updated`、
+`tempo-event.removed` 识别完整 Tempo Map 变化，而不依赖某一个 Command 名称。Add、Move、
+Remove、Replace BPM 及其 Undo / Redo 都使用保留连续 Tick 的完整 Runtime handoff：若 Commit
+到达时仍在 Playing，先停止 Scheduler、释放全部旧 Voice 并进入 Paused；Stopped / Paused 位置也
+按新 Tempo Map 重算 ProjectSecond。新计划安装后不会自动恢复，只有下一次显式 Play 才准备新
+Runtime。
 
 ## 长期包定位
 
@@ -264,8 +267,8 @@ src/
 3. 已编译具体 Track / MIDI Note Span 计划，并建立确定性的 NoteOccurrenceKey。
 4. 已建立注入时钟的 stopped / playing / paused Transport Mapping 与 generation 失效。
 5. 已建立规划层 look-ahead Scheduler、连续 cursor、occurrence 去重与 late / drop policy。
-6. 已支持播放中 Note / Track / Instrument 的选择性失效；Seek、Loop 和 Tempo change 仍待后续
-   产品切片。
+6. 已支持播放中 Note / Track / Instrument 的选择性失效、手动 Timeline Locate，以及 Tempo Map
+   事实变化时保留 Tick 并暂停的全局 handoff；Loop 仍待后续产品切片。
 7. 由后续真实消费者驱动 Track/Device GraphPlan、Audio Clip、Automation、Recording
    monitoring 和 frozen-revision export 计划。
 

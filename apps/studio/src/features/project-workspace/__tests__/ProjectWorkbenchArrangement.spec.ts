@@ -1,12 +1,17 @@
 import {
+  createTempoEventRecord,
   parseClipId,
   parseDeviceTypeId,
   parsePositiveTick,
   parseProjectColor,
   parseProjectId,
+  parseTempoBpm,
+  parseTempoEventId,
   parseTick,
   parseTrackId,
   type ProjectCommit,
+  type TempoEventId,
+  type TempoEventRecord,
   type Tick,
 } from '@seele-daw/project-core'
 import { mount, type VueWrapper } from '@vue/test-utils'
@@ -73,6 +78,8 @@ interface MountArrangementOptions {
   readonly createClipFailure?: Error
   readonly playbackPhase?: ProjectPlaybackState['phase']
   readonly playbackPositionTick?: number
+  readonly selectedTempoEventId?: TempoEventId | null
+  readonly tempoEvents?: readonly TempoEventRecord[]
   readonly timelineEndTick?: Tick
   readonly tracks?: InstanceType<typeof ProjectWorkbenchArrangement>['$props']['tracks']
 }
@@ -162,6 +169,8 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       barSpanTick: parsePositiveTick(3_840),
       clips: options.clips ?? Object.freeze([]),
       projectId,
+      selectedTempoEventId: options.selectedTempoEventId ?? null,
+      tempoEvents: options.tempoEvents ?? Object.freeze([]),
       timeSignatureNumerator: 4,
       timelineEndTick: options.timelineEndTick ?? parseTick(3_840 * 8),
       tracks: options.tracks ?? Object.freeze([]),
@@ -585,6 +594,54 @@ describe('ProjectWorkbenchArrangement', () => {
 
     expect(followControl.attributes('disabled')).toBeUndefined()
     expect(followControl.attributes('aria-pressed')).toBe('true')
+  })
+
+  it('reveals and navigates selected Tempo Events through the Arrangement scroll authority', async () => {
+    const initial = createTempoEventRecord({
+      bpm: parseTempoBpm(120),
+      id: parseTempoEventId('tempo-navigation-initial'),
+      tick: parseTick(0),
+    })
+    const selected = createTempoEventRecord({
+      bpm: parseTempoBpm(90),
+      id: parseTempoEventId('tempo-navigation-selected'),
+      tick: parseTick(15_360),
+    })
+    const next = createTempoEventRecord({
+      bpm: parseTempoBpm(110),
+      id: parseTempoEventId('tempo-navigation-next'),
+      tick: parseTick(23_040),
+    })
+    const fixture = mountArrangement({
+      playbackPhase: PROJECT_PLAYBACK_PHASE.PLAYING,
+      selectedTempoEventId: selected.id,
+      tempoEvents: Object.freeze([next, initial, selected]),
+    })
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+    const viewportElement = viewport.element as HTMLElement
+    Object.defineProperties(viewportElement, {
+      clientWidth: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1_600 },
+    })
+    const followControl = fixture.wrapper.get('.project-workbench__follow-control')
+
+    expect(fixture.wrapper.get('.tempo-track-control__location').text()).toContain('5 · 1 · 0/960')
+    expect(fixture.wrapper.get('.tempo-track-control__location').text()).toContain('00:08.000')
+    expect(followControl.attributes('aria-pressed')).toBe('true')
+
+    await fixture.wrapper
+      .get('button[aria-label="Reveal selected Tempo Event on Timeline"]')
+      .trigger('click')
+
+    expect(viewportElement.scrollLeft).toBe(600)
+    expect(followControl.attributes('aria-pressed')).toBe('false')
+    expect(fixture.locateAtTick).not.toHaveBeenCalled()
+
+    await fixture.wrapper.get('button[aria-label="Select next Tempo Event"]').trigger('click')
+
+    expect(fixture.wrapper.emitted('tempoEventSelect')).toEqual([[next.id]])
+    expect(viewportElement.scrollLeft).toBe(1_000)
+    expect(fixture.locateAtTick).not.toHaveBeenCalled()
   })
 
   it('presents all planned Track types in an accessible command menu', async () => {

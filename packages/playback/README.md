@@ -83,7 +83,9 @@ Batch 2A 还在包内建立了 `time/` 边界：
   AudioContext 或浏览器。
 
 TempoMap 现在由具体 MIDI Compiler 消费，并把冻结的 Segment DTO 放入计划；Transport 从这些
-DTO 严格重建同一时间边界。两者仍未从 package root 导出。
+DTO 严格重建同一时间边界。完整 TempoMap、Segment DTO 与重建能力仍留在包内；在 Tempo Track
+形成真实跨包消费者后，package root 只额外公开只读的 `resolveProjectSecondAtTick` 与其
+`ProjectSecond` 结果类型，避免 Studio 复制 Tick → ProjectSecond 换算。
 
 Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
 

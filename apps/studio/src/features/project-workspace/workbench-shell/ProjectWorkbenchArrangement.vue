@@ -21,10 +21,16 @@ import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
+import {
+  createProjectTempoEventLocationPresentation,
+  orderProjectTempoEvents,
+  type ProjectTempoEventNavigationDirection,
+} from '@/features/project-workspace/tempo-track/tempo-track'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
 import {
+  resolveCenteredTimelineScrollLeft,
   resolvePagedFollowScrollLeft,
   resolveTimelineEdgeScrollVelocity,
   resolveTimelineLocateTick,
@@ -160,6 +166,27 @@ const rulerPositionTick = computed(() =>
 )
 const selectedTempoEvent = computed(
   () => props.tempoEvents.find(({ id }) => id === props.selectedTempoEventId) ?? null,
+)
+const orderedTempoEvents = computed(() => orderProjectTempoEvents(props.tempoEvents))
+const selectedTempoEventIndex = computed(() =>
+  orderedTempoEvents.value.findIndex(({ id }) => id === props.selectedTempoEventId),
+)
+const selectedTempoEventLocation = computed(() => {
+  const tempoEvent = selectedTempoEvent.value
+  if (tempoEvent === null) return null
+
+  return createProjectTempoEventLocationPresentation({
+    barSpanTick: props.barSpanTick,
+    tempoEvent,
+    tempoEvents: props.tempoEvents,
+    timeSignatureNumerator: props.timeSignatureNumerator,
+  })
+})
+const canNavigateToPreviousTempoEvent = computed(() => selectedTempoEventIndex.value > 0)
+const canNavigateToNextTempoEvent = computed(
+  () =>
+    selectedTempoEventIndex.value >= 0 &&
+    selectedTempoEventIndex.value < orderedTempoEvents.value.length - 1,
 )
 
 const timelineBars = computed((): readonly TimelineBarPresentation[] => {
@@ -314,6 +341,36 @@ function setArrangementScrollLeft(nextScrollLeft: number): boolean {
   // Consume the ensuing native scroll event as this page jump, not as user navigation.
   observedArrangementScrollLeft = viewport.scrollLeft
   return viewport.scrollLeft !== previousScrollLeft
+}
+
+function revealTempoEvent(tempoEvent: TempoEventRecord): void {
+  const viewport = arrangementViewportElement.value
+  if (viewport === null) return
+
+  suspendTimelineFollow()
+  setArrangementScrollLeft(
+    resolveCenteredTimelineScrollLeft({
+      clientWidth: viewport.clientWidth,
+      positionRatio: timelinePositionRatio(tempoEvent.tick, props.timelineEndTick),
+      scrollWidth: viewport.scrollWidth,
+    }),
+  )
+}
+
+function revealSelectedTempoEvent(): void {
+  const tempoEvent = selectedTempoEvent.value
+  if (tempoEvent !== null) revealTempoEvent(tempoEvent)
+}
+
+function navigateSelectedTempoEvent(direction: ProjectTempoEventNavigationDirection): void {
+  const currentIndex = selectedTempoEventIndex.value
+  if (currentIndex < 0) return
+  const targetIndex = direction === 'previous' ? currentIndex - 1 : currentIndex + 1
+  const targetEvent = orderedTempoEvents.value[targetIndex]
+  if (targetEvent === undefined) return
+
+  emit('tempoEventSelect', targetEvent.id)
+  revealTempoEvent(targetEvent)
 }
 
 function followCurrentPlaybackPosition(): void {
@@ -685,11 +742,16 @@ onUnmounted(() => cancelTimelineLocate())
         </div>
       </div>
       <TempoTrackControl
+        :can-navigate-to-next="canNavigateToNextTempoEvent"
+        :can-navigate-to-previous="canNavigateToPreviousTempoEvent"
         :editing-disabled="props.tempoEditingDisabled"
         :selected-tempo-event="selectedTempoEvent"
+        :selected-tempo-event-location="selectedTempoEventLocation"
         @bpm-commit="(tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)"
         @edit-start="emit('tempoEditStart')"
+        @navigate="navigateSelectedTempoEvent"
         @remove="emit('tempoEventRemove', $event)"
+        @reveal="revealSelectedTempoEvent"
       />
       <div
         ref="trackViewportElement"

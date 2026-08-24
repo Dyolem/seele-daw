@@ -1,4 +1,4 @@
-/** Public API for playback compilation, transport, and scheduler contracts. */
+/** Public API for playback compilation, time projection, transport, and scheduler contracts. */
 export { compileAudibleMidiProject } from './compiler/audible-midi-compiler'
 export { AUDIBLE_MIDI_PLAN_STATUS } from './compiler/audible-midi-plan'
 export type {
@@ -51,8 +51,13 @@ export {
   decodeStudioGrandDeviceState,
 } from './studio-grand-device'
 export type { StudioGrandDeviceState } from './studio-grand-device'
+export { resolveProjectSecondAtTick } from './time/tempo-map'
 export { parsePlaybackClockDurationSecond, parsePlaybackClockSecond } from './time/project-time'
-export type { PlaybackClockDurationSecond, PlaybackClockSecond } from './time/project-time'
+export type {
+  PlaybackClockDurationSecond,
+  PlaybackClockSecond,
+  ProjectSecond,
+} from './time/project-time'
 export {
   AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
   AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT,

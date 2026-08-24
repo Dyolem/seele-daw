@@ -37,6 +37,7 @@ import {
   type ProjectWorkbenchClipSelectionCandidate,
 } from '@/features/project-workspace/project-workbench-selection-store'
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
+import { formatProjectTimelineTime } from '@/features/project-workspace/timeline/presentation'
 import {
   createProjectEntryLocation,
   createProjectWorkspaceLocation,
@@ -202,7 +203,7 @@ const clipSelectionCandidates = computed((): readonly ProjectWorkbenchClipSelect
 })
 
 const playbackTime = computed(() =>
-  formatPlaybackTime(playbackVisualPosition.value.positionProjectSecond),
+  formatProjectTimelineTime(playbackVisualPosition.value.positionProjectSecond),
 )
 const playbackCanReturnToLastStartPosition = computed(() => {
   // These projections make the Coordinator-owned capability reactive without duplicating its
@@ -216,14 +217,6 @@ const playbackCanToggle = computed(
     playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.LOADING &&
     (playbackState.value.planStatus === 'partial' || playbackState.value.planStatus === 'playable'),
 )
-
-function formatPlaybackTime(projectSecond: number): string {
-  const safeMillisecond = Math.max(0, Math.floor(projectSecond * 1_000))
-  const minute = Math.floor(safeMillisecond / 60_000)
-  const second = Math.floor((safeMillisecond % 60_000) / 1_000)
-  const millisecond = safeMillisecond % 1_000
-  return `${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}.${String(millisecond).padStart(3, '0')}`
-}
 
 function describeFailure(resolution: FailedProjectEntryResolution): string {
   const cause = resolution.failureCause

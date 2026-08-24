@@ -1,19 +1,31 @@
 <script setup lang="ts">
 import type { TempoEventRecord } from '@seele-daw/project-core'
+import ChevronLeftIcon from '~icons/fluent/chevron-left-20-regular'
+import ChevronRightIcon from '~icons/fluent/chevron-right-20-regular'
 import DeleteIcon from '~icons/fluent/delete-20-regular'
+import LocationIcon from '~icons/fluent/location-20-regular'
 import { computed, ref, watch } from 'vue'
 
 import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-control'
+import type {
+  ProjectTempoEventLocationPresentation,
+  ProjectTempoEventNavigationDirection,
+} from '@/features/project-workspace/tempo-track/tempo-track'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
 const props = defineProps<{
+  readonly canNavigateToNext: boolean
+  readonly canNavigateToPrevious: boolean
   readonly editingDisabled: boolean
   readonly selectedTempoEvent: TempoEventRecord | null
+  readonly selectedTempoEventLocation: ProjectTempoEventLocationPresentation | null
 }>()
 const emit = defineEmits<{
   bpmCommit: [tempoEventId: TempoEventRecord['id'], input: string]
   editStart: []
+  navigate: [direction: ProjectTempoEventNavigationDirection]
   remove: [tempoEventId: TempoEventRecord['id']]
+  reveal: []
 }>()
 
 const draft = ref('')
@@ -101,7 +113,6 @@ function removeSelectedTempoEvent(): void {
         />
         <span>BPM</span>
       </label>
-      <span class="tempo-track-control__tick">Tick {{ props.selectedTempoEvent.tick }}</span>
       <UiIconButton
         class="tempo-track-control__remove"
         :disabled="!canRemove"
@@ -114,6 +125,36 @@ function removeSelectedTempoEvent(): void {
         size="small"
         @click="removeSelectedTempoEvent"
       />
+      <div
+        v-if="props.selectedTempoEventLocation"
+        class="tempo-track-control__location"
+        :title="props.selectedTempoEventLocation.title"
+      >
+        <span>{{ props.selectedTempoEventLocation.musicalPosition }}</span>
+        <time>{{ props.selectedTempoEventLocation.projectTime }}</time>
+      </div>
+      <div class="tempo-track-control__navigation" aria-label="Selected Tempo Event navigation">
+        <UiIconButton
+          :disabled="!props.canNavigateToPrevious"
+          :icon="ChevronLeftIcon"
+          label="Select previous Tempo Event"
+          size="small"
+          @click="emit('navigate', 'previous')"
+        />
+        <UiIconButton
+          :icon="LocationIcon"
+          label="Reveal selected Tempo Event on Timeline"
+          size="small"
+          @click="emit('reveal')"
+        />
+        <UiIconButton
+          :disabled="!props.canNavigateToNext"
+          :icon="ChevronRightIcon"
+          label="Select next Tempo Event"
+          size="small"
+          @click="emit('navigate', 'next')"
+        />
+      </div>
     </template>
     <p v-else>Select a Tempo point to edit its value.</p>
   </section>
@@ -187,20 +228,41 @@ function removeSelectedTempoEvent(): void {
   cursor: default;
 }
 
-.tempo-track-control__tick {
+.tempo-track-control__location {
+  display: grid;
+  min-inline-size: 0;
   grid-column: 1;
   grid-row: 3;
   overflow: hidden;
-  color: var(--sd-color-text-disabled);
+  gap: 1px;
+  color: var(--sd-color-text-secondary);
   font-family: var(--sd-font-family-numeric);
   font-size: var(--sd-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tempo-track-control__location span,
+.tempo-track-control__location time {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.tempo-track-control__location time {
+  color: var(--sd-color-text-disabled);
+  font-size: 0.625rem;
+}
+
 .tempo-track-control__remove {
   grid-column: 2;
-  grid-row: 2 / 4;
+  grid-row: 2;
+}
+
+.tempo-track-control__navigation {
+  display: flex;
+  grid-column: 2;
+  grid-row: 3;
+  gap: var(--sd-space-0-5);
 }
 
 .tempo-track-control p {

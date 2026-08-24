@@ -326,7 +326,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
   --project-workbench-track-width: 16.25rem;
   --project-workbench-ruler-height: 2rem;
   --project-workbench-track-actions-height: 3.3125rem;
-  --project-workbench-tempo-track-height: 7rem;
+  --project-workbench-tempo-track-height: 7.5rem;
   --project-workbench-track-row-height: 4.75rem;
   display: grid;
   min-block-size: 0;

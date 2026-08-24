@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  resolveCenteredTimelineScrollLeft,
   resolvePagedFollowScrollLeft,
   resolveTimelineEdgeScrollVelocity,
   resolveTimelineLocateTick,
@@ -66,6 +67,30 @@ describe('Arrangement Timeline layout', () => {
         scrollWidth: 1_600,
       }),
     ).toBe(160)
+  })
+
+  it('centers an explicitly revealed Timeline fact and clamps either edge', () => {
+    expect(
+      resolveCenteredTimelineScrollLeft({
+        clientWidth: 400,
+        positionRatio: 0.5,
+        scrollWidth: 1_600,
+      }),
+    ).toBe(600)
+    expect(
+      resolveCenteredTimelineScrollLeft({
+        clientWidth: 400,
+        positionRatio: 0,
+        scrollWidth: 1_600,
+      }),
+    ).toBe(0)
+    expect(
+      resolveCenteredTimelineScrollLeft({
+        clientWidth: 400,
+        positionRatio: 1,
+        scrollWidth: 1_600,
+      }),
+    ).toBe(1_200)
   })
 
   it('maps a scrolled Ruler pointer to the nearest bounded Project Tick', () => {

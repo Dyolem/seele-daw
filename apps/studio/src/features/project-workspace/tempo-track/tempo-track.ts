@@ -7,8 +7,14 @@ import {
   type TempoEventRecord,
   type Tick,
 } from '@seele-daw/project-core'
+import { resolveProjectSecondAtTick } from '@seele-daw/playback'
 
 import { roundProjectTempoBpmForEditing } from '@/features/project-workspace/tempo/tempo-control'
+import {
+  describeProjectTimelineMusicalPosition,
+  formatProjectTimelineMusicalPosition,
+  formatProjectTimelineTime,
+} from '@/features/project-workspace/timeline/presentation'
 
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM = 40
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MAXIMUM_BPM = 240
@@ -18,6 +24,21 @@ export const PROJECT_TEMPO_TRACK_DRAG_THRESHOLD_PX = 4
 export interface ProjectTempoTrackScale {
   readonly maximumBpm: number
   readonly minimumBpm: number
+}
+
+export interface ProjectTempoEventLocationPresentation {
+  readonly musicalPosition: string
+  readonly projectTime: string
+  readonly title: string
+}
+
+export type ProjectTempoEventNavigationDirection = 'next' | 'previous'
+
+interface CreateProjectTempoEventLocationPresentationInput {
+  readonly barSpanTick: Tick
+  readonly tempoEvent: TempoEventRecord
+  readonly tempoEvents: readonly TempoEventRecord[]
+  readonly timeSignatureNumerator: number
 }
 
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_SCALE = Object.freeze<ProjectTempoTrackScale>({
@@ -61,6 +82,26 @@ export function orderProjectTempoEvents(
       return 0
     }),
   )
+}
+
+/** Projects a selected Tempo Event through the Arrangement grid and Playback's precise TempoMap. */
+export function createProjectTempoEventLocationPresentation(
+  input: CreateProjectTempoEventLocationPresentationInput,
+): ProjectTempoEventLocationPresentation {
+  const positionInput = {
+    barSpanTick: input.barSpanTick,
+    tick: input.tempoEvent.tick,
+    timeSignatureNumerator: input.timeSignatureNumerator,
+  }
+  const projectTime = formatProjectTimelineTime(
+    resolveProjectSecondAtTick(input.tempoEvents, input.tempoEvent.tick),
+  )
+
+  return Object.freeze({
+    musicalPosition: formatProjectTimelineMusicalPosition(positionInput),
+    projectTime,
+    title: `${describeProjectTimelineMusicalPosition(positionInput)}; Project time ${projectTime}`,
+  })
 }
 
 /** Creates the transient view scale for a Project without treating presentation as a Project fact. */

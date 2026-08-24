@@ -82,6 +82,23 @@ interface PagedFollowScrollInput {
   readonly scrollWidth: number
 }
 
+interface CenteredTimelineScrollInput {
+  readonly clientWidth: number
+  readonly positionRatio: number
+  readonly scrollWidth: number
+}
+
+/** Centers a Timeline fact when possible and clamps either end to the native scroll range. */
+export function resolveCenteredTimelineScrollLeft(input: CenteredTimelineScrollInput): number {
+  const clientWidth = Math.max(0, input.clientWidth)
+  const scrollWidth = Math.max(0, input.scrollWidth)
+  const maximumScrollLeft = Math.max(0, scrollWidth - clientWidth)
+  if (clientWidth === 0 || scrollWidth === 0) return 0
+
+  const positionInlineOffset = Math.min(1, Math.max(0, input.positionRatio)) * scrollWidth
+  return Math.min(maximumScrollLeft, Math.max(0, positionInlineOffset - clientWidth / 2))
+}
+
 /** Keeps the Playhead on discrete viewport pages instead of continuously centering it. */
 export function resolvePagedFollowScrollLeft(input: PagedFollowScrollInput): number {
   const clientWidth = Math.max(0, input.clientWidth)

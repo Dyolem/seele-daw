@@ -8,6 +8,8 @@ import {
 } from '@seele-daw/project-core'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
+import { resolveProjectSecondAtTick } from '#internal/index'
+
 import {
   ProjectTimeError,
   parseContinuousTickPosition,
@@ -87,13 +89,15 @@ describe('Project time values', () => {
 
 describe('TempoMap', () => {
   it('converts constant-tempo ticks, seconds, and ranges at the Project PPQ', () => {
-    const tempoMap = createTempoMap([tempoEvent('tempo-constant', 0, 120)])
+    const tempoEvents = [tempoEvent('tempo-constant', 0, 120)]
+    const tempoMap = createTempoMap(tempoEvents)
 
     expect(tempoMap.projectSecondAtTick(parseTick(0))).toBe(0)
     expect(tempoMap.projectSecondAtTick(parseTick(960))).toBe(0.5)
     expect(tempoMap.projectSecondAtTick(parseTick(3_840))).toBe(2)
     expect(tempoMap.tickPositionAtProjectSecond(parseProjectSecond(0.75))).toBe(1_440)
     expect(tempoMap.durationBetweenTicks(parseTick(960), parseTick(2_880))).toBe(1)
+    expect(resolveProjectSecondAtTick(tempoEvents, parseTick(960))).toBe(0.5)
     expect(Object.isFrozen(tempoMap)).toBe(true)
   })
 

@@ -7,6 +7,7 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import {
+  createProjectTempoEventLocationPresentation,
   createInitialProjectTempoTrackScale,
   expandProjectTempoTrackScale,
   orderProjectTempoEvents,
@@ -26,6 +27,25 @@ function tempoEvent(id: string, tick: number, bpm: number) {
 }
 
 describe('Tempo Track projection', () => {
+  it('presents the selected Event in musical and precise multi-Tempo project time', () => {
+    const initial = tempoEvent('tempo-location-initial', 0, 120)
+    const slower = tempoEvent('tempo-location-slower', 3_840, 60)
+    const selected = tempoEvent('tempo-location-selected', 5_760, 90)
+
+    expect(
+      createProjectTempoEventLocationPresentation({
+        barSpanTick: parseTick(3_840),
+        tempoEvent: selected,
+        tempoEvents: [selected, initial, slower],
+        timeSignatureNumerator: 4,
+      }),
+    ).toEqual({
+      musicalPosition: '2 · 3 · 0/960',
+      projectTime: '00:04.000',
+      title: 'Bar 2, beat 3, 0 of 960 ticks; Project Tick 5760; Project time 00:04.000',
+    })
+  })
+
   it('orders Tempo Events and keeps ordinary maps in a legible default scale', () => {
     const later = tempoEvent('tempo-later', 960, 90)
     const initial = tempoEvent('tempo-initial', 0, 120)

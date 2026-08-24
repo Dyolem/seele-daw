@@ -414,6 +414,14 @@ export function createTempoMap(input: readonly TempoEventRecord[]): TempoMap {
   return createTempoMapFromNormalizedSegments(createTempoSegments(normalizeTempoEvents(input)))
 }
 
+/** Resolves one Project Tick for read-only cross-package presentation without exposing TempoMap internals. */
+export function resolveProjectSecondAtTick(
+  tempoEvents: readonly TempoEventRecord[],
+  tick: Tick,
+): ProjectSecond {
+  return createTempoMap(tempoEvents).projectSecondAtTick(tick)
+}
+
 /** Rehydrates a TempoMap from a compiled, serializable Segment plan. */
 export function createTempoMapFromSegments(input: readonly TempoSegmentPlan[]): TempoMap {
   return createTempoMapFromNormalizedSegments(normalizeTempoSegments(input))

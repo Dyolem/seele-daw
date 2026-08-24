@@ -71,6 +71,8 @@ import {
 } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import { PROJECT_TRACK_CONTEXT_KEY } from '@/workbench/project/track/vue/project-track-context'
+import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
+import { PROJECT_TEMPO_EVENT_CONTEXT_KEY } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
 import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/workbench/project/vue/active-project-context'
 import {
   createActiveProjectVueBinding,
@@ -252,6 +254,10 @@ export function composeStudioApplication(
       createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
       createRandomValue: composition.createRandomValue ?? Math.random,
     })
+    const projectTempoEvents = createProjectTempoEventCoordinator({
+      activeProject: projectRuntime.activeProject,
+      createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
+    })
     const projectClips = createProjectClipCoordinator({
       activeProject: projectRuntime.activeProject,
       createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
@@ -293,6 +299,7 @@ export function composeStudioApplication(
     vueApplication.provide(PROJECT_ENTRY_CONTEXT_KEY, Object.freeze({ projectEntry }))
     vueApplication.provide(PROJECT_MIDI_IMPORT_CONTEXT_KEY, Object.freeze({ projectMidiImport }))
     vueApplication.provide(PROJECT_TRACK_CONTEXT_KEY, Object.freeze({ projectTracks }))
+    vueApplication.provide(PROJECT_TEMPO_EVENT_CONTEXT_KEY, Object.freeze({ projectTempoEvents }))
     vueApplication.provide(PROJECT_CLIP_CONTEXT_KEY, Object.freeze({ projectClips }))
     vueApplication.provide(PROJECT_MIDI_NOTE_CONTEXT_KEY, Object.freeze({ projectMidiNotes }))
     vueApplication.provide(PROJECT_PLAYBACK_CONTEXT_KEY, projectPlaybackBinding.context)

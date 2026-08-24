@@ -97,6 +97,11 @@ import {
   ACTIVE_PROJECT_CONTEXT_KEY,
   type ActiveProjectVueContext,
 } from '@/workbench/project/vue/active-project-context'
+import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
+import {
+  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
+  type ProjectTempoEventVueContext,
+} from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
@@ -242,6 +247,13 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
   })
   const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
+  let tempoEventIdentity = 0
+  const projectTempoEventContext: ProjectTempoEventVueContext = Object.freeze({
+    projectTempoEvents: createProjectTempoEventCoordinator({
+      activeProject: fixture.activeProjectContext.activeProject,
+      createUniqueId: () => `workspace-page-tempo-event-${++tempoEventIdentity}`,
+    }),
+  })
   const keyboardBindingRegistry = new TestStudioKeyboardBindingRegistry()
   const keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
     bindingRegistry: keyboardBindingRegistry,
@@ -305,6 +317,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
         [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: fixture.projectMidiImportContext,
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]: projectNavigationDecisionContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: projectPlaybackContext,
+        [PROJECT_TEMPO_EVENT_CONTEXT_KEY as symbol]: projectTempoEventContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
         [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboardShortcutContext,
       },
@@ -474,6 +487,99 @@ describe('ProjectWorkspacePage', () => {
     })
     await nextTick()
     expect(input.element.value).toBe('90.25')
+  })
+
+  it('coordinates Tempo Track add, move, numeric BPM edit, selection, and removal', async () => {
+    const projectId = parseProjectId('project-workspace-page-tempo-track')
+    const session = createInitialProjectSession({
+      projectId,
+      projectName: 'Tempo Track Project',
+      tempoEventId: parseTempoEventId('tempo-track-project-initial'),
+      timeSignatureEventId: parseTimeSignatureEventId('tempo-track-project-meter'),
+    })
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId, session),
+    )
+    const { playbackState, projectPlayback, wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const shell = wrapper.getComponent(ProjectWorkbenchShell)
+
+    await wrapper.get('.tempo-track-lane__point').trigger('click')
+    expect(
+      wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event BPM"]').element.value,
+    ).toBe('120')
+
+    playbackState.value = Object.freeze({
+      ...STOPPED_PLAYBACK_STATE,
+      modelRevision: session.modelRevision,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+      planStatus: 'playable',
+      projectId,
+    })
+    vi.mocked(projectPlayback.pause).mockImplementation(() => {
+      playbackState.value = Object.freeze({
+        ...playbackState.value,
+        phase: PROJECT_PLAYBACK_PHASE.PAUSED,
+      })
+      return true
+    })
+    await nextTick()
+
+    shell.vm.$emit('tempoEventAdd', parseTempoBpm(96), parseTick(960))
+    await nextTick()
+    expect(projectPlayback.pause).toHaveBeenCalledOnce()
+    expect(session.getSnapshot().tempoEvents).toContainEqual({
+      bpm: 96,
+      id: 'workspace-page-tempo-event-1',
+      tick: 960,
+    })
+
+    fixture.state.value = createReadyState(projectId, session)
+    await nextTick()
+    expect(shell.props('selectedTempoEventId')).toBe('workspace-page-tempo-event-1')
+
+    const addedTempoEventId = parseTempoEventId('workspace-page-tempo-event-1')
+    shell.vm.$emit('tempoEventMove', addedTempoEventId, parseTick(1_920))
+    shell.vm.$emit('tempoEventBpmCommit', addedTempoEventId, '101.25')
+    expect(session.getSnapshot().tempoEvents).toContainEqual({
+      bpm: 101.25,
+      id: addedTempoEventId,
+      tick: 1_920,
+    })
+
+    shell.vm.$emit('tempoEventRemove', addedTempoEventId)
+    await nextTick()
+    expect(session.getSnapshot().tempoEvents).toHaveLength(1)
+    expect(shell.props('selectedTempoEventId')).toBeNull()
+  })
+
+  it('surfaces Tempo Track Tick collisions without changing Project history', async () => {
+    const projectId = parseProjectId('project-workspace-page-tempo-track-collision')
+    const session = createInitialProjectSession({
+      projectId,
+      projectName: 'Tempo Track Collision Project',
+      tempoEventId: parseTempoEventId('tempo-track-collision-initial'),
+      timeSignatureEventId: parseTimeSignatureEventId('tempo-track-collision-meter'),
+    })
+    const fixture = createFixture(
+      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      createReadyState(projectId, session),
+    )
+    const { wrapper } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const revision = session.modelRevision
+
+    wrapper
+      .getComponent(ProjectWorkbenchShell)
+      .vm.$emit('tempoEventAdd', parseTempoBpm(90), parseTick(0))
+    await nextTick()
+
+    expect(session.modelRevision).toBe(revision)
+    expect(useUiToastStore().message).toMatchObject({
+      title: 'Tempo Event could not be added',
+      tone: 'danger',
+    })
   })
 
   it('extends a long imported MIDI song through eight complete Timeline tail bars', async () => {

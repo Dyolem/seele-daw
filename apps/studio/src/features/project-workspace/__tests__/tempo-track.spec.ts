@@ -1,0 +1,96 @@
+import {
+  createTempoEventRecord,
+  parseTempoBpm,
+  parseTempoEventId,
+  parseTick,
+} from '@seele-daw/project-core'
+import { describe, expect, it } from 'vitest'
+
+import {
+  deriveProjectTempoTrackScale,
+  orderProjectTempoEvents,
+  projectTempoTrackBpmPositionRatio,
+  resolveDraggedProjectTempoBpm,
+  resolveProjectTempoTrackBpm,
+  resolveProjectTempoTrackDragAxis,
+  resolveProjectTempoTrackTick,
+} from '@/features/project-workspace/tempo-track/tempo-track'
+
+function tempoEvent(id: string, tick: number, bpm: number) {
+  return createTempoEventRecord({
+    bpm: parseTempoBpm(bpm),
+    id: parseTempoEventId(id),
+    tick: parseTick(tick),
+  })
+}
+
+describe('Tempo Track projection', () => {
+  it('orders Tempo Events and keeps ordinary maps in a legible default scale', () => {
+    const later = tempoEvent('tempo-later', 960, 90)
+    const initial = tempoEvent('tempo-initial', 0, 120)
+
+    expect(orderProjectTempoEvents([later, initial])).toEqual([initial, later])
+    expect(deriveProjectTempoTrackScale([later, initial])).toEqual({
+      maximumBpm: 240,
+      minimumBpm: 40,
+    })
+    expect(projectTempoTrackBpmPositionRatio(240, { minimumBpm: 40, maximumBpm: 240 })).toBe(0)
+    expect(projectTempoTrackBpmPositionRatio(40, { minimumBpm: 40, maximumBpm: 240 })).toBe(1)
+  })
+
+  it('expands the scale to retain legal imported extreme values', () => {
+    expect(
+      deriveProjectTempoTrackScale([
+        tempoEvent('tempo-minimum', 0, 5),
+        tempoEvent('tempo-maximum', 960, 999),
+      ]),
+    ).toEqual({ maximumBpm: 999, minimumBpm: 5 })
+  })
+
+  it('maps pointer coordinates to integer Tick and two-decimal BPM values', () => {
+    expect(
+      resolveProjectTempoTrackTick({
+        clientX: 350,
+        laneLeft: 100,
+        laneWidth: 1_000,
+        timelineEndTick: parseTick(3_840),
+      }),
+    ).toBe(960)
+    expect(
+      resolveProjectTempoTrackBpm({
+        clientY: 75,
+        laneHeight: 100,
+        laneTop: 50,
+        scale: { maximumBpm: 240, minimumBpm: 40 },
+      }),
+    ).toBe(190)
+  })
+
+  it('applies vertical drag delta without jumping from an off-center point grab', () => {
+    expect(
+      resolveDraggedProjectTempoBpm({
+        currentClientY: 40,
+        laneHeight: 100,
+        scale: { maximumBpm: 240, minimumBpm: 40 },
+        startBpm: parseTempoBpm(120),
+        startClientY: 50,
+      }),
+    ).toBe(140)
+    expect(
+      resolveDraggedProjectTempoBpm({
+        currentClientY: -1_000,
+        laneHeight: 100,
+        scale: { maximumBpm: 240, minimumBpm: 40 },
+        startBpm: parseTempoBpm(120),
+        startClientY: 50,
+      }),
+    ).toBe(999)
+  })
+
+  it('locks the dominant axis only after the click-tolerance threshold', () => {
+    expect(resolveProjectTempoTrackDragAxis(3, 3, true)).toBeNull()
+    expect(resolveProjectTempoTrackDragAxis(6, 2, true)).toBe('tick')
+    expect(resolveProjectTempoTrackDragAxis(2, -6, true)).toBe('bpm')
+    expect(resolveProjectTempoTrackDragAxis(6, 2, false)).toBe('blocked-tick')
+  })
+})

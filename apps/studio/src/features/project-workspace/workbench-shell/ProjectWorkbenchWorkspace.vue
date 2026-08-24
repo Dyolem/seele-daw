@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import type { ProjectSession, Tick } from '@seele-daw/project-core'
+import type {
+  ProjectSession,
+  TempoBpm,
+  TempoEventId,
+  TempoEventRecord,
+  Tick,
+} from '@seele-daw/project-core'
 import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
 
 import type {
@@ -32,18 +38,31 @@ const props = withDefaults(
     readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
     readonly projectId: string
     readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
+    readonly selectedTempoEventId?: TempoEventId | null
+    readonly tempoEditingDisabled?: boolean
+    readonly tempoEvents?: readonly TempoEventRecord[]
     readonly timeSignatureNumerator: number
     readonly timelineEndTick: Tick
     readonly tracks: readonly ProjectTrackPresentation[]
   }>(),
   {
     isMidiImporting: false,
+    selectedTempoEventId: null,
+    tempoEditingDisabled: false,
+    tempoEvents: () => Object.freeze([]),
   },
 )
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const emit = defineEmits<{
   contextEditorOpenChange: [isOpen: boolean]
   importMidiAsNewTracks: []
+  tempoEditStart: []
+  tempoEventAdd: [bpm: TempoBpm, tick: Tick]
+  tempoEventBpmChange: [tempoEventId: TempoEventId, bpm: TempoBpm]
+  tempoEventBpmCommit: [tempoEventId: TempoEventId, input: string]
+  tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
+  tempoEventRemove: [tempoEventId: TempoEventId]
+  tempoEventSelect: [tempoEventId: TempoEventId]
 }>()
 
 const workspaceElement = shallowRef<HTMLElement | null>(null)
@@ -242,11 +261,25 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       :clips="props.clips"
       :is-midi-importing="props.isMidiImporting"
       :project-id="props.projectId"
+      :selected-tempo-event-id="props.selectedTempoEventId"
+      :tempo-editing-disabled="props.tempoEditingDisabled"
+      :tempo-events="props.tempoEvents"
       :time-signature-numerator="props.timeSignatureNumerator"
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
       @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
       @open-midi-clip="openContextEditor"
+      @tempo-edit-start="emit('tempoEditStart')"
+      @tempo-event-add="(bpm, tick) => emit('tempoEventAdd', bpm, tick)"
+      @tempo-event-bpm-change="
+        (tempoEventId, bpm) => emit('tempoEventBpmChange', tempoEventId, bpm)
+      "
+      @tempo-event-bpm-commit="
+        (tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)
+      "
+      @tempo-event-move="(tempoEventId, tick) => emit('tempoEventMove', tempoEventId, tick)"
+      @tempo-event-remove="emit('tempoEventRemove', $event)"
+      @tempo-event-select="emit('tempoEventSelect', $event)"
     />
 
     <div
@@ -293,6 +326,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
   --project-workbench-track-width: 16.25rem;
   --project-workbench-ruler-height: 2rem;
   --project-workbench-track-actions-height: 3.3125rem;
+  --project-workbench-tempo-track-height: 7rem;
   --project-workbench-track-row-height: 4.75rem;
   display: grid;
   min-block-size: 0;

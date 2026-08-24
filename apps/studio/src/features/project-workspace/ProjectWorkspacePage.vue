@@ -2,13 +2,14 @@
 import {
   PROJECT_PPQ,
   ZERO_TICK,
-  createReplaceTempoEventBpmCommand,
   parseTempoBpm,
   parsePositiveTick,
   parseProjectId,
   parseTick,
   type ProjectId,
   type TempoBpm,
+  type TempoEventId,
+  type TempoEventRecord,
   type Tick,
 } from '@seele-daw/project-core'
 import {
@@ -67,6 +68,7 @@ import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
+import { useProjectTempoEvents } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
 import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
 const props = defineProps<{
@@ -96,6 +98,7 @@ const DEFAULT_TEMPO_CONTROL_PRESENTATION = Object.freeze<ProjectTempoControlPres
 const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
 const { projectMidiImport } = useProjectMidiImport()
+const { projectTempoEvents } = useProjectTempoEvents()
 const projectNavigationDecision = useProjectNavigationDecision()
 const { keyboardShortcuts } = useStudioKeyboardShortcuts()
 const {
@@ -116,6 +119,7 @@ interface PendingMidiImport {
   readonly target: 'new-project' | 'new-tracks'
 }
 const pendingMidiImport = shallowRef<PendingMidiImport | null>(null)
+const selectedTempoEventId = shallowRef<TempoEventId | null>(null)
 const projectPresentation = shallowRef<ProjectPresentation>({
   barSpanTick: DEFAULT_BAR_SPAN_TICK,
   projectId: null,
@@ -135,6 +139,9 @@ const readyProject = computed(() => {
     : null
 })
 const projectSnapshot = computed(() => readyProject.value?.session.getSnapshot() ?? null)
+const tempoEvents = computed((): readonly TempoEventRecord[] => {
+  return projectSnapshot.value?.tempoEvents ?? Object.freeze([])
+})
 const tempoControlPresentation = computed(() => {
   const snapshot = projectSnapshot.value
   if (snapshot === null) return DEFAULT_TEMPO_CONTROL_PRESENTATION
@@ -150,6 +157,9 @@ const tempoEditable = computed(
   () =>
     tempoControlPresentation.value.mode === PROJECT_TEMPO_CONTROL_MODE.SINGLE &&
     playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.LOADING,
+)
+const tempoEditingDisabled = computed(
+  () => playbackState.value.phase === PROJECT_PLAYBACK_PHASE.LOADING,
 )
 const timelineEndTick = computed(() => {
   const snapshot = projectSnapshot.value
@@ -377,7 +387,7 @@ function replaceSingleTempoBpm(bpm: TempoBpm): void {
   if (tempoEvents.length !== 1) {
     toasts.info(
       'Tempo Map is read-only',
-      'Multi-Tempo projects require a dedicated Tempo Map editor.',
+      'Use the dedicated Tempo Track to edit individual Tempo Events.',
     )
     return
   }
@@ -390,13 +400,7 @@ function replaceSingleTempoBpm(bpm: TempoBpm): void {
     return
   }
 
-  ready.session.execute(
-    createReplaceTempoEventBpmCommand({
-      baseRevision: ready.session.modelRevision,
-      bpm,
-      tempoEventId: tempoEvent.id,
-    }),
-  )
+  projectTempoEvents.replaceTempoEventBpm({ bpm, tempoEventId: tempoEvent.id })
 }
 
 function commitTempoInput(input: string): void {
@@ -415,6 +419,78 @@ function commitTempoInput(input: string): void {
     replaceSingleTempoBpm(parsed.bpm)
   } catch (cause) {
     toasts.danger('Tempo could not be changed', describeTempoEditFailure(cause))
+  }
+}
+
+function selectTempoEvent(tempoEventId: TempoEventId): void {
+  if (tempoEvents.value.some(({ id }) => id === tempoEventId)) {
+    selectedTempoEventId.value = tempoEventId
+  }
+}
+
+function prepareTempoEventCommand(failureTitle: string): boolean {
+  if (ensureTempoPlaybackIsInactive()) return true
+  toasts.danger(failureTitle, 'Playback could not be paused safely.')
+  return false
+}
+
+function addTempoEvent(bpm: TempoBpm, tick: Tick): void {
+  const failureTitle = 'Tempo Event could not be added'
+  if (!prepareTempoEventCommand(failureTitle)) return
+  try {
+    const result = projectTempoEvents.addTempoEvent({ bpm, tick })
+    selectedTempoEventId.value = result.tempoEventId
+  } catch (cause) {
+    toasts.danger(failureTitle, describeTempoEditFailure(cause))
+  }
+}
+
+function moveTempoEvent(tempoEventId: TempoEventId, tick: Tick): void {
+  const failureTitle = 'Tempo Event could not be moved'
+  if (!prepareTempoEventCommand(failureTitle)) return
+  try {
+    projectTempoEvents.moveTempoEvent({ tempoEventId, tick })
+  } catch (cause) {
+    toasts.danger(failureTitle, describeTempoEditFailure(cause))
+  }
+}
+
+function replaceTempoEventBpm(tempoEventId: TempoEventId, bpm: TempoBpm): void {
+  const tempoEvent = tempoEvents.value.find(({ id }) => id === tempoEventId)
+  if (tempoEvent === undefined || tempoEvent.bpm === bpm) return
+  const failureTitle = 'Tempo Event BPM could not be changed'
+  if (!prepareTempoEventCommand(failureTitle)) return
+  try {
+    projectTempoEvents.replaceTempoEventBpm({ bpm, tempoEventId })
+  } catch (cause) {
+    toasts.danger(failureTitle, describeTempoEditFailure(cause))
+  }
+}
+
+function commitTempoEventInput(tempoEventId: TempoEventId, input: string): void {
+  const parsed = parseProjectTempoInput(input)
+  if (parsed.status === 'rejected') {
+    toasts.warning('Tempo Event was not changed', parsed.message)
+    return
+  }
+  const tempoEvent = tempoEvents.value.find(({ id }) => id === tempoEventId)
+  if (
+    tempoEvent === undefined ||
+    formatProjectTempoBpm(tempoEvent.bpm) === formatProjectTempoBpm(parsed.bpm)
+  ) {
+    return
+  }
+  replaceTempoEventBpm(tempoEventId, parsed.bpm)
+}
+
+function removeTempoEvent(tempoEventId: TempoEventId): void {
+  const failureTitle = 'Tempo Event could not be removed'
+  if (!prepareTempoEventCommand(failureTitle)) return
+  try {
+    projectTempoEvents.removeTempoEvent(tempoEventId)
+    if (selectedTempoEventId.value === tempoEventId) selectedTempoEventId.value = null
+  } catch (cause) {
+    toasts.danger(failureTitle, describeTempoEditFailure(cause))
   }
 }
 
@@ -526,6 +602,20 @@ watch(
 )
 
 watch(
+  () => readyProject.value?.projectId ?? null,
+  () => {
+    selectedTempoEventId.value = null
+  },
+)
+
+watch(tempoEvents, (events) => {
+  const selectedId = selectedTempoEventId.value
+  if (selectedId !== null && !events.some(({ id }) => id === selectedId)) {
+    selectedTempoEventId.value = null
+  }
+})
+
+watch(
   [() => readyProject.value?.projectId ?? null, trackPresentations, clipSelectionCandidates],
   ([projectId, tracks, clips]) => {
     if (projectId === null) return
@@ -584,8 +674,11 @@ onUnmounted(() => {
     :project-session="readyProject.session"
     :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
     :save-status="readyProject.saveStatus"
+    :selected-tempo-event-id="selectedTempoEventId"
     :tempo-display-bpm="tempoControlPresentation.displayBpm"
+    :tempo-editing-disabled="tempoEditingDisabled"
     :tempo-editable="tempoEditable"
+    :tempo-events="tempoEvents"
     :tempo-mode="tempoControlPresentation.mode"
     :time-signature-denominator="projectPresentation.timeSignatureDenominator"
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
@@ -600,6 +693,12 @@ onUnmounted(() => {
     @save="saveProject"
     @tempo-commit="commitTempoInput"
     @tempo-edit-start="beginTempoEdit"
+    @tempo-event-add="addTempoEvent"
+    @tempo-event-bpm-change="replaceTempoEventBpm"
+    @tempo-event-bpm-commit="commitTempoEventInput"
+    @tempo-event-move="moveTempoEvent"
+    @tempo-event-remove="removeTempoEvent"
+    @tempo-event-select="selectTempoEvent"
     @undo="undoProject"
   />
 

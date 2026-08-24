@@ -66,6 +66,8 @@ import {
   PROJECT_TRACK_CONTEXT_KEY,
   type ProjectTrackVueContext,
 } from '@/workbench/project/track/vue/project-track-context'
+import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
+import { PROJECT_TEMPO_EVENT_CONTEXT_KEY } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
 import {
   ACTIVE_PROJECT_CONTEXT_KEY,
   type ActiveProjectVueContext,
@@ -221,18 +223,26 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
       : createProjectWorkspaceLocation(projectId),
   )
   await router.isReady()
+  const activeProjectContext = createActiveProjectContext(state)
+  let tempoEventIdentity = 0
 
   const wrapper = mount(App, {
     global: {
       plugins: [createPinia(), router],
       provide: {
-        [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(state),
+        [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: activeProjectContext,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: createProjectClipContext(),
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
         [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: createProjectMidiImportContext(),
         [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
           createProjectNavigationDecisionContext(),
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: createProjectPlaybackContext(),
+        [PROJECT_TEMPO_EVENT_CONTEXT_KEY as symbol]: Object.freeze({
+          projectTempoEvents: createProjectTempoEventCoordinator({
+            activeProject: activeProjectContext.activeProject,
+            createUniqueId: () => `app-tempo-event-${++tempoEventIdentity}`,
+          }),
+        }),
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: createProjectTrackContext(),
         [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: createKeyboardShortcutContext(),
       },

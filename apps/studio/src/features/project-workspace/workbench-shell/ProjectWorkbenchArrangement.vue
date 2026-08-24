@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { parseTick, type Tick, type TrackId } from '@seele-daw/project-core'
+import {
+  parseTick,
+  type TempoBpm,
+  type TempoEventId,
+  type TempoEventRecord,
+  type Tick,
+  type TrackId,
+} from '@seele-daw/project-core'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MidiIcon from '~icons/fluent/midi-20-regular'
@@ -12,6 +19,8 @@ import { computed, nextTick, onUnmounted, shallowRef, type StyleValue, watch } f
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
+import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
@@ -77,17 +86,30 @@ const props = withDefaults(
     readonly clips: readonly ProjectMidiClipPresentation[]
     readonly isMidiImporting?: boolean
     readonly projectId: string
+    readonly selectedTempoEventId?: TempoEventId | null
+    readonly tempoEditingDisabled?: boolean
+    readonly tempoEvents?: readonly TempoEventRecord[]
     readonly timeSignatureNumerator: number
     readonly timelineEndTick: Tick
     readonly tracks: readonly ProjectTrackPresentation[]
   }>(),
   {
     isMidiImporting: false,
+    selectedTempoEventId: null,
+    tempoEditingDisabled: false,
+    tempoEvents: () => Object.freeze([]),
   },
 )
 const emit = defineEmits<{
   importMidiAsNewTracks: []
   openMidiClip: []
+  tempoEditStart: []
+  tempoEventAdd: [bpm: TempoBpm, tick: Tick]
+  tempoEventBpmChange: [tempoEventId: TempoEventId, bpm: TempoBpm]
+  tempoEventBpmCommit: [tempoEventId: TempoEventId, input: string]
+  tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
+  tempoEventRemove: [tempoEventId: TempoEventId]
+  tempoEventSelect: [tempoEventId: TempoEventId]
 }>()
 
 const { projectClips } = useProjectClips()
@@ -135,6 +157,9 @@ const rulerPositionTick = computed(() =>
       Math.max(0, locatePreviewTick.value ?? currentPlaybackPositionTick.value),
     ),
   ),
+)
+const selectedTempoEvent = computed(
+  () => props.tempoEvents.find(({ id }) => id === props.selectedTempoEventId) ?? null,
 )
 
 const timelineBars = computed((): readonly TimelineBarPresentation[] => {
@@ -659,6 +684,13 @@ onUnmounted(() => cancelTimelineLocate())
           <ProjectAddTrackMenu @select="handleTrackTypeSelection" />
         </div>
       </div>
+      <TempoTrackControl
+        :editing-disabled="props.tempoEditingDisabled"
+        :selected-tempo-event="selectedTempoEvent"
+        @bpm-commit="(tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)"
+        @edit-start="emit('tempoEditStart')"
+        @remove="emit('tempoEventRemove', $event)"
+      />
       <div
         ref="trackViewportElement"
         class="project-workbench__track-viewport"
@@ -769,6 +801,19 @@ onUnmounted(() => cancelTimelineLocate())
           <div class="project-workbench__lane-heading" aria-hidden="true">
             <span>Track lanes</span>
           </div>
+          <TempoTrackLane
+            :bar-span-tick="props.barSpanTick"
+            :editing-disabled="props.tempoEditingDisabled"
+            :selected-tempo-event-id="props.selectedTempoEventId"
+            :tempo-events="props.tempoEvents"
+            :timeline-end-tick="props.timelineEndTick"
+            @add="({ bpm, tick }) => emit('tempoEventAdd', bpm, tick)"
+            @bpm-change="(tempoEventId, bpm) => emit('tempoEventBpmChange', tempoEventId, bpm)"
+            @edit-start="emit('tempoEditStart')"
+            @move="(tempoEventId, tick) => emit('tempoEventMove', tempoEventId, tick)"
+            @remove="emit('tempoEventRemove', $event)"
+            @select="emit('tempoEventSelect', $event)"
+          />
         </div>
 
         <div v-if="props.tracks.length === 0" class="project-workbench__surface-empty">
@@ -886,6 +931,7 @@ onUnmounted(() => cancelTimelineLocate())
   grid-column: 1;
   grid-template-rows:
     calc(var(--project-workbench-ruler-height) + var(--project-workbench-track-actions-height))
+    var(--project-workbench-tempo-track-height)
     minmax(0, 1fr);
   border-inline-end: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
@@ -929,7 +975,7 @@ onUnmounted(() => cancelTimelineLocate())
 .project-workbench__track-viewport {
   min-inline-size: 0;
   min-block-size: 0;
-  grid-row: 2;
+  grid-row: 3;
   overflow: hidden;
   background: var(--sd-color-surface-panel);
 }
@@ -1008,10 +1054,15 @@ onUnmounted(() => cancelTimelineLocate())
   inline-size: var(--project-workbench-timeline-inline-size);
   min-block-size: 100%;
   grid-template-rows:
-    calc(var(--project-workbench-ruler-height) + var(--project-workbench-track-actions-height))
+    calc(
+      var(--project-workbench-ruler-height) + var(--project-workbench-track-actions-height) +
+        var(--project-workbench-tempo-track-height)
+    )
     minmax(
       calc(
-        100% - var(--project-workbench-ruler-height) - var(--project-workbench-track-actions-height)
+        100% - var(--project-workbench-ruler-height) -
+          var(--project-workbench-track-actions-height) -
+          var(--project-workbench-tempo-track-height)
       ),
       auto
     );
@@ -1028,7 +1079,8 @@ onUnmounted(() => cancelTimelineLocate())
   grid-row: 1;
   grid-template-rows:
     var(--project-workbench-ruler-height)
-    var(--project-workbench-track-actions-height);
+    var(--project-workbench-track-actions-height)
+    var(--project-workbench-tempo-track-height);
   background: var(--sd-color-surface-canvas);
 }
 

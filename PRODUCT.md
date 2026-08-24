@@ -4,9 +4,10 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-21，Project Tempo Control V1 已实施，待审核
+> 最近更新：2026-08-24，Project Tempo Track V1 MT3 已实施，待审核
 >
-> 当前阶段：Project Tempo Control V1；Project Core、Tempo handoff Runtime 与 Studio 主控已接通
+> 当前阶段：Project Tempo Control V1；Tempo Event 生命周期、Playback handoff、主控与专用
+> Tempo Track 已接通
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -43,8 +44,9 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
    缩放、删除操作。
 7. 在 Vite 本地开发环境点击 Play 或按 `Space`，加载当前计划所需的 Studio Grand 采样并听见
    Note；可 Pause、继续、从 Arrangement Ruler 手动定位，并返回最后一次手动起始位置。
-8. 在 Transport 查看最多两位小数的 BPM；单 Tempo 项目可直接输入新 BPM，多 Tempo 项目显示
-   Playhead 所在段的当前值并保持只读。
+8. 在 Transport 查看最多两位小数的 BPM；单 Tempo 项目可直接输入新 BPM，多 Tempo 项目的
+   Transport 主控显示 Playhead 所在段的当前值并保持只读；在 Arrangement 的 Tempo Track
+   新增、选择、移动、调整或删除独立 Tempo Event。
 9. 显式保存项目。
 10. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
 11. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
@@ -74,6 +76,7 @@ Studio 会明确失败，不静默替换声音。
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                   |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return；播放中相关编辑按 Note / Track 选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                             |
+| `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；每个完成手势只提交一个 Command。                             |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                |
 | `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、原子 Pencil 放置、Clip 内完整 Note 编辑、Snap 与 Undo / Redo 已接入。                   |
 
@@ -209,7 +212,7 @@ Workbench 已建立真实项目状态驱动的布局：
 
 - Global Bar：项目菜单、品牌、项目名称、保存状态、Save，以及“导入为新项目 / 新 Track”入口。
 - Transport Bar：Undo / Redo、Tempo、拍号、播放区和 MIDI Editor 开关。
-- Arrangement：Track 控制区、时间标尺、Track Lane 和 Add Track；右侧时间内容持有唯一真实
+- Arrangement：Track 控制区、时间标尺、固定 Tempo Track、Track Lane 和 Add Track；右侧时间内容持有唯一真实
   纵向 / 横向滚动状态，左侧 Track 控制列以裁切从视图保持行对齐。至少 150 小节的 Ruler /
   Lane 可横向滚动，原生横向滚动条只出现在时间内容下方。
 - Context Editor Dock：Track Inspector 与未来 MIDI Editor 宿主。
@@ -239,9 +242,28 @@ Arrangement Ruler 可点击或静默拖动定位，拖到视口边缘会连续�
   Command / History 步骤，可 Undo / Redo；
 - Playing 时开始编辑先自动 Pause，在同一连续音乐 Tick 上安装新 Tempo Map；提交后保持 Paused，
   不自动恢复。Stopped / Paused 修改同样保留 Tick，只重算对应 ProjectSecond；
-- 多 Tempo 项目在主控显示 Playhead 所在 step event 的当前 BPM，并以 `MAP` 标记只读；当前不会
-  flatten、缩放、删除或合并 Tempo Map，完整编辑等待专用 Tempo Map 编辑器；
+- 多 Tempo 项目在主控显示 Playhead 所在 step event 的当前 BPM，并以 `MAP` 标记只读；主控不会
+  flatten、缩放、删除或合并 Tempo Map，完整点编辑位于 Arrangement 的专用 Tempo Track；
 - Playback Loading 期间主控暂时只读。
+
+Arrangement 的 Tempo Track 遵循以下规则：
+
+- Tempo Track 固定在 Ruler / Track Actions 下方，不随普通 Track Lane 的纵向滚动离开视口；右侧
+  Tempo 时间内容与 Ruler、Clip 和 Playhead 共享同一横向滚动与绝对 Project Tick 坐标；
+- 点击既有点只选择该 Tempo Event；左侧控制区显示所选点的完整 Tick 和最多两位小数 BPM，可输入
+  `5..999 BPM` 的新值；选择和 Drag Preview 是页面级瞬态状态，不写入 Project、History 或文件；
+- 双击 Tempo Track 空白处创建一个 step Tempo Event。横坐标转换为最近的整数 Project Tick，
+  不做拍、小节或其他音乐 Grid 吸附；纵坐标按照当前可见 BPM 标尺转换为最多两位小数的值；
+- 默认可见标尺覆盖 `40..240 BPM`；只有现有 Project 事实超出该区间时才向 `5..999 BPM` 领域边界
+  扩展并保留上下余量，不能为了显示而 clamp 或修改导入值；
+- 拖动超过 click tolerance 后按主导方向锁定单一轴：横向只移动 Tick，纵向只调整 BPM，锁定后不在
+  同一手势中切换；拖动期间只移动本地 Preview，Pointer Up 才形成一个 Move 或 Replace BPM
+  Command / History 步骤，Pointer Cancel、Capture Loss 或 Escape 不提交；
+- Tick `0` 的初始点允许纵向拖动和数值 BPM 编辑，但不可横向移动、删除或用键盘移除；所选非初始点
+  可用左侧删除按钮或点获得焦点后的 `Delete` / `Backspace` 删除；
+- 目标 Tick 已有其他 Tempo Event 时拒绝 Add / Move 并显示 Toast，不静默合并、覆盖或交换 ID；
+- Playing 中真正开始修改会先 Pause，并在同一连续 Tick 安装新 Tempo Map；提交后不自动恢复。
+  Loading 期间仍可选择点，但所有事实修改暂时禁用。
 
 以下控件仍只是诚实占位：
 
@@ -259,8 +281,8 @@ Arrangement Ruler 可点击或静默拖动定位，拖到视口边缘会连续�
 - 执行新的分叉 Command 会使旧 Redo 分支失效。
 - History 是 Session 本地状态，不保存到 Snapshot、Project File、Checkpoint 或 IndexedDB。
 - 当前 Studio 中可直接产生的历史操作包括 Instrument Track、旧 Slot 的 Studio Grand 选择、空
-  MIDI Clip，以及 MIDI Note Add、Selection Move、单 Note Resize 与原子删除完整 Note
-  Selection。
+  MIDI Clip，Tempo Event Add / Move / Replace BPM / Remove，以及 MIDI Note Add、Selection
+  Move、单 Note Resize 与原子删除完整 Note Selection。
 - Workbench 可使用 `Mod+Z` Undo、`Mod+Shift+Z` Redo；Windows 兼容 `Control+Y`。
 
 ### 5.3 `CONTEXT-EDITOR-DOCK` 编辑器 Dock
@@ -854,9 +876,10 @@ File 导入是独立交换格式入口，不替代 Project File。
     Track 同色，批次内相邻 Track 继续避重，Clip 保持 `null` 以继承 Track 颜色。
 11. Project Tempo 的可表示范围是 `5..999 BPM`；MIDI 导入保留范围内的完整浮点值和所有有效
     Tempo Event，不静默 clamp、倍增或按密度删除。
-12. Tempo 主控只舍入显示，不修改隐藏精度。单 Tempo 项目可编辑；多 Tempo 项目主控显示
-    Playhead 当前值但只读。Playing 编辑必须先 Pause，并在新 Tempo Map 下保留连续 Tick；不得
-    自动恢复播放或把 Tempo Map 隐式压平。
+12. Tempo 主控只舍入显示，不修改隐藏精度。单 Tempo 项目可从主控编辑；多 Tempo 项目主控显示
+    Playhead 当前值但只读，并从专用 Tempo Track 编辑事件。Tick 0 初始点不可移动或删除，事件
+    Tick 不得碰撞；一次点拖动只形成一个 Command。Playing 编辑必须先 Pause，并在新 Tempo Map
+    下保留连续 Tick；不得自动恢复播放或把 Tempo Map 隐式压平。
 13. 未知或不可用 Device 必须保存并显示 Missing，不能静默替换声音。
 14. 普通 Clip 复制的长期产品语义是创建独立 MIDI Source 与新 Note 身份。
 15. Move、Resize、Split 等编辑算法必须在对应 Command 实现前确定产品边界。
@@ -932,6 +955,9 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-17 | `PLAYBACK`、`PLAYBACK-VIEW`                                | 完成后台视觉恢复、Timeline / Transport、生命周期与资源清理证据审计；Audible MIDI Playback V1 全部批次通过审核并收口。                                            | `f1d0298`                                  |
 | 2026-08-18 | `TIMELINE-LOCATE`、`PLAYBACK`                              | 建立 Ruler 点击 / 静默拖动、连续边缘滚动、键盘 / ARIA、播放中安全重调度、Return Anchor、Follow 恢复及纵向可见 Playhead；已通过统一审核与用户浏览器验证。         | `2b89595..f4cb601`                         |
 | 2026-08-20 | `MIDI-IMPORT`                                              | 完成 Project Entry 导入纵向切片，并在 Workbench 项目菜单与 Arrangement 末尾增加明确的“导入为新项目”入口及 dirty 导航保护。                                       | `fca1c49`、`2b95ee9`                       |
+| 2026-08-24 | `TEMPO-CONTROL`                                            | Studio 接通单 Tempo 主控精度显示、数值编辑、播放中自动 Pause、History 与多 Tempo 当前值只读投影。                                                                | `554c2f9`                                  |
+| 2026-08-24 | `TEMPO-TRACK`                                              | Project Core 完成 Tempo Event Add / Move / Remove 生命周期；Playback 对全部 Tempo Change 使用保留连续 Tick 的完整 handoff。                                      | `003b557`、`a2a2092`                       |
+| 2026-08-24 | `TEMPO-TRACK`                                              | Studio 增加固定 Tempo Track、事件选择、双击新增、单轴拖动、精确数值编辑、删除、失败反馈与 Composition Root ID 协调。                                             | 本次提交                                   |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -948,6 +974,10 @@ Audible MIDI Playback V1 Batch 1A、Batch 1B、Batch 2A、Batch 2B、Batch 3A、
 Batch 4B.1、Batch 4B.2、Batch 5A、Batch 6A–6F 与 Batch 7A–7F 已通过本地验证和功能审核。
 Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 浏览器布局 smoke。按约定没有新增 E2E：
+
+- Project Tempo Control V1 MT3 已于 2026-08-24 通过完整 `pnpm check`，包括 Architecture、
+  Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist boundary；Studio
+  为 56 个测试文件 / 359 项测试。未执行浏览器人工测试，代码与功能待用户审核。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist
@@ -980,17 +1010,17 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   与 soundbank dist boundary；Batch 6 按约定未新增 E2E。
 - Batch 4B.2 已通过完整 `pnpm check`（Architecture、Workspace Type Check、全部测试、
   Studio Production Build 与 soundbank dist boundary），并通过改动范围的 Oxlint / ESLint 与格式检查。
-- Project Core：29 个测试文件，415 项测试。
+- Project Core：31 个测试文件，432 项测试。
 - midi-file：3 个测试文件，14 项测试。
 - project-midi：3 个测试文件，22 项测试。
 - platform-browser：3 个测试文件，23 项测试。
 - editor：11 个测试文件，112 项测试。
-- playback：9 个测试文件，101 项测试。
+- playback：9 个测试文件，102 项测试。
 - audio-web：16 个测试文件，110 项测试。
-- Studio：49 个测试文件，313 项测试。
+- Studio：56 个测试文件，359 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
-合计 124 个测试文件、1112 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace Type
+合计 133 个测试文件、1176 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace Type
 Check、Studio Production Build 与 soundbank dist boundary。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

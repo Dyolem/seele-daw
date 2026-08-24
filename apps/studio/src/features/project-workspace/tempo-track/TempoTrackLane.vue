@@ -15,6 +15,7 @@ import {
   orderProjectTempoEvents,
   projectTempoTrackBpmPositionRatio,
   resolveDraggedProjectTempoBpm,
+  resolveNearestProjectTempoTrackEvent,
   resolveProjectTempoTrackBpm,
   resolveProjectTempoTrackDragAxis,
   resolveProjectTempoTrackTick,
@@ -86,12 +87,16 @@ const renderedEvents = computed(() => {
   )
 })
 
+function formatPositionPercentage(ratio: number): string {
+  return `${Number((ratio * 100).toFixed(6))}%`
+}
+
 function eventStyle(tempoEvent: TempoEventRecord): StyleValue {
   const inlineOffsetRem =
     (tempoEvent.tick / props.barSpanTick) * PROJECT_TIMELINE_BAR_INLINE_SIZE_REM
   const blockRatio = projectTempoTrackBpmPositionRatio(tempoEvent.bpm, tempoScale.value)
   return {
-    insetBlockStart: `${blockRatio * 100}%`,
+    insetBlockStart: formatPositionPercentage(blockRatio),
     transform: `translate3d(${inlineOffsetRem}rem, -50%, 0)`,
   }
 }
@@ -104,10 +109,23 @@ function segmentStyle(tempoEvent: TempoEventRecord, eventIndex: number): StyleVa
     inlineSize: `${
       (Math.max(0, endTick - startTick) / props.barSpanTick) * PROJECT_TIMELINE_BAR_INLINE_SIZE_REM
     }rem`,
-    insetBlockStart: `${
-      projectTempoTrackBpmPositionRatio(tempoEvent.bpm, tempoScale.value) * 100
-    }%`,
+    insetBlockStart: formatPositionPercentage(
+      projectTempoTrackBpmPositionRatio(tempoEvent.bpm, tempoScale.value),
+    ),
     transform: `translate3d(${(startTick / props.barSpanTick) * PROJECT_TIMELINE_BAR_INLINE_SIZE_REM}rem, -50%, 0)`,
+  }
+}
+
+function transitionStyle(tempoEvent: TempoEventRecord, eventIndex: number): StyleValue {
+  const previousEvent = renderedEvents.value[eventIndex - 1]
+  if (previousEvent === undefined) return { display: 'none' }
+
+  const previousRatio = projectTempoTrackBpmPositionRatio(previousEvent.bpm, tempoScale.value)
+  const currentRatio = projectTempoTrackBpmPositionRatio(tempoEvent.bpm, tempoScale.value)
+  return {
+    blockSize: formatPositionPercentage(Math.abs(currentRatio - previousRatio)),
+    insetBlockStart: formatPositionPercentage(Math.min(previousRatio, currentRatio)),
+    transform: `translate3d(${(tempoEvent.tick / props.barSpanTick) * PROJECT_TIMELINE_BAR_INLINE_SIZE_REM}rem, 0, 0)`,
   }
 }
 
@@ -125,6 +143,39 @@ function tickAtClientX(clientX: number, bounds: DOMRect): Tick {
   })
 }
 
+function tempoEventAtClientPosition(
+  clientX: number,
+  clientY: number,
+  bounds: DOMRect,
+): TempoEventRecord | null {
+  return resolveNearestProjectTempoTrackEvent({
+    clientX,
+    clientY,
+    laneHeight: bounds.height,
+    laneLeft: bounds.left,
+    laneTop: bounds.top,
+    laneWidth: bounds.width,
+    scale: tempoScale.value,
+    tempoEvents: renderedEvents.value,
+    timelineEndTick: props.timelineEndTick,
+  })
+}
+
+function selectNearestTempoEvent(event: MouseEvent): void {
+  if (event.button !== 0) return
+  const plot = plotElement.value
+  if (plot === null) return
+  const tempoEvent = tempoEventAtClientPosition(
+    event.clientX,
+    event.clientY,
+    plot.getBoundingClientRect(),
+  )
+  if (tempoEvent === null) return
+
+  emit('select', tempoEvent.id)
+  event.preventDefault()
+}
+
 function addTempoEvent(event: MouseEvent): void {
   if (props.editingDisabled || event.button !== 0) return
   const target = event.target
@@ -132,6 +183,12 @@ function addTempoEvent(event: MouseEvent): void {
   const plot = plotElement.value
   if (plot === null) return
   const bounds = plot.getBoundingClientRect()
+  const existingTempoEvent = tempoEventAtClientPosition(event.clientX, event.clientY, bounds)
+  if (existingTempoEvent !== null) {
+    emit('select', existingTempoEvent.id)
+    event.preventDefault()
+    return
+  }
   emit('add', {
     bpm: resolveProjectTempoTrackBpm({
       clientY: event.clientY,
@@ -146,32 +203,41 @@ function addTempoEvent(event: MouseEvent): void {
 
 function beginPointGesture(tempoEvent: TempoEventRecord, event: PointerEvent): void {
   if (activeGesture.value !== null || event.isPrimary === false || event.button !== 0) return
-  emit('select', tempoEvent.id)
-  if (props.editingDisabled) return
   const plot = plotElement.value
-  if (plot === null) return
+  const laneBounds = plot?.getBoundingClientRect()
+  const targetTempoEvent =
+    laneBounds === undefined
+      ? tempoEvent
+      : (tempoEventAtClientPosition(event.clientX, event.clientY, laneBounds) ?? tempoEvent)
+  emit('select', targetTempoEvent.id)
+  if (props.editingDisabled || plot === null || laneBounds === undefined) return
   const surface = event.currentTarget as HTMLElement
-  const laneBounds = plot.getBoundingClientRect()
   activeGesture.value = {
     axis: null,
-    grabOffsetTick: tickAtClientX(event.clientX, laneBounds) - tempoEvent.tick,
+    grabOffsetTick: tickAtClientX(event.clientX, laneBounds) - targetTempoEvent.tick,
     laneBounds,
     pointerId: event.pointerId,
     scale: tempoScale.value,
-    startBpm: tempoEvent.bpm,
+    startBpm: targetTempoEvent.bpm,
     startClientX: event.clientX,
     startClientY: event.clientY,
-    startTick: tempoEvent.tick,
+    startTick: targetTempoEvent.tick,
     surface,
-    tempoEventId: tempoEvent.id,
+    tempoEventId: targetTempoEvent.id,
   }
   pointPreview.value = {
-    bpm: tempoEvent.bpm,
-    tempoEventId: tempoEvent.id,
-    tick: tempoEvent.tick,
+    bpm: targetTempoEvent.bpm,
+    tempoEventId: targetTempoEvent.id,
+    tick: targetTempoEvent.tick,
   }
   surface.setPointerCapture?.(event.pointerId)
   event.preventDefault()
+}
+
+function handlePointClick(tempoEvent: TempoEventRecord, event: MouseEvent): void {
+  // Pointer selection happens on Pointer Down so dense overlaps can use geometric hit testing.
+  // A keyboard-synthesized click has detail 0 and still needs the point's direct selection path.
+  if (event.detail === 0) emit('select', tempoEvent.id)
 }
 
 function updatePointGesture(event: PointerEvent): void {
@@ -312,7 +378,12 @@ onUnmounted(() => {
     aria-label="Project Tempo Track"
     title="Double-click empty space to add a Tempo Event"
   >
-    <div ref="plotElement" class="tempo-track-lane__plot" @dblclick="addTempoEvent">
+    <div
+      ref="plotElement"
+      class="tempo-track-lane__plot"
+      @click="selectNearestTempoEvent"
+      @dblclick="addTempoEvent"
+    >
       <span class="tempo-track-lane__scale-layer" aria-hidden="true">
         <span class="tempo-track-lane__scale tempo-track-lane__scale--maximum">
           {{ tempoScale.maximumBpm }}
@@ -325,8 +396,27 @@ onUnmounted(() => {
         v-for="(tempoEvent, eventIndex) in renderedEvents"
         :key="`segment-${tempoEvent.id}`"
         class="tempo-track-lane__segment"
+        :class="{
+          'tempo-track-lane__segment--selected': props.selectedTempoEventId === tempoEvent.id,
+        }"
         :style="segmentStyle(tempoEvent, eventIndex)"
         aria-hidden="true"
+        :title="pointLabel(tempoEvent)"
+        @click.stop="emit('select', tempoEvent.id)"
+        @dblclick.stop
+      ></span>
+      <span
+        v-for="(tempoEvent, transitionIndex) in renderedEvents.slice(1)"
+        :key="`transition-${tempoEvent.id}`"
+        class="tempo-track-lane__transition"
+        :class="{
+          'tempo-track-lane__transition--selected': props.selectedTempoEventId === tempoEvent.id,
+        }"
+        :style="transitionStyle(tempoEvent, transitionIndex + 1)"
+        aria-hidden="true"
+        :title="pointLabel(tempoEvent)"
+        @click.stop="emit('select', tempoEvent.id)"
+        @dblclick.stop
       ></span>
       <button
         v-for="tempoEvent in renderedEvents"
@@ -342,7 +432,7 @@ onUnmounted(() => {
         :aria-label="pointLabel(tempoEvent)"
         :aria-pressed="props.selectedTempoEventId === tempoEvent.id"
         :title="pointLabel(tempoEvent)"
-        @click.stop="emit('select', tempoEvent.id)"
+        @click.stop="handlePointClick(tempoEvent, $event)"
         @dblclick.stop
         @keydown="handlePointKeydown(tempoEvent, $event)"
         @lostpointercapture="cancelPointGesture"
@@ -419,8 +509,44 @@ onUnmounted(() => {
   inset-inline-start: 0;
   block-size: 1px;
   background: color-mix(in srgb, var(--sd-color-border-focus) 72%, transparent);
-  pointer-events: none;
+  cursor: pointer;
   transform-origin: left center;
+}
+
+.tempo-track-lane__segment::after {
+  position: absolute;
+  inset: -0.375rem 0;
+  content: '';
+}
+
+.tempo-track-lane__transition {
+  position: absolute;
+  z-index: 1;
+  inset-inline-start: 0;
+  inline-size: 1px;
+  background: color-mix(in srgb, var(--sd-color-border-focus) 72%, transparent);
+  cursor: pointer;
+  transform-origin: left top;
+}
+
+.tempo-track-lane__transition::after {
+  position: absolute;
+  inset: 0 -0.375rem;
+  content: '';
+}
+
+.tempo-track-lane__segment--selected,
+.tempo-track-lane__transition--selected {
+  z-index: 2;
+  background: var(--sd-color-text-primary);
+}
+
+.tempo-track-lane__segment--selected {
+  block-size: 2px;
+}
+
+.tempo-track-lane__transition--selected {
+  inline-size: 2px;
 }
 
 .tempo-track-lane__point {
@@ -454,11 +580,13 @@ onUnmounted(() => {
 }
 
 .tempo-track-lane__point--selected {
+  z-index: 3;
   background: var(--sd-color-text-primary);
   box-shadow: 0 0 0 2px var(--sd-color-border-focus);
 }
 
 .tempo-track-lane__point--active {
+  z-index: 4;
   transition: none;
 }
 

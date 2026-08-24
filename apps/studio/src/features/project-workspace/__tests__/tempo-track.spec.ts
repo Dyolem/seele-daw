@@ -13,6 +13,7 @@ import {
   orderProjectTempoEvents,
   projectTempoTrackBpmPositionRatio,
   resolveDraggedProjectTempoBpm,
+  resolveNearestProjectTempoTrackEvent,
   resolveProjectTempoTrackBpm,
   resolveProjectTempoTrackDragAxis,
   resolveProjectTempoTrackTick,
@@ -104,6 +105,29 @@ describe('Tempo Track projection', () => {
         scale: { maximumBpm: 240, minimumBpm: 40 },
       }),
     ).toBe(190)
+  })
+
+  it('selects the nearest dense point inside a bounded geometric hit radius', () => {
+    const earlier = tempoEvent('tempo-hit-earlier', 100, 100)
+    const later = tempoEvent('tempo-hit-later', 108, 102)
+    const input = {
+      laneHeight: 100,
+      laneLeft: 100,
+      laneTop: 50,
+      laneWidth: 1_000,
+      maximumDistancePx: 14,
+      scale: { maximumBpm: 240, minimumBpm: 40 },
+      tempoEvents: [later, earlier],
+      timelineEndTick: parseTick(1_000),
+    }
+
+    expect(resolveNearestProjectTempoTrackEvent({ ...input, clientX: 207, clientY: 119 })).toBe(
+      later,
+    )
+    expect(resolveNearestProjectTempoTrackEvent({ ...input, clientX: 204, clientY: 119.5 })).toBe(
+      earlier,
+    )
+    expect(resolveNearestProjectTempoTrackEvent({ ...input, clientX: 400, clientY: 50 })).toBeNull()
   })
 
   it('applies vertical drag delta without jumping from an off-center point grab', () => {

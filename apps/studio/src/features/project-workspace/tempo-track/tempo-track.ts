@@ -20,6 +20,7 @@ export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM = 40
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MAXIMUM_BPM = 240
 export const PROJECT_TEMPO_TRACK_VISIBLE_SCALE_PADDING_BPM = 20
 export const PROJECT_TEMPO_TRACK_DRAG_THRESHOLD_PX = 4
+export const PROJECT_TEMPO_TRACK_POINT_HIT_RADIUS_PX = 14
 
 export interface ProjectTempoTrackScale {
   readonly maximumBpm: number
@@ -68,6 +69,19 @@ export interface ResolveDraggedProjectTempoBpmInput {
   readonly scale: ProjectTempoTrackScale
   readonly startBpm: TempoBpm
   readonly startClientY: number
+}
+
+interface ResolveNearestProjectTempoTrackEventInput {
+  readonly clientX: number
+  readonly clientY: number
+  readonly laneHeight: number
+  readonly laneLeft: number
+  readonly laneTop: number
+  readonly laneWidth: number
+  readonly maximumDistancePx?: number
+  readonly scale: ProjectTempoTrackScale
+  readonly tempoEvents: readonly TempoEventRecord[]
+  readonly timelineEndTick: Tick
 }
 
 /** Orders the immutable Project facts for deterministic step-line and keyboard presentation. */
@@ -149,6 +163,45 @@ export function projectTempoTrackBpmPositionRatio(
   const span = scale.maximumBpm - scale.minimumBpm
   if (!Number.isFinite(bpm) || !Number.isFinite(span) || span <= 0) return 0
   return Math.min(1, Math.max(0, (scale.maximumBpm - bpm) / span))
+}
+
+/** Resolves the closest visible point inside a bounded hit radius for deterministic dense-map selection. */
+export function resolveNearestProjectTempoTrackEvent(
+  input: ResolveNearestProjectTempoTrackEventInput,
+): TempoEventRecord | null {
+  if (
+    !Number.isFinite(input.clientX) ||
+    !Number.isFinite(input.clientY) ||
+    !Number.isFinite(input.laneHeight) ||
+    !Number.isFinite(input.laneLeft) ||
+    !Number.isFinite(input.laneTop) ||
+    !Number.isFinite(input.laneWidth) ||
+    input.laneHeight <= 0 ||
+    input.laneWidth <= 0 ||
+    input.timelineEndTick <= 0
+  ) {
+    return null
+  }
+
+  const maximumDistancePx = input.maximumDistancePx ?? PROJECT_TEMPO_TRACK_POINT_HIT_RADIUS_PX
+  if (!Number.isFinite(maximumDistancePx) || maximumDistancePx < 0) return null
+  let nearestTempoEvent: TempoEventRecord | null = null
+  let nearestDistanceSquared = maximumDistancePx ** 2
+
+  for (const tempoEvent of orderProjectTempoEvents(input.tempoEvents)) {
+    const pointX = input.laneLeft + (tempoEvent.tick / input.timelineEndTick) * input.laneWidth
+    const pointY =
+      input.laneTop +
+      projectTempoTrackBpmPositionRatio(tempoEvent.bpm, input.scale) * input.laneHeight
+    const distanceSquared = (input.clientX - pointX) ** 2 + (input.clientY - pointY) ** 2
+    if (distanceSquared > nearestDistanceSquared) continue
+    if (distanceSquared === nearestDistanceSquared && nearestTempoEvent !== null) continue
+
+    nearestTempoEvent = tempoEvent
+    nearestDistanceSquared = distanceSquared
+  }
+
+  return nearestTempoEvent
 }
 
 /** Maps a Tempo lane x-coordinate to the nearest integer Project Tick without musical snapping. */

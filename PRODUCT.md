@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-24，Project Tempo Track V1 MT4A 已通过审核并提交，MT4B 已实施，待审核
+> 最近更新：2026-08-24，Project Tempo Track V1 MT4B 已通过审核并提交，MT4C 已实施，待审核
 >
-> 当前阶段：Project Tempo Control V1；正在完善 Tempo Event 的位置展示与稠密事件导航
+> 当前阶段：Project Tempo Control V1；正在完善密集 Step Tempo Map 的轮廓与命中语义
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -265,6 +265,14 @@ Arrangement 的 Tempo Track 遵循以下规则：
   Project 内新事实超出范围时继续扩展，但删除、Undo 或 Drag Preview 不自动收缩标尺，避免编辑中
   纵轴跳动；切换 Project 时重新建立视图。可视标尺不写入 Project、History 或 Project File，也
   不能为了显示而 clamp 或修改导入值；
+- Step 轮廓由每个事件生效后的水平段和事件 Tick 处连接前后 BPM 的垂直段组成，使密集离散事件仍能
+  形成连续可读的起伏；垂直段只表达瞬时 step change，不代表 ramp、插值、平滑曲线或额外 Project
+  Fact，Playback 仍从事件 Tick 起立即使用新 BPM；
+- 点、水平 Step 段和垂直过渡段都提供大于可见线宽的指针命中区；点击 Step 段选择使该段生效的事件，
+  点击过渡段选择从该 Tick 生效的事件。重叠点按屏幕二维距离在有界半径内选择最近事件，等距时按
+  Tick / ID 稳定顺序决定；所选轮廓和点提升视觉层级，仍可结合前后事件导航逐项检查密集 Map；
+- 双击落在既有事件的命中半径内只选择该事件，不意外创建近乎重叠的新事件；超出命中区的空白位置
+  才按既有规则创建事件。导入的密集事件不因显示或命中便利而删除、合并、降采样或改写 BPM；
 - 拖动超过 click tolerance 后按主导方向锁定单一轴：横向只移动 Tick，纵向只调整 BPM，锁定后不在
   同一手势中切换；拖动期间只移动本地 Preview，Pointer Up 才形成一个 Move 或 Replace BPM
   Command / History 步骤，Pointer Cancel、Capture Loss 或 Escape 不提交；
@@ -968,7 +976,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-24 | `TEMPO-TRACK`                                              | Project Core 完成 Tempo Event Add / Move / Remove 生命周期；Playback 对全部 Tempo Change 使用保留连续 Tick 的完整 handoff。                                      | `003b557`、`a2a2092`                       |
 | 2026-08-24 | `TEMPO-TRACK`                                              | Studio 增加固定 Tempo Track、事件选择、双击新增、单轴拖动、精确数值编辑、删除、失败反馈与 Composition Root ID 协调。                                             | `f62f384`                                  |
 | 2026-08-24 | `TEMPO-TRACK`                                              | MT4A 区分 `5..999` 领域范围与 `40..240` 默认视图，统一 Studio 编辑精度，并建立按 Project 重置、同一 Project 内只扩不缩的瞬态纵轴。                               | `254c46b`                                  |
-| 2026-08-24 | `TEMPO-TRACK`、`TIMELINE`                                  | MT4B 为所选 Tempo Event 提供音乐位置 / 多 Tempo 绝对时间、前后事件导航和不移动 Playhead 的显式居中定位，并在播放中暂停 Follow。                                  | 本次实现                                   |
+| 2026-08-24 | `TEMPO-TRACK`、`TIMELINE`                                  | MT4B 为所选 Tempo Event 提供音乐位置 / 多 Tempo 绝对时间、前后事件导航和不移动 Playhead 的显式居中定位，并在播放中暂停 Follow。                                  | `c0a7554`                                  |
+| 2026-08-24 | `TEMPO-TRACK`                                              | MT4C 以水平段和垂直过渡段绘制连续 Step 轮廓，增加线段命中、重叠点最近选择、所选层级及近点双击保护，不引入 ramp 或事件简化。                                      | 本次实现                                   |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -997,7 +1006,12 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 
 - Project Tempo Control V1 MT4B 已于 2026-08-24 通过根级 `pnpm lint`、Playback Type Check 与
   9 个测试文件 / 102 项测试、Studio Type Check 与 57 个测试文件 / 370 项测试、Production
-  Build 及 soundbank dist boundary。未执行浏览器人工测试，代码与功能待用户审核。
+  Build 及 soundbank dist boundary。未执行浏览器人工测试，代码与功能已通过用户审核并提交为
+  `c0a7554`。
+
+- Project Tempo Control V1 MT4C 已于 2026-08-24 通过根级 `pnpm lint`、Studio Type Check、
+  57 个测试文件 / 374 项测试、Production Build 与 soundbank dist boundary。未执行浏览器人工
+  测试，代码与功能待用户审核。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

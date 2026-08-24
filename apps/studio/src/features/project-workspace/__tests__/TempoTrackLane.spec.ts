@@ -90,15 +90,53 @@ afterEach(() => {
 })
 
 describe('TempoTrackLane', () => {
-  it('renders step segments and transform-positioned Tempo points', () => {
+  it('renders a continuous selected Step contour and transform-positioned Tempo points', () => {
     const { wrapper } = mountLane({ selectedTempoEventId: LATER_EVENT.id })
     const points = wrapper.findAll('.tempo-track-lane__point')
+    const transitions = wrapper.findAll('.tempo-track-lane__transition')
 
     expect(points).toHaveLength(2)
     expect(wrapper.findAll('.tempo-track-lane__segment')).toHaveLength(2)
+    expect(transitions).toHaveLength(1)
     expect(points[0]?.attributes('style')).toContain('translate3d(0rem, -50%, 0)')
     expect(points[1]?.attributes('style')).toContain('translate3d(1.25rem, -50%, 0)')
     expect(points[1]?.classes()).toContain('tempo-track-lane__point--selected')
+    expect(transitions[0]?.attributes('style')).toContain('block-size: 10%')
+    expect(transitions[0]?.classes()).toContain('tempo-track-lane__transition--selected')
+    expect(wrapper.findAll('.tempo-track-lane__segment')[1]?.classes()).toContain(
+      'tempo-track-lane__segment--selected',
+    )
+  })
+
+  it('selects the owning Event from horizontal and vertical Step contour hits', async () => {
+    const { wrapper } = mountLane()
+    const segments = wrapper.findAll('.tempo-track-lane__segment')
+    const transition = wrapper.get('.tempo-track-lane__transition')
+
+    await segments[0]!.trigger('click')
+    await transition.trigger('click')
+    await transition.trigger('dblclick')
+
+    expect(wrapper.emitted('select')).toEqual([[INITIAL_EVENT.id], [LATER_EVENT.id]])
+    expect(wrapper.emitted('add')).toBeUndefined()
+  })
+
+  it('resolves a dense overlap by geometry instead of DOM paint order', async () => {
+    const denseEarlier = tempoEvent('tempo-track-lane-dense-earlier', 960, 100)
+    const denseLater = tempoEvent('tempo-track-lane-dense-later', 980, 102)
+    const { wrapper } = mountLane({
+      editingDisabled: true,
+      tempoEvents: Object.freeze([INITIAL_EVENT, denseEarlier, denseLater]),
+    })
+    const earlierPoint = wrapper.findAll('.tempo-track-lane__point')[1]!
+
+    await dispatchPointer(earlierPoint.element, 'pointerdown', {
+      clientX: 355,
+      clientY: 119,
+      pointerId: 6,
+    })
+
+    expect(wrapper.emitted('select')).toEqual([[denseLater.id]])
   })
 
   it('keeps an expanded view stable within one Project and resets it for another Project', async () => {
@@ -133,6 +171,23 @@ describe('TempoTrackLane', () => {
     await Promise.resolve()
 
     expect(wrapper.emitted('add')).toEqual([[{ bpm: parseTempoBpm(140), tick: parseTick(1_920) }]])
+  })
+
+  it('selects rather than adds when a double-click lands inside an existing point hit radius', async () => {
+    const { plot, wrapper } = mountLane()
+    plot.dispatchEvent(
+      new MouseEvent('dblclick', {
+        bubbles: true,
+        button: 0,
+        cancelable: true,
+        clientX: 350,
+        clientY: 120,
+      }),
+    )
+    await Promise.resolve()
+
+    expect(wrapper.emitted('select')).toEqual([[LATER_EVENT.id]])
+    expect(wrapper.emitted('add')).toBeUndefined()
   })
 
   it('locks horizontal drag, previews silently, and emits one Move on release', async () => {

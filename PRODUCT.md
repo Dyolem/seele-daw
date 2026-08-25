@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-25，Project Tempo Track V1 MT4D 语义化精确位置编辑与 MT4E 拖拽预览同步已实施，待审核
+> 最近更新：2026-08-25，Project Tempo Control V1 MT5 已通过审核并完成阶段收口
 >
-> 当前阶段：Project Tempo Control V1；正在完善 Tempo Event 的精确数值编辑
+> 当前阶段：Project Tempo Control V1 已完成；下一阶段范围待规划
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -298,6 +298,19 @@ Arrangement 的 Tempo Track 遵循以下规则：
 - 目标 Tick 已有其他 Tempo Event 时拒绝 Add / Move 并显示 Toast，不静默合并、覆盖或交换 ID；
 - Playing 中真正开始修改会先 Pause，并在同一连续 Tick 安装新 Tempo Map；提交后不自动恢复。
   Loading 期间仍可选择点，但所有事实修改暂时禁用。
+
+Project Tempo Control V1 的已交付范围到此收口：单 Tempo 主控编辑、多 Tempo 主控只读投影、
+Tempo Event Add / Select / Move / Replace BPM / Remove、Step 轮廓、精确音乐位置、导航定位、播放中
+连续 Tick handoff、Undo / Redo、持久化与拖拽预览同步都已有真实产品入口。以下能力明确延期，不得
+由当前 `STEP` 标记或轮廓视觉暗示已经存在：
+
+- Linear / Ramp / Bézier Tempo、曲线控制柄、曲线采样生成或密集事件自动简化；
+- 连续 Pencil 绘制、独立 Select / Draw 工具、框选、多事件批量编辑和键盘位置微调；
+- Tempo Snap / Grid、纵轴缩放、Arrangement Zoom，以及可停靠的完整 Tempo Inspector；
+- Time Signature Event 编辑、SMPTE 位置编辑、Metronome、Tempo Automation 与通用 Automation
+  Lane 平台；
+- 使用 D3 或其他曲线库。只有真实 Linear / Ramp 产品切片确定数据模型、命中、编辑与 Playback
+  语义后，才重新评估曲线渲染依赖。
 
 以下控件仍只是诚实占位：
 
@@ -996,14 +1009,15 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-24 | `TEMPO-TRACK`、`TIMELINE`                                  | MT4B 为所选 Tempo Event 提供音乐位置 / 多 Tempo 绝对时间、前后事件导航和不移动 Playhead 的显式居中定位，并在播放中暂停 Follow。                                  | `c0a7554`                                  |
 | 2026-08-24 | `TEMPO-TRACK`                                              | MT4C 以水平段和垂直过渡段绘制连续 Step 轮廓，增加线段命中、重叠点最近选择、所选层级及近点双击保护，不引入 ramp 或事件简化。                                      | `b0bacbe`                                  |
 | 2026-08-25 | `TEMPO-TRACK`                                              | MT4C 视觉修正把节点中心精确锚定到 Tick / BPM，改用紧凑菱形并弱化垂直跳变；保留真实 Step 阶梯，不把离散事件伪装成 Linear / Ramp 折线。                            | `9eb7855`                                  |
-| 2026-08-25 | `TEMPO-TRACK`                                              | MT4D 增加 BAR / BEAT / OFFSET 组合位置输入与 TIME 标签，保留网格 / Timeline 校验、无变化短路和单次 Move Command；初始位置只读。                                  | 本次实现                                   |
-| 2026-08-25 | `TEMPO-TRACK`                                              | MT4E 由 Arrangement 持有 feature-scoped 交互控制器，令轨道拖拽与左侧 BPM / 位置 / TIME 共用瞬时预览；取消不写事实，松手只交接一次既有命令。                      | 本次实现                                   |
+| 2026-08-25 | `TEMPO-TRACK`                                              | MT4D 增加 BAR / BEAT / OFFSET 组合位置输入与 TIME 标签，保留网格 / Timeline 校验、无变化短路和单次 Move Command；初始位置只读。                                  | `31b5040`                                  |
+| 2026-08-25 | `TEMPO-TRACK`                                              | MT4E 由 Arrangement 持有 feature-scoped 交互控制器，令轨道拖拽与左侧 BPM / 位置 / TIME 共用瞬时预览；取消不写事实，松手只交接一次既有命令。                      | `31b5040`                                  |
+| 2026-08-25 | `TEMPO-CONTROL`、`TEMPO-TRACK`                             | MT5 收口 Project Tempo Control V1 已交付范围，集中记录曲线、多事件工具、Time Signature / SMPTE 编辑和通用 Automation 平台等延期边界。                            | 本次提交                                   |
 
 ## 13. 阶段收口与当前验证基线
 
 Audible MIDI Playback V1 已于 2026-08-17 按
 [阶段计划](./packages/playback/docs/audible-midi-playback-v1-phase-plan.md)完成收口，验收基线为
-`f1d0298`。阶段完成与 Git checkpoint 相互独立；当前未创建新的 checkpoint tag。
+`f1d0298`。阶段完成与 Git checkpoint 相互独立；该阶段本身未单独创建 checkpoint tag。
 
 其后的 [Manual Timeline Locate V1](./packages/playback/docs/manual-timeline-locate-v1-phase-plan.md)
 已于 2026-08-18 完成四个独立主批次和一个 Playhead 纵向可见性 UX 修正，并通过用户统一代码
@@ -1039,7 +1053,15 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 
 - Project Tempo Control V1 MT4D / MT4E 已于 2026-08-25 通过根级 `pnpm lint`、Studio Type
   Check、57 个测试文件 / 380 项测试、Production Build 与 soundbank dist boundary。本轮未执行
-  浏览器人工测试，代码与功能待用户审核。
+  浏览器人工测试，代码与功能已通过用户审核并提交为 `31b5040`。
+
+- Project Tempo Control V1 MT5 阶段收口已于 2026-08-25 通过完整 `pnpm check`，包括
+  Architecture、Workspace Quality、Format、Oxlint、ESLint、全工作区 Type Check、全部测试、
+  Studio Production Build 与 soundbank dist boundary。测试基线为 Project Core 31 文件 / 432 项、
+  MIDI File 3 / 14、Platform Browser 3 / 23、Editor 11 / 112、Project MIDI 3 / 22、Playback
+  9 / 102、Audio Web 16 / 110、Studio 57 / 380、Type Utils 1 / 2。本轮未执行浏览器人工测试，
+  阶段收口文档已通过用户审核并随本次提交封版。阶段 checkpoint 为
+  `checkpoint/project-tempo-control-2026-08-25`。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

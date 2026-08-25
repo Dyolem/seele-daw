@@ -15,9 +15,9 @@ describe('Project Timeline presentation', () => {
       timeSignatureNumerator: 4,
     }
 
-    expect(formatProjectTimelineMusicalPosition(input)).toBe('4 · 3 · 240/960')
+    expect(formatProjectTimelineMusicalPosition(input)).toBe('Bar 4, beat 3, offset 240')
     expect(describeProjectTimelineMusicalPosition(input)).toBe(
-      'Bar 4, beat 3, 240 of 960 ticks; Project Tick 13680',
+      'Bar 4, beat 3, offset 240 within beat; Project Tick 13680',
     )
   })
 
@@ -28,7 +28,7 @@ describe('Project Timeline presentation', () => {
         tick: parseTick(5_400),
         timeSignatureNumerator: 6,
       }),
-    ).toBe('2 · 6 · 120/480')
+    ).toBe('Bar 2, beat 6, offset 120')
   })
 
   it('formats Project time without normalizing or rounding its precise source value', () => {

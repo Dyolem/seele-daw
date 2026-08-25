@@ -9,6 +9,10 @@ import {
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  createTempoTrackInteractionController,
+  TEMPO_TRACK_INTERACTION_KEY,
+} from '@/features/project-workspace/tempo-track/interaction'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
 
 const mountedWrappers: VueWrapper[] = []
@@ -32,6 +36,7 @@ function mountLane(
     readonly tempoEvents?: readonly TempoEventRecord[]
   } = {},
 ) {
+  const interaction = createTempoTrackInteractionController()
   const wrapper = mount(TempoTrackLane, {
     props: {
       barSpanTick: parsePositiveTick(3_840),
@@ -40,6 +45,11 @@ function mountLane(
       selectedTempoEventId: input.selectedTempoEventId ?? null,
       tempoEvents: input.tempoEvents ?? Object.freeze([INITIAL_EVENT, LATER_EVENT]),
       timelineEndTick: parseTick(3_840),
+    },
+    global: {
+      provide: {
+        [TEMPO_TRACK_INTERACTION_KEY as symbol]: interaction,
+      },
     },
   })
   mountedWrappers.push(wrapper)
@@ -55,7 +65,7 @@ function mountLane(
     x: 100,
     y: 50,
   })
-  return { plot, wrapper }
+  return { interaction, plot, wrapper }
 }
 
 async function dispatchPointer(
@@ -191,7 +201,7 @@ describe('TempoTrackLane', () => {
   })
 
   it('locks horizontal drag, previews silently, and emits one Move on release', async () => {
-    const { wrapper } = mountLane()
+    const { interaction, wrapper } = mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -208,6 +218,12 @@ describe('TempoTrackLane', () => {
     expect(wrapper.emitted('select')).toEqual([[LATER_EVENT.id]])
     expect(wrapper.emitted('editStart')).toHaveLength(1)
     expect(wrapper.emitted('move')).toBeUndefined()
+    expect(interaction.preview.value).toEqual({
+      bpm: LATER_EVENT.bpm,
+      owner: 'lane-drag',
+      tempoEventId: LATER_EVENT.id,
+      tick: parseTick(1_920),
+    })
     expect(wrapper.findAll('.tempo-track-lane__point')[1]?.attributes('style')).toContain(
       'translate3d(calc(2.5rem - 50%), -50%, 0)',
     )
@@ -219,6 +235,7 @@ describe('TempoTrackLane', () => {
     })
     expect(wrapper.emitted('move')).toEqual([[LATER_EVENT.id, parseTick(1_920)]])
     expect(wrapper.emitted('bpmChange')).toBeUndefined()
+    expect(interaction.preview.value).toBeNull()
   })
 
   it('locks vertical drag and emits one BPM replacement on release', async () => {
@@ -247,7 +264,7 @@ describe('TempoTrackLane', () => {
   })
 
   it('cancels an active preview from the global Escape path without committing', async () => {
-    const { wrapper } = mountLane()
+    const { interaction, wrapper } = mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -265,6 +282,7 @@ describe('TempoTrackLane', () => {
 
     expect(wrapper.emitted('move')).toBeUndefined()
     expect(wrapper.emitted('bpmChange')).toBeUndefined()
+    expect(interaction.preview.value).toBeNull()
     expect(wrapper.findAll('.tempo-track-lane__point')[1]?.attributes('style')).toContain(
       'translate3d(calc(1.25rem - 50%), -50%, 0)',
     )

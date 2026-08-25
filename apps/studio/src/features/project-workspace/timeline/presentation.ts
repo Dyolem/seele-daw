@@ -1,19 +1,19 @@
 import type { Tick } from '@seele-daw/project-core'
 
-interface ProjectTimelineMusicalPositionInput {
+export interface ProjectTimelineMusicalPositionInput {
   readonly barSpanTick: Tick
   readonly tick: Tick
   readonly timeSignatureNumerator: number
 }
 
-interface ProjectTimelineMusicalPosition {
+export interface ProjectTimelineMusicalPosition {
   readonly barNumber: number
   readonly beatNumber: number
   readonly beatSpanTick: number
   readonly tickWithinBeat: number
 }
 
-function resolveProjectTimelineMusicalPosition(
+export function resolveProjectTimelineMusicalPosition(
   input: ProjectTimelineMusicalPositionInput,
 ): ProjectTimelineMusicalPosition {
   const beatSpanTick = input.barSpanTick / input.timeSignatureNumerator
@@ -32,12 +32,12 @@ function resolveProjectTimelineMusicalPosition(
   })
 }
 
-/** Formats the fixed Arrangement grid as bar, beat, and exact in-beat Project Tick. */
+/** Formats the fixed Arrangement grid with user-facing musical position labels. */
 export function formatProjectTimelineMusicalPosition(
   input: ProjectTimelineMusicalPositionInput,
 ): string {
   const position = resolveProjectTimelineMusicalPosition(input)
-  return `${position.barNumber} · ${position.beatNumber} · ${position.tickWithinBeat}/${position.beatSpanTick}`
+  return `Bar ${position.barNumber}, beat ${position.beatNumber}, offset ${position.tickWithinBeat}`
 }
 
 /** Describes the same musical address while retaining the raw Project Tick for diagnostics. */
@@ -45,7 +45,7 @@ export function describeProjectTimelineMusicalPosition(
   input: ProjectTimelineMusicalPositionInput,
 ): string {
   const position = resolveProjectTimelineMusicalPosition(input)
-  return `Bar ${position.barNumber}, beat ${position.beatNumber}, ${position.tickWithinBeat} of ${position.beatSpanTick} ticks; Project Tick ${input.tick}`
+  return `Bar ${position.barNumber}, beat ${position.beatNumber}, offset ${position.tickWithinBeat} within beat; Project Tick ${input.tick}`
 }
 
 /** Formats non-negative Project time without changing Playback's precise value. */

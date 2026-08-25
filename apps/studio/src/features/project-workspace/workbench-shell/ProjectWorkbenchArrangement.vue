@@ -21,9 +21,12 @@ import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
+import { provideTempoTrackInteraction } from '@/features/project-workspace/tempo-track/interaction'
 import {
   createProjectTempoEventLocationPresentation,
   orderProjectTempoEvents,
+  parseProjectTempoEventPositionInput,
+  type ProjectTempoEventPositionDraft,
   type ProjectTempoEventNavigationDirection,
 } from '@/features/project-workspace/tempo-track/tempo-track'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
@@ -132,6 +135,7 @@ const trackViewportElement = shallowRef<HTMLElement | null>(null)
 const trackFollowerElement = shallowRef<HTMLElement | null>(null)
 const isTimelineFollowSuspended = shallowRef(false)
 const locatePreviewTick = shallowRef<Tick | null>(null)
+const tempoTrackInteraction = provideTempoTrackInteraction()
 let observedArrangementScrollLeft = 0
 let activeTimelineLocateGesture: ActiveTimelineLocateGesture | null = null
 let locateEdgeScrollFrameHandle: number | null = null
@@ -164,8 +168,30 @@ const rulerPositionTick = computed(() =>
     ),
   ),
 )
+const presentedTempoEvents = computed(() => {
+  const preview = tempoTrackInteraction.preview.value
+  if (preview === null) return props.tempoEvents
+
+  return Object.freeze(
+    props.tempoEvents.map((tempoEvent) =>
+      tempoEvent.id === preview.tempoEventId
+        ? Object.freeze({ ...tempoEvent, bpm: preview.bpm, tick: preview.tick })
+        : tempoEvent,
+    ),
+  )
+})
 const selectedTempoEvent = computed(
-  () => props.tempoEvents.find(({ id }) => id === props.selectedTempoEventId) ?? null,
+  () => presentedTempoEvents.value.find(({ id }) => id === props.selectedTempoEventId) ?? null,
+)
+const tempoPreviewHasPositionConflict = computed(() => {
+  const preview = tempoTrackInteraction.preview.value
+  return (
+    preview !== null &&
+    props.tempoEvents.some(({ id, tick }) => id !== preview.tempoEventId && tick === preview.tick)
+  )
+})
+const selectedTempoEventIsInitial = computed(
+  () => props.tempoEvents.find(({ id }) => id === props.selectedTempoEventId)?.tick === 0,
 )
 const orderedTempoEvents = computed(() => orderProjectTempoEvents(props.tempoEvents))
 const selectedTempoEventIndex = computed(() =>
@@ -177,8 +203,9 @@ const selectedTempoEventLocation = computed(() => {
 
   return createProjectTempoEventLocationPresentation({
     barSpanTick: props.barSpanTick,
+    projectTimeUnavailable: tempoPreviewHasPositionConflict.value,
     tempoEvent,
-    tempoEvents: props.tempoEvents,
+    tempoEvents: presentedTempoEvents.value,
     timeSignatureNumerator: props.timeSignatureNumerator,
   })
 })
@@ -371,6 +398,26 @@ function navigateSelectedTempoEvent(direction: ProjectTempoEventNavigationDirect
 
   emit('tempoEventSelect', targetEvent.id)
   revealTempoEvent(targetEvent)
+}
+
+function commitSelectedTempoEventPosition(
+  tempoEventId: TempoEventId,
+  position: ProjectTempoEventPositionDraft,
+): void {
+  const result = parseProjectTempoEventPositionInput({
+    barSpanTick: props.barSpanTick,
+    position,
+    timelineEndTick: props.timelineEndTick,
+    timeSignatureNumerator: props.timeSignatureNumerator,
+  })
+  if (result.status === 'rejected') {
+    toasts.warning('Tempo Event was not moved', result.message)
+    return
+  }
+
+  const tempoEvent = props.tempoEvents.find(({ id }) => id === tempoEventId)
+  if (tempoEvent === undefined || tempoEvent.tick === result.tick) return
+  emit('tempoEventMove', tempoEventId, result.tick)
 }
 
 function followCurrentPlaybackPosition(): void {
@@ -716,7 +763,15 @@ watch(
   () => void nextTick(followCurrentPlaybackPosition),
 )
 
-onUnmounted(() => cancelTimelineLocate())
+watch(
+  () => props.projectId,
+  () => tempoTrackInteraction.cancelPreview(),
+)
+
+onUnmounted(() => {
+  cancelTimelineLocate()
+  tempoTrackInteraction.cancelPreview()
+})
 </script>
 
 <template>
@@ -746,10 +801,12 @@ onUnmounted(() => cancelTimelineLocate())
         :can-navigate-to-previous="canNavigateToPreviousTempoEvent"
         :editing-disabled="props.tempoEditingDisabled"
         :selected-tempo-event="selectedTempoEvent"
+        :selected-tempo-event-is-initial="selectedTempoEventIsInitial"
         :selected-tempo-event-location="selectedTempoEventLocation"
         @bpm-commit="(tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)"
         @edit-start="emit('tempoEditStart')"
         @navigate="navigateSelectedTempoEvent"
+        @position-commit="commitSelectedTempoEventPosition"
         @remove="emit('tempoEventRemove', $event)"
         @reveal="revealSelectedTempoEvent"
       />

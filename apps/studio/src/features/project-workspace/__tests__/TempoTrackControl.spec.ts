@@ -20,9 +20,20 @@ const LATER_EVENT = createTempoEventRecord({
   tick: parseTick(960),
 })
 const INITIAL_LOCATION = Object.freeze({
-  musicalPosition: '1 · 1 · 0/960',
+  barNumber: 1,
+  beatNumber: 1,
+  maximumOffsetWithinBeat: 959,
+  offsetWithinBeat: 0,
   projectTime: '00:00.000',
-  title: 'Bar 1, beat 1, 0 of 960 ticks; Project Tick 0; Project time 00:00.000',
+  title: 'Bar 1, beat 1, offset 0 within beat; Project Tick 0; Project time 00:00.000',
+})
+const LATER_LOCATION = Object.freeze({
+  barNumber: 1,
+  beatNumber: 2,
+  maximumOffsetWithinBeat: 959,
+  offsetWithinBeat: 0,
+  projectTime: '00:00.500',
+  title: 'Bar 1, beat 2, offset 0 within beat; Project Tick 960; Project time 00:00.500',
 })
 
 describe('TempoTrackControl', () => {
@@ -33,15 +44,27 @@ describe('TempoTrackControl', () => {
         canNavigateToPrevious: false,
         editingDisabled: false,
         selectedTempoEvent: INITIAL_EVENT,
+        selectedTempoEventIsInitial: true,
         selectedTempoEventLocation: INITIAL_LOCATION,
       },
     })
     const input = wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event BPM"]')
 
     expect(input.element.value).toBe('144')
-    expect(wrapper.text()).toContain('1 · 1 · 0/960')
+    expect(
+      wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event bar"]').element.value,
+    ).toBe('1')
+    expect(
+      wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event beat"]').element.value,
+    ).toBe('1')
+    expect(
+      wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event offset within beat"]')
+        .element.value,
+    ).toBe('0')
+    expect(wrapper.text()).not.toContain('/960')
+    expect(wrapper.text()).toContain('TIME')
     expect(wrapper.text()).toContain('00:00.000')
-    expect(wrapper.get('.tempo-track-control__location').attributes('title')).toContain(
+    expect(wrapper.get('.tempo-track-control__position').attributes('title')).toContain(
       'Project Tick 0',
     )
     await input.trigger('focus')
@@ -52,6 +75,39 @@ describe('TempoTrackControl', () => {
     expect(wrapper.emitted('bpmCommit')).toEqual([[INITIAL_EVENT.id, '121.25']])
   })
 
+  it('commits a precise musical position for a movable Tempo Event', async () => {
+    const wrapper = mount(TempoTrackControl, {
+      props: {
+        canNavigateToNext: false,
+        canNavigateToPrevious: true,
+        editingDisabled: false,
+        selectedTempoEvent: LATER_EVENT,
+        selectedTempoEventIsInitial: false,
+        selectedTempoEventLocation: LATER_LOCATION,
+      },
+    })
+    const bar = wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event bar"]')
+    const beat = wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event beat"]')
+    const offset = wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event offset within beat"]',
+    )
+
+    await bar.trigger('focus')
+    await bar.setValue('5')
+    await wrapper.get('.tempo-track-control__position').trigger('focusout', {
+      relatedTarget: beat.element,
+    })
+    expect(wrapper.emitted('positionCommit')).toBeUndefined()
+    await beat.setValue('2')
+    await offset.setValue('240')
+    await offset.trigger('keydown', { key: 'Enter' })
+
+    expect(wrapper.emitted('editStart')).toHaveLength(1)
+    expect(wrapper.emitted('positionCommit')).toEqual([
+      [LATER_EVENT.id, { bar: '5', beat: '2', offset: '240' }],
+    ])
+  })
+
   it('protects the initial point but exposes removal for a later selected point', async () => {
     const wrapper = mount(TempoTrackControl, {
       props: {
@@ -59,14 +115,24 @@ describe('TempoTrackControl', () => {
         canNavigateToPrevious: false,
         editingDisabled: false,
         selectedTempoEvent: INITIAL_EVENT,
+        selectedTempoEventIsInitial: true,
         selectedTempoEventLocation: INITIAL_LOCATION,
       },
     })
     const remove = wrapper.get<HTMLButtonElement>('.tempo-track-control__remove')
+    const position = wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event offset within beat"]',
+    )
     expect(remove.attributes('disabled')).toBeDefined()
+    expect(position.attributes('readonly')).toBeDefined()
 
-    await wrapper.setProps({ selectedTempoEvent: LATER_EVENT })
+    await wrapper.setProps({
+      selectedTempoEvent: LATER_EVENT,
+      selectedTempoEventIsInitial: false,
+      selectedTempoEventLocation: LATER_LOCATION,
+    })
     expect(remove.attributes('disabled')).toBeUndefined()
+    expect(position.attributes('readonly')).toBeUndefined()
     await remove.trigger('click')
     expect(wrapper.emitted('remove')).toEqual([[LATER_EVENT.id]])
   })
@@ -78,6 +144,7 @@ describe('TempoTrackControl', () => {
         canNavigateToPrevious: false,
         editingDisabled: false,
         selectedTempoEvent: null,
+        selectedTempoEventIsInitial: false,
         selectedTempoEventLocation: null,
       },
     })
@@ -93,11 +160,8 @@ describe('TempoTrackControl', () => {
         canNavigateToPrevious: true,
         editingDisabled: true,
         selectedTempoEvent: LATER_EVENT,
-        selectedTempoEventLocation: Object.freeze({
-          musicalPosition: '1 · 2 · 0/960',
-          projectTime: '00:00.500',
-          title: 'Later event',
-        }),
+        selectedTempoEventIsInitial: false,
+        selectedTempoEventLocation: LATER_LOCATION,
       },
     })
 

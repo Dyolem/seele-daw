@@ -10,6 +10,7 @@ import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-
 import type {
   ProjectTempoEventLocationPresentation,
   ProjectTempoEventNavigationDirection,
+  ProjectTempoEventPositionDraft,
 } from '@/features/project-workspace/tempo-track/tempo-track'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
@@ -18,67 +19,151 @@ const props = defineProps<{
   readonly canNavigateToPrevious: boolean
   readonly editingDisabled: boolean
   readonly selectedTempoEvent: TempoEventRecord | null
+  readonly selectedTempoEventIsInitial: boolean
   readonly selectedTempoEventLocation: ProjectTempoEventLocationPresentation | null
 }>()
 const emit = defineEmits<{
   bpmCommit: [tempoEventId: TempoEventRecord['id'], input: string]
   editStart: []
   navigate: [direction: ProjectTempoEventNavigationDirection]
+  positionCommit: [tempoEventId: TempoEventRecord['id'], position: ProjectTempoEventPositionDraft]
   remove: [tempoEventId: TempoEventRecord['id']]
   reveal: []
 }>()
 
-const draft = ref('')
-const isEditing = ref(false)
+const bpmDraft = ref('')
+const barDraft = ref('')
+const beatDraft = ref('')
+const offsetDraft = ref('')
+const isEditingBpm = ref(false)
+const isEditingPosition = ref(false)
 const displayBpm = computed(() =>
   props.selectedTempoEvent === null ? '' : formatProjectTempoBpm(props.selectedTempoEvent.bpm),
 )
-const isReadOnly = computed(() => props.editingDisabled || props.selectedTempoEvent === null)
+const isBpmReadOnly = computed(() => props.editingDisabled || props.selectedTempoEvent === null)
+const isPositionReadOnly = computed(
+  () =>
+    props.editingDisabled || props.selectedTempoEvent === null || props.selectedTempoEventIsInitial,
+)
 const canRemove = computed(
-  () => !props.editingDisabled && (props.selectedTempoEvent?.tick ?? 0) > 0,
+  () =>
+    !props.editingDisabled &&
+    props.selectedTempoEvent !== null &&
+    !props.selectedTempoEventIsInitial,
 )
 
+function resetBpmDraft(): void {
+  bpmDraft.value = displayBpm.value
+}
+
+function resetPositionDraft(): void {
+  barDraft.value = String(props.selectedTempoEventLocation?.barNumber ?? '')
+  beatDraft.value = String(props.selectedTempoEventLocation?.beatNumber ?? '')
+  offsetDraft.value = String(props.selectedTempoEventLocation?.offsetWithinBeat ?? '')
+}
+
 watch(
-  [() => props.selectedTempoEvent?.id ?? null, displayBpm],
+  [
+    () => props.selectedTempoEvent?.id ?? null,
+    displayBpm,
+    () => props.selectedTempoEventLocation?.barNumber ?? null,
+    () => props.selectedTempoEventLocation?.beatNumber ?? null,
+    () => props.selectedTempoEventLocation?.offsetWithinBeat ?? null,
+  ],
   () => {
-    if (isEditing.value) isEditing.value = false
-    draft.value = displayBpm.value
+    isEditingBpm.value = false
+    isEditingPosition.value = false
+    resetBpmDraft()
+    resetPositionDraft()
   },
   { immediate: true },
 )
 
-watch(isReadOnly, (readOnly) => {
-  if (!readOnly) return
-  isEditing.value = false
-  draft.value = displayBpm.value
-})
+watch(
+  () => props.editingDisabled,
+  (editingDisabled) => {
+    if (!editingDisabled) return
+    isEditingBpm.value = false
+    isEditingPosition.value = false
+    resetBpmDraft()
+    resetPositionDraft()
+  },
+)
 
-function beginEdit(event: FocusEvent): void {
-  if (isReadOnly.value) return
-  isEditing.value = true
-  draft.value = displayBpm.value
-  emit('editStart')
+function selectInputContents(event: FocusEvent): void {
   if (event.currentTarget instanceof HTMLInputElement) event.currentTarget.select()
 }
 
-function commitEdit(): void {
+function beginBpmEdit(event: FocusEvent): void {
+  if (isBpmReadOnly.value) return
+  isEditingBpm.value = true
+  resetBpmDraft()
+  emit('editStart')
+  selectInputContents(event)
+}
+
+function beginPositionEdit(event: FocusEvent): void {
+  if (isPositionReadOnly.value) return
+  if (!isEditingPosition.value) {
+    isEditingPosition.value = true
+    resetPositionDraft()
+    emit('editStart')
+  }
+  selectInputContents(event)
+}
+
+function commitBpmEdit(): void {
   const tempoEvent = props.selectedTempoEvent
-  if (!isEditing.value || tempoEvent === null) return
-  const input = draft.value
-  isEditing.value = false
-  draft.value = displayBpm.value
+  if (!isEditingBpm.value || tempoEvent === null) return
+  const input = bpmDraft.value
+  isEditingBpm.value = false
+  resetBpmDraft()
   emit('bpmCommit', tempoEvent.id, input)
 }
 
-function commitAndBlur(event: KeyboardEvent): void {
-  commitEdit()
+function commitPositionEdit(): void {
+  const tempoEvent = props.selectedTempoEvent
+  if (!isEditingPosition.value || tempoEvent === null) return
+  const position = Object.freeze({
+    bar: barDraft.value,
+    beat: beatDraft.value,
+    offset: offsetDraft.value,
+  })
+  isEditingPosition.value = false
+  resetPositionDraft()
+  emit('positionCommit', tempoEvent.id, position)
+}
+
+function commitBpmAndBlur(event: KeyboardEvent): void {
+  commitBpmEdit()
   if (event.currentTarget instanceof HTMLInputElement) event.currentTarget.blur()
 }
 
-function cancelEdit(event: KeyboardEvent): void {
-  if (!isEditing.value) return
-  isEditing.value = false
-  draft.value = displayBpm.value
+function commitPositionAndBlur(event: KeyboardEvent): void {
+  commitPositionEdit()
+  if (event.currentTarget instanceof HTMLInputElement) event.currentTarget.blur()
+}
+
+function commitPositionAfterGroupBlur(event: FocusEvent): void {
+  const group = event.currentTarget
+  const nextTarget = event.relatedTarget
+  if (group instanceof HTMLElement && nextTarget instanceof Node && group.contains(nextTarget)) {
+    return
+  }
+  commitPositionEdit()
+}
+
+function cancelBpmEdit(event: KeyboardEvent): void {
+  if (!isEditingBpm.value) return
+  isEditingBpm.value = false
+  resetBpmDraft()
+  if (event.currentTarget instanceof HTMLInputElement) event.currentTarget.blur()
+}
+
+function cancelPositionEdit(event: KeyboardEvent): void {
+  if (!isEditingPosition.value) return
+  isEditingPosition.value = false
+  resetPositionDraft()
   if (event.currentTarget instanceof HTMLInputElement) event.currentTarget.blur()
 }
 
@@ -97,19 +182,19 @@ function removeSelectedTempoEvent(): void {
     </header>
 
     <template v-if="props.selectedTempoEvent">
-      <label title="Selected Tempo Event BPM">
+      <label class="tempo-track-control__bpm" title="Selected Tempo Event BPM">
         <input
-          v-model="draft"
+          v-model="bpmDraft"
           type="text"
           inputmode="decimal"
           autocomplete="off"
           aria-label="Selected Tempo Event BPM"
-          :readonly="isReadOnly"
+          :readonly="isBpmReadOnly"
           spellcheck="false"
-          @blur="commitEdit"
-          @focus="beginEdit"
-          @keydown.enter.stop.prevent="commitAndBlur"
-          @keydown.escape.stop.prevent="cancelEdit"
+          @blur="commitBpmEdit"
+          @focus="beginBpmEdit"
+          @keydown.enter.stop.prevent="commitBpmAndBlur"
+          @keydown.escape.stop.prevent="cancelBpmEdit"
         />
         <span>BPM</span>
       </label>
@@ -118,7 +203,7 @@ function removeSelectedTempoEvent(): void {
         :disabled="!canRemove"
         :icon="DeleteIcon"
         :label="
-          props.selectedTempoEvent.tick === 0
+          props.selectedTempoEventIsInitial
             ? 'The initial Tempo Event cannot be removed'
             : 'Remove selected Tempo Event'
         "
@@ -127,34 +212,89 @@ function removeSelectedTempoEvent(): void {
       />
       <div
         v-if="props.selectedTempoEventLocation"
-        class="tempo-track-control__location"
+        class="tempo-track-control__position"
+        role="group"
+        aria-label="Selected Tempo Event musical position"
         :title="props.selectedTempoEventLocation.title"
+        @focusout="commitPositionAfterGroupBlur"
       >
-        <span>{{ props.selectedTempoEventLocation.musicalPosition }}</span>
-        <time>{{ props.selectedTempoEventLocation.projectTime }}</time>
+        <label>
+          <span>BAR</span>
+          <input
+            v-model="barDraft"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="Selected Tempo Event bar"
+            :readonly="isPositionReadOnly"
+            spellcheck="false"
+            @focus="beginPositionEdit"
+            @keydown.enter.stop.prevent="commitPositionAndBlur"
+            @keydown.escape.stop.prevent="cancelPositionEdit"
+          />
+        </label>
+        <label>
+          <span>BEAT</span>
+          <input
+            v-model="beatDraft"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="Selected Tempo Event beat"
+            :readonly="isPositionReadOnly"
+            spellcheck="false"
+            @focus="beginPositionEdit"
+            @keydown.enter.stop.prevent="commitPositionAndBlur"
+            @keydown.escape.stop.prevent="cancelPositionEdit"
+          />
+        </label>
+        <label
+          :title="`Exact position within the beat, from 0 through ${props.selectedTempoEventLocation.maximumOffsetWithinBeat}. 0 is the beat start.`"
+        >
+          <span>OFFSET</span>
+          <input
+            v-model="offsetDraft"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="Selected Tempo Event offset within beat"
+            :aria-description="`From 0 through ${props.selectedTempoEventLocation.maximumOffsetWithinBeat}; 0 is the beat start`"
+            :readonly="isPositionReadOnly"
+            spellcheck="false"
+            @focus="beginPositionEdit"
+            @keydown.enter.stop.prevent="commitPositionAndBlur"
+            @keydown.escape.stop.prevent="cancelPositionEdit"
+          />
+        </label>
       </div>
-      <div class="tempo-track-control__navigation" aria-label="Selected Tempo Event navigation">
-        <UiIconButton
-          :disabled="!props.canNavigateToPrevious"
-          :icon="ChevronLeftIcon"
-          label="Select previous Tempo Event"
-          size="small"
-          @click="emit('navigate', 'previous')"
-        />
-        <UiIconButton
-          :icon="LocationIcon"
-          label="Reveal selected Tempo Event on Timeline"
-          size="small"
-          @click="emit('reveal')"
-        />
-        <UiIconButton
-          :disabled="!props.canNavigateToNext"
-          :icon="ChevronRightIcon"
-          label="Select next Tempo Event"
-          size="small"
-          @click="emit('navigate', 'next')"
-        />
-      </div>
+      <footer>
+        <span class="tempo-track-control__time">
+          <span>TIME</span>
+          <time>{{ props.selectedTempoEventLocation?.projectTime }}</time>
+        </span>
+        <span class="tempo-track-control__navigation" aria-label="Selected Tempo Event navigation">
+          <UiIconButton
+            :disabled="!props.canNavigateToPrevious"
+            :icon="ChevronLeftIcon"
+            label="Select previous Tempo Event"
+            size="small"
+            @click="emit('navigate', 'previous')"
+          />
+          <UiIconButton
+            :icon="LocationIcon"
+            label="Reveal selected Tempo Event on Timeline"
+            size="small"
+            @click="emit('reveal')"
+          />
+          <UiIconButton
+            :disabled="!props.canNavigateToNext"
+            :icon="ChevronRightIcon"
+            label="Select next Tempo Event"
+            size="small"
+            @click="emit('navigate', 'next')"
+          />
+        </span>
+      </footer>
     </template>
     <p v-else>Select a Tempo point to edit its value.</p>
   </section>
@@ -166,9 +306,9 @@ function removeSelectedTempoEvent(): void {
   min-inline-size: 0;
   min-block-size: 0;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   align-items: center;
-  gap: var(--sd-space-2);
+  gap: var(--sd-space-1);
   padding: var(--sd-space-3);
   border-block-end: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
@@ -193,7 +333,7 @@ function removeSelectedTempoEvent(): void {
   letter-spacing: 0.04em;
 }
 
-.tempo-track-control label {
+.tempo-track-control__bpm {
   display: flex;
   min-inline-size: 0;
   grid-column: 1;
@@ -205,7 +345,6 @@ function removeSelectedTempoEvent(): void {
 }
 
 .tempo-track-control input {
-  inline-size: 4.5rem;
   min-inline-size: 0;
   padding: var(--sd-space-1) var(--sd-space-2);
   border: 1px solid var(--sd-color-border-default);
@@ -216,7 +355,11 @@ function removeSelectedTempoEvent(): void {
   font-family: var(--sd-font-family-numeric);
   font-size: var(--sd-font-size-sm);
   font-variant-numeric: tabular-nums;
-  text-align: end;
+  text-align: center;
+}
+
+.tempo-track-control__bpm input {
+  inline-size: 4.5rem;
 }
 
 .tempo-track-control input:not([readonly]):focus {
@@ -228,29 +371,68 @@ function removeSelectedTempoEvent(): void {
   cursor: default;
 }
 
-.tempo-track-control__location {
+.tempo-track-control__position {
   display: grid;
   min-inline-size: 0;
-  grid-column: 1;
+  grid-column: 1 / -1;
   grid-row: 3;
-  overflow: hidden;
-  gap: 1px;
-  color: var(--sd-color-text-secondary);
-  font-family: var(--sd-font-family-numeric);
-  font-size: var(--sd-font-size-xs);
-  font-variant-numeric: tabular-nums;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: var(--sd-space-1);
 }
 
-.tempo-track-control__location span,
-.tempo-track-control__location time {
+.tempo-track-control__position label {
+  display: grid;
+  min-inline-size: 0;
+  gap: 1px;
+}
+
+.tempo-track-control__position label > span {
   overflow: hidden;
+  color: var(--sd-color-text-disabled);
+  font-size: 0.5625rem;
+  letter-spacing: 0.04em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tempo-track-control__location time {
+.tempo-track-control__position input {
+  inline-size: 100%;
+  padding-inline: var(--sd-space-1);
+}
+
+.tempo-track-control footer {
+  display: flex;
+  min-inline-size: 0;
+  grid-column: 1 / -1;
+  grid-row: 4;
+  align-items: center;
+  align-self: end;
+  justify-content: space-between;
+  gap: var(--sd-space-1);
+}
+
+.tempo-track-control__time {
+  display: flex;
+  min-inline-size: 0;
+  align-items: baseline;
+  gap: var(--sd-space-1);
   color: var(--sd-color-text-disabled);
+  font-family: var(--sd-font-family-numeric);
   font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tempo-track-control__time > span {
+  color: var(--sd-color-text-muted);
+  font-family: var(--sd-font-family-sans);
+  font-size: 0.5625rem;
+  letter-spacing: 0.04em;
+}
+
+.tempo-track-control__time time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tempo-track-control__remove {
@@ -260,14 +442,13 @@ function removeSelectedTempoEvent(): void {
 
 .tempo-track-control__navigation {
   display: flex;
-  grid-column: 2;
-  grid-row: 3;
+  flex: none;
   gap: var(--sd-space-0-5);
 }
 
 .tempo-track-control p {
   grid-column: 1 / -1;
-  grid-row: 2 / 4;
+  grid-row: 2 / 5;
   margin: 0;
   color: var(--sd-color-text-disabled);
   font-size: var(--sd-font-size-xs);

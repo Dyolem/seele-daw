@@ -224,6 +224,7 @@ async function dispatchPointerEvent(
   input: {
     readonly button?: number
     readonly clientX?: number
+    readonly clientY?: number
     readonly isPrimary?: boolean
     readonly pointerId: number
   },
@@ -233,6 +234,7 @@ async function dispatchPointerEvent(
     button: input.button ?? 0,
     cancelable: true,
     clientX: input.clientX ?? 0,
+    clientY: input.clientY ?? 0,
   })
   Object.defineProperties(event, {
     isPrimary: { value: input.isPrimary ?? true },
@@ -625,8 +627,20 @@ describe('ProjectWorkbenchArrangement', () => {
     })
     const followControl = fixture.wrapper.get('.project-workbench__follow-control')
 
-    expect(fixture.wrapper.get('.tempo-track-control__location').text()).toContain('5 · 1 · 0/960')
-    expect(fixture.wrapper.get('.tempo-track-control__location').text()).toContain('00:08.000')
+    expect(
+      fixture.wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event bar"]').element
+        .value,
+    ).toBe('5')
+    expect(
+      fixture.wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event beat"]').element
+        .value,
+    ).toBe('1')
+    expect(
+      fixture.wrapper.get<HTMLInputElement>(
+        'input[aria-label="Selected Tempo Event offset within beat"]',
+      ).element.value,
+    ).toBe('0')
+    expect(fixture.wrapper.get('.tempo-track-control__time').text()).toContain('00:08.000')
     expect(followControl.attributes('aria-pressed')).toBe('true')
 
     await fixture.wrapper
@@ -642,6 +656,178 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(fixture.wrapper.emitted('tempoEventSelect')).toEqual([[next.id]])
     expect(viewportElement.scrollLeft).toBe(1_000)
     expect(fixture.locateAtTick).not.toHaveBeenCalled()
+  })
+
+  it('translates precise Tempo Event position input into one existing Move intent', async () => {
+    const selected = createTempoEventRecord({
+      bpm: parseTempoBpm(90),
+      id: parseTempoEventId('tempo-position-selected'),
+      tick: parseTick(960),
+    })
+    const fixture = mountArrangement({
+      selectedTempoEventId: selected.id,
+      tempoEvents: Object.freeze([
+        createTempoEventRecord({
+          bpm: parseTempoBpm(120),
+          id: parseTempoEventId('tempo-position-initial'),
+          tick: parseTick(0),
+        }),
+        selected,
+      ]),
+    })
+    const bar = fixture.wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event bar"]',
+    )
+    const beat = fixture.wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event beat"]',
+    )
+    const offset = fixture.wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event offset within beat"]',
+    )
+
+    await bar.trigger('focus')
+    await bar.setValue('1')
+    await beat.setValue('2')
+    await offset.setValue('0')
+    await offset.trigger('keydown', { key: 'Enter' })
+    expect(fixture.wrapper.emitted('tempoEventMove')).toBeUndefined()
+
+    await bar.trigger('focus')
+    await bar.setValue('2')
+    await beat.setValue('3')
+    await offset.setValue('240')
+    await offset.trigger('keydown', { key: 'Enter' })
+
+    expect(fixture.wrapper.emitted('tempoEditStart')).toHaveLength(2)
+    expect(fixture.wrapper.emitted('tempoEventMove')).toEqual([[selected.id, parseTick(6_000)]])
+
+    await bar.trigger('focus')
+    await bar.setValue('10')
+    await beat.setValue('1')
+    await offset.setValue('0')
+    await offset.trigger('keydown', { key: 'Enter' })
+
+    expect(fixture.wrapper.emitted('tempoEventMove')).toHaveLength(1)
+    expect(fixture.toasts.message?.title).toBe('Tempo Event was not moved')
+    expect(fixture.toasts.message?.description).toContain('at or before Bar 9, beat 1, offset 0')
+  })
+
+  it('shares lane drag previews with the selected Tempo Event controls without early commits', async () => {
+    const initial = createTempoEventRecord({
+      bpm: parseTempoBpm(120),
+      id: parseTempoEventId('tempo-preview-initial'),
+      tick: parseTick(0),
+    })
+    const selected = createTempoEventRecord({
+      bpm: parseTempoBpm(100),
+      id: parseTempoEventId('tempo-preview-selected'),
+      tick: parseTick(960),
+    })
+    const fixture = mountArrangement({
+      selectedTempoEventId: selected.id,
+      tempoEvents: Object.freeze([initial, selected]),
+      timelineEndTick: parseTick(3_840),
+    })
+    const plot = fixture.wrapper.get('.tempo-track-lane__plot').element as HTMLElement
+    vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
+      bottom: 150,
+      height: 100,
+      left: 100,
+      right: 1_100,
+      toJSON: () => ({}),
+      top: 50,
+      width: 1_000,
+      x: 100,
+      y: 50,
+    })
+    const point = fixture.wrapper.findAll('.tempo-track-lane__point')[1]!
+    const bpm = fixture.wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event BPM"]',
+    )
+    const bar = fixture.wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event bar"]',
+    )
+    const beat = fixture.wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event beat"]',
+    )
+    const offset = fixture.wrapper.get<HTMLInputElement>(
+      'input[aria-label="Selected Tempo Event offset within beat"]',
+    )
+
+    await dispatchPointerEvent(point.element, 'pointerdown', {
+      clientX: 350,
+      clientY: 120,
+      pointerId: 71,
+    })
+    await dispatchPointerEvent(point.element, 'pointermove', {
+      clientX: 600,
+      clientY: 121,
+      pointerId: 71,
+    })
+    await nextTick()
+
+    expect(fixture.wrapper.emitted('tempoEventMove')).toBeUndefined()
+    expect(bar.element.value).toBe('1')
+    expect(beat.element.value).toBe('3')
+    expect(offset.element.value).toBe('0')
+    expect(fixture.wrapper.get('.tempo-track-control__time').text()).toContain('00:01.000')
+
+    await dispatchPointerEvent(point.element, 'pointerup', {
+      clientX: 600,
+      clientY: 121,
+      pointerId: 71,
+    })
+    expect(fixture.wrapper.emitted('tempoEventMove')).toEqual([[selected.id, parseTick(1_920)]])
+    expect(beat.element.value).toBe('2')
+
+    await dispatchPointerEvent(point.element, 'pointerdown', {
+      clientX: 350,
+      clientY: 120,
+      pointerId: 72,
+    })
+    await dispatchPointerEvent(point.element, 'pointermove', {
+      clientX: 352,
+      clientY: 100,
+      pointerId: 72,
+    })
+    await nextTick()
+
+    expect(fixture.wrapper.emitted('tempoEventBpmChange')).toBeUndefined()
+    expect(bpm.element.value).toBe('140')
+
+    await dispatchPointerEvent(point.element, 'pointerup', {
+      clientX: 352,
+      clientY: 100,
+      pointerId: 72,
+    })
+    expect(fixture.wrapper.emitted('tempoEventBpmChange')).toEqual([
+      [selected.id, parseTempoBpm(140)],
+    ])
+
+    await dispatchPointerEvent(point.element, 'pointerdown', {
+      clientX: 350,
+      clientY: 120,
+      pointerId: 73,
+    })
+    await dispatchPointerEvent(point.element, 'pointermove', {
+      clientX: 100,
+      clientY: 121,
+      pointerId: 73,
+    })
+    await nextTick()
+
+    expect(bar.element.value).toBe('1')
+    expect(beat.element.value).toBe('1')
+    expect(offset.element.value).toBe('0')
+    expect(fixture.wrapper.get('.tempo-track-control__time').text()).toContain('TIME—')
+
+    await dispatchPointerEvent(point.element, 'pointercancel', {
+      clientX: 100,
+      clientY: 121,
+      pointerId: 73,
+    })
+    expect(fixture.wrapper.emitted('tempoEventMove')).toHaveLength(1)
+    expect(fixture.wrapper.get('.tempo-track-control__time').text()).toContain('00:00.500')
   })
 
   it('presents all planned Track types in an accessible command menu', async () => {

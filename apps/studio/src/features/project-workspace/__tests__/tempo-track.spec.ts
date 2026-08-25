@@ -11,6 +11,7 @@ import {
   createInitialProjectTempoTrackScale,
   expandProjectTempoTrackScale,
   orderProjectTempoEvents,
+  parseProjectTempoEventPositionInput,
   projectTempoTrackBpmPositionRatio,
   resolveDraggedProjectTempoBpm,
   resolveNearestProjectTempoTrackEvent,
@@ -41,9 +42,92 @@ describe('Tempo Track projection', () => {
         timeSignatureNumerator: 4,
       }),
     ).toEqual({
-      musicalPosition: '2 · 3 · 0/960',
+      barNumber: 2,
+      beatNumber: 3,
+      maximumOffsetWithinBeat: 959,
+      offsetWithinBeat: 0,
       projectTime: '00:04.000',
-      title: 'Bar 2, beat 3, 0 of 960 ticks; Project Tick 5760; Project time 00:04.000',
+      title: 'Bar 2, beat 3, offset 0 within beat; Project Tick 5760; Project time 00:04.000',
+    })
+  })
+
+  it('keeps musical position visible when a transient overlap has no valid TempoMap time', () => {
+    const initial = tempoEvent('tempo-location-conflict-initial', 0, 120)
+    const selected = tempoEvent('tempo-location-conflict-selected', 960, 90)
+
+    expect(
+      createProjectTempoEventLocationPresentation({
+        barSpanTick: parseTick(3_840),
+        projectTimeUnavailable: true,
+        tempoEvent: selected,
+        tempoEvents: [initial, selected],
+        timeSignatureNumerator: 4,
+      }),
+    ).toMatchObject({
+      barNumber: 1,
+      beatNumber: 2,
+      offsetWithinBeat: 0,
+      projectTime: '—',
+    })
+  })
+
+  it('resolves semantic bar, beat, and offset fields against the visible Arrangement grid', () => {
+    const input = {
+      barSpanTick: parseTick(3_840),
+      timelineEndTick: parseTick(30_720),
+      timeSignatureNumerator: 4,
+    }
+
+    expect(
+      parseProjectTempoEventPositionInput({
+        ...input,
+        position: { bar: ' 2 ', beat: '3', offset: '240' },
+      }),
+    ).toEqual({ status: 'accepted', tick: parseTick(6_000) })
+  })
+
+  it('rejects ambiguous or out-of-grid Tempo Event positions', () => {
+    const input = {
+      barSpanTick: parseTick(3_840),
+      timelineEndTick: parseTick(30_720),
+      timeSignatureNumerator: 4,
+    }
+
+    expect(
+      parseProjectTempoEventPositionInput({
+        ...input,
+        position: { bar: '2', beat: '', offset: '0' },
+      }),
+    ).toEqual({
+      status: 'rejected',
+      message: 'Beat must be a whole number.',
+    })
+    expect(
+      parseProjectTempoEventPositionInput({
+        ...input,
+        position: { bar: '2', beat: '5', offset: '0' },
+      }),
+    ).toEqual({
+      status: 'rejected',
+      message: 'Beat must be from 1 through 4.',
+    })
+    expect(
+      parseProjectTempoEventPositionInput({
+        ...input,
+        position: { bar: '2', beat: '3', offset: '960' },
+      }),
+    ).toEqual({
+      status: 'rejected',
+      message: 'Offset must be from 0 through 959 within the beat.',
+    })
+    expect(
+      parseProjectTempoEventPositionInput({
+        ...input,
+        position: { bar: '10', beat: '1', offset: '0' },
+      }),
+    ).toEqual({
+      status: 'rejected',
+      message: 'Position must be at or before Bar 9, beat 1, offset 0.',
     })
   })
 

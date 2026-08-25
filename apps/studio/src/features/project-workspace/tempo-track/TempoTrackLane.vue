@@ -10,6 +10,10 @@ import { computed, onMounted, onUnmounted, shallowRef, type StyleValue, watch } 
 
 import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-control'
 import {
+  type TempoTrackEventPreview,
+  useTempoTrackInteraction,
+} from '@/features/project-workspace/tempo-track/interaction'
+import {
   createInitialProjectTempoTrackScale,
   expandProjectTempoTrackScale,
   orderProjectTempoEvents,
@@ -43,12 +47,6 @@ interface ActiveTempoPointGesture {
   readonly tempoEventId: TempoEventId
 }
 
-interface TempoPointPreview {
-  readonly bpm: TempoBpm
-  readonly tempoEventId: TempoEventId
-  readonly tick: Tick
-}
-
 const props = defineProps<{
   readonly barSpanTick: Tick
   readonly editingDisabled: boolean
@@ -70,12 +68,12 @@ const plotElement = shallowRef<HTMLElement | null>(null)
 // A captured gesture mutates only this preview. Axis lock happens once, and Pointer Up emits one
 // semantic intent for the Page-owned command coordinator; cancellation discards the preview.
 const activeGesture = shallowRef<ActiveTempoPointGesture | null>(null)
-const pointPreview = shallowRef<TempoPointPreview | null>(null)
+const tempoTrackInteraction = useTempoTrackInteraction()
 const tempoScale = shallowRef<ProjectTempoTrackScale>(
   createInitialProjectTempoTrackScale(props.tempoEvents),
 )
 const renderedEvents = computed(() => {
-  const preview = pointPreview.value
+  const preview = tempoTrackInteraction.preview.value
   return orderProjectTempoEvents(
     preview === null
       ? props.tempoEvents
@@ -130,7 +128,8 @@ function transitionStyle(tempoEvent: TempoEventRecord, eventIndex: number): Styl
 }
 
 function pointLabel(tempoEvent: TempoEventRecord): string {
-  const initial = tempoEvent.tick === 0 ? ' Initial point; Tick cannot be moved or removed.' : ''
+  const initial =
+    tempoEvent.tick === 0 ? ' Initial point; Position cannot be moved or removed.' : ''
   return `Tempo ${formatProjectTempoBpm(tempoEvent.bpm)} BPM at Project Tick ${tempoEvent.tick}.${initial}`
 }
 
@@ -212,6 +211,16 @@ function beginPointGesture(tempoEvent: TempoEventRecord, event: PointerEvent): v
   emit('select', targetTempoEvent.id)
   if (props.editingDisabled || plot === null || laneBounds === undefined) return
   const surface = event.currentTarget as HTMLElement
+  if (
+    !tempoTrackInteraction.beginPreview({
+      bpm: targetTempoEvent.bpm,
+      owner: 'lane-drag',
+      tempoEventId: targetTempoEvent.id,
+      tick: targetTempoEvent.tick,
+    })
+  ) {
+    return
+  }
   activeGesture.value = {
     axis: null,
     grabOffsetTick: tickAtClientX(event.clientX, laneBounds) - targetTempoEvent.tick,
@@ -224,11 +233,6 @@ function beginPointGesture(tempoEvent: TempoEventRecord, event: PointerEvent): v
     startTick: targetTempoEvent.tick,
     surface,
     tempoEventId: targetTempoEvent.id,
-  }
-  pointPreview.value = {
-    bpm: targetTempoEvent.bpm,
-    tempoEventId: targetTempoEvent.id,
-    tick: targetTempoEvent.tick,
   }
   surface.setPointerCapture?.(event.pointerId)
   event.preventDefault()
@@ -257,13 +261,14 @@ function updatePointGesture(event: PointerEvent): void {
 
   if (axis === 'tick') {
     const targetTick = tickAtClientX(event.clientX, gesture.laneBounds) - gesture.grabOffsetTick
-    pointPreview.value = {
+    tempoTrackInteraction.updatePreview({
       bpm: gesture.startBpm,
+      owner: 'lane-drag',
       tempoEventId: gesture.tempoEventId,
       tick: parseTick(Math.min(props.timelineEndTick, Math.max(0, targetTick))),
-    }
+    })
   } else if (axis === 'bpm') {
-    pointPreview.value = {
+    tempoTrackInteraction.updatePreview({
       bpm: resolveDraggedProjectTempoBpm({
         currentClientY: event.clientY,
         laneHeight: gesture.laneBounds.height,
@@ -271,24 +276,25 @@ function updatePointGesture(event: PointerEvent): void {
         startBpm: gesture.startBpm,
         startClientY: gesture.startClientY,
       }),
+      owner: 'lane-drag',
       tempoEventId: gesture.tempoEventId,
       tick: gesture.startTick,
-    }
+    })
   }
   event.preventDefault()
 }
 
 function releasePointGesture(pointerId: number): {
   readonly gesture: ActiveTempoPointGesture
-  readonly preview: TempoPointPreview
+  readonly preview: TempoTrackEventPreview
 } | null {
   const gesture = activeGesture.value
-  const preview = pointPreview.value
-  if (gesture === null || preview === null || gesture.pointerId !== pointerId) return null
+  if (gesture === null || gesture.pointerId !== pointerId) return null
+  const preview = tempoTrackInteraction.finishPreview('lane-drag', gesture.tempoEventId)
   activeGesture.value = null
-  pointPreview.value = null
   if (gesture.surface.hasPointerCapture?.(pointerId))
     gesture.surface.releasePointerCapture(pointerId)
+  if (preview === null) return null
   return { gesture, preview }
 }
 
@@ -307,7 +313,10 @@ function commitPointGesture(event: PointerEvent): void {
 function cancelPointGesture(event?: PointerEvent): void {
   const gesture = activeGesture.value
   if (gesture === null || (event !== undefined && gesture.pointerId !== event.pointerId)) return
-  releasePointGesture(gesture.pointerId)
+  activeGesture.value = null
+  tempoTrackInteraction.cancelPreview('lane-drag', gesture.tempoEventId)
+  if (gesture.surface.hasPointerCapture?.(gesture.pointerId))
+    gesture.surface.releasePointerCapture(gesture.pointerId)
   event?.preventDefault()
 }
 
@@ -342,13 +351,28 @@ function handleWindowBlur(): void {
 
 watch(
   [() => props.projectId, () => props.tempoEvents],
-  ([projectId, tempoEvents], [previousProjectId]) => {
+  ([projectId, tempoEvents], [previousProjectId, previousTempoEvents]) => {
+    if (
+      activeGesture.value !== null &&
+      (projectId !== previousProjectId || tempoEvents !== previousTempoEvents)
+    ) {
+      cancelPointGesture()
+    }
     if (projectId !== previousProjectId) {
       tempoScale.value = createInitialProjectTempoTrackScale(tempoEvents)
       return
     }
 
     tempoScale.value = expandProjectTempoTrackScale(tempoScale.value, tempoEvents)
+  },
+)
+
+watch(
+  () => props.selectedTempoEventId,
+  (selectedTempoEventId) => {
+    if (activeGesture.value !== null && activeGesture.value.tempoEventId !== selectedTempoEventId) {
+      cancelPointGesture()
+    }
   },
 )
 

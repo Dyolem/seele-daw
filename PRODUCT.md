@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-25，Project Tempo Track V1 MT4C 与 Step 节点锚点视觉修正已通过审核并提交
+> 最近更新：2026-08-25，Project Tempo Track V1 MT4D 语义化精确位置编辑与 MT4E 拖拽预览同步已实施，待审核
 >
-> 当前阶段：Project Tempo Control V1；正在完善密集 Step Tempo Map 的轮廓与命中语义
+> 当前阶段：Project Tempo Control V1；正在完善 Tempo Event 的精确数值编辑
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -249,9 +249,23 @@ Arrangement 的 Tempo Track 遵循以下规则：
 
 - Tempo Track 固定在 Ruler / Track Actions 下方，不随普通 Track Lane 的纵向滚动离开视口；右侧
   Tempo 时间内容与 Ruler、Clip 和 Playhead 共享同一横向滚动与绝对 Project Tick 坐标；
-- 点击既有点只选择该 Tempo Event；左侧控制区以“小节 · 拍 · 拍内 Tick / 每拍 Tick”为主要位置，
-  以 `mm:ss.mmm` 为次要绝对时间，并只在 Tooltip 中保留完整 Project Tick；位置使用当前
-  Arrangement 的固定初始拍号网格，绝对时间使用完整多段 Tempo Map 换算；
+- 点击既有点只选择该 Tempo Event；左侧控制区以永久标注的 `BAR / BEAT / OFFSET` 三段组合输入
+  表达音乐位置，不要求用户记忆位置字符串或分隔符。小节和拍从 `1` 开始，`OFFSET` 从 `0` 开始并
+  表示拍内精确位置；普通界面不显示 `/PPQ` 或拍内 Tick 术语，只在 Offset 帮助中解释当前拍内范围和
+  `0` 表示拍头，并只在诊断 Tooltip 中保留完整 Project Tick；
+- 左侧控制区以带有 `TIME` 标签的 `mm:ss.mmm` 显示只读项目绝对时间。音乐位置使用当前
+  Arrangement 的固定初始拍号网格，绝对时间使用包含瞬时预览的完整多段 Tempo Map 换算；若拖拽
+  预览与另一 Tempo Event 重叠、暂时无法构造合法 Tempo Map，位置字段继续更新，`TIME` 显示 `—`；
+- 所选非初始 Tempo Event 可分别精确输入 BAR、BEAT 和 OFFSET；三个字段属于同一个编辑事务，在
+  字段间移动焦点不提交，Enter 或离开整个组合控件只形成一次提交，Escape 恢复权威位置。输入必须是
+  完整的安全整数并落在当前拍号网格与 Timeline 范围内；错误提示使用界面可见的 Bar、Beat、Offset
+  术语，同位置输入不形成命令。合法输入复用既有 Move Tempo Event Command，因此仍只有一个
+  History 步骤并继续遵守同 Tick 冲突规则；Project Tick `0` 初始事件的位置字段只读；
+- Tempo 点拖拽使用 Arrangement 生命周期内的 feature-scoped 交互控制器；轨道轮廓与左侧 BPM、
+  BAR、BEAT、OFFSET、TIME 读取同一份瞬时预览并实时同步。预览不是 Project Fact，不进入 Pinia、
+  Project File 或 History；Pointer Up 仍只交接一次既有命令，Escape、Pointer Cancel、项目切换或
+  权威 Tempo Event 集合改变会丢弃预览。只有未来出现 Arrangement 组件树之外的真实消费者时，才把
+  这份瞬时 UI 状态迁移为独立 Pinia Store，且 Pinia 仍不得镜像 Project Fact 或执行 Core Command；
 - 左侧控制区提供上一枚 / 下一枚 Tempo Event 导航，以及把所选事件居中带回当前 Arrangement
   视口的显式定位按钮。两种导航都只改变页面级选择与横向滚动，不移动 Playhead、不写入 Project、
   History 或文件；播放中执行时暂停 Timeline Follow，避免自动翻页立刻覆盖用户定位；
@@ -981,7 +995,9 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-24 | `TEMPO-TRACK`                                              | MT4A 区分 `5..999` 领域范围与 `40..240` 默认视图，统一 Studio 编辑精度，并建立按 Project 重置、同一 Project 内只扩不缩的瞬态纵轴。                               | `254c46b`                                  |
 | 2026-08-24 | `TEMPO-TRACK`、`TIMELINE`                                  | MT4B 为所选 Tempo Event 提供音乐位置 / 多 Tempo 绝对时间、前后事件导航和不移动 Playhead 的显式居中定位，并在播放中暂停 Follow。                                  | `c0a7554`                                  |
 | 2026-08-24 | `TEMPO-TRACK`                                              | MT4C 以水平段和垂直过渡段绘制连续 Step 轮廓，增加线段命中、重叠点最近选择、所选层级及近点双击保护，不引入 ramp 或事件简化。                                      | `b0bacbe`                                  |
-| 2026-08-25 | `TEMPO-TRACK`                                              | MT4C 视觉修正把节点中心精确锚定到 Tick / BPM，改用紧凑菱形并弱化垂直跳变；保留真实 Step 阶梯，不把离散事件伪装成 Linear / Ramp 折线。                            | 本次提交                                   |
+| 2026-08-25 | `TEMPO-TRACK`                                              | MT4C 视觉修正把节点中心精确锚定到 Tick / BPM，改用紧凑菱形并弱化垂直跳变；保留真实 Step 阶梯，不把离散事件伪装成 Linear / Ramp 折线。                            | `9eb7855`                                  |
+| 2026-08-25 | `TEMPO-TRACK`                                              | MT4D 增加 BAR / BEAT / OFFSET 组合位置输入与 TIME 标签，保留网格 / Timeline 校验、无变化短路和单次 Move Command；初始位置只读。                                  | 本次实现                                   |
+| 2026-08-25 | `TEMPO-TRACK`                                              | MT4E 由 Arrangement 持有 feature-scoped 交互控制器，令轨道拖拽与左侧 BPM / 位置 / TIME 共用瞬时预览；取消不写事实，松手只交接一次既有命令。                      | 本次实现                                   |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1019,7 +1035,11 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 
 - Project Tempo Control V1 MT4C Step 节点锚点视觉修正已于 2026-08-24 通过根级 `pnpm lint`、
   Studio Type Check、57 个测试文件 / 374 项测试、Production Build 与 soundbank dist boundary。
-  未执行浏览器人工测试，代码与功能已通过用户审核并随本次变更提交。
+  未执行浏览器人工测试，代码与功能已通过用户审核并提交为 `9eb7855`。
+
+- Project Tempo Control V1 MT4D / MT4E 已于 2026-08-25 通过根级 `pnpm lint`、Studio Type
+  Check、57 个测试文件 / 380 项测试、Production Build 与 soundbank dist boundary。本轮未执行
+  浏览器人工测试，代码与功能待用户审核。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

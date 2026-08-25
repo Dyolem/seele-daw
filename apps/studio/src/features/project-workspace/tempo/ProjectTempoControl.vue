@@ -117,7 +117,7 @@ function cancelEdit(event: KeyboardEvent): void {
   font-family: var(--sd-font-family-numeric);
   font-size: var(--sd-font-size-sm);
   font-variant-numeric: tabular-nums;
-  text-align: end;
+  text-align: center;
 }
 
 .project-tempo-control__input:not([readonly]):hover {

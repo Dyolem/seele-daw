@@ -14,6 +14,7 @@ import {
   describeProjectTimelineMusicalPosition,
   formatProjectTimelineMusicalPosition,
   formatProjectTimelineTime,
+  resolveProjectTimelineMusicalPosition,
 } from '@/features/project-workspace/timeline/presentation'
 
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM = 40
@@ -28,17 +29,54 @@ export interface ProjectTempoTrackScale {
 }
 
 export interface ProjectTempoEventLocationPresentation {
-  readonly musicalPosition: string
+  readonly barNumber: number
+  readonly beatNumber: number
+  readonly maximumOffsetWithinBeat: number
+  readonly offsetWithinBeat: number
   readonly projectTime: string
   readonly title: string
 }
+
+export interface ProjectTempoEventPositionDraft {
+  readonly bar: string
+  readonly beat: string
+  readonly offset: string
+}
+
+export type ProjectTempoEventPositionInputResult =
+  | {
+      readonly status: 'accepted'
+      readonly tick: Tick
+    }
+  | {
+      readonly status: 'rejected'
+      readonly message: string
+    }
+
+type ProjectTempoEventPositionComponentResult =
+  | {
+      readonly status: 'accepted'
+      readonly value: number
+    }
+  | {
+      readonly status: 'rejected'
+      readonly message: string
+    }
 
 export type ProjectTempoEventNavigationDirection = 'next' | 'previous'
 
 interface CreateProjectTempoEventLocationPresentationInput {
   readonly barSpanTick: Tick
+  readonly projectTimeUnavailable?: boolean
   readonly tempoEvent: TempoEventRecord
   readonly tempoEvents: readonly TempoEventRecord[]
+  readonly timeSignatureNumerator: number
+}
+
+interface ParseProjectTempoEventPositionInput {
+  readonly barSpanTick: Tick
+  readonly position: ProjectTempoEventPositionDraft
+  readonly timelineEndTick: Tick
   readonly timeSignatureNumerator: number
 }
 
@@ -107,15 +145,105 @@ export function createProjectTempoEventLocationPresentation(
     tick: input.tempoEvent.tick,
     timeSignatureNumerator: input.timeSignatureNumerator,
   }
-  const projectTime = formatProjectTimelineTime(
-    resolveProjectSecondAtTick(input.tempoEvents, input.tempoEvent.tick),
-  )
+  const projectTime = input.projectTimeUnavailable
+    ? '—'
+    : formatProjectTimelineTime(
+        resolveProjectSecondAtTick(input.tempoEvents, input.tempoEvent.tick),
+      )
+  const musicalPosition = resolveProjectTimelineMusicalPosition(positionInput)
 
   return Object.freeze({
-    musicalPosition: formatProjectTimelineMusicalPosition(positionInput),
+    barNumber: musicalPosition.barNumber,
+    beatNumber: musicalPosition.beatNumber,
+    maximumOffsetWithinBeat: musicalPosition.beatSpanTick - 1,
+    offsetWithinBeat: musicalPosition.tickWithinBeat,
     projectTime,
-    title: `${describeProjectTimelineMusicalPosition(positionInput)}; Project time ${projectTime}`,
+    title: input.projectTimeUnavailable
+      ? `${describeProjectTimelineMusicalPosition(positionInput)}; Project time is unavailable while Tempo Events overlap`
+      : `${describeProjectTimelineMusicalPosition(positionInput)}; Project time ${projectTime}`,
   })
+}
+
+function parsePositionComponent(
+  input: string,
+  label: 'Bar' | 'Beat' | 'Offset',
+): ProjectTempoEventPositionComponentResult {
+  const normalizedInput = input.trim()
+  if (!/^\d+$/.test(normalizedInput)) {
+    return Object.freeze({
+      status: 'rejected',
+      message: `${label} must be a whole number.`,
+    })
+  }
+
+  const value = Number(normalizedInput)
+  if (!Number.isSafeInteger(value)) {
+    return Object.freeze({
+      status: 'rejected',
+      message: `${label} is too large to edit safely.`,
+    })
+  }
+  return Object.freeze({ status: 'accepted', value })
+}
+
+/** Resolves the three semantic position fields without exposing raw Project Tick as an editor. */
+export function parseProjectTempoEventPositionInput(
+  input: ParseProjectTempoEventPositionInput,
+): ProjectTempoEventPositionInputResult {
+  const bar = parsePositionComponent(input.position.bar, 'Bar')
+  if (bar.status === 'rejected') return bar
+  const beat = parsePositionComponent(input.position.beat, 'Beat')
+  if (beat.status === 'rejected') return beat
+  const offset = parsePositionComponent(input.position.offset, 'Offset')
+  if (offset.status === 'rejected') return offset
+
+  const barNumber = bar.value
+  const beatNumber = beat.value
+  const offsetWithinBeat = offset.value
+  if (barNumber < 1) {
+    return Object.freeze({ status: 'rejected', message: 'Bar must be 1 or greater.' })
+  }
+  if (beatNumber < 1 || beatNumber > input.timeSignatureNumerator) {
+    return Object.freeze({
+      status: 'rejected',
+      message: `Beat must be from 1 through ${input.timeSignatureNumerator}.`,
+    })
+  }
+
+  const beatSpanTick = input.barSpanTick / input.timeSignatureNumerator
+  if (!Number.isSafeInteger(beatSpanTick) || beatSpanTick <= 0) {
+    return Object.freeze({
+      status: 'rejected',
+      message: 'The Project grid cannot resolve this musical position.',
+    })
+  }
+  if (offsetWithinBeat >= beatSpanTick) {
+    return Object.freeze({
+      status: 'rejected',
+      message: `Offset must be from 0 through ${beatSpanTick - 1} within the beat.`,
+    })
+  }
+
+  const targetTick =
+    (barNumber - 1) * input.barSpanTick + (beatNumber - 1) * beatSpanTick + offsetWithinBeat
+  if (!Number.isSafeInteger(targetTick)) {
+    return Object.freeze({
+      status: 'rejected',
+      message: 'Position is too large for the Project Timeline.',
+    })
+  }
+  if (targetTick > input.timelineEndTick) {
+    return Object.freeze({
+      status: 'rejected',
+      message: `Position must be at or before ${formatProjectTimelineMusicalPosition({
+        barSpanTick: input.barSpanTick,
+        tick: input.timelineEndTick,
+        timeSignatureNumerator: input.timeSignatureNumerator,
+      })}.`,
+    })
+  }
+
+  return Object.freeze({ status: 'accepted', tick: parseTick(targetTick) })
 }
 
 /** Creates the transient view scale for a Project without treating presentation as a Project fact. */

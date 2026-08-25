@@ -97,7 +97,7 @@ function eventStyle(tempoEvent: TempoEventRecord): StyleValue {
   const blockRatio = projectTempoTrackBpmPositionRatio(tempoEvent.bpm, tempoScale.value)
   return {
     insetBlockStart: formatPositionPercentage(blockRatio),
-    transform: `translate3d(${inlineOffsetRem}rem, -50%, 0)`,
+    transform: `translate3d(calc(${inlineOffsetRem}rem - 50%), -50%, 0)`,
   }
 }
 
@@ -524,7 +524,7 @@ onUnmounted(() => {
   z-index: 1;
   inset-inline-start: 0;
   inline-size: 1px;
-  background: color-mix(in srgb, var(--sd-color-border-focus) 72%, transparent);
+  background: color-mix(in srgb, var(--sd-color-border-focus) 38%, transparent);
   cursor: pointer;
   transform-origin: left top;
 }
@@ -535,8 +535,7 @@ onUnmounted(() => {
   content: '';
 }
 
-.tempo-track-lane__segment--selected,
-.tempo-track-lane__transition--selected {
+.tempo-track-lane__segment--selected {
   z-index: 2;
   background: var(--sd-color-text-primary);
 }
@@ -546,7 +545,8 @@ onUnmounted(() => {
 }
 
 .tempo-track-lane__transition--selected {
-  inline-size: 2px;
+  z-index: 2;
+  background: color-mix(in srgb, var(--sd-color-text-primary) 64%, transparent);
 }
 
 .tempo-track-lane__point {
@@ -555,18 +555,33 @@ onUnmounted(() => {
   inset-inline-start: 0;
   inline-size: 0.75rem;
   block-size: 0.75rem;
+  appearance: none;
   padding: 0;
-  border: 2px solid var(--sd-color-surface-canvas);
-  border-radius: 2px;
+  border: 0;
   color: inherit;
-  background: var(--sd-color-border-focus);
+  background: transparent;
   cursor: move;
   touch-action: none;
   transform-origin: center;
+  will-change: transform;
+}
+
+.tempo-track-lane__point::before {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  box-sizing: border-box;
+  inline-size: 0.4375rem;
+  block-size: 0.4375rem;
+  border: 1px solid var(--sd-color-surface-canvas);
+  border-radius: 1px;
+  background: var(--sd-color-border-focus);
+  content: '';
+  transform: translate(-50%, -50%) rotate(45deg);
   transition:
     box-shadow var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
-    background var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
-  will-change: transform;
+    background var(--sd-motion-duration-fast) var(--sd-motion-easing-standard),
+    transform var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
 }
 
 .tempo-track-lane__point::after {
@@ -579,10 +594,19 @@ onUnmounted(() => {
   cursor: ns-resize;
 }
 
+.tempo-track-lane__point:hover::before,
+.tempo-track-lane__point:focus-visible::before {
+  transform: translate(-50%, -50%) rotate(45deg) scale(1.18);
+}
+
 .tempo-track-lane__point--selected {
   z-index: 3;
+}
+
+.tempo-track-lane__point--selected::before {
   background: var(--sd-color-text-primary);
   box-shadow: 0 0 0 2px var(--sd-color-border-focus);
+  transform: translate(-50%, -50%) rotate(45deg) scale(1.18);
 }
 
 .tempo-track-lane__point--active {

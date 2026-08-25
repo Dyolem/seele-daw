@@ -90,7 +90,7 @@ afterEach(() => {
 })
 
 describe('TempoTrackLane', () => {
-  it('renders a continuous selected Step contour and transform-positioned Tempo points', () => {
+  it('renders a continuous selected Step contour with center-anchored Tempo points', () => {
     const { wrapper } = mountLane({ selectedTempoEventId: LATER_EVENT.id })
     const points = wrapper.findAll('.tempo-track-lane__point')
     const transitions = wrapper.findAll('.tempo-track-lane__transition')
@@ -98,8 +98,8 @@ describe('TempoTrackLane', () => {
     expect(points).toHaveLength(2)
     expect(wrapper.findAll('.tempo-track-lane__segment')).toHaveLength(2)
     expect(transitions).toHaveLength(1)
-    expect(points[0]?.attributes('style')).toContain('translate3d(0rem, -50%, 0)')
-    expect(points[1]?.attributes('style')).toContain('translate3d(1.25rem, -50%, 0)')
+    expect(points[0]?.attributes('style')).toContain('translate3d(calc(0rem - 50%), -50%, 0)')
+    expect(points[1]?.attributes('style')).toContain('translate3d(calc(1.25rem - 50%), -50%, 0)')
     expect(points[1]?.classes()).toContain('tempo-track-lane__point--selected')
     expect(transitions[0]?.attributes('style')).toContain('block-size: 10%')
     expect(transitions[0]?.classes()).toContain('tempo-track-lane__transition--selected')
@@ -209,7 +209,7 @@ describe('TempoTrackLane', () => {
     expect(wrapper.emitted('editStart')).toHaveLength(1)
     expect(wrapper.emitted('move')).toBeUndefined()
     expect(wrapper.findAll('.tempo-track-lane__point')[1]?.attributes('style')).toContain(
-      'translate3d(2.5rem, -50%, 0)',
+      'translate3d(calc(2.5rem - 50%), -50%, 0)',
     )
 
     await dispatchPointer(point.element, 'pointerup', {
@@ -266,7 +266,7 @@ describe('TempoTrackLane', () => {
     expect(wrapper.emitted('move')).toBeUndefined()
     expect(wrapper.emitted('bpmChange')).toBeUndefined()
     expect(wrapper.findAll('.tempo-track-lane__point')[1]?.attributes('style')).toContain(
-      'translate3d(1.25rem, -50%, 0)',
+      'translate3d(calc(1.25rem - 50%), -50%, 0)',
     )
   })
 

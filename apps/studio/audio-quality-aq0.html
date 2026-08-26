@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/src/assets/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seele Audio Quality AQ0</title>
+  </head>
+  <body>
+    <main class="audition-shell">
+      <header class="audition-header">
+        <div>
+          <p class="eyebrow">Developer-only · Audio Quality Foundation V1A</p>
+          <h1>AQ0 合成 PCM 基线</h1>
+          <p class="lede">
+            本页使用浏览器 OfflineAudioContext、合成正弦波和生产 Sample Voice Runtime 生成结构化
+            报告；不读取 Project 或本地 Soundbank，也不会进入 Studio 生产构建。
+          </p>
+        </div>
+        <output id="run-status" class="status" data-kind="idle">尚未运行</output>
+      </header>
+
+      <section class="panel" aria-labelledby="contract-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Frozen characterization input</p>
+            <h2 id="contract-title">当前线性 Velocity 特征报告</h2>
+          </div>
+          <span class="badge">48 kHz · synthetic sine</span>
+        </div>
+        <p>
+          固定渲染 Velocity 1、32、64、96、127，测量稳定窗口的 peak、RMS、DC offset、相对电平和
+          release 后尾部，并核对 Runtime 资源是否归零。本页只记录 AQ0 当前行为，不实施 AQ1 曲线或
+          -12 dB calibration trim。
+        </p>
+        <div class="button-row">
+          <button id="run-baseline" type="button">运行 OfflineAudioContext 基线</button>
+          <button id="copy-report" type="button" class="secondary" disabled>复制报告 JSON</button>
+        </div>
+        <pre id="report-output" class="result" tabindex="0">等待运行。</pre>
+      </section>
+    </main>
+
+    <script type="module" src="/src/development/audio-quality-aq0/main.ts"></script>
+  </body>
+</html>

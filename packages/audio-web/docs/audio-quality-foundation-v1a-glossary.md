@@ -1,0 +1,114 @@
+# Audio Quality Foundation V1A 术语表
+
+> Status: Active reference for Audio Quality Foundation V1A
+>
+> Date: 2026-08-26
+
+本文用尽量直白的中文解释 Audio Quality Foundation V1A 中反复出现的音频、MIDI 与测试术语。
+英文原词保留在表中，是为了便于对照源码、Web Audio API 和第三方资料，不要求读者先理解英文
+才能审阅阶段计划。
+
+阅读其他 V1A 文档时，术语首次出现应优先写成“中文（English）”；后续可以只使用中文或已经
+稳定的源码名称。这里描述的是 Seele 当前阶段中的具体含义，不是完整的行业百科定义。
+
+## 1. 电平与测量
+
+| 中文术语     | 英文原词                              | 在 Seele V1A 中的含义                                                                                            |
+| ------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 脉冲编码调制 | PCM, Pulse-Code Modulation            | 把声音表示成连续数字采样值的方式。AQ0 的合成测试信号直接使用 PCM，不依赖受限音源。                               |
+| 采样值       | Sample                                | 某个声道在某一瞬间的数字振幅。不要与“采样乐器的一段 WAV 素材”混淆。                                              |
+| 音频帧       | Audio Frame                           | 同一时刻所有声道采样值的集合；立体声一帧包含左、右两个采样值。                                                   |
+| 采样率       | Sample Rate                           | 每秒音频帧数量，例如 48 kHz 表示每秒 48,000 帧。                                                                 |
+| 振幅         | Amplitude                             | 波形瞬时大小。数字音频常把 `-1...1` 作为规范化范围。                                                             |
+| 线性增益     | Linear Gain                           | 直接乘到振幅上的倍率；`0.5` 是一半振幅，`1` 保持不变。它不是“听起来一半响”的保证。                               |
+| 分贝满刻度   | dBFS, Decibels relative to Full Scale | 以数字系统最大幅度为 `0 dBFS` 的电平单位；负数表示低于上限。数字静音没有有限 dBFS 值。                           |
+| 峰值         | Peak                                  | 测量窗口内绝对采样值的最大值，用于发现削波风险和异常尖峰。                                                       |
+| 均方根电平   | RMS, Root Mean Square                 | 描述一段波形平均能量的指标，比单个峰值更接近持续响度，但不等于人耳响度模型。                                     |
+| 直流偏移     | DC Offset                             | 波形长期围绕非零值摆动。异常偏移可能浪费 headroom，或在切换时产生 click。                                        |
+| 增益分级     | Gain Staging                          | 安排 Voice、Track、Master 与系统输出各层增益，使正常内容保留余量且不过早削波。                                   |
+| 峰值余量     | Headroom                              | 当前峰值到 `0 dBFS` 之间保留的空间。例如峰值 `-6 dBFS` 约有 6 dB 余量。                                          |
+| 校准衰减     | Calibration Trim                      | 项目 Master 之后、系统输出之前的固定校准增益。它不修改 Project Fact，也不等同于用户 Master Gain。                |
+| 削波         | Clipping                              | 波形超过输出范围后被截平，通常产生明显失真。固定 trim 无法对任意增益与任意相干复音作绝对防削波保证。             |
+| 限幅器       | Limiter                               | 为阻止峰值超过阈值而自动降低增益的处理器。它会改变声音，若采用就必须在实时和离线导出中保持一致。                 |
+| 压缩器       | Compressor                            | 按动态范围自动改变增益的处理器。V1A 不把它当作无副作用的安全开关。                                               |
+| 瞬态         | Transient                             | 起音等位置短而快速的能量变化，决定敲击感，也最容易暴露削波或 click。                                             |
+| 点击杂音     | Click                                 | 不连续电平变化产生的短促高频杂音。`attack = 0` 或素材自身不连续可能有意或不可避免地形成突变。                    |
+| 渲染量子     | Render Quantum                        | Web Audio 分块处理音频的最小工作单位；当前浏览器通常以 128 帧处理，但质量契约不把平台实现细节当作 Project Fact。 |
+
+## 2. MIDI、动态与发声生命周期
+
+| 中文术语     | 英文原词                | 在 Seele V1A 中的含义                                                                                  |
+| ------------ | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| 力度         | MIDI Velocity           | MIDI Note 的 `1...127` 创作事实。当前 Sample Runtime 只用它控制振幅，不改变采样音色。                  |
+| 力度响应曲线 | Velocity Response Curve | 把 MIDI Velocity 转成线性增益的函数。V1A 已批准先比较带低电平下限的平方曲线。                          |
+| 力度层       | Velocity Layer          | 同一音高按力度选择不同采样素材。当前 Manifest 和 Studio Grand 没有该能力，不能把音量曲线称为力度层。   |
+| 起音         | Note On / Attack        | 新 Note 开始发声，以及包络从零进入稳定电平的阶段。                                                     |
+| 松音         | Note Off / Release      | Note 结束输入，以及包络把声音降到静音的阶段。Note Off 不等于立即销毁 AudioNode。                       |
+| 包络         | Envelope                | 控制 Voice 振幅随时间变化的曲线；当前 Profile 明确包含 attack 和 release。                             |
+| 门控触发     | Gated                   | Note Off 会启动 release；音符时长参与声音生命周期。                                                    |
+| 单次触发     | One-shot                | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                            |
+| 声部实例     | Voice                   | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                |
+| 复音数       | Polyphony               | 同时存在或同时发声的 Voice 数量。无限增长会造成峰值、CPU 与节点资源风险。                              |
+| 同音重触发   | Retrigger               | 同一作用域内相同 pitch 再次 Note On。V1A 保留不同 occurrence 的独立身份，不全局强制 choke。            |
+| 声部窃取     | Voice Stealing          | Voice 超过预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出资源。                   |
+| 退场尾音     | Retirement Tail         | 已被 cancel 或 steal、正在快速 release、尚未完成清理的 Voice。它也必须有独立上限。                     |
+| 卡死声部     | Stuck Voice             | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。 |
+| 互斥组       | Mutex / Exclusive Group | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                              |
+| 快速释放     | Fast Release            | stop、cancel、steal 或 fast mutex 使用的短 release。当前实现约 6 ms，AQ0 记录它，AQ2 再决定是否调整。  |
+
+## 3. 采样、Zone 与循环
+
+| 中文术语 | 英文原词        | 在 Seele V1A 中的含义                                                                        |
+| -------- | --------------- | -------------------------------------------------------------------------------------------- |
+| 采样素材 | Sample Asset    | 被 AudioBufferSourceNode 播放的 WAV/AudioBuffer。开发者本地音源不等于可分发资产。            |
+| 音区     | Zone            | Manifest 中把 pitch 范围、素材、root pitch、包络、loop、offset 与 mutex 组合起来的发声规则。 |
+| 根音高   | Root Pitch      | 素材未经转调时对应的 MIDI pitch；目标 pitch 与它的差决定播放速率。                           |
+| 转调     | Transposition   | 通过改变播放速率让一个素材覆盖其他 pitch；也会改变素材的自然持续时间。                       |
+| 源偏移   | Source Offset   | 从素材内部哪个时间点开始播放。                                                               |
+| 连续循环 | Continuous Loop | 进入 loop 后在 Note On 和 release 期间都继续循环，直到 Voice 完全停止。                      |
+| 延音循环 | Sustain Loop    | Note 持续时循环，Note Off 后离开循环并进入素材非循环尾部。它不是 Sustain Pedal。             |
+| 循环接缝 | Loop Seam       | loop 末端跳回开头的边界。素材或 loop point 不连续时可能产生 click。                          |
+| 交叉淡化 | Crossfade       | 在两个片段或 loop 边界间重叠并渐变。当前 Supported SFZ Profile 不支持非零 loop crossfade。   |
+| 自然尾部 | Natural Tail    | 不再循环后由素材剩余部分或 release 包络形成的尾音。                                          |
+
+## 4. 调度、测试与质量流程
+
+| 中文术语           | 英文原词                     | 在 Seele V1A 中的含义                                                                                                                                                                           |
+| ------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 发声计划           | Voice Plan                   | Playback 产生的浏览器无关调度 DTO，包含时间、pitch、velocity、gain、pan 与目标设备。                                                                                                            |
+| 出现实例           | Occurrence                   | Arrangement 展开后一次具体 Note 出现；重叠同音必须用 occurrence 区分。                                                                                                                          |
+| 发声令牌           | Voice Token                  | 当前由 `(engineGeneration, occurrenceKey)` 组成的 Voice 身份，用于 cancel、重排和清理。                                                                                                         |
+| 引擎代次           | Engine Generation            | Transport 时间映射或全局状态失效时推进的运行时代次；旧代计划必须被丢弃。它不是 modelRevision。                                                                                                  |
+| 离线音频上下文     | OfflineAudioContext          | 浏览器中不连接扬声器、尽快渲染到 AudioBuffer 的 Web Audio 后端。AQ0 用它运行真实 Voice Runtime 和合成素材。                                                                                     |
+| 离线上下文适配视图 | Offline Context Adapter View | `OfflineAudioContext` 在开始渲染前报告 `suspended`，但生产 Voice Runtime 只接收已激活的 `running` 上下文。AQ0 只在调度窗口把状态读取适配为 `running`；节点和 PCM 仍由原生离线上下文创建和渲染。 |
+| 实时/离线一致性    | Realtime/Offline Parity      | 实时播放和未来 WAV 导出使用相同发声政策，而不是两套听起来不同的实现。                                                                                                                           |
+| 测试样本           | Fixture                      | 固定、可重复的测试输入。AQ0 fixture 是自行生成的 PCM 与 Voice Plan，不包含受限音源。                                                                                                            |
+| 基线               | Baseline                     | 改动前被明确记录的当前行为。基线不代表该行为永远正确，只用于审阅差异。                                                                                                                          |
+| 质量门禁           | Quality Gate                 | 必须达到的客观检查或人工听测条件；未运行必须写成“未运行”，不能记作通过。                                                                                                                        |
+| 特征测试           | Characterization Test        | 固定当前行为的测试。AQ1 有意改变 Velocity 时，应同时更新特征测试和阶段记录。                                                                                                                    |
+| 硬门禁             | Hard Gate                    | 可自动判断通过/失败的约束，例如无 NaN、资源归零或确定性顺序。                                                                                                                                   |
+| 校准门禁           | Calibrated Gate              | 需要先取得基线再冻结阈值的指标，例如 reference chord peak。                                                                                                                                     |
+| 人工听测           | Listening Gate               | 由人判断 click、截断感、动态和音色接受度；数值测试不能替代它。                                                                                                                                  |
+| A/B 对比           | A/B Comparison               | 在响度匹配等受控条件下比较旧政策和候选政策，避免把单纯更响误认为更好。                                                                                                                          |
+| 确定性             | Deterministic                | 相同输入和政策得到相同调度、保留/steal 顺序与报告结构，不依赖 Map 偶然顺序。                                                                                                                    |
+
+## 5. Sustain Pedal 延期术语
+
+| 中文术语     | 英文原词                  | 在 Seele 后续阶段中的含义                                                                   |
+| ------------ | ------------------------- | ------------------------------------------------------------------------------------------- |
+| 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。V1 将保留原始 `0...127`，通常用 `>=64` 判断踏板按下。AQ0 不实现它。 |
+| 踏板保持声部 | Pedal-held Voice          | Note Off 已到达、但因 CC64 按下而不能进入最终 release 的 Voice。                            |
+| 抬踏板       | Pedal Up                  | CC64 从按下变为抬起，触发此前 pedal-held Voice 的 release。                                 |
+| 控制器追赶   | Controller Chase          | 从歌曲中间播放或 seek 时，恢复该位置之前最后生效的 CC 状态。                                |
+| 半踏板       | Half-pedal                | 使用 CC64 中间值表达连续制音程度；不属于首个 CC64 纵向切片。                                |
+| 制音器共鸣   | Damper Resonance          | 踏板按下后琴弦与琴体额外共鸣的声学效果；当前单层 Sample Runtime 不具备。                    |
+| 松键采样     | Release Sample            | Note Off 或 Pedal Up 时额外触发的素材；当前 Manifest 未声明该能力。                         |
+
+## 6. 最容易混淆的边界
+
+- **力度不等于响度**：Velocity 是 MIDI 输入；曲线、素材、复音和输出设备共同决定听感。
+- **延音循环不等于延音踏板**：前者是单个 Zone 的素材循环规则，后者是 CC64 控制器状态。
+- **release 不等于立刻 stop**：release 期间 Voice 仍发声并占用有限资源。
+- **headroom 不等于绝不削波**：固定 trim 只能覆盖已声明的增益和 fixture 范围。
+- **客观指标不等于主观音质**：peak、RMS 和 seam 可以发现错误，但不能决定钢琴是否自然。
+- **开发者本地听测不等于可分发资产**：Studio Grand 仍受既有资产边界约束。

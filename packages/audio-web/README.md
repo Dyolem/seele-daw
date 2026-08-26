@@ -21,6 +21,11 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 规范化 Manifest、加载预算和浏览器矩阵仍须按阶段计划逐批审阅。任何把采样随构建公开交付的
 方案仍必须先解决替代资产或再分发权限。
 
+后续音质加固已经进入
+[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。当前仅 AQ0
+基线、质量契约与合成测试设施进入审阅，尚未改变生产发声行为；相关行业词汇见
+[V1A 术语表](./docs/audio-quality-foundation-v1a-glossary.md)。
+
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
 4A.1b 的生成命令、ZIP 安全预算和本地输出结果。

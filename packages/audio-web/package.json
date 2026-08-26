@@ -9,6 +9,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./development/audio-quality-aq0": "./src/development/audio-quality-aq0.ts",
     "./development/sample-instrument-audition": "./src/development/sample-instrument-audition.ts"
   },
   "scripts": {

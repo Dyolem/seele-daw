@@ -1,6 +1,7 @@
 import { parseSoundbankId, type ScheduledSampleVoicePlan } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
+import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
 import type {
   SampleInstrumentManifestV1,
@@ -18,6 +19,8 @@ import {
 } from '#internal/__tests__/support/fake-web-audio'
 
 const SOUNDBANK_ID = parseSoundbankId('fixture-voice-bank')
+const FAST_RELEASE_SECOND = AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
+const STOP_SAFETY_SECOND = AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
 
 function createZone(
   zoneId: string,
@@ -218,7 +221,7 @@ describe('Sample Instrument Voice Runtime', () => {
       loop: false,
       starts: [{ duration: null, offset: 0.25, when: 5 }],
     })
-    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(6.401)
+    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(6.4 + STOP_SAFETY_SECOND)
     expect(context.bufferSources[0]?.playbackRate.events).toEqual([
       { kind: 'set', time: 5, value: expectedRate },
     ])
@@ -267,7 +270,7 @@ describe('Sample Instrument Voice Runtime', () => {
       loopEnd: 2,
       starts: [{ duration: null, offset: 0, when: 1 }],
     })
-    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(3.301)
+    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(3.3 + STOP_SAFETY_SECOND)
     expect(setMasterGainAtTime).toHaveBeenCalledWith(0.9, 0)
   })
 
@@ -310,7 +313,7 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources[1]).toMatchObject({
       loop: false,
       starts: [{ duration: null, offset: 1.25, when: 12 }],
-      stops: [12.501],
+      stops: [12.5 + STOP_SAFETY_SECOND],
     })
     expect(runtime.statistics.sourceNodeCount).toBe(2)
 
@@ -340,7 +343,9 @@ describe('Sample Instrument Voice Runtime', () => {
       time: 2.5,
     })
     expect(context.bufferSources[0]?.stops).toHaveLength(1)
-    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(2.507)
+    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(
+      2.5 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+    )
     context.bufferSources[0]?.finish()
     expect(runtime.cancel(result.token!)).toBe(false)
   })
@@ -369,8 +374,8 @@ describe('Sample Instrument Voice Runtime', () => {
       value: 0,
     })
     expect(context.bufferSources[0]?.stops).toHaveLength(2)
-    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(6.401)
-    expect(context.bufferSources[0]?.stops[1]).toBeCloseTo(8.401)
+    expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(6.4 + STOP_SAFETY_SECOND)
+    expect(context.bufferSources[0]?.stops[1]).toBeCloseTo(8.4 + STOP_SAFETY_SECOND)
 
     context.bufferSources[0]?.finish()
     expect(runtime.hasVoice(result.token!)).toBe(false)
@@ -398,12 +403,12 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources[1]).toMatchObject({
       disconnectCallCount: 1,
       starts: [{ duration: null, offset: 1.25, when: 5 }],
-      stops: [5.501, 2],
+      stops: [5.5 + STOP_SAFETY_SECOND, 2],
     })
     expect(context.bufferSources[2]).toMatchObject({
       loop: false,
       starts: [{ duration: null, offset: 1.25, when: 7 }],
-      stops: [7.501],
+      stops: [7.5 + STOP_SAFETY_SECOND],
     })
   })
 
@@ -452,7 +457,7 @@ describe('Sample Instrument Voice Runtime', () => {
       kind: 'cancel-and-hold',
       time: 3,
     })
-    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(3.301)
+    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(3.3 + STOP_SAFETY_SECOND)
     expect(runtime.rescheduleRelease(result.token!, 8)).toMatchObject({
       outcome: 'release-started',
     })
@@ -487,16 +492,18 @@ describe('Sample Instrument Voice Runtime', () => {
 
     expect(context.gainNodes[0]?.gain.events).toContainEqual({
       kind: 'linear-ramp',
-      time: 2.006,
+      time: 2 + FAST_RELEASE_SECOND,
       value: 0,
     })
-    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(2.007)
+    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(
+      2 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+    )
     expect(context.gainNodes[2]?.gain.events).toContainEqual({
       kind: 'linear-ramp',
       time: 4.4,
       value: 0,
     })
-    expect(context.bufferSources[2]?.stops.at(-1)).toBeCloseTo(4.401)
+    expect(context.bufferSources[2]?.stops.at(-1)).toBeCloseTo(4.4 + STOP_SAFETY_SECOND)
   })
 
   it('moves a sustain loop into its unlooped tail when normal mutex release starts early', () => {
@@ -526,7 +533,7 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources[3]?.playbackRate.events).toEqual([
       { kind: 'set', time: 4, value: 1 },
     ])
-    expect(context.bufferSources[3]?.stops[0]).toBeCloseTo(4.401)
+    expect(context.bufferSources[3]?.stops[0]).toBeCloseTo(4.4 + STOP_SAFETY_SECOND)
   })
 
   it('isolates generations and occurrence tokens while suppressing stale and expired plans', () => {
@@ -576,7 +583,7 @@ describe('Sample Instrument Voice Runtime', () => {
     ).toEqual({ outcome: 'expired', playbackRate: null, token: null, zoneId: null })
 
     expect(runtime.advanceGeneration(2 as ScheduledSampleVoicePlan['engineGeneration'])).toBe(true)
-    expect(context.bufferSources[0]?.stops).toEqual([8.301])
+    expect(context.bufferSources[0]?.stops).toEqual([8.3 + STOP_SAFETY_SECOND])
     expect(
       runtime.schedule(
         createPlan('shared-occurrence', 60, {
@@ -631,7 +638,7 @@ describe('Sample Instrument Voice Runtime', () => {
       endedListenerCount: 0,
       sourceNodeCount: 0,
     })
-    expect(context.bufferSources[0]?.stops).toEqual([6.301, 0])
+    expect(context.bufferSources[0]?.stops).toEqual([6.3 + STOP_SAFETY_SECOND, 0])
     expect(context.endedListenerCount).toBe(0)
   })
 
@@ -681,7 +688,9 @@ describe('Sample Instrument Voice Runtime', () => {
       }),
     )
     expect(runtime.statistics.activeVoiceCount).toBe(1)
-    expect(context.bufferSources[1]?.stops.at(-1)).toBeCloseTo(0.007)
+    expect(context.bufferSources[1]?.stops.at(-1)).toBeCloseTo(
+      FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+    )
     context.bufferSources[1]?.finish()
     expect(runtime.statistics).toEqual({
       activeVoiceCount: 0,

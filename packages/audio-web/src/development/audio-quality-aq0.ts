@@ -8,6 +8,13 @@ export type {
   AudioQualityAq0PolyphonyMeasurement,
   AudioQualityAq0VelocityMeasurement,
 } from './audio-quality-aq0/browser-report'
+export type {
+  AudioQualityAq2BrowserReport,
+  AudioQualityAq2EnvelopeMeasurement,
+  AudioQualityAq2LoopMeasurement,
+  AudioQualityAq2MutexMeasurement,
+  AudioQualityAq2OneShotMeasurement,
+} from './audio-quality-aq0/aq2-browser-report'
 export {
   countAudioQualityClippedFrames,
   measureAudioQualityAq0Channel,

@@ -1,6 +1,6 @@
 # Audio Quality Foundation V1A 阶段计划
 
-> Status: AQ0 reviewed and committed (`40c44a1`); AQ1 implemented for review; AQ2–AQ4 not implemented
+> Status: AQ0 and AQ1 reviewed and committed (`40c44a1`, `1b74d26`); AQ2 implemented for review; AQ3–AQ4 not implemented
 >
 > Date: 2026-08-26
 >
@@ -42,7 +42,7 @@ V1A 不把“基础可靠性”描述成完整钢琴真实性。当前单层 Sam
 
 ### 2.1 Velocity 与 gain staging
 
-AQ1 当前工作树使用带 `-36 dB` 低电平下限的平方响应：
+AQ1 已冻结并提交带 `-36 dB` 低电平下限的平方响应：
 
 ```text
 floor = 10 ^ (-36 / 20)
@@ -52,7 +52,7 @@ gain(velocity) = floor + (1 - floor) * (velocity / 127) ^ 2
 系统 calibration trim 为 `-12 dB`，位于 Project Master Gain 之后的独立 GainNode。它不是 Project
 Fact，不修改保存的 Track/Master Gain。AQ0 已记录线性振幅、无 calibration trim 的历史基线；
 AQ1 使用相同 fixture 记录当前政策。自动数值对照已经完成，developer-local soundbank 的
-level-matched 人工听测仍为 `not-run`，须在 AQ1 审阅或后续收口时明确记录。
+level-matched 人工听测仍为 `not-run`，须在后续收口时如实记录。
 
 V1A 默认不静默加入 compressor、soft clipper 或 limiter。由于 Track Gain、Master Gain 均允许
 `0...4`，加上任意相干复音，固定 trim 不可能对所有输入作绝对不削波保证。V1A 的 peak 门禁只
@@ -93,14 +93,14 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
 - 固定 Velocity 锚点、单调性、Track/Master/System 乘法、mute 和 failure cleanup；
 - 用 AQ0 同一输入完成 level-matched A/B，再决定是否保留候选数值。
 
-当前工作树证据：
+已审核证据：
 
 - 纯政策函数覆盖全部 `1...127`、五个固定锚点和非法输入；Playback 仍传递原始 Velocity；
 - Project Master 与固定输出校准是两个职责不同的 GainNode，dispose 和 graph failure 均回收；
 - Chromium 48 kHz 合成报告的参考三和弦峰值为 `-16.321 dBFS`，10 Voice 完全同相压力峰值为
   `-1.031 dBFS`；无满刻度帧，release 后数字静音，Runtime 资源归零；
 - 自动测试与浏览器校准门禁为 `passed`；developer-local soundbank 人工听测为 `not-run`；
-- AQ1 尚未提交，等待本批功能审阅。
+- AQ1 已审核并提交为 `1b74d26`。
 
 ### AQ2：Envelope 与 Loop
 
@@ -109,6 +109,20 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
 - 合成无缝 loop 的 Runtime seam 是硬门禁；真实资产自身 seam 单独报告，不由 Runtime 猜
   crossfade；
 - `attack = 0` 仍表示立即起音，不偷偷覆盖 Manifest 作者语义。
+
+当前工作树证据：
+
+- `6 ms` fast release、`1 ms` source stop guard 与 `32` 段非线性 Envelope 近似已进入同一个
+  `seele.audio-quality-foundation-v1a-aq2` 渲染政策；数值与现有声音语义保持兼容；
+- Node 语义测试继续覆盖 short Note、normal/fast release、Note Off reschedule、continuous/sustain
+  loop、one-shot、mutex、自然结束与资源回收；
+- Chromium 48 kHz 生产 Runtime 合成报告实际测得 shaped/short Envelope 最大绝对误差分别为
+  `4.861e-5`、`4.715e-5` full scale，fast release 为 `1.038e-8`，均满足 `<= 1e-4`；
+- continuous/sustain loop 的最大 seam error 均为 `1.197e-5` full scale，one-shot 在普通 Note Off
+  后继续发声，fast mutex 旧 Voice 误差为 `1.209e-8` 且新 Voice 正常接管；
+- 所有 AQ2 输入在 render 完成和 dispose 后的 Voice、node 与 listener 统计归零，最终 tail 满足
+  `< -90 dBFS`；自动与浏览器门禁为 `passed`，真实 soundbank seam/听感仍为 `not-run`；
+- AQ2 尚未提交，等待本批功能审阅。
 
 ### AQ3：Retrigger、Polyphony 与 Voice Stealing
 

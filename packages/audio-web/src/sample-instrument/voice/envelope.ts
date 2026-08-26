@@ -1,7 +1,7 @@
 import type { SampleInstrumentEnvelopeSegmentV1 } from '#internal/sample-instrument/contract/manifest'
+import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
 
 export const SAMPLE_INSTRUMENT_ENVELOPE_CURVE_LIMIT = 10
-const CURVED_SEGMENT_COUNT = 32
 const LINEAR_CURVE_EPSILON = 1e-6
 
 function clampUnitInterval(value: number): number {
@@ -70,7 +70,10 @@ export function scheduleSampleInstrumentEnvelopeTransition(
     return scheduledEndValue
   }
 
-  const scheduledSegmentCount = Math.max(1, Math.ceil(CURVED_SEGMENT_COUNT * normalizedEndTime))
+  const scheduledSegmentCount = Math.max(
+    1,
+    Math.ceil(AUDIO_QUALITY_V1A_RENDER_POLICY.envelopeCurveSegmentCount * normalizedEndTime),
+  )
   for (let index = 1; index <= scheduledSegmentCount; index += 1) {
     const normalizedTime = normalizedEndTime * (index / scheduledSegmentCount)
     parameter.linearRampToValueAtTime(

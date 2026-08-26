@@ -3,6 +3,10 @@ import {
   calculateAudioQualityV1aVelocityGain,
 } from '#internal/audio-quality/render-policy'
 import {
+  runAudioQualityAq2BrowserReport,
+  type AudioQualityAq2BrowserReport,
+} from '#internal/development/audio-quality-aq0/aq2-browser-report'
+import {
   AUDIO_QUALITY_AQ0_NOTE_RELEASE_SECOND,
   AUDIO_QUALITY_AQ0_NOTE_START_SECOND,
   AUDIO_QUALITY_AQ0_RENDER_DURATION_SECOND,
@@ -27,7 +31,7 @@ import {
 } from '#internal/development/audio-quality-aq0/measurement'
 import {
   renderAudioQualityAq0Plans,
-  type AudioQualityAq0OfflineRenderResult,
+  type AudioQualityOfflineRenderResult,
 } from '#internal/development/audio-quality-aq0/offline-render'
 import type { SampleInstrumentVoiceRuntimeStatistics } from '#internal/sample-instrument/voice/voice-runtime'
 
@@ -60,8 +64,19 @@ export interface AudioQualityAq0PolyphonyMeasurement extends AudioQualityAq0Rend
 }
 
 export interface AudioQualityAq0BrowserReport {
+  readonly aq2: AudioQualityAq2BrowserReport
   readonly checks: {
     readonly allMeasurementsFinite: boolean
+    readonly aq2AllMeasurementsFinite: boolean
+    readonly aq2EnvelopeErrorsAtOrBelowTolerance: boolean
+    readonly aq2LoopSeamsAtOrBelowTolerance: boolean
+    readonly aq2LoopSignalsAudible: boolean
+    readonly aq2MutexFastReleaseAtOrBelowTolerance: boolean
+    readonly aq2MutexRoutesNewVoiceAfterChoke: boolean
+    readonly aq2OneShotContinuesAfterNoteOff: boolean
+    readonly aq2ResourcesReleasedAfterDispose: boolean
+    readonly aq2ResourcesReleasedAfterRender: boolean
+    readonly aq2TailsBelowMinus90Dbfs: boolean
     readonly noClippedFrames: boolean
     readonly referencePeakAtOrBelowMinus3Dbfs: boolean
     readonly resourcesReleasedAfterDispose: boolean
@@ -89,7 +104,7 @@ export interface AudioQualityAq0BrowserReport {
   readonly polyphonyMeasurements: readonly AudioQualityAq0PolyphonyMeasurement[]
   readonly renderPolicy: typeof AUDIO_QUALITY_V1A_RENDER_POLICY.id
   readonly schema: typeof AUDIO_QUALITY_AQ0_REPORT_SCHEMA
-  readonly schemaVersion: 2
+  readonly schemaVersion: 3
   readonly velocityMeasurements: readonly AudioQualityAq0VelocityMeasurement[]
 }
 
@@ -103,7 +118,7 @@ function isZeroStatistics(statistics: SampleInstrumentVoiceRuntimeStatistics): b
 }
 
 function measureRenderedWindow(
-  rendered: AudioQualityAq0OfflineRenderResult,
+  rendered: AudioQualityOfflineRenderResult,
 ): AudioQualityAq0RenderedWindowMeasurement {
   const steady = measureAudioQualityAq0Channels(
     rendered.channels,
@@ -236,13 +251,25 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
   )
   const polyphonyMeasurements = Object.freeze([referenceTriad, coherentStress])
   const allMeasurements = [...velocityMeasurements, ...polyphonyMeasurements]
+  const aq2 = await runAudioQualityAq2BrowserReport()
 
   return Object.freeze({
+    aq2,
     checks: Object.freeze({
       allMeasurementsFinite: collectFiniteMeasurementValues(
         velocityMeasurements,
         polyphonyMeasurements,
       ).every(Number.isFinite),
+      aq2AllMeasurementsFinite: aq2.checks.allMeasurementsFinite,
+      aq2EnvelopeErrorsAtOrBelowTolerance: aq2.checks.envelopeErrorsAtOrBelowTolerance,
+      aq2LoopSeamsAtOrBelowTolerance: aq2.checks.loopSeamsAtOrBelowTolerance,
+      aq2LoopSignalsAudible: aq2.checks.loopSignalsAudible,
+      aq2MutexFastReleaseAtOrBelowTolerance: aq2.checks.mutexFastReleaseAtOrBelowTolerance,
+      aq2MutexRoutesNewVoiceAfterChoke: aq2.checks.mutexRoutesNewVoiceAfterChoke,
+      aq2OneShotContinuesAfterNoteOff: aq2.checks.oneShotContinuesAfterNoteOff,
+      aq2ResourcesReleasedAfterDispose: aq2.checks.resourcesReleasedAfterDispose,
+      aq2ResourcesReleasedAfterRender: aq2.checks.resourcesReleasedAfterRender,
+      aq2TailsBelowMinus90Dbfs: aq2.checks.tailsBelowMinus90Dbfs,
       noClippedFrames: allMeasurements.every((measurement) => measurement.clippedFrameCount === 0),
       referencePeakAtOrBelowMinus3Dbfs:
         referenceTriad.peakDbfs !== null && referenceTriad.peakDbfs <= -3,
@@ -278,7 +305,7 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
     polyphonyMeasurements,
     renderPolicy: AUDIO_QUALITY_V1A_RENDER_POLICY.id,
     schema: AUDIO_QUALITY_AQ0_REPORT_SCHEMA,
-    schemaVersion: 2,
+    schemaVersion: 3,
     velocityMeasurements,
   })
 }

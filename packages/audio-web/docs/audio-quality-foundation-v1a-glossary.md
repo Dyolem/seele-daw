@@ -40,40 +40,43 @@
 
 ## 2. MIDI、动态与发声生命周期
 
-| 中文术语     | 英文原词                    | 在 Seele V1A 中的含义                                                                                  |
-| ------------ | --------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 力度         | MIDI Velocity               | MIDI Note 的 `1...127` 创作事实。当前 Sample Runtime 只用它控制振幅，不改变采样音色。                  |
-| 力度响应曲线 | Velocity Response Curve     | 把 MIDI Velocity 转成线性增益的函数。AQ1 当前使用带低电平下限的平方曲线。                              |
-| 平方力度响应 | Quadratic Velocity Response | 先把 Velocity 归一化再取平方，使中低力度比线性振幅政策更安静；它只改变音量映射，不会创造新的采样音色。 |
-| 力度层       | Velocity Layer              | 同一音高按力度选择不同采样素材。当前 Manifest 和 Studio Grand 没有该能力，不能把音量曲线称为力度层。   |
-| 起音         | Note On / Attack            | 新 Note 开始发声，以及包络从零进入稳定电平的阶段。                                                     |
-| 松音         | Note Off / Release          | Note 结束输入，以及包络把声音降到静音的阶段。Note Off 不等于立即销毁 AudioNode。                       |
-| 包络         | Envelope                    | 控制 Voice 振幅随时间变化的曲线；当前 Profile 明确包含 attack 和 release。                             |
-| 门控触发     | Gated                       | Note Off 会启动 release；音符时长参与声音生命周期。                                                    |
-| 单次触发     | One-shot                    | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                            |
-| 声部实例     | Voice                       | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                |
-| 复音数       | Polyphony                   | 同时存在或同时发声的 Voice 数量。无限增长会造成峰值、CPU 与节点资源风险。                              |
-| 同音重触发   | Retrigger                   | 同一作用域内相同 pitch 再次 Note On。V1A 保留不同 occurrence 的独立身份，不全局强制 choke。            |
-| 声部窃取     | Voice Stealing              | Voice 超过预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出资源。                   |
-| 退场尾音     | Retirement Tail             | 已被 cancel 或 steal、正在快速 release、尚未完成清理的 Voice。它也必须有独立上限。                     |
-| 卡死声部     | Stuck Voice                 | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。 |
-| 互斥组       | Mutex / Exclusive Group     | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                              |
-| 快速释放     | Fast Release                | stop、cancel、steal 或 fast mutex 使用的短 release。当前实现约 6 ms，AQ0 记录它，AQ2 再决定是否调整。  |
+| 中文术语     | 英文原词                      | 在 Seele V1A 中的含义                                                                                                |
+| ------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 力度         | MIDI Velocity                 | MIDI Note 的 `1...127` 创作事实。当前 Sample Runtime 只用它控制振幅，不改变采样音色。                                |
+| 力度响应曲线 | Velocity Response Curve       | 把 MIDI Velocity 转成线性增益的函数。AQ1 当前使用带低电平下限的平方曲线。                                            |
+| 平方力度响应 | Quadratic Velocity Response   | 先把 Velocity 归一化再取平方，使中低力度比线性振幅政策更安静；它只改变音量映射，不会创造新的采样音色。               |
+| 力度层       | Velocity Layer                | 同一音高按力度选择不同采样素材。当前 Manifest 和 Studio Grand 没有该能力，不能把音量曲线称为力度层。                 |
+| 起音         | Note On / Attack              | 新 Note 开始发声，以及包络从零进入稳定电平的阶段。                                                                   |
+| 松音         | Note Off / Release            | Note 结束输入，以及包络把声音降到静音的阶段。Note Off 不等于立即销毁 AudioNode。                                     |
+| 包络         | Envelope                      | 控制 Voice 振幅随时间变化的曲线；当前 Profile 明确包含 attack 和 release。                                           |
+| 分段曲线近似 | Piecewise Curve Approximation | 把一条非线性包络拆成多个短线性 ramp 执行。AQ2 固定使用 32 段，目的是稳定逼近 Manifest 曲线，不是改变作者给出的时长。 |
+| 门控触发     | Gated                         | Note Off 会启动 release；音符时长参与声音生命周期。                                                                  |
+| 单次触发     | One-shot                      | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                                          |
+| 声部实例     | Voice                         | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                              |
+| 复音数       | Polyphony                     | 同时存在或同时发声的 Voice 数量。无限增长会造成峰值、CPU 与节点资源风险。                                            |
+| 同音重触发   | Retrigger                     | 同一作用域内相同 pitch 再次 Note On。V1A 保留不同 occurrence 的独立身份，不全局强制 choke。                          |
+| 声部窃取     | Voice Stealing                | Voice 超过预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出资源。                                 |
+| 退场尾音     | Retirement Tail               | 已被 cancel 或 steal、正在快速 release、尚未完成清理的 Voice。它也必须有独立上限。                                   |
+| 卡死声部     | Stuck Voice                   | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。               |
+| 互斥组       | Mutex / Exclusive Group       | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                                            |
+| 快速释放     | Fast Release                  | stop、cancel、未来的 steal 或 fast mutex 使用的短 release。AQ2 将既有值正式冻结为 6 ms 线性淡出，避免直接硬切。      |
+| 停止保护间隔 | Source Stop Guard             | release 排程结束到真正停止 source 之间的短保护时间。AQ2 固定为 1 ms，防止调度舍入让 source 提前截断包络。            |
 
 ## 3. 采样、Zone 与循环
 
-| 中文术语 | 英文原词        | 在 Seele V1A 中的含义                                                                        |
-| -------- | --------------- | -------------------------------------------------------------------------------------------- |
-| 采样素材 | Sample Asset    | 被 AudioBufferSourceNode 播放的 WAV/AudioBuffer。开发者本地音源不等于可分发资产。            |
-| 音区     | Zone            | Manifest 中把 pitch 范围、素材、root pitch、包络、loop、offset 与 mutex 组合起来的发声规则。 |
-| 根音高   | Root Pitch      | 素材未经转调时对应的 MIDI pitch；目标 pitch 与它的差决定播放速率。                           |
-| 转调     | Transposition   | 通过改变播放速率让一个素材覆盖其他 pitch；也会改变素材的自然持续时间。                       |
-| 源偏移   | Source Offset   | 从素材内部哪个时间点开始播放。                                                               |
-| 连续循环 | Continuous Loop | 进入 loop 后在 Note On 和 release 期间都继续循环，直到 Voice 完全停止。                      |
-| 延音循环 | Sustain Loop    | Note 持续时循环，Note Off 后离开循环并进入素材非循环尾部。它不是 Sustain Pedal。             |
-| 循环接缝 | Loop Seam       | loop 末端跳回开头的边界。素材或 loop point 不连续时可能产生 click。                          |
-| 交叉淡化 | Crossfade       | 在两个片段或 loop 边界间重叠并渐变。当前 Supported SFZ Profile 不支持非零 loop crossfade。   |
-| 自然尾部 | Natural Tail    | 不再循环后由素材剩余部分或 release 包络形成的尾音。                                          |
+| 中文术语 | 英文原词        | 在 Seele V1A 中的含义                                                                                            |
+| -------- | --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 采样素材 | Sample Asset    | 被 AudioBufferSourceNode 播放的 WAV/AudioBuffer。开发者本地音源不等于可分发资产。                                |
+| 音区     | Zone            | Manifest 中把 pitch 范围、素材、root pitch、包络、loop、offset 与 mutex 组合起来的发声规则。                     |
+| 根音高   | Root Pitch      | 素材未经转调时对应的 MIDI pitch；目标 pitch 与它的差决定播放速率。                                               |
+| 转调     | Transposition   | 通过改变播放速率让一个素材覆盖其他 pitch；也会改变素材的自然持续时间。                                           |
+| 源偏移   | Source Offset   | 从素材内部哪个时间点开始播放。                                                                                   |
+| 连续循环 | Continuous Loop | 进入 loop 后在 Note On 和 release 期间都继续循环，直到 Voice 完全停止。                                          |
+| 延音循环 | Sustain Loop    | Note 持续时循环，Note Off 后离开循环并进入素材非循环尾部。它不是 Sustain Pedal。                                 |
+| 循环接缝 | Loop Seam       | loop 末端跳回开头的边界。素材或 loop point 不连续时可能产生 click。                                              |
+| 接缝误差 | Loop Seam Error | 实际回绕点附近 PCM 与首轮参考片段之间的最大差值。AQ2 用它检查 Runtime 是否额外制造不连续，不替真实资产保证无缝。 |
+| 交叉淡化 | Crossfade       | 在两个片段或 loop 边界间重叠并渐变。当前 Supported SFZ Profile 不支持非零 loop crossfade。                       |
+| 自然尾部 | Natural Tail    | 不再循环后由素材剩余部分或 release 包络形成的尾音。                                                              |
 
 ## 4. 调度、测试与质量流程
 
@@ -97,13 +100,15 @@
 | 满刻度帧           | Full-scale Frame             | 至少一个声道的绝对采样值达到或超过 `1` 的音频帧。AQ1 合成报告把数量非零视为削波风险证据。                                                                                                       |
 | 参考三和弦         | Reference Triad              | 固定 pitch `60, 64, 67`、Velocity 96 的三 Voice 输入，用于观察普通复音路径的 peak、RMS、尾部与清理。                                                                                            |
 | 相干压力输入       | Coherent Stress Fixture      | 同时启动 10 个完全相同、满力度 Voice 的确定性最坏情况输入，用来校准 headroom；它不是 Voice 上限或真实乐曲模型。                                                                                 |
+| 最大绝对误差       | Maximum Absolute Error       | 实际 PCM 与同一时刻解析目标值之差的最大绝对值。AQ2 的 Envelope 门禁用 full scale 比例表达，`1e-4` 约等于满刻度的万分之一。                                                                      |
+| 尾部窗口           | Tail Window                  | release 与 source stop 理应完成后用于检查残余信号的时间窗；数字静音记为 `null dBFS`，不是测量失败。                                                                                             |
 | 确定性             | Deterministic                | 相同输入和政策得到相同调度、保留/steal 顺序与报告结构，不依赖 Map 偶然顺序。                                                                                                                    |
 
 ## 5. Sustain Pedal 延期术语
 
 | 中文术语     | 英文原词                  | 在 Seele 后续阶段中的含义                                                                   |
 | ------------ | ------------------------- | ------------------------------------------------------------------------------------------- |
-| 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。V1 将保留原始 `0...127`，通常用 `>=64` 判断踏板按下。AQ0 不实现它。 |
+| 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。V1 将保留原始 `0...127`，通常用 `>=64` 判断踏板按下。AQ2 不实现它。 |
 | 踏板保持声部 | Pedal-held Voice          | Note Off 已到达、但因 CC64 按下而不能进入最终 release 的 Voice。                            |
 | 抬踏板       | Pedal Up                  | CC64 从按下变为抬起，触发此前 pedal-held Voice 的 release。                                 |
 | 控制器追赶   | Controller Chase          | 从歌曲中间播放或 seek 时，恢复该位置之前最后生效的 CC 状态。                                |

@@ -1,7 +1,10 @@
 export const AUDIO_QUALITY_V1A_RENDER_POLICY = Object.freeze({
-  id: 'seele.audio-quality-foundation-v1a-aq1',
+  defaultFastReleaseSecond: 0.006,
+  envelopeCurveSegmentCount: 32,
+  id: 'seele.audio-quality-foundation-v1a-aq2',
   outputCalibrationDb: -12,
   outputCalibrationGain: 10 ** (-12 / 20),
+  sourceStopSafetySecond: 0.001,
   velocityExponent: 2,
   velocityFloorDb: -36,
   velocityFloorGain: 10 ** (-36 / 20),

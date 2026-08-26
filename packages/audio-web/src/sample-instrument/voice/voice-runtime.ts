@@ -1,6 +1,9 @@
 import type { ScheduledSampleVoicePlan, SoundbankId } from '@seele-daw/playback'
 
-import { calculateAudioQualityV1aVelocityGain } from '#internal/audio-quality/render-policy'
+import {
+  AUDIO_QUALITY_V1A_RENDER_POLICY,
+  calculateAudioQualityV1aVelocityGain,
+} from '#internal/audio-quality/render-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
 import type {
   SampleInstrumentEnvelopeSegmentV1,
@@ -17,10 +20,6 @@ import {
   evaluateSampleInstrumentEnvelopeTransition,
   scheduleSampleInstrumentEnvelopeTransition,
 } from '#internal/sample-instrument/voice/envelope'
-
-const DEFAULT_FAST_RELEASE_SECOND = 0.006
-const RESCHEDULED_ATTACK_SEGMENT_COUNT = 32
-const SOURCE_STOP_SAFETY_SECOND = 0.001
 
 type EngineGeneration = ScheduledSampleVoicePlan['engineGeneration']
 type NoteOccurrenceKey = ScheduledSampleVoicePlan['occurrenceKey']
@@ -335,7 +334,8 @@ export class SampleInstrumentVoiceRuntime {
   #disposed = false
 
   constructor(options: SampleInstrumentVoiceRuntimeOptions) {
-    const fastReleaseSecond = options.fastReleaseSecond ?? DEFAULT_FAST_RELEASE_SECOND
+    const fastReleaseSecond =
+      options.fastReleaseSecond ?? AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
     if (!Number.isFinite(fastReleaseSecond) || fastReleaseSecond <= 0 || fastReleaseSecond > 0.1) {
       fail('invalid-configuration', 'fastReleaseSecond must be greater than 0 through 0.1 seconds')
     }
@@ -641,7 +641,7 @@ export class SampleInstrumentVoiceRuntime {
     const remainingFraction = (endTime - fromTime) / attack.durationSecond
     const segmentCount = Math.max(
       1,
-      Math.ceil(RESCHEDULED_ATTACK_SEGMENT_COUNT * remainingFraction),
+      Math.ceil(AUDIO_QUALITY_V1A_RENDER_POLICY.envelopeCurveSegmentCount * remainingFraction),
     )
     for (let index = 1; index <= segmentCount; index += 1) {
       const time = fromTime + (endTime - fromTime) * (index / segmentCount)
@@ -657,7 +657,8 @@ export class SampleInstrumentVoiceRuntime {
     releaseTime: number,
     releaseDurationSecond: number,
   ): void {
-    const stopTime = releaseTime + releaseDurationSecond + SOURCE_STOP_SAFETY_SECOND
+    const stopTime =
+      releaseTime + releaseDurationSecond + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
     if (voice.zone.loop.kind !== 'sustain' || releaseDurationSecond === 0) {
       // Web Audio applies the latest stop() call while an earlier scheduled stop has not fired.
       for (const source of voice.sources) source.node.stop(stopTime)
@@ -746,10 +747,10 @@ export class SampleInstrumentVoiceRuntime {
         releaseTime,
         calculateSustainReleaseOffset(zone, voice.playbackRate, startTime, releaseTime),
       )
-      releaseSource.stop(releaseEndTime + SOURCE_STOP_SAFETY_SECOND)
+      releaseSource.stop(releaseEndTime + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond)
       return
     }
-    source.stop(releaseEndTime + SOURCE_STOP_SAFETY_SECOND)
+    source.stop(releaseEndTime + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond)
   }
 
   #createSource(
@@ -870,7 +871,10 @@ export class SampleInstrumentVoiceRuntime {
         releaseTime,
         release,
       )
-      const stopTime = releaseTime + release.durationSecond + SOURCE_STOP_SAFETY_SECOND
+      const stopTime =
+        releaseTime +
+        release.durationSecond +
+        AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
       if (
         mode === 'normal' &&
         voice.zone.loop.kind === 'sustain' &&

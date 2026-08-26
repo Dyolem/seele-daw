@@ -1,11 +1,11 @@
 # Audio Quality Foundation V1A：AQ0 基线与质量契约
 
-> Status: AQ0 reviewed and committed (`40c44a1`); AQ1 evidence added from current working tree for review
+> Status: AQ0 and AQ1 reviewed and committed (`40c44a1`, `1b74d26`); AQ2 evidence added from current working tree for review
 >
 > Date: 2026-08-26
 
-本文冻结 AQ0 的输入、历史行为基线、测量方法和后续验收规则，并追加使用同一输入取得的 AQ1
-证据。术语解释见
+本文冻结 AQ0 的输入、历史行为基线、测量方法和后续验收规则，并追加使用生产 Runtime 取得的
+AQ1 与 AQ2 证据。术语解释见
 [V1A 术语表](./audio-quality-foundation-v1a-glossary.md)，完整阶段边界见
 [V1A 阶段计划](./audio-quality-foundation-v1a-phase-plan.md)。
 
@@ -43,7 +43,7 @@ AQ0 在 2026-08-26 记录以下当时现状；它们是 AQ1–AQ3 的对照，�
 
 AQ1 已有意改变前两项，相关特征测试已同步更新；本表继续保留为历史对照，不能改写成当前行为。
 
-### 2.1 AQ1 当前工作树行为
+### 2.1 AQ1 当前政策
 
 | 领域     | AQ1 政策                                                                                                           |
 | -------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -51,7 +51,21 @@ AQ1 已有意改变前两项，相关特征测试已同步更新；本表继续�
 | Master   | Project `masterGain` 原值写入 Project master GainNode；独立下游节点再应用固定 `-12 dB` 输出校准。                  |
 | 项目事实 | MIDI Velocity、Track Gain、Master Gain、Project File 与 Playback Voice Plan 数值均不迁移、不重写。                 |
 | 动态处理 | 没有隐藏 compressor、soft clipper、limiter 或 true-peak meter。                                                    |
-| 其余领域 | Retrigger、Polyphony、Envelope、Loop、Fast release 与 Voice cleanup 仍保持 AQ0 所记录行为，等待 AQ2/AQ3。          |
+| 其余领域 | Retrigger、Polyphony、Envelope、Loop、Fast release 与 Voice cleanup 在 AQ1 仍保持 AQ0 所记录行为。                 |
+
+### 2.2 AQ2 当前工作树政策
+
+AQ2 没有改写 Manifest 作者给出的 attack、release、loop 或 trigger 值，也没有引入 crossfade。它把
+既有实现数值收进同一个可版本化政策，并用真实浏览器 PCM 冻结兼容行为：
+
+| 领域            | AQ2 政策                                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| Fast release    | cancel、Stop、generation、all-notes-off 与 fast mutex 使用 `6 ms` 线性释放。                         |
+| Source stop     | 释放结束后保留 `1 ms` source stop guard，避免调度边界提前停止。                                      |
+| Shaped Envelope | 非零 curve 使用 `32` 段线性 ramp 近似 Seele Manifest 指数形状；`curve: null` 与 `0` 仍保持原生线性。 |
+| Trigger / Loop  | one-shot、continuous loop、sustain loop 与 directed mutex 的既有产品语义不变。                       |
+| 版本标识        | 完整渲染政策为 `seele.audio-quality-foundation-v1a-aq2`。                                            |
+| 仍待 AQ3 的领域 | Retrigger 保持 occurrence 独立；Polyphony 仍无 Voice cap 或 steal policy。                           |
 
 ## 3. 可提交合成 PCM fixture
 
@@ -95,17 +109,19 @@ http://127.0.0.1:5173/audio-quality-aq0.html
 pnpm --filter @seele-daw/studio dev
 ```
 
-页面不读取 Studio Grand 或 Project，只创建合成 sine AudioBuffer，通过真实
-`SampleInstrumentVoiceRuntime` 在 `OfflineAudioContext` 中渲染固定 Velocity 向量、参考三和弦与
-10 Voice 相干压力输入。报告包含：
+页面不读取 Studio Grand 或 Project，只创建合成 AudioBuffer，通过真实
+`SampleInstrumentVoiceRuntime` 在 `OfflineAudioContext` 中渲染固定 Velocity 向量、参考三和弦、
+10 Voice 相干压力输入以及 AQ2 Envelope/Loop/Trigger 场景。报告包含：
 
 - schema/version、浏览器 user agent、sample rate 与 fixture 参数；
 - 每个 Velocity 的 per-channel peak、RMS、DC offset；
 - steady window 的 combined peak/RMS 与相对 `v127` dB；
 - release 完成后的 tail peak；
 - 每个输入的满刻度帧数量；
+- shaped/short/fast Envelope 相对解析目标曲线的最大绝对误差；
+- continuous/sustain loop 的 seam error、one-shot Note Off 后电平与 fast mutex 接管结果；
 - render 完成和显式 dispose 后的 Runtime 资源统计；
-- 当前完整 render policy 参数与代码级标识 `seele.audio-quality-foundation-v1a-aq1`。
+- 当前完整 render policy 参数与代码级标识 `seele.audio-quality-foundation-v1a-aq2`。
 
 原生 `OfflineAudioContext` 在 `startRendering()` 前报告 `suspended`，而生产 Voice Runtime
 按实时安全边界只接收 `running` Context。AQ0 因此使用最小适配视图：仅在构建和调度 Voice 的
@@ -157,6 +173,29 @@ developer-only harness，不修改生产 Runtime，也不是未来 Offline Backe
 衰减。10 Voice 压力输入只比 `-1 dBFS` 门槛保留约 `0.031 dB`，因此该结果是固定参数下的校准证据，
 不是任意项目或跨浏览器绝不削波的保证。AQ1 的 developer-local soundbank 人工听测仍为 `not-run`。
 
+### 5.3 2026-08-26 Chromium AQ2 报告
+
+同一 Chromium `151.0.0.0`、macOS user agent、48 kHz 入口使用 schema version 3 运行生产 AQ2
+渲染政策。报告的 AQ1 peak/headroom 检查继续通过，并增加以下 AQ2 PCM 结果：
+
+| Envelope 输入 | 最大绝对误差（full scale） | 门禁      |
+| ------------- | -------------------------: | --------- |
+| shaped        |                 `4.861e-5` | `<= 1e-4` |
+| short Note    |                 `4.715e-5` | `<= 1e-4` |
+| fast release  |                 `1.038e-8` | `<= 1e-4` |
+
+| Loop / Trigger 输入 | 实测结果                                                                         |
+| ------------------- | -------------------------------------------------------------------------------- |
+| continuous loop     | 9 个回绕点，最大 seam error `1.197e-5` full scale                                |
+| sustain loop        | 6 个回绕/离环点，最大 seam error `1.197e-5` full scale                           |
+| one-shot            | 普通 Note Off 后测量窗口峰值 `0.088809`，确认素材继续发声                        |
+| fast mutex          | 旧 Voice release 误差 `1.209e-8`；一个 render quantum 后旧声道为 `-342.281 dBFS` |
+
+全部测量值有限；两类 Loop 保持可听信号；mutex 新 Voice 正常接管；所有场景在 render 完成与 dispose
+后的 Voice、source、node 和 listener 统计归零，最终 tail 为数字静音。合成报告能证明 Runtime 没有
+额外制造超阈值接缝，不能证明真实资产的 loop point 天然无缝；developer-local soundbank 的 seam 与
+主观听测仍为 `not-run`。
+
 ## 6. Gate 分类
 
 ### 6.1 AQ0 hard gate
@@ -168,7 +207,7 @@ developer-only harness，不修改生产 Runtime，也不是未来 Offline Backe
 - natural end、cancel、failure 和 dispose 后资源统计能够归零；
 - 生产 build 不包含 AQ0 HTML、合成报告或 developer-local soundbank。
 
-### 6.2 AQ1 与后续 calibrated gate
+### 6.2 AQ1、AQ2 与后续 calibrated gate
 
 AQ1 已冻结并实际运行：
 
@@ -176,10 +215,16 @@ AQ1 已冻结并实际运行：
 - coherent 10 Voice stress 峰值 `<= -1 dBFS`，实测 `-1.031 dBFS`；
 - 所有 AQ1 输入的满刻度帧数量为 0，tail 与 Runtime 资源均归零。
 
-后续批次仍待冻结：
+AQ2 已冻结并实际运行：
 
-- AQ2 非零 attack/release 合成边界误差候选 `<= 1e-4` full scale；
-- AQ2 release 结束加一个 render quantum 后 tail 候选 `< -90 dBFS`；
+- shaped、short Note 与 fast release 的 Envelope 最大绝对误差 `<= 1e-4` full scale；
+- continuous 与 sustain loop 的合成 seam error `<= 1e-4` full scale；
+- one-shot 在普通 Note Off 后继续可听，fast mutex 在释放旧 Voice 后由新 Voice 接管；
+- release 结束加一个 render quantum 后旧 mutex 声道与最终 tail `< -90 dBFS`；
+- 所有 AQ2 场景在 render 和 dispose 后的 Runtime 资源统计归零。
+
+后续 AQ3 仍待冻结：
+
 - AQ3 sounding Voice 和 retirement tail 不超过最终冻结预算；
 - AQ3 相同压力输入保留/steal 相同 Voice Token。
 
@@ -225,7 +270,7 @@ Reviewer decision:
 ## 8. AQ0 明确不做
 
 以下是已完成 AQ0 批次的历史边界；AQ1 只按已批准范围改变了第一项中的 Velocity curve 与
-calibration trim：
+calibration trim，AQ2 只把既有 Envelope/Loop/Trigger 语义版本化并增加真实 PCM 门禁：
 
 - 不实施新 Velocity curve、calibration trim、limiter 或 meter；
 - 不修改 envelope、loop、fast release、retrigger 或 polyphony；

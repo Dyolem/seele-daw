@@ -6,11 +6,14 @@ import {
 } from '#internal/audio-quality/render-policy'
 
 describe('Audio Quality Foundation V1A render policy', () => {
-  it('freezes the approved AQ1 Velocity and output calibration parameters', () => {
+  it('freezes the approved V1A gain, Envelope, and Voice cleanup parameters', () => {
     expect(AUDIO_QUALITY_V1A_RENDER_POLICY).toEqual({
-      id: 'seele.audio-quality-foundation-v1a-aq1',
+      defaultFastReleaseSecond: 0.006,
+      envelopeCurveSegmentCount: 32,
+      id: 'seele.audio-quality-foundation-v1a-aq2',
       outputCalibrationDb: -12,
       outputCalibrationGain: 0.251188643150958,
+      sourceStopSafetySecond: 0.001,
       velocityExponent: 2,
       velocityFloorDb: -36,
       velocityFloorGain: 0.015848931924611134,

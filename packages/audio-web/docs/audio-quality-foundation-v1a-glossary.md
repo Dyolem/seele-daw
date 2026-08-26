@@ -53,13 +53,16 @@
 | 门控触发     | Gated                         | Note Off 会启动 release；音符时长参与声音生命周期。                                                                  |
 | 单次触发     | One-shot                      | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                                          |
 | 声部实例     | Voice                         | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                              |
-| 复音数       | Polyphony                     | 同时存在或同时发声的 Voice 数量。无限增长会造成峰值、CPU 与节点资源风险。                                            |
+| 复音数       | Polyphony                     | 同时存在或同时发声的 Voice 数量。AQ3 的预算按 Runtime 已接纳并拥有的 Voice 图计数，不等同于瞬时声学响度。            |
+| 发声槽       | Sounding Voice Slot           | AQ3 中尚未被复音分配器标记为退场的 Runtime Voice 名额；每个乐器设备 64 个、同一项目 Runtime 128 个。                 |
 | 同音重触发   | Retrigger                     | 同一作用域内相同 pitch 再次 Note On。V1A 保留不同 occurrence 的独立身份，不全局强制 choke。                          |
-| 声部窃取     | Voice Stealing                | Voice 超过预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出资源。                                 |
-| 退场尾音     | Retirement Tail               | 已被 cancel 或 steal、正在快速 release、尚未完成清理的 Voice。它也必须有独立上限。                                   |
+| 声部窃取     | Voice Stealing                | 发声槽达到预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出名额。                                 |
+| 退场尾音     | Retirement Tail               | AQ3 中专指被复音分配器 steal、正在快速 release、尚未完成清理的 Voice；最多 16 个。Stop/Cancel 尾音不混入该计数。     |
+| 复音丢弃     | Polyphony Drop                | 退场尾音预算也已满时，不接纳新 Voice Plan，并返回 `polyphony-dropped`；已有尾音不会被硬切。                          |
+| 溢出诊断     | Overflow Diagnostics          | 累计 steal/drop 次数和当前发声槽/退场尾音数量，用于确认压力行为；当前不是 Project Fact 或 Studio 持久化警告。        |
 | 卡死声部     | Stuck Voice                   | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。               |
 | 互斥组       | Mutex / Exclusive Group       | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                                            |
-| 快速释放     | Fast Release                  | stop、cancel、未来的 steal 或 fast mutex 使用的短 release。AQ2 将既有值正式冻结为 6 ms 线性淡出，避免直接硬切。      |
+| 快速释放     | Fast Release                  | stop、cancel、steal 或 fast mutex 使用的短 release。AQ2 将既有值正式冻结为 6 ms 线性淡出，避免直接硬切。             |
 | 停止保护间隔 | Source Stop Guard             | release 排程结束到真正停止 source 之间的短保护时间。AQ2 固定为 1 ms，防止调度舍入让 source 提前截断包络。            |
 
 ## 3. 采样、Zone 与循环
@@ -108,7 +111,7 @@
 
 | 中文术语     | 英文原词                  | 在 Seele 后续阶段中的含义                                                                   |
 | ------------ | ------------------------- | ------------------------------------------------------------------------------------------- |
-| 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。V1 将保留原始 `0...127`，通常用 `>=64` 判断踏板按下。AQ2 不实现它。 |
+| 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。V1 将保留原始 `0...127`，通常用 `>=64` 判断踏板按下。AQ3 不实现它。 |
 | 踏板保持声部 | Pedal-held Voice          | Note Off 已到达、但因 CC64 按下而不能进入最终 release 的 Voice。                            |
 | 抬踏板       | Pedal Up                  | CC64 从按下变为抬起，触发此前 pedal-held Voice 的 release。                                 |
 | 控制器追赶   | Controller Chase          | 从歌曲中间播放或 seek 时，恢复该位置之前最后生效的 CC 状态。                                |
@@ -121,6 +124,10 @@
 - **力度不等于响度**：Velocity 是 MIDI 输入；曲线、素材、复音和输出设备共同决定听感。
 - **延音循环不等于延音踏板**：前者是单个 Zone 的素材循环规则，后者是 CC64 控制器状态。
 - **release 不等于立刻 stop**：release 期间 Voice 仍发声并占用有限资源。
+- **退场尾音不等于所有快速释放 Voice**：AQ3 的 16 个预算只属于声部窃取分配器；Stop、Cancel、
+  Generation 和 mutex 仍按各自生命周期释放。
+- **复音丢弃不等于项目编辑失败**：它是 Audio Runtime 没有接纳某个发声计划的诊断，不回滚合法
+  Project Commit，也不修改 MIDI Note。
 - **headroom 不等于绝不削波**：固定 trim 只能覆盖已声明的增益和 fixture 范围。
 - **客观指标不等于主观音质**：peak、RMS 和 seam 可以发现错误，但不能决定钢琴是否自然。
 - **开发者本地听测不等于可分发资产**：Studio Grand 仍受既有资产边界约束。

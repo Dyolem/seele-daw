@@ -1,6 +1,6 @@
 # Audio Quality Foundation V1A 阶段计划
 
-> Status: AQ0 and AQ1 reviewed and committed (`40c44a1`, `1b74d26`); AQ2 implemented for review; AQ3–AQ4 not implemented
+> Status: AQ0–AQ2 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`); AQ3 implemented for review; AQ4 not implemented
 >
 > Date: 2026-08-26
 >
@@ -63,13 +63,15 @@ V1A 默认不静默加入 compressor、soft clipper 或 limiter。由于 Track G
 
 - 不同 occurrence 继续拥有独立 Voice Token；相同 pitch 不被全局强制 choke；
 - 每次 Note On 产生新 attack；已经 release 的同音尾部可以成为优先 steal 对象；
-- 首轮校准预算为每个乐器 Runtime 64 个 sounding Voice、全项目 128 个 sounding Voice，以及
-  最多 16 个 retirement tail；
+- 每个 `instrumentDeviceId` 最多拥有 64 个发声槽（sounding Voice slot），同一个项目 Voice Runtime
+  最多拥有 128 个发声槽；
+- 声部窃取分配器（voice-stealing allocator）最多同时保留 16 个退场尾音（retirement tail）；
 - 候选 steal 顺序为 release 状态、较低有效增益、较早起音、稳定 Voice Token；
 - 被 steal 的 Voice 使用 fast release，不直接硬切；溢出必须可观测，不能变成 Project Commit
   失败。
 
-上述数字在 AQ3 压测前是获准使用的校准起点，不是已实现事实。
+上述数字已经通过 AQ3 的 10,000 Note On 压力输入与项目级输入冻结。它们约束 Runtime 已接纳并
+拥有的 Voice 图，不是对任意时间点声学响度或绝不削波的保证。
 
 ## 3. 分批计划
 
@@ -110,7 +112,7 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
   crossfade；
 - `attack = 0` 仍表示立即起音，不偷偷覆盖 Manifest 作者语义。
 
-当前工作树证据：
+已审核证据：
 
 - `6 ms` fast release、`1 ms` source stop guard 与 `32` 段非线性 Envelope 近似已进入同一个
   `seele.audio-quality-foundation-v1a-aq2` 渲染政策；数值与现有声音语义保持兼容；
@@ -122,7 +124,7 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
   后继续发声，fast mutex 旧 Voice 误差为 `1.209e-8` 且新 Voice 正常接管；
 - 所有 AQ2 输入在 render 完成和 dispose 后的 Voice、node 与 listener 统计归零，最终 tail 满足
   `< -90 dBFS`；自动与浏览器门禁为 `passed`，真实 soundbank seam/听感仍为 `not-run`；
-- AQ2 尚未提交，等待本批功能审阅。
+- AQ2 已审核并提交为 `dfa2411`。
 
 ### AQ3：Retrigger、Polyphony 与 Voice Stealing
 
@@ -130,6 +132,23 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
 - 用已批准的 64/128/16 起点压测，再冻结实际预算；
 - 固定 deterministic steal 顺序、fast-release retirement 和 overflow diagnostics；
 - 覆盖密集和弦、快速同音、10,000 事件压力、future schedule、generation 与清理。
+
+当前工作树证据：
+
+- 有界分配器只位于项目级 `SampleInstrumentVoiceRuntime` 的 Sample Voice 所有权内；Playback Voice
+  Plan、Project Fact、Project File 与 History 均未改变；
+- 已冻结每个 `instrumentDeviceId` 64 个、整个 Runtime 128 个发声槽，以及最多 16 个由分配器拥有
+  的退场尾音；Stop、Cancel、Generation 与 mutex 的普通快速释放不被误计为分配器退场尾音；
+- 候选按“已进入 release、较低当前有效增益、较早 start、稳定 Voice Token”排序；相同输入不依赖
+  `Map` 遍历偶然顺序；同 pitch 的不同 occurrence 仍各自 attack，不做全局 choke；
+- 退场尾音预算已满时，新 Voice 返回可观测的 `polyphony-dropped`，保留 Voice 不被硬切；累计 steal、
+  drop、发声槽和退场尾音计数由 Runtime 公开，Studio 仍按既有边界把非 `scheduled` 结果视为未接纳；
+- Chromium 48 kHz 的 10,000 Note On 压力输入精确得到 `64` 个发声 Voice、`16` 个退场尾音和
+  `9,920` 个 drop；项目级 129 Voice 输入精确维持 `128` 个发声 Voice，并 steal `1` 个旧 Voice；
+- 两组退场快速释放的最大 PCM 误差分别为 `6.240e-9` 与 `1.893e-10` full scale；发声电平误差
+  均 `< 1e-5`，无满刻度帧，最终 tail 为数字静音，render 与 dispose 后资源统计归零；
+- 自动与浏览器门禁为 `passed`；developer-local soundbank 的最大复音听测仍为 `not-run`；AQ3 尚未
+  提交，等待本批功能审阅。
 
 ### AQ4：集成与收口
 

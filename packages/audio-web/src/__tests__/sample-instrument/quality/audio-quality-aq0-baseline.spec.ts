@@ -198,7 +198,7 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
     })
   })
 
-  it('records that current same-pitch occurrences have no per-runtime Voice cap', () => {
+  it('characterizes the AQ3 per-Instrument sounding and retirement Voice budgets', () => {
     const { context, runtime } = createRuntime()
     const plans = Array.from({ length: 65 }, (_, index) =>
       createAudioQualityVoicePlan({ occurrenceKey: `uncapped-${index + 1}` }),
@@ -206,6 +206,12 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
 
     for (const plan of plans) expect(runtime.schedule(plan).outcome).toBe('scheduled')
     expect(runtime.statistics.activeVoiceCount).toBe(65)
+    expect(runtime.polyphonyStatistics).toEqual({
+      polyphonyDropCount: 0,
+      retirementVoiceCount: 1,
+      soundingVoiceCount: 64,
+      voiceStealCount: 1,
+    })
 
     runtime.dispose()
     for (const source of context.bufferSources) source.finish()

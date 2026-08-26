@@ -29,7 +29,7 @@ runButton.addEventListener('click', () => {
   void (async () => {
     runButton.disabled = true
     copyButton.disabled = true
-    setStatus('正在离线渲染 Velocity、Envelope、Loop 与触发压力输入…', 'busy')
+    setStatus('正在离线渲染 Velocity、Envelope、Loop 与 10,000 Note On 复音压力输入…', 'busy')
     try {
       const report = await runAudioQualityAq0BrowserBaseline()
       serializedReport = JSON.stringify(report, null, 2)
@@ -37,13 +37,13 @@ runButton.addEventListener('click', () => {
       copyButton.disabled = false
       const hardChecksPass = Object.values(report.checks).every(Boolean)
       setStatus(
-        hardChecksPass ? 'AQ2 浏览器检查通过' : 'AQ2 报告包含未通过检查',
+        hardChecksPass ? 'AQ3 浏览器检查通过' : 'AQ3 报告包含未通过检查',
         hardChecksPass ? 'ready' : 'error',
       )
     } catch (error) {
       serializedReport = null
       output.textContent = describeError(error)
-      setStatus('AQ2 浏览器检查失败', 'error')
+      setStatus('AQ3 浏览器检查失败', 'error')
     } finally {
       runButton.disabled = false
     }
@@ -55,7 +55,7 @@ copyButton.addEventListener('click', () => {
     if (serializedReport === null) return
     try {
       await navigator.clipboard.writeText(`${serializedReport}\n`)
-      setStatus('AQ2 报告 JSON 已复制', 'ready')
+      setStatus('AQ3 报告 JSON 已复制', 'ready')
     } catch (error) {
       setStatus(`复制失败：${describeError(error)}`, 'error')
     }

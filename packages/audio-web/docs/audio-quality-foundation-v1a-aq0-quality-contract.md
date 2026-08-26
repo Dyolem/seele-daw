@@ -1,11 +1,11 @@
 # Audio Quality Foundation V1A：AQ0 基线与质量契约
 
-> Status: AQ0 and AQ1 reviewed and committed (`40c44a1`, `1b74d26`); AQ2 evidence added from current working tree for review
+> Status: AQ0–AQ2 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`); AQ3 evidence added from current working tree for review
 >
 > Date: 2026-08-26
 
 本文冻结 AQ0 的输入、历史行为基线、测量方法和后续验收规则，并追加使用生产 Runtime 取得的
-AQ1 与 AQ2 证据。术语解释见
+AQ1、AQ2 与 AQ3 证据。术语解释见
 [V1A 术语表](./audio-quality-foundation-v1a-glossary.md)，完整阶段边界见
 [V1A 阶段计划](./audio-quality-foundation-v1a-phase-plan.md)。
 
@@ -53,7 +53,7 @@ AQ1 已有意改变前两项，相关特征测试已同步更新；本表继续�
 | 动态处理 | 没有隐藏 compressor、soft clipper、limiter 或 true-peak meter。                                                    |
 | 其余领域 | Retrigger、Polyphony、Envelope、Loop、Fast release 与 Voice cleanup 在 AQ1 仍保持 AQ0 所记录行为。                 |
 
-### 2.2 AQ2 当前工作树政策
+### 2.2 AQ2 已提交政策
 
 AQ2 没有改写 Manifest 作者给出的 attack、release、loop 或 trigger 值，也没有引入 crossfade。它把
 既有实现数值收进同一个可版本化政策，并用真实浏览器 PCM 冻结兼容行为：
@@ -66,6 +66,26 @@ AQ2 没有改写 Manifest 作者给出的 attack、release、loop 或 trigger �
 | Trigger / Loop  | one-shot、continuous loop、sustain loop 与 directed mutex 的既有产品语义不变。                       |
 | 版本标识        | 完整渲染政策为 `seele.audio-quality-foundation-v1a-aq2`。                                            |
 | 仍待 AQ3 的领域 | Retrigger 保持 occurrence 独立；Polyphony 仍无 Voice cap 或 steal policy。                           |
+
+### 2.3 AQ3 当前工作树政策
+
+AQ3 不改变发声计划（Voice Plan）或项目数据，只在项目级 Sample Voice Runtime 内限制已经接纳的
+Web Audio Voice 图数量：
+
+| 领域               | AQ3 政策                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| 乐器发声槽预算     | 每个 `instrumentDeviceId` 最多 `64` 个非分配器退场 Voice。                                               |
+| Runtime 发声槽预算 | 同一个项目 `SampleInstrumentVoiceRuntime` 最多 `128` 个非分配器退场 Voice。                              |
+| 分配器退场尾音预算 | 最多 `16` 个因声部窃取而执行 `6 ms` 快速释放、尚未清理的 Voice；普通 Stop/Cancel 尾音不混入该计数。      |
+| 确定性候选顺序     | 已进入 release 优先，其次当前有效增益较低、start 较早、稳定 Voice Token 较小。                           |
+| 同音重触发         | 不同 occurrence 继续产生独立 Voice 和 attack；相同 pitch 不会被全局强制 choke。                          |
+| 退场预算已满       | 新计划返回 `polyphony-dropped`；不创建新 AudioNode、不硬切已有退场尾音，也不使合法 Project Commit 失败。 |
+| 可观测计数         | Runtime 公开累计 steal/drop 与当前发声槽/分配器退场尾音数量；目前没有新增 Studio 用户提示或持久化诊断。  |
+| 版本标识           | 完整渲染政策为 `seele.audio-quality-foundation-v1a-aq3`。                                                |
+| 尚未包含           | CC64、pedal-held Voice、Velocity Layer、release sample、共鸣、limiter 与未来 WAV Offline Backend。       |
+
+这里的“发声槽”指 Runtime 已接纳并仍拥有、且没有被复音分配器标记为退场的 Voice。它包括提前调度的
+Voice 图，因此是确定的资源所有权预算，不声称等于某一采样帧上实际非零的声学 Voice 数量。
 
 ## 3. 可提交合成 PCM fixture
 
@@ -111,7 +131,8 @@ pnpm --filter @seele-daw/studio dev
 
 页面不读取 Studio Grand 或 Project，只创建合成 AudioBuffer，通过真实
 `SampleInstrumentVoiceRuntime` 在 `OfflineAudioContext` 中渲染固定 Velocity 向量、参考三和弦、
-10 Voice 相干压力输入以及 AQ2 Envelope/Loop/Trigger 场景。报告包含：
+10 Voice 相干压力输入、AQ2 Envelope/Loop/Trigger 场景，以及 AQ3 的 10,000 Note On 与项目级
+复音预算场景。报告包含：
 
 - schema/version、浏览器 user agent、sample rate 与 fixture 参数；
 - 每个 Velocity 的 per-channel peak、RMS、DC offset；
@@ -120,8 +141,10 @@ pnpm --filter @seele-daw/studio dev
 - 每个输入的满刻度帧数量；
 - shaped/short/fast Envelope 相对解析目标曲线的最大绝对误差；
 - continuous/sustain loop 的 seam error、one-shot Note Off 后电平与 fast mutex 接管结果；
+- AQ3 的 scheduled/drop 数量、发声槽/退场尾音预算、steal/drop 累计计数、退场快速释放 PCM
+  误差与保留 Voice 电平误差；
 - render 完成和显式 dispose 后的 Runtime 资源统计；
-- 当前完整 render policy 参数与代码级标识 `seele.audio-quality-foundation-v1a-aq2`。
+- 当前完整 render policy 参数与代码级标识 `seele.audio-quality-foundation-v1a-aq3`。
 
 原生 `OfflineAudioContext` 在 `startRendering()` 前报告 `suspended`，而生产 Voice Runtime
 按实时安全边界只接收 `running` Context。AQ0 因此使用最小适配视图：仅在构建和调度 Voice 的
@@ -196,6 +219,32 @@ developer-only harness，不修改生产 Runtime，也不是未来 Offline Backe
 额外制造超阈值接缝，不能证明真实资产的 loop point 天然无缝；developer-local soundbank 的 seam 与
 主观听测仍为 `not-run`。
 
+### 5.4 2026-08-26 Chromium AQ3 报告
+
+同一 Chromium `151.0.0.0`、macOS user agent、48 kHz 入口使用 schema version 4 运行生产 AQ3
+渲染政策。原有 AQ1 peak/headroom 与 AQ2 Envelope/Loop 的所有检查继续通过，AQ3 新增结果如下：
+
+| 压力输入                 |   Plan | Scheduled |  Drop | 发声槽 | 退场尾音 | Steal | 满刻度帧 |
+| ------------------------ | -----: | --------: | ----: | -----: | -------: | ----: | -------: |
+| 单乐器 10,000 Note On    | 10,000 |        80 | 9,920 |     64 |       16 |    16 |        0 |
+| 三乐器项目级第 129 Voice |    129 |       129 |     0 |    128 |        1 |     1 |        0 |
+
+10,000 Note On 输入中，前 64 个 Voice 占用乐器发声槽，接下来的 16 个新 Voice 各自确定性选择一个
+旧 Voice 执行快速释放；分配器退场尾音达到 16 后，其余 9,920 个计划返回 `polyphony-dropped`。
+项目级输入由两个各 64 Voice 的乐器先占满 128 个 Runtime 发声槽，第 129 个不同乐器 Voice 确定性
+steal 最早的稳定候选，没有触发 drop。
+
+| PCM 指标                    | 单乐器 10,000 输入 | 项目级 129 输入 | 门禁      |
+| --------------------------- | -----------------: | --------------: | --------- |
+| 退场快速释放最大绝对误差    |         `6.240e-9` |     `1.893e-10` | `<= 1e-5` |
+| 保留 Voice 电平最大绝对误差 |         `4.526e-8` |      `1.203e-7` | `<= 1e-5` |
+| 退场声道尾部                |    `-346.157 dBFS` | `-340.137 dBFS` | `< -90`   |
+| 最终 tail                   |           数字静音 |        数字静音 | `< -90`   |
+
+两组场景的 Voice、source、node 与 listener 在 render 和 dispose 后均归零；累计 steal/drop 计数保留
+用于诊断，当前占用计数归零。该合成门禁证明预算、选择结果和快速释放 PCM 可重复，不替代真实
+Soundbank 在最大复音下的主观听测；该 listening gate 仍为 `not-run`。
+
 ## 6. Gate 分类
 
 ### 6.1 AQ0 hard gate
@@ -207,7 +256,7 @@ developer-only harness，不修改生产 Runtime，也不是未来 Offline Backe
 - natural end、cancel、failure 和 dispose 后资源统计能够归零；
 - 生产 build 不包含 AQ0 HTML、合成报告或 developer-local soundbank。
 
-### 6.2 AQ1、AQ2 与后续 calibrated gate
+### 6.2 AQ1–AQ3 calibrated gate
 
 AQ1 已冻结并实际运行：
 
@@ -223,10 +272,13 @@ AQ2 已冻结并实际运行：
 - release 结束加一个 render quantum 后旧 mutex 声道与最终 tail `< -90 dBFS`；
 - 所有 AQ2 场景在 render 和 dispose 后的 Runtime 资源统计归零。
 
-后续 AQ3 仍待冻结：
+AQ3 已冻结并实际运行：
 
-- AQ3 sounding Voice 和 retirement tail 不超过最终冻结预算；
-- AQ3 相同压力输入保留/steal 相同 Voice Token。
+- 每个 `instrumentDeviceId` 最多 64 个发声槽，同一项目 Runtime 最多 128 个发声槽；
+- 复音分配器最多保留 16 个退场尾音；达到上限后的新计划明确返回 `polyphony-dropped`；
+- 相同压力输入按 release、当前有效增益、start 与稳定 Voice Token 选择同一个 steal 候选；
+- 退场快速释放和保留 Voice 电平最大绝对误差均 `<= 1e-5` full scale；
+- 所有 AQ3 合成压力场景无满刻度帧，最终 tail `< -90 dBFS`，Runtime 资源归零。
 
 没有 limiter 时，这些 peak 阈值只适用于约定 fixture 和默认 gain，不外推为任意项目绝不削波。
 
@@ -270,7 +322,8 @@ Reviewer decision:
 ## 8. AQ0 明确不做
 
 以下是已完成 AQ0 批次的历史边界；AQ1 只按已批准范围改变了第一项中的 Velocity curve 与
-calibration trim，AQ2 只把既有 Envelope/Loop/Trigger 语义版本化并增加真实 PCM 门禁：
+calibration trim，AQ2 只把既有 Envelope/Loop/Trigger 语义版本化并增加真实 PCM 门禁，AQ3 只在
+Sample Voice Runtime 内加入有界复音分配与诊断：
 
 - 不实施新 Velocity curve、calibration trim、limiter 或 meter；
 - 不修改 envelope、loop、fast release、retrigger 或 polyphony；

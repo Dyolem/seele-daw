@@ -20,6 +20,7 @@ import {
   evaluateSampleInstrumentEnvelopeTransition,
   scheduleSampleInstrumentEnvelopeTransition,
 } from '#internal/sample-instrument/voice/envelope'
+import { selectSampleInstrumentVoiceStealCandidate } from '#internal/sample-instrument/voice/polyphony-policy'
 
 type EngineGeneration = ScheduledSampleVoicePlan['engineGeneration']
 type NoteOccurrenceKey = ScheduledSampleVoicePlan['occurrenceKey']
@@ -29,7 +30,11 @@ export interface SampleInstrumentVoiceToken {
   readonly occurrenceKey: NoteOccurrenceKey
 }
 
-export type SampleInstrumentVoiceScheduleOutcome = 'expired' | 'scheduled' | 'stale-generation'
+export type SampleInstrumentVoiceScheduleOutcome =
+  | 'expired'
+  | 'polyphony-dropped'
+  | 'scheduled'
+  | 'stale-generation'
 
 export interface SampleInstrumentVoiceScheduleResult {
   readonly outcome: SampleInstrumentVoiceScheduleOutcome
@@ -56,6 +61,13 @@ export interface SampleInstrumentVoiceRuntimeStatistics {
   readonly connectedNodeCount: number
   readonly endedListenerCount: number
   readonly sourceNodeCount: number
+}
+
+export interface SampleInstrumentVoicePolyphonyStatistics {
+  readonly polyphonyDropCount: number
+  readonly retirementVoiceCount: number
+  readonly soundingVoiceCount: number
+  readonly voiceStealCount: number
 }
 
 export interface SampleInstrumentVoiceRuntimeOptions {
@@ -113,8 +125,16 @@ interface ActiveSampleVoice {
   readonly startTime: number
   readonly token: SampleInstrumentVoiceToken
   readonly zone: SampleInstrumentZoneV1
-  forcedReleaseStartTime: number | null
+  forcedRelease: ActiveSampleVoiceForcedRelease | null
+  polyphonyRetired: boolean
   releasePlaybackClockSecond: number
+}
+
+interface ActiveSampleVoiceForcedRelease {
+  readonly mode: 'fast' | 'normal'
+  readonly segment: SampleInstrumentEnvelopeSegmentV1
+  readonly startGain: number
+  readonly startTime: number
 }
 
 interface ActiveSampleSource {
@@ -122,6 +142,11 @@ interface ActiveSampleSource {
   readonly kind: 'primary' | 'release'
   readonly node: AudioBufferSourceNode
 }
+
+type SampleInstrumentVoicePolyphonyAdmission =
+  | { readonly kind: 'admit' }
+  | { readonly kind: 'drop' }
+  | { readonly kind: 'steal'; readonly voice: ActiveSampleVoice }
 
 function fail(
   code: SampleInstrumentVoiceRuntimeErrorCode,
@@ -316,6 +341,32 @@ function calculatePlannedGainAtTimeBeforeRelease(voice: ActiveSampleVoice, time:
   )
 }
 
+function calculateEffectiveGainAtTime(voice: ActiveSampleVoice, time: number): number {
+  const forcedRelease = voice.forcedRelease
+  if (forcedRelease === null || time < forcedRelease.startTime) {
+    return calculatePlannedGainAtTime(voice, time)
+  }
+  if (forcedRelease.segment.durationSecond === 0) return 0
+  return evaluateSampleInstrumentEnvelopeTransition(
+    forcedRelease.startGain,
+    0,
+    Math.min(1, (time - forcedRelease.startTime) / forcedRelease.segment.durationSecond),
+    forcedRelease.segment.curve,
+  )
+}
+
+function hasReleaseStartedAtTime(voice: ActiveSampleVoice, time: number): boolean {
+  return (
+    (voice.forcedRelease !== null && voice.forcedRelease.startTime <= time) ||
+    (voice.zone.triggerMode === 'gated' && voice.releasePlaybackClockSecond <= time)
+  )
+}
+
+function calculatePolyphonyPriorityGain(voice: ActiveSampleVoice, time: number): number {
+  // A Voice exactly on its Note On boundary is ranked by intended level, not the zero attack origin.
+  return time <= voice.startTime ? voice.baseGain : calculateEffectiveGainAtTime(voice, time)
+}
+
 /**
  * Bridges the external playback pipeline into disposable Web Audio voices.
  *
@@ -332,6 +383,8 @@ export class SampleInstrumentVoiceRuntime {
   readonly #voices = new Map<string, ActiveSampleVoice>()
   #activeGeneration: EngineGeneration | null = null
   #disposed = false
+  #polyphonyDropCount = 0
+  #voiceStealCount = 0
 
   constructor(options: SampleInstrumentVoiceRuntimeOptions) {
     const fastReleaseSecond =
@@ -357,6 +410,19 @@ export class SampleInstrumentVoiceRuntime {
       connectedNodeCount: sourceNodeCount + this.#voices.size * 2,
       endedListenerCount: sourceNodeCount,
       sourceNodeCount,
+    })
+  }
+
+  get polyphonyStatistics(): SampleInstrumentVoicePolyphonyStatistics {
+    let retirementVoiceCount = 0
+    for (const voice of this.#voices.values()) {
+      if (voice.polyphonyRetired) retirementVoiceCount += 1
+    }
+    return Object.freeze({
+      polyphonyDropCount: this.#polyphonyDropCount,
+      retirementVoiceCount,
+      soundingVoiceCount: this.#voices.size - retirementVoiceCount,
+      voiceStealCount: this.#voiceStealCount,
     })
   }
 
@@ -447,16 +513,27 @@ export class SampleInstrumentVoiceRuntime {
     const startTime = Math.max(plan.startPlaybackClockSecond, context.currentTime)
     const playbackRate = calculatePlaybackRate(zone, plan.pitch)
     const baseGain = calculateAudioQualityV1aVelocityGain(plan.velocity) * plan.trackGain
+    const polyphonyAdmission = this.#planPolyphonyAdmission(plan, startTime)
+    if (polyphonyAdmission.kind === 'drop') {
+      this.#polyphonyDropCount += 1
+      return Object.freeze({
+        outcome: 'polyphony-dropped',
+        playbackRate: null,
+        token: null,
+        zoneId: null,
+      })
+    }
     const { gain, output } = this.#createVoiceGainAndOutput(context, plan, startTime)
     const voice: ActiveSampleVoice = {
       audioBuffer: resource.audioBuffer,
       baseGain,
-      forcedReleaseStartTime: null,
+      forcedRelease: null,
       gain,
       key,
       output,
       plan,
       playbackRate,
+      polyphonyRetired: false,
       releasePlaybackClockSecond: plan.releasePlaybackClockSecond,
       sources: new Set<ActiveSampleSource>(),
       startTime,
@@ -479,6 +556,9 @@ export class SampleInstrumentVoiceRuntime {
       )
     }
     try {
+      if (polyphonyAdmission.kind === 'steal') {
+        this.#retireVoiceForPolyphony(polyphonyAdmission.voice, startTime)
+      }
       this.#chokeVoicesFor(voice)
     } catch (error) {
       this.#stopAndDisconnectVoice(voice)
@@ -536,10 +616,7 @@ export class SampleInstrumentVoiceRuntime {
     }
 
     const context = requireRunningContext(this.#output)
-    if (
-      voice.forcedReleaseStartTime !== null ||
-      context.currentTime >= voice.releasePlaybackClockSecond
-    ) {
+    if (voice.forcedRelease !== null || context.currentTime >= voice.releasePlaybackClockSecond) {
       return Object.freeze({
         outcome: 'release-started',
         releasePlaybackClockSecond: voice.releasePlaybackClockSecond,
@@ -825,6 +902,54 @@ export class SampleInstrumentVoiceRuntime {
     }
   }
 
+  #planPolyphonyAdmission(
+    plan: ScheduledSampleVoicePlan,
+    startTime: number,
+  ): SampleInstrumentVoicePolyphonyAdmission {
+    const soundingVoices = [...this.#voices.values()].filter((voice) => !voice.polyphonyRetired)
+    const instrumentSoundingVoiceCount = soundingVoices.reduce(
+      (count, voice) => count + Number(voice.plan.instrumentDeviceId === plan.instrumentDeviceId),
+      0,
+    )
+    const instrumentLimitReached =
+      instrumentSoundingVoiceCount >=
+      AUDIO_QUALITY_V1A_RENDER_POLICY.maximumInstrumentSoundingVoiceCount
+    const runtimeLimitReached =
+      soundingVoices.length >= AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRuntimeSoundingVoiceCount
+    if (!instrumentLimitReached && !runtimeLimitReached) return Object.freeze({ kind: 'admit' })
+
+    const retirementVoiceCount = this.#voices.size - soundingVoices.length
+    if (retirementVoiceCount >= AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRetirementVoiceCount) {
+      return Object.freeze({ kind: 'drop' })
+    }
+    const eligibleVoices = instrumentLimitReached
+      ? soundingVoices.filter((voice) => voice.plan.instrumentDeviceId === plan.instrumentDeviceId)
+      : soundingVoices
+    const selectedVoice = selectSampleInstrumentVoiceStealCandidate(
+      eligibleVoices.map((voice) =>
+        Object.freeze({
+          effectiveGain: calculatePolyphonyPriorityGain(voice, startTime),
+          releaseStarted: hasReleaseStartedAtTime(voice, startTime),
+          stableToken: voice.key,
+          startTime: voice.startTime,
+          value: voice,
+        }),
+      ),
+    )
+    return selectedVoice === null
+      ? Object.freeze({ kind: 'drop' })
+      : Object.freeze({ kind: 'steal', voice: selectedVoice })
+  }
+
+  #retireVoiceForPolyphony(voice: ActiveSampleVoice, releaseTime: number): void {
+    if (voice.polyphonyRetired) return
+    this.#releaseVoice(voice, releaseTime, 'fast')
+    // A retired Voice stays owned until its fast-release source ends; it no longer consumes a
+    // sounding slot, and the independent tail limit prevents unbounded overlap.
+    voice.polyphonyRetired = true
+    this.#voiceStealCount += 1
+  }
+
   #chokeVoicesFor(newVoice: ActiveSampleVoice): void {
     const groupId = newVoice.zone.exclusiveGroup?.groupId
     if (groupId === undefined) return
@@ -855,13 +980,23 @@ export class SampleInstrumentVoiceRuntime {
       return true
     }
     const releaseTime = Math.max(requestedTime, context.currentTime)
-    if (voice.forcedReleaseStartTime !== null && releaseTime >= voice.forcedReleaseStartTime) {
+    const normalRelease = voice.zone.amplitudeEnvelope.release
+    let releaseMode: ActiveSampleVoiceForcedRelease['mode'] = 'fast'
+    let release = this.#fastRelease
+    if (mode === 'normal' && normalRelease !== null) {
+      releaseMode = 'normal'
+      release = normalRelease
+    }
+    const previousForcedRelease = voice.forcedRelease
+    if (
+      previousForcedRelease !== null &&
+      releaseTime >= previousForcedRelease.startTime &&
+      !(releaseMode === 'fast' && previousForcedRelease.mode === 'normal')
+    ) {
       return false
     }
 
-    const startGain = calculatePlannedGainAtTime(voice, releaseTime)
-    const normalRelease = voice.zone.amplitudeEnvelope.release
-    const release = mode === 'normal' && normalRelease !== null ? normalRelease : this.#fastRelease
+    const startGain = calculateEffectiveGainAtTime(voice, releaseTime)
     try {
       voice.gain.gain.cancelAndHoldAtTime(releaseTime)
       scheduleSampleInstrumentEnvelopeTransition(
@@ -876,7 +1011,7 @@ export class SampleInstrumentVoiceRuntime {
         release.durationSecond +
         AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
       if (
-        mode === 'normal' &&
+        releaseMode === 'normal' &&
         voice.zone.loop.kind === 'sustain' &&
         release.durationSecond > 0 &&
         releaseTime >= voice.startTime &&
@@ -913,7 +1048,12 @@ export class SampleInstrumentVoiceRuntime {
         voice.plan.soundbankId,
       )
     }
-    voice.forcedReleaseStartTime = releaseTime
+    voice.forcedRelease = Object.freeze({
+      mode: releaseMode,
+      segment: release,
+      startGain,
+      startTime: releaseTime,
+    })
     return true
   }
 

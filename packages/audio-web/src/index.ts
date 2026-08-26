@@ -21,6 +21,7 @@ export { SampleInstrumentVoiceRuntime } from './sample-instrument/voice/voice-ru
 export type {
   SampleInstrumentVoiceReleaseUpdateOutcome,
   SampleInstrumentVoiceReleaseUpdateResult,
+  SampleInstrumentVoicePolyphonyStatistics,
   SampleInstrumentVoiceRuntimeStatistics,
   SampleInstrumentVoiceScheduleOutcome,
   SampleInstrumentVoiceScheduleResult,

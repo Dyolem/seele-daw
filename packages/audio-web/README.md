@@ -22,9 +22,10 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 方案仍必须先解决替代资产或再分发权限。
 
 后续音质加固已经进入
-[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。AQ0
-基线及 AQ1 Velocity/输出校准已审核并提交；AQ2 的 Envelope/Loop/Trigger 政策与真实浏览器 PCM
-门禁已在当前工作树实现并通过，正在等待功能审阅。相关行业词汇见
+[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。AQ0–AQ2
+基线、Velocity/输出校准与 Envelope/Loop/Trigger 政策已审核并提交；AQ3 的有界复音、确定性
+Voice Stealing、溢出诊断与真实浏览器 10,000 Note On 门禁已在当前工作树实现并通过，正在等待
+功能审阅。相关行业词汇见
 [V1A 术语表](./docs/audio-quality-foundation-v1a-glossary.md)。
 
 本地资产的来源链、指纹和分发边界见
@@ -62,13 +63,17 @@ Batch 4B.2 在同一包内增加执行边界：
 - `curve: null` 与 `0` 使用 linear amplitude。非零 shape 用 Seele V1 的归一化指数形状并以分段
   `linearRampToValueAtTime` 排程，shape 在运行时钳制到 `[-10, 10]` 以保持数值稳定；该函数是
   Seele Manifest 执行定义，不声称复刻任一来源私有播放器；
-- 当前 V1A AQ2 渲染政策保留带 `-36 dB` 低电平下限的平方 Velocity 响应，再乘 Track Gain；Project Master
+- 当前 V1A AQ3 渲染政策保留带 `-36 dB` 低电平下限的平方 Velocity 响应，再乘 Track Gain；Project Master
   保持原始项目值，随后由独立节点应用 `-12 dB` 固定输出校准。系统没有隐藏 limiter，阈值保证只
   适用于已声明 fixture 与默认增益。Pan 使用 `StereoPannerNode`；缺少 StereoPanner 时只允许中心
   声像降级为 Gain pass-through，非中心 Pan 明确失败；
 - 普通 gated Note Off 使用 Zone release；one-shot 忽略普通 Span End 并自然结束；cancel、Stop、
   generation 切换和 `allNotesOff` 使用 `6 ms` linear fast release，结束后保留 `1 ms` source stop
   guard；非零 Envelope curve 使用固定 `32` 段线性 ramp 近似。这些 AQ2 参数由同一版本化政策拥有；
+- 每个 `instrumentDeviceId` 最多拥有 64 个发声槽，同一项目 Voice Runtime 最多 128 个；超过预算
+  时按 release、当前有效增益、起音时间与稳定 Voice Token 确定性选择旧 Voice，并用同一 `6 ms`
+  fast release 退场；分配器最多保留 16 个退场尾音，达到上限后的新计划返回可观测的
+  `polyphony-dropped`，不硬切已有尾音；
 - continuous loop 在 release 阶段继续循环；sustain loop 在 Note Off 停止循环，并从当时 source
   位置启动无 loop tail；无 loop Sample 若早于 Note 结束则自然耗尽，不猜测循环点；
 - Voice Token 是 `(engineGeneration, occurrenceKey)`；旧 generation 计划丢弃，同一代重复 token

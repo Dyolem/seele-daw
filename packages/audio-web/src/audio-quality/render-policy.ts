@@ -1,7 +1,10 @@
 export const AUDIO_QUALITY_V1A_RENDER_POLICY = Object.freeze({
   defaultFastReleaseSecond: 0.006,
   envelopeCurveSegmentCount: 32,
-  id: 'seele.audio-quality-foundation-v1a-aq2',
+  id: 'seele.audio-quality-foundation-v1a-aq3',
+  maximumInstrumentSoundingVoiceCount: 64,
+  maximumRetirementVoiceCount: 16,
+  maximumRuntimeSoundingVoiceCount: 128,
   outputCalibrationDb: -12,
   outputCalibrationGain: 10 ** (-12 / 20),
   sourceStopSafetySecond: 0.001,

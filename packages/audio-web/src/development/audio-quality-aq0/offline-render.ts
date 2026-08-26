@@ -11,6 +11,8 @@ import {
 } from '#internal/development/audio-quality-aq0/fixture'
 import {
   SampleInstrumentVoiceRuntime,
+  type SampleInstrumentVoicePolyphonyStatistics,
+  type SampleInstrumentVoiceScheduleOutcome,
   type SampleInstrumentVoiceScheduleResult,
   type SampleInstrumentVoiceRuntimeStatistics,
 } from '#internal/sample-instrument/voice/voice-runtime'
@@ -18,11 +20,16 @@ import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instru
 
 export interface AudioQualityOfflineRenderResult {
   readonly channels: readonly Float32Array[]
+  readonly polyphonyStatisticsAfterDispose: SampleInstrumentVoicePolyphonyStatistics
+  readonly polyphonyStatisticsAfterRender: SampleInstrumentVoicePolyphonyStatistics
+  readonly polyphonyStatisticsAfterSchedule: SampleInstrumentVoicePolyphonyStatistics
   readonly runtimeStatisticsAfterDispose: SampleInstrumentVoiceRuntimeStatistics
   readonly runtimeStatisticsAfterRender: SampleInstrumentVoiceRuntimeStatistics
+  readonly scheduleResults: readonly SampleInstrumentVoiceScheduleResult[]
 }
 
 export interface AudioQualityOfflineRenderOptions {
+  readonly acceptedScheduleOutcomes?: readonly SampleInstrumentVoiceScheduleOutcome[]
   readonly createPreparedResources: (
     context: OfflineAudioContext,
   ) => PreparedAudibleMidiSampleResources
@@ -117,25 +124,33 @@ export async function renderAudioQualityPlans(
   try {
     runtime.advanceGeneration(1 as ScheduledSampleVoicePlan['engineGeneration'])
     const results: SampleInstrumentVoiceScheduleResult[] = []
+    const acceptedScheduleOutcomes = options.acceptedScheduleOutcomes ?? ['scheduled']
     for (const plan of plans) {
       const result = runtime.schedule(plan)
-      if (result.outcome !== 'scheduled') {
+      if (!acceptedScheduleOutcomes.includes(result.outcome)) {
         throw new TypeError(`Audio Quality Voice was not scheduled: ${result.outcome}`)
       }
       results.push(result)
     }
-    options.onScheduled?.(runtime, Object.freeze(results))
+    const scheduleResults = Object.freeze(results)
+    options.onScheduled?.(runtime, scheduleResults)
+    const polyphonyStatisticsAfterSchedule = runtime.polyphonyStatistics
 
     const renderRequest = context.startRendering()
     contextAdapter.finishScheduling()
     const rendered = await renderRequest
     await Promise.resolve()
+    const polyphonyStatisticsAfterRender = runtime.polyphonyStatistics
     const runtimeStatisticsAfterRender = runtime.statistics
     runtime.dispose()
     return Object.freeze({
       channels: collectChannels(rendered),
+      polyphonyStatisticsAfterDispose: runtime.polyphonyStatistics,
+      polyphonyStatisticsAfterRender,
+      polyphonyStatisticsAfterSchedule,
       runtimeStatisticsAfterDispose: runtime.statistics,
       runtimeStatisticsAfterRender,
+      scheduleResults,
     })
   } catch (error) {
     contextAdapter.finishScheduling()

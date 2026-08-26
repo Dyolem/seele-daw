@@ -7,6 +7,10 @@ import {
   type AudioQualityAq2BrowserReport,
 } from '#internal/development/audio-quality-aq0/aq2-browser-report'
 import {
+  runAudioQualityAq3BrowserReport,
+  type AudioQualityAq3BrowserReport,
+} from '#internal/development/audio-quality-aq0/aq3-browser-report'
+import {
   AUDIO_QUALITY_AQ0_NOTE_RELEASE_SECOND,
   AUDIO_QUALITY_AQ0_NOTE_START_SECOND,
   AUDIO_QUALITY_AQ0_RENDER_DURATION_SECOND,
@@ -65,6 +69,7 @@ export interface AudioQualityAq0PolyphonyMeasurement extends AudioQualityAq0Rend
 
 export interface AudioQualityAq0BrowserReport {
   readonly aq2: AudioQualityAq2BrowserReport
+  readonly aq3: AudioQualityAq3BrowserReport
   readonly checks: {
     readonly allMeasurementsFinite: boolean
     readonly aq2AllMeasurementsFinite: boolean
@@ -77,6 +82,16 @@ export interface AudioQualityAq0BrowserReport {
     readonly aq2ResourcesReleasedAfterDispose: boolean
     readonly aq2ResourcesReleasedAfterRender: boolean
     readonly aq2TailsBelowMinus90Dbfs: boolean
+    readonly aq3AllMeasurementsFinite: boolean
+    readonly aq3NoClippedFrames: boolean
+    readonly aq3ProjectRuntimeBudgetExact: boolean
+    readonly aq3ResourcesReleasedAfterDispose: boolean
+    readonly aq3ResourcesReleasedAfterRender: boolean
+    readonly aq3RetirementFastReleaseAtOrBelowTolerance: boolean
+    readonly aq3RetirementTailsBelowMinus90Dbfs: boolean
+    readonly aq3SoundingLevelsAtOrBelowTolerance: boolean
+    readonly aq3StressBudgetExact: boolean
+    readonly aq3TailsBelowMinus90Dbfs: boolean
     readonly noClippedFrames: boolean
     readonly referencePeakAtOrBelowMinus3Dbfs: boolean
     readonly resourcesReleasedAfterDispose: boolean
@@ -104,7 +119,7 @@ export interface AudioQualityAq0BrowserReport {
   readonly polyphonyMeasurements: readonly AudioQualityAq0PolyphonyMeasurement[]
   readonly renderPolicy: typeof AUDIO_QUALITY_V1A_RENDER_POLICY.id
   readonly schema: typeof AUDIO_QUALITY_AQ0_REPORT_SCHEMA
-  readonly schemaVersion: 3
+  readonly schemaVersion: 4
   readonly velocityMeasurements: readonly AudioQualityAq0VelocityMeasurement[]
 }
 
@@ -251,10 +266,14 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
   )
   const polyphonyMeasurements = Object.freeze([referenceTriad, coherentStress])
   const allMeasurements = [...velocityMeasurements, ...polyphonyMeasurements]
-  const aq2 = await runAudioQualityAq2BrowserReport()
+  const [aq2, aq3] = await Promise.all([
+    runAudioQualityAq2BrowserReport(),
+    runAudioQualityAq3BrowserReport(),
+  ])
 
   return Object.freeze({
     aq2,
+    aq3,
     checks: Object.freeze({
       allMeasurementsFinite: collectFiniteMeasurementValues(
         velocityMeasurements,
@@ -270,6 +289,17 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
       aq2ResourcesReleasedAfterDispose: aq2.checks.resourcesReleasedAfterDispose,
       aq2ResourcesReleasedAfterRender: aq2.checks.resourcesReleasedAfterRender,
       aq2TailsBelowMinus90Dbfs: aq2.checks.tailsBelowMinus90Dbfs,
+      aq3AllMeasurementsFinite: aq3.checks.allMeasurementsFinite,
+      aq3NoClippedFrames: aq3.checks.noClippedFrames,
+      aq3ProjectRuntimeBudgetExact: aq3.checks.projectRuntimeBudgetExact,
+      aq3ResourcesReleasedAfterDispose: aq3.checks.resourcesReleasedAfterDispose,
+      aq3ResourcesReleasedAfterRender: aq3.checks.resourcesReleasedAfterRender,
+      aq3RetirementFastReleaseAtOrBelowTolerance:
+        aq3.checks.retirementFastReleaseAtOrBelowTolerance,
+      aq3RetirementTailsBelowMinus90Dbfs: aq3.checks.retirementTailsBelowMinus90Dbfs,
+      aq3SoundingLevelsAtOrBelowTolerance: aq3.checks.soundingLevelsAtOrBelowTolerance,
+      aq3StressBudgetExact: aq3.checks.stressBudgetExact,
+      aq3TailsBelowMinus90Dbfs: aq3.checks.tailsBelowMinus90Dbfs,
       noClippedFrames: allMeasurements.every((measurement) => measurement.clippedFrameCount === 0),
       referencePeakAtOrBelowMinus3Dbfs:
         referenceTriad.peakDbfs !== null && referenceTriad.peakDbfs <= -3,
@@ -305,7 +335,7 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
     polyphonyMeasurements,
     renderPolicy: AUDIO_QUALITY_V1A_RENDER_POLICY.id,
     schema: AUDIO_QUALITY_AQ0_REPORT_SCHEMA,
-    schemaVersion: 3,
+    schemaVersion: 4,
     velocityMeasurements,
   })
 }

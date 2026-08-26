@@ -138,11 +138,19 @@ function createPreparedResources(
 
 type VoicePlanOverrides = Omit<
   Partial<ScheduledSampleVoicePlan>,
-  'pan' | 'releasePlaybackClockSecond' | 'startPlaybackClockSecond'
+  | 'instrumentDeviceId'
+  | 'pan'
+  | 'releasePlaybackClockSecond'
+  | 'startPlaybackClockSecond'
+  | 'trackGain'
+  | 'velocity'
 > & {
+  readonly instrumentDeviceId?: string
   readonly pan?: number
   readonly releasePlaybackClockSecond?: number
   readonly startPlaybackClockSecond?: number
+  readonly trackGain?: number
+  readonly velocity?: number
 }
 
 function createPlan(
@@ -594,6 +602,87 @@ describe('Sample Instrument Voice Runtime', () => {
       ).outcome,
     ).toBe('scheduled')
     expect(runtime.cancel(active.token!)).toBe(true)
+  })
+
+  it('bounds one Instrument to 64 sounding Voices and 16 fast-release retirement tails', () => {
+    const { context, runtime } = createRuntime()
+    const results = Array.from({ length: 81 }, (_, index) =>
+      runtime.schedule(
+        createPlan(`instrument-polyphony-${String(index).padStart(3, '0')}`, 60, {
+          instrumentDeviceId: 'polyphony-instrument-a',
+          releasePlaybackClockSecond: 10,
+          startPlaybackClockSecond: index < 64 ? 1 : 2,
+          trackGain: 1,
+          velocity: 127,
+        }),
+      ),
+    )
+
+    expect(results.slice(0, 80).every(({ outcome }) => outcome === 'scheduled')).toBe(true)
+    expect(results[80]).toEqual({
+      outcome: 'polyphony-dropped',
+      playbackRate: null,
+      token: null,
+      zoneId: null,
+    })
+    expect(context.bufferSources).toHaveLength(80)
+    expect(runtime.statistics.activeVoiceCount).toBe(80)
+    expect(runtime.polyphonyStatistics).toEqual({
+      polyphonyDropCount: 1,
+      retirementVoiceCount: 16,
+      soundingVoiceCount: 64,
+      voiceStealCount: 16,
+    })
+    for (let index = 0; index < 16; index += 1) {
+      expect(context.bufferSources[index]?.stops.at(-1)).toBeCloseTo(
+        2 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+      )
+    }
+
+    for (const source of context.bufferSources) source.finish()
+    expect(runtime.polyphonyStatistics).toEqual({
+      polyphonyDropCount: 1,
+      retirementVoiceCount: 0,
+      soundingVoiceCount: 0,
+      voiceStealCount: 16,
+    })
+  })
+
+  it('applies the 128 Voice Runtime budget across distinct Instrument devices', () => {
+    const { context, runtime } = createRuntime()
+    const initialPlans = Array.from({ length: 128 }, (_, index) =>
+      createPlan(`runtime-polyphony-${String(index).padStart(3, '0')}`, 60, {
+        instrumentDeviceId: index < 64 ? 'polyphony-instrument-a' : 'polyphony-instrument-b',
+        releasePlaybackClockSecond: 10,
+        startPlaybackClockSecond: 1,
+        trackGain: 1,
+        velocity: 127,
+      }),
+    )
+    for (const plan of initialPlans) expect(runtime.schedule(plan).outcome).toBe('scheduled')
+
+    expect(
+      runtime.schedule(
+        createPlan('runtime-polyphony-new', 60, {
+          instrumentDeviceId: 'polyphony-instrument-c',
+          releasePlaybackClockSecond: 10,
+          startPlaybackClockSecond: 2,
+          trackGain: 1,
+          velocity: 127,
+        }),
+      ).outcome,
+    ).toBe('scheduled')
+
+    expect(context.bufferSources).toHaveLength(129)
+    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(
+      2 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+    )
+    expect(runtime.polyphonyStatistics).toEqual({
+      polyphonyDropCount: 0,
+      retirementVoiceCount: 1,
+      soundingVoiceCount: 128,
+      voiceStealCount: 1,
+    })
   })
 
   it('supports allNotesOff and deterministic disposal without residual listeners or nodes', () => {

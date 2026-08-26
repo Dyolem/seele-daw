@@ -10,7 +10,10 @@ describe('Audio Quality Foundation V1A render policy', () => {
     expect(AUDIO_QUALITY_V1A_RENDER_POLICY).toEqual({
       defaultFastReleaseSecond: 0.006,
       envelopeCurveSegmentCount: 32,
-      id: 'seele.audio-quality-foundation-v1a-aq2',
+      id: 'seele.audio-quality-foundation-v1a-aq3',
+      maximumInstrumentSoundingVoiceCount: 64,
+      maximumRetirementVoiceCount: 16,
+      maximumRuntimeSoundingVoiceCount: 128,
       outputCalibrationDb: -12,
       outputCalibrationGain: 0.251188643150958,
       sourceStopSafetySecond: 0.001,

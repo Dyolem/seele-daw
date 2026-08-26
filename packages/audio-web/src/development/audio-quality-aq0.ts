@@ -15,6 +15,10 @@ export type {
   AudioQualityAq2MutexMeasurement,
   AudioQualityAq2OneShotMeasurement,
 } from './audio-quality-aq0/aq2-browser-report'
+export type {
+  AudioQualityAq3BrowserReport,
+  AudioQualityAq3PolyphonyMeasurement,
+} from './audio-quality-aq0/aq3-browser-report'
 export {
   countAudioQualityClippedFrames,
   measureAudioQualityAq0Channel,

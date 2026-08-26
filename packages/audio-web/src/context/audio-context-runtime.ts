@@ -1,3 +1,5 @@
+import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+
 export type WebAudioContextRuntimeState =
   | 'closed'
   | 'disposed'
@@ -10,6 +12,7 @@ export type WebAudioContextRuntimeState =
 export interface WebAudioContextRuntimeStatistics {
   readonly audioContextCreated: boolean
   readonly masterNodeCount: number
+  readonly outputCalibrationNodeCount: number
   readonly state: WebAudioContextRuntimeState
 }
 
@@ -72,12 +75,13 @@ function createDefaultAudioContext(): AudioContext {
   return new AudioContextConstructor()
 }
 
-/** Owns the user-activated AudioContext and the single application master output node. */
+/** Owns the user-activated AudioContext, Project master stage, and fixed output calibration. */
 export class WebAudioContextRuntime {
   readonly #audioContextFactory: () => AudioContext
   #activationRequest: Promise<ActiveWebAudioOutput> | null = null
   #audioContext: AudioContext | null = null
   #masterGain: GainNode | null = null
+  #outputCalibrationGain: GainNode | null = null
   #output: ActiveWebAudioOutput | null = null
   #disposed = false
 
@@ -94,6 +98,7 @@ export class WebAudioContextRuntime {
     return Object.freeze({
       audioContextCreated: this.#audioContext !== null,
       masterNodeCount: this.#masterGain === null ? 0 : 1,
+      outputCalibrationNodeCount: this.#outputCalibrationGain === null ? 0 : 1,
       state,
     })
   }
@@ -117,14 +122,18 @@ export class WebAudioContextRuntime {
     this.#disposed = true
     const context = this.#audioContext
     const masterGain = this.#masterGain
+    const outputCalibrationGain = this.#outputCalibrationGain
     this.#audioContext = null
     this.#masterGain = null
+    this.#outputCalibrationGain = null
     this.#output = null
 
-    try {
-      masterGain?.disconnect()
-    } catch {
-      // The graph is already unreachable; context.close() remains the authoritative cleanup.
+    for (const node of [masterGain, outputCalibrationGain]) {
+      try {
+        node?.disconnect()
+      } catch {
+        // The graph is already unreachable; context.close() remains the authoritative cleanup.
+      }
     }
     if (context !== null && readContextState(context) !== 'closed') {
       try {
@@ -149,11 +158,20 @@ export class WebAudioContextRuntime {
         fail('audio-context-create-failed', `AudioContext creation failed: ${errorDetail(error)}`)
       }
       this.#audioContext = context
+      let masterGain: GainNode | null = null
+      let outputCalibrationGain: GainNode | null = null
       try {
-        const masterGain = context.createGain()
+        masterGain = context.createGain()
+        outputCalibrationGain = context.createGain()
         masterGain.gain.setValueAtTime(1, context.currentTime)
-        masterGain.connect(context.destination)
+        outputCalibrationGain.gain.setValueAtTime(
+          AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain,
+          context.currentTime,
+        )
+        masterGain.connect(outputCalibrationGain)
+        outputCalibrationGain.connect(context.destination)
         this.#masterGain = masterGain
+        this.#outputCalibrationGain = outputCalibrationGain
         this.#output = Object.freeze({
           audioContext: context,
           masterInput: masterGain,
@@ -163,7 +181,15 @@ export class WebAudioContextRuntime {
       } catch (error) {
         this.#audioContext = null
         this.#masterGain = null
+        this.#outputCalibrationGain = null
         this.#output = null
+        for (const node of [masterGain, outputCalibrationGain]) {
+          try {
+            node?.disconnect()
+          } catch {
+            // Closing the rejected context remains the authoritative failure cleanup.
+          }
+        }
         try {
           if (readContextState(context) !== 'closed') await context.close()
         } catch {

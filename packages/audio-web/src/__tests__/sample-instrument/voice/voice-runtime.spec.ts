@@ -207,7 +207,7 @@ describe('Sample Instrument Voice Runtime', () => {
     const result = runtime.schedule(createPlan('range-note', 50))
 
     const expectedRate = 2 ** (2.5 / 12)
-    const expectedGain = (64 / 127) * 0.8
+    const expectedGain = 0.26577656381975606 * 0.8
     expect(result).toEqual({
       outcome: 'scheduled',
       playbackRate: expectedRate,
@@ -332,7 +332,7 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources[0]?.stops).toEqual([])
     expect(context.gainNodes[0]?.gain.events).toEqual([
       { kind: 'set', time: 1, value: 0 },
-      { kind: 'set', time: 1, value: (64 / 127) * 0.8 },
+      { kind: 'set', time: 1, value: 0.26577656381975606 * 0.8 },
     ])
     expect(runtime.cancel(result.token!, 2.5)).toBe(true)
     expect(context.gainNodes[0]?.gain.events).toContainEqual({

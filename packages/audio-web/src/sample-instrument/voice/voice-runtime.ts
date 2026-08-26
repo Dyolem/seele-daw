@@ -1,5 +1,6 @@
 import type { ScheduledSampleVoicePlan, SoundbankId } from '@seele-daw/playback'
 
+import { calculateAudioQualityV1aVelocityGain } from '#internal/audio-quality/render-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
 import type {
   SampleInstrumentEnvelopeSegmentV1,
@@ -445,7 +446,7 @@ export class SampleInstrumentVoiceRuntime {
 
     const startTime = Math.max(plan.startPlaybackClockSecond, context.currentTime)
     const playbackRate = calculatePlaybackRate(zone, plan.pitch)
-    const baseGain = (plan.velocity / 127) * plan.trackGain
+    const baseGain = calculateAudioQualityV1aVelocityGain(plan.velocity) * plan.trackGain
     const { gain, output } = this.#createVoiceGainAndOutput(context, plan, startTime)
     const voice: ActiveSampleVoice = {
       audioBuffer: resource.audioBuffer,

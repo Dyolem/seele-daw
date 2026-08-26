@@ -7,9 +7,11 @@ import type {
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
 import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
+import { calculateAudioQualityV1aVelocityGain } from '#internal/audio-quality/render-policy'
 import { SampleInstrumentVoiceRuntime } from '#internal/sample-instrument/voice/voice-runtime'
 import {
   AUDIO_QUALITY_AQ0_VELOCITY_VECTOR,
+  countAudioQualityClippedFrames,
   measureAudioQualityAq0Channel,
 } from '#internal/development/audio-quality-aq0'
 import {
@@ -123,6 +125,9 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
       peakLinear: sine.peakLinear,
       rmsLinear: sine.rmsLinear,
     })
+    expect(countAudioQualityClippedFrames([new Float32Array([0, 0.999, 1, -1, 1.001])], 0, 5)).toBe(
+      3,
+    )
     expect(AUDIO_QUALITY_AQ0_VELOCITY_VECTOR).toEqual(AUDIO_QUALITY_VELOCITY_VECTOR)
   })
 
@@ -161,11 +166,11 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
     ).toBe(true)
   })
 
-  it('characterizes the current linear Velocity amplitude and direct master gain handoff', () => {
+  it('applies the approved AQ1 Velocity response while preserving raw master gain handoff', () => {
     const { context, runtime, setMasterGainAtTime } = createRuntime()
     const plans = AUDIO_QUALITY_VELOCITY_VECTOR.map((velocity, index) =>
       createAudioQualityVoicePlan({
-        occurrenceKey: `current-linear-${velocity}`,
+        occurrenceKey: `aq1-velocity-${velocity}`,
         startSecond: 1 + index,
         velocity,
       }),
@@ -178,7 +183,7 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
       expect(context.gainNodes[index]?.gain.events).toContainEqual({
         kind: 'set',
         time: plans[index]!.startPlaybackClockSecond,
-        value: plans[index]!.velocity / 127,
+        value: calculateAudioQualityV1aVelocityGain(plans[index]!.velocity),
       })
     }
     expect(setMasterGainAtTime).toHaveBeenCalledTimes(plans.length)

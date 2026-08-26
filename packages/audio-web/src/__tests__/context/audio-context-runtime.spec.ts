@@ -4,6 +4,7 @@ import {
   WebAudioContextRuntime,
   type WebAudioContextRuntimeError,
 } from '#internal/context/audio-context-runtime'
+import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
 import { FakeAudioContext, FakeGainNode } from '#internal/__tests__/support/fake-web-audio'
 
 describe('Web Audio context runtime', () => {
@@ -20,6 +21,7 @@ describe('Web Audio context runtime', () => {
     expect(runtime.statistics).toEqual({
       audioContextCreated: false,
       masterNodeCount: 0,
+      outputCalibrationNodeCount: 0,
       state: 'dormant',
     })
 
@@ -28,12 +30,21 @@ describe('Web Audio context runtime', () => {
     expect(first).toBe(second)
     expect(createCount).toBe(1)
     expect(context.resumeCallCount).toBe(1)
-    expect(context.gainNodes).toHaveLength(1)
+    expect(context.gainNodes).toHaveLength(2)
     expect(context.gainNodes[0]?.gain.events).toEqual([{ kind: 'set', time: 3, value: 1 }])
-    expect(context.gainNodes[0]?.connections).toEqual([context.destination])
+    expect(context.gainNodes[1]?.gain.events).toEqual([
+      {
+        kind: 'set',
+        time: 3,
+        value: AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain,
+      },
+    ])
+    expect(context.gainNodes[0]?.connections).toEqual([context.gainNodes[1]])
+    expect(context.gainNodes[1]?.connections).toEqual([context.destination])
     expect(runtime.statistics).toEqual({
       audioContextCreated: true,
       masterNodeCount: 1,
+      outputCalibrationNodeCount: 1,
       state: 'running',
     })
   })
@@ -91,8 +102,12 @@ describe('Web Audio context runtime', () => {
       }),
     )
 
+    const rejectedMaster = new FakeGainNode()
+    let graphGainCreationCount = 0
     const graphContext = new FakeAudioContext({
       createGain: () => {
+        graphGainCreationCount += 1
+        if (graphGainCreationCount === 1) return rejectedMaster
         throw new TypeError('fixture graph failure')
       },
     })
@@ -105,7 +120,10 @@ describe('Web Audio context runtime', () => {
         code: 'audio-graph-create-failed',
       }),
     )
+    expect(graphGainCreationCount).toBe(2)
+    expect(rejectedMaster.disconnectCallCount).toBe(1)
     expect(graphContext.closeCallCount).toBe(1)
+    expect(graphContext.state).toBe('closed')
 
     const resumeContext = new FakeAudioContext({
       resume: async () => {
@@ -137,7 +155,9 @@ describe('Web Audio context runtime', () => {
 
   it('disconnects and closes its graph exactly once on disposal', async () => {
     const master = new FakeGainNode()
-    const context = new FakeAudioContext({ createGain: () => master })
+    const calibration = new FakeGainNode()
+    const gains = [master, calibration]
+    const context = new FakeAudioContext({ createGain: () => gains.shift()! })
     const runtime = new WebAudioContextRuntime({
       audioContextFactory: () => context.asAudioContext(),
     })
@@ -147,10 +167,12 @@ describe('Web Audio context runtime', () => {
     await runtime.dispose()
 
     expect(master.disconnectCallCount).toBe(1)
+    expect(calibration.disconnectCallCount).toBe(1)
     expect(context.closeCallCount).toBe(1)
     expect(runtime.statistics).toEqual({
       audioContextCreated: false,
       masterNodeCount: 0,
+      outputCalibrationNodeCount: 0,
       state: 'disposed',
     })
     await expect(runtime.activate()).rejects.toEqual(
@@ -179,6 +201,7 @@ describe('Web Audio context runtime', () => {
     await runtime.dispose()
     expect(context.closeCallCount).toBe(1)
     expect(context.gainNodes[0]?.disconnectCallCount).toBe(1)
+    expect(context.gainNodes[1]?.disconnectCallCount).toBe(1)
 
     finishResume?.()
 

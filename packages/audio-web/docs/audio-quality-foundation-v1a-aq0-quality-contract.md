@@ -1,10 +1,11 @@
 # Audio Quality Foundation V1A：AQ0 基线与质量契约
 
-> Status: Implemented for review; no production audio behavior changed
+> Status: AQ0 reviewed and committed (`40c44a1`); AQ1 evidence added from current working tree for review
 >
 > Date: 2026-08-26
 
-本文冻结 AQ0 的输入、当前行为基线、测量方法和后续验收规则。术语解释见
+本文冻结 AQ0 的输入、历史行为基线、测量方法和后续验收规则，并追加使用同一输入取得的 AQ1
+证据。术语解释见
 [V1A 术语表](./audio-quality-foundation-v1a-glossary.md)，完整阶段边界见
 [V1A 阶段计划](./audio-quality-foundation-v1a-phase-plan.md)。
 
@@ -24,11 +25,11 @@ Plan 或 Project Fact。完成时必须具备：
 Node 测试的 Fake Web Audio 只能证明 schedule、automation、node 和 cleanup 控制语义，不能声称
 测得真实 PCM。浏览器报告必须直接复用生产 Voice Runtime，禁止用独立参考渲染器替代它。
 
-## 2. 当前行为特征基线
+## 2. AQ0 历史行为特征基线
 
-AQ0 在 2026-08-26 记录以下现状；它们是 AQ1–AQ3 的对照，不是永久产品承诺：
+AQ0 在 2026-08-26 记录以下当时现状；它们是 AQ1–AQ3 的对照，不是永久产品承诺：
 
-| 领域           | 当前行为                                                                                                 |
+| 领域           | AQ0 当时行为                                                                                             |
 | -------------- | -------------------------------------------------------------------------------------------------------- |
 | Velocity       | Voice base gain 为 `(velocity / 127) * trackGain`，即线性振幅。                                          |
 | Master         | Project `masterGain` 原值写入唯一 master GainNode；系统没有 calibration trim。                           |
@@ -40,7 +41,17 @@ AQ0 在 2026-08-26 记录以下现状；它们是 AQ1–AQ3 的对照，不是�
 | Loop           | continuous loop 贯穿 release；sustain loop 在 Note Off 转为未循环尾部。                                  |
 | Cleanup        | 现有测试覆盖 natural end、cancel、all-notes-off、failure 与 dispose 后的 Voice/node/listener 回收。      |
 
-AQ1 有意改变前两项时，必须同步更新特征测试和本表，不能为了维持 AQ0 测试而保留旧声音。
+AQ1 已有意改变前两项，相关特征测试已同步更新；本表继续保留为历史对照，不能改写成当前行为。
+
+### 2.1 AQ1 当前工作树行为
+
+| 领域     | AQ1 政策                                                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Velocity | Voice base gain 为 `floor + (1 - floor) * (velocity / 127) ^ 2`，其中 `floor = 10 ^ (-36 / 20)`，再乘 Track Gain。 |
+| Master   | Project `masterGain` 原值写入 Project master GainNode；独立下游节点再应用固定 `-12 dB` 输出校准。                  |
+| 项目事实 | MIDI Velocity、Track Gain、Master Gain、Project File 与 Playback Voice Plan 数值均不迁移、不重写。                 |
+| 动态处理 | 没有隐藏 compressor、soft clipper、limiter 或 true-peak meter。                                                    |
+| 其余领域 | Retrigger、Polyphony、Envelope、Loop、Fast release 与 Voice cleanup 仍保持 AQ0 所记录行为，等待 AQ2/AQ3。          |
 
 ## 3. 可提交合成 PCM fixture
 
@@ -85,15 +96,16 @@ pnpm --filter @seele-daw/studio dev
 ```
 
 页面不读取 Studio Grand 或 Project，只创建合成 sine AudioBuffer，通过真实
-`SampleInstrumentVoiceRuntime` 在 `OfflineAudioContext` 中分别渲染固定 Velocity 向量。报告至少
-包含：
+`SampleInstrumentVoiceRuntime` 在 `OfflineAudioContext` 中渲染固定 Velocity 向量、参考三和弦与
+10 Voice 相干压力输入。报告包含：
 
 - schema/version、浏览器 user agent、sample rate 与 fixture 参数；
 - 每个 Velocity 的 per-channel peak、RMS、DC offset；
 - steady window 的 combined peak/RMS 与相对 `v127` dB；
 - release 完成后的 tail peak；
+- 每个输入的满刻度帧数量；
 - render 完成和显式 dispose 后的 Runtime 资源统计；
-- 当前 render policy 标识 `aq0-current-linear-amplitude-no-calibration-trim`。
+- 当前完整 render policy 参数与代码级标识 `seele.audio-quality-foundation-v1a-aq1`。
 
 原生 `OfflineAudioContext` 在 `startRendering()` 前报告 `suspended`，而生产 Voice Runtime
 按实时安全边界只接收 `running` Context。AQ0 因此使用最小适配视图：仅在构建和调度 Voice 的
@@ -101,10 +113,10 @@ pnpm --filter @seele-daw/studio dev
 PCM 仍委托给同一个原生 `OfflineAudioContext`；渲染开始后立即恢复原生状态读取。该适配只属于
 developer-only harness，不修改生产 Runtime，也不是未来 Offline Backend 的最终契约。
 
-AQ0 页面是 developer-only Vite entry，不进入默认 Studio production build。报告只供复制审阅，
+该页面是 developer-only Vite entry，不进入默认 Studio production build。报告只供复制审阅，
 不自动写入仓库或浏览器存储。
 
-### 5.1 2026-08-26 Chromium 基线
+### 5.1 2026-08-26 Chromium AQ0 历史基线
 
 在 Codex 内置 Chromium `151.0.0.0`、macOS user agent、48 kHz 条件下运行上述入口，四项浏览器
 检查全部通过：测量值有限、渲染结束后资源归零、显式 dispose 后资源归零、tail 低于 `-90 dBFS`。
@@ -119,8 +131,31 @@ AQ0 页面是 developer-only Vite entry，不进入默认 Studio production buil
 |      127 |              1 |    -9.031 |  -12.041 |             0 |
 
 合成源自身 peak 为 `-6.021 dBFS`；center StereoPanner 的等功率声道分配使单声道源在每个输出声道
-再降低约 3.01 dB。绝对值用于固定当前完整图路径，`relative v127 RMS` 则直接证明当前 Velocity
-仍为线性振幅关系。该单浏览器结果不是跨浏览器 SLO，AQ1 仍须用同一入口重新报告候选曲线和 trim。
+再降低约 3.01 dB。绝对值用于固定 AQ0 完整图路径，`relative v127 RMS` 则直接证明当时 Velocity
+为线性振幅关系。该表只保留为历史对照。
+
+### 5.2 2026-08-26 Chromium AQ1 报告
+
+同一 Chromium `151.0.0.0`、macOS user agent、48 kHz 入口使用 schema version 2 运行当前生产
+政策。七项自动检查全部通过：数值有限、无满刻度帧、参考与压力峰值满足阈值、渲染结束与 dispose
+后资源归零、tail 低于 `-90 dBFS`。tail 为数字静音，因此 `tailPeakDbfs` 为 `null`。
+
+| Velocity | AQ1 base gain | Peak dBFS | RMS dBFS | 相对 v127 RMS |
+| -------: | ------------: | --------: | -------: | ------------: |
+|        1 |      0.015910 |   -56.998 |  -60.008 |       -35.967 |
+|       32 |      0.078331 |   -43.152 |  -46.163 |       -22.121 |
+|       64 |      0.265777 |   -32.541 |  -35.551 |       -11.510 |
+|       96 |      0.578186 |   -25.790 |  -28.800 |        -4.759 |
+|      127 |             1 |   -21.031 |  -24.041 |             0 |
+
+| 复音输入                         | Voice | Velocity | Peak dBFS | RMS dBFS | 满刻度帧 |
+| -------------------------------- | ----: | -------: | --------: | -------: | -------: |
+| 参考三和弦 `60, 64, 67`          |     3 |       96 |   -16.321 |  -24.021 |        0 |
+| 10 Voice 完全同相、同 pitch 压力 |    10 |      127 |    -1.031 |   -4.041 |        0 |
+
+与 AQ0 相比，Velocity 127 的完整图峰值准确降低约 12 dB；中低 Velocity 还叠加平方响应带来的额外
+衰减。10 Voice 压力输入只比 `-1 dBFS` 门槛保留约 `0.031 dB`，因此该结果是固定参数下的校准证据，
+不是任意项目或跨浏览器绝不削波的保证。AQ1 的 developer-local soundbank 人工听测仍为 `not-run`。
 
 ## 6. Gate 分类
 
@@ -128,17 +163,21 @@ AQ0 页面是 developer-only Vite entry，不进入默认 Studio production buil
 
 - fixture 的 sample rate、frame count、peak、RMS、DC、loop wrap delta 与立体声反相关系稳定；
 - Voice Plan 矩阵完全冻结、occurrenceKey 唯一、时间范围有效；
-- 当前 Velocity 特征测试精确覆盖五个锚点并确认线性 base gain；
+- AQ0 历史 Velocity 特征测试精确覆盖五个锚点并确认当时的线性 base gain；
 - 任一指标没有 NaN/Infinity；数字静音的 dBFS 用 `null` 表示，不写入非法 JSON 数值；
 - natural end、cancel、failure 和 dispose 后资源统计能够归零；
 - 生产 build 不包含 AQ0 HTML、合成报告或 developer-local soundbank。
 
-### 6.2 后续 calibrated gate
+### 6.2 AQ1 与后续 calibrated gate
 
-以下阈值先以 AQ0 报告为证据，再在对应批次冻结：
+AQ1 已冻结并实际运行：
 
-- AQ1 reference fixture 峰值目标候选 `<= -3 dBFS`；
-- AQ1 stress fixture 峰值目标候选 `<= -1 dBFS`；
+- reference triad 峰值 `<= -3 dBFS`，实测 `-16.321 dBFS`；
+- coherent 10 Voice stress 峰值 `<= -1 dBFS`，实测 `-1.031 dBFS`；
+- 所有 AQ1 输入的满刻度帧数量为 0，tail 与 Runtime 资源均归零。
+
+后续批次仍待冻结：
+
 - AQ2 非零 attack/release 合成边界误差候选 `<= 1e-4` full scale；
 - AQ2 release 结束加一个 render quantum 后 tail 候选 `< -90 dBFS`；
 - AQ3 sounding Voice 和 retirement tail 不超过最终冻结预算；
@@ -184,6 +223,9 @@ Reviewer decision:
 ```
 
 ## 8. AQ0 明确不做
+
+以下是已完成 AQ0 批次的历史边界；AQ1 只按已批准范围改变了第一项中的 Velocity curve 与
+calibration trim：
 
 - 不实施新 Velocity curve、calibration trim、limiter 或 meter；
 - 不修改 envelope、loop、fast release、retrigger 或 polyphony；

@@ -22,8 +22,9 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 方案仍必须先解决替代资产或再分发权限。
 
 后续音质加固已经进入
-[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。当前仅 AQ0
-基线、质量契约与合成测试设施进入审阅，尚未改变生产发声行为；相关行业词汇见
+[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。AQ0
+基线、质量契约与合成测试设施已审核并提交；AQ1 的 Velocity 响应与输出校准已在当前工作树实现，
+自动测试和 Chromium 合成 PCM 门禁通过，正在等待功能审阅。相关行业词汇见
 [V1A 术语表](./docs/audio-quality-foundation-v1a-glossary.md)。
 
 本地资产的来源链、指纹和分发边界见
@@ -51,8 +52,8 @@ Batch 4B.1 的生产资源准备边界保持在包内：
 
 Batch 4B.2 在同一包内增加执行边界：
 
-- `context/audio-context-runtime.ts` 只在显式 `activate()` 时创建 / resume AudioContext，并拥有单一
-  master Gain；构造 Runtime 不触发浏览器音频设备生命周期；
+- `context/audio-context-runtime.ts` 只在显式 `activate()` 时创建 / resume AudioContext，并拥有
+  Project master Gain 与其后的固定输出校准 Gain；构造 Runtime 不触发浏览器音频设备生命周期；
 - Voice 直接消费 Playback 公开的 `ScheduledSampleVoicePlan` 和 4B.1 已准备资源，不读取 Project
   Model、Catalog、Mapping、URL 或 Transport；
 - Zone selector、root pitch / tune、offset、velocity、Track / Master Gain、Pan、attack / release、
@@ -61,9 +62,10 @@ Batch 4B.2 在同一包内增加执行边界：
 - `curve: null` 与 `0` 使用 linear amplitude。非零 shape 用 Seele V1 的归一化指数形状并以分段
   `linearRampToValueAtTime` 排程，shape 在运行时钳制到 `[-10, 10]` 以保持数值稳定；该函数是
   Seele Manifest 执行定义，不声称复刻任一来源私有播放器；
-- Velocity V1 使用 `velocity / 127`，再乘 Track Gain；Master Gain 由唯一 master node 应用，Pan
-  使用 `StereoPannerNode`。缺少 StereoPanner 时只允许中心声像降级为 Gain pass-through，非中心
-  Pan 明确失败；
+- 当前 V1A AQ1 使用带 `-36 dB` 低电平下限的平方 Velocity 响应，再乘 Track Gain；Project Master
+  保持原始项目值，随后由独立节点应用 `-12 dB` 固定输出校准。系统没有隐藏 limiter，阈值保证只
+  适用于已声明 fixture 与默认增益。Pan 使用 `StereoPannerNode`；缺少 StereoPanner 时只允许中心
+  声像降级为 Gain pass-through，非中心 Pan 明确失败；
 - 普通 gated Note Off 使用 Zone release；one-shot 忽略普通 Span End 并自然结束；cancel、Stop、
   generation 切换和 `allNotesOff` 使用 `6 ms` linear fast release，避免硬切 click；
 - continuous loop 在 release 阶段继续循环；sustain loop 在 Note Off 停止循环，并从当时 source

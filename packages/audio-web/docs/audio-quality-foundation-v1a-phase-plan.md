@@ -1,6 +1,6 @@
 # Audio Quality Foundation V1A 阶段计划
 
-> Status: AQ0 implemented for review; AQ1–AQ4 approved in principle but not implemented
+> Status: AQ0 reviewed and committed (`40c44a1`); AQ1 implemented for review; AQ2–AQ4 not implemented
 >
 > Date: 2026-08-26
 >
@@ -42,16 +42,17 @@ V1A 不把“基础可靠性”描述成完整钢琴真实性。当前单层 Sam
 
 ### 2.1 Velocity 与 gain staging
 
-AQ1 首轮 A/B 使用带 `-36 dB` 低电平下限的平方响应：
+AQ1 当前工作树使用带 `-36 dB` 低电平下限的平方响应：
 
 ```text
 floor = 10 ^ (-36 / 20)
 gain(velocity) = floor + (1 - floor) * (velocity / 127) ^ 2
 ```
 
-首轮系统 calibration trim 候选为 `-12 dB`，位于 Project Master Gain 之后。它不是 Project
-Fact，不修改保存的 Track/Master Gain。AQ0 先记录当前线性振幅、无 calibration trim 基线；AQ1
-改变行为时再用相同 fixture 做 level-matched A/B。
+系统 calibration trim 为 `-12 dB`，位于 Project Master Gain 之后的独立 GainNode。它不是 Project
+Fact，不修改保存的 Track/Master Gain。AQ0 已记录线性振幅、无 calibration trim 的历史基线；
+AQ1 使用相同 fixture 记录当前政策。自动数值对照已经完成，developer-local soundbank 的
+level-matched 人工听测仍为 `not-run`，须在 AQ1 审阅或后续收口时明确记录。
 
 V1A 默认不静默加入 compressor、soft clipper 或 limiter。由于 Track Gain、Master Gain 均允许
 `0...4`，加上任意相干复音，固定 trim 不可能对所有输入作绝对不削波保证。V1A 的 peak 门禁只
@@ -83,12 +84,23 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
 - developer-local Studio Grand 听测矩阵与不可分发边界；
 - 中文术语表和报告模板。
 
+状态：已审核并提交为 `40c44a1`。
+
 ### AQ1：Velocity 与 gain staging
 
 - 把 Velocity 响应收敛为 `audio-web` 内部纯政策，Playback 继续传原始 `1...127`；
 - 实施并测试获准的首轮曲线和 calibration trim；
 - 固定 Velocity 锚点、单调性、Track/Master/System 乘法、mute 和 failure cleanup；
 - 用 AQ0 同一输入完成 level-matched A/B，再决定是否保留候选数值。
+
+当前工作树证据：
+
+- 纯政策函数覆盖全部 `1...127`、五个固定锚点和非法输入；Playback 仍传递原始 Velocity；
+- Project Master 与固定输出校准是两个职责不同的 GainNode，dispose 和 graph failure 均回收；
+- Chromium 48 kHz 合成报告的参考三和弦峰值为 `-16.321 dBFS`，10 Voice 完全同相压力峰值为
+  `-1.031 dBFS`；无满刻度帧，release 后数字静音，Runtime 资源归零；
+- 自动测试与浏览器校准门禁为 `passed`；developer-local soundbank 人工听测为 `not-run`；
+- AQ1 尚未提交，等待本批功能审阅。
 
 ### AQ2：Envelope 与 Loop
 

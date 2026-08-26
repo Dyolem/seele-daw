@@ -13,48 +13,52 @@
 
 ## 1. 电平与测量
 
-| 中文术语     | 英文原词                              | 在 Seele V1A 中的含义                                                                                            |
-| ------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 脉冲编码调制 | PCM, Pulse-Code Modulation            | 把声音表示成连续数字采样值的方式。AQ0 的合成测试信号直接使用 PCM，不依赖受限音源。                               |
-| 采样值       | Sample                                | 某个声道在某一瞬间的数字振幅。不要与“采样乐器的一段 WAV 素材”混淆。                                              |
-| 音频帧       | Audio Frame                           | 同一时刻所有声道采样值的集合；立体声一帧包含左、右两个采样值。                                                   |
-| 采样率       | Sample Rate                           | 每秒音频帧数量，例如 48 kHz 表示每秒 48,000 帧。                                                                 |
-| 振幅         | Amplitude                             | 波形瞬时大小。数字音频常把 `-1...1` 作为规范化范围。                                                             |
-| 线性增益     | Linear Gain                           | 直接乘到振幅上的倍率；`0.5` 是一半振幅，`1` 保持不变。它不是“听起来一半响”的保证。                               |
-| 分贝满刻度   | dBFS, Decibels relative to Full Scale | 以数字系统最大幅度为 `0 dBFS` 的电平单位；负数表示低于上限。数字静音没有有限 dBFS 值。                           |
-| 峰值         | Peak                                  | 测量窗口内绝对采样值的最大值，用于发现削波风险和异常尖峰。                                                       |
-| 均方根电平   | RMS, Root Mean Square                 | 描述一段波形平均能量的指标，比单个峰值更接近持续响度，但不等于人耳响度模型。                                     |
-| 直流偏移     | DC Offset                             | 波形长期围绕非零值摆动。异常偏移可能浪费 headroom，或在切换时产生 click。                                        |
-| 增益分级     | Gain Staging                          | 安排 Voice、Track、Master 与系统输出各层增益，使正常内容保留余量且不过早削波。                                   |
-| 峰值余量     | Headroom                              | 当前峰值到 `0 dBFS` 之间保留的空间。例如峰值 `-6 dBFS` 约有 6 dB 余量。                                          |
-| 校准衰减     | Calibration Trim                      | 项目 Master 之后、系统输出之前的固定校准增益。它不修改 Project Fact，也不等同于用户 Master Gain。                |
-| 削波         | Clipping                              | 波形超过输出范围后被截平，通常产生明显失真。固定 trim 无法对任意增益与任意相干复音作绝对防削波保证。             |
-| 限幅器       | Limiter                               | 为阻止峰值超过阈值而自动降低增益的处理器。它会改变声音，若采用就必须在实时和离线导出中保持一致。                 |
-| 压缩器       | Compressor                            | 按动态范围自动改变增益的处理器。V1A 不把它当作无副作用的安全开关。                                               |
-| 瞬态         | Transient                             | 起音等位置短而快速的能量变化，决定敲击感，也最容易暴露削波或 click。                                             |
-| 点击杂音     | Click                                 | 不连续电平变化产生的短促高频杂音。`attack = 0` 或素材自身不连续可能有意或不可避免地形成突变。                    |
-| 渲染量子     | Render Quantum                        | Web Audio 分块处理音频的最小工作单位；当前浏览器通常以 128 帧处理，但质量契约不把平台实现细节当作 Project Fact。 |
+| 中文术语     | 英文原词                              | 在 Seele V1A 中的含义                                                                                                  |
+| ------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 脉冲编码调制 | PCM, Pulse-Code Modulation            | 把声音表示成连续数字采样值的方式。AQ0 的合成测试信号直接使用 PCM，不依赖受限音源。                                     |
+| 采样值       | Sample                                | 某个声道在某一瞬间的数字振幅。不要与“采样乐器的一段 WAV 素材”混淆。                                                    |
+| 音频帧       | Audio Frame                           | 同一时刻所有声道采样值的集合；立体声一帧包含左、右两个采样值。                                                         |
+| 采样率       | Sample Rate                           | 每秒音频帧数量，例如 48 kHz 表示每秒 48,000 帧。                                                                       |
+| 振幅         | Amplitude                             | 波形瞬时大小。数字音频常把 `-1...1` 作为规范化范围。                                                                   |
+| 线性增益     | Linear Gain                           | 直接乘到振幅上的倍率；`0.5` 是一半振幅，`1` 保持不变。它不是“听起来一半响”的保证。                                     |
+| 分贝满刻度   | dBFS, Decibels relative to Full Scale | 以数字系统最大幅度为 `0 dBFS` 的电平单位；负数表示低于上限。数字静音没有有限 dBFS 值。                                 |
+| 峰值         | Peak                                  | 测量窗口内绝对采样值的最大值，用于发现削波风险和异常尖峰。                                                             |
+| 均方根电平   | RMS, Root Mean Square                 | 描述一段波形平均能量的指标，比单个峰值更接近持续响度，但不等于人耳响度模型。                                           |
+| 直流偏移     | DC Offset                             | 波形长期围绕非零值摆动。异常偏移可能浪费 headroom，或在切换时产生 click。                                              |
+| 增益分级     | Gain Staging                          | 安排 Voice、Track、Master 与系统输出各层增益，使正常内容保留余量且不过早削波。                                         |
+| 峰值余量     | Headroom                              | 当前峰值到 `0 dBFS` 之间保留的空间。例如峰值 `-6 dBFS` 约有 6 dB 余量。                                                |
+| 校准衰减     | Calibration Trim                      | 项目 Master 之后、系统输出之前的固定校准增益。它不修改 Project Fact，也不等同于用户 Master Gain。                      |
+| 低电平下限   | Velocity Floor                        | 力度响应函数在输入接近零时保留的最小增益。AQ1 的 `-36 dB` 是 Velocity 0 的数学下限；合法最小值 Velocity 1 会略高于它。 |
+| 相干叠加     | Coherent Summation                    | 多个同相、同频波形的峰值直接相加。10 个完全相同 Voice 是刻意严苛的峰值压力输入，不代表普通和弦的常见听感。             |
+| 等功率声像   | Equal-power Panning                   | 中心声像把单声道信号按等功率规则送到左右声道；每个声道通常比原单声道低约 3 dB。                                        |
+| 削波         | Clipping                              | 波形超过输出范围后被截平，通常产生明显失真。固定 trim 无法对任意增益与任意相干复音作绝对防削波保证。                   |
+| 限幅器       | Limiter                               | 为阻止峰值超过阈值而自动降低增益的处理器。它会改变声音，若采用就必须在实时和离线导出中保持一致。                       |
+| 压缩器       | Compressor                            | 按动态范围自动改变增益的处理器。V1A 不把它当作无副作用的安全开关。                                                     |
+| 瞬态         | Transient                             | 起音等位置短而快速的能量变化，决定敲击感，也最容易暴露削波或 click。                                                   |
+| 点击杂音     | Click                                 | 不连续电平变化产生的短促高频杂音。`attack = 0` 或素材自身不连续可能有意或不可避免地形成突变。                          |
+| 渲染量子     | Render Quantum                        | Web Audio 分块处理音频的最小工作单位；当前浏览器通常以 128 帧处理，但质量契约不把平台实现细节当作 Project Fact。       |
 
 ## 2. MIDI、动态与发声生命周期
 
-| 中文术语     | 英文原词                | 在 Seele V1A 中的含义                                                                                  |
-| ------------ | ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| 力度         | MIDI Velocity           | MIDI Note 的 `1...127` 创作事实。当前 Sample Runtime 只用它控制振幅，不改变采样音色。                  |
-| 力度响应曲线 | Velocity Response Curve | 把 MIDI Velocity 转成线性增益的函数。V1A 已批准先比较带低电平下限的平方曲线。                          |
-| 力度层       | Velocity Layer          | 同一音高按力度选择不同采样素材。当前 Manifest 和 Studio Grand 没有该能力，不能把音量曲线称为力度层。   |
-| 起音         | Note On / Attack        | 新 Note 开始发声，以及包络从零进入稳定电平的阶段。                                                     |
-| 松音         | Note Off / Release      | Note 结束输入，以及包络把声音降到静音的阶段。Note Off 不等于立即销毁 AudioNode。                       |
-| 包络         | Envelope                | 控制 Voice 振幅随时间变化的曲线；当前 Profile 明确包含 attack 和 release。                             |
-| 门控触发     | Gated                   | Note Off 会启动 release；音符时长参与声音生命周期。                                                    |
-| 单次触发     | One-shot                | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                            |
-| 声部实例     | Voice                   | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                |
-| 复音数       | Polyphony               | 同时存在或同时发声的 Voice 数量。无限增长会造成峰值、CPU 与节点资源风险。                              |
-| 同音重触发   | Retrigger               | 同一作用域内相同 pitch 再次 Note On。V1A 保留不同 occurrence 的独立身份，不全局强制 choke。            |
-| 声部窃取     | Voice Stealing          | Voice 超过预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出资源。                   |
-| 退场尾音     | Retirement Tail         | 已被 cancel 或 steal、正在快速 release、尚未完成清理的 Voice。它也必须有独立上限。                     |
-| 卡死声部     | Stuck Voice             | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。 |
-| 互斥组       | Mutex / Exclusive Group | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                              |
-| 快速释放     | Fast Release            | stop、cancel、steal 或 fast mutex 使用的短 release。当前实现约 6 ms，AQ0 记录它，AQ2 再决定是否调整。  |
+| 中文术语     | 英文原词                    | 在 Seele V1A 中的含义                                                                                  |
+| ------------ | --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 力度         | MIDI Velocity               | MIDI Note 的 `1...127` 创作事实。当前 Sample Runtime 只用它控制振幅，不改变采样音色。                  |
+| 力度响应曲线 | Velocity Response Curve     | 把 MIDI Velocity 转成线性增益的函数。AQ1 当前使用带低电平下限的平方曲线。                              |
+| 平方力度响应 | Quadratic Velocity Response | 先把 Velocity 归一化再取平方，使中低力度比线性振幅政策更安静；它只改变音量映射，不会创造新的采样音色。 |
+| 力度层       | Velocity Layer              | 同一音高按力度选择不同采样素材。当前 Manifest 和 Studio Grand 没有该能力，不能把音量曲线称为力度层。   |
+| 起音         | Note On / Attack            | 新 Note 开始发声，以及包络从零进入稳定电平的阶段。                                                     |
+| 松音         | Note Off / Release          | Note 结束输入，以及包络把声音降到静音的阶段。Note Off 不等于立即销毁 AudioNode。                       |
+| 包络         | Envelope                    | 控制 Voice 振幅随时间变化的曲线；当前 Profile 明确包含 attack 和 release。                             |
+| 门控触发     | Gated                       | Note Off 会启动 release；音符时长参与声音生命周期。                                                    |
+| 单次触发     | One-shot                    | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                            |
+| 声部实例     | Voice                       | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                |
+| 复音数       | Polyphony                   | 同时存在或同时发声的 Voice 数量。无限增长会造成峰值、CPU 与节点资源风险。                              |
+| 同音重触发   | Retrigger                   | 同一作用域内相同 pitch 再次 Note On。V1A 保留不同 occurrence 的独立身份，不全局强制 choke。            |
+| 声部窃取     | Voice Stealing              | Voice 超过预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出资源。                   |
+| 退场尾音     | Retirement Tail             | 已被 cancel 或 steal、正在快速 release、尚未完成清理的 Voice。它也必须有独立上限。                     |
+| 卡死声部     | Stuck Voice                 | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。 |
+| 互斥组       | Mutex / Exclusive Group     | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                              |
+| 快速释放     | Fast Release                | stop、cancel、steal 或 fast mutex 使用的短 release。当前实现约 6 ms，AQ0 记录它，AQ2 再决定是否调整。  |
 
 ## 3. 采样、Zone 与循环
 
@@ -90,6 +94,9 @@
 | 校准门禁           | Calibrated Gate              | 需要先取得基线再冻结阈值的指标，例如 reference chord peak。                                                                                                                                     |
 | 人工听测           | Listening Gate               | 由人判断 click、截断感、动态和音色接受度；数值测试不能替代它。                                                                                                                                  |
 | A/B 对比           | A/B Comparison               | 在响度匹配等受控条件下比较旧政策和候选政策，避免把单纯更响误认为更好。                                                                                                                          |
+| 满刻度帧           | Full-scale Frame             | 至少一个声道的绝对采样值达到或超过 `1` 的音频帧。AQ1 合成报告把数量非零视为削波风险证据。                                                                                                       |
+| 参考三和弦         | Reference Triad              | 固定 pitch `60, 64, 67`、Velocity 96 的三 Voice 输入，用于观察普通复音路径的 peak、RMS、尾部与清理。                                                                                            |
+| 相干压力输入       | Coherent Stress Fixture      | 同时启动 10 个完全相同、满力度 Voice 的确定性最坏情况输入，用来校准 headroom；它不是 Voice 上限或真实乐曲模型。                                                                                 |
 | 确定性             | Deterministic                | 相同输入和政策得到相同调度、保留/steal 顺序与报告结构，不依赖 Map 偶然顺序。                                                                                                                    |
 
 ## 5. Sustain Pedal 延期术语

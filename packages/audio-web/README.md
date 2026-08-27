@@ -22,10 +22,10 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 方案仍必须先解决替代资产或再分发权限。
 
 后续音质加固已经进入
-[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。AQ0–AQ2
-基线、Velocity/输出校准与 Envelope/Loop/Trigger 政策已审核并提交；AQ3 的有界复音、确定性
-Voice Stealing、溢出诊断与真实浏览器 10,000 Note On 门禁已在当前工作树实现并通过，正在等待
-功能审阅。相关行业词汇见
+[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。AQ0–AQ3
+基线、Velocity/输出校准、Envelope/Loop/Trigger 与有界复音政策已审核并提交；AQ4 已冻结最终政策
+标识、综合门禁、兼容/失败边界与听测状态，正在等待收口审阅。完整证据见
+[V1A 收口报告](./docs/audio-quality-foundation-v1a-closure-report.md)，相关行业词汇见
 [V1A 术语表](./docs/audio-quality-foundation-v1a-glossary.md)。
 
 本地资产的来源链、指纹和分发边界见

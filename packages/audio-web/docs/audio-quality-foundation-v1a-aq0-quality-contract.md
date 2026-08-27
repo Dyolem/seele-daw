@@ -1,13 +1,14 @@
 # Audio Quality Foundation V1A：AQ0 基线与质量契约
 
-> Status: AQ0–AQ2 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`); AQ3 evidence added from current working tree for review
+> Status: AQ0–AQ3 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`, `64118f7`); AQ4 closure evidence added for review
 >
 > Date: 2026-08-26
 
 本文冻结 AQ0 的输入、历史行为基线、测量方法和后续验收规则，并追加使用生产 Runtime 取得的
 AQ1、AQ2 与 AQ3 证据。术语解释见
 [V1A 术语表](./audio-quality-foundation-v1a-glossary.md)，完整阶段边界见
-[V1A 阶段计划](./audio-quality-foundation-v1a-phase-plan.md)。
+[V1A 阶段计划](./audio-quality-foundation-v1a-phase-plan.md)，最终状态汇总见
+[V1A 收口报告](./audio-quality-foundation-v1a-closure-report.md)。
 
 ## 1. AQ0 的完成定义
 
@@ -67,7 +68,7 @@ AQ2 没有改写 Manifest 作者给出的 attack、release、loop 或 trigger �
 | 版本标识        | 完整渲染政策为 `seele.audio-quality-foundation-v1a-aq2`。                                            |
 | 仍待 AQ3 的领域 | Retrigger 保持 occurrence 独立；Polyphony 仍无 Voice cap 或 steal policy。                           |
 
-### 2.3 AQ3 当前工作树政策
+### 2.3 AQ3 已提交政策
 
 AQ3 不改变发声计划（Voice Plan）或项目数据，只在项目级 Sample Voice Runtime 内限制已经接纳的
 Web Audio Voice 图数量：
@@ -318,6 +319,19 @@ Listening observations:
 Known limitations:
 Reviewer decision:
 ```
+
+AQ4 当前收口记录：
+
+| Gate                                      | 状态      |
+| ----------------------------------------- | --------- |
+| AQ0–AQ3 Node / TypeScript 自动门禁        | `passed`  |
+| Chromium 151 / 48 kHz / schema version 4  | `passed`  |
+| Studio Grand 当前 Manifest/WAV 静态完整性 | `passed`  |
+| AQ1–AQ3 developer-local 最终政策人工听测  | `not-run` |
+| 完整根级 `pnpm check`                     | `passed`  |
+
+最终生产政策标识冻结为 `seele.audio-quality-foundation-v1a-aq3`。AQ4 没有改变可听算法，不为阶段
+收口虚构新的音频政策版本；详细解释与延期边界见收口报告。
 
 ## 8. AQ0 明确不做
 

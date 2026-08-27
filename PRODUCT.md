@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-25，Project Tempo Control V1 MT5 已通过审核并完成阶段收口
+> 最近更新：2026-08-26，Audio Quality Foundation V1A AQ4 已实现并等待收口审核
 >
-> 当前阶段：Project Tempo Control V1 已完成；下一阶段范围待规划
+> 当前阶段：Audio Quality Foundation V1A AQ0–AQ3 已审核提交；AQ4 收口后进入 Workbench Action / Menu / Shortcut
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -55,6 +55,11 @@ production build 仍禁止复制整棵 public，因此这个资产映射不是�
 本地资产、保存了其他尚未配置 location 的 Sample Instrument，或浏览器拒绝 AudioContext 时，
 Studio 会明确失败，不静默替换声音。
 
+当前 Sample Voice Runtime 已采用带 `-36 dB` 下限的平方 Velocity 响应、Project Master 后独立
+`-12 dB` 输出校准、Manifest Envelope/Loop/Trigger 语义，以及每个乐器设备 64 个、项目 Runtime
+128 个发声槽和最多 16 个偷音退场尾音。该政策没有用户设置入口，不加入隐藏 limiter，也不表示
+已经支持 Velocity Layer、Sustain Pedal 或物理钢琴建模。
+
 ### 2.1 功能总览
 
 | 编号                   | 功能                      | 状态         | 当前边界                                                                                                                          |
@@ -74,6 +79,7 @@ Studio 会明确失败，不静默替换声音。
 | `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                      |
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                   |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return；播放中相关编辑按 Note / Track 选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
+| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、确定性 Voice Stealing 与溢出诊断已通过自动和 Chromium PCM 门禁。              |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                             |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                             |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                |
@@ -843,7 +849,7 @@ File 导入是独立交换格式入口，不替代 Project File。
 | `apps/studio`                 | 项目入口、创建新项目 / 追加当前 Track 两种 Standard MIDI File 导入、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback Coordinator、Play / Pause / Return Anchor / 共享视觉位置与时间反馈、Arrangement Ruler 点击 / 静默拖动 / 边缘滚动 / 键盘定位、播放中 Note / Track / Instrument 选择性重协调、默认 Studio Grand Add Track、旧 Slot 显式选择、派生 150 小节 Arrangement、Arrangement / Track 独立 Follow、Track / Clip 双模式 Piano Roll 与 Note 编辑；Track Cursor 完整 Note 编辑尚未接入。 |
 | `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note Snapshot 投影、Timeline Grid Snap、Pencil Placement、Selection Session、Select / Move / Resize Interaction、Move / Resize Preview、Canvas Grid、DOM / Canvas Note Adapter、DOM Body / Edge Hit 与 Pointer Input。                                                                                                                                                                                                                                  |
 | `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、派生 Timeline 范围、具体 MIDI Plan Compiler、Tick Locate / Return Anchor Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；公开 Studio / Audio Web 真实消费者所需的最小规划 API，不提供音频资源。                                                                                                                                                                              |
-| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、可重排 Note Off、loop、mutex、选择性 cancel、generation 与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                                                                                                                                                                                                                          |
+| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Velocity/输出校准、可重排 Note Off、loop、mutex、选择性 cancel、generation、有界复音、确定性 Voice Stealing、溢出诊断与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                                                                                                                                                             |
 | `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ## 9. 明确尚未提供的产品能力
@@ -872,6 +878,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 - 完整 Instrument Browser、Preset Library、第三方 Device UI 与任意 Instrument 替换；当前只有旧空
   Slot 的 `Use Studio Grand`。
 - 通用 Web Audio Graph、AudioWorklet 与电平；当前只有 Sample Voice 所需的最小 master output。
+- Velocity Layer、Sustain Pedal CC64、half-pedal、共鸣、release sample、pedal noise 与物理钢琴
+  建模；当前 Velocity 只改变单层 Sample 振幅，Sustain Loop 也不等于 Sustain Pedal。
 - 可听 Scrub、Note Chase、Locator / Marker、Loop、Record、实时 Meter、监听，以及 Gain / Pan /
   Mute 的持久 Track Bus 实时更新。当前支持 Play / Pause / Resume、Arrangement Ruler Manual
   Locate 与 Return to Last Start Position；播放中的 Note Add / Move / Resize / Delete、Undo / Redo、
@@ -1012,6 +1020,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-25 | `TEMPO-TRACK`                                              | MT4D 增加 BAR / BEAT / OFFSET 组合位置输入与 TIME 标签，保留网格 / Timeline 校验、无变化短路和单次 Move Command；初始位置只读。                                  | `31b5040`                                  |
 | 2026-08-25 | `TEMPO-TRACK`                                              | MT4E 由 Arrangement 持有 feature-scoped 交互控制器，令轨道拖拽与左侧 BPM / 位置 / TIME 共用瞬时预览；取消不写事实，松手只交接一次既有命令。                      | `31b5040`                                  |
 | 2026-08-25 | `TEMPO-CONTROL`、`TEMPO-TRACK`                             | MT5 收口 Project Tempo Control V1 已交付范围，集中记录曲线、多事件工具、Time Signature / SMPTE 编辑和通用 Automation 平台等延期边界。                            | 本次提交                                   |
+| 2026-08-26 | `AUDIO-QUALITY`                                            | AQ0–AQ3 建立合成 PCM 基线、平方 Velocity / `-12 dB` 输出校准、Envelope/Loop 门禁，以及 64/128/16 有界复音、确定性 Voice Stealing 与溢出诊断。                    | `40c44a1`、`1b74d26`、`dfa2411`、`64118f7` |
+| 2026-08-26 | `AUDIO-QUALITY`                                            | AQ4 冻结最终 V1A 政策标识、综合 Chromium 门禁、听测状态、兼容/失败边界及 CC64 后表达力集成门禁；未把开发报告冒充 WAV Export Backend。                            | 本次提交                                   |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1062,6 +1072,14 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   9 / 102、Audio Web 16 / 110、Studio 57 / 380、Type Utils 1 / 2。本轮未执行浏览器人工测试，
   阶段收口文档已通过用户审核并随本次提交封版。阶段 checkpoint 为
   `checkpoint/project-tempo-control-2026-08-25`。
+
+- Audio Quality Foundation V1A AQ0–AQ3 已于 2026-08-26 分批通过审核并提交为 `40c44a1`、
+  `1b74d26`、`dfa2411` 与 `64118f7`。AQ4 收口工作树的 Chromium 151 / 48 kHz / schema version 4
+  综合报告已通过 AQ1 headroom、AQ2 Envelope/Loop 与 AQ3 10,000 Note On 全部检查；本地 Studio
+  Grand 静态测量报告保持当前。完整根级 `pnpm check` 已通过 Architecture、Workspace Quality、
+  Lint、全工作区 Type Check、137 个测试文件 / 1,219 项测试、Studio Production Build 与
+  soundbank dist boundary；AQ1–AQ3 最终政策的 developer-local 人工听测如实记录为 `not-run`，
+  历史单音 smoke 不被重复计为通过。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

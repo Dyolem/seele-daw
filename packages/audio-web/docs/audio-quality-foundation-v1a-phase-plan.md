@@ -1,6 +1,6 @@
 # Audio Quality Foundation V1A 阶段计划
 
-> Status: AQ0–AQ2 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`); AQ3 implemented for review; AQ4 not implemented
+> Status: AQ0–AQ3 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`, `64118f7`); AQ4 implemented for review
 >
 > Date: 2026-08-26
 >
@@ -23,6 +23,8 @@ Audio Quality Foundation V1A 是“MIDI 音质、表现力与编辑基础”大�
 [Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。AQ0 的 fixture、
 测量窗口、报告结构和验收方式见
 [AQ0 基线与质量契约](./audio-quality-foundation-v1a-aq0-quality-contract.md)。
+最终阶段证据汇总见
+[Audio Quality Foundation V1A 收口报告](./audio-quality-foundation-v1a-closure-report.md)。
 
 ## 1. 已批准的产品定位
 
@@ -133,7 +135,7 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
 - 固定 deterministic steal 顺序、fast-release retirement 和 overflow diagnostics；
 - 覆盖密集和弦、快速同音、10,000 事件压力、future schedule、generation 与清理。
 
-当前工作树证据：
+已审核证据：
 
 - 有界分配器只位于项目级 `SampleInstrumentVoiceRuntime` 的 Sample Voice 所有权内；Playback Voice
   Plan、Project Fact、Project File 与 History 均未改变；
@@ -147,8 +149,8 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
   `9,920` 个 drop；项目级 129 Voice 输入精确维持 `128` 个发声 Voice，并 steal `1` 个旧 Voice；
 - 两组退场快速释放的最大 PCM 误差分别为 `6.240e-9` 与 `1.893e-10` full scale；发声电平误差
   均 `< 1e-5`，无满刻度帧，最终 tail 为数字静音，render 与 dispose 后资源统计归零；
-- 自动与浏览器门禁为 `passed`；developer-local soundbank 的最大复音听测仍为 `not-run`；AQ3 尚未
-  提交，等待本批功能审阅。
+- 自动与浏览器门禁为 `passed`；developer-local soundbank 的最大复音听测仍为 `not-run`；AQ3 已
+  审核并提交为 `64118f7`。
 
 ### AQ4：集成与收口
 
@@ -156,6 +158,20 @@ AQ0 不改变生产发声行为，只建立后续变化可复核的尺子：
 - 只有本阶段收口才运行完整根级 `pnpm check`；
 - 更新产品与架构状态，明确改变旧项目听感但不改变 Project File schema；
 - 为渲染政策提供代码级版本标识，供未来 WAV 导出报告记录，但不自动升级为 Project Fact。
+
+当前工作树证据：
+
+- AQ4 不改变声音算法；最终生产政策标识冻结为
+  `seele.audio-quality-foundation-v1a-aq3`，因为最后一次可听行为变化发生在 AQ3；
+- schema version 4 的 Chromium 48 kHz 综合报告同时重跑 AQ1 headroom、AQ2 Envelope/Loop 与 AQ3
+  10,000 Note On 门禁，全部顶层检查必须继续为 `true`；
+- developer-local Studio Grand 静态测量报告已确认仍与当前 Manifest/WAV 一致；2026-08-13 的历史
+  单音听测不能替代 AQ1–AQ3 最终政策听测，当前完整 listening matrix 如实记录为 `not-run`；
+- Project、Playback、Audio Web 与 Studio 的兼容/失败边界，以及 CC64 后、WAV Export 前必须执行的
+  表达力集成音质门禁，已集中写入收口报告；
+- AQ4 最终根级 `pnpm check` 已通过 Architecture、Workspace Quality、Lint、全工作区 Type Check、
+  137 个测试文件 / 1,219 项测试、Studio Production Build 与 soundbank dist boundary；AQ4 尚未
+  提交，等待本批功能审阅。
 
 每个批次完成后默认停止等待审核，除非用户另行要求连续实施。
 

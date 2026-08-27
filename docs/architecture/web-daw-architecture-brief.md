@@ -4,7 +4,7 @@
 > 产品定位：桌面浏览器优先、面向个人创作者的轻量 Web DAW  
 > 文档作用：回答系统如何拆分、模块如何依赖，以及从哪里开始开发  
 > 详细设计：遇到具体模块时再查阅 Web DAW 长期路线与架构设计 v3\
-> 最近校准：2026-08-21
+> 最近校准：2026-08-26
 
 ---
 
@@ -44,7 +44,7 @@ Arrangement 只拥有 Pointer / Keyboard、Preview、边缘滚动与 Follow。�
 MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase。阶段 checkpoint 为
 `checkpoint/manual-timeline-locate-2026-08-18`。
 
-当前下一条纵向切片是
+随后实施的
 [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)。
 新建的 `midi-file` 只拥有中立 SMF Document 与可替换 Decoder / Encoder Adapter，不依赖 Project
 Core 或 Browser；`project-midi` 独立拥有 MIDI Document 与 Project Model 的双向映射，不拥有项目
@@ -56,6 +56,14 @@ Core 或 Browser；`project-midi` 独立拥有 MIDI Document 与 Project Model �
 意图：`project-midi` 生成完整 Track 所有权图，Project Core 以一个集合 Command 原子追加并形成一个
 History 步骤；来源 Tempo / 拍号不进入该模式，当前 Project 时间轴保持权威。阻断失败不留下部分
 项目事实，非阻断诊断通过共享摘要反馈。MIDI Export 仍留在后续批次。
+
+Project Tempo Control V1 已通过
+`checkpoint/project-tempo-control-2026-08-25` 收口。其后的
+[Audio Quality Foundation V1A](../../packages/audio-web/docs/audio-quality-foundation-v1a-phase-plan.md)
+只在现有 Sample Voice 纵向切片内校准 Velocity/输出、Envelope/Loop、重触发与复音：Audio Web
+拥有最终政策和 Web Audio 节点，Playback 继续只传浏览器无关 Voice Plan，Studio 继续是唯一
+Composition Root。该阶段不建立 CC64、Velocity Layer、通用 Graph、AudioWorklet 或 WAV Offline
+Backend；下一条已批准切片是 Workbench Action / Menu / Shortcut。
 
 ---
 
@@ -253,6 +261,13 @@ Voice Lifecycle
 Realtime / Offline Backend
 ```
 
+当前已实现范围仍是主线程原生 Web Audio 的 Sample Voice Runtime。Audio Quality Foundation V1A
+冻结带低电平下限的平方 Velocity 响应、Project Master 后独立输出校准、Manifest Envelope/Loop
+语义，以及每个乐器设备 64 个、项目 Runtime 128 个发声槽和最多 16 个 steal 退场尾音。该预算、
+累计 steal/drop 与当前占用属于可重建运行状态，不进入 Project、History 或 Playback DTO；
+`polyphony-dropped` 也不能回滚合法 Project Commit。开发用 `OfflineAudioContext` 只执行生产
+Runtime 的 PCM 门禁，不等于长期 Offline Backend 已实现。
+
 ### Platform Services
 
 封装浏览器能力：
@@ -414,6 +429,12 @@ CapabilityService
 Transport / Scheduler，并把冻结 Voice Plan 交给 Audio Web。Vue 只通过 typed Context 观察
 shallow frozen state；Timer、AudioContext、解码缓存和 Voice 都由应用生命周期释放，不进入
 Pinia 或 Project Core。
+
+Audio Quality Foundation V1A 延续同一组合边界：Studio 为已准备项目创建一个项目级
+`SampleInstrumentVoiceRuntime`，Voice Plan 的 `instrumentDeviceId` 只用于区分乐器复音预算；
+Velocity 曲线、Envelope、Web Audio Node 与 Voice Stealing 不反向下沉到 Coordinator、Playback
+或 Project Core。渲染政策的代码级标识不是 Project Fact，也不与 `modelRevision` 或
+`engineGeneration` 混用。
 
 Batch 7 的 `timelineEndTick` 由 Playback 从 Project Snapshot 派生，并同时约束 Studio Ruler 与
 Transport 自然结束。Studio 以一个帧采样绑定读取 Transport 权威位置；浏览器后台不触发动画帧

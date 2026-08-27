@@ -37,13 +37,13 @@ runButton.addEventListener('click', () => {
       copyButton.disabled = false
       const hardChecksPass = Object.values(report.checks).every(Boolean)
       setStatus(
-        hardChecksPass ? 'AQ3 浏览器检查通过' : 'AQ3 报告包含未通过检查',
+        hardChecksPass ? 'V1A 综合浏览器检查通过' : 'V1A 综合报告包含未通过检查',
         hardChecksPass ? 'ready' : 'error',
       )
     } catch (error) {
       serializedReport = null
       output.textContent = describeError(error)
-      setStatus('AQ3 浏览器检查失败', 'error')
+      setStatus('V1A 综合浏览器检查失败', 'error')
     } finally {
       runButton.disabled = false
     }
@@ -55,7 +55,7 @@ copyButton.addEventListener('click', () => {
     if (serializedReport === null) return
     try {
       await navigator.clipboard.writeText(`${serializedReport}\n`)
-      setStatus('AQ3 报告 JSON 已复制', 'ready')
+      setStatus('V1A 综合报告 JSON 已复制', 'ready')
     } catch (error) {
       setStatus(`复制失败：${describeError(error)}`, 'error')
     }

@@ -89,6 +89,8 @@
 | 出现实例           | Occurrence                   | Arrangement 展开后一次具体 Note 出现；重叠同音必须用 occurrence 区分。                                                                                                                          |
 | 发声令牌           | Voice Token                  | 当前由 `(engineGeneration, occurrenceKey)` 组成的 Voice 身份，用于 cancel、重排和清理。                                                                                                         |
 | 引擎代次           | Engine Generation            | Transport 时间映射或全局状态失效时推进的运行时代次；旧代计划必须被丢弃。它不是 modelRevision。                                                                                                  |
+| 渲染政策标识       | Render Policy ID             | 标记一组实际发声算法与常数的代码级字符串。最终 V1A 为 `seele.audio-quality-foundation-v1a-aq3`；它不是 Project Fact 或文件 schema。                                                             |
+| 报告结构版本       | Report Schema Version        | 标记浏览器质量报告字段形状的整数。schema version 4 不表示 Project File v4，也不等于渲染政策版本。                                                                                               |
 | 离线音频上下文     | OfflineAudioContext          | 浏览器中不连接扬声器、尽快渲染到 AudioBuffer 的 Web Audio 后端。AQ0 用它运行真实 Voice Runtime 和合成素材。                                                                                     |
 | 离线上下文适配视图 | Offline Context Adapter View | `OfflineAudioContext` 在开始渲染前报告 `suspended`，但生产 Voice Runtime 只接收已激活的 `running` 上下文。AQ0 只在调度窗口把状态读取适配为 `running`；节点和 PCM 仍由原生离线上下文创建和渲染。 |
 | 实时/离线一致性    | Realtime/Offline Parity      | 实时播放和未来 WAV 导出使用相同发声政策，而不是两套听起来不同的实现。                                                                                                                           |

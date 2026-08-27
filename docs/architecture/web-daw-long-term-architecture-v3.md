@@ -4,7 +4,7 @@
 > 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
 > 评审日期：2026-07-09\
-> 最近实现校准：2026-08-21\
+> 最近实现校准：2026-08-26\
 > 状态：Proposed Architecture Baseline v3
 
 > 本文描述长期目标，不是当前实现清单。当前仓库边界见
@@ -15,12 +15,15 @@
 > 仍是长期能力，除非阶段计划明确纳入，否则不能作为首版可听切片的验收要求。
 > 本文其余未加 `Audible MIDI Playback` 限定的 `V1` 是 2026-07-09 长期基线中的“首版产品 /
 > 模型”简称，同样不是文档版本；落地时仍须由对应专项计划重新确认。
-> Manual Timeline Locate 已通过 `checkpoint/manual-timeline-locate-2026-08-18` 收口；当前实施中的
+> Manual Timeline Locate 已通过 `checkpoint/manual-timeline-locate-2026-08-18` 收口；随后实施的
 > [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)
 > 以独立 `midi-file` Codec 和 `project-midi` 映射边界开始，不把第三方 Parser 类型、格式规则或
 > 文件 I/O 反向带入 Project Core。当前已完成调用方验证 Session 的新项目生命周期入口、本地 Blob
 > 字节读取 Adapter，以及 Studio Project Entry / Workbench 的文件选择、Codec / Bridge 组合、
-> dirty 导航确认与共享导入反馈；MIDI Export 仍属于后续批次。
+> dirty 导航确认与共享导入反馈；MIDI Export 仍属于后续批次。Project Tempo Control V1 已通过
+> `checkpoint/project-tempo-control-2026-08-25` 收口；当前 Audio Quality Foundation V1A 在既有
+> Sample Voice 边界内冻结 Velocity/输出、Envelope/Loop 与有界复音政策，不提前建立通用 Graph、
+> CC64 或 WAV Offline Backend。
 
 ---
 
@@ -70,6 +73,13 @@ Manifest 驱动 MIDISampleSynth Runtime，并以 Studio Grand 作为首次听觉
 Seele Supported SFZ Profile 声明公开 authoring 子集，各来源 Importer 消除自身语法、继承和
 私有默认值，规范化 Sample Instrument Manifest 才是内置 Runtime 的唯一输入。当前默认内置
 Mapping 的逆向推断只属于 Compatibility Adapter，不构成通用宿主规则。
+
+Audio Quality Foundation V1A 进一步冻结当前 Sample Voice Runtime 的生产行为：带 `-36 dB`
+低电平下限的平方 Velocity 响应、Project Master 后独立 `-12 dB` 输出校准、Manifest 作者声明的
+Envelope/Loop/Trigger，以及每个乐器设备 64 个、项目 Runtime 128 个发声槽和最多 16 个
+Voice Stealing 退场尾音。确定性候选、steal/drop 计数和 `polyphony-dropped` 都属于可重建运行时；
+它们不进入 Project File、History 或 Playback Plan。代码级渲染政策标识为
+`seele.audio-quality-foundation-v1a-aq3`，不与 modelRevision 或 engineGeneration 混用。
 
 该切片还由 Playback 从 Snapshot 派生至少 150 小节的 `timelineEndTick`，并由 Studio 将同一
 Transport 视觉位置投影到 Arrangement、Track-time Piano Roll 和 Clip Focus Piano Roll。动画帧
@@ -1448,7 +1458,11 @@ fallback-supported
 
 存在 realtime-only 设备时禁止悄悄导出不同声音；要么提示并中止，要么由用户明确选择 bypass / realtime bounce。
 
-导出结果包含 peak 检测、时长、sample rate、channel count 与所用 modelRevision。V1 优先 WAV；有损格式作为独立编码 adapter。
+导出结果包含 peak 检测、时长、sample rate、channel count、所用 modelRevision 与实际渲染政策
+标识。V1 优先 WAV；有损格式作为独立编码 adapter。当前 V1A 的 Chromium
+`OfflineAudioContext` 工具只是直接运行实时 Sample Voice Runtime 的开发质量门禁，不是这里的
+Offline Backend。CC64 完成后还必须先通过表达力集成音质门禁，才能冻结 WAV Export 的实时/
+离线共同语义。
 
 ---
 

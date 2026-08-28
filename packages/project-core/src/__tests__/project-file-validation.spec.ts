@@ -9,6 +9,7 @@ import {
   type ProjectFileDTO,
 } from '#internal/index'
 import projectFileV1Golden from './fixtures/project-files/v1/complete-project.json'
+import projectFileV2Golden from './fixtures/project-files/v2/complete-project.json'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
 type MutableDataObject = Record<string, unknown>
@@ -54,14 +55,38 @@ function expectDeeplyFrozen(value: unknown): void {
   for (const child of Object.values(value)) expectDeeplyFrozen(child)
 }
 
-describe('ProjectFileDTO V1 input decoding', () => {
-  it('keeps the executable V1 protocol and current writer aligned with the static golden file', () => {
-    const { projected } = createMutableProjectFileInput()
+describe('ProjectFileDTO input decoding and migration', () => {
+  it('strictly decodes and migrates the static V1 golden without inventing CC64 facts', () => {
     const decodedGolden = decodeProjectFileDTO(projectFileV1Golden as unknown)
 
-    expect(decodedGolden).toEqual(projectFileV1Golden)
-    expect(projected).toEqual(decodedGolden)
+    expect(decodedGolden.formatVersion).toBe(2)
     expect(decodedGolden).not.toBe(projectFileV1Golden)
+    expect(Object.values(decodedGolden.midiSources)).toHaveLength(2)
+    for (const source of Object.values(decodedGolden.midiSources)) {
+      expect(source.sustainPedalEvents).toEqual({})
+    }
+    expectDeeplyFrozen(decodedGolden)
+  })
+
+  it('keeps V1 strict instead of accepting the V2 Sustain Pedal Event field early', () => {
+    const input = requireDataObject(JSON.parse(JSON.stringify(projectFileV1Golden)))
+    getEntity(input, 'midiSources', 'source-non-loop').sustainPedalEvents = {}
+
+    expect(() => decodeProjectFileDTO(input)).toThrowError(
+      expect.objectContaining<Partial<ProjectFileValidationError>>({
+        code: 'unexpected-property',
+        path: ['midiSources', 'source-non-loop', 'sustainPedalEvents'],
+      }),
+    )
+  })
+
+  it('keeps the executable V2 protocol and current writer aligned with the static golden file', () => {
+    const { projected } = createMutableProjectFileInput()
+    const decodedGolden = decodeProjectFileDTO(projectFileV2Golden as unknown)
+
+    expect(decodedGolden).toEqual(projectFileV2Golden)
+    expect(projected).toEqual(decodedGolden)
+    expect(decodedGolden).not.toBe(projectFileV2Golden)
     expectDeeplyFrozen(decodedGolden)
   })
 
@@ -123,7 +148,7 @@ describe('ProjectFileDTO V1 input decoding', () => {
     expectDeeplyFrozen(decoded)
   })
 
-  it('reports deterministic paths for missing and unexpected V1 fields', () => {
+  it('reports deterministic paths for missing and unexpected current fields', () => {
     const missing = createMutableProjectFileInput().input
     delete missing.name
 
@@ -146,14 +171,14 @@ describe('ProjectFileDTO V1 input decoding', () => {
   })
 
   it('rejects unsupported versions before interpreting version-specific fields', () => {
-    const futureInput = { formatVersion: 2, futureRoot: true }
+    const futureInput = { formatVersion: 3, futureRoot: true }
 
     expect(() => decodeProjectFileDTO(futureInput)).toThrowError(
       expect.objectContaining<Partial<ProjectFileValidationError>>({
         code: 'unsupported-format-version',
         path: ['formatVersion'],
-        expected: '1',
-        actual: '2',
+        expected: '1 or 2',
+        actual: '3',
       }),
     )
   })
@@ -228,6 +253,24 @@ describe('ProjectFileDTO V1 input decoding', () => {
     ).pitch = 999
 
     expect(() => decodeProjectFileDTO(domainInvalidButStructurallyValid)).not.toThrow()
+
+    const fractionalControlValue = createMutableProjectFileInput().input
+    const sustainPedalEvents = requireDataObject(
+      getEntity(fractionalControlValue, 'midiSources', sourceId).sustainPedalEvents,
+    )
+    const eventId = Object.keys(sustainPedalEvents)[0]!
+    getEntity(
+      getEntity(fractionalControlValue, 'midiSources', sourceId),
+      'sustainPedalEvents',
+      eventId,
+    ).value = 63.5
+
+    expect(() => decodeProjectFileDTO(fractionalControlValue)).toThrowError(
+      expect.objectContaining<Partial<ProjectFileValidationError>>({
+        code: 'invalid-integer',
+        path: ['midiSources', sourceId, 'sustainPedalEvents', eventId, 'value'],
+      }),
+    )
   })
 
   it('rejects unsupported discriminators and branch-specific extra fields', () => {

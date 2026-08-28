@@ -38,6 +38,11 @@ export function prepareAddMidiClipWithNoteCommand(
         after: [command.note],
       },
       {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: command.source.id,
+        after: [],
+      },
+      {
         type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
         after: command.clip,
       },

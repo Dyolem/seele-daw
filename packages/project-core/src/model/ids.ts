@@ -7,6 +7,7 @@ export type TrackId = Brand<string, 'TrackId'>
 export type ClipId = Brand<string, 'ClipId'>
 export type MidiSourceId = Brand<string, 'MidiSourceId'>
 export type NoteId = Brand<string, 'NoteId'>
+export type MidiSustainPedalEventId = Brand<string, 'MidiSustainPedalEventId'>
 export type DeviceId = Brand<string, 'DeviceId'>
 export type TempoEventId = Brand<string, 'TempoEventId'>
 export type TimeSignatureEventId = Brand<string, 'TimeSignatureEventId'>
@@ -34,6 +35,10 @@ export function parseMidiSourceId(value: unknown): MidiSourceId {
 
 export function parseNoteId(value: unknown): NoteId {
   return parseOpaqueId<NoteId>(value, 'NoteId')
+}
+
+export function parseMidiSustainPedalEventId(value: unknown): MidiSustainPedalEventId {
+  return parseOpaqueId<MidiSustainPedalEventId>(value, 'MidiSustainPedalEventId')
 }
 
 export function parseDeviceId(value: unknown): DeviceId {

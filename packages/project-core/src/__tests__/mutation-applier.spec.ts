@@ -185,7 +185,7 @@ describe('MutationApplier plan admission and revision checks', () => {
 })
 
 describe('MutationApplier complete transaction', () => {
-  it('applies all 27 mutation types exactly like the materialized projection and commits once', () => {
+  it('applies all 32 mutation types exactly like the materialized projection and commits once', () => {
     const { fixture, mutations } = createCompleteMutationScenario()
     const store = new ModelStore(fixture.seed)
     const plan = createMutationPlan(store.modelRevision, mutations)
@@ -196,7 +196,7 @@ describe('MutationApplier complete transaction', () => {
       Object.values(typeGroup),
     )
 
-    expect(plan.forward).toHaveLength(27)
+    expect(plan.forward).toHaveLength(32)
     expect(new Set(plan.forward.map(({ type }) => type))).toEqual(new Set(canonicalMutationTypes))
 
     const committedRevision = applier.apply(plan)

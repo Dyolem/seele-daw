@@ -2,7 +2,10 @@
 
 ## 协议状态
 
-本文档是 Seele DAW `formatVersion: 1` 项目文件的规范性协议。它定义持久化字段、JSON 形状、数值单位、引用关系和兼容规则，不定义 ModelStore、ProjectSnapshot 或任意其他运行时对象的内部布局。
+本文档是 Seele DAW 历史 `formatVersion: 1` 项目文件的规范性协议。它定义持久化字段、JSON
+形状、数值单位、引用关系和兼容规则，不定义 ModelStore、ProjectSnapshot 或任意其他运行时
+对象的内部布局。当前 writer 已输出 V2；严格 V1 reader 仍受支持，合法 V1 会确定性迁移为
+当前 V2 DTO。
 
 本协议一旦用于真实项目文件，V1 的以下内容必须保持稳定：
 
@@ -20,32 +23,37 @@
 Project File Format 不承诺与当前 TypeScript 领域 Record 同名或同构。运行时字段重命名、容器替换或类型名调整不得自动修改 V1；写出 projector 和读取 normalizer 负责显式映射。
 
 ```text
-                         Project File Format V1
-                        /                      \
-Runtime -> Snapshot -> Projector              Decoder -> Runtime
+Runtime -> Snapshot -> current V2 Projector -> Project File Format V2
+
+Project File Format V1 -> strict V1 Decoder -> V1-to-V2 Migration -> Runtime
+Project File Format V2 -> strict V2 Decoder -----------------------> Runtime
 ```
 
 这是一份方向无关的持久化协议，不是导出和导入各自拥有一份格式：
 
 - `ProjectSnapshot` 是特定 `modelRevision` 的运行时视图，是 writer 的可信输入，不是可版本化文件；
-- projector 把当前运行时事实显式映射为本协议；
-- decoder 按同一协议校验外部数据，后续 migration 和 domain normalizer 再创建当前运行时模型；
+- 历史 V1 projector 的字段映射由本协议与 golden 固定；当前 projector 写 V2，不再生成 V1；
+- V1 decoder 按本协议校验外部数据，随后 V1-to-V2 migration 和 domain normalizer 创建当前
+  运行时模型；
 - Snapshot 可以随 package 运行时需求演进，但不能借此静默修改已发布的 V1 字段。
 
 例如，运行时将 `TrackRecord.name` 重命名为 `displayName` 时，V1 文件仍使用 `name`，只调整两侧映射。
 
 ## 协议校准机制
 
-文档不能单独保证实现正确。V1 由以下四层共同校准：
+文档不能单独保证实现正确。历史 V1 由以下四层共同校准：
 
 1. **规范文档**：本文档供人工审阅字段和语义。
 2. **编译期字段校准**：`project-file-v1-protocol.ts` 使用 mapped type 将 V1 运行时字段集与对应 DTO interface 对齐；漏字段、多字段和重命名会使类型检查失败。
 3. **运行时协议校验**：`decodeProjectFileDTO(input)` 直接消费该 V1 字段集和判别值，对每份外部数据执行严格校验，不进行 TypeScript cast。
-4. **历史兼容校准**：静态 V1 golden JSON 不由当前 projector 动态生成，必须始终能被当前 reader 解码，并与当前 complete writer fixture 的投影等价。
+4. **历史兼容校准**：静态 V1 golden JSON 不由当前 projector 动态生成，必须始终能被当前
+   reader 解码，并迁移为与原有事实等价、每个 Source 带空 CC64 Event 表的当前 DTO。
 
 编译期校准只能检测 property 集与 TypeScript 形状偏移；数值单位、范围、外键和所有权等语义仍必须由运行时解码、领域工厂、`InvariantValidator` 和 golden 测试共同保护。
 
-所有外部读取都必须通过 decoder。Writer 从已验证的 ModelStore / Snapshot 边界生成 DTO，通过 DTO 返回类型、完整投影测试和 golden 校准保证协议一致，不在每次保存时再次调用 decoder 复制整个大型项目。
+所有外部读取都必须通过 decoder。当前 Writer 从已验证的 ModelStore / Snapshot 边界生成 V2
+DTO，通过 DTO 返回类型、完整投影测试和 V2 golden 校准保证协议一致，不在每次保存时再次
+调用 decoder 复制整个大型项目。
 
 ## JSON 数据模型
 
@@ -197,6 +205,10 @@ Note 不重复保存 `sourceId`；它所在的 `MidiSourceDTO.notes` table 表�
 
 V1 中每个 MidiClip 独占一个 MidiSource，每个 MidiSource 被且仅被一个 MidiClip 引用。
 
+V1 不包含 `sustainPedalEvents`，也不持久化其他 MIDI CC。严格 V1 decoder 会拒绝提前出现的
+V2 字段；通过校验后，V1-to-V2 migration 为每个 Source 添加空踏板事件表，不猜测踏板状态，
+也不修改 Note Duration。当前扩展见 [Seele Project File Format V2](./project-file-format-v2.md)。
+
 ## Timeline
 
 TempoEventDTO 只包含：
@@ -283,7 +295,8 @@ V1 decoder 负责 JSON 形状与实体 key / ID。领域 Record 工厂负责 ID�
 
 V1 Track 是封闭的 `instrument | audio` 判别联合，每个分支也拒绝未知 property。因此：
 
-- 新增会持久化为新 `kind` 的 Group、Folder、Return 或其他 Track 分支必须定义 V2 或更高版本；
+- 新增会持久化为新 `kind` 的 Group、Folder、Return 或其他 Track 分支必须定义晚于当前版本的
+  新格式；
 - 向现有 Instrument / Audio Track 增加新必填持久化字段也必须升级格式；
 - 只是运行时 Record 重命名、缓存、索引或 UI 临时分组不修改文件格式；
 - 能够完整由现有 Instrument / Audio Track 与 Device 结构表达的产品能力通常不需要新 Track 分支。
@@ -294,10 +307,12 @@ V1 Track 是封闭的 `instrument | audio` 判别联合，每个分支也拒绝�
 
 - DTO 类型：`src/persistence/project-file-dto.ts`
 - 可执行字段协议：`src/persistence/project-file-v1-protocol.ts`
-- 运行时解码：`src/persistence/project-file-decoder.ts`
+- 版本路由与运行时解码：`src/persistence/project-file-decoder.ts`
+- V1 到 V2 迁移：`src/persistence/project-file-v1-to-v2-migration.ts`
 - 当前领域映射：`src/persistence/project-file-normalizer.ts`
 - fresh Session 加载：`src/persistence/project-file-loader.ts`
-- 当前写出投影：`src/persistence/project-file-projector.ts`
+- 当前 V2 写出投影：`src/persistence/project-file-projector.ts`
 - 静态兼容样本：`src/__tests__/fixtures/project-files/v1/complete-project.json`
+- 当前协议：[Seele Project File Format V2](./project-file-format-v2.md)
 
 参考实现可以重构，但本协议和已发布 golden 数据不能因运行时模型重构而被静默改写。

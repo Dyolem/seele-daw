@@ -27,7 +27,7 @@ V1 数据模型需要支持以下闭环：
 - Project 基本身份；
 - Instrument Track，以及未来 Audio Track 所需的拓扑判别方式；
 - 一张统一的 Clip 表；
-- MidiClip、MidiSource 和 MidiNote；
+- MidiClip、MidiSource、MidiNote 和 Source-owned Sustain Pedal CC64 Event；
 - MIDI Loop 的存储语义；
 - Tempo 和 Time Signature；
 - 最小 Device descriptor 和 Channel Strip；
@@ -37,7 +37,7 @@ V1 数据模型需要支持以下闭环：
 
 - AudioClip 的完整字段和时间算法；
 - Automation；
-- MIDI CC、Pitch Bend、Aftertouch、MPE 和 Note Expression；
+- CC64 以外的 MIDI CC、Pitch Bend、Aftertouch、MPE 和 Note Expression；
 - Recording、Asset 和媒体垃圾回收；
 - Linked Clip、Take Lane、Comping；
 - Group、Return、Send 和任意路由图；
@@ -68,7 +68,8 @@ ProjectFileDTO
 
 - Clip 保存 `trackId`，Track 不保存 `clipIds`；
 - Track 到 Clip 的查询通过可重建索引完成；
-- Note 的所属 Source 由 `midiNotesBySource` 分区表达，Note 不重复保存 `sourceId`；
+- Note 与 Sustain Pedal Event 的所属 Source 分别由 Source 分区表达，事件本身不重复保存
+  `sourceId`；
 - Device 的所属位置和顺序由 Track 的 Device ID 集合表达，Device 不保存 `trackId`；
 - 只有真正表达人工顺序的关系才保存 ID 数组，例如 `trackOrder` 和 Device Chain。
 
@@ -76,7 +77,8 @@ ProjectFileDTO
 
 ### 实体与值对象区别对待
 
-拥有独立身份、选择、生命周期或 Undo 语义的数据进入实体表，例如 Track、Clip、MidiSource、Note、Tempo Event 和 Device。
+拥有独立身份、选择、生命周期或 Undo 语义的数据进入实体表，例如 Track、Clip、MidiSource、
+Note、Sustain Pedal Event、Tempo Event 和 Device。
 
 没有独立生命周期的组合值直接嵌入实体，例如 `ChannelStripDescriptor` 和 `MidiLoop`。规范化不等于把每一个小对象都拆成独立表。
 
@@ -101,6 +103,7 @@ type TrackId = Brand<string, 'TrackId'>
 type ClipId = Brand<string, 'ClipId'>
 type MidiSourceId = Brand<string, 'MidiSourceId'>
 type NoteId = Brand<string, 'NoteId'>
+type MidiSustainPedalEventId = Brand<string, 'MidiSustainPedalEventId'>
 type DeviceId = Brand<string, 'DeviceId'>
 type TempoEventId = Brand<string, 'TempoEventId'>
 type TimeSignatureEventId = Brand<string, 'TimeSignatureEventId'>
@@ -111,6 +114,7 @@ type ParameterId = Brand<string, 'ParameterId'>
 type Tick = Brand<number, 'Tick'>
 type MidiPitch = Brand<number, 'MidiPitch'>
 type MidiVelocity = Brand<number, 'MidiVelocity'>
+type MidiControlValue = Brand<number, 'MidiControlValue'>
 type MidiChannel = Brand<number, 'MidiChannel'>
 type LinearGain = Brand<number, 'LinearGain'>
 type BipolarValue = Brand<number, 'BipolarValue'>
@@ -264,13 +268,14 @@ sourceOffsetTick + spanTick <= midiSource.lengthTick
 
 Track 不保存 `clipIds`。运行时通过 `clipsByTrack` 派生索引完成 Track 到 Clip 的反向查询。
 
-## MidiSource 与 MidiNote
+## MidiSource、MidiNote 与 Sustain Pedal CC64
 
 Clip 是时间线窗口，MidiSource 是相对时间内容。V1 采用严格的一对一所有权：
 
 ```text
 MidiClip 1 ---- 1 MidiSource
 MidiSource 1 -- 1 NoteTable
+MidiSource 1 -- 1 SustainPedalEventTable
 ```
 
 ```ts
@@ -292,9 +297,21 @@ interface MidiNoteAddress {
   readonly sourceId: MidiSourceId
   readonly noteId: NoteId
 }
+
+interface MidiSustainPedalEventRecord {
+  readonly id: MidiSustainPedalEventId
+  readonly tick: Tick
+  readonly value: MidiControlValue
+  readonly channel: MidiChannel
+}
+
+interface MidiSustainPedalEventAddress {
+  readonly sourceId: MidiSourceId
+  readonly eventId: MidiSustainPedalEventId
+}
 ```
 
-Note 的时间坐标相对于 MidiSource，不是项目时间线。
+Note 与 Sustain Pedal Event 的时间坐标都相对于 MidiSource，不是项目时间线。
 
 字段范围：
 
@@ -306,6 +323,9 @@ note.startTick + note.durationTick <= source.lengthTick
 note.pitch 是整数 0..127
 note.velocity 是整数 1..127
 note.channel 是整数 0..15
+pedalEvent.tick 是整数 0..source.lengthTick
+pedalEvent.value 是整数 0..127
+pedalEvent.channel 是整数 0..15
 ```
 
 规则：
@@ -318,7 +338,15 @@ note.channel 是整数 0..15
 - 相同 Source 中允许同音高 Note 重叠；
 - Playback Compiler 必须为播放事件生成唯一 Event Key，Runtime 使用 voice token 结束对应 Voice；
 - Selection、hover 和拖拽预览不进入 Note Record；
-- Release Velocity、CC、Pitch Bend、Aftertouch 和 MPE 等到真正实现时再设计对应事件表。
+- Release Velocity、CC64 以外的 CC、Pitch Bend、Aftertouch 和 MPE 等到真正实现时再设计对应
+  事件表。
+
+CC64 使用专用 Source-owned Event，而不是通用 Automation。原始 `value` 保持 `0..127`；当前
+状态解释为 `value >= 64` 时 Pedal Down，低于 `64` 时 Pedal Up，但 Core 不把中间值改写为
+布尔值。同一 Source、Channel、Tick 最多存在一枚 Event，Event ID 在整个项目唯一。CC64 不
+烘焙进 Note Duration，也不读取或改写音源控制文件中的 Sample Loop、Envelope、Trigger、
+Mutex 或 Release 参数。完整事务与兼容边界见
+[MIDI Sustain Pedal CC64 Project Fact V1](./midi-sustain-pedal-cc64-project-fact-v1.md)。
 
 普通 Add Note 和同一 MidiSource 内的 Move Notes 使用严格边界：每个 Note 区间必须完整落在
 Source 的半开区间内，Pitch 必须落在 0–127。越界 Command 必须整体拒绝，不执行 Core
@@ -342,25 +370,31 @@ Track 全局 Piano Roll 的 Pencil 放置使用两个显式产品命令，而不
 完整边界见
 [MIDI Clip / Note 原子放置命令计划](./midi-clip-note-placement-command-plan.md)。
 
-运行时按 Source 分区存储 Note：
+运行时按 Source 分别存储 Note 与 Sustain Pedal Event：
 
 ```ts
 type MidiNoteTable = Map<NoteId, MidiNoteRecord>
 
 midiSources: Map<MidiSourceId, MidiSourceRecord>
 midiNotesBySource: Map<MidiSourceId, MidiNoteTable>
+midiSustainPedalEventsBySource: Map<
+  MidiSourceId,
+  Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
+>
 ```
 
-这种结构使 Piano Roll 可以直接定位一张 Source 的 Note 表，高频 Note 编辑不需要替换整个 MidiSource，同时避免每个 Note 重复保存 `sourceId`。
+这种结构使 Piano Roll 与 Controller Lane 可以直接定位一张 Source 的内容分区，高频事件编辑
+不需要替换整个 MidiSource，同时避免每个事件重复保存 `sourceId`。
 
 ### 复制与删除所有权
 
 - 默认复制 MidiClip 时生成新的 Clip ID 和 MidiSource ID；
-- Source 内容执行深复制，每个复制出的 Note 也生成新的 Note ID；
+- Source 内容执行深复制，每个复制出的 Note 与 Sustain Pedal Event 也生成新的实体 ID；
 - 普通复制不会形成 Linked Clip；
 - Linked Clip 必须作为显式产品能力和新的所有权语义加入；
-- 删除 MidiClip 时，同一事务删除其 MidiSource 和 Note Table；
-- 删除 Track 时，同一事务删除所属 Clip、Source、Note、Device，并更新 `trackOrder`；
+- 删除 MidiClip 时，同一事务删除其 MidiSource、Note Table 和 Sustain Pedal Event Table；
+- 删除 Track 时，同一事务删除所属 Clip、Source、Note、Sustain Pedal Event、Device，并更新
+  `trackOrder`；
 - Undo 必须原子恢复整个所有权图，不能暴露中间状态；
 - 任意已提交状态中都不能存在孤立 Source 或一个 Source 被多个 Clip 引用。
 
@@ -505,6 +539,10 @@ interface InternalModelStore {
 
   midiSources: Map<MidiSourceId, MidiSourceRecord>
   midiNotesBySource: Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>
+  midiSustainPedalEventsBySource: Map<
+    MidiSourceId,
+    Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
+  >
 
   tempoEvents: Map<TempoEventId, TempoEventRecord>
   timeSignatureEvents: Map<TimeSignatureEventId, TimeSignatureEventRecord>
@@ -516,7 +554,9 @@ interface InternalModelStore {
 
 ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只读 ID 集合表达已经规范化的输入，但不等同于外部 `ProjectFileDTO`，也不表示跨实体不变量已经通过验证。
 
-构造器复制 `trackOrder`、每张顶层 Map 和 `midiNotesBySource` 中的每张 Note Map，取得所有可变容器的独占所有权；已经由领域工厂创建的只读实体 Record 保持原引用。调用方在构造后修改原 Seed 容器不能改变 Store，未变化实体则继续保持引用相等。
+构造器复制 `trackOrder`、每张顶层 Map，以及两个 Source 内容分区中的每张 Event Map，取得
+所有可变容器的独占所有权；已经由领域工厂创建的只读实体 Record 保持原引用。调用方在构造
+后修改原 Seed 容器不能改变 Store，未变化实体则继续保持引用相等。
 
 `ModelStoreReader` 只提供实体属性、按 ID 查找和 entry iterator，不返回内部 `Map`、表的 `ReadonlyMap` 视图或 `trackOrder` 数组。`ModelStore`、Seed 和 Reader 都是包内实现，不从 package 公共入口导出。
 
@@ -526,7 +566,8 @@ ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只�
 - ModelStore 构造器不执行跨实体校验、修复或过滤，完整 Seed 由 `InvariantValidator` 判断是否合法；
 - ModelStore 构造时注册捕获 `#private` 字段的细粒度写闭包，但不开放 Map、分区表、`trackOrder`、通用 setter 或 revision setter；
 - `MutationApplier` 是唯一允许领取写 capability 的组件，同一个 ModelStore 的 lease 只能领取一次；
-- 实体表、Note 分区和 `trackOrder` 通过 expected / next 或 index / ID 形式的 CAS primitive 修改；全部前置检查和临时 Map 构建必须先于那一次权威容器写；
+- 实体表、Source 内容分区和 `trackOrder` 通过 expected / next 或 index / ID 形式的 CAS
+  primitive 修改；全部前置检查和临时 Map 构建必须先于那一次权威容器写；
 - Map 中的实体是只读记录，字段改变时创建新记录并替换表项；
 - 一次原子事务只让 `modelRevision` 增加一次；
 - revision 是成功事务的最后一次写入；失败回滚不改变 revision，Undo 则是产生新 revision 的新事务；
@@ -546,7 +587,8 @@ Map insertion order 不表达实体表的领域顺序。防御性回滚或 Undo 
 - Tick 0 的 120 BPM Tempo Event；
 - Tick 0 的 4/4 Time Signature Event；
 - gain 为 `1`、未静音且没有 Audio Effect 的 Master；
-- 空的 `trackOrder`、Track、Clip、MidiSource、Note 分区和 Device 表；
+- 空的 `trackOrder`、Track、Clip、MidiSource、Note 分区、Sustain Pedal Event 分区和 Device
+  表；
 - revision 为 `0` 的 ModelStore。
 
 零 Track 是合法项目状态。默认 Instrument Track 必须同时决定 Instrument Device 和对应 Device Definition，因此属于 Studio 的项目模板，而不是 ModelStore 的结构默认值。初始化器构造 Store 后执行 `assertModelInvariants`；ModelStore 构造器本身仍不承担验证或修复职责。
@@ -605,10 +647,12 @@ interface MidiSourceDTO {
   readonly id: string
   readonly lengthTick: number
   readonly notes: Record<string, MidiNoteDTO>
+  readonly sustainPedalEvents: Record<string, MidiSustainPedalEventDTO>
 }
 ```
 
-Note 在 DTO 中嵌套于 MidiSource，加载后再规范化为 `midiNotesBySource`。这只是文件结构，不改变运行时所有权。
+Note 与 Sustain Pedal Event 在 DTO 中嵌套于 MidiSource，加载后再规范化为各自的 Source
+分区。这只是文件结构，不改变运行时所有权。
 
 所有外部数据必须经过：
 
@@ -624,9 +668,24 @@ parse
 
 保存时执行相反方向的显式投影，不调用 `JSON.stringify(ModelStore)`。
 
-当前已经实现 `formatVersion: 1` 的完整内存往返边界：`ProjectSnapshot -> ProjectFileDTO` 写出投影、`unknown -> ProjectFileDTO V1` 严格解码，以及 `ProjectFileDTO -> domain Records -> ModelStore -> ProjectSession` 领域加载。写出会复制并冻结全部 DTO 容器、把 Note 嵌入所属 MidiSource、深复制 Device JsonValue，并省略本地 `modelRevision`。读取解码严格校验 V1 字段、版本、required feature、数字形状、判别联合、entity table key / ID 和 JsonValue；领域 normalizer 随后调用当前 parser 与 Record factory，并在完整 Store 上验证跨实体不变量。加载成功创建 revision `0`、空 History、重建 QueryIndex 的 fresh Session。V1 可执行字段定义受 DTO mapped type 校准，静态 golden JSON 同时保护 reader 与 writer 的历史兼容。
+当前 writer 输出 `formatVersion: 2`：`ProjectSnapshot -> ProjectFileDTO` 投影会把 Note 与 Sustain
+Pedal Event 嵌入所属 MidiSource，复制并冻结全部 DTO 容器、深复制 Device JsonValue，并省略
+本地 `modelRevision`。Reader 对 V1 与 V2 分别执行严格字段解码；合法 V1 通过纯迁移为 V2，并
+为每个 Source 添加空 `sustainPedalEvents` 表，不伪造 Pedal Up 或修改 Note Duration。随后领域
+normalizer 调用当前 parser 与 Record factory，并在完整 Store 上验证跨实体不变量。加载成功
+创建 revision `0`、空 History、重建 QueryIndex 的 fresh Session。静态 V1 golden 保护历史
+读取与迁移，静态 V2 golden 校准当前 reader 与 writer。
 
-当前也已实现独立版本的 storage-neutral `ProjectCheckpoint` envelope、`ProjectCheckpointStore` 端口、单 Snapshot 保存 receipt 和按优先级候选恢复。Checkpoint 保存来源 `modelRevision` 但恢复时不写回该 revision；active 候选损坏时由核心校验边界尝试 previous。IndexedDB adapter、JSON codec、历史版本迁移与 Journal 仍是后续独立边界。规范性协议见 [Seele Project File Format V1](./project-file-format-v1.md)，实施决策见 [ProjectFileDTO V1 写出边界计划](./project-file-dto-v1-write-plan.md)、[ProjectFileDTO V1 读取校验计划](./project-file-dto-v1-read-validation-plan.md)、[Project File V1 Session 加载计划](./project-file-v1-session-load-plan.md) 与 [Project Checkpoint 基础协议与存储端口计划](./project-checkpoint-foundation-plan.md)。
+当前也已实现独立版本的 storage-neutral `ProjectCheckpoint` envelope、`ProjectCheckpointStore`
+端口、单 Snapshot 保存 receipt 和按优先级候选恢复。Checkpoint 保存来源 `modelRevision` 但
+恢复时不写回该 revision；active 候选损坏时由核心校验边界尝试 previous。IndexedDB adapter、
+JSON codec 与 Journal 仍是后续独立边界。规范性协议见历史
+[Seele Project File Format V1](./project-file-format-v1.md) 与当前
+[Seele Project File Format V2](./project-file-format-v2.md)；V1 实施决策仍见
+[ProjectFileDTO V1 写出边界计划](./project-file-dto-v1-write-plan.md)、
+[ProjectFileDTO V1 读取校验计划](./project-file-dto-v1-read-validation-plan.md)、
+[Project File V1 Session 加载计划](./project-file-v1-session-load-plan.md) 与
+[Project Checkpoint 基础协议与存储端口计划](./project-checkpoint-foundation-plan.md)。
 
 ## 跨实体不变量
 
@@ -637,13 +696,16 @@ parse
 3. 每个 MidiClip 引用存在的 MidiSource。
 4. 非循环 Clip 的 Source 窗口以及循环 Clip 的 Loop 区域都落在 MidiSource 长度内。
 5. 每个 MidiSource 被且仅被一个 MidiClip 引用。
-6. 每个 MidiSource 恰好存在一张 Note Table，不存在没有 Source 的孤立 Note 分区。
+6. 每个 MidiSource 恰好存在一张 Note Table 和一张 Sustain Pedal Event Table；不存在没有
+   Source 的孤立内容分区。
 7. 所有 Note 都落在所属 MidiSource 的合法范围内，Note ID 在全部 Source 分区中保持唯一。
-8. Tick 0 存在唯一的初始 Tempo 和 Time Signature，同类 Timeline 事件在同一 Tick 最多一个。
-9. 每个 Device Descriptor 恰好拥有一个 Track 或 Master 拓扑位置，所有设备引用都存在。
-10. 所有实体表 key 与记录自身 `id` 相同。
-11. 不存在孤立 Source、Device 或悬空外键。
-12. QueryIndex 可以从当前 ModelStore 丢弃并得到等价重建结果。
+8. 所有 Sustain Pedal Event 都落在所属 Source 的 `0..lengthTick` 范围内，Event ID 在全部
+   Source 分区中唯一；同一 Source、Channel、Tick 最多一枚 Event。
+9. Tick 0 存在唯一的初始 Tempo 和 Time Signature，同类 Timeline 事件在同一 Tick 最多一个。
+10. 每个 Device Descriptor 恰好拥有一个 Track 或 Master 拓扑位置，所有设备引用都存在。
+11. 所有实体表 key 与记录自身 `id` 相同。
+12. 不存在孤立 Source、Device 或悬空外键。
+13. QueryIndex 可以从当前 ModelStore 丢弃并得到等价重建结果。
 
 单实体的 Tick、MIDI 数值、gain、pan、BPM 和拍号值域由 parser 与 Record 工厂保证；`InvariantValidator` 不为每次全局扫描重复执行全部本地解析。外部 DTO 必须先经过 schema 校验、迁移和领域工厂，形成 ModelStore 后再检查跨实体规则。
 

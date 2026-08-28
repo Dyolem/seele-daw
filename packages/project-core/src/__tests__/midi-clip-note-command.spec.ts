@@ -168,7 +168,7 @@ describe('MIDI Clip with Note Command public contracts', () => {
 })
 
 describe('AddMidiClipWithNoteCommand preparation', () => {
-  it('inserts Source, populated Note Partition, and Clip in one reversible plan', () => {
+  it('inserts Source, Note and Sustain Pedal Event partitions, and Clip in one reversible plan', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createNewClipCommand(store, { trackId: fixture.records.instrumentTrack.id })
@@ -189,6 +189,11 @@ describe('AddMidiClipWithNoteCommand preparation', () => {
         after: [preparation.command.note],
       },
       {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: preparation.command.source.id,
+        after: [],
+      },
+      {
         type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
         after: preparation.command.clip,
       },
@@ -197,6 +202,11 @@ describe('AddMidiClipWithNoteCommand preparation', () => {
       {
         type: PROJECT_MUTATION_TYPE.CLIP.REMOVE,
         before: preparation.command.clip,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        sourceId: preparation.command.source.id,
+        before: [],
       },
       {
         type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,

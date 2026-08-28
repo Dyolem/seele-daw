@@ -7,7 +7,10 @@ import {
   type MidiLoopDTO,
   type MidiNoteDTO,
   type MidiSourceDTO,
+  type MidiSourceV1DTO,
+  type MidiSustainPedalEventDTO,
   type ProjectFileDTO,
+  type ProjectFileV1DTO,
   type TempoEventDTO,
   type TimeSignatureEventDTO,
   type TrackDTO,
@@ -18,7 +21,9 @@ import {
   type ProjectFileValidationErrorDetails,
   type ProjectFileValidationPathSegment,
 } from '#internal/persistence/project-file-validation-error'
+import { migrateProjectFileV1ToV2 } from '#internal/persistence/project-file-v1-to-v2-migration'
 import { PROJECT_FILE_V1_PROTOCOL } from '#internal/persistence/project-file-v1-protocol'
+import { PROJECT_FILE_V2_PROTOCOL } from '#internal/persistence/project-file-v2-protocol'
 
 type ValidationPath = readonly ProjectFileValidationPathSegment[]
 type DataFields = ReadonlyMap<string, unknown>
@@ -529,6 +534,7 @@ function decodeRequiredFeatures(
   value: unknown,
   path: ValidationPath,
   ancestors: Set<object>,
+  supportedFeatures: Readonly<Record<string, true>>,
 ): readonly string[] {
   const features = decodeArray(value, path, ancestors, decodeNonEmptyString)
   const firstIndexByFeature = new Map<string, number>()
@@ -557,7 +563,7 @@ function decodeRequiredFeatures(
   for (let index = 0; index < features.length; index += 1) {
     const featureId = features[index]!
 
-    if (!Object.hasOwn(PROJECT_FILE_V1_PROTOCOL.supportedRequiredFeatures, featureId)) {
+    if (!Object.hasOwn(supportedFeatures, featureId)) {
       const featurePath = appendPath(path, index)
       return rejectValidation(
         'unsupported-required-feature',
@@ -784,11 +790,11 @@ function decodeEntityTable<DTO extends { readonly id: string }>(
   })
 }
 
-function decodeMidiSource(
+function decodeMidiSourceV1(
   value: unknown,
   path: ValidationPath,
   ancestors: Set<object>,
-): MidiSourceDTO {
+): MidiSourceV1DTO {
   return withStrictDataObject(
     value,
     path,
@@ -804,6 +810,58 @@ function decodeMidiSource(
           ancestors,
           'MIDI Note',
           decodeMidiNote,
+        ),
+      }),
+  )
+}
+
+function decodeMidiSustainPedalEvent(
+  value: unknown,
+  path: ValidationPath,
+  ancestors: Set<object>,
+): MidiSustainPedalEventDTO {
+  return withStrictDataObject(
+    value,
+    path,
+    PROJECT_FILE_V2_PROTOCOL.fields.midiSustainPedalEvent,
+    ancestors,
+    (fields) =>
+      Object.freeze({
+        id: decodeString(fields.get('id'), appendPath(path, 'id')),
+        tick: decodeSafeInteger(fields.get('tick'), appendPath(path, 'tick')),
+        value: decodeSafeInteger(fields.get('value'), appendPath(path, 'value')),
+        channel: decodeSafeInteger(fields.get('channel'), appendPath(path, 'channel')),
+      }),
+  )
+}
+
+function decodeMidiSourceV2(
+  value: unknown,
+  path: ValidationPath,
+  ancestors: Set<object>,
+): MidiSourceDTO {
+  return withStrictDataObject(
+    value,
+    path,
+    PROJECT_FILE_V2_PROTOCOL.fields.midiSource,
+    ancestors,
+    (fields) =>
+      Object.freeze({
+        id: decodeString(fields.get('id'), appendPath(path, 'id')),
+        lengthTick: decodeSafeInteger(fields.get('lengthTick'), appendPath(path, 'lengthTick')),
+        notes: decodeEntityTable(
+          fields.get('notes'),
+          appendPath(path, 'notes'),
+          ancestors,
+          'MIDI Note',
+          decodeMidiNote,
+        ),
+        sustainPedalEvents: decodeEntityTable(
+          fields.get('sustainPedalEvents'),
+          appendPath(path, 'sustainPedalEvents'),
+          ancestors,
+          'MIDI Sustain Pedal Event',
+          decodeMidiSustainPedalEvent,
         ),
       }),
   )
@@ -877,44 +935,45 @@ function decodeDevice(value: unknown, path: ValidationPath, ancestors: Set<objec
   )
 }
 
-function decodeFormatVersion(
+function decodeExpectedFormatVersion<Version extends number>(
   value: unknown,
   path: ValidationPath,
-): typeof PROJECT_FILE_V1_PROTOCOL.formatVersion {
+  expectedVersion: Version,
+): Version {
   const version = decodeSafeInteger(value, path)
 
-  if (version !== PROJECT_FILE_V1_PROTOCOL.formatVersion) {
+  if (version !== expectedVersion) {
     return rejectValidation(
       'unsupported-format-version',
       path,
-      `Unsupported project file format version ${version}; this client supports version ${PROJECT_FILE_V1_PROTOCOL.formatVersion}`,
-      { actual: String(version), expected: String(PROJECT_FILE_V1_PROTOCOL.formatVersion) },
+      `Unsupported project file format version ${version}; expected version ${expectedVersion}`,
+      { actual: String(version), expected: String(expectedVersion) },
     )
   }
 
-  return PROJECT_FILE_V1_PROTOCOL.formatVersion
+  return expectedVersion
 }
 
-/** Decodes untrusted structured data into a detached, deeply frozen current ProjectFileDTO. */
-export function decodeProjectFileDTO(input: unknown): ProjectFileDTO {
+function decodeProjectFileV1DTO(input: unknown): ProjectFileV1DTO {
   const path: ValidationPath = []
   const ancestors = new Set<object>()
 
   return withDataObject(input, path, ancestors, (fields) => {
-    // Route on the header before applying V1 field rules to a potentially newer shape.
-    const formatVersion = decodeFormatVersion(
+    const formatVersion = decodeExpectedFormatVersion(
       requireField(fields, 'formatVersion', path),
       appendPath(path, 'formatVersion'),
+      PROJECT_FILE_V1_PROTOCOL.formatVersion,
     )
 
     validateExactFields(fields, PROJECT_FILE_V1_PROTOCOL.fields.topLevel, path)
 
-    return Object.freeze<ProjectFileDTO>({
+    return Object.freeze<ProjectFileV1DTO>({
       formatVersion,
       requiredFeatures: decodeRequiredFeatures(
         fields.get('requiredFeatures'),
         appendPath(path, 'requiredFeatures'),
         ancestors,
+        PROJECT_FILE_V1_PROTOCOL.supportedRequiredFeatures,
       ),
       projectId: decodeString(fields.get('projectId'), appendPath(path, 'projectId')),
       name: decodeString(fields.get('name'), appendPath(path, 'name')),
@@ -942,7 +1001,7 @@ export function decodeProjectFileDTO(input: unknown): ProjectFileDTO {
         appendPath(path, 'midiSources'),
         ancestors,
         'MIDI Source',
-        decodeMidiSource,
+        decodeMidiSourceV1,
       ),
       tempoEvents: decodeEntityTable(
         fields.get('tempoEvents'),
@@ -968,4 +1027,113 @@ export function decodeProjectFileDTO(input: unknown): ProjectFileDTO {
       master: decodeMasterChannel(fields.get('master'), appendPath(path, 'master'), ancestors),
     })
   })
+}
+
+function decodeProjectFileV2DTO(input: unknown): ProjectFileDTO {
+  const path: ValidationPath = []
+  const ancestors = new Set<object>()
+
+  return withDataObject(input, path, ancestors, (fields) => {
+    const formatVersion = decodeExpectedFormatVersion(
+      requireField(fields, 'formatVersion', path),
+      appendPath(path, 'formatVersion'),
+      PROJECT_FILE_V2_PROTOCOL.formatVersion,
+    )
+
+    validateExactFields(fields, PROJECT_FILE_V2_PROTOCOL.fields.topLevel, path)
+
+    return Object.freeze<ProjectFileDTO>({
+      formatVersion,
+      requiredFeatures: decodeRequiredFeatures(
+        fields.get('requiredFeatures'),
+        appendPath(path, 'requiredFeatures'),
+        ancestors,
+        PROJECT_FILE_V2_PROTOCOL.supportedRequiredFeatures,
+      ),
+      projectId: decodeString(fields.get('projectId'), appendPath(path, 'projectId')),
+      name: decodeString(fields.get('name'), appendPath(path, 'name')),
+      trackOrder: decodeStringArray(
+        fields.get('trackOrder'),
+        appendPath(path, 'trackOrder'),
+        ancestors,
+      ),
+      tracks: decodeEntityTable(
+        fields.get('tracks'),
+        appendPath(path, 'tracks'),
+        ancestors,
+        'Track',
+        decodeTrack,
+      ),
+      clips: decodeEntityTable(
+        fields.get('clips'),
+        appendPath(path, 'clips'),
+        ancestors,
+        'Clip',
+        decodeClip,
+      ),
+      midiSources: decodeEntityTable(
+        fields.get('midiSources'),
+        appendPath(path, 'midiSources'),
+        ancestors,
+        'MIDI Source',
+        decodeMidiSourceV2,
+      ),
+      tempoEvents: decodeEntityTable(
+        fields.get('tempoEvents'),
+        appendPath(path, 'tempoEvents'),
+        ancestors,
+        'Tempo Event',
+        decodeTempoEvent,
+      ),
+      timeSignatureEvents: decodeEntityTable(
+        fields.get('timeSignatureEvents'),
+        appendPath(path, 'timeSignatureEvents'),
+        ancestors,
+        'Time Signature Event',
+        decodeTimeSignatureEvent,
+      ),
+      devices: decodeEntityTable(
+        fields.get('devices'),
+        appendPath(path, 'devices'),
+        ancestors,
+        'Device',
+        decodeDevice,
+      ),
+      master: decodeMasterChannel(fields.get('master'), appendPath(path, 'master'), ancestors),
+    })
+  })
+}
+
+function inspectProjectFileFormatVersion(input: unknown): number {
+  const path: ValidationPath = []
+
+  return withDataObject(input, path, new Set(), (fields) =>
+    decodeSafeInteger(
+      requireField(fields, 'formatVersion', path),
+      appendPath(path, 'formatVersion'),
+    ),
+  )
+}
+
+/** Decodes and migrates untrusted structured data into a deeply frozen current ProjectFileDTO. */
+export function decodeProjectFileDTO(input: unknown): ProjectFileDTO {
+  const formatVersion = inspectProjectFileFormatVersion(input)
+
+  if (formatVersion === PROJECT_FILE_V1_PROTOCOL.formatVersion) {
+    return migrateProjectFileV1ToV2(decodeProjectFileV1DTO(input))
+  }
+
+  if (formatVersion === PROJECT_FILE_V2_PROTOCOL.formatVersion) {
+    return decodeProjectFileV2DTO(input)
+  }
+
+  return rejectValidation(
+    'unsupported-format-version',
+    ['formatVersion'],
+    `Unsupported project file format version ${formatVersion}; this client supports versions ${PROJECT_FILE_V1_PROTOCOL.formatVersion} and ${PROJECT_FILE_V2_PROTOCOL.formatVersion}`,
+    {
+      actual: String(formatVersion),
+      expected: `${PROJECT_FILE_V1_PROTOCOL.formatVersion} or ${PROJECT_FILE_V2_PROTOCOL.formatVersion}`,
+    },
+  )
 }

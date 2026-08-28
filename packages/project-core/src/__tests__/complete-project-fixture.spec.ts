@@ -11,7 +11,7 @@ describe('complete project fixture contract', () => {
     expect(validateModelInvariants(new ModelStore(fixture.seed))).toEqual([])
   })
 
-  it('returns fresh records, arrays, Maps, and nested Note partitions', () => {
+  it('returns fresh records, arrays, Maps, and nested MIDI content partitions', () => {
     const first = createCompleteProjectFixture()
     const second = createCompleteProjectFixture()
 
@@ -26,16 +26,27 @@ describe('complete project fixture contract', () => {
     expect(first.containers.midiNotesBySource).not.toBe(second.containers.midiNotesBySource)
     expect(first.containers.nonLoopNotePartition).not.toBe(second.containers.nonLoopNotePartition)
     expect(first.containers.loopingNotePartition).not.toBe(second.containers.loopingNotePartition)
+    expect(first.containers.midiSustainPedalEventsBySource).not.toBe(
+      second.containers.midiSustainPedalEventsBySource,
+    )
+    expect(first.containers.nonLoopSustainPedalEventPartition).not.toBe(
+      second.containers.nonLoopSustainPedalEventPartition,
+    )
+    expect(first.containers.loopingSustainPedalEventPartition).not.toBe(
+      second.containers.loopingSustainPedalEventPartition,
+    )
     expect(first.containers.tempoEvents).not.toBe(second.containers.tempoEvents)
     expect(first.containers.timeSignatureEvents).not.toBe(second.containers.timeSignatureEvents)
     expect(first.containers.devices).not.toBe(second.containers.devices)
 
     first.containers.trackOrder.length = 0
     first.containers.nonLoopNotePartition.clear()
+    first.containers.nonLoopSustainPedalEventPartition.clear()
     first.containers.devices.clear()
 
     expect(second.containers.trackOrder).toHaveLength(2)
     expect(second.containers.nonLoopNotePartition).toHaveLength(2)
+    expect(second.containers.nonLoopSustainPedalEventPartition).toHaveLength(2)
     expect(second.containers.devices).toHaveLength(5)
   })
 
@@ -48,6 +59,10 @@ describe('complete project fixture contract', () => {
     const partitionIds = [...reader.midiNotePartitionIds()]
     const notes = partitionIds.flatMap((sourceId) =>
       [...reader.midiNoteEntries(sourceId)].map(([, note]) => note),
+    )
+    const sustainPedalEventPartitionIds = [...reader.midiSustainPedalEventPartitionIds()]
+    const sustainPedalEvents = sustainPedalEventPartitionIds.flatMap((sourceId) =>
+      [...reader.midiSustainPedalEventEntries(sourceId)].map(([, event]) => event),
     )
     const tempoEvents = [...reader.tempoEventEntries()].map(([, event]) => event)
     const timeSignatureEvents = [...reader.timeSignatureEventEntries()].map(([, event]) => event)
@@ -72,6 +87,9 @@ describe('complete project fixture contract', () => {
     ])
     expect(notes).toHaveLength(4)
     expect(new Set(notes.map(({ id }) => id))).toHaveLength(4)
+    expect(sustainPedalEventPartitionIds).toEqual(partitionIds)
+    expect(sustainPedalEvents).toHaveLength(4)
+    expect(new Set(sustainPedalEvents.map(({ id }) => id))).toHaveLength(4)
 
     expect(tempoEvents).toHaveLength(2)
     expect(tempoEvents.map(({ tick }) => tick)).toEqual([0, 3_840])

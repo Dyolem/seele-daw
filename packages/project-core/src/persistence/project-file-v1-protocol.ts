@@ -8,8 +8,8 @@ import {
   type MidiClipDTO,
   type MidiLoopDTO,
   type MidiNoteDTO,
-  type MidiSourceDTO,
-  type ProjectFileDTO,
+  type MidiSourceV1DTO,
+  type ProjectFileV1DTO,
   type TempoEventDTO,
   type TimeSignatureEventDTO,
   type TrackDTO,
@@ -47,7 +47,7 @@ function defineRequiredFeatures(
 export const PROJECT_FILE_V1_PROTOCOL = Object.freeze({
   formatVersion: PROJECT_FILE_V1_FORMAT_VERSION,
   fields: Object.freeze({
-    topLevel: defineFields<ProjectFileDTO>({
+    topLevel: defineFields<ProjectFileV1DTO>({
       formatVersion: true,
       requiredFeatures: true,
       projectId: true,
@@ -115,7 +115,7 @@ export const PROJECT_FILE_V1_PROTOCOL = Object.freeze({
       velocity: true,
       channel: true,
     }),
-    midiSource: defineFields<MidiSourceDTO>({
+    midiSource: defineFields<MidiSourceV1DTO>({
       id: true,
       lengthTick: true,
       notes: true,

@@ -19,6 +19,7 @@ import {
   parseTick,
   parseTickDelta,
   type AddNoteCommand,
+  type AddMidiSustainPedalEventCommand,
   type AddTempoEventCommand,
   type AddInstrumentTrackCollectionCommand,
   type AddInstrumentTrackCommand,
@@ -27,11 +28,14 @@ import {
   type ExtendMidiClipWithNoteCommand,
   type ModelRevision,
   type MoveNotesCommand,
+  type MoveMidiSustainPedalEventsCommand,
   type MoveTempoEventCommand,
   type ProjectCommand,
   type RemoveNotesCommand,
+  type RemoveMidiSustainPedalEventsCommand,
   type RemoveTempoEventCommand,
   type ReplaceInstrumentDeviceCommand,
+  type ReplaceMidiSustainPedalEventValueCommand,
   type ReplaceTempoEventBpmCommand,
   type ResizeNoteCommand,
 } from '#internal/index'
@@ -190,13 +194,17 @@ describe('ProjectCommand public contract', () => {
       | AddMidiClipCommand
       | AddMidiClipWithNoteCommand
       | AddNoteCommand
+      | AddMidiSustainPedalEventCommand
       | AddTempoEventCommand
       | ExtendMidiClipWithNoteCommand
       | MoveNotesCommand
+      | MoveMidiSustainPedalEventsCommand
       | MoveTempoEventCommand
       | RemoveNotesCommand
+      | RemoveMidiSustainPedalEventsCommand
       | RemoveTempoEventCommand
       | ReplaceInstrumentDeviceCommand
+      | ReplaceMidiSustainPedalEventValueCommand
       | ReplaceTempoEventBpmCommand
       | ResizeNoteCommand
     >()

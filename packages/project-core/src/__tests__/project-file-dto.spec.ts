@@ -18,6 +18,7 @@ import {
   type JsonObject,
   type JsonValue,
   type MidiNoteDTO,
+  type MidiSustainPedalEventDTO,
   type ProjectFileDTO,
   type ProjectSnapshot,
   type TrackDTO,
@@ -56,12 +57,12 @@ function snapshotWithDevice(seed: ModelStoreSeed, device: DeviceDescriptor): Pro
   return createProjectSession(new ModelStore({ ...seed, devices })).getSnapshot()
 }
 
-describe('ProjectFileDTO V1 public contract', () => {
-  it('exports the V1 format and projector without exposing persistence internals', () => {
+describe('current ProjectFileDTO public contract', () => {
+  it('exports the V2 format and projector without exposing persistence internals', () => {
     const { session } = createFixtureProjectSession()
     const dto = createProjectFileDTO(session.getSnapshot())
 
-    expect(PROJECT_FILE_FORMAT_VERSION).toBe(1)
+    expect(PROJECT_FILE_FORMAT_VERSION).toBe(2)
     expect(dto.formatVersion).toBe(PROJECT_FILE_FORMAT_VERSION)
     expect(dto.requiredFeatures).toEqual([])
     expectTypeOf(dto).toEqualTypeOf<ProjectFileDTO>()
@@ -69,13 +70,16 @@ describe('ProjectFileDTO V1 public contract', () => {
     expectTypeOf(Object.values(Object.values(dto.midiSources)[0]!.notes)).toEqualTypeOf<
       MidiNoteDTO[]
     >()
+    expectTypeOf(
+      Object.values(Object.values(dto.midiSources)[0]!.sustainPedalEvents),
+    ).toEqualTypeOf<MidiSustainPedalEventDTO[]>()
     expect('modelRevision' in dto).toBe(false)
     expect('parseProjectFileDTO' in projectCore).toBe(false)
     expect('normalizeProjectFileDTO' in projectCore).toBe(false)
     expect('migrateProjectFileDTO' in projectCore).toBe(false)
   })
 
-  it('projects every current project fact into explicit JSON-friendly V1 fields', () => {
+  it('projects every current project fact into explicit JSON-friendly V2 fields', () => {
     const { fixture, session } = createFixtureProjectSession()
     const snapshot = session.getSnapshot()
     const dto = createProjectFileDTO(snapshot)
@@ -86,7 +90,7 @@ describe('ProjectFileDTO V1 public contract', () => {
     const device = dto.devices[fixture.records.instrumentDevice.id]!
 
     expect(dto).toMatchObject({
-      formatVersion: 1,
+      formatVersion: 2,
       requiredFeatures: [],
       projectId: fixture.records.project.id,
       name: fixture.records.project.name,
@@ -126,6 +130,11 @@ describe('ProjectFileDTO V1 public contract', () => {
         (partition) => partition.sourceId === fixture.records.nonLoopSource.id,
       )!.notes,
     )
+    expect(Object.values(nonLoopSource.sustainPedalEvents)).toEqual(
+      snapshot.midiSustainPedalEventPartitions.find(
+        (partition) => partition.sourceId === fixture.records.nonLoopSource.id,
+      )!.events,
+    )
     expect(dto.tempoEvents[fixture.records.initialTempoEvent.id]).toEqual(
       fixture.records.initialTempoEvent,
     )
@@ -153,6 +162,7 @@ describe('ProjectFileDTO V1 public contract', () => {
     const trackDTO = dto.tracks[fixture.records.instrumentTrack.id]!
     const sourceDTO = dto.midiSources[fixture.records.nonLoopSource.id]!
     const noteDTO = sourceDTO.notes[fixture.records.nonLoopNote.id]!
+    const sustainPedalEventDTO = sourceDTO.sustainPedalEvents[fixture.records.nonLoopPedalDown.id]!
     const deviceDTO = dto.devices[fixture.records.instrumentDevice.id]!
 
     expectDeeplyFrozen(dto)
@@ -161,6 +171,7 @@ describe('ProjectFileDTO V1 public contract', () => {
     expect(trackDTO.audioEffectIds).not.toBe(fixture.records.instrumentTrack.audioEffectIds)
     expect(sourceDTO).not.toBe(fixture.records.nonLoopSource)
     expect(noteDTO).not.toBe(fixture.records.nonLoopNote)
+    expect(sustainPedalEventDTO).not.toBe(fixture.records.nonLoopPedalDown)
     expect(deviceDTO).not.toBe(fixture.records.instrumentDevice)
     expect(deviceDTO.parameters).not.toBe(fixture.records.instrumentDevice.parameters)
   })
@@ -339,6 +350,47 @@ describe('ProjectFileDTO projection safeguards', () => {
     expect(() => createProjectFileDTO(orphan)).toThrowError(
       expect.objectContaining<Partial<ProjectFileProjectionError>>({
         code: 'orphan-midi-note-partition',
+        sourceId: orphanSourceId,
+      }),
+    )
+  })
+
+  it('rejects duplicate, missing, and orphan MIDI Sustain Pedal Event partitions', () => {
+    const { session } = createFixtureProjectSession()
+    const snapshot = session.getSnapshot()
+    const partition = snapshot.midiSustainPedalEventPartitions[0]!
+    const missing: ProjectSnapshot = {
+      ...snapshot,
+      midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.slice(1),
+    }
+    const duplicate: ProjectSnapshot = {
+      ...snapshot,
+      midiSustainPedalEventPartitions: [...snapshot.midiSustainPedalEventPartitions, partition],
+    }
+    const orphanSourceId = parseMidiSourceId('source-file-dto-sustain-pedal-orphan')
+    const orphan: ProjectSnapshot = {
+      ...snapshot,
+      midiSustainPedalEventPartitions: [
+        ...snapshot.midiSustainPedalEventPartitions,
+        { sourceId: orphanSourceId, events: [] },
+      ],
+    }
+
+    expect(() => createProjectFileDTO(missing)).toThrowError(
+      expect.objectContaining<Partial<ProjectFileProjectionError>>({
+        code: 'midi-sustain-pedal-event-partition-missing',
+        sourceId: partition.sourceId,
+      }),
+    )
+    expect(() => createProjectFileDTO(duplicate)).toThrowError(
+      expect.objectContaining<Partial<ProjectFileProjectionError>>({
+        code: 'duplicate-midi-sustain-pedal-event-partition',
+        sourceId: partition.sourceId,
+      }),
+    )
+    expect(() => createProjectFileDTO(orphan)).toThrowError(
+      expect.objectContaining<Partial<ProjectFileProjectionError>>({
+        code: 'orphan-midi-sustain-pedal-event-partition',
         sourceId: orphanSourceId,
       }),
     )

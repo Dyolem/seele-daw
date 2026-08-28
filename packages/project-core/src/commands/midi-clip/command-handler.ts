@@ -68,6 +68,14 @@ function assertClipGraphIdentitiesAvailable(
       commandDetails(command),
     )
   }
+
+  if (reader.hasMidiSustainPedalEventPartition(command.source.id)) {
+    throw new ProjectCommandError(
+      'sustain-pedal-event-partition-already-exists',
+      `MidiSource ID ${command.source.id} already has a MIDI Sustain Pedal Event partition`,
+      commandDetails(command),
+    )
+  }
 }
 
 function assertClipWithinSource(command: NewMidiClipCommand): void {
@@ -116,6 +124,11 @@ export function prepareAddMidiClipCommand(
       },
       {
         type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        sourceId: command.source.id,
+        after: [],
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
         sourceId: command.source.id,
         after: [],
       },

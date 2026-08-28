@@ -2,6 +2,7 @@ import type {
   ClipId,
   DeviceId,
   MidiSourceId,
+  MidiSustainPedalEventId,
   NoteId,
   TempoEventId,
   TrackId,
@@ -16,8 +17,10 @@ export type ProjectCommandErrorCode =
   | 'device-id-already-exists'
   | 'device-not-found'
   | 'duplicate-note-id'
+  | 'duplicate-sustain-pedal-event-id'
   | 'empty-instrument-track-collection'
   | 'empty-note-id-list'
+  | 'empty-sustain-pedal-event-id-list'
   | 'invalid-base-revision'
   | 'invalid-track-order-index'
   | 'instrument-device-id-mismatch'
@@ -40,6 +43,12 @@ export type ProjectCommandErrorCode =
   | 'note-out-of-clip-range'
   | 'note-out-of-source-range'
   | 'note-pitch-out-of-range'
+  | 'sustain-pedal-event-id-already-exists'
+  | 'sustain-pedal-event-not-found'
+  | 'sustain-pedal-event-out-of-source-range'
+  | 'sustain-pedal-event-partition-missing'
+  | 'sustain-pedal-event-partition-already-exists'
+  | 'sustain-pedal-event-tick-channel-already-exists'
   | 'initial-tempo-event-cannot-move'
   | 'initial-tempo-event-cannot-remove'
   | 'tempo-event-id-already-exists'
@@ -53,6 +62,7 @@ export type ProjectCommandErrorCode =
 export interface ProjectCommandErrorDetails {
   readonly baseRevision?: number
   readonly blockingTempoEventId?: TempoEventId
+  readonly blockingSustainPedalEventId?: MidiSustainPedalEventId
   readonly blockingClipId?: ClipId
   readonly clipEndTick?: Tick
   readonly clipId?: ClipId
@@ -68,6 +78,9 @@ export interface ProjectCommandErrorDetails {
   readonly sourceLengthTick?: Tick
   readonly sourceReadEndTick?: Tick
   readonly sourceReadStartTick?: Tick
+  readonly sustainPedalEventChannel?: number
+  readonly sustainPedalEventId?: MidiSustainPedalEventId
+  readonly sustainPedalEventTick?: number
   readonly targetSpanTick?: Tick
   readonly tempoEventId?: TempoEventId
   readonly tempoEventTick?: Tick
@@ -81,6 +94,7 @@ export class ProjectCommandError extends Error {
   readonly code: ProjectCommandErrorCode
   readonly baseRevision: number | null
   readonly blockingTempoEventId: TempoEventId | null
+  readonly blockingSustainPedalEventId: MidiSustainPedalEventId | null
   readonly blockingClipId: ClipId | null
   readonly clipEndTick: Tick | null
   readonly clipId: ClipId | null
@@ -96,6 +110,9 @@ export class ProjectCommandError extends Error {
   readonly sourceLengthTick: Tick | null
   readonly sourceReadEndTick: Tick | null
   readonly sourceReadStartTick: Tick | null
+  readonly sustainPedalEventChannel: number | null
+  readonly sustainPedalEventId: MidiSustainPedalEventId | null
+  readonly sustainPedalEventTick: number | null
   readonly targetSpanTick: Tick | null
   readonly tempoEventId: TempoEventId | null
   readonly tempoEventTick: Tick | null
@@ -113,6 +130,7 @@ export class ProjectCommandError extends Error {
     this.code = code
     this.baseRevision = details.baseRevision ?? null
     this.blockingTempoEventId = details.blockingTempoEventId ?? null
+    this.blockingSustainPedalEventId = details.blockingSustainPedalEventId ?? null
     this.blockingClipId = details.blockingClipId ?? null
     this.clipEndTick = details.clipEndTick ?? null
     this.clipId = details.clipId ?? null
@@ -128,6 +146,9 @@ export class ProjectCommandError extends Error {
     this.sourceLengthTick = details.sourceLengthTick ?? null
     this.sourceReadEndTick = details.sourceReadEndTick ?? null
     this.sourceReadStartTick = details.sourceReadStartTick ?? null
+    this.sustainPedalEventChannel = details.sustainPedalEventChannel ?? null
+    this.sustainPedalEventId = details.sustainPedalEventId ?? null
+    this.sustainPedalEventTick = details.sustainPedalEventTick ?? null
     this.targetSpanTick = details.targetSpanTick ?? null
     this.tempoEventId = details.tempoEventId ?? null
     this.tempoEventTick = details.tempoEventTick ?? null

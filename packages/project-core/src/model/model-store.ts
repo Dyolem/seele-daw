@@ -4,6 +4,7 @@ import type {
   ClipId,
   DeviceId,
   MidiSourceId,
+  MidiSustainPedalEventId,
   NoteId,
   TempoEventId,
   TimeSignatureEventId,
@@ -12,6 +13,7 @@ import type {
 import type { ClipRecord } from './midi-clip'
 import type { MidiNoteRecord } from './midi-note'
 import type { MidiSourceRecord } from './midi-source'
+import type { MidiSustainPedalEventRecord } from './midi-sustain-pedal-event'
 import { INITIAL_MODEL_REVISION, nextModelRevision, type ModelRevision } from './model-revision'
 import {
   ModelStoreWriteAccessError,
@@ -108,6 +110,39 @@ function midiNotePartitionMatches(
   return true
 }
 
+function createMidiSustainPedalEventTable(
+  events: readonly MidiSustainPedalEventRecord[],
+): Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord> {
+  const eventTable = new Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>()
+
+  for (const event of events) {
+    if (eventTable.has(event.id)) {
+      rejectStoreWrite(`MIDI Sustain Pedal Event partition contains duplicate Event ID ${event.id}`)
+    }
+
+    eventTable.set(event.id, event)
+  }
+
+  return eventTable
+}
+
+function midiSustainPedalEventPartitionMatches(
+  eventTable: ReadonlyMap<MidiSustainPedalEventId, MidiSustainPedalEventRecord>,
+  expectedEvents: readonly MidiSustainPedalEventRecord[],
+): boolean {
+  if (eventTable.size !== expectedEvents.length) return false
+
+  const expectedById = new Map(expectedEvents.map((event) => [event.id, event] as const))
+
+  if (expectedById.size !== expectedEvents.length) return false
+
+  for (const [eventId, event] of eventTable) {
+    if (expectedById.get(eventId) !== event) return false
+  }
+
+  return true
+}
+
 export interface ModelStoreSeed {
   readonly project: ProjectRecord
   readonly trackOrder: readonly TrackId[]
@@ -115,6 +150,10 @@ export interface ModelStoreSeed {
   readonly clips: ReadonlyMap<ClipId, ClipRecord>
   readonly midiSources: ReadonlyMap<MidiSourceId, MidiSourceRecord>
   readonly midiNotesBySource: ReadonlyMap<MidiSourceId, ReadonlyMap<NoteId, MidiNoteRecord>>
+  readonly midiSustainPedalEventsBySource: ReadonlyMap<
+    MidiSourceId,
+    ReadonlyMap<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
+  >
   readonly tempoEvents: ReadonlyMap<TempoEventId, TempoEventRecord>
   readonly timeSignatureEvents: ReadonlyMap<TimeSignatureEventId, TimeSignatureEventRecord>
   readonly devices: ReadonlyMap<DeviceId, DeviceDescriptor>
@@ -142,6 +181,16 @@ export interface ModelStoreReader {
   getMidiNote(sourceId: MidiSourceId, noteId: NoteId): MidiNoteRecord | undefined
   midiNoteEntries(sourceId: MidiSourceId): IterableIterator<readonly [NoteId, MidiNoteRecord]>
 
+  hasMidiSustainPedalEventPartition(sourceId: MidiSourceId): boolean
+  midiSustainPedalEventPartitionIds(): IterableIterator<MidiSourceId>
+  getMidiSustainPedalEvent(
+    sourceId: MidiSourceId,
+    eventId: MidiSustainPedalEventId,
+  ): MidiSustainPedalEventRecord | undefined
+  midiSustainPedalEventEntries(
+    sourceId: MidiSourceId,
+  ): IterableIterator<readonly [MidiSustainPedalEventId, MidiSustainPedalEventRecord]>
+
   getTempoEvent(id: TempoEventId): TempoEventRecord | undefined
   tempoEventEntries(): IterableIterator<readonly [TempoEventId, TempoEventRecord]>
 
@@ -164,6 +213,10 @@ export class ModelStore implements ModelStoreReader {
 
   #midiSources: Map<MidiSourceId, MidiSourceRecord>
   #midiNotesBySource: Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>
+  #midiSustainPedalEventsBySource: Map<
+    MidiSourceId,
+    Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
+  >
 
   #tempoEvents: Map<TempoEventId, TempoEventRecord>
   #timeSignatureEvents: Map<TimeSignatureEventId, TimeSignatureEventRecord>
@@ -184,6 +237,11 @@ export class ModelStore implements ModelStoreReader {
 
     for (const [sourceId, noteTable] of seed.midiNotesBySource) {
       this.#midiNotesBySource.set(sourceId, new Map(noteTable))
+    }
+
+    this.#midiSustainPedalEventsBySource = new Map()
+    for (const [sourceId, eventTable] of seed.midiSustainPedalEventsBySource) {
+      this.#midiSustainPedalEventsBySource.set(sourceId, new Map(eventTable))
     }
 
     this.#tempoEvents = new Map(seed.tempoEvents)
@@ -282,6 +340,43 @@ export class ModelStore implements ModelStoreReader {
 
         writeEntityRecord(noteTable, `MIDI Note in partition ${sourceId}`, expected, next)
       },
+      insertMidiSustainPedalEventPartition: (sourceId, events) => {
+        if (this.#midiSustainPedalEventsBySource.has(sourceId)) {
+          rejectStoreWrite(`MIDI Sustain Pedal Event partition ${sourceId} already exists`)
+        }
+
+        const eventTable = createMidiSustainPedalEventTable(events)
+        this.#midiSustainPedalEventsBySource.set(sourceId, eventTable)
+      },
+      removeMidiSustainPedalEventPartition: (sourceId, expectedEvents) => {
+        const eventTable = this.#midiSustainPedalEventsBySource.get(sourceId)
+
+        if (eventTable === undefined) {
+          rejectStoreWrite(`MIDI Sustain Pedal Event partition ${sourceId} does not exist`)
+        }
+
+        if (!midiSustainPedalEventPartitionMatches(eventTable, expectedEvents)) {
+          rejectStoreWrite(
+            `MIDI Sustain Pedal Event partition ${sourceId} no longer matches the expected records`,
+          )
+        }
+
+        this.#midiSustainPedalEventsBySource.delete(sourceId)
+      },
+      writeMidiSustainPedalEvent: (sourceId, expected, next) => {
+        const eventTable = this.#midiSustainPedalEventsBySource.get(sourceId)
+
+        if (eventTable === undefined) {
+          rejectStoreWrite(`MIDI Sustain Pedal Event partition ${sourceId} does not exist`)
+        }
+
+        writeEntityRecord(
+          eventTable,
+          `MIDI Sustain Pedal Event in partition ${sourceId}`,
+          expected,
+          next,
+        )
+      },
       commitModelRevision: (expected, next) => {
         if (this.#modelRevision !== expected) {
           rejectStoreWrite(
@@ -357,6 +452,29 @@ export class ModelStore implements ModelStoreReader {
     if (noteTable !== undefined) {
       yield* noteTable.entries()
     }
+  }
+
+  hasMidiSustainPedalEventPartition(sourceId: MidiSourceId): boolean {
+    return this.#midiSustainPedalEventsBySource.has(sourceId)
+  }
+
+  midiSustainPedalEventPartitionIds(): IterableIterator<MidiSourceId> {
+    return this.#midiSustainPedalEventsBySource.keys()
+  }
+
+  getMidiSustainPedalEvent(
+    sourceId: MidiSourceId,
+    eventId: MidiSustainPedalEventId,
+  ): MidiSustainPedalEventRecord | undefined {
+    return this.#midiSustainPedalEventsBySource.get(sourceId)?.get(eventId)
+  }
+
+  *midiSustainPedalEventEntries(
+    sourceId: MidiSourceId,
+  ): IterableIterator<readonly [MidiSustainPedalEventId, MidiSustainPedalEventRecord]> {
+    const eventTable = this.#midiSustainPedalEventsBySource.get(sourceId)
+
+    if (eventTable !== undefined) yield* eventTable.entries()
   }
 
   getTempoEvent(id: TempoEventId): TempoEventRecord | undefined {

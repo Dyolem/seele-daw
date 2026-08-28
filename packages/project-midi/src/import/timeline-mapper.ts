@@ -160,7 +160,7 @@ export function createTimeSignatureEvents(
     if (!supportedNumerator || !supportedDenominator) {
       throw new ProjectMidiImportError(
         'unsupported-time-signature',
-        `MIDI time signature ${event.numerator}/${event.denominator} cannot be represented by the Project V1 model.`,
+        `MIDI time signature ${event.numerator}/${event.denominator} cannot be represented by the current Project model.`,
         { sourceTick: event.tick, value: `${event.numerator}/${event.denominator}` },
       )
     }

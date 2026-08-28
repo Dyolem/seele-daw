@@ -2,16 +2,22 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
   DomainValueError,
+  MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER,
+  MIDI_SUSTAIN_PEDAL_DOWN_VALUE_MIN,
   ZERO_TICK,
   addTicks,
   createMidiClipRecord,
   createMidiLoop,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
+  isMidiSustainPedalDown,
   parseClipId,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parsePositiveTick,
@@ -22,6 +28,7 @@ import {
   type MidiLoop,
   type MidiNoteRecord,
   type MidiSourceRecord,
+  type MidiSustainPedalEventRecord,
 } from '#internal/index'
 
 describe('Tick arithmetic', () => {
@@ -97,6 +104,36 @@ describe('MidiSourceRecord', () => {
         lengthTick: ZERO_TICK,
       }),
     ).toThrow(DomainValueError)
+  })
+})
+
+describe('MidiSustainPedalEventRecord', () => {
+  it('preserves the raw CC64 value, Source-relative Tick, and MIDI Channel', () => {
+    const input = {
+      id: parseMidiSustainPedalEventId('sustain-pedal-event-1'),
+      tick: parseTick(480),
+      value: parseMidiControlValue(96),
+      channel: parseMidiChannel(3),
+    }
+
+    const event = createMidiSustainPedalEventRecord(input)
+
+    expect(event).not.toBe(input)
+    expect(event).toEqual(input)
+    expectTypeOf(event).toEqualTypeOf<MidiSustainPedalEventRecord>()
+    expect(MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER).toBe(64)
+  })
+
+  it('uses the MIDI CC64 threshold while retaining values for future interpretation', () => {
+    expect(MIDI_SUSTAIN_PEDAL_DOWN_VALUE_MIN).toBe(64)
+    expect(isMidiSustainPedalDown(parseMidiControlValue(0))).toBe(false)
+    expect(isMidiSustainPedalDown(parseMidiControlValue(63))).toBe(false)
+    expect(isMidiSustainPedalDown(parseMidiControlValue(64))).toBe(true)
+    expect(isMidiSustainPedalDown(parseMidiControlValue(127))).toBe(true)
+  })
+
+  it.each([-1, 128, 1.5, Number.NaN])('rejects invalid MIDI control value %s', (value) => {
+    expect(() => parseMidiControlValue(value)).toThrow(DomainValueError)
   })
 })
 

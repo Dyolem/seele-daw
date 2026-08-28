@@ -8,13 +8,17 @@ import {
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   createTempoEventRecord,
   createTimeSignatureEventRecord,
   parseClipId,
   parseDeviceId,
   parseDeviceTypeId,
   parseLinearGain,
+  parseMidiChannel,
+  parseMidiControlValue,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseNoteId,
   parseTempoBpm,
   parseTempoEventId,
@@ -153,6 +157,18 @@ describe('normalized table key invariants', () => {
         fixture.containers.nonLoopNotePartition.set(
           parseNoteId('wrong-note-key'),
           fixture.records.nonLoopNote,
+        )
+      },
+    ],
+    [
+      'MIDI Sustain Pedal Event',
+      (fixture) => {
+        fixture.containers.nonLoopSustainPedalEventPartition.delete(
+          fixture.records.nonLoopPedalDown.id,
+        )
+        fixture.containers.nonLoopSustainPedalEventPartition.set(
+          parseMidiSustainPedalEventId('wrong-sustain-pedal-event-key'),
+          fixture.records.nonLoopPedalDown,
         )
       },
     ],
@@ -324,6 +340,96 @@ describe('MIDI Note partition invariants', () => {
     fixture.containers.loopingNotePartition.set(duplicateNote.id, duplicateNote)
 
     expect(codesFor(fixture.seed)).toContain('note-id-duplicate')
+  })
+})
+
+describe('MIDI Sustain Pedal Event partition invariants', () => {
+  it('rejects a MIDI Source without a Sustain Pedal Event partition', () => {
+    const fixture = createCompleteProjectFixture()
+
+    fixture.containers.midiSustainPedalEventsBySource.delete(fixture.records.nonLoopSource.id)
+
+    expect(codesFor(fixture.seed)).toContain('midi-source-missing-sustain-pedal-event-partition')
+  })
+
+  it('rejects a Sustain Pedal Event partition without a MIDI Source', () => {
+    const fixture = createCompleteProjectFixture()
+
+    fixture.containers.midiSustainPedalEventsBySource.set(
+      parseMidiSourceId('missing-sustain-pedal-source'),
+      new Map(),
+    )
+
+    expect(codesFor(fixture.seed)).toContain('sustain-pedal-event-partition-missing-midi-source')
+  })
+
+  it('rejects an Event beyond its Source while allowing an Event at the terminal Tick', () => {
+    const boundaryFixture = createCompleteProjectFixture()
+    const boundaryEvent = createMidiSustainPedalEventRecord({
+      id: parseMidiSustainPedalEventId('sustain-pedal-at-source-end'),
+      tick: boundaryFixture.records.nonLoopSource.lengthTick,
+      value: parseMidiControlValue(0),
+      channel: parseMidiChannel(2),
+    })
+    boundaryFixture.containers.nonLoopSustainPedalEventPartition.set(
+      boundaryEvent.id,
+      boundaryEvent,
+    )
+
+    expect(validateSeed(boundaryFixture.seed)).toEqual([])
+
+    const outsideFixture = createCompleteProjectFixture()
+    const outsideEvent = createMidiSustainPedalEventRecord({
+      ...boundaryEvent,
+      tick: parseTick(outsideFixture.records.nonLoopSource.lengthTick + 1),
+    })
+    outsideFixture.containers.nonLoopSustainPedalEventPartition.set(outsideEvent.id, outsideEvent)
+
+    expect(codesFor(outsideFixture.seed)).toContain('sustain-pedal-event-outside-midi-source')
+  })
+
+  it('requires Event IDs to be unique across Source partitions', () => {
+    const fixture = createCompleteProjectFixture()
+    const duplicate = createMidiSustainPedalEventRecord({
+      ...fixture.records.nonLoopPedalDown,
+      tick: parseTick(1_200),
+      channel: parseMidiChannel(1),
+    })
+
+    fixture.containers.loopingSustainPedalEventPartition.set(duplicate.id, duplicate)
+
+    expect(codesFor(fixture.seed)).toContain('sustain-pedal-event-id-duplicate')
+  })
+
+  it('rejects two Events at the same Source Tick and Channel', () => {
+    const fixture = createCompleteProjectFixture()
+    const duplicatePosition = createMidiSustainPedalEventRecord({
+      id: parseMidiSustainPedalEventId('sustain-pedal-duplicate-position'),
+      tick: fixture.records.nonLoopPedalDown.tick,
+      value: parseMidiControlValue(64),
+      channel: fixture.records.nonLoopPedalDown.channel,
+    })
+
+    fixture.containers.nonLoopSustainPedalEventPartition.set(
+      duplicatePosition.id,
+      duplicatePosition,
+    )
+
+    expect(codesFor(fixture.seed)).toContain('sustain-pedal-event-duplicate-tick-channel')
+  })
+
+  it('allows the same Tick on different MIDI Channels', () => {
+    const fixture = createCompleteProjectFixture()
+    const otherChannel = createMidiSustainPedalEventRecord({
+      id: parseMidiSustainPedalEventId('sustain-pedal-other-channel'),
+      tick: fixture.records.nonLoopPedalDown.tick,
+      value: parseMidiControlValue(64),
+      channel: parseMidiChannel(1),
+    })
+
+    fixture.containers.nonLoopSustainPedalEventPartition.set(otherChannel.id, otherChannel)
+
+    expect(validateSeed(fixture.seed)).toEqual([])
   })
 })
 
@@ -517,6 +623,11 @@ describe('Invariant diagnostics', () => {
         sourceId,
         [...store.midiNoteEntries(sourceId)],
       ]),
+      sustainPedalEventPartitionIds: [...store.midiSustainPedalEventPartitionIds()],
+      sustainPedalEvents: [...store.midiSustainPedalEventPartitionIds()].map((sourceId) => [
+        sourceId,
+        [...store.midiSustainPedalEventEntries(sourceId)],
+      ]),
       tempoEvents: [...store.tempoEventEntries()],
       timeSignatureEvents: [...store.timeSignatureEventEntries()],
       devices: [...store.deviceEntries()],
@@ -535,6 +646,11 @@ describe('Invariant diagnostics', () => {
       notes: [...store.midiNotePartitionIds()].map((sourceId) => [
         sourceId,
         [...store.midiNoteEntries(sourceId)],
+      ]),
+      sustainPedalEventPartitionIds: [...store.midiSustainPedalEventPartitionIds()],
+      sustainPedalEvents: [...store.midiSustainPedalEventPartitionIds()].map((sourceId) => [
+        sourceId,
+        [...store.midiSustainPedalEventEntries(sourceId)],
       ]),
       tempoEvents: [...store.tempoEventEntries()],
       timeSignatureEvents: [...store.timeSignatureEventEntries()],

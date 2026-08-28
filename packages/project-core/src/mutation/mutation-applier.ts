@@ -262,6 +262,27 @@ export class MutationApplier {
         this.#writeAccess.writeMidiNote(mutation.sourceId, mutation.before, mutation.after)
         return
 
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
+        this.#writeAccess.insertMidiSustainPedalEventPartition(mutation.sourceId, mutation.after)
+        return
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
+        this.#writeAccess.removeMidiSustainPedalEventPartition(mutation.sourceId, mutation.before)
+        return
+
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
+        this.#writeAccess.writeMidiSustainPedalEvent(mutation.sourceId, undefined, mutation.after)
+        return
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
+        this.#writeAccess.writeMidiSustainPedalEvent(mutation.sourceId, mutation.before, undefined)
+        return
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
+        this.#writeAccess.writeMidiSustainPedalEvent(
+          mutation.sourceId,
+          mutation.before,
+          mutation.after,
+        )
+        return
+
       default:
         return rejectUnknownMutation(mutation, index)
     }

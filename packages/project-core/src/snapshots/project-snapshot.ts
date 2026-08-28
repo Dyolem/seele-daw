@@ -4,6 +4,7 @@ import type { MidiSourceId, TrackId } from '#internal/model/ids'
 import type { ClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
+import type { MidiSustainPedalEventRecord } from '#internal/model/midi-sustain-pedal-event'
 import type { ModelRevision } from '#internal/model/model-revision'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import type { ProjectRecord } from '#internal/model/project'
@@ -25,6 +26,11 @@ export interface MidiNotePartitionSnapshot {
   readonly notes: readonly MidiNoteRecord[]
 }
 
+export interface MidiSustainPedalEventPartitionSnapshot {
+  readonly sourceId: MidiSourceId
+  readonly events: readonly MidiSustainPedalEventRecord[]
+}
+
 /** Complete read-only project facts captured at one ModelStore revision. */
 export interface ProjectSnapshot {
   readonly modelRevision: ModelRevision
@@ -35,6 +41,7 @@ export interface ProjectSnapshot {
   readonly clips: readonly ClipRecord[]
   readonly midiSources: readonly MidiSourceRecord[]
   readonly midiNotePartitions: readonly MidiNotePartitionSnapshot[]
+  readonly midiSustainPedalEventPartitions: readonly MidiSustainPedalEventPartitionSnapshot[]
   readonly tempoEvents: readonly TempoEventRecord[]
   readonly timeSignatureEvents: readonly TimeSignatureEventRecord[]
   readonly devices: readonly DeviceDescriptor[]
@@ -85,6 +92,20 @@ function createMidiNotePartitionSnapshots(
   return Object.freeze(partitions)
 }
 
+function createMidiSustainPedalEventPartitionSnapshots(
+  reader: ModelStoreReader,
+): readonly MidiSustainPedalEventPartitionSnapshot[] {
+  const sourceIds = [...reader.midiSustainPedalEventPartitionIds()].sort(compareStrings)
+  const partitions = sourceIds.map((sourceId) =>
+    Object.freeze<MidiSustainPedalEventPartitionSnapshot>({
+      sourceId,
+      events: copySortedTimelineRecords(reader.midiSustainPedalEventEntries(sourceId)),
+    }),
+  )
+
+  return Object.freeze(partitions)
+}
+
 /** @internal Creates a low-frequency stable projection without exposing Store containers. */
 export function createProjectSnapshot(reader: ModelStoreReader): ProjectSnapshot {
   return Object.freeze({
@@ -96,6 +117,7 @@ export function createProjectSnapshot(reader: ModelStoreReader): ProjectSnapshot
     clips: copySortedRecords(reader.clipEntries()),
     midiSources: copySortedRecords(reader.midiSourceEntries()),
     midiNotePartitions: createMidiNotePartitionSnapshots(reader),
+    midiSustainPedalEventPartitions: createMidiSustainPedalEventPartitionSnapshots(reader),
     tempoEvents: copySortedTimelineRecords(reader.tempoEventEntries()),
     timeSignatureEvents: copySortedTimelineRecords(reader.timeSignatureEventEntries()),
     devices: copySortedRecords(reader.deviceEntries()),

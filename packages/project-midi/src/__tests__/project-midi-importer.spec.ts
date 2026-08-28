@@ -111,6 +111,7 @@ describe('createProjectMidiImportDraft', () => {
           channel: 2,
         },
       },
+      sustainPedalEvents: {},
     })
     expect(projectFile.tempoEvents['tempo-event-0']).toMatchObject({ tick: 0, bpm: 96 })
     expect(projectFile.timeSignatureEvents['time-signature-event-0']).toMatchObject({

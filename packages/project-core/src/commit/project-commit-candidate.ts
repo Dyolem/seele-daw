@@ -6,18 +6,22 @@ import {
   type AddMidiClipCommand,
   type AddMidiClipWithNoteCommand,
   type AddNoteCommand,
+  type AddMidiSustainPedalEventCommand,
   type ExtendMidiClipWithNoteCommand,
   type InstrumentTrackCollectionClip,
   type InstrumentTrackCollectionEntry,
   type MoveTempoEventCommand,
   type MoveNotesCommand,
+  type MoveMidiSustainPedalEventsCommand,
   type ProjectCommand,
   type ProjectCommandType,
   type RemoveTempoEventCommand,
   type RemoveNotesCommand,
+  type RemoveMidiSustainPedalEventsCommand,
   type ReplaceInstrumentDeviceCommand,
   type ReplaceTempoEventBpmCommand,
   type ResizeNoteCommand,
+  type ReplaceMidiSustainPedalEventValueCommand,
 } from '#internal/commands/protocol/project-command'
 import {
   PROJECT_CHANGE_TYPE,
@@ -33,6 +37,9 @@ import {
   type MidiNoteAddedChange,
   type MidiNoteRemovedChange,
   type MidiNoteUpdatedChange,
+  type MidiSustainPedalEventAddedChange,
+  type MidiSustainPedalEventRemovedChange,
+  type MidiSustainPedalEventUpdatedChange,
   type ProjectChange,
   type TempoEventAddedChange,
   type TempoEventRemovedChange,
@@ -54,6 +61,10 @@ import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-
 import { createMidiClipRecord, type MidiClipRecord } from '#internal/model/midi-clip'
 import { MIDI_PITCH_MAX, MIDI_PITCH_MIN, parseMidiPitch } from '#internal/model/scalars'
 import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
+import {
+  createMidiSustainPedalEventRecord,
+  type MidiSustainPedalEventRecord,
+} from '#internal/model/midi-sustain-pedal-event'
 import { nextModelRevision } from '#internal/model/model-revision'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import { ownPropertiesHaveSameValues } from '#internal/model/value-equality'
@@ -104,8 +115,9 @@ function createMidiClipPlacement(
   clip: MidiClipRecord,
   source: MidiSourceRecord,
   notes: readonly MidiNoteRecord[],
+  sustainPedalEvents: readonly MidiSustainPedalEventRecord[],
 ): MidiClipPlacement {
-  return Object.freeze({ clip, source, notes })
+  return Object.freeze({ clip, source, notes, sustainPedalEvents })
 }
 
 function createClipRange(clip: MidiClipRecord): AffectedTickRange {
@@ -209,6 +221,49 @@ function mapNoteMutationToChange(mutation: ProjectMutation, mutationIndex: numbe
   }
 }
 
+function mapSustainPedalEventMutationToChange(
+  mutation: ProjectMutation,
+  mutationIndex: number,
+): ProjectChange {
+  switch (mutation.type) {
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
+      return Object.freeze<MidiSustainPedalEventAddedChange>({
+        type: PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADDED,
+        sourceId: mutation.sourceId,
+        sustainPedalEventId: mutation.after.id,
+        affectedFromTick: mutation.after.tick,
+        after: mutation.after,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
+      return Object.freeze<MidiSustainPedalEventRemovedChange>({
+        type: PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVED,
+        sourceId: mutation.sourceId,
+        sustainPedalEventId: mutation.before.id,
+        affectedFromTick: mutation.before.tick,
+        before: mutation.before,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
+      return Object.freeze<MidiSustainPedalEventUpdatedChange>({
+        type: PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.UPDATED,
+        sourceId: mutation.sourceId,
+        sustainPedalEventId: mutation.after.id,
+        affectedFromTick:
+          mutation.before.tick < mutation.after.tick ? mutation.before.tick : mutation.after.tick,
+        before: mutation.before,
+        after: mutation.after,
+      })
+
+    default:
+      return rejectCandidate(
+        'unsupported-mutation-type',
+        `Mutation ${mutation.type} at index ${mutationIndex} does not have Sustain Pedal ProjectDelta semantics`,
+        { mutationIndex, mutationType: mutation.type },
+      )
+  }
+}
+
 function mapAddedInstrumentTrack(
   mutations: readonly ProjectMutation[],
   mutationIndex: number,
@@ -282,14 +337,18 @@ function mapAddedMidiClip(
   mutationIndex: number,
 ): MidiClipAddedChange {
   const sourceMutation = mutations[mutationIndex]
-  const partitionMutation = mutations[mutationIndex + 1]
-  const clipMutation = mutations[mutationIndex + 2]
+  const notePartitionMutation = mutations[mutationIndex + 1]
+  const sustainPedalEventPartitionMutation = mutations[mutationIndex + 2]
+  const clipMutation = mutations[mutationIndex + 3]
 
   if (
     sourceMutation?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT ||
-    partitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT ||
+    notePartitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT ||
+    sustainPedalEventPartitionMutation?.type !==
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT ||
     clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT ||
-    partitionMutation.sourceId !== sourceMutation.after.id ||
+    notePartitionMutation.sourceId !== sourceMutation.after.id ||
+    sustainPedalEventPartitionMutation.sourceId !== sourceMutation.after.id ||
     clipMutation.after.sourceId !== sourceMutation.after.id
   ) {
     return rejectCandidate(
@@ -307,7 +366,12 @@ function mapAddedMidiClip(
     sourceId: sourceMutation.after.id,
     trackId: clip.trackId,
     affected: createClipRange(clip),
-    after: createMidiClipPlacement(clip, sourceMutation.after, partitionMutation.after),
+    after: createMidiClipPlacement(
+      clip,
+      sourceMutation.after,
+      notePartitionMutation.after,
+      sustainPedalEventPartitionMutation.after,
+    ),
   })
 }
 
@@ -316,14 +380,18 @@ function mapRemovedMidiClip(
   mutationIndex: number,
 ): MidiClipRemovedChange {
   const clipMutation = mutations[mutationIndex]
-  const partitionMutation = mutations[mutationIndex + 1]
-  const sourceMutation = mutations[mutationIndex + 2]
+  const sustainPedalEventPartitionMutation = mutations[mutationIndex + 1]
+  const notePartitionMutation = mutations[mutationIndex + 2]
+  const sourceMutation = mutations[mutationIndex + 3]
 
   if (
     clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.REMOVE ||
-    partitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE ||
+    sustainPedalEventPartitionMutation?.type !==
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE ||
+    notePartitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE ||
     sourceMutation?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE ||
-    partitionMutation.sourceId !== sourceMutation.before.id ||
+    sustainPedalEventPartitionMutation.sourceId !== sourceMutation.before.id ||
+    notePartitionMutation.sourceId !== sourceMutation.before.id ||
     clipMutation.before.sourceId !== sourceMutation.before.id
   ) {
     return rejectCandidate(
@@ -341,7 +409,12 @@ function mapRemovedMidiClip(
     sourceId: sourceMutation.before.id,
     trackId: clip.trackId,
     affected: createClipRange(clip),
-    before: createMidiClipPlacement(clip, sourceMutation.before, partitionMutation.before),
+    before: createMidiClipPlacement(
+      clip,
+      sourceMutation.before,
+      notePartitionMutation.before,
+      sustainPedalEventPartitionMutation.before,
+    ),
   })
 }
 
@@ -420,12 +493,18 @@ function createProjectChanges(mutations: readonly ProjectMutation[]): readonly P
 
       case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
         changes.push(mapAddedMidiClip(mutations, mutationIndex))
-        mutationIndex += 2
+        mutationIndex += 3
         break
 
       case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
         changes.push(mapRemovedMidiClip(mutations, mutationIndex))
-        mutationIndex += 2
+        mutationIndex += 3
+        break
+
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
+      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
+        changes.push(mapSustainPedalEventMutationToChange(mutation, mutationIndex))
         break
 
       case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE: {
@@ -518,12 +597,15 @@ function matchesMidiClipInsertion(
   mutationIndex: number,
 ): boolean {
   const sourceMutation = mutations[mutationIndex]
-  const partitionMutation = mutations[mutationIndex + 1]
-  const clipMutation = mutations[mutationIndex + 2]
+  const notePartitionMutation = mutations[mutationIndex + 1]
+  const sustainPedalEventPartitionMutation = mutations[mutationIndex + 2]
+  const clipMutation = mutations[mutationIndex + 3]
 
   if (
     sourceMutation?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT ||
-    partitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT ||
+    notePartitionMutation?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT ||
+    sustainPedalEventPartitionMutation?.type !==
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT ||
     clipMutation?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT
   ) {
     return false
@@ -532,9 +614,14 @@ function matchesMidiClipInsertion(
   return (
     sourceMutation.after === graph.source &&
     clipMutation.after === graph.clip &&
-    partitionMutation.sourceId === sourceMutation.after.id &&
-    partitionMutation.after.length === graph.notes.length &&
-    partitionMutation.after.every((note, index) => note === graph.notes[index]) &&
+    notePartitionMutation.sourceId === sourceMutation.after.id &&
+    notePartitionMutation.after.length === graph.notes.length &&
+    notePartitionMutation.after.every((note, index) => note === graph.notes[index]) &&
+    sustainPedalEventPartitionMutation.sourceId === sourceMutation.after.id &&
+    sustainPedalEventPartitionMutation.after.length === graph.sustainPedalEvents.length &&
+    sustainPedalEventPartitionMutation.after.every(
+      (event, index) => event === graph.sustainPedalEvents[index],
+    ) &&
     clipMutation.after.sourceId === sourceMutation.after.id
   )
 }
@@ -544,9 +631,9 @@ function matchesAddedMidiClip(
   mutations: readonly ProjectMutation[],
 ): boolean {
   return (
-    mutations.length === 3 &&
+    mutations.length === 4 &&
     matchesMidiClipInsertion(
-      { clip: command.clip, source: command.source, notes: [] },
+      { clip: command.clip, source: command.source, notes: [], sustainPedalEvents: [] },
       mutations,
       0,
     )
@@ -574,7 +661,7 @@ function matchesAddedInstrumentTrackCollection(
 
     for (const clipGraph of entry.clips) {
       if (!matchesMidiClipInsertion(clipGraph, mutations, mutationIndex)) return false
-      mutationIndex += 3
+      mutationIndex += 4
     }
   }
 
@@ -587,18 +674,23 @@ function matchesAddedMidiClipWithNote(
 ): boolean {
   const sourceMutation = mutations[0]
   const partitionMutation = mutations[1]
-  const clipMutation = mutations[2]
+  const sustainPedalEventPartitionMutation = mutations[2]
+  const clipMutation = mutations[3]
 
   return (
-    mutations.length === 3 &&
+    mutations.length === 4 &&
     sourceMutation?.type === PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT &&
     partitionMutation?.type === PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT &&
+    sustainPedalEventPartitionMutation?.type ===
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT &&
     clipMutation?.type === PROJECT_MUTATION_TYPE.CLIP.INSERT &&
     sourceMutation.after === command.source &&
     clipMutation.after === command.clip &&
     partitionMutation.sourceId === command.source.id &&
     partitionMutation.after.length === 1 &&
     partitionMutation.after[0] === command.note &&
+    sustainPedalEventPartitionMutation.sourceId === command.source.id &&
+    sustainPedalEventPartitionMutation.after.length === 0 &&
     command.clip.sourceId === command.source.id
   )
 }
@@ -773,6 +865,87 @@ function matchesResizedNote(command: ResizeNoteCommand, mutation: ProjectMutatio
   return ownPropertiesHaveSameValues(mutation.after, expectedAfter)
 }
 
+function matchesAddedMidiSustainPedalEvent(
+  command: AddMidiSustainPedalEventCommand,
+  mutation: ProjectMutation,
+): boolean {
+  return (
+    mutation.type === PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT &&
+    mutation.sourceId === command.sourceId &&
+    mutation.after === command.event
+  )
+}
+
+function matchesMovedMidiSustainPedalEvents(
+  command: MoveMidiSustainPedalEventsCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  if (mutations.length !== command.eventIds.length || command.deltaTick === 0) return false
+
+  return mutations.every((mutation, index) => {
+    const eventId = command.eventIds[index]
+    if (
+      eventId === undefined ||
+      mutation.type !== PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE ||
+      mutation.sourceId !== command.sourceId ||
+      mutation.before.id !== eventId ||
+      mutation.after.id !== eventId
+    ) {
+      return false
+    }
+
+    const nextTick = mutation.before.tick + command.deltaTick
+    if (!Number.isSafeInteger(nextTick) || nextTick < 0) return false
+
+    const expectedAfter = createMidiSustainPedalEventRecord({
+      ...mutation.before,
+      tick: parseTick(nextTick),
+    })
+
+    return ownPropertiesHaveSameValues(mutation.after, expectedAfter)
+  })
+}
+
+function matchesRemovedMidiSustainPedalEvents(
+  command: RemoveMidiSustainPedalEventsCommand,
+  mutations: readonly ProjectMutation[],
+): boolean {
+  return (
+    mutations.length === command.eventIds.length &&
+    mutations.every((mutation, index) => {
+      const eventId = command.eventIds[index]
+      return (
+        eventId !== undefined &&
+        mutation.type === PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE &&
+        mutation.sourceId === command.sourceId &&
+        mutation.before.id === eventId
+      )
+    })
+  )
+}
+
+function matchesReplacedMidiSustainPedalEventValue(
+  command: ReplaceMidiSustainPedalEventValueCommand,
+  mutation: ProjectMutation,
+): boolean {
+  if (
+    mutation.type !== PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE ||
+    mutation.sourceId !== command.sourceId ||
+    mutation.before.id !== command.eventId ||
+    mutation.after.id !== command.eventId ||
+    mutation.before.value === command.value
+  ) {
+    return false
+  }
+
+  const expectedAfter = createMidiSustainPedalEventRecord({
+    ...mutation.before,
+    value: command.value,
+  })
+
+  return ownPropertiesHaveSameValues(mutation.after, expectedAfter)
+}
+
 function matchesReplacedTempoEventBpm(
   command: ReplaceTempoEventBpmCommand,
   mutation: ProjectMutation,
@@ -867,6 +1040,10 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
     matches = matchesRemovedNotes(command, plan.forward)
   } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE) {
     matches = matchesMovedNotes(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE) {
+    matches = matchesMovedMidiSustainPedalEvents(command, plan.forward)
+  } else if (command.type === PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE) {
+    matches = matchesRemovedMidiSustainPedalEvents(command, plan.forward)
   } else if (plan.forward.length === 1 && mutation !== undefined) {
     switch (command.type) {
       case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
@@ -874,6 +1051,12 @@ function assertCommandPlanCorrespondence(command: ProjectCommand, plan: Mutation
         break
       case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
         matches = matchesResizedNote(command, mutation)
+        break
+      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
+        matches = matchesAddedMidiSustainPedalEvent(command, mutation)
+        break
+      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
+        matches = matchesReplacedMidiSustainPedalEventValue(command, mutation)
         break
     }
   }

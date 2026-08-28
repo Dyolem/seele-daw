@@ -54,6 +54,15 @@ export const PROJECT_MUTATION_TYPE = {
     REMOVE: 'note.remove',
     REPLACE: 'note.replace',
   },
+  SUSTAIN_PEDAL_EVENT_PARTITION: {
+    INSERT: 'sustain-pedal-event-partition.insert',
+    REMOVE: 'sustain-pedal-event-partition.remove',
+  },
+  SUSTAIN_PEDAL_EVENT: {
+    INSERT: 'sustain-pedal-event.insert',
+    REMOVE: 'sustain-pedal-event.remove',
+    REPLACE: 'sustain-pedal-event.replace',
+  },
 } as const
 
 type ProjectMutationTypeGroup = ValueOf<typeof PROJECT_MUTATION_TYPE>

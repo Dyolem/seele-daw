@@ -2,11 +2,13 @@ import { ProjectCommandError } from '#internal/commands/protocol/project-command
 import {
   parseClipId,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseNoteId,
   parseTempoEventId,
   parseTrackId,
   type ClipId,
   type MidiSourceId,
+  type MidiSustainPedalEventId,
   type NoteId,
   type TempoEventId,
   type TrackId,
@@ -18,6 +20,10 @@ import {
 } from '#internal/model/device'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
 import {
+  createMidiSustainPedalEventRecord,
+  type MidiSustainPedalEventRecord,
+} from '#internal/model/midi-sustain-pedal-event'
+import {
   ModelRevisionError,
   parseModelRevision,
   type ModelRevision,
@@ -26,9 +32,11 @@ import type { ValueOf } from '@seele-daw/type-utils'
 import {
   type ProjectColor,
   type MidiChannel,
+  type MidiControlValue,
   type MidiPitch,
   type MidiPitchDelta,
   type MidiVelocity,
+  parseMidiControlValue,
   parseMidiPitchDelta,
 } from '#internal/model/scalars'
 import { createInstrumentTrackRecord, type InstrumentTrackRecord } from '#internal/model/track'
@@ -74,6 +82,12 @@ export const PROJECT_COMMAND_TYPE = {
     REMOVE: 'midi-note.remove',
     RESIZE: 'midi-note.resize',
   },
+  MIDI_SUSTAIN_PEDAL_EVENT: {
+    ADD: 'midi-sustain-pedal-event.add',
+    MOVE: 'midi-sustain-pedal-event.move',
+    REMOVE: 'midi-sustain-pedal-event.remove',
+    REPLACE_VALUE: 'midi-sustain-pedal-event.replace-value',
+  },
   TEMPO_EVENT: {
     ADD: 'tempo-event.add',
     MOVE: 'tempo-event.move',
@@ -101,6 +115,20 @@ interface MidiNoteCollectionCommandBase<
 > extends ProjectCommandBase<Type> {
   readonly sourceId: MidiSourceId
   readonly noteIds: readonly NoteId[]
+}
+
+interface MidiSustainPedalEventCommandBase<
+  Type extends ProjectCommandType,
+> extends ProjectCommandBase<Type> {
+  readonly sourceId: MidiSourceId
+  readonly eventId: MidiSustainPedalEventId
+}
+
+interface MidiSustainPedalEventCollectionCommandBase<
+  Type extends ProjectCommandType,
+> extends ProjectCommandBase<Type> {
+  readonly sourceId: MidiSourceId
+  readonly eventIds: readonly MidiSustainPedalEventId[]
 }
 
 export interface ReplaceTempoEventBpmCommand extends ProjectCommandBase<
@@ -142,6 +170,7 @@ export interface InstrumentTrackCollectionClip {
   readonly clip: MidiClipRecord
   readonly source: MidiSourceRecord
   readonly notes: readonly MidiNoteRecord[]
+  readonly sustainPedalEvents: readonly MidiSustainPedalEventRecord[]
 }
 
 /** One complete Instrument Track graph, including every newly owned MIDI Clip. */
@@ -217,6 +246,29 @@ export interface ResizeNoteCommand extends MidiNoteCommandBase<
   readonly durationTick: Tick
 }
 
+export interface AddMidiSustainPedalEventCommand extends ProjectCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD
+> {
+  readonly sourceId: MidiSourceId
+  readonly event: MidiSustainPedalEventRecord
+}
+
+export interface MoveMidiSustainPedalEventsCommand extends MidiSustainPedalEventCollectionCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE
+> {
+  readonly deltaTick: TickDelta
+}
+
+export type RemoveMidiSustainPedalEventsCommand = MidiSustainPedalEventCollectionCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE
+>
+
+export interface ReplaceMidiSustainPedalEventValueCommand extends MidiSustainPedalEventCommandBase<
+  typeof PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE
+> {
+  readonly value: MidiControlValue
+}
+
 export type ProjectCommand =
   | AddTempoEventCommand
   | MoveTempoEventCommand
@@ -232,6 +284,10 @@ export type ProjectCommand =
   | MoveNotesCommand
   | RemoveNotesCommand
   | ResizeNoteCommand
+  | AddMidiSustainPedalEventCommand
+  | MoveMidiSustainPedalEventsCommand
+  | RemoveMidiSustainPedalEventsCommand
+  | ReplaceMidiSustainPedalEventValueCommand
 
 export interface CreateAddTempoEventCommandInput {
   readonly baseRevision: ModelRevision
@@ -349,6 +405,35 @@ export interface CreateResizeNoteCommandInput extends CreateNoteCommandInputBase
   readonly durationTick: Tick
 }
 
+interface CreateMidiSustainPedalEventCommandInputBase {
+  readonly baseRevision: ModelRevision
+  readonly sourceId: MidiSourceId
+  readonly eventId: MidiSustainPedalEventId
+}
+
+export interface CreateAddMidiSustainPedalEventCommandInput extends CreateMidiSustainPedalEventCommandInputBase {
+  readonly tick: Tick
+  readonly value: MidiControlValue
+  readonly channel: MidiChannel
+}
+
+interface CreateMidiSustainPedalEventCollectionCommandInputBase {
+  readonly baseRevision: ModelRevision
+  readonly sourceId: MidiSourceId
+  readonly eventIds: readonly MidiSustainPedalEventId[]
+}
+
+export interface CreateMoveMidiSustainPedalEventsCommandInput extends CreateMidiSustainPedalEventCollectionCommandInputBase {
+  readonly deltaTick: TickDelta
+}
+
+export type CreateRemoveMidiSustainPedalEventsCommandInput =
+  CreateMidiSustainPedalEventCollectionCommandInputBase
+
+export interface CreateReplaceMidiSustainPedalEventValueCommandInput extends CreateMidiSustainPedalEventCommandInputBase {
+  readonly value: MidiControlValue
+}
+
 function parseCommandBaseRevision(value: ModelRevision): ModelRevision {
   try {
     return parseModelRevision(value)
@@ -451,6 +536,9 @@ function normalizeInstrumentTrackCollectionClip(
     clip: createMidiClipRecord(input.clip),
     source: createMidiSourceRecord(input.source),
     notes: Object.freeze(input.notes.map((note) => createMidiNoteRecord(note))),
+    sustainPedalEvents: Object.freeze(
+      input.sustainPedalEvents.map((event) => createMidiSustainPedalEventRecord(event)),
+    ),
   })
 }
 
@@ -662,6 +750,93 @@ export function createResizeNoteCommand(input: CreateResizeNoteCommandInput): Re
   }
 }
 
+export function createAddMidiSustainPedalEventCommand(
+  input: CreateAddMidiSustainPedalEventCommandInput,
+): AddMidiSustainPedalEventCommand {
+  const event = createMidiSustainPedalEventRecord({
+    id: input.eventId,
+    tick: input.tick,
+    value: input.value,
+    channel: input.channel,
+  })
+
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    sourceId: parseMidiSourceId(input.sourceId),
+    event,
+  }
+}
+
+function parseDistinctMidiSustainPedalEventIds(
+  eventIds: readonly MidiSustainPedalEventId[],
+  commandName: 'MoveMidiSustainPedalEventsCommand' | 'RemoveMidiSustainPedalEventsCommand',
+): readonly MidiSustainPedalEventId[] {
+  if (eventIds.length === 0) {
+    throw new ProjectCommandError(
+      'empty-sustain-pedal-event-id-list',
+      `${commandName}.eventIds must contain at least one MIDI Sustain Pedal Event ID`,
+    )
+  }
+
+  const parsedEventIds = eventIds.map(parseMidiSustainPedalEventId)
+  const uniqueEventIds = new Set<MidiSustainPedalEventId>()
+
+  for (const eventId of parsedEventIds) {
+    if (uniqueEventIds.has(eventId)) {
+      throw new ProjectCommandError(
+        'duplicate-sustain-pedal-event-id',
+        `${commandName}.eventIds contains duplicate MIDI Sustain Pedal Event ID ${eventId}`,
+        { sustainPedalEventId: eventId },
+      )
+    }
+    uniqueEventIds.add(eventId)
+  }
+
+  return Object.freeze(parsedEventIds)
+}
+
+export function createMoveMidiSustainPedalEventsCommand(
+  input: CreateMoveMidiSustainPedalEventsCommandInput,
+): MoveMidiSustainPedalEventsCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    sourceId: parseMidiSourceId(input.sourceId),
+    eventIds: parseDistinctMidiSustainPedalEventIds(
+      input.eventIds,
+      'MoveMidiSustainPedalEventsCommand',
+    ),
+    deltaTick: parseTickDelta(input.deltaTick),
+  }
+}
+
+export function createRemoveMidiSustainPedalEventsCommand(
+  input: CreateRemoveMidiSustainPedalEventsCommandInput,
+): RemoveMidiSustainPedalEventsCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    sourceId: parseMidiSourceId(input.sourceId),
+    eventIds: parseDistinctMidiSustainPedalEventIds(
+      input.eventIds,
+      'RemoveMidiSustainPedalEventsCommand',
+    ),
+  }
+}
+
+export function createReplaceMidiSustainPedalEventValueCommand(
+  input: CreateReplaceMidiSustainPedalEventValueCommandInput,
+): ReplaceMidiSustainPedalEventValueCommand {
+  return {
+    type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE,
+    baseRevision: parseCommandBaseRevision(input.baseRevision),
+    sourceId: parseMidiSourceId(input.sourceId),
+    eventId: parseMidiSustainPedalEventId(input.eventId),
+    value: parseMidiControlValue(input.value),
+  }
+}
+
 function rejectUnknownCommand(command: never): never {
   const type = (command as { readonly type?: unknown }).type
 
@@ -778,6 +953,21 @@ export function normalizeProjectCommand(command: ProjectCommand): ProjectCommand
       return createRemoveNotesCommand(command)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
       return createResizeNoteCommand(command)
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
+      return createAddMidiSustainPedalEventCommand({
+        baseRevision: command.baseRevision,
+        sourceId: command.sourceId,
+        eventId: command.event.id,
+        tick: command.event.tick,
+        value: command.event.value,
+        channel: command.event.channel,
+      })
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE:
+      return createMoveMidiSustainPedalEventsCommand(command)
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE:
+      return createRemoveMidiSustainPedalEventsCommand(command)
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
+      return createReplaceMidiSustainPedalEventValueCommand(command)
     default:
       return rejectUnknownCommand(command)
   }

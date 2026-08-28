@@ -8,10 +8,12 @@ import {
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   createProjectRecord,
   createTempoEventRecord,
   createTimeSignatureEventRecord,
   parseLinearGain,
+  parseMidiControlValue,
   parseMidiVelocity,
   parseTempoBpm,
   parseTick,
@@ -33,6 +35,7 @@ import { ProjectedModelStoreReader } from '#internal/mutation/projected-model-st
 
 function snapshotReader(reader: ModelStoreReader) {
   const partitionIds = [...reader.midiNotePartitionIds()]
+  const sustainPedalEventPartitionIds = [...reader.midiSustainPedalEventPartitionIds()]
 
   return {
     revision: reader.modelRevision,
@@ -44,6 +47,11 @@ function snapshotReader(reader: ModelStoreReader) {
     midiSources: [...reader.midiSourceEntries()],
     partitionIds,
     notes: partitionIds.map((sourceId) => [sourceId, [...reader.midiNoteEntries(sourceId)]]),
+    sustainPedalEventPartitionIds,
+    sustainPedalEvents: sustainPedalEventPartitionIds.map((sourceId) => [
+      sourceId,
+      [...reader.midiSustainPedalEventEntries(sourceId)],
+    ]),
     tempoEvents: [...reader.tempoEventEntries()],
     timeSignatureEvents: [...reader.timeSignatureEventEntries()],
     devices: [...reader.deviceEntries()],
@@ -104,6 +112,10 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
       ...records.nonLoopNote,
       velocity: parseMidiVelocity(116),
     }),
+    sustainPedalEvent: createMidiSustainPedalEventRecord({
+      ...records.nonLoopPedalDown,
+      value: parseMidiControlValue(96),
+    }),
   }
 }
 
@@ -133,6 +145,14 @@ describe('ProjectedModelStoreReader complete projection', () => {
     const replacement = createReplacementRecords(fixture)
     const partitionBefore = [fixture.records.nonLoopHarmonyNote, fixture.records.nonLoopNote]
     const partitionAfter = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
+    const sustainPedalEventPartitionBefore = [
+      fixture.records.nonLoopPedalUp,
+      fixture.records.nonLoopPedalDown,
+    ]
+    const sustainPedalEventPartitionAfter = [
+      fixture.records.nonLoopPedalDown,
+      fixture.records.nonLoopPedalUp,
+    ]
     const mutations: readonly ProjectMutation[] = [
       {
         type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
@@ -258,6 +278,32 @@ describe('ProjectedModelStoreReader complete projection', () => {
         before: fixture.records.nonLoopNote,
         after: replacement.note,
       },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: sustainPedalEventPartitionBefore,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: fixture.records.nonLoopSource.id,
+        after: sustainPedalEventPartitionAfter,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: fixture.records.nonLoopPedalDown,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+        sourceId: fixture.records.nonLoopSource.id,
+        after: fixture.records.nonLoopPedalDown,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: fixture.records.nonLoopPedalDown,
+        after: replacement.sustainPedalEvent,
+      },
     ]
 
     const projected: ModelStoreReader = createProjection(base, mutations)
@@ -277,6 +323,12 @@ describe('ProjectedModelStoreReader complete projection', () => {
     expect(projected.getMidiNote(fixture.records.nonLoopSource.id, replacement.note.id)).toBe(
       replacement.note,
     )
+    expect(
+      projected.getMidiSustainPedalEvent(
+        fixture.records.nonLoopSource.id,
+        replacement.sustainPedalEvent.id,
+      ),
+    ).toBe(replacement.sustainPedalEvent)
     expect(snapshotReader(base)).toEqual(beforeBase)
     expect(base.project).toBe(fixture.records.project)
     expect(base.master).toBe(fixture.records.master)
@@ -496,6 +548,29 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       })
     }
   })
+
+  it('requires Sustain Pedal Event partition payloads to contain exact IDs and references', () => {
+    const fixture = createCompleteProjectFixture()
+    const staleEvent = createMidiSustainPedalEventRecord({
+      ...fixture.records.nonLoopPedalDown,
+    })
+    const base = new ModelStore(fixture.seed)
+    const error = capturePreconditionError(() =>
+      createProjection(base, [
+        {
+          type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+          sourceId: fixture.records.nonLoopSource.id,
+          before: [staleEvent, fixture.records.nonLoopPedalUp],
+        },
+      ]),
+    )
+
+    expect(error).toMatchObject({
+      code: 'sustain-pedal-event-partition-content-mismatch',
+      mutationIndex: 0,
+      mutationType: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+    })
+  })
 })
 
 describe('Projected Note partition behavior', () => {
@@ -546,6 +621,11 @@ describe('Projected Note partition behavior', () => {
         type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
         sourceId: fixture.records.nonLoopSource.id,
         before: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: [fixture.records.nonLoopPedalDown, fixture.records.nonLoopPedalUp],
       },
       {
         type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE,

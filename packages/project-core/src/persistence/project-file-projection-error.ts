@@ -1,9 +1,12 @@
 export type ProjectFileProjectionErrorCode =
   | 'duplicate-entity-id'
   | 'duplicate-midi-note-partition'
+  | 'duplicate-midi-sustain-pedal-event-partition'
   | 'invalid-device-json'
   | 'midi-note-partition-missing'
+  | 'midi-sustain-pedal-event-partition-missing'
   | 'orphan-midi-note-partition'
+  | 'orphan-midi-sustain-pedal-event-partition'
   | 'unsupported-record-kind'
 
 export interface ProjectFileProjectionErrorDetails {
@@ -13,7 +16,7 @@ export interface ProjectFileProjectionErrorDetails {
   readonly sourceId?: string
 }
 
-/** Raised when a Snapshot cannot be represented truthfully as ProjectFileDTO V1. */
+/** Raised when a Snapshot cannot be represented truthfully as the current ProjectFileDTO. */
 export class ProjectFileProjectionError extends Error {
   readonly code: ProjectFileProjectionErrorCode
   readonly entityId: string | null

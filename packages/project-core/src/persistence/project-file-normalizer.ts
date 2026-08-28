@@ -11,6 +11,7 @@ import {
   parseDeviceId,
   parseDeviceTypeId,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseNoteId,
   parseParameterId,
   parseProjectId,
@@ -20,6 +21,7 @@ import {
   type ClipId,
   type DeviceId,
   type MidiSourceId,
+  type MidiSustainPedalEventId,
   type NoteId,
   type ParameterId,
   type TempoEventId,
@@ -30,6 +32,10 @@ import { parseJsonValue, type JsonValue } from '#internal/model/json-value'
 import { createMidiClipRecord, createMidiLoop, type ClipRecord } from '#internal/model/midi-clip'
 import { createMidiNoteRecord, type MidiNoteRecord } from '#internal/model/midi-note'
 import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
+import {
+  createMidiSustainPedalEventRecord,
+  type MidiSustainPedalEventRecord,
+} from '#internal/model/midi-sustain-pedal-event'
 import type { ModelStoreSeed } from '#internal/model/model-store'
 import { createProjectRecord } from '#internal/model/project'
 import {
@@ -37,6 +43,7 @@ import {
   parseEntityName,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiVelocity,
   parseProjectColor,
@@ -52,6 +59,7 @@ import type {
   MasterChannelDTO,
   MidiClipDTO,
   MidiNoteDTO,
+  MidiSustainPedalEventDTO,
   ProjectFileDTO,
   TrackDTO,
 } from '#internal/persistence/project-file-dto'
@@ -191,6 +199,20 @@ function normalizeMidiNote(dto: MidiNoteDTO, path: LoadPath): MidiNoteRecord {
   )
 }
 
+function normalizeMidiSustainPedalEvent(
+  dto: MidiSustainPedalEventDTO,
+  path: LoadPath,
+): MidiSustainPedalEventRecord {
+  return parseDomainValue(path, () =>
+    createMidiSustainPedalEventRecord({
+      id: parseDomainValue([...path, 'id'], () => parseMidiSustainPedalEventId(dto.id)),
+      tick: parseDomainValue([...path, 'tick'], () => parseTick(dto.tick)),
+      value: parseDomainValue([...path, 'value'], () => parseMidiControlValue(dto.value)),
+      channel: parseDomainValue([...path, 'channel'], () => parseMidiChannel(dto.channel)),
+    }),
+  )
+}
+
 function normalizeDeviceParameters(
   dto: DeviceDTO,
   path: LoadPath,
@@ -255,7 +277,7 @@ function createEntityMap<Id extends string, DTO, RecordType extends { readonly i
   return records
 }
 
-/** @internal Maps the stable V1 protocol explicitly into the current normalized Store shape. */
+/** @internal Maps the migrated current protocol explicitly into the normalized Store shape. */
 export function normalizeProjectFileDTO(dto: ProjectFileDTO): ModelStoreSeed {
   const project = parseDomainValue([], () =>
     createProjectRecord({
@@ -278,6 +300,10 @@ export function normalizeProjectFileDTO(dto: ProjectFileDTO): ModelStoreSeed {
   )
   const midiSources = new Map<MidiSourceId, MidiSourceRecord>()
   const midiNotesBySource = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>()
+  const midiSustainPedalEventsBySource = new Map<
+    MidiSourceId,
+    Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
+  >()
 
   for (const key of Object.keys(dto.midiSources)) {
     const sourceDTO = dto.midiSources[key]!
@@ -295,9 +321,17 @@ export function normalizeProjectFileDTO(dto: ProjectFileDTO): ModelStoreSeed {
       'notes',
       (noteDTO, notePath) => normalizeMidiNote(noteDTO, [...path, ...notePath]),
     )
+    const sustainPedalEvents = createEntityMap<
+      MidiSustainPedalEventId,
+      MidiSustainPedalEventDTO,
+      MidiSustainPedalEventRecord
+    >(sourceDTO.sustainPedalEvents, 'sustainPedalEvents', (eventDTO, eventPath) =>
+      normalizeMidiSustainPedalEvent(eventDTO, [...path, ...eventPath]),
+    )
 
     midiSources.set(source.id, source)
     midiNotesBySource.set(source.id, notes)
+    midiSustainPedalEventsBySource.set(source.id, sustainPedalEvents)
   }
 
   const tempoEvents = createEntityMap<
@@ -345,6 +379,7 @@ export function normalizeProjectFileDTO(dto: ProjectFileDTO): ModelStoreSeed {
     clips,
     midiSources,
     midiNotesBySource,
+    midiSustainPedalEventsBySource,
     tempoEvents,
     timeSignatureEvents,
     devices,

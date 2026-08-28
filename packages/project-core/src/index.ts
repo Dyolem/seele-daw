@@ -6,13 +6,17 @@ export {
   createAddInstrumentTrackCollectionCommand,
   createAddMidiClipCommand,
   createAddMidiClipWithNoteCommand,
+  createAddMidiSustainPedalEventCommand,
   createAddNoteCommand,
   createExtendMidiClipWithNoteCommand,
   createMoveNotesCommand,
+  createMoveMidiSustainPedalEventsCommand,
   createMoveTempoEventCommand,
   createRemoveNotesCommand,
+  createRemoveMidiSustainPedalEventsCommand,
   createRemoveTempoEventCommand,
   createReplaceInstrumentDeviceCommand,
+  createReplaceMidiSustainPedalEventValueCommand,
   createReplaceTempoEventBpmCommand,
   createResizeNoteCommand,
 } from './commands/protocol/project-command'
@@ -23,30 +27,38 @@ export type {
   AddMidiClipCommand,
   AddMidiClipWithNoteCommand,
   AddNoteCommand,
+  AddMidiSustainPedalEventCommand,
   CreateAddInstrumentTrackCommandInput,
   CreateAddInstrumentTrackCollectionCommandInput,
   CreateAddMidiClipCommandInput,
   CreateAddMidiClipWithNoteCommandInput,
   CreateAddNoteCommandInput,
+  CreateAddMidiSustainPedalEventCommandInput,
   CreateAddTempoEventCommandInput,
   CreateExtendMidiClipWithNoteCommandInput,
   CreateMoveNotesCommandInput,
+  CreateMoveMidiSustainPedalEventsCommandInput,
   CreateMoveTempoEventCommandInput,
   CreateRemoveNotesCommandInput,
+  CreateRemoveMidiSustainPedalEventsCommandInput,
   CreateRemoveTempoEventCommandInput,
   CreateReplaceInstrumentDeviceCommandInput,
+  CreateReplaceMidiSustainPedalEventValueCommandInput,
   CreateReplaceTempoEventBpmCommandInput,
   CreateResizeNoteCommandInput,
   ExtendMidiClipWithNoteCommand,
   InstrumentTrackCollectionClip,
   InstrumentTrackCollectionEntry,
   MoveNotesCommand,
+  MoveMidiSustainPedalEventsCommand,
   MoveTempoEventCommand,
   ProjectCommand,
   ProjectCommandType,
   RemoveNotesCommand,
+  RemoveMidiSustainPedalEventsCommand,
   RemoveTempoEventCommand,
   ReplaceInstrumentDeviceCommand,
+  ReplaceMidiSustainPedalEventValueCommand,
   ReplaceTempoEventBpmCommand,
   ResizeNoteCommand,
 } from './commands/protocol/project-command'
@@ -71,6 +83,9 @@ export type {
   MidiNoteAddedChange,
   MidiNoteRemovedChange,
   MidiNoteUpdatedChange,
+  MidiSustainPedalEventAddedChange,
+  MidiSustainPedalEventRemovedChange,
+  MidiSustainPedalEventUpdatedChange,
   ProjectChange,
   ProjectChangeType,
   TempoEventAddedChange,
@@ -129,7 +144,11 @@ export type {
   ProjectSubscriptionErrorDetails,
 } from './subscriptions/project-subscription-error'
 
-export type { MidiNotePartitionSnapshot, ProjectSnapshot } from './snapshots/project-snapshot'
+export type {
+  MidiNotePartitionSnapshot,
+  MidiSustainPedalEventPartitionSnapshot,
+  ProjectSnapshot,
+} from './snapshots/project-snapshot'
 
 export {
   PROJECT_CHECKPOINT_FORMAT_VERSION,
@@ -178,6 +197,7 @@ export type {
   MidiLoopDTO,
   MidiNoteDTO,
   MidiSourceDTO,
+  MidiSustainPedalEventDTO,
   ProjectFileDTO,
   ProjectFileFormatVersion,
   TempoEventDTO,
@@ -245,6 +265,18 @@ export type { CreateMidiNoteRecordInput, MidiNoteAddress, MidiNoteRecord } from 
 export { createMidiSourceRecord } from './model/midi-source'
 export type { CreateMidiSourceRecordInput, MidiSourceRecord } from './model/midi-source'
 
+export {
+  MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER,
+  MIDI_SUSTAIN_PEDAL_DOWN_VALUE_MIN,
+  createMidiSustainPedalEventRecord,
+  isMidiSustainPedalDown,
+} from './model/midi-sustain-pedal-event'
+export type {
+  CreateMidiSustainPedalEventRecordInput,
+  MidiSustainPedalEventAddress,
+  MidiSustainPedalEventRecord,
+} from './model/midi-sustain-pedal-event'
+
 export { createProjectRecord } from './model/project'
 export type { CreateProjectRecordInput, ProjectRecord } from './model/project'
 
@@ -266,6 +298,7 @@ export {
   parseDeviceId,
   parseDeviceTypeId,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseNoteId,
   parseParameterId,
   parseProjectId,
@@ -281,6 +314,7 @@ export type {
   DeviceId,
   DeviceTypeId,
   MidiSourceId,
+  MidiSustainPedalEventId,
   NoteId,
   ParameterId,
   ProjectId,
@@ -297,6 +331,8 @@ export {
   MAX_ENTITY_NAME_LENGTH,
   MIDI_CHANNEL_MAX,
   MIDI_CHANNEL_MIN,
+  MIDI_CONTROL_VALUE_MAX,
+  MIDI_CONTROL_VALUE_MIN,
   MIDI_PITCH_MAX,
   MIDI_PITCH_MIN,
   MIDI_VELOCITY_MAX,
@@ -305,6 +341,7 @@ export {
   parseEntityName,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiPitchDelta,
   parseMidiVelocity,
@@ -314,6 +351,7 @@ export type {
   BipolarValue,
   LinearGain,
   MidiChannel,
+  MidiControlValue,
   MidiPitch,
   MidiPitchDelta,
   MidiVelocity,

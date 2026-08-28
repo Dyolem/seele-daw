@@ -5,10 +5,12 @@ import {
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   createProjectRecord,
   createTempoEventRecord,
   createTimeSignatureEventRecord,
   parseLinearGain,
+  parseMidiControlValue,
   parseMidiVelocity,
   parseTempoBpm,
   parseTick,
@@ -39,6 +41,7 @@ function sortedEntries<RecordType>(
 /** Captures storage traversal as-is, including Map insertion order. */
 export function snapshotModelReader(reader: ModelStoreReader) {
   const partitionIds = [...reader.midiNotePartitionIds()]
+  const sustainPedalEventPartitionIds = [...reader.midiSustainPedalEventPartitionIds()]
 
   return {
     revision: reader.modelRevision,
@@ -50,6 +53,11 @@ export function snapshotModelReader(reader: ModelStoreReader) {
     midiSources: [...reader.midiSourceEntries()],
     partitionIds,
     notes: partitionIds.map((sourceId) => [sourceId, [...reader.midiNoteEntries(sourceId)]]),
+    sustainPedalEventPartitionIds,
+    sustainPedalEvents: sustainPedalEventPartitionIds.map((sourceId) => [
+      sourceId,
+      [...reader.midiSustainPedalEventEntries(sourceId)],
+    ]),
     tempoEvents: [...reader.tempoEventEntries()],
     timeSignatureEvents: [...reader.timeSignatureEventEntries()],
     devices: [...reader.deviceEntries()],
@@ -62,6 +70,7 @@ export function snapshotModelReader(reader: ModelStoreReader) {
  */
 export function snapshotSemanticProjectFacts(reader: ModelStoreReader) {
   const partitionIds = [...reader.midiNotePartitionIds()].sort()
+  const sustainPedalEventPartitionIds = [...reader.midiSustainPedalEventPartitionIds()].sort()
 
   return {
     project: reader.project,
@@ -73,6 +82,11 @@ export function snapshotSemanticProjectFacts(reader: ModelStoreReader) {
     partitionIds,
     notes: partitionIds.map(
       (sourceId) => [sourceId, sortedEntries(reader.midiNoteEntries(sourceId))] as const,
+    ),
+    sustainPedalEventPartitionIds,
+    sustainPedalEvents: sustainPedalEventPartitionIds.map(
+      (sourceId) =>
+        [sourceId, sortedEntries(reader.midiSustainPedalEventEntries(sourceId))] as const,
     ),
     tempoEvents: sortedEntries(reader.tempoEventEntries()),
     timeSignatureEvents: sortedEntries(reader.timeSignatureEventEntries()),
@@ -125,6 +139,10 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
       ...records.nonLoopNote,
       velocity: parseMidiVelocity(116),
     }),
+    sustainPedalEvent: createMidiSustainPedalEventRecord({
+      ...records.nonLoopPedalDown,
+      value: parseMidiControlValue(96),
+    }),
   }
 }
 
@@ -138,6 +156,14 @@ export function createCompleteMutationScenario() {
   const replacement = createReplacementRecords(fixture)
   const partitionBefore = [fixture.records.nonLoopHarmonyNote, fixture.records.nonLoopNote]
   const partitionAfter = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
+  const sustainPedalEventPartitionBefore = [
+    fixture.records.nonLoopPedalUp,
+    fixture.records.nonLoopPedalDown,
+  ]
+  const sustainPedalEventPartitionAfter = [
+    fixture.records.nonLoopPedalDown,
+    fixture.records.nonLoopPedalUp,
+  ]
   const mutations: readonly ProjectMutation[] = [
     {
       type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
@@ -262,6 +288,32 @@ export function createCompleteMutationScenario() {
       sourceId: fixture.records.nonLoopSource.id,
       before: fixture.records.nonLoopNote,
       after: replacement.note,
+    },
+    {
+      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+      sourceId: fixture.records.nonLoopSource.id,
+      before: sustainPedalEventPartitionBefore,
+    },
+    {
+      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+      sourceId: fixture.records.nonLoopSource.id,
+      after: sustainPedalEventPartitionAfter,
+    },
+    {
+      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+      sourceId: fixture.records.nonLoopSource.id,
+      before: fixture.records.nonLoopPedalDown,
+    },
+    {
+      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+      sourceId: fixture.records.nonLoopSource.id,
+      after: fixture.records.nonLoopPedalDown,
+    },
+    {
+      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+      sourceId: fixture.records.nonLoopSource.id,
+      before: fixture.records.nonLoopPedalDown,
+      after: replacement.sustainPedalEvent,
     },
   ]
 

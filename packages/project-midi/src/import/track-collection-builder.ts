@@ -172,7 +172,15 @@ export function createImportedTrackCollection(
       return Object.freeze({
         track,
         instrumentDevice,
-        clips: Object.freeze([Object.freeze({ clip, source, notes: Object.freeze(notes) })]),
+        clips: Object.freeze([
+          Object.freeze({
+            clip,
+            source,
+            notes: Object.freeze(notes),
+            // CC64 import remains a separate product batch; do not bake it into Note duration.
+            sustainPedalEvents: Object.freeze([]),
+          }),
+        ]),
       })
     })
   } catch (cause) {

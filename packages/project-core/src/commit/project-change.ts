@@ -3,6 +3,7 @@ import type {
   ClipId,
   DeviceId,
   MidiSourceId,
+  MidiSustainPedalEventId,
   NoteId,
   TempoEventId,
   TrackId,
@@ -10,6 +11,7 @@ import type {
 import type { MidiClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
+import type { MidiSustainPedalEventRecord } from '#internal/model/midi-sustain-pedal-event'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import type { TempoEventRecord } from '#internal/time/tempo-event'
 import type { Tick } from '#internal/time/tick'
@@ -33,6 +35,11 @@ export const PROJECT_CHANGE_TYPE = {
     ADDED: 'midi-note.added',
     REMOVED: 'midi-note.removed',
     UPDATED: 'midi-note.updated',
+  },
+  MIDI_SUSTAIN_PEDAL_EVENT: {
+    ADDED: 'midi-sustain-pedal-event.added',
+    REMOVED: 'midi-sustain-pedal-event.removed',
+    UPDATED: 'midi-sustain-pedal-event.updated',
   },
   TEMPO_EVENT: {
     ADDED: 'tempo-event.added',
@@ -88,6 +95,7 @@ export interface MidiClipPlacement {
   readonly clip: MidiClipRecord
   readonly source: MidiSourceRecord
   readonly notes: readonly MidiNoteRecord[]
+  readonly sustainPedalEvents: readonly MidiSustainPedalEventRecord[]
 }
 
 interface MidiClipChangeBase<Type extends ProjectChangeType> {
@@ -150,6 +158,33 @@ export interface MidiNoteUpdatedChange extends MidiNoteChangeBase<
   readonly after: MidiNoteRecord
 }
 
+interface MidiSustainPedalEventChangeBase<Type extends ProjectChangeType> {
+  readonly type: Type
+  readonly sourceId: MidiSourceId
+  readonly sustainPedalEventId: MidiSustainPedalEventId
+  /** CC64 changes can alter pedal state for every later event on the same channel. */
+  readonly affectedFromTick: Tick
+}
+
+export interface MidiSustainPedalEventAddedChange extends MidiSustainPedalEventChangeBase<
+  typeof PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADDED
+> {
+  readonly after: MidiSustainPedalEventRecord
+}
+
+export interface MidiSustainPedalEventRemovedChange extends MidiSustainPedalEventChangeBase<
+  typeof PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVED
+> {
+  readonly before: MidiSustainPedalEventRecord
+}
+
+export interface MidiSustainPedalEventUpdatedChange extends MidiSustainPedalEventChangeBase<
+  typeof PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.UPDATED
+> {
+  readonly before: MidiSustainPedalEventRecord
+  readonly after: MidiSustainPedalEventRecord
+}
+
 interface TempoEventChangeBase<Type extends ProjectChangeType> {
   readonly type: Type
   readonly tempoEventId: TempoEventId
@@ -184,6 +219,9 @@ export type ProjectChange =
   | MidiNoteAddedChange
   | MidiNoteRemovedChange
   | MidiNoteUpdatedChange
+  | MidiSustainPedalEventAddedChange
+  | MidiSustainPedalEventRemovedChange
+  | MidiSustainPedalEventUpdatedChange
   | TempoEventAddedChange
   | TempoEventRemovedChange
   | TempoEventUpdatedChange

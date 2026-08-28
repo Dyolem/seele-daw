@@ -59,6 +59,7 @@ export function createInitialModelStore(input: CreateInitialModelStoreInput): Mo
     clips: new Map(),
     midiSources: new Map(),
     midiNotesBySource: new Map(),
+    midiSustainPedalEventsBySource: new Map(),
     tempoEvents: new Map([[tempoEvent.id, tempoEvent]]),
     timeSignatureEvents: new Map([[timeSignatureEvent.id, timeSignatureEvent]]),
     devices: new Map(),

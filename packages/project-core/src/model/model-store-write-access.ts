@@ -11,6 +11,7 @@ import type { MidiSourceId, TrackId } from './ids'
 import type { ClipRecord } from './midi-clip'
 import type { MidiNoteRecord } from './midi-note'
 import type { MidiSourceRecord } from './midi-source'
+import type { MidiSustainPedalEventRecord } from './midi-sustain-pedal-event'
 import type { ModelRevision } from './model-revision'
 import type { ProjectRecord } from './project'
 import type { TrackRecord } from './track'
@@ -77,6 +78,19 @@ export interface ModelStoreWriteAccess {
     sourceId: MidiSourceId,
     expected: MidiNoteRecord | undefined,
     next: MidiNoteRecord | undefined,
+  ) => void
+  readonly insertMidiSustainPedalEventPartition: (
+    sourceId: MidiSourceId,
+    events: readonly MidiSustainPedalEventRecord[],
+  ) => void
+  readonly removeMidiSustainPedalEventPartition: (
+    sourceId: MidiSourceId,
+    expectedEvents: readonly MidiSustainPedalEventRecord[],
+  ) => void
+  readonly writeMidiSustainPedalEvent: (
+    sourceId: MidiSourceId,
+    expected: MidiSustainPedalEventRecord | undefined,
+    next: MidiSustainPedalEventRecord | undefined,
   ) => void
 
   readonly commitModelRevision: (expected: ModelRevision, next: ModelRevision) => void

@@ -9,10 +9,13 @@ import {
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   createProjectRecord,
   createTempoEventRecord,
   createTimeSignatureEventRecord,
   parseLinearGain,
+  parseMidiControlValue,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
@@ -82,7 +85,12 @@ function createMutationExamples(): readonly MutationExample[] {
     ...records.nonLoopNote,
     velocity: parseMidiVelocity(112),
   })
+  const replacementSustainPedalEvent = createMidiSustainPedalEventRecord({
+    ...records.nonLoopPedalDown,
+    value: parseMidiControlValue(96),
+  })
   const partition = [records.nonLoopNote, records.nonLoopHarmonyNote]
+  const sustainPedalEventPartition = [records.nonLoopPedalDown, records.nonLoopPedalUp]
 
   return [
     {
@@ -278,6 +286,47 @@ function createMutationExamples(): readonly MutationExample[] {
         after: replacementNote,
       },
     },
+    {
+      label: 'Sustain Pedal Event partition insert',
+      mutation: {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: records.nonLoopSource.id,
+        after: sustainPedalEventPartition,
+      },
+    },
+    {
+      label: 'Sustain Pedal Event partition remove',
+      mutation: {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        sourceId: records.nonLoopSource.id,
+        before: sustainPedalEventPartition,
+      },
+    },
+    {
+      label: 'Sustain Pedal Event insert',
+      mutation: {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+        sourceId: records.nonLoopSource.id,
+        after: records.nonLoopPedalDown,
+      },
+    },
+    {
+      label: 'Sustain Pedal Event remove',
+      mutation: {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+        sourceId: records.nonLoopSource.id,
+        before: records.nonLoopPedalDown,
+      },
+    },
+    {
+      label: 'Sustain Pedal Event replace',
+      mutation: {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        sourceId: records.nonLoopSource.id,
+        before: records.nonLoopPedalDown,
+        after: replacementSustainPedalEvent,
+      },
+    },
   ]
 }
 
@@ -292,6 +341,7 @@ function recordReferences(mutation: ProjectMutation): readonly object[] {
     case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
     case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
     case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
       return [mutation.before, mutation.after]
 
     case PROJECT_MUTATION_TYPE.TRACK.INSERT:
@@ -301,6 +351,7 @@ function recordReferences(mutation: ProjectMutation): readonly object[] {
     case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT:
     case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
     case PROJECT_MUTATION_TYPE.NOTE.INSERT:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
       return [mutation.after]
 
     case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
@@ -310,11 +361,17 @@ function recordReferences(mutation: ProjectMutation): readonly object[] {
     case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
     case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
     case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
       return [mutation.before]
 
     case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
       return mutation.after
     case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
+      return mutation.before
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
+      return mutation.after
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
       return mutation.before
 
     case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
@@ -345,6 +402,11 @@ function mutationLocation(mutation: ProjectMutation): Readonly<Record<string, nu
     case PROJECT_MUTATION_TYPE.NOTE.INSERT:
     case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
     case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
       return { sourceId: mutation.sourceId }
 
     default:
@@ -375,14 +437,14 @@ describe('PROJECT_MUTATION_TYPE contract', () => {
     expectTypeOf<ProjectMutation['type']>().toEqualTypeOf<ProjectMutationType>()
   })
 
-  it('contains exactly 27 unique runtime mutation names', () => {
+  it('contains exactly 32 unique runtime mutation names', () => {
     const mutationTypes = Object.values(PROJECT_MUTATION_TYPE).flatMap((group) =>
       Object.values(group),
     )
     const exampleTypes = createMutationExamples().map(({ mutation }) => mutation.type)
 
-    expect(mutationTypes).toHaveLength(27)
-    expect(new Set(mutationTypes)).toHaveLength(27)
+    expect(mutationTypes).toHaveLength(32)
+    expect(new Set(mutationTypes)).toHaveLength(32)
     expect(new Set(exampleTypes)).toEqual(new Set(mutationTypes))
   })
 })
@@ -448,7 +510,7 @@ describe('invertProjectMutation', () => {
     }
   })
 
-  it('inverts track-order, Note partition, and Note mutations', () => {
+  it('inverts track-order, Note, and Sustain Pedal Event structural mutations', () => {
     const structuralExamples = createMutationExamples().slice(20)
     const expectedTypes = [
       PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
@@ -458,6 +520,11 @@ describe('invertProjectMutation', () => {
       PROJECT_MUTATION_TYPE.NOTE.REMOVE,
       PROJECT_MUTATION_TYPE.NOTE.INSERT,
       PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
     ]
 
     structuralExamples.forEach(({ label, mutation }, index) => {
@@ -467,7 +534,8 @@ describe('invertProjectMutation', () => {
       expect(mutationLocation(inverse)).toEqual(mutationLocation(mutation))
 
       const expectedReferences =
-        mutation.type === PROJECT_MUTATION_TYPE.NOTE.REPLACE
+        mutation.type === PROJECT_MUTATION_TYPE.NOTE.REPLACE ||
+        mutation.type === PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE
           ? [...recordReferences(mutation)].reverse()
           : recordReferences(mutation)
 
@@ -673,6 +741,12 @@ describe('MutationPlanError', () => {
         before: fixture.records.nonLoopNote,
         after: fixture.records.nonLoopNote,
       },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: fixture.records.nonLoopPedalDown,
+        after: fixture.records.nonLoopPedalDown,
+      },
     ]
 
     for (const mutation of mutations) {
@@ -718,6 +792,10 @@ describe('MutationPlanError', () => {
       ...fixture.records.nonLoopNote,
       id: parseNoteId('different-note'),
     })
+    const differentSustainPedalEvent = createMidiSustainPedalEventRecord({
+      ...fixture.records.nonLoopPedalDown,
+      id: parseMidiSustainPedalEventId('different-sustain-pedal-event'),
+    })
     const mutations: readonly ProjectMutation[] = [
       {
         type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
@@ -734,6 +812,12 @@ describe('MutationPlanError', () => {
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopNote,
         after: differentNote,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: fixture.records.nonLoopPedalDown,
+        after: differentSustainPedalEvent,
       },
     ]
 
@@ -781,6 +865,38 @@ describe('MutationPlanError', () => {
       )
 
       expect(error.code).toBe('duplicate-note-id-in-partition')
+      expect(error.mutationIndex).toBe(1)
+    }
+  })
+
+  it('rejects duplicate Sustain Pedal Event IDs in partition payloads at plan index', () => {
+    const fixture = createCompleteProjectFixture()
+    const duplicateEvents = [fixture.records.nonLoopPedalDown, fixture.records.nonLoopPedalDown]
+    const invalidPartitionMutations: readonly ProjectMutation[] = [
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: fixture.records.nonLoopSource.id,
+        after: duplicateEvents,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        sourceId: fixture.records.nonLoopSource.id,
+        before: duplicateEvents,
+      },
+    ]
+
+    for (const mutation of invalidPartitionMutations) {
+      const error = captureMutationPlanError(() =>
+        createMutationPlan(INITIAL_MODEL_REVISION, [
+          {
+            type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+            before: fixture.records.audioTrack,
+          },
+          mutation,
+        ]),
+      )
+
+      expect(error.code).toBe('duplicate-sustain-pedal-event-id-in-partition')
       expect(error.mutationIndex).toBe(1)
     }
   })

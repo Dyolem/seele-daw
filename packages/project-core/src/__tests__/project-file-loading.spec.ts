@@ -21,11 +21,16 @@ import {
 import { DomainValueError } from '#internal/model/domain-value-error'
 import { ModelInvariantError } from '#internal/model/invariant-validator'
 import projectFileV1Golden from './fixtures/project-files/v1/complete-project.json'
+import projectFileV2Golden from './fixtures/project-files/v2/complete-project.json'
 
 type MutableDataObject = Record<string, unknown>
 
 function createMutableGolden(): MutableDataObject {
   return JSON.parse(JSON.stringify(projectFileV1Golden)) as MutableDataObject
+}
+
+function createMutableV2Golden(): MutableDataObject {
+  return JSON.parse(JSON.stringify(projectFileV2Golden)) as MutableDataObject
 }
 
 function requireDataObject(value: unknown): MutableDataObject {
@@ -251,5 +256,92 @@ describe('Project File V1 Session loading', () => {
     expect(Object.hasOwn(projected.midiSources['source-non-loop']!.notes, '__proto__')).toBe(true)
     expect(Object.hasOwn(projectedParameters, '__proto__')).toBe(true)
     expect(projectedParameters.__proto__).toEqual({ constructor: true })
+  })
+})
+
+describe('Project File V2 Sustain Pedal Event loading', () => {
+  it('loads raw CC64 facts into Source-owned Snapshot partitions', () => {
+    const session = createProjectSessionFromProjectFile(projectFileV2Golden as unknown)
+    const sourceId = parseMidiSourceId('source-non-loop')
+    const partition = session
+      .getSnapshot()
+      .midiSustainPedalEventPartitions.find((candidate) => candidate.sourceId === sourceId)
+
+    expect(partition?.events).toEqual([
+      {
+        id: 'sustain-non-loop-down',
+        tick: 360,
+        value: 127,
+        channel: 0,
+      },
+      {
+        id: 'sustain-non-loop-up',
+        tick: 900,
+        value: 0,
+        channel: 0,
+      },
+    ])
+    expect(createProjectFileDTO(session.getSnapshot())).toEqual(projectFileV2Golden)
+  })
+
+  it('reports invalid raw values at the V2 Event path', () => {
+    const input = createMutableV2Golden()
+    const source = getEntity(input, 'midiSources', 'source-non-loop')
+    getEntity(source, 'sustainPedalEvents', 'sustain-non-loop-down').value = 128
+
+    expect(captureLoadFailure(input)).toMatchObject({
+      code: 'invalid-domain-value',
+      path: [
+        'midiSources',
+        'source-non-loop',
+        'sustainPedalEvents',
+        'sustain-non-loop-down',
+        'value',
+      ],
+      failureCause: expect.any(DomainValueError),
+    })
+  })
+
+  it('rejects out-of-range, duplicate-ID, and duplicate-position Event graphs', () => {
+    const outside = createMutableV2Golden()
+    const outsideSource = getEntity(outside, 'midiSources', 'source-non-loop')
+    getEntity(outsideSource, 'sustainPedalEvents', 'sustain-non-loop-down').tick = 1_921
+
+    const duplicateId = createMutableV2Golden()
+    const duplicateIdSources = requireDataObject(duplicateId.midiSources)
+    const duplicateIdLooping = getEntity(duplicateId, 'midiSources', 'source-looping')
+    const duplicateIdEvents = requireDataObject(duplicateIdLooping.sustainPedalEvents)
+    const nonLoopSource = requireDataObject(duplicateIdSources['source-non-loop'])
+    const nonLoopEvents = requireDataObject(nonLoopSource.sustainPedalEvents)
+    duplicateIdEvents['sustain-non-loop-down'] = {
+      ...requireDataObject(nonLoopEvents['sustain-non-loop-down']),
+      tick: 1_200,
+      channel: 1,
+    }
+
+    const duplicatePosition = createMutableV2Golden()
+    const duplicatePositionSource = getEntity(duplicatePosition, 'midiSources', 'source-non-loop')
+    const duplicatePositionEvents = requireDataObject(duplicatePositionSource.sustainPedalEvents)
+    duplicatePositionEvents['sustain-duplicate-position'] = {
+      id: 'sustain-duplicate-position',
+      tick: 360,
+      value: 64,
+      channel: 0,
+    }
+
+    const failures = [outside, duplicateId, duplicatePosition].map(
+      captureLoadFailure,
+    ) as ProjectFileLoadError[]
+    const violationCodes = failures.map((error) =>
+      error.failureCause instanceof ModelInvariantError
+        ? error.failureCause.violations.map(({ code }) => code)
+        : [],
+    )
+
+    expect(violationCodes).toEqual([
+      expect.arrayContaining(['sustain-pedal-event-outside-midi-source']),
+      expect.arrayContaining(['sustain-pedal-event-id-duplicate']),
+      expect.arrayContaining(['sustain-pedal-event-duplicate-tick-channel']),
+    ])
   })
 })

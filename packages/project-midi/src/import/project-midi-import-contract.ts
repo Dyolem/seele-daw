@@ -76,7 +76,7 @@ export const PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE = {
 export type ProjectMidiImportDiagnosticCode =
   (typeof PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE)[keyof typeof PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE]
 
-/** Non-blocking source facts that the Project V1 model could not represent exactly. */
+/** Non-blocking source facts that the current Project import path does not represent exactly. */
 export interface ProjectMidiImportDiagnostic {
   readonly code: ProjectMidiImportDiagnosticCode
   readonly message: string

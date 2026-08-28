@@ -1,9 +1,10 @@
 import type { JsonValue } from '#internal/model/json-value'
 
 export const PROJECT_FILE_V1_FORMAT_VERSION = 1 as const
+export const PROJECT_FILE_V2_FORMAT_VERSION = 2 as const
 
 // Public writers emit the current format; historical protocol modules use their fixed constant.
-export const PROJECT_FILE_FORMAT_VERSION = PROJECT_FILE_V1_FORMAT_VERSION
+export const PROJECT_FILE_FORMAT_VERSION = PROJECT_FILE_V2_FORMAT_VERSION
 
 export type ProjectFileFormatVersion = typeof PROJECT_FILE_FORMAT_VERSION
 
@@ -70,10 +71,21 @@ export interface MidiNoteDTO {
   readonly channel: number
 }
 
-export interface MidiSourceDTO {
+export interface MidiSustainPedalEventDTO {
+  readonly id: string
+  readonly tick: number
+  readonly value: number
+  readonly channel: number
+}
+
+export interface MidiSourceV1DTO {
   readonly id: string
   readonly lengthTick: number
   readonly notes: Readonly<Record<string, MidiNoteDTO>>
+}
+
+export interface MidiSourceDTO extends MidiSourceV1DTO {
+  readonly sustainPedalEvents: Readonly<Record<string, MidiSustainPedalEventDTO>>
 }
 
 export interface TempoEventDTO {
@@ -98,18 +110,27 @@ export interface DeviceDTO {
   readonly opaqueState: JsonValue | null
 }
 
-/** Versioned JSON-friendly project data. It is not the in-memory Project Model. */
-export interface ProjectFileDTO {
-  readonly formatVersion: ProjectFileFormatVersion
+interface ProjectFileSharedDTO {
   readonly requiredFeatures: readonly string[]
   readonly projectId: string
   readonly name: string
   readonly trackOrder: readonly string[]
   readonly tracks: Readonly<Record<string, TrackDTO>>
   readonly clips: Readonly<Record<string, ClipDTO>>
-  readonly midiSources: Readonly<Record<string, MidiSourceDTO>>
   readonly tempoEvents: Readonly<Record<string, TempoEventDTO>>
   readonly timeSignatureEvents: Readonly<Record<string, TimeSignatureEventDTO>>
   readonly devices: Readonly<Record<string, DeviceDTO>>
   readonly master: MasterChannelDTO
+}
+
+/** Historical V1 shape retained for strict decoding and deterministic migration. */
+export interface ProjectFileV1DTO extends ProjectFileSharedDTO {
+  readonly formatVersion: typeof PROJECT_FILE_V1_FORMAT_VERSION
+  readonly midiSources: Readonly<Record<string, MidiSourceV1DTO>>
+}
+
+/** Current JSON-friendly project data. It is not the in-memory Project Model. */
+export interface ProjectFileDTO extends ProjectFileSharedDTO {
+  readonly formatVersion: ProjectFileFormatVersion
+  readonly midiSources: Readonly<Record<string, MidiSourceDTO>>
 }

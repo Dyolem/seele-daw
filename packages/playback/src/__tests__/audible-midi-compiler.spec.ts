@@ -173,6 +173,7 @@ describe('Audible MIDI Compiler', () => {
       midiNotePartitions: [...snapshot.midiNotePartitions]
         .reverse()
         .map((partition) => ({ ...partition, notes: [...partition.notes].reverse() })),
+      midiSustainPedalEventPartitions: [...snapshot.midiSustainPedalEventPartitions].reverse(),
       midiSources: [...snapshot.midiSources].reverse(),
       tracks: [...snapshot.tracks].reverse(),
     })
@@ -268,6 +269,10 @@ describe('Audible MIDI Compiler', () => {
         midiNotePartitions: [
           ...snapshot.midiNotePartitions,
           Object.freeze({ sourceId: overlappingSource.id, notes: [overlappingNote] }),
+        ],
+        midiSustainPedalEventPartitions: [
+          ...snapshot.midiSustainPedalEventPartitions,
+          Object.freeze({ sourceId: overlappingSource.id, events: [] }),
         ],
       }),
     )
@@ -419,6 +424,7 @@ describe('Audible MIDI Compiler', () => {
         clips: [],
         midiSources: [],
         midiNotePartitions: [],
+        midiSustainPedalEventPartitions: [],
       }),
     )
 
@@ -493,6 +499,9 @@ describe('Audible MIDI Compiler', () => {
       clips: [clip],
       midiSources: [source],
       midiNotePartitions: [Object.freeze({ sourceId: source.id, notes })],
+      midiSustainPedalEventPartitions: [
+        Object.freeze({ sourceId: source.id, events: Object.freeze([]) }),
+      ],
       devices: [device],
     })
 

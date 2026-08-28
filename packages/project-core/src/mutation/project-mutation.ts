@@ -4,6 +4,7 @@ import type { MidiSourceId, TrackId } from '#internal/model/ids'
 import type { ClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
+import type { MidiSustainPedalEventRecord } from '#internal/model/midi-sustain-pedal-event'
 import type { ProjectRecord } from '#internal/model/project'
 import type { TrackRecord } from '#internal/model/track'
 import type { TempoEventRecord } from '#internal/time/tempo-event'
@@ -139,6 +140,46 @@ export interface NoteReplaceMutation {
 
 export type NoteMutation = NoteInsertMutation | NoteRemoveMutation | NoteReplaceMutation
 
+export interface SustainPedalEventPartitionInsertMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT
+  readonly sourceId: MidiSourceId
+  readonly after: readonly MidiSustainPedalEventRecord[]
+}
+
+export interface SustainPedalEventPartitionRemoveMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE
+  readonly sourceId: MidiSourceId
+  readonly before: readonly MidiSustainPedalEventRecord[]
+}
+
+export type SustainPedalEventPartitionMutation =
+  | SustainPedalEventPartitionInsertMutation
+  | SustainPedalEventPartitionRemoveMutation
+
+export interface SustainPedalEventInsertMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT
+  readonly sourceId: MidiSourceId
+  readonly after: MidiSustainPedalEventRecord
+}
+
+export interface SustainPedalEventRemoveMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE
+  readonly sourceId: MidiSourceId
+  readonly before: MidiSustainPedalEventRecord
+}
+
+export interface SustainPedalEventReplaceMutation {
+  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE
+  readonly sourceId: MidiSourceId
+  readonly before: MidiSustainPedalEventRecord
+  readonly after: MidiSustainPedalEventRecord
+}
+
+export type SustainPedalEventMutation =
+  | SustainPedalEventInsertMutation
+  | SustainPedalEventRemoveMutation
+  | SustainPedalEventReplaceMutation
+
 export type ProjectMutation =
   | ProjectReplaceMutation
   | MasterReplaceMutation
@@ -151,6 +192,8 @@ export type ProjectMutation =
   | TrackOrderMutation
   | NotePartitionMutation
   | NoteMutation
+  | SustainPedalEventPartitionMutation
+  | SustainPedalEventMutation
 
 function mutationPosition(index: number | null): string {
   return index === null ? 'Mutation' : `Mutation at index ${index}`
@@ -210,6 +253,25 @@ function assertUniqueNoteIds(notes: readonly MidiNoteRecord[], mutationIndex: nu
   }
 }
 
+function assertUniqueSustainPedalEventIds(
+  events: readonly MidiSustainPedalEventRecord[],
+  mutationIndex: number | null,
+): void {
+  const eventIds = new Set<MidiSustainPedalEventRecord['id']>()
+
+  for (const event of events) {
+    if (eventIds.has(event.id)) {
+      rejectMutation(
+        'duplicate-sustain-pedal-event-id-in-partition',
+        `contains duplicate MIDI Sustain Pedal Event ID ${event.id}`,
+        mutationIndex,
+      )
+    }
+
+    eventIds.add(event.id)
+  }
+}
+
 function assertNeverMutation(mutation: never, index: number | null): never {
   const type = (mutation as { readonly type?: unknown }).type
 
@@ -226,6 +288,7 @@ function validateProjectMutation(mutation: ProjectMutation, index: number | null
     case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
     case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
     case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
       assertReplacement(mutation.before, mutation.after, index)
       return
 
@@ -246,6 +309,14 @@ function validateProjectMutation(mutation: ProjectMutation, index: number | null
       assertUniqueNoteIds(mutation.before, index)
       return
 
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
+      assertUniqueSustainPedalEventIds(mutation.after, index)
+      return
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
+      assertUniqueSustainPedalEventIds(mutation.before, index)
+      return
+
     case PROJECT_MUTATION_TYPE.TRACK.INSERT:
     case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
     case PROJECT_MUTATION_TYPE.CLIP.INSERT:
@@ -260,6 +331,8 @@ function validateProjectMutation(mutation: ProjectMutation, index: number | null
     case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
     case PROJECT_MUTATION_TYPE.NOTE.INSERT:
     case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
       return
 
     default:
@@ -387,6 +460,40 @@ function copyProjectMutation(mutation: ProjectMutation, index: number | null): P
         before: mutation.before,
       })
     case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
+      return Object.freeze({
+        type: mutation.type,
+        sourceId: mutation.sourceId,
+        before: mutation.before,
+        after: mutation.after,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
+      return Object.freeze({
+        type: mutation.type,
+        sourceId: mutation.sourceId,
+        after: Object.freeze([...mutation.after]),
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
+      return Object.freeze({
+        type: mutation.type,
+        sourceId: mutation.sourceId,
+        before: Object.freeze([...mutation.before]),
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
+      return Object.freeze({
+        type: mutation.type,
+        sourceId: mutation.sourceId,
+        after: mutation.after,
+      })
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
+      return Object.freeze({
+        type: mutation.type,
+        sourceId: mutation.sourceId,
+        before: mutation.before,
+      })
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
       return Object.freeze({
         type: mutation.type,
         sourceId: mutation.sourceId,
@@ -545,6 +652,42 @@ function invertValidatedProjectMutation(mutation: ProjectMutation): ProjectMutat
     case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
       return Object.freeze({
         type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        sourceId: mutation.sourceId,
+        before: mutation.after,
+        after: mutation.before,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
+      return Object.freeze({
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        sourceId: mutation.sourceId,
+        before: mutation.after,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
+      return Object.freeze({
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: mutation.sourceId,
+        after: mutation.before,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
+      return Object.freeze({
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+        sourceId: mutation.sourceId,
+        before: mutation.after,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
+      return Object.freeze({
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+        sourceId: mutation.sourceId,
+        after: mutation.before,
+      })
+
+    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
+      return Object.freeze({
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
         sourceId: mutation.sourceId,
         before: mutation.after,
         after: mutation.before,

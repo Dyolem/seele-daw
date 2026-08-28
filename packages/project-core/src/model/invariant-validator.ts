@@ -11,6 +11,7 @@ import type { ModelStoreReader } from './model-store'
 import type {
   DeviceId,
   MidiSourceId,
+  MidiSustainPedalEventId,
   NoteId,
   TempoEventId,
   TimeSignatureEventId,
@@ -26,6 +27,8 @@ export type ModelEntityKind =
   | 'midi-note'
   | 'midi-note-partition'
   | 'midi-source'
+  | 'midi-sustain-pedal-event'
+  | 'midi-sustain-pedal-event-partition'
   | 'tempo-event'
   | 'time-signature-event'
   | 'track'
@@ -38,10 +41,15 @@ export type ModelInvariantCode =
   | 'device-missing'
   | 'device-ownership'
   | 'midi-source-missing-note-partition'
+  | 'midi-source-missing-sustain-pedal-event-partition'
   | 'midi-source-ownership'
   | 'note-id-duplicate'
   | 'note-outside-midi-source'
   | 'note-partition-missing-midi-source'
+  | 'sustain-pedal-event-duplicate-tick-channel'
+  | 'sustain-pedal-event-id-duplicate'
+  | 'sustain-pedal-event-outside-midi-source'
+  | 'sustain-pedal-event-partition-missing-midi-source'
   | 'table-key-id-mismatch'
   | 'tempo-duplicate-tick'
   | 'tempo-initial-event-count'
@@ -85,6 +93,17 @@ interface DeviceReference {
 interface NoteOccurrence {
   readonly sourceId: MidiSourceId
   readonly tableKey: NoteId
+}
+
+interface SustainPedalEventOccurrence {
+  readonly sourceId: MidiSourceId
+  readonly tableKey: MidiSustainPedalEventId
+}
+
+interface SustainPedalEventsAtPosition {
+  readonly tick: number
+  readonly channel: number
+  readonly eventIds: MidiSustainPedalEventId[]
 }
 
 function compareStrings(left: string, right: string): number {
@@ -272,7 +291,7 @@ function validateClips(
   return clipIdsBySource
 }
 
-function validateMidiSourcesAndNotes(
+function validateMidiSourceContent(
   model: ModelStoreReader,
   clipIdsBySource: ReadonlyMap<MidiSourceId, readonly string[]>,
   violations: ViolationList,
@@ -295,6 +314,15 @@ function validateMidiSourcesAndNotes(
         'midi-source-missing-note-partition',
         `MIDI Source ${sourceId} has no MIDI Note partition`,
         [subject('midi-source', sourceId), subject('midi-note-partition', sourceId)],
+      )
+    }
+
+    if (!model.hasMidiSustainPedalEventPartition(sourceId)) {
+      addViolation(
+        violations,
+        'midi-source-missing-sustain-pedal-event-partition',
+        `MIDI Source ${sourceId} has no MIDI Sustain Pedal Event partition`,
+        [subject('midi-source', sourceId), subject('midi-sustain-pedal-event-partition', sourceId)],
       )
     }
   }
@@ -360,6 +388,100 @@ function validateMidiSourcesAndNotes(
         ],
       )
     }
+  }
+
+  const eventOccurrencesById = new Map<MidiSustainPedalEventId, SustainPedalEventOccurrence[]>()
+
+  for (const sourceId of model.midiSustainPedalEventPartitionIds()) {
+    const source = model.getMidiSource(sourceId)
+
+    if (source === undefined) {
+      addViolation(
+        violations,
+        'sustain-pedal-event-partition-missing-midi-source',
+        `MIDI Sustain Pedal Event partition ${sourceId} has no matching MIDI Source`,
+        [subject('midi-sustain-pedal-event-partition', sourceId), subject('midi-source', sourceId)],
+      )
+    }
+
+    const eventsByTickAndChannel = new Map<string, SustainPedalEventsAtPosition>()
+
+    for (const [eventTableKey, event] of model.midiSustainPedalEventEntries(sourceId)) {
+      if (eventTableKey !== event.id) {
+        addTableKeyMismatch(
+          violations,
+          'MIDI Sustain Pedal Event',
+          'midi-sustain-pedal-event',
+          eventTableKey,
+          event.id,
+        )
+      }
+
+      const occurrences = eventOccurrencesById.get(event.id)
+      const occurrence = { sourceId, tableKey: eventTableKey }
+
+      if (occurrences === undefined) {
+        eventOccurrencesById.set(event.id, [occurrence])
+      } else {
+        occurrences.push(occurrence)
+      }
+
+      if (source !== undefined && event.tick > source.lengthTick) {
+        addViolation(
+          violations,
+          'sustain-pedal-event-outside-midi-source',
+          `MIDI Sustain Pedal Event ${event.id} occurs at Tick ${event.tick} beyond Source ${source.id} length ${source.lengthTick}`,
+          [subject('midi-sustain-pedal-event', event.id), subject('midi-source', source.id)],
+        )
+      }
+
+      const tickAndChannelKey = `${event.tick}\u0000${event.channel}`
+      const samePositionEvents = eventsByTickAndChannel.get(tickAndChannelKey)
+
+      if (samePositionEvents === undefined) {
+        eventsByTickAndChannel.set(tickAndChannelKey, {
+          tick: event.tick,
+          channel: event.channel,
+          eventIds: [event.id],
+        })
+      } else {
+        samePositionEvents.eventIds.push(event.id)
+      }
+    }
+
+    for (const { tick, channel, eventIds } of eventsByTickAndChannel.values()) {
+      if (eventIds.length < 2) continue
+
+      const sortedEventIds = [...eventIds].sort(compareStrings)
+
+      addViolation(
+        violations,
+        'sustain-pedal-event-duplicate-tick-channel',
+        `MIDI Sustain Pedal Events ${sortedEventIds.join(', ')} share Tick ${tick} and Channel ${channel} in Source ${sourceId}`,
+        [
+          subject('midi-source', sourceId),
+          ...sortedEventIds.map((eventId) => subject('midi-sustain-pedal-event', eventId)),
+        ],
+      )
+    }
+  }
+
+  for (const [eventId, occurrences] of eventOccurrencesById) {
+    if (occurrences.length < 2) continue
+
+    const occurrenceLabels = occurrences
+      .map(({ sourceId, tableKey }) => `${sourceId}/${tableKey}`)
+      .sort(compareStrings)
+
+    addViolation(
+      violations,
+      'sustain-pedal-event-id-duplicate',
+      `MIDI Sustain Pedal Event ID ${eventId} appears ${occurrences.length} times: ${occurrenceLabels.join(', ')}`,
+      [
+        subject('midi-sustain-pedal-event', eventId),
+        ...occurrences.map(({ sourceId }) => subject('midi-source', sourceId)),
+      ],
+    )
   }
 }
 
@@ -530,7 +652,7 @@ export function validateModelInvariants(
   validateTrackOrder(model, violations)
 
   const clipIdsBySource = validateClips(model, violations)
-  validateMidiSourcesAndNotes(model, clipIdsBySource, violations)
+  validateMidiSourceContent(model, clipIdsBySource, violations)
 
   validateTimelineEvents<TempoEventId, TempoEventRecord>(
     model.tempoEventEntries(),

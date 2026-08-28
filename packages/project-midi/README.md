@@ -1,8 +1,8 @@
 # @seele-daw/project-midi
 
 `project-midi` 是 Standard MIDI File 中立 Document 与 Seele Project Model 之间的浏览器无关桥接层。
-当前 Import 支持两个浏览器无关结果：`createProjectMidiImportDraft` 输出一个已经通过 Project
-File V1 加载边界和完整 Model invariant 校验、但尚未进入 Studio 项目生命周期的 fresh
+当前 Import 支持两个浏览器无关结果：`createProjectMidiImportDraft` 输出一个已经通过当前 Project
+File V2 加载边界和完整 Model invariant 校验、但尚未进入 Studio 项目生命周期的 fresh
 `ProjectSession`；`createProjectMidiTrackImportDraft` 输出一个可向既有 `ProjectSession` 原子追加
 新 Instrument Track 的 Project Command。
 
@@ -18,11 +18,12 @@ File V1 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
 - Source 内 Note tick 改为相对 Clip 起点，Channel、Pitch 和 Velocity 保留；
 - Tempo 与 Time Signature 按换算后的 Project tick 去重；碰撞时保留来源时间上最后生效的事件并
   产生诊断；tick 0 缺失时分别补 120 BPM 与 4/4；
-- Project V1 保留 `5..999 BPM` 范围内的完整浮点 Tempo；范围外 Tempo 或无法表示的 Time
+- 当前 Project Model 保留 `5..999 BPM` 范围内的完整浮点 Tempo；范围外 Tempo 或无法表示的 Time
   Signature 会阻止“新项目”导入，不执行静默 clamp；“新 Track”导入不消费来源 Tempo 或拍号，
   因而让导入 Note 按当前 Project Tempo Map 播放，并分别产生非阻断的时间轴所有权诊断；
-- CC64 不烘焙进 Note 长度。它与其他 CC、Pitch Bend、非零 Release Velocity、非默认 Program、
-  Key Signature 和文本事件都产生非阻断诊断；
+- CC64 不烘焙进 Note 长度。当前 Import 尚未把它映射到已有的 CC64 Project Fact，因此它与其他
+  CC、Pitch Bend、非零 Release Velocity、非默认 Program、Key Signature 和文本事件仍产生非阻断
+  诊断；
 - `@tonejs/midi` 在 Codec 边界已经完成 Note On / Off 配对。中立 Document 当前不携带原始孤立
   Note 事件，因此本桥接层不虚构无法从输入观察到的配对诊断。
 

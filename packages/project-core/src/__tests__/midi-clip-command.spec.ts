@@ -140,7 +140,7 @@ describe('AddMidiClipCommand public contract', () => {
 })
 
 describe('AddMidiClipCommand preparation', () => {
-  it('prepares Source, empty Note Partition, and Clip insertion with an exact inverse', () => {
+  it('prepares Source, empty event partitions, and Clip insertion with an exact inverse', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createCommand(store)
@@ -158,6 +158,11 @@ describe('AddMidiClipCommand preparation', () => {
         after: [],
       },
       {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: command.source.id,
+        after: [],
+      },
+      {
         type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
         after: command.clip,
       },
@@ -166,6 +171,11 @@ describe('AddMidiClipCommand preparation', () => {
       {
         type: PROJECT_MUTATION_TYPE.CLIP.REMOVE,
         before: command.clip,
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        sourceId: command.source.id,
+        before: [],
       },
       {
         type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
@@ -182,14 +192,14 @@ describe('AddMidiClipCommand preparation', () => {
       preparation.status !== 'ready' ||
       preparation.command.type !== PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD ||
       plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT ||
-      plan.forward[2]?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT
+      plan.forward[3]?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT
     ) {
       throw new Error('Expected a ready MIDI Clip graph insertion')
     }
 
     expect(preparation.command).not.toBe(command)
     expect(plan.forward[0].after).toBe(preparation.command.source)
-    expect(plan.forward[2].after).toBe(preparation.command.clip)
+    expect(plan.forward[3].after).toBe(preparation.command.clip)
   })
 
   it('binds aggregate correspondence to the normalized Record references', () => {
@@ -235,7 +245,7 @@ describe('AddMidiClipCommand preparation', () => {
     })
   })
 
-  it('rejects occupied Clip, Source, and Note Partition identities', () => {
+  it('rejects occupied Clip, Source, and MIDI content partition identities', () => {
     const duplicateClipFixture = createCompleteProjectFixture()
     const duplicateClipStore = new ModelStore(duplicateClipFixture.seed)
     const duplicateClip = captureCommandError(() =>
@@ -269,6 +279,24 @@ describe('AddMidiClipCommand preparation', () => {
       ),
     )
 
+    const duplicateSustainPartitionFixture = createCompleteProjectFixture()
+    const sustainPartitionSourceId = parseMidiSourceId(
+      'source-command-sustain-pedal-partition-only',
+    )
+    duplicateSustainPartitionFixture.containers.midiSustainPedalEventsBySource.set(
+      sustainPartitionSourceId,
+      new Map(),
+    )
+    const duplicateSustainPartitionStore = new ModelStore(duplicateSustainPartitionFixture.seed)
+    const duplicateSustainPartition = captureCommandError(() =>
+      prepareProjectCommand(
+        duplicateSustainPartitionStore,
+        createCommand(duplicateSustainPartitionStore, {
+          sourceId: sustainPartitionSourceId,
+        }),
+      ),
+    )
+
     expect(duplicateClip).toMatchObject({
       code: 'clip-id-already-exists',
       clipId: duplicateClipFixture.records.nonLoopClip.id,
@@ -280,6 +308,10 @@ describe('AddMidiClipCommand preparation', () => {
     expect(duplicatePartition).toMatchObject({
       code: 'midi-note-partition-already-exists',
       sourceId: partitionSourceId,
+    })
+    expect(duplicateSustainPartition).toMatchObject({
+      code: 'sustain-pedal-event-partition-already-exists',
+      sourceId: sustainPartitionSourceId,
     })
   })
 
@@ -327,16 +359,20 @@ describe('MIDI Clip commit and History semantics', () => {
         clip: command.clip,
         source: command.source,
         notes: [],
+        sustainPedalEvents: [],
       },
     })
     expect(Object.isFrozen(change)).toBe(true)
     expect(Object.isFrozen(change.affected)).toBe(true)
     expect(Object.isFrozen(change.after)).toBe(true)
     expect(Object.isFrozen(change.after.notes)).toBe(true)
+    expect(Object.isFrozen(change.after.sustainPedalEvents)).toBe(true)
     expect(store.getClip(command.clip.id)).toBe(change.after.clip)
     expect(store.getMidiSource(command.source.id)).toBe(change.after.source)
     expect(store.hasMidiNotePartition(command.source.id)).toBe(true)
     expect([...store.midiNoteEntries(command.source.id)]).toEqual([])
+    expect(store.hasMidiSustainPedalEventPartition(command.source.id)).toBe(true)
+    expect([...store.midiSustainPedalEventEntries(command.source.id)]).toEqual([])
 
     const undoCommit = session.undo()
     const undoChange = undoCommit?.delta.changes[0]
@@ -352,9 +388,11 @@ describe('MIDI Clip commit and History semantics', () => {
     expect(undoChange.before.clip).toBe(change.after.clip)
     expect(undoChange.before.source).toBe(change.after.source)
     expect(undoChange.before.notes).toEqual([])
+    expect(undoChange.before.sustainPedalEvents).toEqual([])
     expect(store.getClip(command.clip.id)).toBeUndefined()
     expect(store.getMidiSource(command.source.id)).toBeUndefined()
     expect(store.hasMidiNotePartition(command.source.id)).toBe(false)
+    expect(store.hasMidiSustainPedalEventPartition(command.source.id)).toBe(false)
 
     const redoCommit = session.redo()
     const redoChange = redoCommit?.delta.changes[0]
@@ -368,6 +406,7 @@ describe('MIDI Clip commit and History semantics', () => {
     expect(store.getClip(command.clip.id)).toBe(change.after.clip)
     expect(store.getMidiSource(command.source.id)).toBe(change.after.source)
     expect(store.hasMidiNotePartition(command.source.id)).toBe(true)
+    expect(store.hasMidiSustainPedalEventPartition(command.source.id)).toBe(true)
   })
 
   it('fails closed when a MIDI Clip graph is incomplete or not empty', () => {
@@ -389,6 +428,11 @@ describe('MIDI Clip commit and History semantics', () => {
         type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
         sourceId: command.source.id,
         after: [fixture.records.nonLoopNote],
+      },
+      {
+        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        sourceId: command.source.id,
+        after: [],
       },
       {
         type: PROJECT_MUTATION_TYPE.CLIP.INSERT,

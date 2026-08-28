@@ -1,4 +1,5 @@
 import { assertMidiNoteWithinSource } from '#internal/commands/midi-note/command-validation'
+import { assertMidiSustainPedalEventWithinSource } from '#internal/commands/midi-sustain-pedal-event/command-validation'
 import type {
   AddInstrumentTrackCollectionCommand,
   InstrumentTrackCollectionClip,
@@ -6,7 +7,14 @@ import type {
 } from '#internal/commands/protocol/project-command'
 import { ProjectCommandError } from '#internal/commands/protocol/project-command-error'
 import type { ReadyProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
-import type { ClipId, DeviceId, MidiSourceId, NoteId, TrackId } from '#internal/model/ids'
+import type {
+  ClipId,
+  DeviceId,
+  MidiSourceId,
+  MidiSustainPedalEventId,
+  NoteId,
+  TrackId,
+} from '#internal/model/ids'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
@@ -94,6 +102,18 @@ function collectExistingNoteIds(reader: ModelStoreReader): Set<NoteId> {
   return noteIds
 }
 
+function collectExistingSustainPedalEventIds(
+  reader: ModelStoreReader,
+): Set<MidiSustainPedalEventId> {
+  const eventIds = new Set<MidiSustainPedalEventId>()
+
+  for (const sourceId of reader.midiSustainPedalEventPartitionIds()) {
+    for (const [eventId] of reader.midiSustainPedalEventEntries(sourceId)) eventIds.add(eventId)
+  }
+
+  return eventIds
+}
+
 function assertCollectionGraphCanBeAdded(
   reader: ModelStoreReader,
   command: AddInstrumentTrackCollectionCommand,
@@ -105,6 +125,7 @@ function assertCollectionGraphCanBeAdded(
   const clipIds = new Set<ClipId>()
   const sourceIds = new Set<MidiSourceId>()
   const noteIds = collectExistingNoteIds(reader)
+  const sustainPedalEventIds = collectExistingSustainPedalEventIds(reader)
 
   for (const entry of command.entries) {
     const details = commandDetails(command, entry)
@@ -165,6 +186,7 @@ function assertCollectionGraphCanBeAdded(
       if (
         reader.getMidiSource(clipGraph.source.id) !== undefined ||
         reader.hasMidiNotePartition(clipGraph.source.id) ||
+        reader.hasMidiSustainPedalEventPartition(clipGraph.source.id) ||
         sourceIds.has(clipGraph.source.id)
       ) {
         rejectReusedId(
@@ -198,6 +220,45 @@ function assertCollectionGraphCanBeAdded(
           clipGraph.source,
           note,
         )
+      }
+      const eventIdsByPosition = new Map<string, MidiSustainPedalEventId>()
+      for (const event of clipGraph.sustainPedalEvents) {
+        if (sustainPedalEventIds.has(event.id)) {
+          throw new ProjectCommandError(
+            'sustain-pedal-event-id-already-exists',
+            `MIDI Sustain Pedal Event ID ${event.id} is already used by the project or this collection`,
+            { ...clipDetails, sustainPedalEventId: event.id },
+          )
+        }
+        sustainPedalEventIds.add(event.id)
+
+        assertMidiSustainPedalEventWithinSource(
+          {
+            baseRevision: command.baseRevision,
+            commandType: command.type,
+            eventId: event.id,
+            sourceId: clipGraph.source.id,
+          },
+          clipGraph.source,
+          event,
+        )
+
+        const position = `${event.tick}\u0000${event.channel}`
+        const blockingEventId = eventIdsByPosition.get(position)
+        if (blockingEventId !== undefined) {
+          throw new ProjectCommandError(
+            'sustain-pedal-event-tick-channel-already-exists',
+            `MIDI Sustain Pedal Events ${blockingEventId} and ${event.id} share Tick ${event.tick} and Channel ${event.channel}`,
+            {
+              ...clipDetails,
+              blockingSustainPedalEventId: blockingEventId,
+              sustainPedalEventChannel: event.channel,
+              sustainPedalEventId: event.id,
+              sustainPedalEventTick: event.tick,
+            },
+          )
+        }
+        eventIdsByPosition.set(position, event.id)
       }
     }
   }
@@ -235,6 +296,11 @@ function createCollectionMutations(
           type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
           sourceId: clipGraph.source.id,
           after: clipGraph.notes,
+        },
+        {
+          type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+          sourceId: clipGraph.source.id,
+          after: clipGraph.sustainPedalEvents,
         },
         {
           type: PROJECT_MUTATION_TYPE.CLIP.INSERT,

@@ -6,6 +6,7 @@ import {
   parseClipId,
   parseDeviceId,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseNoteId,
   parseTempoEventId,
   parseTimeSignatureEventId,
@@ -39,6 +40,9 @@ describe('ModelStore ownership boundary', () => {
     containers.nonLoopNotePartition.clear()
     containers.loopingNotePartition.clear()
     containers.midiNotesBySource.clear()
+    containers.nonLoopSustainPedalEventPartition.clear()
+    containers.loopingSustainPedalEventPartition.clear()
+    containers.midiSustainPedalEventsBySource.clear()
     containers.tempoEvents.clear()
     containers.timeSignatureEvents.clear()
     containers.devices.clear()
@@ -59,6 +63,12 @@ describe('ModelStore ownership boundary', () => {
     expect(store.getMidiNote(records.loopingSource.id, records.loopingNote.id)).toBe(
       records.loopingNote,
     )
+    expect(
+      store.getMidiSustainPedalEvent(records.nonLoopSource.id, records.nonLoopPedalDown.id),
+    ).toBe(records.nonLoopPedalDown)
+    expect(
+      store.getMidiSustainPedalEvent(records.loopingSource.id, records.loopingPedalUp.id),
+    ).toBe(records.loopingPedalUp)
     expect(store.getTempoEvent(records.initialTempoEvent.id)).toBe(records.initialTempoEvent)
     expect(store.getTempoEvent(records.laterTempoEvent.id)).toBe(records.laterTempoEvent)
     expect(store.getTimeSignatureEvent(records.initialTimeSignatureEvent.id)).toBe(
@@ -82,6 +92,7 @@ describe('ModelStore ownership boundary', () => {
       'clips',
       'midiSources',
       'midiNotesBySource',
+      'midiSustainPedalEventsBySource',
       'tempoEvents',
       'timeSignatureEvents',
       'devices',
@@ -90,6 +101,7 @@ describe('ModelStore ownership boundary', () => {
       '#clips',
       '#midiSources',
       '#midiNotesBySource',
+      '#midiSustainPedalEventsBySource',
       '#tempoEvents',
       '#timeSignatureEvents',
       '#devices',
@@ -139,6 +151,19 @@ describe('ModelStoreReader', () => {
       ...containers.loopingNotePartition,
     ])
 
+    expect(reader.hasMidiSustainPedalEventPartition(records.nonLoopSource.id)).toBe(true)
+    expect(reader.hasMidiSustainPedalEventPartition(records.loopingSource.id)).toBe(true)
+    expect([...reader.midiSustainPedalEventPartitionIds()]).toEqual([
+      records.nonLoopSource.id,
+      records.loopingSource.id,
+    ])
+    expect(
+      reader.getMidiSustainPedalEvent(records.nonLoopSource.id, records.nonLoopPedalDown.id),
+    ).toBe(records.nonLoopPedalDown)
+    expect([...reader.midiSustainPedalEventEntries(records.nonLoopSource.id)]).toEqual([
+      ...containers.nonLoopSustainPedalEventPartition,
+    ])
+
     expect(reader.getTempoEvent(records.initialTempoEvent.id)).toBe(records.initialTempoEvent)
     expect(reader.getTempoEvent(records.laterTempoEvent.id)).toBe(records.laterTempoEvent)
     expect([...reader.tempoEventEntries()]).toEqual([...containers.tempoEvents])
@@ -165,6 +190,7 @@ describe('ModelStoreReader', () => {
     const missingClipId = parseClipId('missing-clip')
     const missingSourceId = parseMidiSourceId('missing-source')
     const missingNoteId = parseNoteId('missing-note')
+    const missingSustainPedalEventId = parseMidiSustainPedalEventId('missing-sustain-pedal-event')
     const missingTempoId = parseTempoEventId('missing-tempo')
     const missingTimeSignatureId = parseTimeSignatureEventId('missing-time-signature')
     const missingDeviceId = parseDeviceId('missing-device')
@@ -173,11 +199,16 @@ describe('ModelStoreReader', () => {
     expect(reader.getClip(missingClipId)).toBeUndefined()
     expect(reader.getMidiSource(missingSourceId)).toBeUndefined()
     expect(reader.getMidiNote(missingSourceId, missingNoteId)).toBeUndefined()
+    expect(
+      reader.getMidiSustainPedalEvent(missingSourceId, missingSustainPedalEventId),
+    ).toBeUndefined()
     expect(reader.getTempoEvent(missingTempoId)).toBeUndefined()
     expect(reader.getTimeSignatureEvent(missingTimeSignatureId)).toBeUndefined()
     expect(reader.getDevice(missingDeviceId)).toBeUndefined()
     expect(reader.hasMidiNotePartition(missingSourceId)).toBe(false)
     expect([...reader.midiNoteEntries(missingSourceId)]).toEqual([])
+    expect(reader.hasMidiSustainPedalEventPartition(missingSourceId)).toBe(false)
+    expect([...reader.midiSustainPedalEventEntries(missingSourceId)]).toEqual([])
   })
 
   it('distinguishes an existing empty note partition from a missing partition', () => {
@@ -195,6 +226,23 @@ describe('ModelStoreReader', () => {
     expect(reader.hasMidiNotePartition(missingSourceId)).toBe(false)
     expect([...reader.midiNotePartitionIds()]).not.toContain(missingSourceId)
     expect([...reader.midiNoteEntries(missingSourceId)]).toEqual([])
+  })
+
+  it('distinguishes an existing empty Sustain Pedal Event partition from a missing one', () => {
+    const { seed } = createCompleteProjectFixture()
+    const emptySourceId = parseMidiSourceId('empty-sustain-pedal-source')
+    seed.midiSustainPedalEventsBySource.set(emptySourceId, new Map())
+
+    const reader: ModelStoreReader = new ModelStore(seed)
+
+    expect(reader.hasMidiSustainPedalEventPartition(emptySourceId)).toBe(true)
+    expect([...reader.midiSustainPedalEventPartitionIds()]).toContain(emptySourceId)
+    expect([...reader.midiSustainPedalEventEntries(emptySourceId)]).toEqual([])
+
+    const missingSourceId = parseMidiSourceId('missing-sustain-pedal-source')
+    expect(reader.hasMidiSustainPedalEventPartition(missingSourceId)).toBe(false)
+    expect([...reader.midiSustainPedalEventPartitionIds()]).not.toContain(missingSourceId)
+    expect([...reader.midiSustainPedalEventEntries(missingSourceId)]).toEqual([])
   })
 
   it('keeps explicit track order separate from table insertion and timeline traversal order', () => {

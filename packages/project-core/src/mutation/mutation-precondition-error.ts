@@ -4,6 +4,7 @@ export type MutationPreconditionErrorCode =
   | 'before-reference-mismatch'
   | 'insert-target-exists'
   | 'note-partition-content-mismatch'
+  | 'sustain-pedal-event-partition-content-mismatch'
   | 'target-missing'
   | 'track-order-entry-mismatch'
   | 'track-order-index-out-of-bounds'

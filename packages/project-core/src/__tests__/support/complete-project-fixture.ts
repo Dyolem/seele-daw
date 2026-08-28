@@ -7,6 +7,7 @@ import {
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   createProjectRecord,
   createTempoEventRecord,
   createTimeSignatureEventRecord,
@@ -16,8 +17,10 @@ import {
   parseDeviceTypeId,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
@@ -35,6 +38,8 @@ import {
   type MidiNoteRecord,
   type MidiSourceId,
   type MidiSourceRecord,
+  type MidiSustainPedalEventId,
+  type MidiSustainPedalEventRecord,
   type NoteId,
   type TempoEventId,
   type TempoEventRecord,
@@ -150,6 +155,30 @@ export function createCompleteProjectFixture() {
     velocity: parseMidiVelocity(92),
     channel: parseMidiChannel(1),
   })
+  const nonLoopPedalDown = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-non-loop-down'),
+    tick: parseTick(360),
+    value: parseMidiControlValue(127),
+    channel: parseMidiChannel(0),
+  })
+  const nonLoopPedalUp = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-non-loop-up'),
+    tick: parseTick(900),
+    value: parseMidiControlValue(0),
+    channel: parseMidiChannel(0),
+  })
+  const loopingPedalDown = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-looping-down'),
+    tick: parseTick(120),
+    value: parseMidiControlValue(100),
+    channel: parseMidiChannel(1),
+  })
+  const loopingPedalUp = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-looping-up'),
+    tick: parseTick(840),
+    value: parseMidiControlValue(32),
+    channel: parseMidiChannel(1),
+  })
 
   const nonLoopClip = createMidiClipRecord({
     id: parseClipId('clip-non-loop'),
@@ -232,6 +261,27 @@ export function createCompleteProjectFixture() {
     [nonLoopSource.id, nonLoopNotePartition],
     [loopingSource.id, loopingNotePartition],
   ])
+  const nonLoopSustainPedalEventPartition = new Map<
+    MidiSustainPedalEventId,
+    MidiSustainPedalEventRecord
+  >([
+    [nonLoopPedalDown.id, nonLoopPedalDown],
+    [nonLoopPedalUp.id, nonLoopPedalUp],
+  ])
+  const loopingSustainPedalEventPartition = new Map<
+    MidiSustainPedalEventId,
+    MidiSustainPedalEventRecord
+  >([
+    [loopingPedalDown.id, loopingPedalDown],
+    [loopingPedalUp.id, loopingPedalUp],
+  ])
+  const midiSustainPedalEventsBySource = new Map<
+    MidiSourceId,
+    Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
+  >([
+    [nonLoopSource.id, nonLoopSustainPedalEventPartition],
+    [loopingSource.id, loopingSustainPedalEventPartition],
+  ])
   const tempoEvents = new Map<TempoEventId, TempoEventRecord>([
     [initialTempoEvent.id, initialTempoEvent],
     [laterTempoEvent.id, laterTempoEvent],
@@ -255,6 +305,7 @@ export function createCompleteProjectFixture() {
     clips,
     midiSources,
     midiNotesBySource,
+    midiSustainPedalEventsBySource,
     tempoEvents,
     timeSignatureEvents,
     devices,
@@ -275,6 +326,10 @@ export function createCompleteProjectFixture() {
       nonLoopHarmonyNote,
       loopingNote,
       loopingHarmonyNote,
+      nonLoopPedalDown,
+      nonLoopPedalUp,
+      loopingPedalDown,
+      loopingPedalUp,
       initialTempoEvent,
       laterTempoEvent,
       initialTimeSignatureEvent,
@@ -294,6 +349,9 @@ export function createCompleteProjectFixture() {
       nonLoopNotePartition,
       loopingNotePartition,
       midiNotesBySource,
+      nonLoopSustainPedalEventPartition,
+      loopingSustainPedalEventPartition,
+      midiSustainPedalEventsBySource,
       tempoEvents,
       timeSignatureEvents,
       devices,

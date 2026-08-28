@@ -14,14 +14,17 @@ import {
   createMidiNoteByIdQuery,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   parseBipolarValue,
   parseClipId,
   parseDeviceId,
   parseDeviceTypeId,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
@@ -45,6 +48,7 @@ function createEntry(
     readonly clipTrackId?: string
     readonly clipSourceId?: string
     readonly midiEffectId?: string
+    readonly sustainPedalEventId?: string
   } = {},
 ): InstrumentTrackCollectionEntry {
   const device = createDeviceDescriptor({
@@ -103,8 +107,28 @@ function createEntry(
       channel: parseMidiChannel(0),
     }),
   ]
+  const sustainPedalEvents = [
+    createMidiSustainPedalEventRecord({
+      id: parseMidiSustainPedalEventId(
+        options.sustainPedalEventId ?? `sustain-import-${suffix}-down`,
+      ),
+      tick: parseTick(120),
+      value: parseMidiControlValue(127),
+      channel: parseMidiChannel(0),
+    }),
+    createMidiSustainPedalEventRecord({
+      id: parseMidiSustainPedalEventId(`sustain-import-${suffix}-up`),
+      tick: parseTick(840),
+      value: parseMidiControlValue(0),
+      channel: parseMidiChannel(0),
+    }),
+  ]
 
-  return { track, instrumentDevice: device, clips: [{ clip, source, notes }] }
+  return {
+    track,
+    instrumentDevice: device,
+    clips: [{ clip, source, notes, sustainPedalEvents }],
+  }
 }
 
 function createCommand(
@@ -150,6 +174,9 @@ describe('AddInstrumentTrackCollectionCommand public contract', () => {
     expect(command.entries[0]).not.toBe(inputEntry)
     expect(command.entries[0]?.track).toEqual(inputEntry.track)
     expect(command.entries[0]?.clips[0]?.notes).toEqual(inputEntry.clips[0]?.notes)
+    expect(command.entries[0]?.clips[0]?.sustainPedalEvents).toEqual(
+      inputEntry.clips[0]?.sustainPedalEvents,
+    )
     expect(Object.isFrozen(command.entries)).toBe(true)
     expect(Object.isFrozen(command.entries[0]?.clips)).toBe(true)
     expectTypeOf(command).toEqualTypeOf<AddInstrumentTrackCollectionCommand>()
@@ -179,12 +206,14 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
       PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
       PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
       PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
       PROJECT_MUTATION_TYPE.CLIP.INSERT,
       PROJECT_MUTATION_TYPE.DEVICE.INSERT,
       PROJECT_MUTATION_TYPE.TRACK.INSERT,
       PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
       PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
       PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
       PROJECT_MUTATION_TYPE.CLIP.INSERT,
     ])
     expect(plan.forward[2]).toEqual({
@@ -192,7 +221,7 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
       index: 1,
       trackId: first?.track.id,
     })
-    expect(plan.forward[8]).toEqual({
+    expect(plan.forward[9]).toEqual({
       type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
       index: 2,
       trackId: second?.track.id,
@@ -210,6 +239,8 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
             return PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE
           case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
             return PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE
+          case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
+            return PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE
           case PROJECT_MUTATION_TYPE.CLIP.INSERT:
             return PROJECT_MUTATION_TYPE.CLIP.REMOVE
           default:
@@ -225,6 +256,9 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
     const existingNote = createEntry('existing-note', {
       noteId: fixture.records.nonLoopNote.id,
     })
+    const existingSustainPedalEvent = createEntry('existing-sustain-pedal-event', {
+      sustainPedalEventId: fixture.records.nonLoopPedalDown.id,
+    })
     const wrongTrack = createEntry('wrong-track', { clipTrackId: 'track-other' })
     const wrongSource = createEntry('wrong-source', { clipSourceId: 'source-other' })
     const unsupportedDeviceChain = createEntry('device-chain', {
@@ -235,6 +269,11 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
       captureCommandError(() => prepareProjectCommand(store, createCommand(store, [existingNote])))
         .code,
     ).toBe('note-id-already-exists')
+    expect(
+      captureCommandError(() =>
+        prepareProjectCommand(store, createCommand(store, [existingSustainPedalEvent])),
+      ).code,
+    ).toBe('sustain-pedal-event-id-already-exists')
     expect(
       captureCommandError(() => prepareProjectCommand(store, createCommand(store, [wrongTrack])))
         .code,
@@ -282,7 +321,7 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
 })
 
 describe('Instrument Track collection commit and History semantics', () => {
-  it('commits once, indexes imported Notes, and restores the full batch through one Undo / Redo', () => {
+  it('commits once, preserves imported MIDI content, and restores the batch through one Undo / Redo', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const initialRevision = session.modelRevision
     const command = createCommand(store)
@@ -313,11 +352,24 @@ describe('Instrument Track collection commit and History semantics', () => {
       const clipGraph = entry.clips[0]
       const note = clipGraph?.notes[0]
       if (clipGraph === undefined || note === undefined) throw new Error('Missing test Note graph')
+      const clipChange = result.commit.delta.changes.find(
+        (change) =>
+          change.type === PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED &&
+          change.sourceId === clipGraph.source.id,
+      )
 
       expect(
         session.query(createMidiNoteByIdQuery({ sourceId: clipGraph.source.id, noteId: note.id }))
           .note,
       ).toEqual(note)
+      expect(clipChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED)
+      if (clipChange?.type !== PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED) {
+        throw new Error('Missing imported MIDI Clip change')
+      }
+      expect(clipChange.after.sustainPedalEvents).toEqual(clipGraph.sustainPedalEvents)
+      expect(
+        [...store.midiSustainPedalEventEntries(clipGraph.source.id)].map(([, event]) => event),
+      ).toEqual(clipGraph.sustainPedalEvents)
     }
 
     const undoCommit = session.undo()

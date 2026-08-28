@@ -5,6 +5,7 @@ import { parseJsonValue } from '#internal/model/json-value'
 import type { ClipRecord, MidiLoop } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
+import type { MidiSustainPedalEventRecord } from '#internal/model/midi-sustain-pedal-event'
 import type { TrackRecord } from '#internal/model/track'
 import {
   PROJECT_FILE_FORMAT_VERSION,
@@ -15,6 +16,7 @@ import {
   type MidiLoopDTO,
   type MidiNoteDTO,
   type MidiSourceDTO,
+  type MidiSustainPedalEventDTO,
   type ProjectFileDTO,
   type TempoEventDTO,
   type TimeSignatureEventDTO,
@@ -26,6 +28,7 @@ import {
 } from '#internal/persistence/project-file-projection-error'
 import type {
   MidiNotePartitionSnapshot,
+  MidiSustainPedalEventPartitionSnapshot,
   ProjectSnapshot,
 } from '#internal/snapshots/project-snapshot'
 import type { TempoEventRecord } from '#internal/time/tempo-event'
@@ -236,12 +239,29 @@ function createMidiNoteDTO(note: MidiNoteRecord): MidiNoteDTO {
 
 function createMidiSourceDTO(
   source: MidiSourceRecord,
-  partition: MidiNotePartitionSnapshot,
+  notePartition: MidiNotePartitionSnapshot,
+  sustainPedalEventPartition: MidiSustainPedalEventPartitionSnapshot,
 ): MidiSourceDTO {
   return Object.freeze({
     id: source.id,
     lengthTick: source.lengthTick,
-    notes: createEntityTable('midi-note', partition.notes, createMidiNoteDTO),
+    notes: createEntityTable('midi-note', notePartition.notes, createMidiNoteDTO),
+    sustainPedalEvents: createEntityTable(
+      'midi-sustain-pedal-event',
+      sustainPedalEventPartition.events,
+      createMidiSustainPedalEventDTO,
+    ),
+  })
+}
+
+function createMidiSustainPedalEventDTO(
+  event: MidiSustainPedalEventRecord,
+): MidiSustainPedalEventDTO {
+  return Object.freeze({
+    id: event.id,
+    tick: event.tick,
+    value: event.value,
+    channel: event.channel,
   })
 }
 
@@ -303,13 +323,36 @@ function indexMidiNotePartitions(
   return indexed
 }
 
-/** Projects one trusted runtime Snapshot into a detached, frozen V1 file value. */
-export function createProjectFileDTO(snapshot: ProjectSnapshot): ProjectFileDTO {
-  const partitionsBySource = indexMidiNotePartitions(snapshot.midiNotePartitions)
-  const midiSources = createEntityTable('midi-source', snapshot.midiSources, (source) => {
-    const partition = partitionsBySource.get(source.id)
+function indexMidiSustainPedalEventPartitions(
+  partitions: readonly MidiSustainPedalEventPartitionSnapshot[],
+): Map<string, MidiSustainPedalEventPartitionSnapshot> {
+  const indexed = new Map<string, MidiSustainPedalEventPartitionSnapshot>()
 
-    if (partition === undefined) {
+  for (const partition of partitions) {
+    if (indexed.has(partition.sourceId)) {
+      rejectProjection(
+        'duplicate-midi-sustain-pedal-event-partition',
+        `ProjectSnapshot contains duplicate MIDI Sustain Pedal Event partition ${partition.sourceId}`,
+        { sourceId: partition.sourceId },
+      )
+    }
+
+    indexed.set(partition.sourceId, partition)
+  }
+
+  return indexed
+}
+
+/** Projects one trusted runtime Snapshot into a detached, frozen current file value. */
+export function createProjectFileDTO(snapshot: ProjectSnapshot): ProjectFileDTO {
+  const notePartitionsBySource = indexMidiNotePartitions(snapshot.midiNotePartitions)
+  const sustainPedalEventPartitionsBySource = indexMidiSustainPedalEventPartitions(
+    snapshot.midiSustainPedalEventPartitions,
+  )
+  const midiSources = createEntityTable('midi-source', snapshot.midiSources, (source) => {
+    const notePartition = notePartitionsBySource.get(source.id)
+
+    if (notePartition === undefined) {
       return rejectProjection(
         'midi-note-partition-missing',
         `MIDI Source ${source.id} has no Note partition in ProjectSnapshot`,
@@ -317,16 +360,34 @@ export function createProjectFileDTO(snapshot: ProjectSnapshot): ProjectFileDTO 
       )
     }
 
-    partitionsBySource.delete(source.id)
-    return createMidiSourceDTO(source, partition)
+    const sustainPedalEventPartition = sustainPedalEventPartitionsBySource.get(source.id)
+    if (sustainPedalEventPartition === undefined) {
+      return rejectProjection(
+        'midi-sustain-pedal-event-partition-missing',
+        `MIDI Source ${source.id} has no Sustain Pedal Event partition in ProjectSnapshot`,
+        { sourceId: source.id },
+      )
+    }
+
+    notePartitionsBySource.delete(source.id)
+    sustainPedalEventPartitionsBySource.delete(source.id)
+    return createMidiSourceDTO(source, notePartition, sustainPedalEventPartition)
   })
-  const orphanPartition = partitionsBySource.values().next().value
+  const orphanPartition = notePartitionsBySource.values().next().value
 
   if (orphanPartition !== undefined) {
     rejectProjection(
       'orphan-midi-note-partition',
       `MIDI Note partition ${orphanPartition.sourceId} has no Source in ProjectSnapshot`,
       { sourceId: orphanPartition.sourceId },
+    )
+  }
+  const orphanSustainPedalEventPartition = sustainPedalEventPartitionsBySource.values().next().value
+  if (orphanSustainPedalEventPartition !== undefined) {
+    rejectProjection(
+      'orphan-midi-sustain-pedal-event-partition',
+      `MIDI Sustain Pedal Event partition ${orphanSustainPedalEventPartition.sourceId} has no Source in ProjectSnapshot`,
+      { sourceId: orphanSustainPedalEventPartition.sourceId },
     )
   }
 

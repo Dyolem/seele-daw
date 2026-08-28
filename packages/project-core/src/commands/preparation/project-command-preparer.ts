@@ -21,6 +21,12 @@ import {
   prepareResizeNoteCommand,
 } from '#internal/commands/midi-note/command-handler'
 import {
+  prepareAddMidiSustainPedalEventCommand,
+  prepareMoveMidiSustainPedalEventsCommand,
+  prepareRemoveMidiSustainPedalEventsCommand,
+  prepareReplaceMidiSustainPedalEventValueCommand,
+} from '#internal/commands/midi-sustain-pedal-event/command-handler'
+import {
   prepareAddTempoEventCommand,
   prepareMoveTempoEventCommand,
   prepareRemoveTempoEventCommand,
@@ -99,6 +105,22 @@ function commandAddress(command: ProjectCommand): ProjectCommandErrorDetails {
       return {
         sourceId: command.sourceId,
       }
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
+      return {
+        sourceId: command.sourceId,
+        sustainPedalEventId: command.event.id,
+        sustainPedalEventTick: command.event.tick,
+      }
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
+      return {
+        sourceId: command.sourceId,
+        sustainPedalEventId: command.eventId,
+      }
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE:
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE:
+      return {
+        sourceId: command.sourceId,
+      }
     default:
       return rejectUnknownCommand(command)
   }
@@ -156,6 +178,14 @@ export function prepareProjectCommand(
       return prepareRemoveNotesCommand(reader, normalizedCommand)
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
       return prepareResizeNoteCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
+      return prepareAddMidiSustainPedalEventCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE:
+      return prepareMoveMidiSustainPedalEventsCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE:
+      return prepareRemoveMidiSustainPedalEventsCommand(reader, normalizedCommand)
+    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
+      return prepareReplaceMidiSustainPedalEventValueCommand(reader, normalizedCommand)
     default:
       return rejectUnknownCommand(normalizedCommand)
   }

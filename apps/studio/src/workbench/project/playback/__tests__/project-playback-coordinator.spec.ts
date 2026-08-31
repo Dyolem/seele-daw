@@ -3,6 +3,7 @@ import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddInstrumentTrackCommand,
   createAddMidiClipCommand,
+  createAddMidiSustainPedalEventCommand,
   createAddNoteCommand,
   createAddTempoEventCommand,
   createDeviceDescriptor,
@@ -21,9 +22,11 @@ import {
   parseDeviceTypeId,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiPitchDelta,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parsePositiveTick,
@@ -131,6 +134,8 @@ const DEVICE_ID = parseDeviceId('device-playback-coordinator')
 const CLIP_ID = parseClipId('clip-playback-coordinator')
 const SOURCE_ID = parseMidiSourceId('source-playback-coordinator')
 const NOTE_ID = parseNoteId('note-playback-coordinator')
+const SUSTAIN_PEDAL_DOWN_EVENT_ID = parseMidiSustainPedalEventId('pedal-down-playback-coordinator')
+const SUSTAIN_PEDAL_UP_EVENT_ID = parseMidiSustainPedalEventId('pedal-up-playback-coordinator')
 const SECOND_NOTE_ID = parseNoteId('note-playback-coordinator-second')
 const FAR_NOTE_ID = parseNoteId('note-playback-coordinator-far')
 const MOVED_NOTE_ID = parseNoteId('note-playback-coordinator-moved')
@@ -772,6 +777,53 @@ describe('ProjectPlaybackCoordinator', () => {
         noteId: NOTE_ID,
         sourceId: SOURCE_ID,
         startTick: parseTick(0),
+      }),
+    )
+    activeProject.publishCommit(commit)
+    await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
+
+    expect(activeHandle.isActive()).toBe(true)
+    expect(activeHandle.releaseUpdates).toEqual([0.75])
+    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(coordinator.state.phase).toBe('playing')
+    coordinator.dispose()
+  })
+
+  it('retimes an active Voice to Pedal Up without restarting playback', async () => {
+    const projectId = parseProjectId('project-playback-live-sustain-pedal')
+    const session = createPlayableSession(projectId)
+    requireCommitted(
+      session,
+      createAddMidiSustainPedalEventCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        eventId: SUSTAIN_PEDAL_UP_EVENT_ID,
+        sourceId: SOURCE_ID,
+        tick: parseTick(1_440),
+        value: parseMidiControlValue(0),
+      }),
+    )
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+    await coordinator.play()
+    const firstRuntime = runtime.prepared[0]!
+    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
+    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+
+    const commit = requireCommitted(
+      session,
+      createAddMidiSustainPedalEventCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        eventId: SUSTAIN_PEDAL_DOWN_EVENT_ID,
+        sourceId: SOURCE_ID,
+        tick: parseTick(0),
+        value: parseMidiControlValue(127),
       }),
     )
     activeProject.publishCommit(commit)

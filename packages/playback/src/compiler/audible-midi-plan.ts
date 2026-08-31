@@ -83,7 +83,10 @@ export interface MidiNoteSpanPlan {
   readonly sourceId: MidiSourceId
   readonly noteId: NoteId
   readonly startTick: Tick
+  /** Authored Note Off after Clip-edge clipping. */
   readonly endTick: Tick
+  /** Final gated release after channel-local CC64 hold; never precedes endTick. */
+  readonly releaseTick: Tick
   readonly pitch: MidiPitch
   readonly velocity: MidiVelocity
   readonly channel: MidiChannel

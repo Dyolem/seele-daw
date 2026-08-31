@@ -2,9 +2,10 @@
 
 ## 阶段状态
 
-本文档定义 Sustain Pedal CC64 第一批 Project Core 实现边界。当前已完成的是可保存、可撤销、
-可增量观察的项目事实与命令事务；它还不代表导入、Playback、Audio Runtime 或 Studio
-Controller Lane 已经支持踏板发声。
+本文档定义 Sustain Pedal CC64 的 Project Core 事实边界，并记录后续纵向切片的集成状态。
+Project Core 的可保存、可撤销、可增量观察事实与命令事务已经提交；Standard MIDI File 导入、
+Playback、Audio Runtime 与 Studio 选择性重协调已在后续批次实现并等待审核。Studio Controller
+Lane 尚未实现。
 
 当前批次完成：
 
@@ -12,31 +13,39 @@ Controller Lane 已经支持踏板发声。
 - Add、批量 Move、批量 Remove、Replace Value Project Command；
 - Mutation、ProjectDelta、History、Undo / Redo 与 Snapshot；
 - Project File V2 写出、严格读取，以及 V1 到 V2 的无损迁移；
-- 新建 MIDI Clip 与整轨集合导入命令所需的完整所有权图。
+- 新建 MIDI Clip 与整轨集合导入命令所需的完整所有权图；
+- Standard MIDI File CC64 导入、PPQ 碰撞诊断与原始 Value / Channel 保留；
+- 非循环 Clip 的 Playback 状态追赶、最终 Gate Release 推导与确定性同 Tick 排序；
+- Audio Runtime 最终释放执行，以及播放中 CC64 编辑的选择性 Voice 重排。
 
 后续批次仍需完成：
 
-- Standard MIDI File CC64 到 Project Fact 的导入与导出映射；
-- Playback 编译、循环展开、Locate / Seek chase 和确定性同 Tick 排序；
-- Audio Runtime 的 pedal-held Voice、Pedal Up release 与资源回收；
-- Studio Controller Lane、选择、精确输入和批量编辑。
+- Project MIDI Export Bridge 的 CC64 导出映射与 Studio Export UI；
+- Looped MIDI Clip 的控制器循环展开与已有 Note 的 Note Chase；
+- Studio Controller Lane、选择、精确输入和批量编辑；
+- half-pedal、repedaling、共鸣、pedal noise 与 release sample 等更丰富音源表现力。
+
+播放侧的完整排序、边界与术语见
+[MIDI Sustain Pedal CC64 Playback V1](../../playback/docs/midi-sustain-pedal-cc64-playback-v1.md)。
 
 ## 术语表
 
-| 中文术语     | 行业常用英文                   | 本文中的含义                                                   |
-| ------------ | ------------------------------ | -------------------------------------------------------------- |
-| 延音踏板     | Sustain Pedal / Damper Pedal   | MIDI 控制器编号 64；不等于 Sample Loop。                       |
-| 控制器事件   | Control Change / CC Event      | 在某个 Tick 写入控制器值的 MIDI 事件。当前只建模 CC64。        |
-| 踏板按下     | Pedal Down                     | CC64 原始值 `>= 64`。                                          |
-| 抬踏板       | Pedal Up                       | CC64 原始值 `< 64`。                                           |
-| 踏板保持声部 | Pedal-held Voice               | Note Off 已到达，但因踏板按下而尚未进入最终 Release 的 Voice。 |
-| 延音循环     | Sustain Loop / `loop_sustain`  | Sample Zone 在按键 Gate 内循环；它不是 CC64。                  |
-| 连续循环     | Continuous Loop                | Sample Zone 启动后按自身规则循环；具体退出由控制文件定义。     |
-| 单次触发     | One-shot                       | Sample 按自身素材长度播放，通常不服从普通 Gate Release。       |
-| 抬键尾音     | Release / Release Tail         | Voice 在 Note Off 或 Pedal Up 后按 Zone Envelope 衰减的阶段。  |
-| 松键采样     | Release Sample                 | Release 时额外触发的 Sample；当前音源 Profile 尚未声明该能力。 |
-| 踏板追赶     | Pedal Chase / Controller Chase | 从中途 Locate / Seek 时恢复目标 Tick 之前最后一个 CC64 状态。  |
-| 半踏板       | Half-pedal                     | 连续解释 CC64 中间值；V1 仅保留原值，不实现连续制音模型。      |
+| 中文术语     | 行业常用英文                   | 本文中的含义                                                    |
+| ------------ | ------------------------------ | --------------------------------------------------------------- |
+| 延音踏板     | Sustain Pedal / Damper Pedal   | MIDI 控制器编号 64；不等于 Sample Loop。                        |
+| 控制器事件   | Control Change / CC Event      | 在某个 Tick 写入控制器值的 MIDI 事件。当前只建模 CC64。         |
+| 踏板按下     | Pedal Down                     | CC64 原始值 `>= 64`。                                           |
+| 抬踏板       | Pedal Up                       | CC64 原始值 `< 64`。                                            |
+| 按键释放     | Key Release / Note Off         | Note 自己记录的松键边界；CC64 不改写它。                        |
+| 踏板保持声部 | Pedal-held Voice               | Note Off 已到达，但因踏板按下而尚未进入最终 Release 的 Voice。  |
+| 最终发声释放 | Final Gate Release             | Pedal Up 或 Clip 终点解除 Gate、允许 gated Voice 进入 Release。 |
+| 延音循环     | Sustain Loop / `loop_sustain`  | Sample Zone 在按键 Gate 内循环；它不是 CC64。                   |
+| 连续循环     | Continuous Loop                | Sample Zone 启动后按自身规则循环；具体退出由控制文件定义。      |
+| 单次触发     | One-shot                       | Sample 按自身素材长度播放，通常不服从普通 Gate Release。        |
+| 抬键尾音     | Release / Release Tail         | 最终 Gate Release 后按 Zone Envelope 衰减的阶段。               |
+| 松键采样     | Release Sample                 | Release 时额外触发的 Sample；当前音源 Profile 尚未声明该能力。  |
+| 踏板追赶     | Pedal Chase / Controller Chase | 从中途 Locate / Seek 时恢复目标 Tick 之前最后一个 CC64 状态。   |
+| 半踏板       | Half-pedal                     | 连续解释 CC64 中间值；V1 仅保留原值，不实现连续制音模型。       |
 
 音质阶段更完整的双语术语见
 [Audio Quality Foundation V1A Glossary](../../audio-web/docs/audio-quality-foundation-v1a-glossary.md)。
@@ -114,8 +123,9 @@ MutationPlan 中原子删除或恢复。新建空 MIDI Clip 也会建立空踏�
 ```
 
 同一 Source、Channel 和 Tick 最多存在一个 CC64 Event。这样 Core 不依赖 Map 插入顺序决定
-最终踏板状态，也不会让 Undo / Redo 改变同 Tick 结果。Standard MIDI File 可能包含同位置的
-重复 CC64；后续 Adapter 必须定义可诊断的规范化政策，不能让 Core 静默猜测事件顺序。
+最终踏板状态，也不会让 Undo / Redo 改变同 Tick 结果。Standard MIDI File 可能包含换算后同位置
+的重复 CC64；当前 Adapter 按来源 Tick 与来源事件顺序保留最后一条并产生汇总诊断，不让 Core
+静默猜测事件顺序。
 
 允许 `event.tick === source.lengthTick`，用于保留 Source 终点的控制器状态边界。Playback 的
 Clip / Loop 展开仍采用半开窗口；终点 Event 是否形成实际调度事件，必须由后续 Compiler 的
@@ -175,18 +185,19 @@ Project Fact 不包含 Sample Loop、Envelope、Trigger、Mutex、Release 或 Zo
 
 - 当前 Studio Grand 没有 Sample Loop，这是该音源控制数据的事实，不是 CC64 或 Core 的前提；
 - 其他乐器可以声明无 Loop、Continuous Loop、Sustain Loop、One-shot 或不同 Envelope 参数；
-- 后续 CC64 Runtime 只能改变 Note Off 何时解除按键 Gate，不能覆盖 Zone 自己的 Loop、Envelope、
+- CC64 Runtime 只能改变 Note Off 何时形成最终 Gate Release，不能覆盖 Zone 自己的 Loop、Envelope、
   Trigger、Mutex、Velocity Range 或 Release 参数；
 - 非循环 Sample 可能在踏板仍按下时自然播放到素材尾部；Core 不伪造 Loop；
 - One-shot Zone 是否响应 Note Off 继续由其 Trigger 契约决定；Core 不把它强制改成 Gated Voice；
 - Release Sample 需要控制文件和 Runtime 明确声明，不能因已有 CC64 Fact 就宣称支持。
 
-因此本批次不会读取 Studio Grand 名称、Soundbank、SFZ opcode 或 AudioNode，也不会对不同控制
-文件采用同一套硬编码 Loop / Release 参数。
+因此 Project Core 不读取 Studio Grand 名称、Soundbank、SFZ opcode 或 AudioNode；Playback 与
+Audio Runtime 也不会对不同控制文件采用同一套硬编码 Loop / Release 参数。
 
 ## 后续集成门禁
 
-CC64 Playback 与 Audio Runtime 完成后、WAV Export 开始前，必须重新验证：
+CC64 Playback 与 Audio Runtime 的代码级门禁已覆盖基本保持、释放、Channel 隔离和 Manifest
+行为。Controller Lane 完成后、WAV Export 开始前，仍必须重新验证：
 
 - Note Off 在 Pedal Down 时进入 pedal-held，而不是立即 Release；
 - Pedal Up 只释放对应 Channel 中已经松键的 Voice；
@@ -197,5 +208,5 @@ CC64 Playback 与 Audio Runtime 完成后、WAV Export 开始前，必须重新�
 - 实时与未来离线导出采用同一 CC64 排序与终点政策；
 - 峰值、headroom、click 和 Pedal Up Release 通过表达力音质门禁。
 
-在这些门禁完成前，产品文档只能声明“项目可以保存和编辑 CC64 事实”或对应已完成批次，不能
-声明 Studio Grand 已经产生踏板延音、共鸣、release sample 或 half-pedal 音色。
+在这些门禁完成前，产品文档可以声明“导入的二值 CC64 会延后最终 Gate Release”，但不能声明
+Studio Grand 已经产生新的采样内容、共鸣、release sample 或 half-pedal 音色。

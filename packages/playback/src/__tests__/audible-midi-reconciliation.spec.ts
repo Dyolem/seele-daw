@@ -5,6 +5,7 @@ import {
   createAddMidiClipCommand,
   createAddMidiClipWithNoteCommand,
   createAddNoteCommand,
+  createAddMidiSustainPedalEventCommand,
   createChannelStripDescriptor,
   createInitialProjectSession,
   createMoveNotesCommand,
@@ -16,9 +17,11 @@ import {
   parseDeviceId,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiPitchDelta,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
@@ -154,7 +157,7 @@ describe('Audible MIDI reconciliation', () => {
     expect(plan.reasons).toEqual([])
     expect(plan.occurrenceChanges).toHaveLength(1)
     expect(plan.occurrenceChanges[0]).toMatchObject({
-      changedFields: ['startTick', 'endTick', 'pitch'],
+      changedFields: ['startTick', 'endTick', 'releaseTick', 'pitch'],
       commandTypes: [PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE],
       kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
     })
@@ -280,7 +283,7 @@ describe('Audible MIDI reconciliation', () => {
         }),
         expect.objectContaining({
           after: expect.objectContaining({ endTick: 2_400, noteId: NOTE_ID }),
-          changedFields: ['endTick'],
+          changedFields: ['endTick', 'releaseTick'],
           commandTypes: [PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE],
           kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
         }),
@@ -321,6 +324,40 @@ describe('Audible MIDI reconciliation', () => {
     ])
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([
       previousPlan.midiNoteSpans[0]?.occurrenceKey,
+    ])
+  })
+
+  it('attributes a CC64 hold change to only the affected release timing', () => {
+    const { session } = createFixture()
+    const previousPlan = compileAudibleMidiProject(session.getSnapshot())
+    const commit = executeCommitted(
+      session,
+      createAddMidiSustainPedalEventCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        eventId: parseMidiSustainPedalEventId('pedal-reconciliation-down'),
+        sourceId: SOURCE_ID,
+        tick: parseTick(0),
+        value: parseMidiControlValue(127),
+      }),
+    )
+    const nextPlan = compileAudibleMidiProject(session.getSnapshot())
+
+    const plan = createAudibleMidiReconciliationPlan({
+      commits: [commit],
+      nextPlan,
+      previousPlan,
+    })
+
+    expect(plan.scope).toBe(AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE)
+    expect(plan.occurrenceChanges).toEqual([
+      expect.objectContaining({
+        changedFields: ['releaseTick'],
+        commandTypes: [PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD],
+        kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
+        before: expect.objectContaining({ endTick: 1_200, releaseTick: 1_200 }),
+        after: expect.objectContaining({ endTick: 1_200, releaseTick: 1_920 }),
+      }),
     ])
   })
 

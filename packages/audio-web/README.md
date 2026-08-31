@@ -9,8 +9,9 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 > 已通过功能审阅；Audible MIDI Playback V1 已于 2026-08-17 按验收基线 `f1d0298` 完成，尚未
 > 创建阶段 checkpoint。选择性 Voice 生命周期与按
 > Soundbank 局部资源失败已经收口；当前已有用户激活的 AudioContext、最小 master output、Manifest
-> 驱动的 Sample Voice、可重排 Note Off、loop / mutex、generation、选择性 cancel 与资源统计；
-> SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
+> 驱动的 Sample Voice、可重排最终 Gate Release、loop / mutex、generation、选择性 cancel 与资源
+> 统计。2026-08-31 的 CC64 批次已让 Audio Runtime 执行 Playback 编译的踏板最终释放，并等待
+> 批次审核；SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
@@ -21,12 +22,13 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 规范化 Manifest、加载预算和浏览器矩阵仍须按阶段计划逐批审阅。任何把采样随构建公开交付的
 方案仍必须先解决替代资产或再分发权限。
 
-后续音质加固已经进入
-[Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)。AQ0–AQ3
-基线、Velocity/输出校准、Envelope/Loop/Trigger 与有界复音政策已审核并提交；AQ4 已冻结最终政策
-标识、综合门禁、兼容/失败边界与听测状态，正在等待收口审阅。完整证据见
+后续 [Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)
+已经收口。AQ0–AQ3 基线、Velocity/输出校准、Envelope/Loop/Trigger 与有界复音政策已审核并提交；
+AQ4 以 `9b4c0c9` 冻结最终政策标识、综合门禁、兼容/失败边界与听测状态。完整证据见
 [V1A 收口报告](./docs/audio-quality-foundation-v1a-closure-report.md)，相关行业词汇见
 [V1A 术语表](./docs/audio-quality-foundation-v1a-glossary.md)。
+CC64 的按键释放 / 最终 Gate Release、控制器追赶与 Clip 边界见
+[MIDI Sustain Pedal CC64 Playback V1](../playback/docs/midi-sustain-pedal-cc64-playback-v1.md)。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
@@ -67,15 +69,16 @@ Batch 4B.2 在同一包内增加执行边界：
   保持原始项目值，随后由独立节点应用 `-12 dB` 固定输出校准。系统没有隐藏 limiter，阈值保证只
   适用于已声明 fixture 与默认增益。Pan 使用 `StereoPannerNode`；缺少 StereoPanner 时只允许中心
   声像降级为 Gain pass-through，非中心 Pan 明确失败；
-- 普通 gated Note Off 使用 Zone release；one-shot 忽略普通 Span End 并自然结束；cancel、Stop、
+- 普通 gated Voice 在最终 Gate Release 使用 Zone release；one-shot 忽略普通 Gate Release 并自然
+  结束；cancel、Stop、
   generation 切换和 `allNotesOff` 使用 `6 ms` linear fast release，结束后保留 `1 ms` source stop
   guard；非零 Envelope curve 使用固定 `32` 段线性 ramp 近似。这些 AQ2 参数由同一版本化政策拥有；
 - 每个 `instrumentDeviceId` 最多拥有 64 个发声槽，同一项目 Voice Runtime 最多 128 个；超过预算
   时按 release、当前有效增益、起音时间与稳定 Voice Token 确定性选择旧 Voice，并用同一 `6 ms`
   fast release 退场；分配器最多保留 16 个退场尾音，达到上限后的新计划返回可观测的
   `polyphony-dropped`，不硬切已有尾音；
-- continuous loop 在 release 阶段继续循环；sustain loop 在 Note Off 停止循环，并从当时 source
-  位置启动无 loop tail；无 loop Sample 若早于 Note 结束则自然耗尽，不猜测循环点；
+- continuous loop 在 release 阶段继续循环；sustain loop 在最终 Gate Release 停止循环，并从当时
+  source 位置启动无 loop tail；无 loop Sample 若早于最终 Release 则自然耗尽，不猜测循环点；
 - Voice Token 是 `(engineGeneration, occurrenceKey)`；旧 generation 计划丢弃，同一代重复 token
   拒绝。source、gain、output 与 `ended` listener 都计数，并在自然结束、失败、dispose 后归零；
 - 本批不拥有 Timer，不接 Scheduler wake-up、Workbench 或 Transport UI；这些属于 Batch 5A 的
@@ -103,6 +106,12 @@ Studio Batch 7 的派生 Timeline、Playhead 与 Follow 全部属于 View / Comp
 Audio Web 增加第二套时钟或视图 API。Batch 7F 继续复用现有 Runtime 回归，确认自然结束、Pause、
 Return、项目切换与 dispose 分别经由 Voice `ended`、选择性 / 全局 `allNotesOff` 和幂等清理边界
 归零；本包仍不拥有 Scheduler Timer 或 Project 生命周期。
+
+CC64 批次没有给 Audio Web 增加控制器状态机。Playback Plan 同时提供 Key Release 与 Final Gate
+Release，Runtime 验证两者顺序后只在后者解除 gated Voice。更早的 Key Release 不会覆盖 Zone 的
+loop、trigger、envelope 或 mutex 契约；Studio Grand 当前没有 Sample Loop，其他乐器若在 Manifest
+声明 continuous / sustain loop 或 one-shot，仍分别执行自己的控制文件。当前不触发 release sample、
+damper resonance、pedal noise 或 half-pedal 模型。
 
 当前 Sample Instrument 已形成三组不同变化原因，因此按职责分层；其中较短的文件名是这个模块
 在语义仍然明确时的局部选择，不构成禁止文件名重复目录上下文的全局规则：

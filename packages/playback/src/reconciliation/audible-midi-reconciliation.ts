@@ -46,6 +46,7 @@ export type AudibleMidiOccurrenceField =
   | 'clipId'
   | 'endTick'
   | 'pitch'
+  | 'releaseTick'
   | 'sourceId'
   | 'startTick'
   | 'trackId'
@@ -144,6 +145,7 @@ function occurrenceChangedFields(
   if (before.sourceId !== after.sourceId) fields.push('sourceId')
   if (before.startTick !== after.startTick) fields.push('startTick')
   if (before.endTick !== after.endTick) fields.push('endTick')
+  if (before.releaseTick !== after.releaseTick) fields.push('releaseTick')
   if (before.pitch !== after.pitch) fields.push('pitch')
   if (before.velocity !== after.velocity) fields.push('velocity')
   if (before.channel !== after.channel) fields.push('channel')
@@ -205,6 +207,10 @@ function commandTypesForOccurrence(
           case 'midi-note.removed':
           case 'midi-note.updated':
             return change.sourceId === sourceId && change.noteId === noteId
+          case 'midi-sustain-pedal-event.added':
+          case 'midi-sustain-pedal-event.removed':
+          case 'midi-sustain-pedal-event.updated':
+            return change.sourceId === sourceId
           case 'midi-clip.added':
           case 'midi-clip.removed':
           case 'midi-clip.updated':
@@ -247,6 +253,9 @@ function commandTypesForTrack(
           case 'midi-note.added':
           case 'midi-note.removed':
           case 'midi-note.updated':
+          case 'midi-sustain-pedal-event.added':
+          case 'midi-sustain-pedal-event.removed':
+          case 'midi-sustain-pedal-event.updated':
           case 'tempo-event.added':
           case 'tempo-event.removed':
           case 'tempo-event.updated':

@@ -181,6 +181,7 @@ function validateVoicePlan(plan: ScheduledSampleVoicePlan): void {
   const finiteValues = [
     plan.masterGain,
     plan.pan,
+    plan.keyReleasePlaybackClockSecond,
     plan.releasePlaybackClockSecond,
     plan.startPlaybackClockSecond,
     plan.trackGain,
@@ -204,6 +205,10 @@ function validateVoicePlan(plan: ScheduledSampleVoicePlan): void {
     plan.velocity < 1 ||
     plan.velocity > 127 ||
     plan.startPlaybackClockSecond < 0 ||
+    plan.keyReleasePlaybackClockSecond < 0 ||
+    plan.keyReleasePlaybackClockSecond > plan.releasePlaybackClockSecond ||
+    (plan.timing === 'on-time' &&
+      plan.keyReleasePlaybackClockSecond <= plan.startPlaybackClockSecond) ||
     plan.releasePlaybackClockSecond <= plan.startPlaybackClockSecond
   ) {
     fail('invalid-voice-plan', 'Voice Plan violates the Sample Voice V1 contract', plan.soundbankId)
@@ -784,6 +789,8 @@ export class SampleInstrumentVoiceRuntime {
     gain.connect(output)
     output.connect(this.#output.masterInput)
 
+    // releaseTime is the compiled final Gate Release. A prior key release under CC64 does not
+    // override the Zone's own loop, trigger, or envelope contract.
     const attackLimit =
       zone.triggerMode === 'gated'
         ? Math.max(0, releaseTime - startTime)

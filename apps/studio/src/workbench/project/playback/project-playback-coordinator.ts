@@ -26,6 +26,7 @@ import {
   PROJECT_COMMAND_TYPE,
   type ModelRevision,
   type ProjectCommit,
+  type ProjectCommandType,
   type ProjectId,
   type ProjectSession,
   type Tick,
@@ -254,11 +255,11 @@ function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
     case PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE:
     case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE:
     case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM:
+      return false
     case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
     case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE:
     case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE:
     case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
-      return false
     case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
     case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION:
@@ -271,6 +272,22 @@ function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
     case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
       return true
   }
+}
+
+function reschedulesActiveVoiceRelease(commandTypes: readonly ProjectCommandType[]): boolean {
+  return commandTypes.some((commandType) => {
+    switch (commandType) {
+      case PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE:
+      case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
+      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
+      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE:
+      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE:
+      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
+        return true
+      default:
+        return false
+    }
+  })
 }
 
 /** Routes command and History commits by their semantic Tempo Delta, not their origin label. */
@@ -1202,8 +1219,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         if (
           change.kind !== AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED ||
           change.after === null ||
-          (!change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE) &&
-            !change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE))
+          !reschedulesActiveVoiceRelease(change.commandTypes)
         ) {
           continue
         }
@@ -1217,7 +1233,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
           entry.handle.cancel(now)
           continue
         }
-        const nextRelease = transport.playbackClockSecondAtTick(change.after.endTick)
+        const nextRelease = transport.playbackClockSecondAtTick(change.after.releaseTick)
         entry.handle.rescheduleRelease(nextRelease)
       }
     }

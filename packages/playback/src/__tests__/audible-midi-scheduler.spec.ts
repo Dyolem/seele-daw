@@ -1,5 +1,9 @@
 import {
   createTempoEventRecord,
+  createMidiSustainPedalEventRecord,
+  parseMidiChannel,
+  parseMidiControlValue,
+  parseMidiSustainPedalEventId,
   parseTempoBpm,
   parseTempoEventId,
   parseTick,
@@ -100,6 +104,7 @@ describe('Audible MIDI Scheduler Planner', () => {
         engineGeneration: 1,
         instrumentDeviceId: firstTrack?.instrumentDeviceId,
         kind: 'sample-voice',
+        keyReleasePlaybackClockSecond: 10.5,
         masterGain: plan.master.gain,
         occurrenceKey: firstSpan?.occurrenceKey,
         pan: firstTrack?.pan,
@@ -198,12 +203,59 @@ describe('Audible MIDI Scheduler Planner', () => {
     expect(batch.voicePlans).toHaveLength(2)
     expect(batch.voicePlans[0]).toMatchObject({
       startPlaybackClockSecond: 20,
+      keyReleasePlaybackClockSecond: 20.5,
       releasePlaybackClockSecond: 20.5,
     })
     expect(batch.voicePlans[1]).toMatchObject({
       startPlaybackClockSecond: 20.5,
+      keyReleasePlaybackClockSecond: 21,
       releasePlaybackClockSecond: 21,
     })
+  })
+
+  it('chases pre-anchor CC64 for future Notes while keeping Note chase disabled', () => {
+    const { records, snapshot } = createAudibleMidiProjectFixture()
+    const plan = compileAudibleMidiProject(
+      replaceCompilerFixtureSnapshot(snapshot, {
+        midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map((partition) =>
+          partition.sourceId === records.pianoSource.id
+            ? Object.freeze({
+                sourceId: partition.sourceId,
+                events: [
+                  createMidiSustainPedalEventRecord({
+                    id: parseMidiSustainPedalEventId('pedal-scheduler-down'),
+                    tick: parseTick(120),
+                    value: parseMidiControlValue(127),
+                    channel: parseMidiChannel(0),
+                  }),
+                  createMidiSustainPedalEventRecord({
+                    id: parseMidiSustainPedalEventId('pedal-scheduler-up'),
+                    tick: parseTick(900),
+                    value: parseMidiControlValue(0),
+                    channel: parseMidiChannel(0),
+                  }),
+                ],
+              })
+            : partition,
+        ),
+      }),
+    )
+    const clock = new ManualPlaybackClock(10)
+    const transport = createAudibleMidiTransport(plan, clock)
+    transport.locateAtTick(parseTick(720))
+    const planner = createAudibleMidiSchedulerPlanner(plan, createConfiguration(0.05, 0.3))
+
+    transport.play()
+    const batch = planner.planNextWindow(transport.getSnapshot())
+
+    expect(batch.voicePlans).toEqual([
+      expect.objectContaining({
+        occurrenceKey: plan.midiNoteSpans[1]?.occurrenceKey,
+        startPlaybackClockSecond: 10.125,
+        keyReleasePlaybackClockSecond: 10.375,
+        releasePlaybackClockSecond: 10.46875,
+      }),
+    ])
   })
 
   it('starts a late live Span immediately and drops a Span whose release already expired', () => {

@@ -63,6 +63,10 @@ describe('createProjectMidiTrackImportDraft', () => {
                 createMidiNote({ tick: 480, durationTicks: 240, pitch: 64 }),
                 createMidiNote({ tick: 960, durationTicks: 480, pitch: 67 }),
               ],
+              controlChanges: [
+                { tick: 240, controller: 64, value: 127 },
+                { tick: 1_200, controller: 64, value: 0 },
+              ],
             }),
           ],
         }),
@@ -89,15 +93,19 @@ describe('createProjectMidiTrackImportDraft', () => {
     expect(clipGraph?.clip).toMatchObject({
       id: 'clip-0',
       trackId: 'track-0',
-      startTick: 960,
-      spanTick: 2_880,
+      startTick: 480,
+      spanTick: 3_360,
       sourceId: 'midi-source-0',
       color: null,
     })
-    expect(clipGraph?.source).toEqual({ id: 'midi-source-0', lengthTick: 2_880 })
+    expect(clipGraph?.source).toEqual({ id: 'midi-source-0', lengthTick: 3_360 })
     expect(clipGraph?.notes).toEqual([
-      expect.objectContaining({ id: 'midi-note-0', startTick: 0, durationTick: 480 }),
-      expect.objectContaining({ id: 'midi-note-1', startTick: 960, durationTick: 960 }),
+      expect.objectContaining({ id: 'midi-note-0', startTick: 480, durationTick: 480 }),
+      expect.objectContaining({ id: 'midi-note-1', startTick: 1_440, durationTick: 960 }),
+    ])
+    expect(clipGraph?.sustainPedalEvents).toEqual([
+      { id: 'midi-sustain-pedal-event-0', tick: 0, value: 127, channel: 2 },
+      { id: 'midi-sustain-pedal-event-1', tick: 1_920, value: 0, channel: 2 },
     ])
     expect(draft.importedTrackIds).toEqual(['track-0'])
     expect(createTrackColor).toHaveBeenCalledWith(

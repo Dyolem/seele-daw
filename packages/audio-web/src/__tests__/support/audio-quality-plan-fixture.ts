@@ -39,6 +39,7 @@ export function createAudioQualityVoicePlan(
     engineGeneration: 1,
     instrumentDeviceId: 'audio-quality-fixture-device',
     kind: 'sample-voice',
+    keyReleasePlaybackClockSecond: startSecond + durationSecond,
     masterGain: 1,
     occurrenceKey: options.occurrenceKey,
     pan: 0,

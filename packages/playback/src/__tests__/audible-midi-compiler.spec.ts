@@ -7,13 +7,16 @@ import {
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   parseClipId,
   parseDeviceId,
   parseDeviceTypeId,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseTick,
@@ -113,6 +116,7 @@ describe('Audible MIDI Compiler', () => {
         noteId: records.alternateNotes[0]!.id,
         startTick: 0,
         endTick: 960,
+        releaseTick: 960,
         pitch: 55,
         velocity: 110,
         channel: 2,
@@ -130,6 +134,7 @@ describe('Audible MIDI Compiler', () => {
         noteId: records.pianoNotes[1]!.id,
         startTick: 960,
         endTick: 1_440,
+        releaseTick: 1_440,
         pitch: 60,
         velocity: 100,
         channel: 0,
@@ -147,6 +152,7 @@ describe('Audible MIDI Compiler', () => {
         noteId: records.pianoNotes[2]!.id,
         startTick: 1_680,
         endTick: 1_920,
+        releaseTick: 1_920,
         pitch: 64,
         velocity: 96,
         channel: 1,
@@ -173,7 +179,9 @@ describe('Audible MIDI Compiler', () => {
       midiNotePartitions: [...snapshot.midiNotePartitions]
         .reverse()
         .map((partition) => ({ ...partition, notes: [...partition.notes].reverse() })),
-      midiSustainPedalEventPartitions: [...snapshot.midiSustainPedalEventPartitions].reverse(),
+      midiSustainPedalEventPartitions: [...snapshot.midiSustainPedalEventPartitions]
+        .reverse()
+        .map((partition) => ({ ...partition, events: [...partition.events].reverse() })),
       midiSources: [...snapshot.midiSources].reverse(),
       tracks: [...snapshot.tracks].reverse(),
     })
@@ -287,6 +295,102 @@ describe('Audible MIDI Compiler', () => {
       overlappingClip.id,
       records.pianoClip.id,
     ])
+  })
+
+  it('derives channel-local pedal hold without rewriting authored Note Off', () => {
+    const { records, snapshot } = createAudibleMidiProjectFixture()
+    const pedalEvents = [
+      createMidiSustainPedalEventRecord({
+        id: parseMidiSustainPedalEventId('pedal-before-window-down'),
+        tick: parseTick(120),
+        value: parseMidiControlValue(127),
+        channel: parseMidiChannel(0),
+      }),
+      createMidiSustainPedalEventRecord({
+        id: parseMidiSustainPedalEventId('pedal-channel-one-up'),
+        tick: parseTick(720),
+        value: parseMidiControlValue(0),
+        channel: parseMidiChannel(1),
+      }),
+      createMidiSustainPedalEventRecord({
+        id: parseMidiSustainPedalEventId('pedal-primary-up'),
+        tick: parseTick(900),
+        value: parseMidiControlValue(0),
+        channel: parseMidiChannel(0),
+      }),
+    ]
+    const plan = compileAudibleMidiProject(
+      replaceCompilerFixtureSnapshot(snapshot, {
+        midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map((partition) =>
+          partition.sourceId === records.pianoSource.id
+            ? Object.freeze({ sourceId: partition.sourceId, events: pedalEvents })
+            : partition,
+        ),
+      }),
+    )
+    const primary = plan.midiNoteSpans.find(({ noteId }) => noteId === records.pianoNotes[1]?.id)
+    const otherChannel = plan.midiNoteSpans.find(
+      ({ noteId }) => noteId === records.pianoNotes[2]?.id,
+    )
+
+    expect(primary).toMatchObject({
+      channel: 0,
+      endTick: 1_440,
+      releaseTick: 1_620,
+    })
+    expect(otherChannel).toMatchObject({
+      channel: 1,
+      endTick: 1_920,
+      releaseTick: 1_920,
+    })
+  })
+
+  it('applies CC64 at the Note Off Tick before release and caps missing Pedal Up at Clip End', () => {
+    const { records, snapshot } = createAudibleMidiProjectFixture()
+    const sameTickDown = createMidiSustainPedalEventRecord({
+      id: parseMidiSustainPedalEventId('pedal-same-tick-down'),
+      tick: parseTick(720),
+      value: parseMidiControlValue(64),
+      channel: parseMidiChannel(0),
+    })
+    const plan = compileAudibleMidiProject(
+      replaceCompilerFixtureSnapshot(snapshot, {
+        midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map((partition) =>
+          partition.sourceId === records.pianoSource.id
+            ? Object.freeze({ sourceId: partition.sourceId, events: [sameTickDown] })
+            : partition,
+        ),
+      }),
+    )
+
+    expect(
+      plan.midiNoteSpans.find(({ noteId }) => noteId === records.pianoNotes[1]?.id),
+    ).toMatchObject({ endTick: 1_440, releaseTick: 1_920 })
+  })
+
+  it('fails closed when a forged Snapshot repeats one CC64 Channel and Tick', () => {
+    const { records, snapshot } = createAudibleMidiProjectFixture()
+    const duplicatePositionEvents = ['pedal-duplicate-a', 'pedal-duplicate-b'].map((id) =>
+      createMidiSustainPedalEventRecord({
+        id: parseMidiSustainPedalEventId(id),
+        tick: parseTick(720),
+        value: parseMidiControlValue(127),
+        channel: parseMidiChannel(0),
+      }),
+    )
+
+    expect(() =>
+      compileAudibleMidiProject(
+        replaceCompilerFixtureSnapshot(snapshot, {
+          midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map(
+            (partition) =>
+              partition.sourceId === records.pianoSource.id
+                ? Object.freeze({ sourceId: partition.sourceId, events: duplicatePositionEvents })
+                : partition,
+          ),
+        }),
+      ),
+    ).toThrow(expect.objectContaining({ code: 'duplicate-snapshot-entity' }))
   })
 
   it('lets every Track Solo fact participate even when the soloed Audio Track is unsupported', () => {

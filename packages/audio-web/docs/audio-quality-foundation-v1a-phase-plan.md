@@ -1,6 +1,6 @@
 # Audio Quality Foundation V1A 阶段计划
 
-> Status: AQ0–AQ3 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`, `64118f7`); AQ4 implemented for review
+> Status: Closed; AQ0–AQ4 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`, `64118f7`, `9b4c0c9`)
 >
 > Date: 2026-08-26
 >

@@ -6,13 +6,16 @@ import {
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
+  createMidiSustainPedalEventRecord,
   parseClipId,
   parseBipolarValue,
   parseDeviceId,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseProjectColor,
@@ -134,6 +137,19 @@ export function createImportedTrackCollection(
           channel: parseMidiChannel(note.channel),
         }),
       )
+      const sustainPedalEvents = mappedTrack.sustainPedalEvents.map((event) =>
+        createMidiSustainPedalEventRecord({
+          id: parseMidiSustainPedalEventId(
+            allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SUSTAIN_PEDAL_EVENT, {
+              sourceTrackIndex: mappedTrack.sourceTrackIndex,
+              sourceControlChangeIndex: event.sourceControlChangeIndex,
+            }),
+          ),
+          tick: parseTick(event.tick - mappedTrack.startTick),
+          value: parseMidiControlValue(event.value),
+          channel: parseMidiChannel(event.channel),
+        }),
+      )
       const source = createMidiSourceRecord({
         id: sourceId,
         lengthTick: parseTick(mappedTrack.spanTick),
@@ -177,8 +193,8 @@ export function createImportedTrackCollection(
             clip,
             source,
             notes: Object.freeze(notes),
-            // CC64 import remains a separate product batch; do not bake it into Note duration.
-            sustainPedalEvents: Object.freeze([]),
+            // CC64 stays independent from authored Note duration so playback can derive pedal hold.
+            sustainPedalEvents: Object.freeze(sustainPedalEvents),
           }),
         ]),
       })

@@ -240,7 +240,7 @@ describe('createProjectMidiImportDraft', () => {
     ).toMatchObject({ eventCount: 1, sourceTrackIndex: 0 })
   })
 
-  it('reports every represented-but-unsupported source fact without changing note length', () => {
+  it('imports CC64 independently while reporting the remaining unsupported source facts', () => {
     const draft = createProjectMidiImportDraft(
       createImportInput(
         createMidiDocument({
@@ -265,9 +265,17 @@ describe('createProjectMidiImportDraft', () => {
     const projectFile = createProjectFileDTO(draft.session.getSnapshot())
 
     expect(projectFile.midiSources['midi-source-0']?.notes['midi-note-0']?.durationTick).toBe(480)
+    expect(projectFile.midiSources['midi-source-0']?.sustainPedalEvents).toEqual({
+      'midi-sustain-pedal-event-0': {
+        id: 'midi-sustain-pedal-event-0',
+        tick: 0,
+        value: 127,
+        channel: 0,
+      },
+    })
     expect(
       findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.SUSTAIN_PEDAL_NOT_IMPORTED),
-    ).toMatchObject({ eventCount: 1, controllerNumbers: [64] })
+    ).toBeUndefined()
     expect(
       findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.CONTROL_CHANGES_NOT_IMPORTED),
     ).toMatchObject({ eventCount: 2, controllerNumbers: [1, 7] })
@@ -288,6 +296,88 @@ describe('createProjectMidiImportDraft', () => {
     ).toBeDefined()
     expect(Object.isFrozen(draft.diagnostics)).toBe(true)
     expect(Object.isFrozen(draft.diagnostics[0])).toBe(true)
+  })
+
+  it('preserves CC64 timing, expands Clip bounds, and diagnoses Project-tick collisions', () => {
+    const requests: Parameters<typeof createDeterministicImportId>[0][] = []
+    const draft = createProjectMidiImportDraft(
+      createImportInput(
+        createMidiDocument({
+          ppq: 1_920,
+          tracks: [
+            createMidiTrack({
+              endTick: 1_920,
+              notes: [createMidiNote({ tick: 960, durationTicks: 480 })],
+              controlChanges: [
+                { tick: 1, controller: 64, value: 127 },
+                { tick: 2, controller: 64, value: 96 },
+                { tick: 1_800, controller: 64, value: 0 },
+              ],
+            }),
+          ],
+        }),
+        {
+          createId: (request) => {
+            requests.push(request)
+            return createDeterministicImportId(request)
+          },
+        },
+      ),
+    )
+    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+
+    expect(projectFile.clips['clip-0']).toMatchObject({ startTick: 1, spanTick: 959 })
+    expect(projectFile.midiSources['midi-source-0']).toMatchObject({
+      lengthTick: 959,
+      notes: {
+        'midi-note-0': expect.objectContaining({ startTick: 479, durationTick: 240 }),
+      },
+      sustainPedalEvents: {
+        'midi-sustain-pedal-event-0': {
+          id: 'midi-sustain-pedal-event-0',
+          tick: 0,
+          value: 96,
+          channel: 0,
+        },
+        'midi-sustain-pedal-event-1': {
+          id: 'midi-sustain-pedal-event-1',
+          tick: 899,
+          value: 0,
+          channel: 0,
+        },
+      },
+    })
+    expect(
+      findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.SUSTAIN_PEDAL_EVENTS_COLLAPSED),
+    ).toMatchObject({
+      controllerNumbers: [64],
+      eventCount: 2,
+      projectTick: 1,
+      sourceTrackIndex: 0,
+    })
+    expect(requests.filter(({ kind }) => kind === 'midi-sustain-pedal-event')).toEqual([
+      expect.objectContaining({ ordinal: 0, sourceControlChangeIndex: 1 }),
+      expect.objectContaining({ ordinal: 1, sourceControlChangeIndex: 2 }),
+    ])
+  })
+
+  it('diagnoses CC64 that belongs to a control-only normalized Track', () => {
+    const draft = createProjectMidiImportDraft(
+      createImportInput(
+        createMidiDocument({
+          tracks: [
+            createMidiTrack({
+              notes: [],
+              controlChanges: [{ tick: 0, controller: 64, value: 127 }],
+            }),
+          ],
+        }),
+      ),
+    )
+
+    expect(
+      findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.SUSTAIN_PEDAL_NOT_IMPORTED),
+    ).toMatchObject({ eventCount: 1, sourceTrackIndex: 0 })
   })
 
   it('disambiguates normalized tracks that share a source name', () => {

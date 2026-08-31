@@ -2,7 +2,7 @@
 
 > Status: Active reference for Audio Quality Foundation V1A
 >
-> Date: 2026-08-26
+> Date: 2026-08-31
 
 本文用尽量直白的中文解释 Audio Quality Foundation V1A 中反复出现的音频、MIDI 与测试术语。
 英文原词保留在表中，是为了便于对照源码、Web Audio API 和第三方资料，不要求读者先理解英文
@@ -67,19 +67,19 @@
 
 ## 3. 采样、Zone 与循环
 
-| 中文术语 | 英文原词        | 在 Seele V1A 中的含义                                                                                            |
-| -------- | --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 采样素材 | Sample Asset    | 被 AudioBufferSourceNode 播放的 WAV/AudioBuffer。开发者本地音源不等于可分发资产。                                |
-| 音区     | Zone            | Manifest 中把 pitch 范围、素材、root pitch、包络、loop、offset 与 mutex 组合起来的发声规则。                     |
-| 根音高   | Root Pitch      | 素材未经转调时对应的 MIDI pitch；目标 pitch 与它的差决定播放速率。                                               |
-| 转调     | Transposition   | 通过改变播放速率让一个素材覆盖其他 pitch；也会改变素材的自然持续时间。                                           |
-| 源偏移   | Source Offset   | 从素材内部哪个时间点开始播放。                                                                                   |
-| 连续循环 | Continuous Loop | 进入 loop 后在 Note On 和 release 期间都继续循环，直到 Voice 完全停止。                                          |
-| 延音循环 | Sustain Loop    | Note 持续时循环，Note Off 后离开循环并进入素材非循环尾部。它不是 Sustain Pedal。                                 |
-| 循环接缝 | Loop Seam       | loop 末端跳回开头的边界。素材或 loop point 不连续时可能产生 click。                                              |
-| 接缝误差 | Loop Seam Error | 实际回绕点附近 PCM 与首轮参考片段之间的最大差值。AQ2 用它检查 Runtime 是否额外制造不连续，不替真实资产保证无缝。 |
-| 交叉淡化 | Crossfade       | 在两个片段或 loop 边界间重叠并渐变。当前 Supported SFZ Profile 不支持非零 loop crossfade。                       |
-| 自然尾部 | Natural Tail    | 不再循环后由素材剩余部分或 release 包络形成的尾音。                                                              |
+| 中文术语 | 英文原词        | 在 Seele V1A 中的含义                                                                                                                |
+| -------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 采样素材 | Sample Asset    | 被 AudioBufferSourceNode 播放的 WAV/AudioBuffer。开发者本地音源不等于可分发资产。                                                    |
+| 音区     | Zone            | Manifest 中把 pitch 范围、素材、root pitch、包络、loop、offset 与 mutex 组合起来的发声规则。                                         |
+| 根音高   | Root Pitch      | 素材未经转调时对应的 MIDI pitch；目标 pitch 与它的差决定播放速率。                                                                   |
+| 转调     | Transposition   | 通过改变播放速率让一个素材覆盖其他 pitch；也会改变素材的自然持续时间。                                                               |
+| 源偏移   | Source Offset   | 从素材内部哪个时间点开始播放。                                                                                                       |
+| 连续循环 | Continuous Loop | 进入 loop 后在 Note On 和 release 期间都继续循环，直到 Voice 完全停止。                                                              |
+| 延音循环 | Sustain Loop    | Gate 保持时循环，最终 Gate Release 后离开循环并进入素材非循环尾部。没有 CC64 保持时，该边界就是 Note Off；它本身不是 Sustain Pedal。 |
+| 循环接缝 | Loop Seam       | loop 末端跳回开头的边界。素材或 loop point 不连续时可能产生 click。                                                                  |
+| 接缝误差 | Loop Seam Error | 实际回绕点附近 PCM 与首轮参考片段之间的最大差值。AQ2 用它检查 Runtime 是否额外制造不连续，不替真实资产保证无缝。                     |
+| 交叉淡化 | Crossfade       | 在两个片段或 loop 边界间重叠并渐变。当前 Supported SFZ Profile 不支持非零 loop crossfade。                                           |
+| 自然尾部 | Natural Tail    | 不再循环后由素材剩余部分或 release 包络形成的尾音。                                                                                  |
 
 ## 4. 调度、测试与质量流程
 
@@ -109,17 +109,19 @@
 | 尾部窗口           | Tail Window                  | release 与 source stop 理应完成后用于检查残余信号的时间窗；数字静音记为 `null dBFS`，不是测量失败。                                                                                             |
 | 确定性             | Deterministic                | 相同输入和政策得到相同调度、保留/steal 顺序与报告结构，不依赖 Map 偶然顺序。                                                                                                                    |
 
-## 5. Sustain Pedal 延期术语
+## 5. Sustain Pedal 播放术语
 
-| 中文术语     | 英文原词                  | 在 Seele 后续阶段中的含义                                                                   |
-| ------------ | ------------------------- | ------------------------------------------------------------------------------------------- |
-| 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。V1 将保留原始 `0...127`，通常用 `>=64` 判断踏板按下。AQ3 不实现它。 |
-| 踏板保持声部 | Pedal-held Voice          | Note Off 已到达、但因 CC64 按下而不能进入最终 release 的 Voice。                            |
-| 抬踏板       | Pedal Up                  | CC64 从按下变为抬起，触发此前 pedal-held Voice 的 release。                                 |
-| 控制器追赶   | Controller Chase          | 从歌曲中间播放或 seek 时，恢复该位置之前最后生效的 CC 状态。                                |
-| 半踏板       | Half-pedal                | 使用 CC64 中间值表达连续制音程度；不属于首个 CC64 纵向切片。                                |
-| 制音器共鸣   | Damper Resonance          | 踏板按下后琴弦与琴体额外共鸣的声学效果；当前单层 Sample Runtime 不具备。                    |
-| 松键采样     | Release Sample            | Note Off 或 Pedal Up 时额外触发的素材；当前 Manifest 未声明该能力。                         |
+| 中文术语     | 英文原词                  | 在 Seele 当前阶段中的含义                                                                                              |
+| ------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。保留原始 `0...127`，当前以 `>=64` 判断踏板按下；AQ3 本身未实现，后续 CC64 批次已接通二值播放。 |
+| 按键释放     | Key Release / Note Off    | Note 自己记录的松键时间。踏板不会改写它，Playback Plan 以 `endTick` 保留。                                             |
+| 踏板保持声部 | Pedal-held Voice          | Note Off 已到达、但因对应 Channel 的 CC64 按下而不能进入最终 release 的 Voice。                                        |
+| 抬踏板       | Pedal Up                  | CC64 值回到 `<64`；它让此前已经松键的 pedal-held Voice 到达最终 Gate Release。                                         |
+| 最终发声释放 | Final Gate Release        | gated Voice 真正解除 Gate 的时间；无踏板保持时等于 Note Off，保持时等于 Pedal Up，且不越过 Clip 末端。                 |
+| 控制器追赶   | Controller Chase          | 从歌曲中间播放或 seek 时，恢复该位置之前最后生效的 CC 状态；它不等于补发已经开始的 Note。                              |
+| 半踏板       | Half-pedal                | 使用 CC64 中间值表达连续制音程度；当前只保留原值并做二值播放，不实现连续制音模型。                                     |
+| 制音器共鸣   | Damper Resonance          | 踏板按下后琴弦与琴体额外共鸣的声学效果；当前单层 Sample Runtime 不具备。                                               |
+| 松键采样     | Release Sample            | Note Off 或 Pedal Up 时额外触发的素材；当前 Manifest 未声明该能力。                                                    |
 
 ## 6. 最容易混淆的边界
 

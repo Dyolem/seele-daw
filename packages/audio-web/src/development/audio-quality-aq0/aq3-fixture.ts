@@ -105,6 +105,7 @@ export function createAudioQualityAq3Plan(
     engineGeneration: 1,
     instrumentDeviceId: options.instrumentDeviceId,
     kind: 'sample-voice',
+    keyReleasePlaybackClockSecond: AUDIO_QUALITY_AQ3_RELEASE_SECOND,
     masterGain: 1,
     occurrenceKey: options.occurrenceKey,
     pan: options.pan,

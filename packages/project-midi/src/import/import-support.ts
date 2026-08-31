@@ -4,6 +4,7 @@ import {
   parseClipId,
   parseDeviceId,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseNoteId,
   parseProjectId,
   parseTempoEventId,
@@ -22,6 +23,7 @@ import { assertSourcePpq } from '#internal/import/ppq-converter'
 export interface ImportIdContext {
   readonly sourceTrackIndex?: number
   readonly sourceNoteIndex?: number
+  readonly sourceControlChangeIndex?: number
 }
 
 type IdParser = (value: unknown) => string
@@ -32,6 +34,7 @@ const ID_PARSERS: Readonly<Record<ProjectMidiImportEntityKind, IdParser>> = Obje
   [PROJECT_MIDI_IMPORT_ENTITY_KIND.CLIP]: parseClipId,
   [PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SOURCE]: parseMidiSourceId,
   [PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_NOTE]: parseNoteId,
+  [PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SUSTAIN_PEDAL_EVENT]: parseMidiSustainPedalEventId,
   [PROJECT_MIDI_IMPORT_ENTITY_KIND.DEVICE]: parseDeviceId,
   [PROJECT_MIDI_IMPORT_ENTITY_KIND.TEMPO_EVENT]: parseTempoEventId,
   [PROJECT_MIDI_IMPORT_ENTITY_KIND.TIME_SIGNATURE_EVENT]: parseTimeSignatureEventId,

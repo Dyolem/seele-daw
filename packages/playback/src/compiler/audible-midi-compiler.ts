@@ -12,6 +12,7 @@ import {
   type MidiNoteRecord,
   type MidiSourceId,
   type MidiSourceRecord,
+  type MidiSustainPedalEventPartitionSnapshot,
   type ProjectSnapshot,
   type TrackId,
   type TrackRecord,
@@ -31,6 +32,10 @@ import {
 } from './audible-midi-plan'
 import { AudibleMidiCompilerError } from './audible-midi-compiler-error'
 import {
+  createSustainPedalReleaseResolver,
+  type SustainPedalReleaseResolver,
+} from './sustain-pedal-release'
+import {
   SAMPLE_INSTRUMENT_DEVICE_DEFINITION,
   decodeSampleInstrumentDeviceState,
 } from '#internal/sample-instrument-device'
@@ -47,6 +52,10 @@ interface SnapshotIndexes {
   readonly devicesById: ReadonlyMap<DeviceId, DeviceDescriptor>
   readonly sourcesById: ReadonlyMap<MidiSourceId, MidiSourceRecord>
   readonly notePartitionsBySourceId: ReadonlyMap<MidiSourceId, MidiNotePartitionSnapshot>
+  readonly sustainPedalReleaseResolversBySourceId: ReadonlyMap<
+    MidiSourceId,
+    SustainPedalReleaseResolver
+  >
   readonly clipsByTrackId: ReadonlyMap<TrackId, readonly ClipRecord[]>
 }
 
@@ -122,6 +131,25 @@ function indexNotePartitions(
   return indexed
 }
 
+function indexSustainPedalReleaseResolvers(
+  partitions: readonly MidiSustainPedalEventPartitionSnapshot[],
+): Map<MidiSourceId, SustainPedalReleaseResolver> {
+  const indexed = new Map<MidiSourceId, SustainPedalReleaseResolver>()
+
+  for (const partition of partitions) {
+    if (indexed.has(partition.sourceId)) {
+      throw new AudibleMidiCompilerError(
+        'duplicate-snapshot-entity',
+        `midi-sustain-pedal-event-partition:${partition.sourceId}`,
+        `Project Snapshot contains duplicate MIDI Sustain Pedal Event partition ${partition.sourceId}`,
+      )
+    }
+    indexed.set(partition.sourceId, createSustainPedalReleaseResolver(partition.events))
+  }
+
+  return indexed
+}
+
 function requireReference<Entity>(
   entities: ReadonlyMap<string, Entity>,
   id: string,
@@ -167,6 +195,9 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
   const devicesById = indexUnique(snapshot.devices, 'Device')
   const sourcesById = indexUnique(snapshot.midiSources, 'MIDI Source')
   const notePartitionsBySourceId = indexNotePartitions(snapshot.midiNotePartitions)
+  const sustainPedalReleaseResolversBySourceId = indexSustainPedalReleaseResolvers(
+    snapshot.midiSustainPedalEventPartitions,
+  )
   const mutableClipsByTrackId = new Map<TrackId, ClipRecord[]>()
   const clipIds = new Set<ClipId>()
 
@@ -184,6 +215,11 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
     requireReference(tracksById, clip.trackId, `Clip:${clip.id}.trackId`)
     requireReference(sourcesById, clip.sourceId, `Clip:${clip.id}.sourceId`)
     requireReference(notePartitionsBySourceId, clip.sourceId, `Clip:${clip.id}.notePartition`)
+    requireReference(
+      sustainPedalReleaseResolversBySourceId,
+      clip.sourceId,
+      `Clip:${clip.id}.sustainPedalEventPartition`,
+    )
 
     const clips = mutableClipsByTrackId.get(clip.trackId) ?? []
     clips.push(clip)
@@ -200,6 +236,7 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
     clipsByTrackId,
     devicesById,
     notePartitionsBySourceId,
+    sustainPedalReleaseResolversBySourceId,
     sourcesById,
     tracksById,
   }
@@ -356,6 +393,7 @@ function compileClipNoteSpans(
   trackPlan: TrackPlaybackPlan,
   clip: MidiClipRecord,
   partition: MidiNotePartitionSnapshot,
+  sustainPedalReleaseResolver: SustainPedalReleaseResolver,
 ): readonly MidiNoteSpanPlan[] {
   if (!trackPlan.audible || clip.muted) return []
 
@@ -377,8 +415,22 @@ function compileClipNoteSpans(
       clip.startTick,
       parseTick(clippedSourceEndTick - clip.sourceOffsetTick),
     )
+    const finalSourceReleaseTick = sustainPedalReleaseResolver.resolveFinalReleaseTick(
+      note.channel,
+      clippedSourceEndTick,
+      sourceWindowEndTick,
+    )
+    const projectReleaseTick = addTicks(
+      clip.startTick,
+      parseTick(finalSourceReleaseTick - clip.sourceOffsetTick),
+    )
 
-    if (projectEndTick > clipEndTick || projectEndTick <= projectStartTick) {
+    if (
+      projectEndTick > clipEndTick ||
+      projectEndTick <= projectStartTick ||
+      projectReleaseTick < projectEndTick ||
+      projectReleaseTick > clipEndTick
+    ) {
       throw new AudibleMidiCompilerError(
         'invalid-snapshot-reference',
         `Clip:${clip.id}.Note:${note.id}`,
@@ -395,6 +447,7 @@ function compileClipNoteSpans(
         noteId: note.id,
         occurrenceKey: createNoteOccurrenceKey(trackPlan.trackId, clip.id, clip.sourceId, note.id),
         pitch: note.pitch,
+        releaseTick: projectReleaseTick,
         sourceId: clip.sourceId,
         startTick: projectStartTick,
         trackId: trackPlan.trackId,
@@ -484,7 +537,14 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
         clip.sourceId,
         `Clip:${clip.id}.notePartition`,
       )
-      noteSpans.push(...compileClipNoteSpans(trackPlan, clip, partition))
+      const sustainPedalReleaseResolver = requireReference(
+        indexes.sustainPedalReleaseResolversBySourceId,
+        clip.sourceId,
+        `Clip:${clip.id}.sustainPedalEventPartition`,
+      )
+      noteSpans.push(
+        ...compileClipNoteSpans(trackPlan, clip, partition, sustainPedalReleaseResolver),
+      )
     }
   }
 

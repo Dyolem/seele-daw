@@ -139,6 +139,7 @@ function createPreparedResources(
 type VoicePlanOverrides = Omit<
   Partial<ScheduledSampleVoicePlan>,
   | 'instrumentDeviceId'
+  | 'keyReleasePlaybackClockSecond'
   | 'pan'
   | 'releasePlaybackClockSecond'
   | 'startPlaybackClockSecond'
@@ -146,6 +147,7 @@ type VoicePlanOverrides = Omit<
   | 'velocity'
 > & {
   readonly instrumentDeviceId?: string
+  readonly keyReleasePlaybackClockSecond?: number
   readonly pan?: number
   readonly releasePlaybackClockSecond?: number
   readonly startPlaybackClockSecond?: number
@@ -158,16 +160,19 @@ function createPlan(
   pitch: number,
   overrides: VoicePlanOverrides = {},
 ): ScheduledSampleVoicePlan {
+  const releasePlaybackClockSecond = overrides.releasePlaybackClockSecond ?? 6
   return Object.freeze({
     channel: 0,
     engineGeneration: 1,
     instrumentDeviceId: 'fixture-device',
     kind: 'sample-voice',
+    keyReleasePlaybackClockSecond:
+      overrides.keyReleasePlaybackClockSecond ?? releasePlaybackClockSecond,
     masterGain: 0.9,
     occurrenceKey,
     pan: -0.25,
     pitch,
-    releasePlaybackClockSecond: 6,
+    releasePlaybackClockSecond,
     soundbankId: SOUNDBANK_ID,
     startPlaybackClockSecond: 4,
     timing: 'on-time',
@@ -215,7 +220,9 @@ describe('Sample Instrument Voice Runtime', () => {
   it('selects a range Zone and schedules pitch, offset, velocity, gain, pan, and envelope', () => {
     const { context, runtime, setMasterGainAtTime } = createRuntime({ currentTime: 5 })
 
-    const result = runtime.schedule(createPlan('range-note', 50))
+    const result = runtime.schedule(
+      createPlan('range-note', 50, { keyReleasePlaybackClockSecond: 5.5 }),
+    )
 
     const expectedRate = 2 ** (2.5 / 12)
     const expectedGain = 0.26577656381975606 * 0.8
@@ -245,6 +252,9 @@ describe('Sample Instrument Voice Runtime', () => {
       time: 6.4,
       value: 0,
     })
+    expect(context.gainNodes[0]?.gain.events).not.toContainEqual(
+      expect.objectContaining({ time: 5.5 }),
+    )
     expect(setMasterGainAtTime).toHaveBeenCalledWith(0.9, 5)
     expect(runtime.statistics).toEqual({
       activeVoiceCount: 1,
@@ -262,12 +272,13 @@ describe('Sample Instrument Voice Runtime', () => {
     })
   })
 
-  it('keeps a continuous loop active through release and stops after its release tail', () => {
+  it('keeps a continuous loop active through pedal hold and stops after final release', () => {
     const { context, runtime, setMasterGainAtTime } = createRuntime()
 
     runtime.schedule(
       createPlan('continuous-note', 61, {
         startPlaybackClockSecond: 1,
+        keyReleasePlaybackClockSecond: 2,
         releasePlaybackClockSecond: 3,
       }),
     )
@@ -300,12 +311,13 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(panned.runtime.statistics.activeVoiceCount).toBe(0)
   })
 
-  it('switches a sustain loop to an unlooped tail at Note Off', () => {
+  it('switches a sustain loop to an unlooped tail at final release after pedal hold', () => {
     const { context, runtime } = createRuntime()
 
     runtime.schedule(
       createPlan('sustain-note', 62, {
         startPlaybackClockSecond: 10,
+        keyReleasePlaybackClockSecond: 11,
         releasePlaybackClockSecond: 12,
       }),
     )
@@ -331,11 +343,12 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(runtime.statistics.activeVoiceCount).toBe(0)
   })
 
-  it('lets one-shot audio reach its natural end while explicit cancel still uses fast release', () => {
+  it('does not reinterpret one-shot behavior when a pedal-derived release is supplied', () => {
     const { context, runtime } = createRuntime()
     const result = runtime.schedule(
       createPlan('one-shot-note', 63, {
         startPlaybackClockSecond: 1,
+        keyReleasePlaybackClockSecond: 1.5,
         releasePlaybackClockSecond: 2,
       }),
     )

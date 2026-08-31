@@ -222,6 +222,7 @@ export function createAudioQualityAq2Plan(
     engineGeneration: 1,
     instrumentDeviceId: 'audio-quality-aq2-browser-device',
     kind: 'sample-voice',
+    keyReleasePlaybackClockSecond: options.releaseSecond,
     masterGain: 1,
     occurrenceKey: options.occurrenceKey,
     pan: options.pan ?? 0,

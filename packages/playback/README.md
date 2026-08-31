@@ -12,7 +12,9 @@ AudioNode。已完成的首个可听切片只输出阶段计划定义的具体�
 > Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
 > Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
 > Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
-> 长期架构中的名称 `playback-core` 对应当前包。
+> 2026-08-31 的 CC64 批次已实现非循环 Clip 的 Channel-local 状态追赶、按键释放 / 最终 Gate
+> Release 双时间、调度与选择性重协调，正在等待批次审核。长期架构中的名称 `playback-core`
+> 对应当前包。
 
 已完成阶段的范围、证据和延期记录见
 [Audible MIDI Playback V1 阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
@@ -20,6 +22,8 @@ AudioNode。已完成的首个可听切片只输出阶段计划定义的具体�
 [Manual Timeline Locate V1 阶段记录](./docs/manual-timeline-locate-v1-phase-plan.md)。
 Compiler、Transport 与 Scheduler 的协作和术语另见
 [Audible MIDI Scheduler 工作原理](./docs/audible-midi-scheduler-primer.md)。
+延音踏板的导入、排序、追赶、音源控制文件边界与双语术语见
+[MIDI Sustain Pedal CC64 Playback V1](./docs/midi-sustain-pedal-cc64-playback-v1.md)。
 默认内置 MIDISampleSynth 数据的证据与兼容推断见
 [默认内置 MIDISampleSynth 控制文件逆向分析](../audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
 规范宿主语义见
@@ -99,7 +103,11 @@ Batch 2B 还在包内建立了浏览器无关的具体 MIDI Compiler：
   其他有效 Track 继续；Compiler 不读取 Catalog、Indexes、Mapping、ZIP 或采样文件；
 - Looped MIDI Clip 只跳过该 Clip；Disabled Effect 被忽略，Enabled Track MIDI / Audio Effect
   跳过对应 Track，Enabled Master Effect 阻止整个可执行计划；
-- Clip Source Window 使用半开区间，不执行 Note Chase，并把 Note End 裁剪到 Clip End；
+- Clip Source Window 使用半开区间，不执行 Note Chase，并把 Note End 裁剪到 Clip End；CC64 在
+  Source / Channel 内独立追赶，先保留裁剪后的按键释放 `endTick`，再推导不越过 Clip End 的最终
+  Gate Release `releaseTick`；
+- 同 Tick CC64 先于 Note Off 生效；不同 Channel 隔离。Pedal Down 找不到窗口内后续 Pedal Up 时
+  在 Clip End 形成最终释放，Project Note Duration 不被改写；
 - occurrence key 使用 `[trackId, clipId, sourceId, noteId]` 的无歧义结构化编码；输入集合顺序不
   影响最终计划排序；
 - 没有可听 Note Span 是带 diagnostic 的合法 Empty Plan，不是编译异常；伪造或引用不一致的
@@ -145,7 +153,8 @@ Batch 3B 进一步建立了浏览器无关的 Scheduler Planner：
 - `planNextWindow(transportSnapshot)` 从同一代 Transport Anchor 推进连续半开窗口，窗口在
   Timeline End 截止；Timer 只负责未来唤醒，不属于 Planner；
 - Scheduled Sample Voice 携带 generation、occurrence key、Soundbank / Device 路由、Track /
-  Master Gain、Pan、Pitch、Velocity、Channel，以及目标 Start / release Clock Second；
+  Master Gain、Pan、Pitch、Velocity、Channel，以及目标 Start、Key Release 与 Final Gate Release
+  Clock Second；
 - 首次或延迟唤醒时，Start 已迟到但 release 尚未来的 Span 立即开始并保留原 release；已经结束
   的 Span 丢弃，两种情况只输出批级有界计数；
 - 新 generation 从新 Anchor 重置 cursor 与去重集合，不 chase Anchor 之前的长 Note；观察到较新
@@ -187,8 +196,9 @@ Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 - Transport `handoffPlan` 保留连续音乐 Tick 与单调 Playback Clock anchor；Tempo Map 变化只会
   重算该 Tick 对应的 ProjectSecond，不会移动 Playhead。handoff 在原位递增 `engineGeneration`，
   不把 generation 变化等同于 `allNotesOff`；
-- Note / Clip / Track / Instrument 的活动 Voice 语义由 Studio 按操作执行；Scheduler 只从新
-  anchor 规划尚未越过起点的事件，不执行 Note Chase；
+- Note / Clip / Track / Instrument 的活动 Voice 语义由 Studio 按操作执行；CC64 Add / Move /
+  Remove / Replace Value 可以只重排受影响活动 Voice 的最终 Release。Scheduler 只从新 anchor
+  规划尚未越过起点的事件，不执行 Note Chase；
 - Tempo、Master route、Commit gap 或不可播放目标仍明确要求全局安全兜底。Playback 不拥有
   AudioContext、Voice handle、资源准备或 UI warning。
 

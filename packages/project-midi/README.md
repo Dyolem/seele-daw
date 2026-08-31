@@ -12,18 +12,21 @@ File V2 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
 - 四舍五入后为零长度的 Note 扩为一个 Project tick，并产生汇总诊断；
 - 一个含 Note 的 normalized MIDI Track 创建一个 Instrument Track、一个非循环 Clip 和一个独占
   MIDI Source；空 Track（包括 conductor Track）不创建 Project Track；
-- Clip 从第一枚 Note 的文件内全局位置开始，结束位置取最后一枚 Note 终点和 End of Track 中的较大
-  值；“新项目”把文件 tick 0 放在 Project tick 0，“新 Track”由调用方传入 `placementTick`，把文件
-  tick 0 映射到该 Project tick，所有 Track 的前导空白与相对位置保持不变；
-- Source 内 Note tick 改为相对 Clip 起点，Channel、Pitch 和 Velocity 保留；
+- Clip 从第一枚 Note 或 CC64 的文件内全局位置开始，结束位置取最后一枚 Note 终点、最后一枚
+  CC64 与 End of Track 中的最大值；“新项目”把文件 tick 0 放在 Project tick 0，“新 Track”由
+  调用方传入 `placementTick`，把文件 tick 0 映射到该 Project tick，所有 Track 的前导空白与相对
+  位置保持不变；
+- Source 内 Note 与 CC64 tick 改为相对 Clip 起点；Note Channel、Pitch、Velocity 与 CC64 Channel、
+  原始 Value 均保留；
 - Tempo 与 Time Signature 按换算后的 Project tick 去重；碰撞时保留来源时间上最后生效的事件并
   产生诊断；tick 0 缺失时分别补 120 BPM 与 4/4；
 - 当前 Project Model 保留 `5..999 BPM` 范围内的完整浮点 Tempo；范围外 Tempo 或无法表示的 Time
   Signature 会阻止“新项目”导入，不执行静默 clamp；“新 Track”导入不消费来源 Tempo 或拍号，
   因而让导入 Note 按当前 Project Tempo Map 播放，并分别产生非阻断的时间轴所有权诊断；
-- CC64 不烘焙进 Note 长度。当前 Import 尚未把它映射到已有的 CC64 Project Fact，因此它与其他
-  CC、Pitch Bend、非零 Release Velocity、非默认 Program、Key Signature 和文本事件仍产生非阻断
-  诊断；
+- CC64 不烘焙进 Note 长度。含 Note 的 Track 会把 CC64 映射到独立 Project Fact；PPQ 换算后落在
+  同一 Project Tick 的多条 CC64 确定性保留来源顺序最后一条并产生汇总诊断。只有控制器而没有
+  Note 的 Track 仍不创建 Instrument Track；其他 CC、Pitch Bend、非零 Release Velocity、非默认
+  Program、Key Signature 和文本事件继续产生非阻断诊断；
 - `@tonejs/midi` 在 Codec 边界已经完成 Note On / Off 配对。中立 Document 当前不携带原始孤立
   Note 事件，因此本桥接层不虚构无法从输入观察到的配对诊断。
 
@@ -46,6 +49,9 @@ Tempo 不是 Track 级事实。“新项目”导入可以用来源 MIDI 的 Tem
 导入只保留 Note 的音乐 Tick 位置，来源 Tempo 即使与当前 Project 不同也不会缩放 Tick、覆盖或合并
 Project Tempo Map。调用方应把这项预期语义与其他未支持来源事实区分展示，不能把正常的 Project
 Tempo 所有权误报成导入失败。
+
+当前桥接层只实现 Standard MIDI File 到 Project 的 CC64 导入。Project MIDI Export Bridge 与
+Studio Export UI 尚未实现，因此不能从 Project 把 CC64 写回 `.mid` 文件。
 
 `placementTick` 是调用方已经确定的导入锚点，本包不会再次 Snap 或读取 Transport。Studio 在打开
 文件选择器时把连续 Playhead 位置转换为最近的整数 Project Tick 并冻结，从而避免文件读取期间移动

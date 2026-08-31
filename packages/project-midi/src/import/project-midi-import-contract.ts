@@ -16,6 +16,7 @@ export const PROJECT_MIDI_IMPORT_ENTITY_KIND = {
   CLIP: 'clip',
   MIDI_SOURCE: 'midi-source',
   MIDI_NOTE: 'midi-note',
+  MIDI_SUSTAIN_PEDAL_EVENT: 'midi-sustain-pedal-event',
   DEVICE: 'device',
   TEMPO_EVENT: 'tempo-event',
   TIME_SIGNATURE_EVENT: 'time-signature-event',
@@ -29,6 +30,7 @@ export interface ProjectMidiImportIdRequest {
   readonly ordinal: number
   readonly sourceTrackIndex?: number
   readonly sourceNoteIndex?: number
+  readonly sourceControlChangeIndex?: number
 }
 
 export type ProjectMidiImportIdFactory = (request: ProjectMidiImportIdRequest) => string
@@ -64,6 +66,7 @@ export const PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE = {
   PROGRAM_NOT_APPLIED: 'program-not-applied',
   PROJECT_NAME_ADJUSTED: 'project-name-adjusted',
   RELEASE_VELOCITIES_NOT_IMPORTED: 'release-velocities-not-imported',
+  SUSTAIN_PEDAL_EVENTS_COLLAPSED: 'sustain-pedal-events-collapsed',
   SUSTAIN_PEDAL_NOT_IMPORTED: 'sustain-pedal-not-imported',
   TEMPO_EVENTS_NOT_IMPORTED: 'tempo-events-not-imported',
   TEMPO_EVENTS_COLLAPSED: 'tempo-events-collapsed',

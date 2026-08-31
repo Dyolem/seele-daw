@@ -110,6 +110,7 @@ export function createAudioQualityBrowserPlan(
     engineGeneration: 1,
     instrumentDeviceId: 'audio-quality-aq0-browser-device',
     kind: 'sample-voice',
+    keyReleasePlaybackClockSecond: AUDIO_QUALITY_AQ0_NOTE_RELEASE_SECOND,
     masterGain: 1,
     occurrenceKey: options.occurrenceKey,
     pan: 0,

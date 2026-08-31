@@ -87,6 +87,9 @@ function addTrackCollection(
       for (const note of clipGraph.notes) setRecord(notes, note.id, note)
       const sustainPedalEvents =
         createRecordTable<ProjectFileDTO['midiSources'][string]['sustainPedalEvents'][string]>()
+      for (const event of clipGraph.sustainPedalEvents) {
+        setRecord(sustainPedalEvents, event.id, event)
+      }
 
       setRecord(collections.clips, clipGraph.clip.id, clipGraph.clip)
       setRecord(collections.midiSources, clipGraph.source.id, {

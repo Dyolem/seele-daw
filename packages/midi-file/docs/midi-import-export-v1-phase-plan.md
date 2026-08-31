@@ -49,8 +49,8 @@ Playback Runtime。
 - Meta-only conductor Track 不创建空 Instrument Track；
 - 导入 Track V1 持久化选择 Studio Grand；Program / Bank 先用于名称和诊断，不静默替换为未准备
   Runtime 的音源；
-- CC、Pitch Bend、Aftertouch、SysEx 等尚无 Project Fact 的事件不得宣称完整往返；具体诊断与
-  Sustain CC64 处理在 Project bridge 批次落地前复核；
+- CC、Pitch Bend、Aftertouch、SysEx 等尚无 Project Fact 的事件不得宣称完整往返；后续 Project
+  bridge 批次已经补充 Sustain CC64 导入，但 Project Export Bridge 尚未补充对应导出；
 - Export 输出全部创作事实，不受 Mute、Solo 或当前播放状态影响；
 - Gain、Pan、Device Descriptor 与其他 Seele 私有事实不写入 MIDI；
 - Loop Clip 在 V1 不静默丢弃，Project exporter 必须返回明确诊断或阻止导出。

@@ -1,4 +1,9 @@
-import type { MidiFileDocument, MidiFileNote, MidiFileTrack } from '@seele-daw/midi-file'
+import type {
+  MidiFileControlChange,
+  MidiFileDocument,
+  MidiFileNote,
+  MidiFileTrack,
+} from '@seele-daw/midi-file'
 import {
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   type ProjectMidiImportDiagnostic,
@@ -19,6 +24,14 @@ interface AbsoluteMappedNote {
   readonly channel: number
 }
 
+interface AbsoluteMappedSustainPedalEvent {
+  readonly sourceControlChangeIndex: number
+  readonly sourceTick: number
+  readonly tick: number
+  readonly value: number
+  readonly channel: number
+}
+
 export interface MappedTrack {
   readonly sourceTrack: MidiFileTrack
   readonly sourceTrackIndex: number
@@ -27,6 +40,7 @@ export interface MappedTrack {
   readonly startTick: number
   readonly spanTick: number
   readonly notes: readonly AbsoluteMappedNote[]
+  readonly sustainPedalEvents: readonly AbsoluteMappedSustainPedalEvent[]
 }
 
 function addUnsupportedFactDiagnostics(
@@ -42,12 +56,12 @@ function addUnsupportedFactDiagnostics(
     (event) => event.controller !== SUSTAIN_PEDAL_CONTROLLER,
   )
 
-  if (sustainEventCount > 0) {
+  if (!imported && sustainEventCount > 0) {
     diagnostics.push(
       createDiagnostic({
         code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.SUSTAIN_PEDAL_NOT_IMPORTED,
         message:
-          'Sustain pedal CC64 was not baked into note durations or imported as a Project fact.',
+          'Sustain pedal CC64 could not be imported because its normalized Track contains no Notes.',
         sourceTrackIndex,
         eventCount: sustainEventCount,
         controllerNumbers: [SUSTAIN_PEDAL_CONTROLLER],
@@ -100,6 +114,87 @@ function addUnsupportedFactDiagnostics(
       }),
     )
   }
+}
+
+function mapSustainPedalEvent(
+  event: MidiFileControlChange,
+  sourcePpq: number,
+  channel: number,
+  sourceTrackIndex: number,
+  sourceControlChangeIndex: number,
+): AbsoluteMappedSustainPedalEvent {
+  if (
+    !Number.isSafeInteger(event.tick) ||
+    event.tick < 0 ||
+    !Number.isSafeInteger(event.value) ||
+    event.value < 0 ||
+    event.value > 127
+  ) {
+    throw new ProjectMidiImportError(
+      'invalid-midi-document',
+      'MIDI sustain-pedal events require a non-negative Tick and an integer value from 0 through 127.',
+      { sourceTrackIndex, sourceTick: event.tick, value: event.value },
+    )
+  }
+
+  return {
+    channel,
+    sourceControlChangeIndex,
+    sourceTick: event.tick,
+    tick: convertMidiTickToProjectTick(event.tick, sourcePpq),
+    value: event.value,
+  }
+}
+
+function mapSustainPedalEvents(
+  track: MidiFileTrack,
+  sourcePpq: number,
+  sourceTrackIndex: number,
+  diagnostics: ProjectMidiImportDiagnostic[],
+): readonly AbsoluteMappedSustainPedalEvent[] {
+  const mapped = track.controlChanges.flatMap((event, sourceControlChangeIndex) =>
+    event.controller === SUSTAIN_PEDAL_CONTROLLER
+      ? [
+          mapSustainPedalEvent(
+            event,
+            sourcePpq,
+            track.channel,
+            sourceTrackIndex,
+            sourceControlChangeIndex,
+          ),
+        ]
+      : [],
+  )
+  mapped.sort(
+    (left, right) =>
+      left.tick - right.tick ||
+      left.sourceTick - right.sourceTick ||
+      left.sourceControlChangeIndex - right.sourceControlChangeIndex,
+  )
+
+  const effectiveEvents: AbsoluteMappedSustainPedalEvent[] = []
+  for (let index = 0; index < mapped.length; ) {
+    const projectTick = mapped[index]!.tick
+    let groupEndIndex = index + 1
+    while (mapped[groupEndIndex]?.tick === projectTick) groupEndIndex += 1
+    const group = mapped.slice(index, groupEndIndex)
+    if (group.length > 1) {
+      diagnostics.push(
+        createDiagnostic({
+          code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.SUSTAIN_PEDAL_EVENTS_COLLAPSED,
+          message: `${group.length} source sustain-pedal events rounded to Project tick ${projectTick}; the latest source event was kept.`,
+          eventCount: group.length,
+          projectTick,
+          sourceTrackIndex,
+          controllerNumbers: [SUSTAIN_PEDAL_CONTROLLER],
+        }),
+      )
+    }
+    effectiveEvents.push(group[group.length - 1]!)
+    index = groupEndIndex
+  }
+
+  return effectiveEvents
 }
 
 function assertTrackShape(track: MidiFileTrack, sourceTrackIndex: number): void {
@@ -209,20 +304,27 @@ function createImportedTrackName(
   return importedName
 }
 
-function findTrackBounds(notes: readonly AbsoluteMappedNote[]): {
+function findTrackBounds(
+  notes: readonly AbsoluteMappedNote[],
+  sustainPedalEvents: readonly AbsoluteMappedSustainPedalEvent[],
+): {
   readonly startTick: number
-  readonly noteEndTick: number
+  readonly contentEndTick: number
   readonly expandedNoteCount: number
 } {
   let startTick = Number.MAX_SAFE_INTEGER
-  let noteEndTick = 0
+  let contentEndTick = 0
   let expandedNoteCount = 0
   for (const note of notes) {
     startTick = Math.min(startTick, note.startTick)
-    noteEndTick = Math.max(noteEndTick, note.endTick)
+    contentEndTick = Math.max(contentEndTick, note.endTick)
     if (note.durationExpanded) expandedNoteCount += 1
   }
-  return { startTick, noteEndTick, expandedNoteCount }
+  for (const event of sustainPedalEvents) {
+    startTick = Math.min(startTick, event.tick)
+    contentEndTick = Math.max(contentEndTick, event.tick)
+  }
+  return { startTick, contentEndTick, expandedNoteCount }
 }
 
 export function mapTracks(
@@ -260,12 +362,22 @@ export function mapTracks(
         left.sourceNoteIndex - right.sourceNoteIndex,
     )
 
-    const { startTick, noteEndTick, expandedNoteCount } = findTrackBounds(notes)
+    const sustainPedalEvents = mapSustainPedalEvents(
+      track,
+      document.ppq,
+      sourceTrackIndex,
+      diagnostics,
+    )
+
+    const { startTick, contentEndTick, expandedNoteCount } = findTrackBounds(
+      notes,
+      sustainPedalEvents,
+    )
     const endOfTrackTick =
       track.endTick === undefined
-        ? noteEndTick
+        ? contentEndTick
         : convertMidiTickToProjectTick(track.endTick, document.ppq)
-    const endTick = Math.max(noteEndTick, endOfTrackTick)
+    const endTick = Math.max(contentEndTick, endOfTrackTick)
     if (expandedNoteCount > 0) {
       diagnostics.push(
         createDiagnostic({
@@ -291,6 +403,7 @@ export function mapTracks(
       startTick,
       spanTick: endTick - startTick,
       notes,
+      sustainPedalEvents,
     })
   })
   return mappedTracks

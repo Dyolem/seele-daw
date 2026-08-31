@@ -87,6 +87,9 @@ export interface ScheduledSampleVoicePlan {
   readonly velocity: MidiVelocity
   readonly channel: MidiChannel
   readonly startPlaybackClockSecond: PlaybackClockSecond
+  /** Authored Note Off target; it can precede a late-immediate Voice start. */
+  readonly keyReleasePlaybackClockSecond: PlaybackClockSecond
+  /** Final Gate Release after CC64 hold; Audio Runtime releases gated Zones here. */
   readonly releasePlaybackClockSecond: PlaybackClockSecond
   readonly timing: ScheduledVoiceTiming
 }
@@ -194,7 +197,13 @@ function normalizeNoteSpans(
   for (const inputSpan of plan.midiNoteSpans) {
     const startTick = parseTick(inputSpan.startTick)
     const endTick = parseTick(inputSpan.endTick)
-    if (endTick <= startTick || endTick > arrangementEndTick) {
+    const releaseTick = parseTick(inputSpan.releaseTick)
+    if (
+      endTick <= startTick ||
+      endTick > arrangementEndTick ||
+      releaseTick < endTick ||
+      releaseTick > arrangementEndTick
+    ) {
       throw new AudibleMidiSchedulerError(
         'invalid-note-span',
         `Scheduler Note Span ${inputSpan.occurrenceKey} has an invalid Tick range`,
@@ -228,7 +237,7 @@ function normalizeNoteSpans(
     }
 
     occurrenceKeys.add(inputSpan.occurrenceKey)
-    spans.push(Object.freeze({ ...inputSpan, endTick, startTick }))
+    spans.push(Object.freeze({ ...inputSpan, endTick, releaseTick, startTick }))
     previousStartTick = startTick
   }
 
@@ -402,6 +411,7 @@ export function createAudibleMidiSchedulerPlanner(
     route: SchedulerTrackRoute,
     generation: EngineGeneration,
     startPlaybackClockSecond: PlaybackClockSecond,
+    keyReleasePlaybackClockSecond: PlaybackClockSecond,
     releasePlaybackClockSecond: PlaybackClockSecond,
     timing: ScheduledVoiceTiming,
   ): ScheduledSampleVoicePlan {
@@ -410,6 +420,7 @@ export function createAudibleMidiSchedulerPlanner(
       engineGeneration: generation,
       instrumentDeviceId: route.instrumentDeviceId,
       kind: 'sample-voice',
+      keyReleasePlaybackClockSecond,
       masterGain,
       occurrenceKey: span.occurrenceKey,
       pan: route.pan,
@@ -512,6 +523,9 @@ export function createAudibleMidiSchedulerPlanner(
       }
 
       const targetReleasePlaybackClockSecond = playbackClockSecondAtProjectSecond(
+        tempoMap.projectSecondAtTick(span.releaseTick),
+      )
+      const targetKeyReleasePlaybackClockSecond = playbackClockSecondAtProjectSecond(
         tempoMap.projectSecondAtTick(span.endTick),
       )
       newlyHandledKeys.push(span.occurrenceKey)
@@ -541,6 +555,7 @@ export function createAudibleMidiSchedulerPlanner(
           route,
           snapshot.engineGeneration,
           startPlaybackClockSecond,
+          targetKeyReleasePlaybackClockSecond,
           targetReleasePlaybackClockSecond,
           isLate ? 'late-immediate' : 'on-time',
         ),

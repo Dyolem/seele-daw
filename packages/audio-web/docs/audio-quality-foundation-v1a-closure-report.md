@@ -1,6 +1,6 @@
 # Audio Quality Foundation V1A 收口报告
 
-> Status: AQ0–AQ3 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`, `64118f7`); AQ4 implemented for review
+> Status: Closed; AQ0–AQ4 reviewed and committed (`40c44a1`, `1b74d26`, `dfa2411`, `64118f7`, `9b4c0c9`)
 >
 > Date: 2026-08-26
 
@@ -75,8 +75,9 @@ AQ4 不改变声音算法，因此不虚构新的 `aq4` 音频政策版本。未
 - 未知 Device 继续保存并显示 Missing Device；V1A 不静默替换音源。
 - 资源、decode、graph 或 schedule 失败不回滚合法 Project Commit；`polyphony-dropped` 是运行时
   未接纳诊断，不是项目编辑失败。
-- 当前没有 Velocity Layer、CC64、half-pedal、resonance、release sample、pedal noise、物理钢琴
-  建模或用户可见 Meter。
+- V1A 收口范围本身没有 Velocity Layer、CC64、half-pedal、resonance、release sample、pedal noise、
+  物理钢琴建模或用户可见 Meter。后续独立 CC64 批次已接通二值导入与最终 Gate Release，但没有
+  改写 V1A 的冻结音质政策，也没有补齐其余高级钢琴模型。
 
 ## 5. 后续依赖
 
@@ -91,6 +92,6 @@ Workbench Action / Menu / Shortcut
 -> WAV Offline Export
 ```
 
-CC64 完成后、WAV Export 开始前必须重新验证 pedal-held Voice 的优先级、同音重触发、Pedal Up
-release、Locate/Seek controller chase、peak/headroom 和导出结尾收尾。V1A 当前政策不能被描述为
-已经支持 Sustain Pedal。
+CC64 基础播放完成后、WAV Export 开始前仍必须重新验证 pedal-held Voice 的优先级、同音重触发、
+Pedal Up release、Locate/Seek controller chase、peak/headroom 和导出结尾收尾。V1A 冻结政策
+本身不能被描述为包含 Sustain Pedal；产品能力必须以独立 CC64 契约及实际集成门禁为准。

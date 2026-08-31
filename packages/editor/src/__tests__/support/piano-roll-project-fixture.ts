@@ -3,6 +3,7 @@ import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddInstrumentTrackCommand,
   createAddMidiClipCommand,
+  createAddMidiSustainPedalEventCommand,
   createAddNoteCommand,
   createInitialProjectSession,
   createMidiNoteByIdQuery,
@@ -14,9 +15,11 @@ import {
   parseDeviceTypeId,
   parseLinearGain,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiPitchDelta,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
@@ -26,7 +29,9 @@ import {
   parseTimeSignatureEventId,
   parseTrackId,
   type MidiChannel,
+  type MidiControlValue,
   type MidiPitch,
+  type MidiSustainPedalEventId,
   type MidiVelocity,
   type NoteId,
   type ProjectCommand,
@@ -50,6 +55,13 @@ export interface AddFixtureNoteInput {
   readonly pitch: MidiPitch
   readonly startTick: Tick
   readonly velocity?: MidiVelocity
+}
+
+export interface AddFixtureSustainPedalEventInput {
+  readonly channel?: MidiChannel
+  readonly eventId: MidiSustainPedalEventId
+  readonly tick: Tick
+  readonly value: MidiControlValue
 }
 
 /** Creates one public-API Project graph with a non-looped, offset MIDI Clip. */
@@ -123,6 +135,20 @@ export function createPianoRollProjectFixture() {
     )
   }
 
+  function addSustainPedalEvent(input: AddFixtureSustainPedalEventInput): void {
+    executeCommitted(
+      session,
+      createAddMidiSustainPedalEventCommand({
+        baseRevision: session.modelRevision,
+        channel: input.channel ?? parseMidiChannel(0),
+        eventId: parseMidiSustainPedalEventId(input.eventId),
+        sourceId,
+        tick: input.tick,
+        value: parseMidiControlValue(input.value),
+      }),
+    )
+  }
+
   function moveNote(noteId: NoteId, nextStartTick: Tick, nextPitch: MidiPitch): void {
     const before = session.query(createMidiNoteByIdQuery({ sourceId, noteId })).note
     if (before === undefined) throw new Error(`Expected MIDI Note ${noteId}`)
@@ -184,6 +210,7 @@ export function createPianoRollProjectFixture() {
 
   return Object.freeze({
     addNote,
+    addSustainPedalEvent,
     clip,
     context: createPianoRollClipContext(clip, source),
     moveNote,

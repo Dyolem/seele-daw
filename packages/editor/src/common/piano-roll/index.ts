@@ -123,3 +123,5 @@ export type {
 } from './piano-roll-viewport'
 
 export * from './track/index'
+export * from './sustain-pedal-lane/index'
+export * from './value-lane/index'

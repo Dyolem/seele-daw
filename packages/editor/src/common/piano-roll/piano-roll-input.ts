@@ -43,9 +43,9 @@ export interface PianoRollInputModifiers {
  * Hit, origin modifiers, and origin position are fixed at Pointer Down.
  * Current modifiers and position may change while the Pointer is captured.
  */
-export interface PianoRollPointerInput {
+export interface PianoRollPointerInput<Hit extends object = PianoRollHit> {
   readonly hasExceededDragThreshold: boolean
-  readonly hit: PianoRollHit | null
+  readonly hit: Readonly<Hit> | null
   readonly modifiers: PianoRollInputModifiers
   readonly originModifiers: PianoRollInputModifiers
   readonly originPosition: PianoRollCssPoint

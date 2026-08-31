@@ -22,9 +22,9 @@ export interface PianoRollPointerInputAdapterFailure {
   readonly operation: PianoRollPointerInputAdapterFailureOperation
 }
 
-export interface PianoRollPointerInputAdapterObserver {
+export interface PianoRollPointerInputAdapterObserver<Hit extends object = PianoRollHit> {
   onError(failure: PianoRollPointerInputAdapterFailure): void
-  onInput(input: PianoRollPointerInput): void
+  onInput(input: PianoRollPointerInput<Hit>): void
 }
 
 export interface PianoRollPointerInputAdapter {
@@ -32,21 +32,30 @@ export interface PianoRollPointerInputAdapter {
   dispose(): void
 }
 
-export type PianoRollBrowserHitResolver = (
+export type PianoRollBrowserHitResolver<Hit extends object = PianoRollHit> = (
   event: PointerEvent,
   surface: HTMLElement,
-) => PianoRollHit | null
+) => Hit | null
 
-export interface CreatePianoRollPointerInputAdapterInput {
+interface CreatePianoRollPointerInputAdapterBaseInput<Hit extends object> {
   readonly dragThresholdCssPixel?: number
-  readonly observer: PianoRollPointerInputAdapterObserver
-  readonly resolveHit?: PianoRollBrowserHitResolver
+  readonly observer: PianoRollPointerInputAdapterObserver<Hit>
   readonly surface: HTMLElement
 }
 
-interface ActivePointer {
+export interface CreatePianoRollPointerInputAdapterInput extends CreatePianoRollPointerInputAdapterBaseInput<PianoRollHit> {
+  readonly resolveHit?: PianoRollBrowserHitResolver<PianoRollHit>
+}
+
+export interface CreatePianoRollSemanticPointerInputAdapterInput<
+  Hit extends object,
+> extends CreatePianoRollPointerInputAdapterBaseInput<Hit> {
+  readonly resolveHit: PianoRollBrowserHitResolver<Hit>
+}
+
+interface ActivePointer<Hit extends object> {
   currentModifiers: PianoRollInputModifiers
-  readonly hit: PianoRollHit | null
+  readonly hit: Readonly<Hit> | null
   readonly originModifiers: PianoRollInputModifiers
   readonly originPosition: PianoRollCssPoint
   readonly pointerId: number
@@ -96,13 +105,8 @@ function modifiersEqual(left: PianoRollInputModifiers, right: PianoRollInputModi
   )
 }
 
-function copyHit(hit: PianoRollHit | null): PianoRollHit | null {
-  return hit === null
-    ? null
-    : Object.freeze({
-        noteId: hit.noteId,
-        zone: hit.zone,
-      })
+function copyHit<Hit extends object>(hit: Hit | null): Readonly<Hit> | null {
+  return hit === null ? null : Object.freeze({ ...hit })
 }
 
 function createPoint(
@@ -123,23 +127,22 @@ function createFailure(
   return Object.freeze({ cause, operation })
 }
 
-class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
+class PianoRollPointerInputAdapterImpl<Hit extends object> implements PianoRollPointerInputAdapter {
   readonly #dragThresholdSquared: number
-  readonly #observer: PianoRollPointerInputAdapterObserver
-  readonly #resolveHit: PianoRollBrowserHitResolver
+  readonly #observer: PianoRollPointerInputAdapterObserver<Hit>
+  readonly #resolveHit: PianoRollBrowserHitResolver<Hit>
   readonly #surface: HTMLElement
   readonly #window: Window | null
-  #activePointer: ActivePointer | null = null
+  #activePointer: ActivePointer<Hit> | null = null
   #disposed = false
 
-  constructor(input: CreatePianoRollPointerInputAdapterInput) {
+  constructor(input: CreatePianoRollSemanticPointerInputAdapterInput<Hit>) {
     const dragThreshold = requireDragThreshold(
       input.dragThresholdCssPixel ?? PIANO_ROLL_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL,
     )
     this.#dragThresholdSquared = dragThreshold * dragThreshold
     this.#observer = input.observer
-    this.#resolveHit =
-      input.resolveHit ?? ((event, surface) => resolvePianoRollDomNoteHit(event, surface))
+    this.#resolveHit = input.resolveHit
     this.#surface = input.surface
     this.#window = input.surface.ownerDocument.defaultView
 
@@ -207,7 +210,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
       return
     }
 
-    let hit: PianoRollHit | null
+    let hit: Readonly<Hit> | null
     try {
       hit = copyHit(this.#resolveHit(event, this.#surface))
     } catch (cause) {
@@ -218,7 +221,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     if (!this.#capturePointer(event.pointerId)) return
     const position = createPoint(event, this.#surface)
     const originModifiers = createModifiers(event)
-    const activePointer: ActivePointer = {
+    const activePointer: ActivePointer<Hit> = {
       currentModifiers: originModifiers,
       hit,
       originModifiers,
@@ -306,13 +309,13 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     this.cancel()
   }
 
-  #requireActivePointer(pointerId: number): ActivePointer | null {
+  #requireActivePointer(pointerId: number): ActivePointer<Hit> | null {
     if (this.#disposed || this.#activePointer?.pointerId !== pointerId) return null
     return this.#activePointer
   }
 
   #updateActivePointer(
-    activePointer: ActivePointer,
+    activePointer: ActivePointer<Hit>,
     position: PianoRollCssPoint,
     modifiers: PianoRollInputModifiers,
   ): void {
@@ -327,10 +330,10 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
   }
 
   #createInput(
-    activePointer: ActivePointer,
+    activePointer: ActivePointer<Hit>,
     phase: PianoRollPointerInputPhase,
     position: PianoRollCssPoint,
-  ): PianoRollPointerInput {
+  ): PianoRollPointerInput<Hit> {
     return Object.freeze({
       hasExceededDragThreshold: activePointer.hasExceededDragThreshold,
       hit: activePointer.hit,
@@ -364,7 +367,7 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
     }
   }
 
-  #deliverInput(input: PianoRollPointerInput): void {
+  #deliverInput(input: PianoRollPointerInput<Hit>): void {
     try {
       this.#observer.onInput(input)
     } catch (cause) {
@@ -385,5 +388,15 @@ class PianoRollPointerInputAdapterImpl implements PianoRollPointerInputAdapter {
 export function createPianoRollPointerInputAdapter(
   input: CreatePianoRollPointerInputAdapterInput,
 ): PianoRollPointerInputAdapter {
-  return new PianoRollPointerInputAdapterImpl(input)
+  return new PianoRollPointerInputAdapterImpl<PianoRollHit>({
+    ...input,
+    resolveHit: input.resolveHit ?? resolvePianoRollDomNoteHit,
+  })
+}
+
+/** Reuses the same captured Pointer lifecycle with a Surface-specific semantic Hit. */
+export function createPianoRollSemanticPointerInputAdapter<Hit extends object>(
+  input: CreatePianoRollSemanticPointerInputAdapterInput<Hit>,
+): PianoRollPointerInputAdapter {
+  return new PianoRollPointerInputAdapterImpl<Hit>(input)
 }

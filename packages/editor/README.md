@@ -8,9 +8,10 @@
 > Cursor Move 与 Cursor / Pencil 单 Note Resize Gesture、Preview 和 Interaction Session
 > 分支已经就绪；
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
-> Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；Studio 已接入
+> Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；`common` / `browser`
+> 还已完成显式 Channel 的 CC64 Value Lane 投影、坐标、语义 Hit 与 Pencil Placement 基础；Studio 已接入
 > Select Interaction、可见 Selection、Pencil Add Note、Cursor Move，以及 DOM Edge Hit
-> 驱动的 Cursor / Pencil Resize 可见闭环。
+> 驱动的 Cursor / Pencil Resize 可见闭环，但尚未接入 CC64 Lane UI。
 
 ## 包定位
 
@@ -57,7 +58,7 @@ DOM / Pointer / Keyboard / MIDI
 ```text
 src/
 ├── common/
-│   ├── piano-roll/   已实现的 Clip / Track 投影、Viewport 与可见 Note Read Model
+│   ├── piano-roll/   已实现的 Note / CC64 Clip / Track 投影、Viewport 与交互解析
 │   ├── input/        EditorInput 与 EditorIntent
 │   ├── session/      Selection、focus、clipboard
 │   ├── surfaces/     Surface 契约与领域坐标
@@ -154,16 +155,36 @@ Active Project、ID、默认 Note Facts 与提交。
 
 首个 Browser Input 切片提供：
 
-- Renderer-neutral `PianoRollHit` 和冻结的 `PianoRollPointerInput`；
+- Renderer-neutral `PianoRollHit` 和冻结的、可按 Surface Hit 类型参数化的
+  `PianoRollPointerInput`；
 - DOM Surface 级事件委托，不在每个 Note 上安装 Listener；
 - DOM Event composed path 到稳定 `NoteId` / body zone 的小型 Hit Adapter；
 - Surface-local CSS Pixel 坐标、固定的 Down origin Hit 与修饰键；
 - 单 primary Pointer、Pointer Capture 与默认 4 CSS Pixel Drag Threshold；
 - Up、Cancel、lost capture、dispose 与失败隔离的完整生命周期。
 
-Browser Input 不读取 ProjectSession，也不直接修改 Selection。它只把浏览器事实交给
-Select Interaction 或 Pencil Placement；Keyboard、Tool Preference 与 Note Command 由
-Studio 组合。
+Browser Input 不读取 ProjectSession，也不直接修改 Selection。默认入口维持 Note DOM Hit；
+需要其他语义 Hit 的 Surface 必须显式提供 Resolver，并复用同一 Pointer Capture、阈值、取消与
+失败隔离生命周期。它只把浏览器事实交给 Select Interaction 或 Pencil Placement；Keyboard、
+Tool Preference 与 Project Command 由 Studio 组合。
+
+## 已实现：CC64 Sustain Pedal Lane Editor Foundation
+
+由真实 Sustain Pedal 编辑切片驱动，`common/piano-roll` 与 `browser/piano-roll` 现已提供：
+
+- 显式 `MidiChannel` 的 Clip-local 与 Track-global CC64 Snapshot 投影，不跨 Channel 混合事件；
+- Clip 左边界前最后一条同 Channel 事件的状态追赶；没有历史事件时从 MIDI 值 `0` 开始；
+- 冻结的原始 Event 投影与派生 Step Segment；值 `64..127` 为踏板按下，`0..63` 为抬起；
+- Clip 右端点事件仍作为可编辑事实显示，但标记为不影响半开播放窗口；
+- `0..127` Value Lane 的确定性 Y 坐标，以及与 Timeline Grid 共用的 X Snap；
+- CC64 DOM Event ID 到语义 Hit 的小型 Adapter，并通过显式 Resolver 复用既有 Pointer 生命周期；
+- 只在完整空白 Click 上产生 `{ timelineTick, value }` 的纯 Pencil Placement。
+
+这一基础不执行 Project Command，也不拥有当前 Channel。Studio 下一批次必须提供可见 Channel
+选择、Clip / Track 时间到 Source Tick 的转换、稳定 Event ID、命令执行和失败提示。水平移动、
+纵向改值、Selection / Delete 与循环 Clip 语义仍明确延期，不能把一个对角拖动偷偷拆成两个
+History 步骤。完整边界和术语见
+[Piano Roll CC64 Lane Foundation](./docs/piano-roll-sustain-pedal-lane-foundation.md)。
 
 ## 已实现：Piano Roll Browser Renderer
 
@@ -208,8 +229,10 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 6. **进行中**：同一 Project 模型的 Track 全局 / Clip Focus 双 Scope；共享 Track Read Model、
    原子 Clip / Note 放置与默认 Track Surface 已完成，可见模式切换与双模式 Playhead / Follow
    尚待后续批次。
-7. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
-8. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
+7. **进行中**：CC64 Sustain Pedal Lane 的 Editor Snapshot 投影、Value Lane 坐标、类型化
+   Browser Hit 与 Pencil Placement 已完成；Studio 可见纵向闭环尚待下一独立批次。
+8. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
+9. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 
 ## 测试与验收
 

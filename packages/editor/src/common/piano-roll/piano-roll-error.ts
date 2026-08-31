@@ -9,6 +9,7 @@ export type PianoRollErrorCode =
   | 'invalid-viewport-pitch-range'
   | 'looped-clip-unsupported'
   | 'read-model-disposed'
+  | 'sustain-pedal-partition-missing'
   | 'tick-outside-clip'
   | 'track-clip-note-partition-missing'
   | 'track-clip-source-missing'

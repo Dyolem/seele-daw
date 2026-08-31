@@ -26,11 +26,18 @@ export { createPianoRollCanvasNoteRenderer } from './piano-roll-canvas-note-rend
 export { resolvePianoRollDomNoteHit } from './piano-roll-dom-note-hit'
 
 export {
+  PIANO_ROLL_DOM_SUSTAIN_PEDAL_EVENT_ID_ATTRIBUTE,
+  resolvePianoRollDomSustainPedalEventHit,
+} from './piano-roll-dom-sustain-pedal-hit'
+
+export {
   PIANO_ROLL_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL,
   createPianoRollPointerInputAdapter,
+  createPianoRollSemanticPointerInputAdapter,
 } from './piano-roll-pointer-input-adapter'
 export type {
   CreatePianoRollPointerInputAdapterInput,
+  CreatePianoRollSemanticPointerInputAdapterInput,
   PianoRollBrowserHitResolver,
   PianoRollPointerInputAdapter,
   PianoRollPointerInputAdapterFailure,

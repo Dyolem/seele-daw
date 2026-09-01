@@ -9,9 +9,9 @@
 > 分支已经就绪；
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
 > Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；`common` / `browser`
-> 还已完成显式 Channel 的 CC64 Value Lane 投影、坐标、语义 Hit 与 Pencil Placement 基础；Studio 已接入
-> Select Interaction、可见 Selection、Pencil Add Note、Cursor Move，以及 DOM Edge Hit
-> 驱动的 Cursor / Pencil Resize 可见闭环，但尚未接入 CC64 Lane UI。
+> 还已完成显式 Channel 的 CC64 Value Lane、Pencil Placement、Event Selection、主导轴 Move /
+> Replace Value 与 authority handoff 基础。Studio 已接入 Note 编辑闭环和 CC64 Lane Pencil Add，
+> 但尚未接入 CC64 Event 的选择、移动、改值与删除。
 
 ## 包定位
 
@@ -180,11 +180,20 @@ Tool Preference 与 Project Command 由 Studio 组合。
 - CC64 DOM Event ID 到语义 Hit 的小型 Adapter，并通过显式 Resolver 复用既有 Pointer 生命周期；
 - 只在完整空白 Click 上产生 `{ timelineTick, value }` 的纯 Pencil Placement。
 
-这一基础不执行 Project Command，也不拥有当前 Channel。Studio 下一批次必须提供可见 Channel
-选择、Clip / Track 时间到 Source Tick 的转换、稳定 Event ID、命令执行和失败提示。水平移动、
-纵向改值、Selection / Delete 与循环 Clip 语义仍明确延期，不能把一个对角拖动偷偷拆成两个
-History 步骤。完整边界和术语见
-[Piano Roll CC64 Lane Foundation](./docs/piano-roll-sustain-pedal-lane-foundation.md)。
+Studio 已提供可见 Channel 选择、Clip / Track 时间到 Source Tick 的转换、稳定 Event ID、单次
+Add Command 与失败提示。Event 编辑的 Editor 后续基础还提供：
+
+- 只指向显式非循环 Active Clip / MidiSource 的 Editable Scope；
+- 稳定 Event ID 的瞬态 Selection、失效校准与批量 Remove Target；
+- 超过共享 Drag Threshold 后的一次主导轴锁定；横向批量 Move、纵向单 Event Replace Value；
+- 绝对 Grid Snap、动态 `Alt` 临时绕过、Source 边界 clamp 与不跳值纵向 Delta；
+- Preview、取消、重复 End 抑制、单 Intent 与 commit revision authority handoff。
+
+这一基础仍不执行 Project Command，也不拥有当前 Channel。Studio 尚未渲染 CC64 Selection /
+Preview，亦未把 Move、Replace Value 或 Remove Intent 接入 Coordinator；不能把内部契约描述为
+用户可用。完整边界和术语见
+[Piano Roll CC64 Lane Foundation](./docs/piano-roll-sustain-pedal-lane-foundation.md)与
+[Piano Roll CC64 Event Editing Foundation](./docs/piano-roll-sustain-pedal-event-editing-foundation.md)。
 
 ## 已实现：Piano Roll Browser Renderer
 

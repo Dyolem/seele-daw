@@ -5,6 +5,8 @@ export type PianoRollErrorCode =
   | 'editor-session-disposed'
   | 'invalid-grid'
   | 'invalid-move-gesture'
+  | 'invalid-sustain-pedal-editing-scope'
+  | 'invalid-sustain-pedal-gesture'
   | 'invalid-viewport-dimension'
   | 'invalid-viewport-pitch-range'
   | 'looped-clip-unsupported'

@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-08-31，Piano Roll MIDI Sustain Pedal CC64 Controller Lane 已实现并等待审核
+> 最近更新：2026-09-01，CC64 Event Editing Foundation 已在 Editor 内实现并等待审核
 >
-> 当前阶段：Audio Quality Foundation V1A 已收口；CC64 Project Fact、导入 / Playback 与 Editor Lane Foundation 已提交，Studio Controller Lane 批次等待审核
+> 当前阶段：Audio Quality Foundation V1A 已收口；CC64 Project Fact、导入 / Playback、Editor Lane Foundation 与 Studio Lane Add 已提交，Event Editing Foundation 等待审核
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -1065,7 +1065,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-28 | `MIDI-CC64`                                                | Project Core 建立独立 CC64 Fact、命令、事务、Delta、Project File V2 与 V1 迁移；不把踏板状态烘焙进 Note Duration。                                               | `d6fa7f4`                                  |
 | 2026-08-31 | `MIDI-IMPORT`、`PLAYBACK`、`MIDI-CC64`                     | 接通 CC64 导入、Channel 状态追赶、按键释放 / 最终 Gate Release、Manifest-aware Audio Runtime 与播放中选择性重协调；高级钢琴模型仍延期。                          | `3ff2853`                                  |
 | 2026-08-31 | `EDITOR`、`MIDI-CC64`                                      | 建立 CC64 Clip / Track Lane Read Model、Value Viewport、Semantic Hit / Pointer 与只解析完成空白 Click 的 Pencil Placement Foundation。                           | `2fb0764`                                  |
-| 2026-08-31 | `PIANO-ROLL`、`MIDI-CC64`                                  | 接入 Track / Clip Focus 可见 Lane、Channel Preference、显式 Active Clip 写入、单 Command Add、Terminal Marker 与可见失败；高级 Event 编辑仍延期。                | 待审核工作树                               |
+| 2026-08-31 | `PIANO-ROLL`、`MIDI-CC64`                                  | 接入 Track / Clip Focus 可见 Lane、Channel Preference、显式 Active Clip 写入、单 Command Add、Terminal Marker 与可见失败；高级 Event 编辑仍延期。                | `a1f4e5e`                                  |
+| 2026-09-01 | `EDITOR`、`MIDI-CC64`                                      | 建立显式 Active Clip 编辑作用域、Event Selection / Remove Target、主导轴批量 Move / 单 Event Replace Value、Preview 与 authority handoff；Studio 尚未接入。      | 待审核工作树                               |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1127,10 +1128,12 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已
-  提交为 `2fb0764`。当前 Studio Controller Lane 批次仍在工作树等待审核；这里只记录自动化代码
-  契约，不把它算作人工听测，也不宣称 half-pedal、共鸣或 release sample 已交付。该待审核批次
-  已通过仓库统一 `pnpm lint`、Studio Type Check、60 个测试文件 / 391 项测试、Production Build
-  与 soundbank dist boundary；未执行浏览器人工布局或听测。
+  提交为 `2fb0764`，Studio Lane Add 已提交为 `a1f4e5e`。当前 Event Editing Foundation 仍在
+  工作树等待审核；它只建立 Editor Intent 与生命周期，不把 Selection / Move / Replace Value /
+  Remove 描述成 Studio 用户可用，也不宣称 half-pedal、共鸣或 release sample 已交付。Studio
+  Lane Add 提交前已通过仓库统一 `pnpm lint`、Studio Type Check、针对性测试、Production Build
+  与 soundbank dist boundary。当前 Event Editing Foundation 已通过根级 `pnpm lint`、Editor
+  Type Check 与 16 个测试文件 / 140 项测试；未执行浏览器人工布局或听测。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

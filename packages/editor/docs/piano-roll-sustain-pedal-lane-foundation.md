@@ -1,6 +1,6 @@
 # Piano Roll CC64 Sustain Pedal Lane Foundation
 
-> Status: Implemented in `@seele-daw/editor`; Studio integration pending
+> Status: Implemented in `@seele-daw/editor` and integrated as Studio Lane Add
 >
 > Date: 2026-08-31
 
@@ -78,15 +78,20 @@ Note Resolver；CC64 Surface 必须显式提供 Sustain Pedal Event Resolver。�
 CC64 Pencil Resolver 只接受未超过 Drag Threshold 的完整空白 Click。它只返回 Timeline Tick
 和原始 MIDI Value，不选择 Channel、不生成 Event ID、不读取 ProjectSession，也不提交命令。
 
+## 后续 Event 编辑基础
+
+Studio 已接入 Track / Clip Focus 可见 Lane、Channel Preference、Pencil Add、Active Clip 约束与
+失败反馈。Event Selection、Remove Target、水平 Move、纵向 Replace Value 和主导轴锁定的
+Editor 契约见
+[Piano Roll CC64 Event Editing Foundation](./piano-roll-sustain-pedal-event-editing-foundation.md)。
+该后续基础仍未接入 Studio，不能把内部 Intent 契约描述成用户可用编辑功能。
+
 ## 明确延期
 
-- Studio Lane 布局、Channel 选择、Renderer、工具状态、可见错误与 Project Coordinator；
-- Event Selection、Delete 与 Keyboard Action；
-- 水平 Move Preview / Commit；
-- 纵向 Replace Value Preview / Commit；
-- 对角拖动的原子 Command。当前 Core 的 Move 与 Replace Value 是两个独立 Command，不能为了
-  UI 便利让一次手势产生两个 History 步骤；若产品确认需要对角拖动，应先增加一个原子 Core
-  Transform Command；
+- Event Selection / Preview 的 Studio Renderer、Delete Keyboard Action 与 Project Coordinator；
+- 水平 Move / 纵向 Replace Value Intent 的 Studio Command 集成；
+- 多 Event 原子 Replace Value；当前单 Event Value Command 不能被 UI 循环调用伪装成一个
+  History 步骤；
 - Looped Clip 的实例选择、Source 编辑和 Chase 规则；
 - 除 CC64 外的通用 CC Lane、Pitch Bend、Aftertouch、MPE 或 Automation 平台。
 

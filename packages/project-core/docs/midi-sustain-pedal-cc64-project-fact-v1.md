@@ -4,8 +4,8 @@
 
 本文档定义 Sustain Pedal CC64 的 Project Core 事实边界，并记录后续纵向切片的集成状态。
 Project Core 的可保存、可撤销、可增量观察事实与命令事务已经提交；Standard MIDI File 导入、
-Playback、Audio Runtime 与 Studio 选择性重协调已在后续批次实现并等待审核。Studio Controller
-Lane 尚未实现。
+Playback、Audio Runtime、Studio 选择性重协调与 Controller Lane Pencil Add 已在后续批次实现。
+Event Selection / Move / Replace Value / Remove 的 Editor Foundation 已建立，但 Studio 尚未接入。
 
 当前批次完成：
 
@@ -22,7 +22,7 @@ Lane 尚未实现。
 
 - Project MIDI Export Bridge 的 CC64 导出映射与 Studio Export UI；
 - Looped MIDI Clip 的控制器循环展开与已有 Note 的 Note Chase；
-- Studio Controller Lane、选择、精确输入和批量编辑；
+- Studio Event Selection / Move / Replace Value / Remove、精确输入和批量编辑；
 - half-pedal、repedaling、共鸣、pedal noise 与 release sample 等更丰富音源表现力。
 
 播放侧的完整排序、边界与术语见

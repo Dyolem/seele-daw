@@ -9,6 +9,7 @@ import {
   createPianoRollGridCanvasRenderer,
   createPianoRollNoteScene,
   createPianoRollPointerInputAdapter,
+  createPianoRollTrackSustainPedalLaneReadModel,
   createPianoRollTimelineViewport,
   pianoRollCssPixelToMidiPitch,
   pianoRollCssPixelToTimelineTickPosition,
@@ -27,11 +28,15 @@ import {
 } from '@seele-daw/editor'
 import {
   ZERO_TICK,
+  parseMidiChannel,
   parseMidiPitch,
   parsePositiveTick,
   parseTick,
   type ClipId,
+  type MidiChannel,
+  type MidiControlValue,
   type MidiPitch,
+  type ModelRevision,
   type NoteId,
   type Tick,
 } from '@seele-daw/project-core'
@@ -52,6 +57,7 @@ import {
 } from 'vue'
 
 import TrackPlayhead from '@/features/piano-roll/playhead/TrackPlayhead.vue'
+import PianoRollSustainPedalLane from '@/features/piano-roll/PianoRollSustainPedalLane.vue'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
 import {
@@ -68,6 +74,8 @@ import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { ProjectMidiSustainPedalError } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-error'
+import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 
@@ -85,6 +93,7 @@ interface TrackPlacementPreview {
 
 const props = defineProps<ProjectPianoRollTrackSurfaceProps>()
 const { projectMidiNotes } = useProjectMidiNotes()
+const { projectMidiSustainPedal } = useProjectMidiSustainPedal()
 const { state: playbackState, visualPosition: playbackVisualPosition } = useProjectPlayback()
 const pianoRollPreferences = usePianoRollPreferencesStore()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
@@ -223,6 +232,15 @@ const clipWindows = computed(() =>
 )
 
 const activeClipId = computed(() => props.presentation.readModel.activeClipId)
+const sustainPedalLaneReadModel = computed(() =>
+  createPianoRollTrackSustainPedalLaneReadModel({
+    activeClipId: props.presentation.readModel.activeClipId,
+    channel: pianoRollPreferences.sustainPedalChannel,
+    snapshot: props.presentation.snapshot,
+    trackId: props.presentation.trackId,
+  }),
+)
+const midiChannelOptions = Object.freeze(Array.from({ length: 16 }, (_, channel) => channel))
 
 const previewNoteStyle = computed((): StyleValue | null => {
   const currentViewport = viewport.value
@@ -314,6 +332,53 @@ function createDisplayGrid() {
 
 function activateTool(tool: PianoRollTool): void {
   pianoRollPreferences.activateTool(tool)
+}
+
+function handleSustainPedalChannelChange(event: Event): void {
+  pianoRollPreferences.selectSustainPedalChannel(
+    parseMidiChannel(Number((event.currentTarget as HTMLSelectElement).value)),
+  )
+}
+
+function focusSurface(): void {
+  surfaceElement.value?.focus({ preventScroll: true })
+}
+
+function reportSustainPedalFailure(cause: unknown): void {
+  const message = describeCause(cause, 'The Sustain Pedal Lane could not complete the interaction.')
+  failureMessage.value = message
+  if (
+    cause instanceof ProjectMidiSustainPedalError &&
+    ['target-clip-looped', 'timeline-tick-outside-clip', 'track-active-clip-required'].includes(
+      cause.code,
+    )
+  ) {
+    toasts.warning('Sustain Pedal placement needs attention', message)
+    return
+  }
+  toasts.danger('Sustain Pedal event could not be placed', message)
+}
+
+function handleSustainPedalPlacement(placement: {
+  readonly activeClipId: ClipId | null
+  readonly channel: MidiChannel
+  readonly modelRevision: ModelRevision
+  readonly timelineTick: Tick
+  readonly value: MidiControlValue
+}): void {
+  try {
+    projectMidiSustainPedal.placeOnTrack({
+      activeClipId: placement.activeClipId,
+      baseRevision: placement.modelRevision,
+      channel: placement.channel,
+      projectTick: placement.timelineTick,
+      trackId: props.presentation.trackId,
+      value: placement.value,
+    })
+    failureMessage.value = null
+  } catch (cause) {
+    reportSustainPedalFailure(cause)
+  }
 }
 
 function readThemeColor(style: CSSStyleDeclaration, token: string): string {
@@ -735,6 +800,18 @@ onUnmounted(() => {
           </option>
         </select>
       </label>
+      <label class="project-piano-roll-track__channel-control">
+        <span>CC64 Ch</span>
+        <select
+          :value="pianoRollPreferences.sustainPedalChannel"
+          aria-label="Sustain Pedal MIDI Channel"
+          @change="handleSustainPedalChannelChange"
+        >
+          <option v-for="channel in midiChannelOptions" :key="channel" :value="channel">
+            {{ channel + 1 }}
+          </option>
+        </select>
+      </label>
       <span
         v-if="previewMessage"
         class="project-piano-roll-track__preview-message"
@@ -754,6 +831,12 @@ onUnmounted(() => {
             {{ key.label }}
           </span>
         </div>
+      </div>
+      <div class="project-piano-roll-track__lane-label" aria-hidden="true">
+        <strong>CC64</strong>
+        <span>127</span>
+        <span>64</span>
+        <span>0</span>
       </div>
     </div>
 
@@ -812,6 +895,18 @@ onUnmounted(() => {
             aria-hidden="true"
           ></div>
         </div>
+        <PianoRollSustainPedalLane
+          :grid="createDisplayGrid()"
+          :label="`Sustain Pedal lane for ${props.presentation.name}`"
+          :pencil-enabled="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.PENCIL"
+          :read-model="sustainPedalLaneReadModel"
+          :snap-enabled="pianoRollPreferences.snapEnabled"
+          :visible-span-tick="props.timelineEndTick"
+          :visible-start-tick="ZERO_TICK"
+          @failure="reportSustainPedalFailure"
+          @placement="handleSustainPedalPlacement"
+          @request-focus="focusSurface"
+        />
         <TrackPlayhead
           :bar-span-tick="props.barSpanTick"
           :project-id="props.presentation.projectId"
@@ -839,6 +934,7 @@ onUnmounted(() => {
 .project-piano-roll-track {
   --project-piano-roll-track-keyboard-width: 4.5rem;
   --project-piano-roll-track-ruler-height: 1.625rem;
+  --project-piano-roll-track-lane-height: 5.5rem;
   --project-piano-roll-track-toolbar-height: 2.25rem;
   position: relative;
   display: grid;
@@ -871,7 +967,8 @@ onUnmounted(() => {
 
 .project-piano-roll-track__tool-group,
 .project-piano-roll-track__snap-control,
-.project-piano-roll-track__active-clip {
+.project-piano-roll-track__active-clip,
+.project-piano-roll-track__channel-control {
   display: flex;
   align-items: center;
   gap: var(--sd-space-1);
@@ -886,6 +983,7 @@ onUnmounted(() => {
 .project-piano-roll-track__snap-control > span,
 .project-piano-roll-track__scope-label,
 .project-piano-roll-track__active-clip > span,
+.project-piano-roll-track__channel-control > span,
 .project-piano-roll-track__preview-message {
   color: var(--sd-color-text-muted);
   font-family: var(--sd-font-family-numeric);
@@ -899,7 +997,8 @@ onUnmounted(() => {
   letter-spacing: 0.08em;
 }
 
-.project-piano-roll-track__active-clip select {
+.project-piano-roll-track__active-clip select,
+.project-piano-roll-track__channel-control select {
   max-inline-size: 10rem;
   block-size: var(--sd-control-height-sm);
   padding-inline: var(--sd-space-2);
@@ -925,7 +1024,10 @@ onUnmounted(() => {
 .project-piano-roll-track__left-stack {
   display: grid;
   min-block-size: 0;
-  grid-template-rows: var(--project-piano-roll-track-ruler-height) minmax(0, 1fr);
+  grid-template-rows:
+    var(--project-piano-roll-track-ruler-height)
+    minmax(0, 1fr)
+    var(--project-piano-roll-track-lane-height);
   border-inline-end: 1px solid var(--sd-color-border-default);
 }
 
@@ -947,6 +1049,29 @@ onUnmounted(() => {
   grid-template-rows: repeat(25, minmax(0, 1fr));
   overflow: hidden;
   background: var(--sd-editor-key-white);
+}
+
+.project-piano-roll-track__lane-label {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-block-size: 0;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  border-block-start: 1px solid var(--sd-color-border-default);
+  color: var(--sd-color-text-muted);
+  font-family: var(--sd-font-family-numeric);
+  font-size: var(--sd-font-size-xs);
+  background: var(--sd-color-surface-panel);
+}
+
+.project-piano-roll-track__lane-label strong {
+  color: var(--sd-color-text-secondary);
+  font-size: var(--sd-font-size-xs);
+  letter-spacing: 0.06em;
+}
+
+.project-piano-roll-track__lane-label span {
+  align-self: flex-end;
 }
 
 .project-piano-roll-track__key-row {
@@ -990,7 +1115,10 @@ onUnmounted(() => {
   display: grid;
   min-inline-size: 100%;
   block-size: 100%;
-  grid-template-rows: var(--project-piano-roll-track-ruler-height) minmax(0, 1fr);
+  grid-template-rows:
+    var(--project-piano-roll-track-ruler-height)
+    minmax(0, 1fr)
+    var(--project-piano-roll-track-lane-height);
 }
 
 .project-piano-roll-track__ruler {

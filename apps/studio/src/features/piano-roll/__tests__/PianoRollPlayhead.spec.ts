@@ -16,10 +16,7 @@ import { nextTick, shallowRef } from 'vue'
 import { describe, expect, it } from 'vitest'
 
 import PianoRollPlayhead from '@/features/piano-roll/playhead/PianoRollPlayhead.vue'
-import {
-  PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
-  type ReadyProjectPianoRollPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
+import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
@@ -61,7 +58,7 @@ function createPresentation(startTick = parseTick(3_840)) {
     startTick,
     trackId: parseTrackId('piano-roll-playhead-track'),
   })
-  const presentation: ReadyProjectPianoRollPresentation = Object.freeze({
+  return Object.freeze({
     clipId: clip.id,
     color: parseProjectColor('#8B5CF6'),
     context: createPianoRollClipContext(clip, source),
@@ -72,7 +69,6 @@ function createPresentation(startTick = parseTick(3_840)) {
     status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
     trackId: clip.trackId,
   })
-  return presentation
 }
 
 function createFixture() {

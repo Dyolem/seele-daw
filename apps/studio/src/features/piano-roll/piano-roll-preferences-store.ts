@@ -1,4 +1,10 @@
-import { PROJECT_PPQ, parsePositiveTick, type Tick } from '@seele-daw/project-core'
+import {
+  PROJECT_PPQ,
+  parseMidiChannel,
+  parsePositiveTick,
+  type MidiChannel,
+  type Tick,
+} from '@seele-daw/project-core'
 import type { ValueOf } from '@seele-daw/type-utils'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
@@ -31,6 +37,8 @@ export const PIANO_ROLL_DEFAULT_TOOL = PIANO_ROLL_TOOL.PENCIL
 export const PIANO_ROLL_DEFAULT_EDITING_SCOPE = PIANO_ROLL_EDITING_SCOPE.TRACK
 export const PIANO_ROLL_DEFAULT_SNAP_ENABLED = true
 export const PIANO_ROLL_DEFAULT_GRID_PRESET = PIANO_ROLL_GRID_PRESET.SIXTEENTH
+/** MIDI facts are zero-based, while the visible Channel selector is numbered 1–16. */
+export const PIANO_ROLL_DEFAULT_SUSTAIN_PEDAL_CHANNEL = parseMidiChannel(0)
 
 /**
  * Owns lightweight Piano Roll preferences for one Studio application lifetime.
@@ -42,6 +50,7 @@ export const usePianoRollPreferencesStore = defineStore('piano-roll-preferences'
   const editingScope = shallowRef<PianoRollEditingScope>(PIANO_ROLL_DEFAULT_EDITING_SCOPE)
   const snapEnabled = shallowRef(PIANO_ROLL_DEFAULT_SNAP_ENABLED)
   const gridPreset = shallowRef<PianoRollGridPreset>(PIANO_ROLL_DEFAULT_GRID_PRESET)
+  const sustainPedalChannel = shallowRef<MidiChannel>(PIANO_ROLL_DEFAULT_SUSTAIN_PEDAL_CHANNEL)
   const subdivisionSpanTick = computed(() => GRID_PRESET_SUBDIVISION_SPAN_TICK[gridPreset.value])
 
   function activateTool(tool: PianoRollTool): void {
@@ -64,11 +73,16 @@ export const usePianoRollPreferencesStore = defineStore('piano-roll-preferences'
     gridPreset.value = preset
   }
 
+  function selectSustainPedalChannel(channel: MidiChannel): void {
+    sustainPedalChannel.value = parseMidiChannel(channel)
+  }
+
   function reset(): void {
     activeTool.value = PIANO_ROLL_DEFAULT_TOOL
     editingScope.value = PIANO_ROLL_DEFAULT_EDITING_SCOPE
     snapEnabled.value = PIANO_ROLL_DEFAULT_SNAP_ENABLED
     gridPreset.value = PIANO_ROLL_DEFAULT_GRID_PRESET
+    sustainPedalChannel.value = PIANO_ROLL_DEFAULT_SUSTAIN_PEDAL_CHANNEL
   }
 
   return {
@@ -76,12 +90,14 @@ export const usePianoRollPreferencesStore = defineStore('piano-roll-preferences'
     editingScope,
     snapEnabled,
     gridPreset,
+    sustainPedalChannel,
     subdivisionSpanTick,
     activateTool,
     selectEditingScope,
     setSnapEnabled,
     toggleSnap,
     selectGridPreset,
+    selectSustainPedalChannel,
     reset,
   }
 })

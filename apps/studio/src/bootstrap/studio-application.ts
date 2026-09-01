@@ -37,6 +37,8 @@ import {
 import { PROJECT_ENTRY_CONTEXT_KEY } from '@/workbench/project/entry/vue/project-entry-context'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import { PROJECT_MIDI_NOTE_CONTEXT_KEY } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { createProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import {
   createProjectMidiImportCoordinator,
   type ProjectMidiImportCoordinator,
@@ -266,6 +268,10 @@ export function composeStudioApplication(
       activeProject: projectRuntime.activeProject,
       createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
     })
+    const projectMidiSustainPedal = createProjectMidiSustainPedalCoordinator({
+      activeProject: projectRuntime.activeProject,
+      createUniqueId: composition.createProjectEntityId ?? createBrowserProjectEntityId,
+    })
     const projectPlaybackRuntime =
       composition.projectPlaybackRuntime ??
       createBrowserProjectPlaybackRuntime({
@@ -302,6 +308,10 @@ export function composeStudioApplication(
     vueApplication.provide(PROJECT_TEMPO_EVENT_CONTEXT_KEY, Object.freeze({ projectTempoEvents }))
     vueApplication.provide(PROJECT_CLIP_CONTEXT_KEY, Object.freeze({ projectClips }))
     vueApplication.provide(PROJECT_MIDI_NOTE_CONTEXT_KEY, Object.freeze({ projectMidiNotes }))
+    vueApplication.provide(
+      PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
+      Object.freeze({ projectMidiSustainPedal }),
+    )
     vueApplication.provide(PROJECT_PLAYBACK_CONTEXT_KEY, projectPlaybackBinding.context)
     vueApplication.provide(
       STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,

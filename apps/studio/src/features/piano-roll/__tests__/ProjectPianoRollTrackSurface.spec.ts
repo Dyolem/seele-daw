@@ -28,6 +28,11 @@ import {
   PROJECT_MIDI_NOTE_CONTEXT_KEY,
   type ProjectMidiNoteVueContext,
 } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { createProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import {
+  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
+  type ProjectMidiSustainPedalVueContext,
+} from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
@@ -158,7 +163,10 @@ function dispatchPointer(
 function installSurfaceEnvironment(): void {
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(
     function (this: HTMLElement) {
-      return this.classList.contains('project-piano-roll-track__canvas-host') ? 12_000 : 960
+      return this.classList.contains('project-piano-roll-track__canvas-host') ||
+        this.classList.contains('piano-roll-sustain-pedal-lane')
+        ? 12_000
+        : 960
     },
   )
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(250)
@@ -206,6 +214,13 @@ function createSurfaceFixture() {
   })
   const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
     projectMidiNotes,
+  })
+  const projectMidiSustainPedal = createProjectMidiSustainPedalCoordinator({
+    activeProject: { state: readyState },
+    createUniqueId: () => 'track-surface-sustain-pedal-event',
+  })
+  const midiSustainPedalContext: ProjectMidiSustainPedalVueContext = Object.freeze({
+    projectMidiSustainPedal,
   })
   const playbackState = shallowRef<ProjectPlaybackState>(
     Object.freeze({
@@ -262,6 +277,7 @@ function createSurfaceFixture() {
       plugins: [pinia],
       provide: {
         [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
+        [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: midiSustainPedalContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
       },
     },
@@ -402,6 +418,70 @@ describe('ProjectPianoRollTrackSurface', () => {
     })
     await nextTick()
     expect(wrapper.find('.project-piano-roll-track__playhead').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('places CC64 in the explicit Active Clip and keeps Track time aligned', async () => {
+    const { clip, presentation, session, wrapper } = createSurfaceFixture()
+    await nextTick()
+    const lane = wrapper.get('.piano-roll-sustain-pedal-lane')
+
+    dispatchPointer(lane.element, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(lane.element, 'pointerup', { clientX: 10, clientY: 125 })
+    await nextTick()
+
+    expect(
+      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toEqual([
+      {
+        channel: 0,
+        id: 'track-surface-sustain-pedal-event',
+        tick: 480,
+        value: 64,
+      },
+    ])
+    expect(session.modelRevision).toBe(presentation.readModel.modelRevision + 1)
+
+    const refreshed = createProjectPianoRollTrackPresentation(
+      session.getSnapshot(),
+      presentation.trackId,
+      clip.clipId,
+    )
+    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected a refreshed Track Piano Roll presentation')
+    }
+    await wrapper.setProps({ presentation: refreshed })
+    expect(
+      wrapper
+        .find('[data-piano-roll-sustain-pedal-event-id="track-surface-sustain-pedal-event"]')
+        .exists(),
+    ).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('reports that Track Scope CC64 placement requires an explicit Active Clip', async () => {
+    const { presentation, session, wrapper } = createSurfaceFixture()
+    const withoutActiveClip = createProjectPianoRollTrackPresentation(
+      session.getSnapshot(),
+      presentation.trackId,
+      null,
+    )
+    if (withoutActiveClip?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected a Track Piano Roll presentation without an Active Clip')
+    }
+    await wrapper.setProps({ presentation: withoutActiveClip })
+    const lane = wrapper.get('.piano-roll-sustain-pedal-lane')
+
+    dispatchPointer(lane.element, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(lane.element, 'pointerup', { clientX: 10, clientY: 125 })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Choose an Active Clip before adding Sustain Pedal events')
+    expect(
+      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toEqual([])
 
     wrapper.unmount()
   })

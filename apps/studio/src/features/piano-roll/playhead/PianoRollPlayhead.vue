@@ -7,7 +7,10 @@ import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/pr
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 
 const props = defineProps<{
-  readonly presentation: ReadyProjectPianoRollPresentation
+  readonly presentation: Pick<
+    ReadyProjectPianoRollPresentation,
+    'context' | 'projectId' | 'startTick'
+  >
   readonly viewport: PianoRollViewport
 }>()
 const { visualPosition } = useProjectPlayback()

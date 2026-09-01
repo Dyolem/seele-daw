@@ -33,6 +33,8 @@ interface ProjectPianoRollPresentationBase {
 
 export interface ReadyProjectPianoRollPresentation extends ProjectPianoRollPresentationBase {
   readonly context: PianoRollClipContext
+  /** Immutable authority used by synchronous controller-lane projections. */
+  readonly snapshot: ProjectSnapshot
   readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
 }
 
@@ -55,6 +57,8 @@ interface ProjectPianoRollTrackPresentationBase {
 
 export interface ReadyProjectPianoRollTrackPresentation extends ProjectPianoRollTrackPresentationBase {
   readonly readModel: PianoRollTrackReadModel
+  /** Immutable authority used by synchronous controller-lane projections. */
+  readonly snapshot: ProjectSnapshot
   readonly status: typeof PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
 }
 
@@ -102,6 +106,7 @@ export function createProjectPianoRollPresentation(
   return Object.freeze({
     ...base,
     context: createPianoRollClipContext(clip, source),
+    snapshot,
     status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
   })
 }
@@ -137,6 +142,7 @@ export function createProjectPianoRollTrackPresentation(
       snapshot,
       trackId: track.id,
     }),
+    snapshot,
     status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
   })
 }

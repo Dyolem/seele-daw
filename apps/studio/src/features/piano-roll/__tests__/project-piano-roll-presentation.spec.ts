@@ -89,6 +89,7 @@ describe('Project Piano Roll Presentation', () => {
       sourceStartTick: 0,
       sourceEndTick: 3_840,
     })
+    expect(presentation.snapshot).toBe(snapshot)
   })
 
   it('keeps a valid looped Clip visible as explicitly unsupported', () => {
@@ -138,6 +139,7 @@ describe('Project Piano Roll Presentation', () => {
       modelRevision: snapshot.modelRevision,
       trackId: fixture.track.trackId,
     })
+    expect(presentation.snapshot).toBe(snapshot)
     expect(presentation.readModel.clips[0]?.clip).toMatchObject({
       clipId: fixture.clip.clipId,
       endTick: 7_680,

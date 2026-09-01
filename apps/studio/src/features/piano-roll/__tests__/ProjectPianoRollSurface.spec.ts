@@ -1,23 +1,16 @@
-import { createPianoRollClipContext } from '@seele-daw/editor'
 import {
   PROJECT_QUERY_TYPE,
   createInitialProjectSession,
-  createMidiClipRecord,
   createMidiNoteRecord,
-  createMidiSourceRecord,
-  parseClipId,
   parseMidiChannel,
   parseMidiPitch,
-  parseMidiSourceId,
   parseMidiVelocity,
   parseNoteId,
   parsePositiveTick,
-  parseProjectColor,
   parseProjectId,
   parseTempoEventId,
   parseTick,
   parseTimeSignatureEventId,
-  parseTrackId,
   type ModelRevision,
   type ProjectQuery,
   type ProjectQueryResult,
@@ -59,6 +52,14 @@ import {
   PROJECT_MIDI_NOTE_CONTEXT_KEY,
   type ProjectMidiNoteVueContext,
 } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import {
+  createProjectMidiSustainPedalCoordinator,
+  type ProjectMidiSustainPedalCoordinator,
+} from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import {
+  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
+  type ProjectMidiSustainPedalVueContext,
+} from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
@@ -111,33 +112,9 @@ function createFakeCanvasContext(): CanvasRenderingContext2D {
 }
 
 function createPresentation(identity = 'studio-piano-roll'): ReadyProjectPianoRollPresentation {
-  const source = createMidiSourceRecord({
-    id: parseMidiSourceId(`${identity}-source`),
-    lengthTick: parsePositiveTick(3_840),
-  })
-  const clip = createMidiClipRecord({
-    id: parseClipId(`${identity}-clip`),
-    trackId: parseTrackId(`${identity}-track`),
-    name: 'Midnight Keys',
-    color: null,
-    muted: false,
-    startTick: parseTick(0),
-    spanTick: parsePositiveTick(3_840),
-    sourceId: source.id,
-    sourceOffsetTick: parseTick(0),
-    loop: null,
-  })
-
   return Object.freeze({
-    clipId: clip.id,
-    color: parseProjectColor('#8B5CF6'),
-    context: createPianoRollClipContext(clip, source),
-    muted: clip.muted,
-    name: clip.name,
-    projectId: parseProjectId(`${identity}-project`),
-    startTick: clip.startTick,
-    status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
-    trackId: clip.trackId,
+    ...createInteractiveFixture(identity).presentation,
+    name: 'Midnight Keys',
   })
 }
 
@@ -205,11 +182,31 @@ function createInteractiveFixture(identity: string) {
     activeProject: { state: readyState },
     createUniqueId: () => noteIds.shift() ?? `${identity}-unused-note-id`,
   })
+  const projectMidiSustainPedal = createProjectMidiSustainPedalCoordinator({
+    activeProject: { state: readyState },
+    createUniqueId: (() => {
+      let index = 0
+      return () => `${identity}-sustain-pedal-event-${++index}`
+    })(),
+  })
 
   return Object.freeze({
     presentation,
     projectMidiNotes,
+    projectMidiSustainPedal,
     session,
+  })
+}
+
+function createUnavailableSustainPedalContext(): ProjectMidiSustainPedalVueContext {
+  const unavailable = (): never => {
+    throw new Error('Unexpected Sustain Pedal command in this test')
+  }
+  return Object.freeze({
+    projectMidiSustainPedal: Object.freeze<ProjectMidiSustainPedalCoordinator>({
+      placeInClip: unavailable,
+      placeOnTrack: unavailable,
+    }),
   })
 }
 
@@ -296,10 +293,16 @@ function restorePrototypeProperty(
 
 beforeEach(() => {
   config.global.stubs.PianoRollPlayhead = true
+  Reflect.set(
+    config.global.provide,
+    PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
+    createUnavailableSustainPedalContext(),
+  )
 })
 
 afterEach(() => {
   Reflect.deleteProperty(config.global.stubs, 'PianoRollPlayhead')
+  Reflect.deleteProperty(config.global.provide, PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol)
   vi.restoreAllMocks()
   restorePrototypeProperty('hasPointerCapture')
   restorePrototypeProperty('releasePointerCapture')
@@ -1109,6 +1112,79 @@ describe('ProjectPianoRollSurface', () => {
       startTick: 1_204,
     })
     expect(wrapper.text()).toContain('1 selected')
+
+    wrapper.unmount()
+    keyboard.keyboardShortcuts.dispose()
+  })
+
+  it('adds one snapped CC64 event in Clip Scope and exposes its raw terminal-aware marker', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-sustain-pedal')
+    const keyboard = createKeyboardFixture()
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation: fixture.presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [createPinia()],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: fixture.projectMidiNotes,
+          }),
+          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiSustainPedal: fixture.projectMidiSustainPedal,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const channelSelector = wrapper.get('select[aria-label="Sustain Pedal MIDI Channel"]')
+    expect(channelSelector.findAll('option').map((option) => option.text())).toEqual(
+      Array.from({ length: 16 }, (_, index) => String(index + 1)),
+    )
+    await channelSelector.setValue('2')
+    const lane = wrapper.get('.piano-roll-sustain-pedal-lane')
+    dispatchPointer(lane.element, 'pointerdown', { clientX: 240, clientY: 125, pointerId: 71 })
+    dispatchPointer(lane.element, 'pointerup', { clientX: 240, clientY: 125, pointerId: 71 })
+    await nextTick()
+
+    expect(
+      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toEqual([
+      {
+        channel: 2,
+        id: 'surface-sustain-pedal-sustain-pedal-event-1',
+        tick: 960,
+        value: 64,
+      },
+    ])
+
+    const refreshedPresentation = createProjectPianoRollPresentation(
+      fixture.session.getSnapshot(),
+      fixture.presentation.clipId,
+    )
+    if (refreshedPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected refreshed Sustain Pedal presentation')
+    }
+    await wrapper.setProps({ presentation: refreshedPresentation })
+    expect(
+      wrapper
+        .find(
+          '[data-piano-roll-sustain-pedal-event-id="surface-sustain-pedal-sustain-pedal-event-1"]',
+        )
+        .exists(),
+    ).toBe(true)
+
+    fixture.session.undo()
+    expect(
+      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toEqual([])
 
     wrapper.unmount()
     keyboard.keyboardShortcuts.dispose()

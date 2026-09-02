@@ -77,7 +77,10 @@ import {
   STUDIO_KEYBOARD_ACTION,
   STUDIO_KEYBOARD_SCOPE,
 } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import { useStudioKeyboardShortcuts } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import {
+  useStudioKeyboardShortcutRegistration,
+  useStudioKeyboardShortcuts,
+} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import { ProjectMidiSustainPedalError } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-error'
 import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
@@ -693,7 +696,7 @@ function isPianoRollFocused(): boolean {
   )
 }
 
-const disposeKeyboardShortcut = keyboardShortcuts.register([
+useStudioKeyboardShortcutRegistration(keyboardShortcuts, [
   {
     actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE,
     bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE),
@@ -771,7 +774,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  disposeKeyboardShortcut()
   resizeObserver?.disconnect()
   resizeObserver = null
   pointerInputAdapter?.dispose()

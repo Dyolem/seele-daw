@@ -1,6 +1,9 @@
-import { inject, type InjectionKey } from 'vue'
+import { inject, onBeforeUnmount, type InjectionKey } from 'vue'
 
-import type { StudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import type {
+  StudioKeyboardShortcutCoordinator,
+  StudioKeyboardShortcutDefinition,
+} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
 import { StudioKeyboardShortcutVueError } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-vue-error'
 
 export interface StudioKeyboardShortcutVueContext {
@@ -22,4 +25,18 @@ export function useStudioKeyboardShortcuts(): StudioKeyboardShortcutVueContext {
   }
 
   return context
+}
+
+/**
+ * Owns Action registrations for the current component instance.
+ *
+ * Vue queues `onUnmounted` after replacement component setup. Releasing globally unique Action IDs
+ * in `onBeforeUnmount` prevents mutually exclusive component branches from overlapping ownership.
+ */
+export function useStudioKeyboardShortcutRegistration(
+  keyboardShortcuts: StudioKeyboardShortcutCoordinator,
+  definitions: readonly StudioKeyboardShortcutDefinition[],
+): void {
+  const dispose = keyboardShortcuts.register(definitions)
+  onBeforeUnmount(dispose)
 }

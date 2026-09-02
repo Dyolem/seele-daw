@@ -1,6 +1,6 @@
 # MIDI Sustain Pedal CC64 Playback V1
 
-> 状态：导入、Playback、Audio Runtime 与 Studio 选择性重协调已实现，等待批次审核
+> 状态：导入、Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`
 >
 > 日期：2026-08-31
 
@@ -110,3 +110,6 @@ sustain loop / one-shot 对最终 Gate Release 的执行。
 本批次不把代码级时间测试冒充人工听测。Controller Lane 完成后、WAV Export 开始前，仍需执行
 表达力集成质量门禁，复核 Pedal Up click、release tail、复音峰值、Voice Stealing、停止 / Locate /
 设备替换资源清理，以及实时与离线语义一致性。
+该门禁现由
+[Expression Quality Integration V1](../../audio-web/docs/expression-quality-integration-v1-phase-plan.md)
+独立跟踪。

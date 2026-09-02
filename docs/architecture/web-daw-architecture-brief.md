@@ -63,7 +63,10 @@ Project Tempo Control V1 已通过
 只在现有 Sample Voice 纵向切片内校准 Velocity/输出、Envelope/Loop、重触发与复音：Audio Web
 拥有最终政策和 Web Audio 节点，Playback 继续只传浏览器无关 Voice Plan，Studio 继续是唯一
 Composition Root。该阶段不建立 CC64、Velocity Layer、通用 Graph、AudioWorklet 或 WAV Offline
-Backend；下一条已批准切片是 Workbench Action / Menu / Shortcut。
+Backend。后续 CC64 切片已经建立独立 Project Fact、导入、Playback 最终 Gate Release 与 Piano
+Roll 编辑；当前 [Expression Quality Integration V1](../../packages/audio-web/docs/expression-quality-integration-v1-phase-plan.md)
+正在 WAV Export 前验证 pedal-held 复音优先级、Pedal Up PCM 与确定性收尾，不把这些能力回写成
+V1A 历史事实。
 
 ---
 

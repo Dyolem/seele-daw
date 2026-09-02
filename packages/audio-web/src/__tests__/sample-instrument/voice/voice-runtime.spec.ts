@@ -661,6 +661,43 @@ describe('Sample Instrument Voice Runtime', () => {
     })
   })
 
+  it('steals a pedal-held Voice before a quieter key-held Voice', () => {
+    const { context, runtime } = createRuntime()
+    const initialPlans = Array.from({ length: 64 }, (_, index) =>
+      createPlan(`expression-priority-${String(index).padStart(3, '0')}`, 60, {
+        keyReleasePlaybackClockSecond: index === 0 ? 2 : 10,
+        releasePlaybackClockSecond: 10,
+        startPlaybackClockSecond: 1,
+        trackGain: 1,
+        velocity: index === 0 ? 127 : 1,
+      }),
+    )
+    for (const plan of initialPlans) expect(runtime.schedule(plan).outcome).toBe('scheduled')
+
+    expect(
+      runtime.schedule(
+        createPlan('expression-priority-new', 60, {
+          keyReleasePlaybackClockSecond: 10,
+          releasePlaybackClockSecond: 10,
+          startPlaybackClockSecond: 4,
+          trackGain: 1,
+          velocity: 127,
+        }),
+      ).outcome,
+    ).toBe('scheduled')
+
+    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(
+      4 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+    )
+    expect(context.bufferSources[1]?.stops.at(-1)).toBeCloseTo(10.3 + STOP_SAFETY_SECOND)
+    expect(runtime.polyphonyStatistics).toEqual({
+      polyphonyDropCount: 0,
+      retirementVoiceCount: 1,
+      soundingVoiceCount: 64,
+      voiceStealCount: 1,
+    })
+  })
+
   it('applies the 128 Voice Runtime budget across distinct Instrument devices', () => {
     const { context, runtime } = createRuntime()
     const initialPlans = Array.from({ length: 128 }, (_, index) =>

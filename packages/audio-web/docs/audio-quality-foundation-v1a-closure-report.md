@@ -95,3 +95,6 @@ Workbench Action / Menu / Shortcut
 CC64 基础播放完成后、WAV Export 开始前仍必须重新验证 pedal-held Voice 的优先级、同音重触发、
 Pedal Up release、Locate/Seek controller chase、peak/headroom 和导出结尾收尾。V1A 冻结政策
 本身不能被描述为包含 Sustain Pedal；产品能力必须以独立 CC64 契约及实际集成门禁为准。
+该后续工作现由
+[Expression Quality Integration V1](./expression-quality-integration-v1-phase-plan.md)独立跟踪；
+它形成新的表达力政策标识，不改写 V1A 的历史政策或报告。

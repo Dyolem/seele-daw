@@ -1,6 +1,11 @@
+import {
+  AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
+  type AudioQualityExpressionVoiceLifecycle,
+} from '#internal/audio-quality/render-policy'
+
 export interface SampleInstrumentVoiceStealCandidate<TValue> {
   readonly effectiveGain: number
-  readonly releaseStarted: boolean
+  readonly lifecycle: AudioQualityExpressionVoiceLifecycle
   readonly stableToken: string
   readonly startTime: number
   readonly value: TValue
@@ -16,7 +21,10 @@ function compareCandidates<TValue>(
   left: SampleInstrumentVoiceStealCandidate<TValue>,
   right: SampleInstrumentVoiceStealCandidate<TValue>,
 ): number {
-  if (left.releaseStarted !== right.releaseStarted) return left.releaseStarted ? -1 : 1
+  const lifecyclePriority = AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY.voiceStealLifecyclePriority
+  if (left.lifecycle !== right.lifecycle) {
+    return lifecyclePriority[left.lifecycle] - lifecyclePriority[right.lifecycle]
+  }
   if (left.effectiveGain !== right.effectiveGain) return left.effectiveGain - right.effectiveGain
   if (left.startTime !== right.startTime) return left.startTime - right.startTime
   return compareStableToken(left.stableToken, right.stableToken)

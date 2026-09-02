@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
   AUDIO_QUALITY_V1A_RENDER_POLICY,
   calculateAudioQualityV1aVelocityGain,
 } from '#internal/audio-quality/render-policy'
@@ -22,6 +23,22 @@ describe('Audio Quality Foundation V1A render policy', () => {
       velocityFloorGain: 0.015848931924611134,
     })
     expect(Object.isFrozen(AUDIO_QUALITY_V1A_RENDER_POLICY)).toBe(true)
+  })
+
+  it('versions the CC64 expression policy without rewriting the V1A foundation identity', () => {
+    expect(AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY).toEqual({
+      foundationPolicyId: 'seele.audio-quality-foundation-v1a-aq3',
+      id: 'seele.audio-quality-expression-v1-eq1',
+      voiceStealLifecyclePriority: {
+        'key-held': 2,
+        'key-released': 1,
+        'release-started': 0,
+      },
+    })
+    expect(Object.isFrozen(AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY)).toBe(true)
+    expect(
+      Object.isFrozen(AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY.voiceStealLifecyclePriority),
+    ).toBe(true)
   })
 
   it.each([

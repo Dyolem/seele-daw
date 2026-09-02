@@ -29,6 +29,9 @@ AQ4 以 `9b4c0c9` 冻结最终政策标识、综合门禁、兼容/失败边界�
 [V1A 术语表](./docs/audio-quality-foundation-v1a-glossary.md)。
 CC64 的按键释放 / 最终 Gate Release、控制器追赶与 Clip 边界见
 [MIDI Sustain Pedal CC64 Playback V1](../playback/docs/midi-sustain-pedal-cc64-playback-v1.md)。
+CC64 后、WAV Export 前的复音优先级、PCM 与收尾门禁见
+[Expression Quality Integration V1](./docs/expression-quality-integration-v1-phase-plan.md)；当前 EQ1 已在
+工作树实施 pedal-aware Voice Stealing，等待审核。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
@@ -74,8 +77,8 @@ Batch 4B.2 在同一包内增加执行边界：
   generation 切换和 `allNotesOff` 使用 `6 ms` linear fast release，结束后保留 `1 ms` source stop
   guard；非零 Envelope curve 使用固定 `32` 段线性 ramp 近似。这些 AQ2 参数由同一版本化政策拥有；
 - 每个 `instrumentDeviceId` 最多拥有 64 个发声槽，同一项目 Voice Runtime 最多 128 个；超过预算
-  时按 release、当前有效增益、起音时间与稳定 Voice Token 确定性选择旧 Voice，并用同一 `6 ms`
-  fast release 退场；分配器最多保留 16 个退场尾音，达到上限后的新计划返回可观测的
+  时先按 release-started、key-released、key-held 生命周期等级，再按当前有效增益、起音时间与稳定
+  Voice Token 确定性选择旧 Voice，并用同一 `6 ms` fast release 退场；分配器最多保留 16 个退场尾音，达到上限后的新计划返回可观测的
   `polyphony-dropped`，不硬切已有尾音；
 - continuous loop 在 release 阶段继续循环；sustain loop 在最终 Gate Release 停止循环，并从当时
   source 位置启动无 loop tail；无 loop Sample 若早于最终 Release 则自然耗尽，不猜测循环点；

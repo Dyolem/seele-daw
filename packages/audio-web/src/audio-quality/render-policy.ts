@@ -13,6 +13,19 @@ export const AUDIO_QUALITY_V1A_RENDER_POLICY = Object.freeze({
   velocityFloorGain: 10 ** (-36 / 20),
 } as const)
 
+export const AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY = Object.freeze({
+  foundationPolicyId: AUDIO_QUALITY_V1A_RENDER_POLICY.id,
+  id: 'seele.audio-quality-expression-v1-eq1',
+  voiceStealLifecyclePriority: Object.freeze({
+    'key-held': 2,
+    'key-released': 1,
+    'release-started': 0,
+  }),
+} as const)
+
+export type AudioQualityExpressionVoiceLifecycle =
+  keyof typeof AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY.voiceStealLifecyclePriority
+
 /** Maps the persisted MIDI Velocity fact to the V1A Sample Voice amplitude policy. */
 export function calculateAudioQualityV1aVelocityGain(velocity: number): number {
   if (!Number.isInteger(velocity) || velocity < 1 || velocity > 127) {

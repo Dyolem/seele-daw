@@ -11,7 +11,7 @@ function candidate(
 ): SampleInstrumentVoiceStealCandidate<string> {
   return Object.freeze({
     effectiveGain: 1,
-    releaseStarted: false,
+    lifecycle: 'key-held',
     stableToken: value,
     startTime: 1,
     value,
@@ -20,18 +20,27 @@ function candidate(
 }
 
 describe('Sample Instrument Voice polyphony policy', () => {
-  it('prefers a releasing Voice before gain, age, and stable token', () => {
+  it('prefers release-started, then key-released Voices before gain', () => {
     expect(
       selectSampleInstrumentVoiceStealCandidate([
         candidate('quiet', { effectiveGain: 0.01, startTime: 0 }),
         candidate('releasing', {
           effectiveGain: 1,
-          releaseStarted: true,
+          lifecycle: 'release-started',
           stableToken: 'z',
           startTime: 2,
         }),
       ]),
     ).toBe('releasing')
+    expect(
+      selectSampleInstrumentVoiceStealCandidate([
+        candidate('quiet-key-held', { effectiveGain: 0.01 }),
+        candidate('loud-key-released', {
+          effectiveGain: 1,
+          lifecycle: 'key-released',
+        }),
+      ]),
+    ).toBe('loud-key-released')
   })
 
   it('then prefers lower effective gain', () => {

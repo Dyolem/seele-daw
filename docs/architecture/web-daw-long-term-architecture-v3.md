@@ -81,6 +81,12 @@ Voice Stealing 退场尾音。确定性候选、steal/drop 计数和 `polyphony-
 它们不进入 Project File、History 或 Playback Plan。代码级渲染政策标识为
 `seele.audio-quality-foundation-v1a-aq3`，不与 modelRevision 或 engineGeneration 混用。
 
+后续 CC64 纵向切片保留按键释放与最终 Gate Release 两个时间，并由 Playback 执行 Controller
+Chase。WAV Export 前的 Expression Quality Integration V1 在 Audio Web 增加独立政策标识；首个
+生产变化让复音分配器先选择 release-started、再选择 key-released / pedal-held、最后选择
+key-held Voice，然后才沿用 AQ3 的增益、起音时间与稳定 Token 排序。该政策不进入 Project File，
+也不让 Audio Web 读取 CC64 Project Fact。
+
 该切片还由 Playback 从 Snapshot 派生至少 150 小节的 `timelineEndTick`，并由 Studio 将同一
 Transport 视觉位置投影到 Arrangement、Track-time Piano Roll 和 Clip Focus Piano Roll。动画帧
 只触发权威位置采样，不累计 UI elapsed time；各视图的 Scroll / Follow 属于 ViewState，不进入

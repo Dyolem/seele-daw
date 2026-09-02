@@ -2,7 +2,7 @@
 
 > Status: Active reference for Audio Quality Foundation V1A
 >
-> Date: 2026-08-31
+> Date: 2026-09-02
 
 本文用尽量直白的中文解释 Audio Quality Foundation V1A 中反复出现的音频、MIDI 与测试术语。
 英文原词保留在表中，是为了便于对照源码、Web Audio API 和第三方资料，不要求读者先理解英文
@@ -115,7 +115,10 @@
 | ------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | 延音踏板控制 | MIDI CC64 / Sustain Pedal | MIDI Control Change 64。保留原始 `0...127`，当前以 `>=64` 判断踏板按下；AQ3 本身未实现，后续 CC64 批次已接通二值播放。 |
 | 按键释放     | Key Release / Note Off    | Note 自己记录的松键时间。踏板不会改写它，Playback Plan 以 `endTick` 保留。                                             |
+| 按键保持声部 | Key-held Voice            | 当前时间仍早于按键释放；演奏者仍按着键的 Voice。Expression EQ1 在复音溢出时最后才选择它。                              |
+| 已松键声部   | Key-released Voice        | 按键已经松开但尚未进入最终 release；对 gated Voice 而言通常是踏板保持，对 one-shot 则仍保留自然播放语义。              |
 | 踏板保持声部 | Pedal-held Voice          | Note Off 已到达、但因对应 Channel 的 CC64 按下而不能进入最终 release 的 Voice。                                        |
+| 释放中声部   | Release-started Voice     | 正常或强制 release 已经开始、但节点和尾音尚未清理完成的 Voice；Expression EQ1 优先让它退场。                           |
 | 抬踏板       | Pedal Up                  | CC64 值回到 `<64`；它让此前已经松键的 pedal-held Voice 到达最终 Gate Release。                                         |
 | 最终发声释放 | Final Gate Release        | gated Voice 真正解除 Gate 的时间；无踏板保持时等于 Note Off，保持时等于 Pedal Up，且不越过 Clip 末端。                 |
 | 控制器追赶   | Controller Chase          | 从歌曲中间播放或 seek 时，恢复该位置之前最后生效的 CC 状态；它不等于补发已经开始的 Note。                              |

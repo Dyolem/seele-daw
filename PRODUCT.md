@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-02，Studio 已接入 CC64 Event Selection / Move / Replace Value / Remove 并等待审核
+> 最近更新：2026-09-02，CC64 Event Editing 已提交；Expression Quality EQ1 在工作树实施 pedal-aware Voice Stealing
 >
-> 当前阶段：Audio Quality Foundation V1A 已收口；CC64 Project Fact、导入 / Playback、Lane Add 与 Editor Event Editing Foundation 已提交，Studio Event Editing 纵向切片等待审核
+> 当前阶段：Audio Quality Foundation V1A 与 CC64 基础纵向切片已提交；正在执行 WAV Export 前的 Expression Quality Integration V1
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -62,8 +62,11 @@ Studio 会明确失败，不静默替换声音。
 当前 Sample Voice Runtime 已采用带 `-36 dB` 下限的平方 Velocity 响应、Project Master 后独立
 `-12 dB` 输出校准、Manifest Envelope/Loop/Trigger 语义，以及每个乐器设备 64 个、项目 Runtime
 128 个发声槽和最多 16 个偷音退场尾音。导入的二值 CC64 已能按 Channel 延后 gated Voice 的最终
-释放，并保持每个音源 Manifest 的 Loop / Trigger / Envelope 语义。该政策没有用户设置入口，不
-加入隐藏 limiter，也不表示已经支持 Velocity Layer、half-pedal、钢琴共鸣或物理钢琴建模。
+释放，并保持每个音源 Manifest 的 Loop / Trigger / Envelope 语义。达到复音预算时，当前表达力
+政策先选择已经进入 release、再选择已松键或踏板保持、最后选择仍按键的 Voice，随后才比较增益、
+起音时间和稳定身份。未达到复音上限时听感不变；达到上限时，预期是用户仍按住的音比踏板尾音
+更连续，被偷取的踏板尾音以既有 6 ms 快速淡出退场。该政策没有用户设置入口，不加入隐藏
+limiter，也不表示已经支持 Velocity Layer、half-pedal、钢琴共鸣或物理钢琴建模。
 
 ### 2.1 功能总览
 
@@ -85,7 +88,7 @@ Studio 会明确失败，不静默替换声音。
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                         |
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
-| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、确定性 Voice Stealing 与溢出诊断已通过自动和 Chromium PCM 门禁。                                                    |
+| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音与溢出诊断已通过既有门禁；CC64 表达力集成正在增加 pedal-aware Voice Stealing 与后续 PCM/收尾门禁。                    |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
@@ -1076,7 +1079,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-31 | `EDITOR`、`MIDI-CC64`                                      | 建立 CC64 Clip / Track Lane Read Model、Value Viewport、Semantic Hit / Pointer 与只解析完成空白 Click 的 Pencil Placement Foundation。                           | `2fb0764`                                  |
 | 2026-08-31 | `PIANO-ROLL`、`MIDI-CC64`                                  | 接入 Track / Clip Focus 可见 Lane、Channel Preference、显式 Active Clip 写入、单 Command Add、Terminal Marker 与可见失败；高级 Event 编辑仍延期。                | `a1f4e5e`                                  |
 | 2026-09-01 | `EDITOR`、`MIDI-CC64`                                      | 建立显式 Active Clip 编辑作用域、Event Selection / Remove Target、主导轴批量 Move / 单 Event Replace Value、Preview 与 authority handoff；Studio 尚未接入。      | `0ed4523`                                  |
-| 2026-09-02 | `PIANO-ROLL`、`MIDI-CC64`                                  | Studio 接入瞬态 Selection、Marker Preview、单 Command Move / Replace Value / Remove、authority handoff 与按聚焦编辑目标路由的既有 Delete / Escape Action。       | 待审核工作树                               |
+| 2026-09-02 | `PIANO-ROLL`、`MIDI-CC64`                                  | Studio 接入瞬态 Selection、Marker Preview、单 Command Move / Replace Value / Remove、authority handoff 与按聚焦编辑目标路由的既有 Delete / Escape Action。       | `210f2c9`                                  |
+| 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ1 让复音分配器先退场 release-started、再退场 key-released / pedal-held，最后才选择 key-held Voice；不改变 64 / 128 / 16 预算。                      | 待审核工作树                               |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1136,14 +1140,22 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   Production Build 与 soundbank dist boundary；AQ1–AQ3 最终政策的 developer-local 人工听测
   如实记录为 `not-run`，历史单音 smoke 不被重复计为通过。
 
+- Expression Quality Integration V1 EQ1 当前在工作树等待审核。它新增独立政策标识
+  `seele.audio-quality-expression-v1-eq1`，让复音分配器先选择 release-started、再选择
+  key-released / pedal-held、最后选择 key-held Voice，并保留 AQ3 的增益、年龄、Token 与
+  64 / 128 / 16 预算。Audio Web Type Check、3 个目标测试文件 / 40 项测试、19 个测试文件 /
+  134 项全包测试与根级 `pnpm lint` 已通过；EQ2 Chromium PCM 与 developer-local 人工听测仍为
+  `not-run`。
+
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已
   提交为 `2fb0764`，Studio Lane Add 已提交为 `a1f4e5e`，Editor Event Editing Foundation 已提交为
-  `0ed4523`。当前 Studio Event Editing 纵向切片仍在工作树等待审核；它接入 Selection、Move、
-  Replace Value、Remove、Preview 与既有 Piano Roll Action，但不宣称 half-pedal、共鸣或 release
-  sample 已交付。Editor Foundation 已通过根级 `pnpm lint`、Editor Type Check 与 16 个测试文件 /
-  140 项测试；Studio 本批已通过根级 `pnpm lint`、Studio Type Check、60 个测试文件 / 395 项测试、
-  Production Build 与 soundbank dist boundary。未执行浏览器人工布局或听测。
+  `0ed4523`，Studio Event Editing 已提交为 `210f2c9`，Scope 切换 Action 生命周期修复已提交为
+  `f83f62d`。该纵向切片接入 Selection、Move、Replace Value、Remove、Preview 与既有 Piano Roll
+  Action，但不宣称 half-pedal、共鸣或 release sample 已交付。Editor Foundation 已通过根级
+  `pnpm lint`、Editor Type Check 与 16 个测试文件 / 140 项测试；Studio 最终通过根级 `pnpm lint`、
+  Studio Type Check、61 个测试文件 / 396 项测试、Production Build 与 soundbank dist boundary。
+  未执行浏览器人工布局或听测。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

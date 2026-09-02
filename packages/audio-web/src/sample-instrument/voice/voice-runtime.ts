@@ -3,6 +3,7 @@ import type { ScheduledSampleVoicePlan, SoundbankId } from '@seele-daw/playback'
 import {
   AUDIO_QUALITY_V1A_RENDER_POLICY,
   calculateAudioQualityV1aVelocityGain,
+  type AudioQualityExpressionVoiceLifecycle,
 } from '#internal/audio-quality/render-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
 import type {
@@ -365,6 +366,17 @@ function hasReleaseStartedAtTime(voice: ActiveSampleVoice, time: number): boolea
     (voice.forcedRelease !== null && voice.forcedRelease.startTime <= time) ||
     (voice.zone.triggerMode === 'gated' && voice.releasePlaybackClockSecond <= time)
   )
+}
+
+function classifyVoiceStealLifecycle(
+  voice: ActiveSampleVoice,
+  time: number,
+): AudioQualityExpressionVoiceLifecycle {
+  if (hasReleaseStartedAtTime(voice, time)) return 'release-started'
+  // For a gated Voice, this middle state is the CC64 pedal-held interval. One-shot Voices also
+  // retain their authored trigger semantics, but become preferable to a Voice whose key is held.
+  if (voice.plan.keyReleasePlaybackClockSecond <= time) return 'key-released'
+  return 'key-held'
 }
 
 function calculatePolyphonyPriorityGain(voice: ActiveSampleVoice, time: number): number {
@@ -936,7 +948,7 @@ export class SampleInstrumentVoiceRuntime {
       eligibleVoices.map((voice) =>
         Object.freeze({
           effectiveGain: calculatePolyphonyPriorityGain(voice, startTime),
-          releaseStarted: hasReleaseStartedAtTime(voice, startTime),
+          lifecycle: classifyVoiceStealLifecycle(voice, startTime),
           stableToken: voice.key,
           startTime: voice.startTime,
           value: voice,

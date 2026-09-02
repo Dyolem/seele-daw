@@ -10,8 +10,9 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 > 创建阶段 checkpoint。选择性 Voice 生命周期与按
 > Soundbank 局部资源失败已经收口；当前已有用户激活的 AudioContext、最小 master output、Manifest
 > 驱动的 Sample Voice、可重排最终 Gate Release、loop / mutex、generation、选择性 cancel 与资源
-> 统计。2026-08-31 的 CC64 批次已让 Audio Runtime 执行 Playback 编译的踏板最终释放，并等待
-> 批次审核；SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
+> 统计。2026-08-31 的 CC64 批次已让 Audio Runtime 执行 Playback 编译的踏板最终释放；2026-09-02
+> 的 Expression EQ1 已提交 pedal-aware Voice Stealing，EQ2 正在增加真实浏览器 PCM 门禁。SFZ 文本
+> parser 与通用 Scheduler Executor 仍未实现。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
@@ -30,8 +31,9 @@ AQ4 以 `9b4c0c9` 冻结最终政策标识、综合门禁、兼容/失败边界�
 CC64 的按键释放 / 最终 Gate Release、控制器追赶与 Clip 边界见
 [MIDI Sustain Pedal CC64 Playback V1](../playback/docs/midi-sustain-pedal-cc64-playback-v1.md)。
 CC64 后、WAV Export 前的复音优先级、PCM 与收尾门禁见
-[Expression Quality Integration V1](./docs/expression-quality-integration-v1-phase-plan.md)；当前 EQ1 已在
-工作树实施 pedal-aware Voice Stealing，等待审核。
+[Expression Quality Integration V1](./docs/expression-quality-integration-v1-phase-plan.md)；EQ1 已提交为
+`f47bf38`，EQ2 的 schema version 5 Chromium 合成 PCM 报告已在工作树通过，真实 Studio Grand
+人工听测仍为 `not-run`。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
@@ -115,6 +117,11 @@ Release，Runtime 验证两者顺序后只在后者解除 gated Voice。更早�
 loop、trigger、envelope 或 mutex 契约；Studio Grand 当前没有 Sample Loop，其他乐器若在 Manifest
 声明 continuous / sustain loop 或 one-shot，仍分别执行自己的控制文件。当前不触发 release sample、
 damper resonance、pedal noise 或 half-pedal 模型。
+
+从用户听觉看，踏板按下后的 Key Release 不应让 gated Voice 提前衰减；Pedal Up 才按 Manifest
+release 退场。同音重触发应产生新的独立起音并叠加在踏板保持尾音上，而不是按 pitch 全局切断旧音。
+EQ2 的合成 PCM 可以证明生命周期、包络、峰值与清理没有偏离，但不会让 Studio Grand 获得新的
+力度层、共鸣、轮换采样或 release sample，也不能替代真实音源人工听测。
 
 当前 Sample Instrument 已形成三组不同变化原因，因此按职责分层；其中较短的文件名是这个模块
 在语义仍然明确时的局部选择，不构成禁止文件名重复目录上下文的全局规则：

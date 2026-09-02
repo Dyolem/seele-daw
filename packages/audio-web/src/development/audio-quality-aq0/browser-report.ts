@@ -1,4 +1,5 @@
 import {
+  AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
   AUDIO_QUALITY_V1A_RENDER_POLICY,
   calculateAudioQualityV1aVelocityGain,
 } from '#internal/audio-quality/render-policy'
@@ -10,6 +11,10 @@ import {
   runAudioQualityAq3BrowserReport,
   type AudioQualityAq3BrowserReport,
 } from '#internal/development/audio-quality-aq0/aq3-browser-report'
+import {
+  runAudioQualityExpressionEq2BrowserReport,
+  type AudioQualityExpressionEq2BrowserReport,
+} from '#internal/development/audio-quality-aq0/expression-eq2-browser-report'
 import {
   AUDIO_QUALITY_AQ0_NOTE_RELEASE_SECOND,
   AUDIO_QUALITY_AQ0_NOTE_START_SECOND,
@@ -92,6 +97,17 @@ export interface AudioQualityAq0BrowserReport {
     readonly aq3SoundingLevelsAtOrBelowTolerance: boolean
     readonly aq3StressBudgetExact: boolean
     readonly aq3TailsBelowMinus90Dbfs: boolean
+    readonly expressionEq2AllMeasurementsFinite: boolean
+    readonly expressionEq2DensePedalHoldLevelStable: boolean
+    readonly expressionEq2DensePedalPeakAtOrBelowMinus3Dbfs: boolean
+    readonly expressionEq2KeyReleaseDoesNotStartFinalRelease: boolean
+    readonly expressionEq2NoClippedFrames: boolean
+    readonly expressionEq2OneShotContinuesAfterFinalGate: boolean
+    readonly expressionEq2PedalUpReleaseAtOrBelowTolerance: boolean
+    readonly expressionEq2ResourcesReleasedAfterDispose: boolean
+    readonly expressionEq2ResourcesReleasedAfterRender: boolean
+    readonly expressionEq2RetriggerOccurrencesRemainIndependent: boolean
+    readonly expressionEq2TailsBelowMinus90Dbfs: boolean
     readonly noClippedFrames: boolean
     readonly referencePeakAtOrBelowMinus3Dbfs: boolean
     readonly resourcesReleasedAfterDispose: boolean
@@ -103,6 +119,9 @@ export interface AudioQualityAq0BrowserReport {
     readonly offlineAudioContextAvailable: true
     readonly userAgent: string
   }
+  readonly expressionEq2: AudioQualityExpressionEq2BrowserReport
+  readonly expressionPolicy: typeof AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY
+  readonly expressionRenderPolicy: typeof AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY.id
   readonly fixture: {
     readonly noteReleaseSecond: number
     readonly noteStartSecond: number
@@ -119,7 +138,7 @@ export interface AudioQualityAq0BrowserReport {
   readonly polyphonyMeasurements: readonly AudioQualityAq0PolyphonyMeasurement[]
   readonly renderPolicy: typeof AUDIO_QUALITY_V1A_RENDER_POLICY.id
   readonly schema: typeof AUDIO_QUALITY_AQ0_REPORT_SCHEMA
-  readonly schemaVersion: 4
+  readonly schemaVersion: 5
   readonly velocityMeasurements: readonly AudioQualityAq0VelocityMeasurement[]
 }
 
@@ -266,9 +285,10 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
   )
   const polyphonyMeasurements = Object.freeze([referenceTriad, coherentStress])
   const allMeasurements = [...velocityMeasurements, ...polyphonyMeasurements]
-  const [aq2, aq3] = await Promise.all([
+  const [aq2, aq3, expressionEq2] = await Promise.all([
     runAudioQualityAq2BrowserReport(),
     runAudioQualityAq3BrowserReport(),
+    runAudioQualityExpressionEq2BrowserReport(),
   ])
 
   return Object.freeze({
@@ -300,6 +320,23 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
       aq3SoundingLevelsAtOrBelowTolerance: aq3.checks.soundingLevelsAtOrBelowTolerance,
       aq3StressBudgetExact: aq3.checks.stressBudgetExact,
       aq3TailsBelowMinus90Dbfs: aq3.checks.tailsBelowMinus90Dbfs,
+      expressionEq2AllMeasurementsFinite: expressionEq2.checks.allMeasurementsFinite,
+      expressionEq2DensePedalHoldLevelStable: expressionEq2.checks.densePedalHoldLevelStable,
+      expressionEq2DensePedalPeakAtOrBelowMinus3Dbfs:
+        expressionEq2.checks.densePedalPeakAtOrBelowMinus3Dbfs,
+      expressionEq2KeyReleaseDoesNotStartFinalRelease:
+        expressionEq2.checks.keyReleaseDoesNotStartFinalRelease,
+      expressionEq2NoClippedFrames: expressionEq2.checks.noClippedFrames,
+      expressionEq2OneShotContinuesAfterFinalGate:
+        expressionEq2.checks.oneShotContinuesAfterFinalGate,
+      expressionEq2PedalUpReleaseAtOrBelowTolerance:
+        expressionEq2.checks.pedalUpReleaseAtOrBelowTolerance,
+      expressionEq2ResourcesReleasedAfterDispose:
+        expressionEq2.checks.resourcesReleasedAfterDispose,
+      expressionEq2ResourcesReleasedAfterRender: expressionEq2.checks.resourcesReleasedAfterRender,
+      expressionEq2RetriggerOccurrencesRemainIndependent:
+        expressionEq2.checks.retriggerOccurrencesRemainIndependent,
+      expressionEq2TailsBelowMinus90Dbfs: expressionEq2.checks.tailsBelowMinus90Dbfs,
       noClippedFrames: allMeasurements.every((measurement) => measurement.clippedFrameCount === 0),
       referencePeakAtOrBelowMinus3Dbfs:
         referenceTriad.peakDbfs !== null && referenceTriad.peakDbfs <= -3,
@@ -319,6 +356,9 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
       offlineAudioContextAvailable: true,
       userAgent: navigator.userAgent,
     }),
+    expressionEq2,
+    expressionPolicy: AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
+    expressionRenderPolicy: AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY.id,
     fixture: Object.freeze({
       noteReleaseSecond: AUDIO_QUALITY_AQ0_NOTE_RELEASE_SECOND,
       noteStartSecond: AUDIO_QUALITY_AQ0_NOTE_START_SECOND,
@@ -335,7 +375,7 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
     polyphonyMeasurements,
     renderPolicy: AUDIO_QUALITY_V1A_RENDER_POLICY.id,
     schema: AUDIO_QUALITY_AQ0_REPORT_SCHEMA,
-    schemaVersion: 4,
+    schemaVersion: 5,
     velocityMeasurements,
   })
 }

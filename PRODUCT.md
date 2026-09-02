@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-02，CC64 Event Editing 已提交；Expression Quality EQ1 在工作树实施 pedal-aware Voice Stealing
+> 最近更新：2026-09-02，CC64 Event Editing 与 Expression Quality EQ1 已提交；EQ2 Chromium PCM 门禁在工作树等待审核
 >
 > 当前阶段：Audio Quality Foundation V1A 与 CC64 基础纵向切片已提交；正在执行 WAV Export 前的 Expression Quality Integration V1
 >
@@ -66,7 +66,11 @@ Studio 会明确失败，不静默替换声音。
 政策先选择已经进入 release、再选择已松键或踏板保持、最后选择仍按键的 Voice，随后才比较增益、
 起音时间和稳定身份。未达到复音上限时听感不变；达到上限时，预期是用户仍按住的音比踏板尾音
 更连续，被偷取的踏板尾音以既有 6 ms 快速淡出退场。该政策没有用户设置入口，不加入隐藏
-limiter，也不表示已经支持 Velocity Layer、half-pedal、钢琴共鸣或物理钢琴建模。
+limiter，也不表示已经支持 Velocity Layer、half-pedal、钢琴共鸣或物理钢琴建模。EQ2 进一步冻结
+用户可听预期：踏板按下后的 Key Release 不应让 gated Voice 提前衰减；Pedal Up 才按 Manifest
+release 退场；踏板保持期间的同音重触发应增加一个独立新起音，而不是切断旧音。32 Voice 合成
+压力报告证明这一固定输入下的保持电平、峰值和资源清理，但不把客观报告冒充 Studio Grand 人工
+听测，也不会为现有音源创造新的力度层、轮换采样、共鸣或 release sample。
 
 ### 2.1 功能总览
 
@@ -88,7 +92,7 @@ limiter，也不表示已经支持 Velocity Layer、half-pedal、钢琴共鸣或
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                         |
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
-| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音与溢出诊断已通过既有门禁；CC64 表达力集成正在增加 pedal-aware Voice Stealing 与后续 PCM/收尾门禁。                    |
+| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音与溢出诊断已通过既有门禁；CC64-aware Voice Stealing 已提交，踏板 PCM 门禁正在审核，确定性收尾仍待后续批次。           |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
@@ -1080,7 +1084,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-31 | `PIANO-ROLL`、`MIDI-CC64`                                  | 接入 Track / Clip Focus 可见 Lane、Channel Preference、显式 Active Clip 写入、单 Command Add、Terminal Marker 与可见失败；高级 Event 编辑仍延期。                | `a1f4e5e`                                  |
 | 2026-09-01 | `EDITOR`、`MIDI-CC64`                                      | 建立显式 Active Clip 编辑作用域、Event Selection / Remove Target、主导轴批量 Move / 单 Event Replace Value、Preview 与 authority handoff；Studio 尚未接入。      | `0ed4523`                                  |
 | 2026-09-02 | `PIANO-ROLL`、`MIDI-CC64`                                  | Studio 接入瞬态 Selection、Marker Preview、单 Command Move / Replace Value / Remove、authority handoff 与按聚焦编辑目标路由的既有 Delete / Escape Action。       | `210f2c9`                                  |
-| 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ1 让复音分配器先退场 release-started、再退场 key-released / pedal-held，最后才选择 key-held Voice；不改变 64 / 128 / 16 预算。                      | 待审核工作树                               |
+| 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ1 让复音分配器先退场 release-started、再退场 key-released / pedal-held，最后才选择 key-held Voice；不改变 64 / 128 / 16 预算。                      | `f47bf38`                                  |
+| 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ2 将 CC64 合成 PCM 场景加入 schema version 5 Chromium 门禁；人工听测仍未运行。                                                                      | 待审核工作树                               |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1140,12 +1145,20 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   Production Build 与 soundbank dist boundary；AQ1–AQ3 最终政策的 developer-local 人工听测
   如实记录为 `not-run`，历史单音 smoke 不被重复计为通过。
 
-- Expression Quality Integration V1 EQ1 当前在工作树等待审核。它新增独立政策标识
+- Expression Quality Integration V1 EQ1 已审核并提交为 `f47bf38`。它新增独立政策标识
   `seele.audio-quality-expression-v1-eq1`，让复音分配器先选择 release-started、再选择
   key-released / pedal-held、最后选择 key-held Voice，并保留 AQ3 的增益、年龄、Token 与
   64 / 128 / 16 预算。Audio Web Type Check、3 个目标测试文件 / 40 项测试、19 个测试文件 /
-  134 项全包测试与根级 `pnpm lint` 已通过；EQ2 Chromium PCM 与 developer-local 人工听测仍为
-  `not-run`。
+  134 项全包测试与根级 `pnpm lint` 已通过。
+
+- Expression Quality Integration V1 EQ2 当前在工作树等待审核。它把四种 Manifest Trigger / Loop
+  语义、32 Voice 踏板保持、踏板下同音重触发和 Pedal Up release 加入 schema version 5 综合报告。
+  Chromium 151 / 48 kHz 运行已全部通过：32 Voice 峰值约 `-9.86 dBFS`、保持 RMS 比约 `1.0000`、
+  同音重触发比为 `2.0`，全部输入无满刻度帧、尾部与 Runtime 资源归零。该报告证明固定合成输入下
+  不提前释放、不错误 choke 和不削波；developer-local Studio Grand 人工听测仍如实记录为
+  `not-run`，不能据此宣称新增力度层、共鸣、round-robin 或 release sample。Audio Web 20 个测试
+  文件 / 137 项测试、根级 `pnpm lint`、Studio Type Check、Production Build 与 soundbank dist
+  boundary 已通过。
 
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已

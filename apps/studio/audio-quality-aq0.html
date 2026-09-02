@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/src/assets/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Seele Audio Quality Foundation V1A</title>
+    <title>Seele Audio Quality Foundation and Expression Gate</title>
   </head>
   <body>
     <main class="audition-shell">
       <header class="audition-header">
         <div>
-          <p class="eyebrow">Developer-only · Audio Quality Foundation V1A</p>
-          <h1>V1A 合成 PCM 质量报告</h1>
+          <p class="eyebrow">Developer-only · Audio Quality Foundation + Expression</p>
+          <h1>V1A 与 CC64 表达力合成 PCM 质量报告</h1>
           <p class="lede">
             本页使用浏览器 OfflineAudioContext、自有合成 PCM 和生产 Sample Voice Runtime 生成结构化
             报告；不读取 Project 或本地 Soundbank，也不会进入 Studio 生产构建。
@@ -23,19 +23,19 @@
       <section class="panel" aria-labelledby="contract-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">AQ4 · V1A closure gate</p>
-            <h2 id="contract-title">Velocity、Envelope、Loop 与复音综合报告</h2>
+            <p class="eyebrow">AQ4 + Expression EQ2</p>
+            <h2 id="contract-title">Velocity、Envelope、Loop、复音与踏板表达力综合报告</h2>
           </div>
           <span class="badge">48 kHz · synthetic PCM</span>
         </div>
         <p>
-          在 AQ1 Velocity/Headroom 与 AQ2 Envelope/Loop 输入之外，继续运行 10,000 Note On 压力、
-          乐器与项目复音预算、确定性 Voice Stealing 和快速退场尾音，测量预算、PCM、尾部与 Runtime
-          资源。AQ4 不改变声音算法；报告继续直接使用最终生产 AQ3 政策，不猜素材 crossfade，也不加入
-          limiter。
+          在 V1A 既有输入之外，增加 32 Voice 踏板保持压力、踏板下同音重触发，以及 no-loop、
+          continuous loop、sustain loop、one-shot 的 Key Release / Pedal Up
+          分离测量。报告直接运行生产 Runtime，同时记录基础与表达力政策；不猜素材 crossfade，不加入
+          limiter，也不把自动指标冒充 人工听测。
         </p>
         <div class="button-row">
-          <button id="run-baseline" type="button">运行 V1A OfflineAudioContext 报告</button>
+          <button id="run-baseline" type="button">运行综合 OfflineAudioContext 报告</button>
           <button id="copy-report" type="button" class="secondary" disabled>复制报告 JSON</button>
         </div>
         <pre id="report-output" class="result" tabindex="0">等待运行。</pre>

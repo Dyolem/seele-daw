@@ -1,10 +1,11 @@
 # Audio Quality Foundation V1A 术语表
 
-> Status: Active reference for Audio Quality Foundation V1A
+> Status: Active reference for Audio Quality Foundation V1A and Expression Quality Integration V1
 >
 > Date: 2026-09-02
 
-本文用尽量直白的中文解释 Audio Quality Foundation V1A 中反复出现的音频、MIDI 与测试术语。
+本文用尽量直白的中文解释 Audio Quality Foundation V1A 与后续 Expression Quality Integration V1
+中反复出现的音频、MIDI 与测试术语。
 英文原词保留在表中，是为了便于对照源码、Web Audio API 和第三方资料，不要求读者先理解英文
 才能审阅阶段计划。
 
@@ -40,30 +41,30 @@
 
 ## 2. MIDI、动态与发声生命周期
 
-| 中文术语     | 英文原词                      | 在 Seele V1A 中的含义                                                                                                |
-| ------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 力度         | MIDI Velocity                 | MIDI Note 的 `1...127` 创作事实。当前 Sample Runtime 只用它控制振幅，不改变采样音色。                                |
-| 力度响应曲线 | Velocity Response Curve       | 把 MIDI Velocity 转成线性增益的函数。AQ1 当前使用带低电平下限的平方曲线。                                            |
-| 平方力度响应 | Quadratic Velocity Response   | 先把 Velocity 归一化再取平方，使中低力度比线性振幅政策更安静；它只改变音量映射，不会创造新的采样音色。               |
-| 力度层       | Velocity Layer                | 同一音高按力度选择不同采样素材。当前 Manifest 和 Studio Grand 没有该能力，不能把音量曲线称为力度层。                 |
-| 起音         | Note On / Attack              | 新 Note 开始发声，以及包络从零进入稳定电平的阶段。                                                                   |
-| 松音         | Note Off / Release            | Note 结束输入，以及包络把声音降到静音的阶段。Note Off 不等于立即销毁 AudioNode。                                     |
-| 包络         | Envelope                      | 控制 Voice 振幅随时间变化的曲线；当前 Profile 明确包含 attack 和 release。                                           |
-| 分段曲线近似 | Piecewise Curve Approximation | 把一条非线性包络拆成多个短线性 ramp 执行。AQ2 固定使用 32 段，目的是稳定逼近 Manifest 曲线，不是改变作者给出的时长。 |
-| 门控触发     | Gated                         | Note Off 会启动 release；音符时长参与声音生命周期。                                                                  |
-| 单次触发     | One-shot                      | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                                          |
-| 声部实例     | Voice                         | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                              |
-| 复音数       | Polyphony                     | 同时存在或同时发声的 Voice 数量。AQ3 的预算按 Runtime 已接纳并拥有的 Voice 图计数，不等同于瞬时声学响度。            |
-| 发声槽       | Sounding Voice Slot           | AQ3 中尚未被复音分配器标记为退场的 Runtime Voice 名额；每个乐器设备 64 个、同一项目 Runtime 128 个。                 |
-| 同音重触发   | Retrigger                     | 同一作用域内相同 pitch 再次 Note On。V1A 保留不同 occurrence 的独立身份，不全局强制 choke。                          |
-| 声部窃取     | Voice Stealing                | 发声槽达到预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出名额。                                 |
-| 退场尾音     | Retirement Tail               | AQ3 中专指被复音分配器 steal、正在快速 release、尚未完成清理的 Voice；最多 16 个。Stop/Cancel 尾音不混入该计数。     |
-| 复音丢弃     | Polyphony Drop                | 退场尾音预算也已满时，不接纳新 Voice Plan，并返回 `polyphony-dropped`；已有尾音不会被硬切。                          |
-| 溢出诊断     | Overflow Diagnostics          | 累计 steal/drop 次数和当前发声槽/退场尾音数量，用于确认压力行为；当前不是 Project Fact 或 Studio 持久化警告。        |
-| 卡死声部     | Stuck Voice                   | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。               |
-| 互斥组       | Mutex / Exclusive Group       | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                                            |
-| 快速释放     | Fast Release                  | stop、cancel、steal 或 fast mutex 使用的短 release。AQ2 将既有值正式冻结为 6 ms 线性淡出，避免直接硬切。             |
-| 停止保护间隔 | Source Stop Guard             | release 排程结束到真正停止 source 之间的短保护时间。AQ2 固定为 1 ms，防止调度舍入让 source 提前截断包络。            |
+| 中文术语     | 英文原词                      | 在 Seele V1A 中的含义                                                                                                                      |
+| ------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 力度         | MIDI Velocity                 | MIDI Note 的 `1...127` 创作事实。当前 Sample Runtime 只用它控制振幅，不改变采样音色。                                                      |
+| 力度响应曲线 | Velocity Response Curve       | 把 MIDI Velocity 转成线性增益的函数。AQ1 当前使用带低电平下限的平方曲线。                                                                  |
+| 平方力度响应 | Quadratic Velocity Response   | 先把 Velocity 归一化再取平方，使中低力度比线性振幅政策更安静；它只改变音量映射，不会创造新的采样音色。                                     |
+| 力度层       | Velocity Layer                | 同一音高按力度选择不同采样素材。当前 Manifest 和 Studio Grand 没有该能力，不能把音量曲线称为力度层。                                       |
+| 起音         | Note On / Attack              | 新 Note 开始发声，以及包络从零进入稳定电平的阶段。                                                                                         |
+| 松音         | Note Off / Release            | Note 结束输入，以及包络把声音降到静音的阶段。Note Off 不等于立即销毁 AudioNode。                                                           |
+| 包络         | Envelope                      | 控制 Voice 振幅随时间变化的曲线；当前 Profile 明确包含 attack 和 release。                                                                 |
+| 分段曲线近似 | Piecewise Curve Approximation | 把一条非线性包络拆成多个短线性 ramp 执行。AQ2 固定使用 32 段，目的是稳定逼近 Manifest 曲线，不是改变作者给出的时长。                       |
+| 门控触发     | Gated                         | Note Off 会启动 release；音符时长参与声音生命周期。                                                                                        |
+| 单次触发     | One-shot                      | 普通 Note Off 不截断素材，让素材自然播放；显式 cancel 或 mutex 仍可停止它。                                                                |
+| 声部实例     | Voice                         | 一次具体发声所拥有的 source、gain、可选 pan、包络状态与清理责任。它不是 Project Track。                                                    |
+| 复音数       | Polyphony                     | 同时存在或同时发声的 Voice 数量。AQ3 的预算按 Runtime 已接纳并拥有的 Voice 图计数，不等同于瞬时声学响度。                                  |
+| 发声槽       | Sounding Voice Slot           | AQ3 中尚未被复音分配器标记为退场的 Runtime Voice 名额；每个乐器设备 64 个、同一项目 Runtime 128 个。                                       |
+| 同音重触发   | Same-pitch Retrigger          | 旧 Voice 仍在发声时，相同 pitch 再次 Note On。不同 occurrence 保持独立，不全局强制 choke；EQ2 预期听到新起音叠加旧尾音，而不是旧音被切断。 |
+| 声部窃取     | Voice Stealing                | 发声槽达到预算时，按确定性规则选择旧 Voice 并让其快速 release，为新 Voice 腾出名额。                                                       |
+| 退场尾音     | Retirement Tail               | AQ3 中专指被复音分配器 steal、正在快速 release、尚未完成清理的 Voice；最多 16 个。Stop/Cancel 尾音不混入该计数。                           |
+| 复音丢弃     | Polyphony Drop                | 退场尾音预算也已满时，不接纳新 Voice Plan，并返回 `polyphony-dropped`；已有尾音不会被硬切。                                                |
+| 溢出诊断     | Overflow Diagnostics          | 累计 steal/drop 次数和当前发声槽/退场尾音数量，用于确认压力行为；当前不是 Project Fact 或 Studio 持久化警告。                              |
+| 卡死声部     | Stuck Voice                   | 本应结束却继续发声或继续占有节点的 Voice。任何 stop、failure、generation 切换和 dispose 后都不能残留。                                     |
+| 互斥组       | Mutex / Exclusive Group       | 新 Voice 触发时按 Manifest 规则关闭同组旧 Voice，常见于开闭镲等互斥发声。                                                                  |
+| 快速释放     | Fast Release                  | stop、cancel、steal 或 fast mutex 使用的短 release。AQ2 将既有值正式冻结为 6 ms 线性淡出，避免直接硬切。                                   |
+| 停止保护间隔 | Source Stop Guard             | release 排程结束到真正停止 source 之间的短保护时间。AQ2 固定为 1 ms，防止调度舍入让 source 提前截断包络。                                  |
 
 ## 3. 采样、Zone 与循环
 
@@ -90,7 +91,7 @@
 | 发声令牌           | Voice Token                  | 当前由 `(engineGeneration, occurrenceKey)` 组成的 Voice 身份，用于 cancel、重排和清理。                                                                                                         |
 | 引擎代次           | Engine Generation            | Transport 时间映射或全局状态失效时推进的运行时代次；旧代计划必须被丢弃。它不是 modelRevision。                                                                                                  |
 | 渲染政策标识       | Render Policy ID             | 标记一组实际发声算法与常数的代码级字符串。最终 V1A 为 `seele.audio-quality-foundation-v1a-aq3`；它不是 Project Fact 或文件 schema。                                                             |
-| 报告结构版本       | Report Schema Version        | 标记浏览器质量报告字段形状的整数。schema version 4 不表示 Project File v4，也不等于渲染政策版本。                                                                                               |
+| 报告结构版本       | Report Schema Version        | 标记浏览器质量报告字段形状的整数。V1A 收口历史报告是 version 4，加入 EQ2 字段后的综合报告是 version 5；两者都不表示 Project File 版本，也不等于渲染政策版本。                                   |
 | 离线音频上下文     | OfflineAudioContext          | 浏览器中不连接扬声器、尽快渲染到 AudioBuffer 的 Web Audio 后端。AQ0 用它运行真实 Voice Runtime 和合成素材。                                                                                     |
 | 离线上下文适配视图 | Offline Context Adapter View | `OfflineAudioContext` 在开始渲染前报告 `suspended`，但生产 Voice Runtime 只接收已激活的 `running` 上下文。AQ0 只在调度窗口把状态读取适配为 `running`；节点和 PCM 仍由原生离线上下文创建和渲染。 |
 | 实时/离线一致性    | Realtime/Offline Parity      | 实时播放和未来 WAV 导出使用相同发声政策，而不是两套听起来不同的实现。                                                                                                                           |
@@ -106,6 +107,9 @@
 | 参考三和弦         | Reference Triad              | 固定 pitch `60, 64, 67`、Velocity 96 的三 Voice 输入，用于观察普通复音路径的 peak、RMS、尾部与清理。                                                                                            |
 | 相干压力输入       | Coherent Stress Fixture      | 同时启动 10 个完全相同、满力度 Voice 的确定性最坏情况输入，用来校准 headroom；它不是 Voice 上限或真实乐曲模型。                                                                                 |
 | 最大绝对误差       | Maximum Absolute Error       | 实际 PCM 与同一时刻解析目标值之差的最大绝对值。AQ2 的 Envelope 门禁用 full scale 比例表达，`1e-4` 约等于满刻度的万分之一。                                                                      |
+| 踏板保持电平比     | Pedal-hold Level Ratio       | EQ2 中按键松开后、Pedal Up 前的 RMS 除以松键前 RMS。接近 `1` 表示二值踏板保持没有额外衰减；它不证明真实钢琴共鸣、主观响度或无限延音。                                                           |
+| 重触发叠加比       | Retrigger Level Ratio        | EQ2 合成同相正弦中两个同音 occurrence 重叠 RMS 除以单 Voice RMS。接近 `2` 证明两个 Voice 独立叠加；真实采样因相位、音色和包络不同不必得到同一比值。                                             |
+| 抬踏板释放误差     | Pedal-up Release Error       | Pedal Up 后生产 PCM 与 Manifest 解析 release 包络之间的最大绝对误差，用于发现提前释放、硬切或错误包络；它不是人耳 click 检测，也不评价素材本身。                                                |
 | 尾部窗口           | Tail Window                  | release 与 source stop 理应完成后用于检查残余信号的时间窗；数字静音记为 `null dBFS`，不是测量失败。                                                                                             |
 | 确定性             | Deterministic                | 相同输入和政策得到相同调度、保留/steal 顺序与报告结构，不依赖 Map 偶然顺序。                                                                                                                    |
 

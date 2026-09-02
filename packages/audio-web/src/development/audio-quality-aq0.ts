@@ -19,6 +19,12 @@ export type {
   AudioQualityAq3BrowserReport,
   AudioQualityAq3PolyphonyMeasurement,
 } from './audio-quality-aq0/aq3-browser-report'
+export type {
+  AudioQualityExpressionEq2BrowserReport,
+  AudioQualityExpressionEq2RetriggerMeasurement,
+  AudioQualityExpressionEq2StressMeasurement,
+  AudioQualityExpressionEq2TriggerMeasurement,
+} from './audio-quality-aq0/expression-eq2-browser-report'
 export {
   countAudioQualityClippedFrames,
   measureAudioQualityAq0Channel,

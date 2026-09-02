@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-02，CC64 Event Editing 与 Expression Quality EQ1 已提交；EQ2 Chromium PCM 门禁在工作树等待审核
+> 最近更新：2026-09-02，Expression Quality EQ1 / EQ2 已提交；EQ3A 非播放态尾音所有权清理已通过审核
 >
 > 当前阶段：Audio Quality Foundation V1A 与 CC64 基础纵向切片已提交；正在执行 WAV Export 前的 Expression Quality Integration V1
 >
@@ -70,7 +70,10 @@ limiter，也不表示已经支持 Velocity Layer、half-pedal、钢琴共鸣或
 用户可听预期：踏板按下后的 Key Release 不应让 gated Voice 提前衰减；Pedal Up 才按 Manifest
 release 退场；踏板保持期间的同音重触发应增加一个独立新起音，而不是切断旧音。32 Voice 合成
 压力报告证明这一固定输入下的保持电平、峰值和资源清理，但不把客观报告冒充 Studio Grand 人工
-听测，也不会为现有音源创造新的力度层、轮换采样、共鸣或 release sample。
+听测，也不会为现有音源创造新的力度层、轮换采样、共鸣或 release sample。Transport 自然结束时
+不强制切断已经排程的正常 release 或 one-shot 尾部；Pause、Locate Preview 与 Return 则继续使用
+6 ms 快速淡出。EQ3A 在 Paused / Stopped 后只轮询并释放已经结束的 Studio Voice Handle 与 retired
+Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍可复用的 prepared Runtime。
 
 ### 2.1 功能总览
 
@@ -92,7 +95,7 @@ release 退场；踏板保持期间的同音重触发应增加一个独立新起
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                         |
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
-| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音与溢出诊断已通过既有门禁；CC64-aware Voice Stealing 已提交，踏板 PCM 门禁正在审核，确定性收尾仍待后续批次。           |
+| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音与踏板 PCM 门禁已通过；EQ3A 已补齐 Paused / Stopped 尾音的确定性所有权清理。                                          |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
@@ -1085,7 +1088,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-09-01 | `EDITOR`、`MIDI-CC64`                                      | 建立显式 Active Clip 编辑作用域、Event Selection / Remove Target、主导轴批量 Move / 单 Event Replace Value、Preview 与 authority handoff；Studio 尚未接入。      | `0ed4523`                                  |
 | 2026-09-02 | `PIANO-ROLL`、`MIDI-CC64`                                  | Studio 接入瞬态 Selection、Marker Preview、单 Command Move / Replace Value / Remove、authority handoff 与按聚焦编辑目标路由的既有 Delete / Escape Action。       | `210f2c9`                                  |
 | 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ1 让复音分配器先退场 release-started、再退场 key-released / pedal-held，最后才选择 key-held Voice；不改变 64 / 128 / 16 预算。                      | `f47bf38`                                  |
-| 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ2 将 CC64 合成 PCM 场景加入 schema version 5 Chromium 门禁；人工听测仍未运行。                                                                      | 待审核工作树                               |
+| 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ2 将 CC64 合成 PCM 场景加入 schema version 5 Chromium 门禁；人工听测仍未运行。                                                                      | `3c29bc9`                                  |
+| 2026-09-02 | `AUDIO-QUALITY`、`PLAYBACK`                                | Expression EQ3A 在 Paused / Stopped 尾音结束后确定性清理 Studio 所有权，不改变声音。                                                                             | 本次提交                                   |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1151,7 +1155,7 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   64 / 128 / 16 预算。Audio Web Type Check、3 个目标测试文件 / 40 项测试、19 个测试文件 /
   134 项全包测试与根级 `pnpm lint` 已通过。
 
-- Expression Quality Integration V1 EQ2 当前在工作树等待审核。它把四种 Manifest Trigger / Loop
+- Expression Quality Integration V1 EQ2 已审核并提交为 `3c29bc9`。它把四种 Manifest Trigger / Loop
   语义、32 Voice 踏板保持、踏板下同音重触发和 Pedal Up release 加入 schema version 5 综合报告。
   Chromium 151 / 48 kHz 运行已全部通过：32 Voice 峰值约 `-9.86 dBFS`、保持 RMS 比约 `1.0000`、
   同音重触发比为 `2.0`，全部输入无满刻度帧、尾部与 Runtime 资源归零。该报告证明固定合成输入下
@@ -1159,6 +1163,14 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   `not-run`，不能据此宣称新增力度层、共鸣、round-robin 或 release sample。Audio Web 20 个测试
   文件 / 137 项测试、根级 `pnpm lint`、Studio Type Check、Production Build 与 soundbank dist
   boundary 已通过。
+
+- Expression Quality Integration V1 EQ3A 已通过审核并随本次提交交付。只读审计确认 Clip 末端踏板强制正常
+  release、Pause / Locate / Return 快速释放、CC64 选择性重排、Instrument Track 选择性 cancel 和
+  失败不回滚 Project Commit 的既有路径。实际修正让 Paused / Stopped 状态在活动尾音或 retired
+  Runtime 存在时继续使用既有 25 ms 低频清理，终态归零后立即停止；自然结束仍不调用全局
+  `allNotesOff`，prepared Runtime 可供下次 Play 复用。Studio Playback Coordinator 定向 1 个测试
+  文件 / 40 项、Studio 全包 61 个测试文件 / 397 项、Type Check、根级 `pnpm lint`、Production
+  Build 与 soundbank dist boundary 已通过。该批不改变 PCM，未重复运行 EQ2 Chromium 报告。
 
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已

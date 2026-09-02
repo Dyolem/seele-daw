@@ -87,12 +87,12 @@ Studio Grand 当前控制文件没有 Sample Loop，所以 CC64 最直接的效�
 
 已有 CC64 Project Command 进入 Studio Playback Coordinator 的选择性 Reconciliation：Add、
 Move、Remove 与 Replace Value 会重新编译受影响 Source 的 occurrence。已经开始且仍活动的 Voice
-只重排最终释放时间；不相关 Voice 不执行全局 `allNotesOff`。未来 Controller Lane 必须复用这条
-路径，并保持一次手势只提交一个 Project Command / History 步骤。
+只重排最终释放时间；不相关 Voice 不执行全局 `allNotesOff`。当前 CC64 Controller Lane 已复用
+这条路径，并保持一次手势只提交一个 Project Command / History 步骤。
 
 以下能力仍明确延期：
 
-- Studio Controller Lane、选择、精确输入、批量编辑与可见踏板状态；
+- CC64 精确数值输入、批量 Value 变换、可见播放态踏板指示与通用 Controller Lane 平台；
 - Looped MIDI Clip 的跨循环 Controller 展开与 Note Chase；
 - half-pedal、repedaling 的连续声学模型、damper resonance、pedal noise 与 release sample；
 - Project MIDI Export Bridge、Studio MIDI Export UI 与 WAV Offline Export；
@@ -109,7 +109,8 @@ sustain loop / one-shot 对最终 Gate Release 的执行。
 
 本批次不把代码级时间测试冒充人工听测。Controller Lane 完成后、WAV Export 开始前，仍需执行
 表达力集成质量门禁，复核 Pedal Up click、release tail、复音峰值、Voice Stealing、停止 / Locate /
-设备替换资源清理，以及实时与离线语义一致性。
-该门禁现由
+设备替换资源清理，以及实时与离线语义一致性。EQ1 Voice Stealing 与 EQ2 Chromium PCM 已分别提交
+为 `f47bf38`、`3c29bc9`；EQ3 正在收口 Transport、重协调与确定性尾音所有权。
+该门禁由
 [Expression Quality Integration V1](../../audio-web/docs/expression-quality-integration-v1-phase-plan.md)
 独立跟踪。

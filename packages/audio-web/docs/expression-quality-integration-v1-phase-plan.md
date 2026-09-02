@@ -1,6 +1,6 @@
 # Expression Quality Integration V1 阶段计划
 
-> Status: EQ0 audit and EQ1 pedal-aware Voice Stealing committed (`f47bf38`); EQ2 Chromium PCM gate implemented in the working tree, pending review
+> Status: EQ0–EQ2 committed (`f47bf38`, `3c29bc9`); EQ3A inactive-tail ownership cleanup implemented and reviewed
 >
 > Date: 2026-09-02
 >
@@ -126,14 +126,60 @@ Studio Grand 音色。EQ2 客观 PCM 门禁可以发现提前衰减、硬切、�
 这次运行是自动 Chromium PCM 门禁，不是 developer-local Studio Grand 人工听测；后者继续记录为
 `not-run`。
 
-## 5. 后续批次
+## 5. EQ3：Transport、重协调与确定性收尾
 
-### EQ3：Transport、重协调与确定性收尾
+### 5.1 只读审计矩阵
 
-- 汇总 Locate/Seek Controller Chase、Stop、Pause、Generation、设备替换和 CC64 编辑重协调；
-- 验证失败不会留下卡死 Voice，也不会回滚合法 Project Commit；
-- 冻结“结束时踏板仍按下”的实时/离线共同收尾政策；
-- 记录自动门禁、Chromium PCM、developer-local listening matrix 和明确未运行项。
+| 场景                                       | 当前权威路径                                                                                      | 收尾政策                                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Clip 终点仍为 Pedal Down                   | Playback Compiler 把 Final Gate Release 限制在非循环 Clip Source Window 终点                      | gated Voice 在 Clip 终点进入 Manifest 正常 release；不改写 Note Duration 或 CC64 Fact                  |
+| Pause、Locate Preview、Return              | Transport 推进 generation，Studio 停止 Scheduler 并调用全部 Runtime 的 `allNotesOff`              | 当前 Voice 使用既有 `6 ms` fast release；准备好的资源与可恢复音乐位置保留                              |
+| Locate / Seek 后继续                       | Compiler 保留 Controller Chase；Scheduler 只调度目标位置之后实际出现或允许 late-immediate 的 Note | 旧 Voice 已由 Locate 中断收尾；当前仍不做 Note Chase                                                   |
+| 播放中 CC64 编辑                           | Reconciliation 只更新受影响 Source occurrence；活动 gated Voice 调用 `rescheduleRelease`          | 未来 Pedal Up 可前后重排；新释放点已在过去时从“现在”启动正常 release；已经开始 release 的 Voice 不复活 |
+| Instrument / Track 替换                    | 只 cancel 受影响 Track Voice，准备下一 Runtime；不相关 Track 保持活动                             | 受影响 Voice 使用 fast release；缺失新 Soundbank 显式 warning，不静默替换                              |
+| Tempo、修订链断裂、准备失败或 Project 替换 | 完整 Handoff / Reset 调用 `allNotesOff` 并 dispose 不再可信的 Runtime                             | 播放失败进入可见失败状态，但不回滚已经合法提交的 Project Commit                                        |
+| Transport 自然结束                         | 保留 Timeline End 位置，不调用全局 `allNotesOff`                                                  | 已排程的正常 release 或 one-shot 自然尾部可以完成，之后只回收应用层 Handle / Runtime 所有权            |
+
+审计确认前六条已有生产路径和回归；真实缺口位于最后一条及 Paused 状态的应用层引用收尾。
+`SampleInstrumentVoiceRuntime` 会在 source `ended` 后归零 AudioNode，但 Studio Scheduler 停止后只会
+轮询 retired Runtime。当前 prepared Runtime 中仍在 normal / fast release 的 Voice Handle 即使稍后
+结束，也可能一直保留到下次 Play、下一次 Commit 或 dispose。
+
+### 5.2 EQ3A：Inactive-tail Ownership Cleanup
+
+EQ3A 把既有 25 ms 低频清理轮询扩展为“非播放态 Voice 清理”：Paused / Stopped 后，只要仍有活动
+Voice Handle 或 retired Runtime，就继续检查终态；两者都归零后立即停止 Timer。进入 Playing 时仍
+停止这枚清理 Timer，由既有 Scheduler Tick 负责同一收集逻辑。
+
+这不是新的音频 Timer、DSP 或 Pedal 状态机。它不修改 Envelope、不提前 stop source，也不 dispose
+仍可复用的 prepared Runtime；它只在 `isActive()` 已经变为 false 后释放 Studio 持有的 Handle、Plan
+与 Runtime 引用。单个 Handle 查询失败时继续按既有失败关闭语义视为不可用，不能阻止其他尾音和
+Runtime 被回收。
+
+### 5.3 用户预期听觉
+
+- Clip 结束时踏板仍按下，gated Voice 应在 Clip 边界按 Manifest 正常 release，而不是无限保持，
+  也不是由 Studio 清理 Timer 硬切；未来 WAV 导出必须为该 release tail 保留渲染尾部；
+- Transport 自然结束允许已经排程的 release 或 one-shot 尾部自然完成。EQ3A 只清理结束后的应用层
+  引用，因此不应产生新的音量、音色、click 或尾音长度变化；
+- Pause、Locate Preview 与 Return 是用户显式中断，当前预期听见既有 6 ms 快速淡出，而不是完整
+  Zone release；这能降低硬切 click，但不承诺完全听不见中断；
+- 播放中提前 Pedal Up 或把 Pedal Up 移到已经过去的位置，应让受影响 Voice 从现在进入正常 release；
+  延后 Pedal Up 应延后尚未开始的 release。已经进入 release 的 Voice 不会被编辑重新复活；
+- 替换 Instrument 时，目标 Track 可以短淡出，不相关 Track 不应中断；失败不能让合法编辑从
+  Project History 消失。
+
+这些政策仍不增加 half-pedal、repedaling 声学模型、共鸣、pedal noise、release sample、Note
+Chase 或 Looped Clip Controller 展开。清理测试证明所有权终结，不等于主观听测已经通过。
+
+### 5.4 后续收口
+
+EQ3 后续批次仍需：
+
+- 汇总 Audio Runtime 的 fast release PCM 与 Studio Transport / Reconciliation 回归为最终门禁；
+- 冻结实时与未来 WAV Backend 对 Arrangement / Clip 边界及渲染尾部的共同输入输出契约；
+- 记录 developer-local Studio Grand 的 Pause、Pedal Up、同音重触发和最大复音听测矩阵，未运行项
+  继续写为 `not-run`。
 
 EQ3 收口并通过审核后，WAV Offline Export 才能依赖这组实时语义。
 
@@ -146,7 +192,7 @@ EQ1 已提交证据：
 - 根级 `pnpm lint` 通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint；
 - EQ1 已审核并提交为 `f47bf38`。
 
-EQ2 当前工作树证据：
+EQ2 已提交证据：
 
 - 合成 fixture 的 3 项结构性测试通过；
 - Audio Web 源码、工具配置与 Studio 开发入口 Type Check 通过；
@@ -154,4 +200,17 @@ EQ2 当前工作树证据：
 - 根级 `pnpm lint` 通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint；
 - Studio Production Build 与 soundbank dist boundary 通过；
 - Chromium 151 / 48 kHz / schema version 5 综合报告的全部 EQ2 检查通过；
-- developer-local Studio Grand 最大复音、Pedal Up 与同音重触发人工听测仍为 `not-run`。
+- developer-local Studio Grand 最大复音、Pedal Up 与同音重触发人工听测仍为 `not-run`；
+- EQ2 已审核并提交为 `3c29bc9`。
+
+EQ3A 已审核证据：
+
+- Studio Playback Coordinator 定向 1 个测试文件 / 40 项测试通过；
+- Paused fast-release tail 会启动非播放态清理轮询，并在后续 selective handoff 后回收 retired Runtime；
+- Transport 自然结束不调用 `allNotesOff`，尾音结束后停止清理 Timer，同时保留 prepared Runtime
+  供下一次 Play 复用；
+- Studio Type Check 与 61 个测试文件 / 397 项全包测试通过；
+- 根级 `pnpm lint` 通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint；
+- Studio Production Build 与 soundbank dist boundary 通过；
+- EQ3A 不改变 PCM 或 AudioNode 调度，因此没有把 EQ2 Chromium 报告重复运行冒充新的听测证据。
+- EQ3A 已通过审核并随本次提交交付。

@@ -1317,7 +1317,7 @@ describe('ProjectPlaybackCoordinator', () => {
     runtime.currentTime = parsePlaybackClockSecond(0.1)
     expect(coordinator.pause()).toBe(true)
     expect(releaseTail.isActive()).toBe(true)
-    expect(timer.callbacks.size).toBe(0)
+    expect(timer.callbacks.size).toBe(1)
 
     const commit = requireCommitted(
       session,
@@ -1692,6 +1692,8 @@ describe('ProjectPlaybackCoordinator', () => {
     })
     await coordinator.play()
     const prepared = runtime.prepared[0]!
+    const completedVoice = requireVoiceHandle(prepared, runtime.plans[0]!, NOTE_ID)
+    completedVoice.finish()
 
     prepared.currentTime = 300 as typeof prepared.currentTime
     const visualPosition = coordinator.readVisualPosition()
@@ -1707,6 +1709,39 @@ describe('ProjectPlaybackCoordinator', () => {
     })
     expect(timer.callbacks.size).toBe(0)
     expect(prepared.allNotesOffCount).toBe(0)
+    coordinator.dispose()
+  })
+
+  it('collects a natural-end release tail without disposing the reusable Runtime', async () => {
+    const projectId = parseProjectId('project-playback-natural-end-release-tail')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    const timer = new ManualProjectPlaybackTimer()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer,
+    })
+    await coordinator.play()
+    const prepared = runtime.prepared[0]!
+    const releaseTail = requireVoiceHandle(prepared, runtime.plans[0]!, NOTE_ID)
+
+    prepared.currentTime = 300 as typeof prepared.currentTime
+    expect(coordinator.readVisualPosition().phase).toBe('stopped')
+    expect(releaseTail.isActive()).toBe(true)
+    expect(prepared.allNotesOffCount).toBe(0)
+    expect(timer.callbacks.size).toBe(1)
+
+    releaseTail.finish()
+    timer.fire()
+    expect(timer.callbacks.size).toBe(0)
+    expect(prepared.disposeCount).toBe(0)
+
+    await expect(coordinator.play()).resolves.toBe(true)
+    expect(runtime.prepared).toEqual([prepared])
+    expect(prepared.generations).toEqual([1, 2])
+    expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
 

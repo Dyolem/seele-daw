@@ -334,7 +334,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #transport: AudibleMidiTransport | null = null
   #scheduler: AudibleMidiSchedulerPlanner | null = null
   #timerHandle: unknown = null
-  #retiredRuntimeCleanupTimerHandle: unknown = null
+  #inactiveVoiceCleanupTimerHandle: unknown = null
   #preparationAbortController: AbortController | null = null
   #requestSequence = 0
   #pendingCommits: ProjectCommit[] = []
@@ -379,7 +379,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         // A visual sample may observe natural end before the Scheduler wakes. Close the same
         // low-frequency state transition here while retaining the Transport's End position.
         this.#stopTimer()
-        this.#startRetiredRuntimeCleanup()
+        this.#startInactiveVoiceCleanup()
         this.#publishTransportState(snapshot)
       }
       return createVisualPosition(
@@ -561,7 +561,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       this.#stopTimer()
       this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
       this.#allNotesOffRuntimes()
-      this.#startRetiredRuntimeCleanup()
+      this.#startInactiveVoiceCleanup()
       this.#publishTransportState(transition.snapshot)
       return true
     } catch (cause) {
@@ -620,7 +620,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         this.#scheduleNextWindow(transition.snapshot)
         this.#startTimer()
       } else {
-        this.#startRetiredRuntimeCleanup()
+        this.#startInactiveVoiceCleanup()
       }
       this.#publishTransportState(transition.snapshot)
       return true
@@ -651,7 +651,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         this.#startTimer()
       } else {
         this.#stopTimer()
-        this.#startRetiredRuntimeCleanup()
+        this.#startInactiveVoiceCleanup()
       }
       this.#publishTransportState(located.snapshot)
       return true
@@ -695,7 +695,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       const transport = this.#transport
       if (transport === null) {
         this.#allNotesOffRuntimes()
-        this.#startRetiredRuntimeCleanup()
+        this.#startInactiveVoiceCleanup()
         this.#publishStoppedAtStart()
         return wasLoading
       }
@@ -707,7 +707,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       } else {
         this.#allNotesOffRuntimes()
       }
-      this.#startRetiredRuntimeCleanup()
+      this.#startInactiveVoiceCleanup()
       this.#publishTransportState(transition.snapshot)
       return (
         wasLoading ||
@@ -929,7 +929,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#invalidateLocateSession()
     this.#cancelPreparation()
     this.#stopTimer()
-    this.#stopRetiredRuntimeCleanup()
+    this.#stopInactiveVoiceCleanup()
     try {
       this.#allNotesOffRuntimes()
     } catch {
@@ -993,7 +993,9 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       runtime.dispose()
       this.#retiredRuntimes.delete(runtime)
     }
-    if (this.#retiredRuntimes.size === 0) this.#stopRetiredRuntimeCleanup()
+    if (this.#retiredRuntimes.size === 0 && this.#scheduledVoices.size === 0) {
+      this.#stopInactiveVoiceCleanup()
+    }
   }
 
   #requirePlayablePlan(): AudibleMidiProjectPlan {
@@ -1046,7 +1048,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   }
 
   #startTimer(): void {
-    this.#stopRetiredRuntimeCleanup()
+    this.#stopInactiveVoiceCleanup()
     if (this.#timerHandle !== null) return
     this.#timerHandle = this.#timerPort.setRepeating(
       () => this.#tick(),
@@ -1060,22 +1062,28 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#timerHandle = null
   }
 
-  #startRetiredRuntimeCleanup(): void {
+  #startInactiveVoiceCleanup(): void {
     if (this.#disposed) return
     this.#collectFinishedVoicesAndRuntimes()
-    if (this.#retiredRuntimes.size === 0 || this.#retiredRuntimeCleanupTimerHandle !== null) {
+    if (
+      (this.#retiredRuntimes.size === 0 && this.#scheduledVoices.size === 0) ||
+      this.#inactiveVoiceCleanupTimerHandle !== null
+    ) {
       return
     }
-    this.#retiredRuntimeCleanupTimerHandle = this.#timerPort.setRepeating(() => {
+    // Playback is inactive here, so the Scheduler timer cannot collect a normal or fast release
+    // tail. Keep only this lightweight ownership sweep alive until every handle and retired
+    // Runtime has reached its terminal state.
+    this.#inactiveVoiceCleanupTimerHandle = this.#timerPort.setRepeating(() => {
       if (this.#disposed) return
       this.#collectFinishedVoicesAndRuntimes()
     }, SCHEDULER_WAKE_CADENCE_MILLISECOND)
   }
 
-  #stopRetiredRuntimeCleanup(): void {
-    if (this.#retiredRuntimeCleanupTimerHandle === null) return
-    this.#timerPort.clear(this.#retiredRuntimeCleanupTimerHandle)
-    this.#retiredRuntimeCleanupTimerHandle = null
+  #stopInactiveVoiceCleanup(): void {
+    if (this.#inactiveVoiceCleanupTimerHandle === null) return
+    this.#timerPort.clear(this.#inactiveVoiceCleanupTimerHandle)
+    this.#inactiveVoiceCleanupTimerHandle = null
   }
 
   #reconcileActiveProjectCommit(event: ActiveProjectCommitEvent): void {
@@ -1339,7 +1347,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       this.#startTimer()
     } else {
       this.#stopTimer()
-      this.#startRetiredRuntimeCleanup()
+      this.#startInactiveVoiceCleanup()
     }
     this.#publishTransportState(transition.snapshot)
     this.#collectFinishedVoicesAndRuntimes()
@@ -1372,7 +1380,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#invalidateLocateSession()
     this.#cancelPreparation()
     this.#stopTimer()
-    this.#stopRetiredRuntimeCleanup()
+    this.#stopInactiveVoiceCleanup()
 
     const transport = this.#transport
     if (transport === null) {
@@ -1411,7 +1419,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       this.#suppressedTrackIds.clear()
 
       this.#publishTransportState(transition.snapshot)
-      this.#startRetiredRuntimeCleanup()
+      this.#startInactiveVoiceCleanup()
       this.#collectFinishedVoicesAndRuntimes()
     } catch (cause) {
       this.#failReconciledPlan(event, nextPlan, cause)
@@ -1479,7 +1487,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       const snapshot = transport.getSnapshot()
       if (snapshot.state !== 'playing') {
         this.#stopTimer()
-        this.#startRetiredRuntimeCleanup()
+        this.#startInactiveVoiceCleanup()
         this.#publishTransportState(snapshot)
         return
       }

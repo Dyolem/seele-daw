@@ -95,6 +95,10 @@
 | 离线音频上下文     | OfflineAudioContext          | 浏览器中不连接扬声器、尽快渲染到 AudioBuffer 的 Web Audio 后端。AQ0 用它运行真实 Voice Runtime 和合成素材。                                                                                     |
 | 离线上下文适配视图 | Offline Context Adapter View | `OfflineAudioContext` 在开始渲染前报告 `suspended`，但生产 Voice Runtime 只接收已激活的 `running` 上下文。AQ0 只在调度窗口把状态读取适配为 `running`；节点和 PCM 仍由原生离线上下文创建和渲染。 |
 | 实时/离线一致性    | Realtime/Offline Parity      | 实时播放和未来 WAV 导出使用相同发声政策，而不是两套听起来不同的实现。                                                                                                                           |
+| 自然结束           | Natural End                  | Transport 自己到达 Timeline End。它不等于用户按 Pause / Return；已排程的正常 release 或 one-shot 尾部可以继续完成。                                                                             |
+| 显式播放中断       | Explicit Transport Interrupt | Pause、Locate Preview、Return 或完整 Runtime Reset 等用户或系统操作。当前活动 Voice 使用 6 ms fast release，不等待完整 Zone release。                                                           |
+| 非播放态尾音清理   | Inactive-tail Cleanup        | EQ3A 在 Paused / Stopped 后低频检查 Voice Handle 与 retired Runtime 是否已经结束，并在归零后停止 Timer。它只释放应用层引用，不改变 PCM、Envelope 或尾音长度。                                   |
+| 可复用运行时       | Prepared Runtime             | 已准备好 Manifest / AudioBuffer 并可继续 Play 的当前 Audio Runtime。EQ3A 清理结束的 Handle 时不会仅因 Transport 停止就 dispose 它。                                                             |
 | 测试样本           | Fixture                      | 固定、可重复的测试输入。AQ0 fixture 是自行生成的 PCM 与 Voice Plan，不包含受限音源。                                                                                                            |
 | 基线               | Baseline                     | 改动前被明确记录的当前行为。基线不代表该行为永远正确，只用于审阅差异。                                                                                                                          |
 | 质量门禁           | Quality Gate                 | 必须达到的客观检查或人工听测条件；未运行必须写成“未运行”，不能记作通过。                                                                                                                        |

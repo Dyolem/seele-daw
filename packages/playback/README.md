@@ -12,9 +12,9 @@ AudioNode。已完成的首个可听切片只输出阶段计划定义的具体�
 > Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
 > Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
 > Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
-> 2026-08-31 的 CC64 批次已实现非循环 Clip 的 Channel-local 状态追赶、按键释放 / 最终 Gate
-> Release 双时间、调度与选择性重协调，正在等待批次审核。长期架构中的名称 `playback-core`
-> 对应当前包。
+> 2026-08-31 的 CC64 批次已实现并提交非循环 Clip 的 Channel-local 状态追赶、按键释放 / 最终
+> Gate Release 双时间、调度与选择性重协调。2026-09-02 的 EQ3B 进一步冻结 Clip Gate、派生
+> Timeline 与未来 WAV 声音尾部不能混用的边界。长期架构中的名称 `playback-core` 对应当前包。
 
 已完成阶段的范围、证据和延期记录见
 [Audible MIDI Playback V1 阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。

@@ -345,7 +345,7 @@ describe('Audible MIDI Compiler', () => {
     })
   })
 
-  it('applies CC64 at the Note Off Tick before release and caps missing Pedal Up at Clip End', () => {
+  it('applies same-Tick CC64 before Note Off and caps its Gate at Clip End, not Timeline End', () => {
     const { records, snapshot } = createAudibleMidiProjectFixture()
     const sameTickDown = createMidiSustainPedalEventRecord({
       id: parseMidiSustainPedalEventId('pedal-same-tick-down'),
@@ -363,9 +363,17 @@ describe('Audible MIDI Compiler', () => {
       }),
     )
 
-    expect(
-      plan.midiNoteSpans.find(({ noteId }) => noteId === records.pianoNotes[1]?.id),
-    ).toMatchObject({ endTick: 1_440, releaseTick: 1_920 })
+    const pedalHeldSpan = plan.midiNoteSpans.find(
+      ({ noteId }) => noteId === records.pianoNotes[1]?.id,
+    )
+    const clipEndTick = parseTick(records.pianoClip.startTick + records.pianoClip.spanTick)
+
+    expect(clipEndTick).toBe(1_920)
+    expect(plan.arrangementEndTick).toBe(clipEndTick)
+    expect(plan.timelineEndTick).toBe(576_000)
+    expect(pedalHeldSpan).toMatchObject({ endTick: 1_440, releaseTick: 1_920 })
+    expect(pedalHeldSpan?.releaseTick).toBe(clipEndTick)
+    expect(pedalHeldSpan?.releaseTick).toBeLessThan(plan.timelineEndTick)
   })
 
   it('fails closed when a forged Snapshot repeats one CC64 Channel and Tick', () => {

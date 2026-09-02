@@ -1,6 +1,6 @@
 # Expression Quality Integration V1 阶段计划
 
-> Status: EQ0–EQ2 committed (`f47bf38`, `3c29bc9`); EQ3A inactive-tail ownership cleanup implemented and reviewed
+> Status: Closed; EQ0–EQ3B reviewed (`f47bf38`, `3c29bc9`, `5ef34a5`, EQ3B closure commit)
 >
 > Date: 2026-09-02
 >
@@ -172,14 +172,27 @@ Runtime 被回收。
 这些政策仍不增加 half-pedal、repedaling 声学模型、共鸣、pedal noise、release sample、Note
 Chase 或 Looped Clip Controller 展开。清理测试证明所有权终结，不等于主观听测已经通过。
 
-### 5.4 后续收口
+### 5.4 EQ3B：Realtime / Offline Render Boundary
 
-EQ3 后续批次仍需：
+EQ3B 冻结三种不能混用的终点：
 
-- 汇总 Audio Runtime 的 fast release PCM 与 Studio Transport / Reconciliation 回归为最终门禁；
-- 冻结实时与未来 WAV Backend 对 Arrangement / Clip 边界及渲染尾部的共同输入输出契约；
-- 记录 developer-local Studio Grand 的 Pause、Pedal Up、同音重触发和最大复音听测矩阵，未运行项
-  继续写为 `not-run`。
+- `arrangementEndTick` 是全部原始 Clip 的中性内容终点；未来完整编排 V1 导出的默认音乐范围为
+  `[0, arrangementEndTick]`；
+- `timelineEndTick` 是 Ruler 与实时 Transport 自然结束使用的派生交互范围，不是 Project Fact，
+  也不是 WAV 文件时长；
+- 音频输出渲染终点至少覆盖音乐范围，并在需要时继续到最后一枚已接纳 Voice 完成 Manifest 正常
+  release 或 one-shot 自然播放；它取音乐范围终点与声音尾部终点中较晚者。
+
+非循环 Clip 仍只关闭 Gate：踏板没有在窗口内抬起时，Final Gate Release 位于 Clip End，但
+release、loop 退出与素材尾部由 Audio Web 继续执行。未来 WAV Backend 必须在默认音乐范围内安排
+同一 Voice Plan，至少覆盖音乐范围并在需要时继续渲染到所有 Voice 终结；不能把 UI 的 150 小节
+范围导出为无意义静音，也不能在 Clip / Arrangement / Timeline End 静默硬切声音尾部。显式
+Pause / Locate / Return 的 `6 ms` fast release 不属于正常离线导出语义。
+
+精确声音终点依赖 Manifest、AudioBuffer 时长、offset、移调与 Runtime 终态，不能下沉成 Project
+Fact 或由 Playback 猜测。EQ3B 因此只冻结共同责任和可测试边界，不为尚不存在的 WAV Backend
+新增 package root API。完整契约、证据与听测矩阵见
+[Expression Quality Integration V1 收口报告](./expression-quality-integration-v1-closure-report.md)。
 
 EQ3 收口并通过审核后，WAV Offline Export 才能依赖这组实时语义。
 
@@ -213,4 +226,18 @@ EQ3A 已审核证据：
 - 根级 `pnpm lint` 通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint；
 - Studio Production Build 与 soundbank dist boundary 通过；
 - EQ3A 不改变 PCM 或 AudioNode 调度，因此没有把 EQ2 Chromium 报告重复运行冒充新的听测证据。
-- EQ3A 已通过审核并随本次提交交付。
+- EQ3A 已通过审核并提交为 `5ef34a5`。
+
+EQ3B 已审核证据：
+
+- Playback Compiler 回归显式固定 `releaseTick = Clip End < timelineEndTick`，证明 CC64 不把 Gate
+  延伸到派生 UI Timeline；
+- schema version 5 Chromium 报告已经同时覆盖 Pedal Up、fast release、复音退场、headroom、
+  one-shot、尾部静音与资源归零；EQ3B 不改变 PCM，不重复运行冒充新听测；
+- Studio Coordinator 既有回归汇总覆盖 Pause / Locate / Return、选择性 CC64 重排、设备替换、
+  自然结束及 EQ3A 非播放态尾音清理；
+- 最终根级 `pnpm check` 已通过 Architecture、Workspace Quality、Lint、全工作区 Type Check、
+  148 个测试文件 / 1,310 项测试、Studio Production Build 与 soundbank dist boundary；
+  developer-local Studio Grand Pause、Pedal Up、同音重触发与最大复音人工听测继续如实记录为
+  `not-run`。
+- EQ3B 已通过审核并由本收口提交交付；Expression Quality Integration V1 至此关闭。

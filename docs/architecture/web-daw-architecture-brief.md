@@ -65,8 +65,9 @@ Project Tempo Control V1 已通过
 Composition Root。该阶段不建立 CC64、Velocity Layer、通用 Graph、AudioWorklet 或 WAV Offline
 Backend。后续 CC64 切片已经建立独立 Project Fact、导入、Playback 最终 Gate Release 与 Piano
 Roll 编辑；当前 [Expression Quality Integration V1](../../packages/audio-web/docs/expression-quality-integration-v1-phase-plan.md)
-正在 WAV Export 前验证 pedal-held 复音优先级、Pedal Up PCM 与确定性收尾，不把这些能力回写成
-V1A 历史事实。
+已在 WAV Export 前验证 pedal-held 复音优先级、Pedal Up PCM 与确定性收尾；EQ3B 已冻结编排
+内容、交互时间线与实际声音尾部的共同边界，不把这些能力回写成 V1A 历史事实，也不预建 Offline
+Backend。
 
 ---
 
@@ -438,6 +439,12 @@ Audio Quality Foundation V1A 延续同一组合边界：Studio 为已准备项�
 Velocity 曲线、Envelope、Web Audio Node 与 Voice Stealing 不反向下沉到 Coordinator、Playback
 或 Project Core。渲染政策的代码级标识不是 Project Fact，也不与 `modelRevision` 或
 `engineGeneration` 混用。
+
+Expression Quality Integration V1 延续该分层：Playback 的 `arrangementEndTick` 描述原始 Clip 内容，
+`timelineEndTick` 只描述 Ruler 与实时 Transport 的派生范围；两者都不能单独决定 WAV 的 PCM
+终点。未来 Offline Backend 必须在音乐范围内执行同一 Voice Plan，至少覆盖该范围，并依据已准备
+Manifest、素材时长和 Runtime 终态保留更晚结束的正常 release / one-shot 尾音。精确尾长不写入
+Project，也不倒推给浏览器无关 Playback。
 
 Batch 7 的 `timelineEndTick` 由 Playback 从 Project Snapshot 派生，并同时约束 Studio Ruler 与
 Transport 自然结束。Studio 以一个帧采样绑定读取 Transport 权威位置；浏览器后台不触发动画帧

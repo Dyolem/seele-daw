@@ -12,7 +12,8 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 > 驱动的 Sample Voice、可重排最终 Gate Release、loop / mutex、generation、选择性 cancel 与资源
 > 统计。2026-08-31 的 CC64 批次已让 Audio Runtime 执行 Playback 编译的踏板最终释放；2026-09-02
 > 的 Expression EQ1 与 EQ2 已提交 pedal-aware Voice Stealing 和真实浏览器 PCM 门禁；EQ3A 已
-> 补齐 Studio 非播放态尾音的确定性所有权清理。SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
+> 补齐 Studio 非播放态尾音的确定性所有权清理，EQ3B 已冻结未来 WAV 复用的渲染边界。
+> SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
 
 当前可听 MIDI 阶段见
 [Audible MIDI Playback V1 阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
@@ -34,7 +35,8 @@ CC64 后、WAV Export 前的复音优先级、PCM 与收尾门禁见
 [Expression Quality Integration V1](./docs/expression-quality-integration-v1-phase-plan.md)；EQ1 已提交为
 `f47bf38`，EQ2 的 schema version 5 Chromium 合成 PCM 报告已提交为 `3c29bc9`；EQ3A 已在
 Studio Composition Root 补齐 Paused / Stopped 尾音 Handle 清理，真实 Studio Grand 人工
-听测仍为 `not-run`。
+听测仍为 `not-run`。EQ3B 的三种终点、实时 / 未来离线共同契约与证据汇总见
+[Expression Quality Integration V1 收口报告](./docs/expression-quality-integration-v1-closure-report.md)。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录

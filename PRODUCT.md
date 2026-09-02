@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-02，Expression Quality EQ1 / EQ2 已提交；EQ3A 非播放态尾音所有权清理已通过审核
+> 最近更新：2026-09-02，Expression Quality EQ1–EQ3B 已通过审核，Expression Quality Integration V1 完成收口
 >
-> 当前阶段：Audio Quality Foundation V1A 与 CC64 基础纵向切片已提交；正在执行 WAV Export 前的 Expression Quality Integration V1
+> 当前阶段：Audio Quality Foundation V1A、CC64 与 Expression Quality Integration V1 已完成；下一阶段正在规划多乐器 Soundbank 接入
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -95,7 +95,7 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                         |
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
-| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音与踏板 PCM 门禁已通过；EQ3A 已补齐 Paused / Stopped 尾音的确定性所有权清理。                                          |
+| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、踏板 PCM、非播放态尾音清理及未来 WAV 声音尾部边界均已通过。                                                         |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
@@ -1089,7 +1089,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-09-02 | `PIANO-ROLL`、`MIDI-CC64`                                  | Studio 接入瞬态 Selection、Marker Preview、单 Command Move / Replace Value / Remove、authority handoff 与按聚焦编辑目标路由的既有 Delete / Escape Action。       | `210f2c9`                                  |
 | 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ1 让复音分配器先退场 release-started、再退场 key-released / pedal-held，最后才选择 key-held Voice；不改变 64 / 128 / 16 预算。                      | `f47bf38`                                  |
 | 2026-09-02 | `AUDIO-QUALITY`、`MIDI-CC64`                               | Expression EQ2 将 CC64 合成 PCM 场景加入 schema version 5 Chromium 门禁；人工听测仍未运行。                                                                      | `3c29bc9`                                  |
-| 2026-09-02 | `AUDIO-QUALITY`、`PLAYBACK`                                | Expression EQ3A 在 Paused / Stopped 尾音结束后确定性清理 Studio 所有权，不改变声音。                                                                             | 本次提交                                   |
+| 2026-09-02 | `AUDIO-QUALITY`、`PLAYBACK`                                | Expression EQ3A 在 Paused / Stopped 尾音结束后确定性清理 Studio 所有权，不改变声音。                                                                             | `5ef34a5`                                  |
+| 2026-09-02 | `AUDIO-QUALITY`、`PLAYBACK`                                | Expression EQ3B 区分编排内容、交互 Timeline 与音频输出渲染终点，冻结未来 WAV 必须覆盖音乐范围并保留更晚结束的正常 release / one-shot 尾部。                      | 本收口提交                                 |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1172,6 +1173,14 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   文件 / 40 项、Studio 全包 61 个测试文件 / 397 项、Type Check、根级 `pnpm lint`、Production
   Build 与 soundbank dist boundary 已通过。该批不改变 PCM，未重复运行 EQ2 Chromium 报告。
 
+- Expression Quality Integration V1 EQ3B 已通过审核并由本收口提交交付。它冻结完整编排 V1 默认音乐范围
+  `[0, arrangementEndTick]`，明确 `timelineEndTick` 只属于 Ruler 与实时 Transport，并要求未来
+  WAV 至少覆盖音乐范围，并在需要时继续到最后一枚已接纳 Voice 完成 Manifest 正常 release 或
+  one-shot 自然播放。该批不新增 Offline API 或声音算法；Playback Compiler 回归已显式固定踏板保持的
+  `releaseTick = Clip End < timelineEndTick`。最终根级 `pnpm check` 已通过 148 个测试文件 /
+  1,310 项测试、全工作区 Type Check、Studio Production Build 与 soundbank dist boundary；Studio
+  Grand 的 Pause、Pedal Up、同音重触发与最大复音人工听测继续记录为 `not-run`。
+
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已
   提交为 `2fb0764`，Studio Lane Add 已提交为 `a1f4e5e`，Editor Event Editing Foundation 已提交为
@@ -1213,17 +1222,19 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   与 soundbank dist boundary；Batch 6 按约定未新增 E2E。
 - Batch 4B.2 已通过完整 `pnpm check`（Architecture、Workspace Type Check、全部测试、
   Studio Production Build 与 soundbank dist boundary），并通过改动范围的 Oxlint / ESLint 与格式检查。
-- Project Core：31 个测试文件，432 项测试。
+- EQ3B 收口于 2026-09-02 通过最新完整 `pnpm check`；本节以下更新为该次可信基线：
+- Project Core：32 个测试文件，465 项测试。
 - midi-file：3 个测试文件，14 项测试。
-- project-midi：3 个测试文件，22 项测试。
+- project-midi：3 个测试文件，25 项测试。
 - platform-browser：3 个测试文件，23 项测试。
-- editor：11 个测试文件，112 项测试。
-- playback：9 个测试文件，102 项测试。
-- audio-web：16 个测试文件，110 项测试。
-- Studio：56 个测试文件，359 项测试。
+- editor：16 个测试文件，140 项测试。
+- playback：9 个测试文件，107 项测试。
+- audio-web：20 个测试文件，137 项测试。
+- Studio：61 个测试文件，397 项测试。
 - type-utils：1 个测试文件，2 项测试。
 
-合计 133 个测试文件、1176 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace Type
-Check、Studio Production Build 与 soundbank dist boundary。
+合计 148 个测试文件、1,310 项测试。完整 `pnpm check` 同时通过 Architecture、Workspace
+Quality、Format、Oxlint、ESLint、全工作区 Type Check、Studio Production Build 与 soundbank
+dist boundary。
 
 后续功能完成时，测试数量可以增长；“全部验证通过”比固定数量更重要，但本节应保留最近一次可信基线。

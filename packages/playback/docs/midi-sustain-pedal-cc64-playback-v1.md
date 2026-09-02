@@ -110,7 +110,9 @@ sustain loop / one-shot 对最终 Gate Release 的执行。
 本批次不把代码级时间测试冒充人工听测。Controller Lane 完成后、WAV Export 开始前，仍需执行
 表达力集成质量门禁，复核 Pedal Up click、release tail、复音峰值、Voice Stealing、停止 / Locate /
 设备替换资源清理，以及实时与离线语义一致性。EQ1 Voice Stealing 与 EQ2 Chromium PCM 已分别提交
-为 `f47bf38`、`3c29bc9`；EQ3 正在收口 Transport、重协调与确定性尾音所有权。
+为 `f47bf38`、`3c29bc9`，EQ3A 尾音所有权清理已提交为 `5ef34a5`；EQ3B 已冻结
+`arrangementEndTick`、`timelineEndTick` 与音频输出渲染终点的区别。
 该门禁由
 [Expression Quality Integration V1](../../audio-web/docs/expression-quality-integration-v1-phase-plan.md)
-独立跟踪。
+独立跟踪，集中收口证据见
+[Expression Quality Integration V1 收口报告](../../audio-web/docs/expression-quality-integration-v1-closure-report.md)。

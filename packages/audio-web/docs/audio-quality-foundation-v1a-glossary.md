@@ -99,6 +99,12 @@
 | 显式播放中断       | Explicit Transport Interrupt | Pause、Locate Preview、Return 或完整 Runtime Reset 等用户或系统操作。当前活动 Voice 使用 6 ms fast release，不等待完整 Zone release。                                                           |
 | 非播放态尾音清理   | Inactive-tail Cleanup        | EQ3A 在 Paused / Stopped 后低频检查 Voice Handle 与 retired Runtime 是否已经结束，并在归零后停止 Timer。它只释放应用层引用，不改变 PCM、Envelope 或尾音长度。                                   |
 | 可复用运行时       | Prepared Runtime             | 已准备好 Manifest / AudioBuffer 并可继续 Play 的当前 Audio Runtime。EQ3A 清理结束的 Handle 时不会仅因 Transport 停止就 dispose 它。                                                             |
+| 编排内容终点       | Arrangement End              | `arrangementEndTick`；全部原始 Clip 的中性内容范围。EQ3B 用它定义未来完整编排 V1 导出的默认音乐范围，但它本身不是实际声音结束时间。                                                             |
+| 交互时间线终点     | Timeline End                 | `timelineEndTick`；Ruler、滚动与实时 Transport 自然结束使用的派生范围。它至少 150 小节并可能有尾部小节，不应直接成为 WAV 文件时长。                                                             |
+| 音乐范围           | Musical Range                | 需要安排项目事件的 Tick 区间。完整编排 V1 默认为 `[0, arrangementEndTick]`；它和 PCM 必须继续保留多久是两个问题。                                                                               |
+| 声音尾部终点       | Voice Tail End               | 最后一枚已接纳 Voice 完成正常 release 或 one-shot 自然播放的时刻；需要 Manifest、素材与 Runtime 信息，不能只从 Project Tick 猜出。                                                              |
+| 音频输出渲染终点   | Audio Render End             | 音乐范围终点与声音尾部终点中较晚者。它既避免静音末段让文件过早结束，也避免 release / one-shot 被 Clip 或 Arrangement End 截断。                                                                 |
+| 尾部截断           | Tail Truncation              | 在 Voice 正常结束前停止写入 PCM。未来 WAV 若遇到安全预算必须显式失败或让用户决策，不能静默截断后仍声称导出成功。                                                                                |
 | 测试样本           | Fixture                      | 固定、可重复的测试输入。AQ0 fixture 是自行生成的 PCM 与 Voice Plan，不包含受限音源。                                                                                                            |
 | 基线               | Baseline                     | 改动前被明确记录的当前行为。基线不代表该行为永远正确，只用于审阅差异。                                                                                                                          |
 | 质量门禁           | Quality Gate                 | 必须达到的客观检查或人工听测条件；未运行必须写成“未运行”，不能记作通过。                                                                                                                        |
@@ -146,3 +152,5 @@
 - **headroom 不等于绝不削波**：固定 trim 只能覆盖已声明的增益和 fixture 范围。
 - **客观指标不等于主观音质**：peak、RMS 和 seam 可以发现错误，但不能决定钢琴是否自然。
 - **开发者本地听测不等于可分发资产**：Studio Grand 仍受既有资产边界约束。
+- **音乐终点不等于声音终点**：Clip 或 Arrangement 结束可以启动 release，但 WAV 仍须保留其后的
+  正常尾音；`timelineEndTick` 也不是可直接使用的导出文件时长。

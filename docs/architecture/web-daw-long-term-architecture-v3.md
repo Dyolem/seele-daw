@@ -87,6 +87,12 @@ Chase。WAV Export 前的 Expression Quality Integration V1 在 Audio Web 增加
 key-held Voice，然后才沿用 AQ3 的增益、起音时间与稳定 Token 排序。该政策不进入 Project File，
 也不让 Audio Web 读取 CC64 Project Fact。
 
+EQ3B 进一步冻结三种终点：`arrangementEndTick` 是中性 Clip 内容范围，`timelineEndTick` 是交互
+视图与实时 Transport 的派生范围，音频输出渲染终点则取音乐范围终点与 Voice 尾部终点中较晚者。
+未来完整编排 V1 导出默认安排 `[0, arrangementEndTick]` 的音乐事件，至少覆盖该范围，并在需要时
+继续到已接纳 Voice 全部终结；不能把至少 150 小节的 UI Timeline 当作 WAV 时长，也不能在 Clip
+或 Arrangement End 静默截断 release / one-shot 尾音。
+
 该切片还由 Playback 从 Snapshot 派生至少 150 小节的 `timelineEndTick`，并由 Studio 将同一
 Transport 视觉位置投影到 Arrangement、Track-time Piano Roll 和 Clip Focus Piano Roll。动画帧
 只触发权威位置采样，不累计 UI elapsed time；各视图的 Scroll / Follow 属于 ViewState，不进入
@@ -1468,7 +1474,8 @@ fallback-supported
 标识。V1 优先 WAV；有损格式作为独立编码 adapter。当前 V1A 的 Chromium
 `OfflineAudioContext` 工具只是直接运行实时 Sample Voice Runtime 的开发质量门禁，不是这里的
 Offline Backend。CC64 完成后还必须先通过表达力集成音质门禁，才能冻结 WAV Export 的实时/
-离线共同语义。
+离线共同语义。该门禁的 EQ3B 已冻结音乐范围、交互 Timeline 与实际声音尾部的边界；
+它没有实现这里描述的 Offline Graph、PCM Encoder、进度、取消或文件交付。
 
 ---
 

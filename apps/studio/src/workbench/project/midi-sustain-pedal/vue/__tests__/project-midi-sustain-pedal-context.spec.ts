@@ -20,8 +20,17 @@ describe('ProjectMidiSustainPedalVueContext', () => {
   it('resolves the provided Coordinator and fails clearly without composition', () => {
     const placeInClip = vi.fn<ProjectMidiSustainPedalCoordinator['placeInClip']>()
     const placeOnTrack = vi.fn<ProjectMidiSustainPedalCoordinator['placeOnTrack']>()
+    const moveEvents = vi.fn<ProjectMidiSustainPedalCoordinator['moveEvents']>()
+    const removeEvents = vi.fn<ProjectMidiSustainPedalCoordinator['removeEvents']>()
+    const replaceEventValue = vi.fn<ProjectMidiSustainPedalCoordinator['replaceEventValue']>()
     const context: ProjectMidiSustainPedalVueContext = Object.freeze({
-      projectMidiSustainPedal: Object.freeze({ placeInClip, placeOnTrack }),
+      projectMidiSustainPedal: Object.freeze({
+        moveEvents,
+        placeInClip,
+        placeOnTrack,
+        removeEvents,
+        replaceEventValue,
+      }),
     })
     const providedApp = createApp({ render: () => null })
     const missingApp = createApp({ render: () => null })

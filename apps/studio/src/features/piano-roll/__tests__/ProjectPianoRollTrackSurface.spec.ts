@@ -23,6 +23,16 @@ import {
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
 import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
+import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
+import {
+  createStudioKeyboardShortcutCoordinator,
+  type StudioKeyboardShortcutCoordinator,
+} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
+import {
+  STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
+  type StudioKeyboardShortcutVueContext,
+} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import {
   PROJECT_MIDI_NOTE_CONTEXT_KEY,
@@ -53,6 +63,7 @@ const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
   ),
   setPointerCapture: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'setPointerCapture'),
 })
+const keyboardCoordinators: StudioKeyboardShortcutCoordinator[] = []
 
 function createFakeCanvasContext(): CanvasRenderingContext2D {
   return {
@@ -177,6 +188,22 @@ function installSurfaceEnvironment(): void {
   installPointerCapture()
 }
 
+function createKeyboardFixture(): {
+  readonly bindingRegistry: TestStudioKeyboardBindingRegistry
+  readonly context: StudioKeyboardShortcutVueContext
+} {
+  const bindingRegistry = new TestStudioKeyboardBindingRegistry()
+  const keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
+    bindingRegistry,
+    keymap: STUDIO_DEFAULT_KEYMAP,
+  })
+  keyboardCoordinators.push(keyboardShortcuts)
+  return Object.freeze({
+    bindingRegistry,
+    context: Object.freeze({ keyboardShortcuts }),
+  })
+}
+
 function createSurfaceFixture() {
   installSurfaceEnvironment()
   const projectId = parseProjectId('track-surface-project')
@@ -262,6 +289,7 @@ function createSurfaceFixture() {
     visualPosition: playbackVisualPosition,
   })
   const pinia = createPinia()
+  const keyboard = createKeyboardFixture()
   const selection = useProjectWorkbenchSelectionStore(pinia)
   selection.activateProject(projectId)
   selection.selectClip(track.trackId, clip.clipId)
@@ -279,12 +307,14 @@ function createSurfaceFixture() {
         [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
         [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: midiSustainPedalContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
+        [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
       },
     },
   })
 
   return {
     clip,
+    keyboard,
     playbackState,
     playbackVisualPosition,
     presentation,
@@ -295,6 +325,7 @@ function createSurfaceFixture() {
 }
 
 afterEach(() => {
+  for (const keyboardShortcuts of keyboardCoordinators.splice(0)) keyboardShortcuts.dispose()
   vi.restoreAllMocks()
   restorePrototypeProperty('hasPointerCapture')
   restorePrototypeProperty('releasePointerCapture')
@@ -457,6 +488,59 @@ describe('ProjectPianoRollTrackSurface', () => {
         .find('[data-piano-roll-sustain-pedal-event-id="track-surface-sustain-pedal-event"]')
         .exists(),
     ).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('selects and removes an Active Clip CC64 event through the Track Scope Action', async () => {
+    const { clip, keyboard, presentation, session, wrapper } = createSurfaceFixture()
+    await nextTick()
+    const lane = wrapper.get('.piano-roll-sustain-pedal-lane')
+
+    dispatchPointer(lane.element, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(lane.element, 'pointerup', { clientX: 10, clientY: 125 })
+    const refreshed = createProjectPianoRollTrackPresentation(
+      session.getSnapshot(),
+      presentation.trackId,
+      clip.clipId,
+    )
+    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected a refreshed Track Sustain Pedal presentation')
+    }
+    await wrapper.setProps({ presentation: refreshed })
+    await wrapper.get('button[aria-label="Cursor tool"]').trigger('click')
+    const marker = wrapper.get(
+      '[data-piano-roll-sustain-pedal-event-id="track-surface-sustain-pedal-event"]',
+    )
+
+    dispatchPointer(marker.element, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(marker.element, 'pointerup', { clientX: 10, clientY: 125 })
+    await nextTick()
+    expect(marker.classes()).toContain('piano-roll-sustain-pedal-lane__event--selected')
+
+    const revisionBeforeEscape = session.modelRevision
+    const escapeEvent = keyboard.bindingRegistry.dispatch('Escape')
+    await nextTick()
+    expect(escapeEvent.defaultPrevented).toBe(true)
+    expect(session.modelRevision).toBe(revisionBeforeEscape)
+    expect(marker.classes()).not.toContain('piano-roll-sustain-pedal-lane__event--selected')
+
+    dispatchPointer(marker.element, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(marker.element, 'pointerup', { clientX: 10, clientY: 125 })
+    await nextTick()
+
+    const revisionBeforeRemove = session.modelRevision
+    const removeEvent = keyboard.bindingRegistry.dispatch('Backspace')
+    expect(removeEvent.defaultPrevented).toBe(true)
+    expect(session.modelRevision).toBe(revisionBeforeRemove + 1)
+    expect(
+      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toEqual([])
+
+    session.undo()
+    expect(
+      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toHaveLength(1)
 
     wrapper.unmount()
   })

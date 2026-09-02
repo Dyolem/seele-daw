@@ -1,6 +1,6 @@
 # Piano Roll CC64 Event Editing Foundation
 
-> Status: Implemented in `@seele-daw/editor`; Studio integration pending
+> Status: Implemented in `@seele-daw/editor`; integrated in Studio working tree pending review
 >
 > Date: 2026-09-01
 
@@ -23,7 +23,7 @@ Snapshot Lane projection
   -> captured Pointer + frozen facts
   -> dominant-axis Preview
   -> one Move or Replace Value Intent
-  -> Studio Command boundary（下一批次）
+  -> Studio Command boundary（已接入，等待审核）
 ```
 
 ## 可编辑作用域
@@ -117,10 +117,24 @@ committing-* -> idle / awaiting-authority -> idle
   完成的 Project Commit；
 - Resolver、坐标或观察者失败均隔离并失败关闭。
 
+## Studio 集成
+
+Studio 纵向切片把本契约映射为以下可见行为，同时保持 Editor 不执行 Project Command：
+
+- Lane 本地保存稳定 Event ID Selection，并在 Channel、Active Clip 或 Project 身份变化时清空，
+  在 revision 更新时按最新 Editable Scope 校准；
+- Marker 渲染 selected 与最终 transform Preview；Step Segment 在手势期间仍显示权威 Snapshot，
+  不伪造尚未由 Read Model 重新推导的控制状态；
+- Move、Replace Value 与 Remove 分别映射到一个既有 Project Core Command；无变化 Transform
+  不增加 History；
+- Commit 后若 Lane Snapshot 尚未到达目标 revision，最终 Marker Preview 保留到 authority handoff
+  完成；
+- Clip Focus 由父 Surface 在 Note 与 CC64 两个编辑目标间路由既有 Delete / Escape Action；Track
+  Scope 只对显式 Active Clip 的 CC64 Selection 启用同一 Action ID 和默认 Binding。
+
 ## 明确延期
 
-- Studio Marker 选中视觉、Preview Renderer、Command Coordinator 扩展与 Toast；
-- `Delete` / `Backspace` Action、焦点 Scope 与完整 Undo / Redo UI 回归；
+- Step Segment 的手势期派生 Preview 与更丰富的 Controller Curve Renderer；
 - Value 精确数值输入与用户确认事务；
 - 多 Event 原子 Value Transform；
 - looped Clip 的实例 / Source 编辑语义；

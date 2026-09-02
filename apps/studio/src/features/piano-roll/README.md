@@ -51,6 +51,12 @@
 - Track Scope 显示全部 Clip 的 CC64 投影并弱化非 Active Clip；Pencil 只允许写入明确选择的
   非循环 Active Clip，Pointer 必须落在其闭合时间窗口内。V1 不为 CC64 自动新建或扩展 Clip，
   无 Active Clip、越界、looped Clip 或 stale revision 都保持事实不变并显示 Toast；
+- Cursor Click 选择 Active Clip 当前 Channel 的 CC64 Event，修饰键 Click 切换、空白 Click 清空；
+  横向拖动以一次 Command 移动完整 Selection，纵向拖动以一次 Command 替换锚点原始 Value；
+- Marker Preview 在 Pointer Move 期间不写 Project，并在提交后的 Lane Snapshot 到达 commit
+  revision 前保留；权威 Step Segment 只在 Snapshot 更新后重投影；
+- 聚焦 Lane 时复用 Piano Roll 的 `Delete` / `Backspace` 与 `Escape` Action；Clip Focus 按最近
+  聚焦目标路由 Note 或 CC64 Selection，Track Scope 只编辑明确 Active Clip；
 - Arrangement 与 Piano Roll 不维护第二份 Clip：原子命令发布的新建 / 扩展事实会由同一
   Snapshot 投影同时刷新两处。
 
@@ -60,8 +66,8 @@ Focus 实现。当前 Track Cursor 负责显式选择 Active Clip，完整 Note 
 Viewport 没有横向滚动，因此 Clip Focus 不建立多余 Follow。Scope 与 Follow 都不是 Project
 Fact，不得进入 ProjectSession、History、dirty 或 Checkpoint。
 
-当前 Surface 已形成 Note Add、Cursor Move、Cursor / Pencil 单 Note Resize、多选 Delete 与
-CC64 Add 写入闭环，但仍不能编辑 Velocity，也不能选择、移动、替换 Value 或删除 CC64 Event。
+当前 Surface 已形成 Note Add、Cursor Move、Cursor / Pencil 单 Note Resize、多选 Delete，以及
+CC64 Add / Selection / Move / Replace Value / Remove 写入闭环，但仍不能编辑 Note Velocity。
 默认 DOM Note Renderer 提供互不重叠的左右 Edge 热区；Canvas Note Adapter 可以显示同一
 Resize Preview，但尚无 Canvas Hit 实现。DOM Event 必须继续先归一化为 Renderer-neutral Hit，
 不直接修改 Project Model，也不把 ProjectSession 放入 Pinia。

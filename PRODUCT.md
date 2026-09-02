@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-01，CC64 Event Editing Foundation 已在 Editor 内实现并等待审核
+> 最近更新：2026-09-02，Studio 已接入 CC64 Event Selection / Move / Replace Value / Remove 并等待审核
 >
-> 当前阶段：Audio Quality Foundation V1A 已收口；CC64 Project Fact、导入 / Playback、Editor Lane Foundation 与 Studio Lane Add 已提交，Event Editing Foundation 等待审核
+> 当前阶段：Audio Quality Foundation V1A 已收口；CC64 Project Fact、导入 / Playback、Lane Add 与 Editor Event Editing Foundation 已提交，Studio Event Editing 纵向切片等待审核
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -41,16 +41,18 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 5. 在 Piano Roll 聚焦时使用 `Delete` / `Backspace` 原子删除完整 Note Selection。
 6. 在 Piano Roll 选择 CC64 MIDI Channel，并在 Clip Focus 或明确 Active Clip 的 Track Scope
    Sustain Pedal Lane 用 Pencil 写入原始 `0..127` 控制值。
-7. 通过 Undo / Redo 撤销或恢复 Track、Instrument 选择、MIDI Clip、MIDI Note 与 CC64
+7. 用 Cursor 选择 CC64 Event；横向拖动所选 Event、纵向拖动锚点 Value，或用
+   `Delete` / `Backspace` 删除所选 Event。
+8. 通过 Undo / Redo 撤销或恢复 Track、Instrument 选择、MIDI Clip、MIDI Note 与 CC64
    Event 的已接入编辑操作。
-8. 在 Vite 本地开发环境点击 Play 或按 `Space`，加载当前计划所需的 Studio Grand 采样并听见
+9. 在 Vite 本地开发环境点击 Play 或按 `Space`，加载当前计划所需的 Studio Grand 采样并听见
    Note；可 Pause、继续、从 Arrangement Ruler 手动定位，并返回最后一次手动起始位置。
-9. 在 Transport 查看最多两位小数的 BPM；单 Tempo 项目可直接输入新 BPM，多 Tempo 项目的
-   Transport 主控显示 Playhead 所在段的当前值并保持只读；在 Arrangement 的 Tempo Track
-   新增、选择、移动、调整或删除独立 Tempo Event。
-10. 显式保存项目。
-11. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
-12. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
+10. 在 Transport 查看最多两位小数的 BPM；单 Tempo 项目可直接输入新 BPM，多 Tempo 项目的
+    Transport 主控显示 Playhead 所在段的当前值并保持只读；在 Arrangement 的 Tempo Track
+    新增、选择、移动、调整或删除独立 Tempo Event。
+11. 显式保存项目。
+12. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
+13. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
 当前可听闭环使用 `apps/studio/public/soundbanks` 中开发者本机的 Studio Grand 验证资产；Vite
 production build 仍禁止复制整棵 public，因此这个资产映射不是公开构建的可分发内置内容。没有
@@ -72,7 +74,7 @@ Studio 会明确失败，不静默替换声音。
 | `PROJECT-LIFECYCLE`    | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                                                                         |
 | `PROJECT-NAVIGATION`   | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                                                                                |
 | `WORKBENCH-SHELL`      | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                                                                          |
-| `PROJECT-HISTORY`      | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、Instrument 选择、空 MIDI Clip、MIDI Note 编辑与 CC64 Event Add。                                                                             |
+| `PROJECT-HISTORY`      | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、Instrument 选择、空 MIDI Clip、MIDI Note 编辑与 CC64 Event Add / Move / Replace Value / Remove。                                             |
 | `TRACK-CREATE`         | 创建 Instrument Track     | **用户可用** | 新 Track 默认持久化选择内置 Studio Grand。                                                                                                                              |
 | `INSTRUMENT-SELECTION` | 选择 Track Instrument     | **用户可用** | 显示 Studio Grand / Empty / Missing；旧空 Slot 可显式选择 Studio Grand。                                                                                                |
 | `TRACK-SELECTION`      | Track 选择                | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。                                                                                                                |
@@ -81,13 +83,13 @@ Studio 会明确失败，不静默替换声音。
 | `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                                                                         |
 | `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                                                            |
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                         |
-| `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane Pencil Add 已接入；Event Selection / Move / Value Replace / Remove 与 half-pedal 发声尚未接入。                                |
+| `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
 | `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、确定性 Voice Stealing 与溢出诊断已通过自动和 Chromium PCM 门禁。                                                    |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
-| `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、Note 编辑、CC64 Lane Pencil Add、Snap 与 Undo / Redo 已接入。                                                                 |
+| `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、Note 编辑、CC64 Event 编辑、Snap 与 Undo / Redo 已接入。                                                                      |
 
 ## 3. 项目入口与生命周期
 
@@ -831,7 +833,7 @@ Note 被删除或移出当前 Clip Source 时间窗口时由权威 Query 清理�
 
 ### 8.3 `MIDI-CC64` Sustain Pedal Controller Lane
 
-**局部可用；导入、二值播放与 Pencil Add 已有用户界面**
+**局部可用；导入、二值播放与 Event 编辑已有用户界面**
 
 Project Core 把每个 CC64 Event 保存为 MidiSource-owned 独立事实，保留 Tick、MIDI Channel 与
 原始 `0..127` Value，不把踏板状态烘焙进 Note Duration。Piano Roll 的固定 CC64 Lane 使用
@@ -859,9 +861,16 @@ Project 并显示 Toast。
   V1 不为 CC64 自动新建或延长 Clip，也不在重叠或空白区域猜测 Source；
 - 无 Active Clip、Pointer 越界、looped Clip、stale revision 或事实图缺失时拒绝整个意图。
 
-当前 Event Marker 只用于可见语义 Hit，尚不提供 Selection、水平移动、Value Replace、Remove、
-批量编辑或 Keyboard Action。因此已交付的是 CC64 Add 纵向切片，不是通用 Controller /
-Automation 平台，也不代表 Audio Runtime 已支持连续 half-pedal 响应。
+Cursor Click 只选择 Active Clip 中当前 Channel 的 Event，修饰键 Click 切换 Selection，空白 Click
+清空。超过共享 Drag Threshold 后按主导轴锁定：横向拖动对完整 Selection 产生一次批量 Move，
+纵向拖动只对锚点产生一次 Replace Value；Preview 不写 Project，成功提交后保留到 Lane Snapshot
+到达 commit revision。聚焦 CC64 Lane 时，`Delete` / `Backspace` 复用既有 Piano Roll Action，
+一次删除完整 Selection；Track Scope 的非 Active Clip Marker 与 looped Clip 仍只读。
+
+每次 Move、Replace Value 或 Remove 最多执行一个 Project Command / History 步骤；Tick / Channel
+碰撞、stale revision 或事实图缺失时拒绝整个编辑并保留合法 Project。当前不提供框选、精确数值
+输入、原子批量 Value Transform 或 looped Clip 实例编辑。它仍不是通用 Controller / Automation
+平台，也不代表 Audio Runtime 已支持连续 half-pedal 响应。
 
 ### 8.4 Project File 与 Checkpoint
 
@@ -884,8 +893,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | `@seele-daw/midi-file`        | Parser-neutral SMF Document、可替换 Decoder / Encoder Port、封装 `@tonejs/midi` 的 Type 0 / 1 PPQ Decoder 与确定性 Type 1 Encoder。                                                                                                                                                                                                                                                         |
 | `@seele-daw/project-midi`     | Standard MIDI File Document 与 Project Model 的 Note / CC64 导入映射、PPQ 换算、碰撞诊断、完整 Session Draft 与当前项目 Track Command Draft；不拥有 Browser、导出或项目生命周期。                                                                                                                                                                                                           |
 | `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store、Recent Project Catalog 与本地 File / Blob 字节读取 Adapter。                                                                                                                                                                                                                                                                                                 |
-| `apps/studio`                 | 项目入口、两种 Standard MIDI File 导入、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback、Arrangement Locate / Follow、默认 Studio Grand、Track / Clip 双模式 Piano Roll、Note 编辑，以及显式 Channel / Active Clip 的 CC64 Lane Pencil Add；CC64 Event Selection / Move / Replace / Remove 与 Track Cursor 完整 Note 编辑尚未接入。                        |
-| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note 投影、Timeline Grid Snap、Note Interaction、Canvas Grid、DOM / Canvas Note Adapter，以及 CC64 Clip / Track Lane 投影、Value Viewport、Semantic Hit / Pointer 与 Pencil Placement。                                                                                                                              |
+| `apps/studio`                 | 项目入口、两种 Standard MIDI File 导入、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback、Arrangement Locate / Follow、默认 Studio Grand、Track / Clip 双模式 Piano Roll、Note 编辑，以及显式 Channel / Active Clip 的 CC64 Lane Add / Selection / Move / Replace Value / Remove；Track Cursor 完整 Note 编辑尚未接入。                                     |
+| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note 投影、Timeline Grid Snap、Note Interaction、Canvas Grid、DOM / Canvas Note Adapter，以及 CC64 Clip / Track Lane 投影、Value Viewport、Semantic Hit / Pointer、Selection、主导轴 Transform 与 authority handoff。                                                                                                |
 | `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、Studio Grand 默认 Definition / factory / 严格 decoder、TempoMap、派生 Timeline 范围、具体 MIDI Plan Compiler、CC64 Channel 状态追赶与最终 Gate Release、Tick Locate / Return Anchor Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；公开 Studio / Audio Web 真实消费者所需的最小规划 API，不提供音频资源。 |
 | `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与应用生命周期解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Velocity/输出校准、CC64 最终 Gate Release、loop、mutex、选择性 cancel、generation、有界复音、确定性 Voice Stealing、溢出诊断与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                   |
 | `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                                                                                            |
@@ -916,8 +925,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 - 完整 Instrument Browser、Preset Library、第三方 Device UI 与任意 Instrument 替换；当前只有旧空
   Slot 的 `Use Studio Grand`。
 - 通用 Web Audio Graph、AudioWorklet 与电平；当前只有 Sample Voice 所需的最小 master output。
-- Velocity Layer、CC64 Event Selection / Move / Value Replace / Remove、half-pedal 发声、共鸣、
-  release sample、pedal noise 与物理钢琴建模；当前 Velocity 只改变单层 Sample 振幅，CC64 Lane
+- Velocity Layer、CC64 half-pedal 发声、共鸣、release sample、pedal noise 与物理钢琴建模；
+  当前 Velocity 只改变单层 Sample 振幅，CC64 Lane
   保留原始 Value，但 Audio Runtime 仍以 `64` 阈值作二值 Gate Release，Sustain Loop 也不等于
   Sustain Pedal。
 - 可听 Scrub、Note Chase、Locator / Marker、Loop、Record、实时 Meter、监听，以及 Gain / Pan /
@@ -1066,7 +1075,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-08-31 | `MIDI-IMPORT`、`PLAYBACK`、`MIDI-CC64`                     | 接通 CC64 导入、Channel 状态追赶、按键释放 / 最终 Gate Release、Manifest-aware Audio Runtime 与播放中选择性重协调；高级钢琴模型仍延期。                          | `3ff2853`                                  |
 | 2026-08-31 | `EDITOR`、`MIDI-CC64`                                      | 建立 CC64 Clip / Track Lane Read Model、Value Viewport、Semantic Hit / Pointer 与只解析完成空白 Click 的 Pencil Placement Foundation。                           | `2fb0764`                                  |
 | 2026-08-31 | `PIANO-ROLL`、`MIDI-CC64`                                  | 接入 Track / Clip Focus 可见 Lane、Channel Preference、显式 Active Clip 写入、单 Command Add、Terminal Marker 与可见失败；高级 Event 编辑仍延期。                | `a1f4e5e`                                  |
-| 2026-09-01 | `EDITOR`、`MIDI-CC64`                                      | 建立显式 Active Clip 编辑作用域、Event Selection / Remove Target、主导轴批量 Move / 单 Event Replace Value、Preview 与 authority handoff；Studio 尚未接入。      | 待审核工作树                               |
+| 2026-09-01 | `EDITOR`、`MIDI-CC64`                                      | 建立显式 Active Clip 编辑作用域、Event Selection / Remove Target、主导轴批量 Move / 单 Event Replace Value、Preview 与 authority handoff；Studio 尚未接入。      | `0ed4523`                                  |
+| 2026-09-02 | `PIANO-ROLL`、`MIDI-CC64`                                  | Studio 接入瞬态 Selection、Marker Preview、单 Command Move / Replace Value / Remove、authority handoff 与按聚焦编辑目标路由的既有 Delete / Escape Action。       | 待审核工作树                               |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1128,12 +1138,12 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
 
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已
-  提交为 `2fb0764`，Studio Lane Add 已提交为 `a1f4e5e`。当前 Event Editing Foundation 仍在
-  工作树等待审核；它只建立 Editor Intent 与生命周期，不把 Selection / Move / Replace Value /
-  Remove 描述成 Studio 用户可用，也不宣称 half-pedal、共鸣或 release sample 已交付。Studio
-  Lane Add 提交前已通过仓库统一 `pnpm lint`、Studio Type Check、针对性测试、Production Build
-  与 soundbank dist boundary。当前 Event Editing Foundation 已通过根级 `pnpm lint`、Editor
-  Type Check 与 16 个测试文件 / 140 项测试；未执行浏览器人工布局或听测。
+  提交为 `2fb0764`，Studio Lane Add 已提交为 `a1f4e5e`，Editor Event Editing Foundation 已提交为
+  `0ed4523`。当前 Studio Event Editing 纵向切片仍在工作树等待审核；它接入 Selection、Move、
+  Replace Value、Remove、Preview 与既有 Piano Roll Action，但不宣称 half-pedal、共鸣或 release
+  sample 已交付。Editor Foundation 已通过根级 `pnpm lint`、Editor Type Check 与 16 个测试文件 /
+  140 项测试；Studio 本批已通过根级 `pnpm lint`、Studio Type Check、60 个测试文件 / 395 项测试、
+  Production Build 与 soundbank dist boundary。未执行浏览器人工布局或听测。
 
 - Standard MIDI File Import / Export V1 MI5 已于 2026-08-20 通过完整 `pnpm check`，包括
   Architecture、Workspace Type Check、全部测试、Studio Production Build 与 soundbank dist

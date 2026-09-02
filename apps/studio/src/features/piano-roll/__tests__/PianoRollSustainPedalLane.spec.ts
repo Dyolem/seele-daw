@@ -1,4 +1,8 @@
-import { createPianoRollGrid, type PianoRollSustainPedalClipLaneReadModel } from '@seele-daw/editor'
+import {
+  createPianoRollGrid,
+  type PianoRollClipContext,
+  type PianoRollSustainPedalClipLaneReadModel,
+} from '@seele-daw/editor'
 import {
   ZERO_TICK,
   createMidiSustainPedalEventRecord,
@@ -17,6 +21,8 @@ import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import PianoRollSustainPedalLane from '@/features/piano-roll/PianoRollSustainPedalLane.vue'
+import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 
 const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
   hasPointerCapture: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hasPointerCapture'),
@@ -115,6 +121,30 @@ function createReadModel(): PianoRollSustainPedalClipLaneReadModel {
   })
 }
 
+function createClipContext(): PianoRollClipContext {
+  return Object.freeze({
+    clipId: parseClipId('sustain-pedal-lane-clip'),
+    clipSpanTick: parseTick(960),
+    sourceEndTick: parseTick(960),
+    sourceId: parseMidiSourceId('sustain-pedal-lane-source'),
+    sourceLengthTick: parseTick(960),
+    sourceStartTick: ZERO_TICK,
+  })
+}
+
+function createUnavailableCoordinator(): ProjectMidiSustainPedalCoordinator {
+  const unavailable = (): never => {
+    throw new Error('Unexpected Sustain Pedal Project command in presentation-only test')
+  }
+  return Object.freeze({
+    moveEvents: unavailable,
+    placeInClip: unavailable,
+    placeOnTrack: unavailable,
+    removeEvents: unavailable,
+    replaceEventValue: unavailable,
+  })
+}
+
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(960)
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(128)
@@ -132,6 +162,7 @@ describe('PianoRollSustainPedalLane', () => {
   it('renders raw CC64 state and resolves one blank Pencil click through Snap', async () => {
     const wrapper = mount(PianoRollSustainPedalLane, {
       props: {
+        clipContext: createClipContext(),
         grid: createPianoRollGrid({
           barSpanTick: parsePositiveTick(960),
           beatSpanTick: parsePositiveTick(240),
@@ -144,6 +175,13 @@ describe('PianoRollSustainPedalLane', () => {
         snapEnabled: true,
         visibleSpanTick: parsePositiveTick(960),
         visibleStartTick: ZERO_TICK,
+      },
+      global: {
+        provide: {
+          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiSustainPedal: createUnavailableCoordinator(),
+          }),
+        },
       },
     })
     await nextTick()
@@ -176,6 +214,7 @@ describe('PianoRollSustainPedalLane', () => {
   it('does not turn an existing event marker into a second placement', async () => {
     const wrapper = mount(PianoRollSustainPedalLane, {
       props: {
+        clipContext: createClipContext(),
         grid: createPianoRollGrid({
           barSpanTick: parsePositiveTick(960),
           beatSpanTick: parsePositiveTick(240),
@@ -188,6 +227,13 @@ describe('PianoRollSustainPedalLane', () => {
         snapEnabled: true,
         visibleSpanTick: parsePositiveTick(960),
         visibleStartTick: ZERO_TICK,
+      },
+      global: {
+        provide: {
+          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiSustainPedal: createUnavailableCoordinator(),
+          }),
+        },
       },
     })
     await nextTick()

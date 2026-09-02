@@ -11,6 +11,7 @@ import {
   parseProjectId,
   parseTempoEventId,
   parseTick,
+  parseTickDelta,
   parseTimeSignatureEventId,
   type ClipId,
   type ProjectSession,
@@ -182,6 +183,118 @@ describe('ProjectMidiSustainPedalCoordinator', () => {
     })
 
     expect(sustainPedalEvents(fixture.session)[0]).toMatchObject({ tick: 720, value: 127 })
+  })
+
+  it('moves a selection, replaces one value and removes a selection as atomic History edits', () => {
+    const fixture = createFixture('event-edit')
+    const first = fixture.coordinator.placeInClip({
+      baseRevision: fixture.session.modelRevision,
+      channel: parseMidiChannel(0),
+      clipId: fixture.clipId,
+      clipTick: parseTick(120),
+      value: parseMidiControlValue(0),
+    })
+    const second = fixture.coordinator.placeInClip({
+      baseRevision: fixture.session.modelRevision,
+      channel: parseMidiChannel(0),
+      clipId: fixture.clipId,
+      clipTick: parseTick(360),
+      value: parseMidiControlValue(127),
+    })
+
+    const revisionBeforeMove = fixture.session.modelRevision
+    const moved = fixture.coordinator.moveEvents({
+      baseRevision: revisionBeforeMove,
+      clipId: fixture.clipId,
+      deltaTick: parseTickDelta(120),
+      eventIds: [first.eventId, second.eventId],
+    })
+    expect(moved?.commit.origin).toEqual({
+      commandType: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE,
+      kind: 'command',
+    })
+    expect(moved?.commit.modelRevision).toBe(revisionBeforeMove + 1)
+    expect(sustainPedalEvents(fixture.session)).toEqual([
+      { channel: 0, id: first.eventId, tick: 720, value: 0 },
+      { channel: 0, id: second.eventId, tick: 960, value: 127 },
+    ])
+    fixture.session.undo()
+    expect(sustainPedalEvents(fixture.session).map(({ tick }) => tick)).toEqual([600, 840])
+    fixture.session.redo()
+
+    const replaced = fixture.coordinator.replaceEventValue({
+      baseRevision: fixture.session.modelRevision,
+      clipId: fixture.clipId,
+      eventId: first.eventId,
+      value: parseMidiControlValue(96),
+    })
+    expect(replaced?.commit.origin).toEqual({
+      commandType: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE,
+      kind: 'command',
+    })
+    const revisionAfterReplace = fixture.session.modelRevision
+    expect(
+      fixture.coordinator.replaceEventValue({
+        baseRevision: revisionAfterReplace,
+        clipId: fixture.clipId,
+        eventId: first.eventId,
+        value: parseMidiControlValue(96),
+      }),
+    ).toBeNull()
+    expect(fixture.session.modelRevision).toBe(revisionAfterReplace)
+
+    const removed = fixture.coordinator.removeEvents({
+      baseRevision: fixture.session.modelRevision,
+      clipId: fixture.clipId,
+      eventIds: [first.eventId, second.eventId],
+    })
+    expect(removed.commit.origin).toEqual({
+      commandType: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE,
+      kind: 'command',
+    })
+    expect(sustainPedalEvents(fixture.session)).toEqual([])
+    fixture.session.undo()
+    expect(sustainPedalEvents(fixture.session)).toHaveLength(2)
+  })
+
+  it('skips zero-distance moves without changing revision and rejects stale event edits', () => {
+    const fixture = createFixture('event-edit-guard')
+    const event = fixture.coordinator.placeInClip({
+      baseRevision: fixture.session.modelRevision,
+      channel: parseMidiChannel(0),
+      clipId: fixture.clipId,
+      clipTick: parseTick(120),
+      value: parseMidiControlValue(0),
+    })
+    const revision = fixture.session.modelRevision
+
+    expect(
+      fixture.coordinator.moveEvents({
+        baseRevision: revision,
+        clipId: fixture.clipId,
+        deltaTick: parseTickDelta(0),
+        eventIds: [event.eventId],
+      }),
+    ).toBeNull()
+    expect(fixture.session.modelRevision).toBe(revision)
+
+    fixture.coordinator.replaceEventValue({
+      baseRevision: revision,
+      clipId: fixture.clipId,
+      eventId: event.eventId,
+      value: parseMidiControlValue(1),
+    })
+    expect(() =>
+      fixture.coordinator.removeEvents({
+        baseRevision: revision,
+        clipId: fixture.clipId,
+        eventIds: [event.eventId],
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectMidiSustainPedalError>>({
+        code: 'event-edit-stale',
+      }),
+    )
   })
 
   it('reports missing Active Clip, outside placement, stale authority and looped targets', () => {

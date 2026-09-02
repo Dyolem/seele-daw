@@ -1,16 +1,25 @@
 <script setup lang="ts">
 import {
+  PIANO_ROLL_INTERACTION_TOOL,
+  PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT,
+  PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS,
   PIANO_ROLL_TRACK_CLIP_STATUS,
   PIANO_ROLL_POINTER_INPUT_PHASE,
+  createPianoRollSustainPedalInteractionSession,
   createPianoRollSemanticPointerInputAdapter,
   createPianoRollValueLaneViewport,
   pianoRollMidiControlValueToValueLaneCssPixel,
   pianoRollValueLaneTimelineTickToCssPixel,
+  reconcilePianoRollSustainPedalSelection,
   resolvePianoRollDomSustainPedalEventHit,
-  resolvePianoRollSustainPedalPencilPlacement,
+  resolvePianoRollSustainPedalEditingScope,
+  resolvePianoRollSustainPedalRemoval,
+  type PianoRollClipContext,
   type PianoRollGrid,
   type PianoRollPointerInputAdapter,
   type PianoRollSustainPedalClipLaneReadModel,
+  type PianoRollSustainPedalEditingScope,
+  type PianoRollSustainPedalInteractionState,
   type PianoRollSustainPedalLaneEventProjection,
   type PianoRollSustainPedalLaneStepSegment,
   type PianoRollTrackSustainPedalLaneReadModel,
@@ -18,11 +27,13 @@ import {
 } from '@seele-daw/editor'
 import {
   addTicks,
+  isMidiSustainPedalDown,
   parseMidiControlValue,
   parseTick,
   type ClipId,
   type MidiChannel,
   type MidiControlValue,
+  type MidiSustainPedalEventId,
   type ModelRevision,
   type Tick,
 } from '@seele-daw/project-core'
@@ -36,7 +47,11 @@ import {
   type StyleValue,
 } from 'vue'
 
+import { createProjectPianoRollSustainPedalIntentHandler } from '@/features/piano-roll/project-piano-roll-sustain-pedal-intent-handler'
+import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
+
 interface PianoRollSustainPedalLaneProps {
+  readonly clipContext: PianoRollClipContext | null
   readonly grid: PianoRollGrid
   readonly label: string
   readonly pencilEnabled: boolean
@@ -72,17 +87,18 @@ interface RenderedLaneEvent {
   readonly event: PianoRollSustainPedalLaneEventProjection['event']
   readonly key: string
   readonly pedalDown: boolean
+  readonly preview: boolean
+  readonly selected: boolean
   readonly style: StyleValue
   readonly timelineTick: Tick
+  readonly value: MidiControlValue
 }
 
-interface ActiveLanePlacementConfiguration {
+interface ActiveLaneInteractionConfiguration {
   readonly activeClipId: ClipId | null
   readonly channel: MidiChannel
-  readonly grid: PianoRollGrid
   readonly modelRevision: ModelRevision
-  readonly snapEnabled: boolean
-  readonly viewport: PianoRollValueLaneViewport
+  readonly scope: PianoRollSustainPedalEditingScope | null
 }
 
 interface PianoRollSustainPedalLanePlacement {
@@ -95,16 +111,51 @@ interface PianoRollSustainPedalLanePlacement {
 
 const props = defineProps<PianoRollSustainPedalLaneProps>()
 const emit = defineEmits<{
+  completed: []
   failure: [cause: unknown]
   placement: [placement: PianoRollSustainPedalLanePlacement]
   requestFocus: []
 }>()
+const { projectMidiSustainPedal } = useProjectMidiSustainPedal()
 
 const laneSurface = useTemplateRef<HTMLElement>('laneSurface')
 const viewport = shallowRef<PianoRollValueLaneViewport | null>(null)
+const selectedEventIds = shallowRef<readonly MidiSustainPedalEventId[]>(Object.freeze([]))
+const interactionSession = createPianoRollSustainPedalInteractionSession()
+const interactionState = shallowRef<PianoRollSustainPedalInteractionState>(interactionSession.state)
 let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
 let resizeObserver: ResizeObserver | null = null
-let activePlacementConfiguration: ActiveLanePlacementConfiguration | null = null
+let activeInteractionConfiguration: ActiveLaneInteractionConfiguration | null = null
+
+function selectionsEqual(
+  left: readonly MidiSustainPedalEventId[],
+  right: readonly MidiSustainPedalEventId[],
+): boolean {
+  return left.length === right.length && left.every((eventId, index) => eventId === right[index])
+}
+
+function setSelectedEventIds(eventIds: readonly MidiSustainPedalEventId[]): void {
+  const next = Object.freeze([...eventIds])
+  if (selectionsEqual(selectedEventIds.value, next)) return
+  selectedEventIds.value = next
+}
+
+const handleInteractionIntent = createProjectPianoRollSustainPedalIntentHandler({
+  getAuthorityRevision: () => props.readModel.modelRevision,
+  getInteractionScope: () => activeInteractionConfiguration?.scope ?? null,
+  getSelectedEventIds: () => selectedEventIds.value,
+  interactionSession,
+  projectMidiSustainPedal,
+  reportFailure: (cause) => emit('failure', cause),
+  reportSuccess: () => emit('completed'),
+  setSelectedEventIds,
+})
+const unsubscribeInteractionSession = interactionSession.subscribe({
+  onStateChange: (state) => {
+    interactionState.value = state
+  },
+})
+const selectedEventIdSet = computed(() => new Set(selectedEventIds.value))
 
 const occurrences = computed<readonly LaneOccurrence[]>(() => {
   const model = props.readModel
@@ -235,30 +286,53 @@ const renderedSegments = computed<readonly RenderedLaneSegment[]>(() => {
 const renderedEvents = computed<readonly RenderedLaneEvent[]>(() => {
   const currentViewport = viewport.value
   if (currentViewport === null) return Object.freeze([])
+  const preview = interactionState.value.preview
 
   return Object.freeze(
     occurrences.value.flatMap((occurrence) =>
       occurrence.events.flatMap((projection) => {
+        let timelineTick = projection.timelineTick
+        let value = projection.event.value
+        let isPreview = false
+        if (occurrence.active && preview !== null) {
+          const previewEvent = preview.events.find(
+            (candidate) => candidate.eventId === projection.event.id,
+          )
+          if (
+            preview.axis === PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS.TICK &&
+            preview.eventIds.includes(projection.event.id) &&
+            previewEvent === undefined
+          ) {
+            return []
+          }
+          if (previewEvent !== undefined) {
+            timelineTick = previewEvent.timelineTick
+            value = previewEvent.value
+            isPreview = true
+          }
+        }
         if (
-          projection.timelineTick < currentViewport.visibleStartTick ||
-          projection.timelineTick > currentViewport.visibleEndTick
+          timelineTick < currentViewport.visibleStartTick ||
+          timelineTick > currentViewport.visibleEndTick
         ) {
           return []
         }
-        const x = pianoRollValueLaneTimelineTickToCssPixel(currentViewport, projection.timelineTick)
-        const y = pianoRollMidiControlValueToValueLaneCssPixel(
-          currentViewport,
-          projection.event.value,
-        )
+        const x = pianoRollValueLaneTimelineTickToCssPixel(currentViewport, timelineTick)
+        const y = pianoRollMidiControlValueToValueLaneCssPixel(currentViewport, value)
         return [
           Object.freeze({
             active: occurrence.active,
-            affectsPlayback: projection.affectsPlayback,
+            affectsPlayback: isPreview
+              ? timelineTick < occurrence.endTick
+              : projection.affectsPlayback,
             event: projection.event,
             key: `${occurrence.key}:event:${projection.event.id}`,
-            pedalDown: projection.pedalDown,
+            pedalDown: isPreview ? isMidiSustainPedalDown(value) : projection.pedalDown,
+            preview: isPreview,
+            selected: occurrence.active && selectedEventIdSet.value.has(projection.event.id),
             style: Object.freeze({ transform: `translate3d(${x}px, ${y}px, 0)` }) as StyleValue,
-            timelineTick: projection.timelineTick,
+            timelineTick,
+            value,
           }),
         ]
       }),
@@ -273,8 +347,33 @@ const accessibleSummary = computed(() => {
   )
   return `CC64 Channel ${props.readModel.channel + 1}, ${eventCount} visible ${
     eventCount === 1 ? 'event' : 'events'
-  }`
+  }, CC64 selection ${selectedEventIds.value.length}`
 })
+
+function resolveEditingScope(): PianoRollSustainPedalEditingScope | null {
+  const model = props.readModel
+  if ('clipId' in model) {
+    if (props.clipContext === null) {
+      throw new Error('Clip Focus Sustain Pedal editing requires its Piano Roll Clip context')
+    }
+    return resolvePianoRollSustainPedalEditingScope({
+      context: props.clipContext,
+      readModel: model,
+    })
+  }
+  return resolvePianoRollSustainPedalEditingScope({ readModel: model })
+}
+
+function reconcileSelection(): void {
+  try {
+    setSelectedEventIds(
+      reconcilePianoRollSustainPedalSelection(resolveEditingScope(), selectedEventIds.value),
+    )
+  } catch (cause) {
+    setSelectedEventIds([])
+    emit('failure', cause)
+  }
+}
 
 function refreshViewport(): void {
   const surface = laneSurface.value
@@ -299,23 +398,87 @@ function handleWindowResize(): void {
 watch(
   () => [props.visibleStartTick, props.visibleSpanTick],
   () => {
-    pointerInputAdapter?.cancel()
+    if (!(pointerInputAdapter?.cancel() ?? false)) interactionSession.cancel()
+    activeInteractionConfiguration = null
     refreshViewport()
   },
 )
 watch(
+  [
+    () => props.readModel.projectId,
+    () => props.readModel.channel,
+    () => ('clipId' in props.readModel ? props.readModel.clipId : props.readModel.trackId),
+    () =>
+      'activeClipId' in props.readModel ? props.readModel.activeClipId : props.readModel.clipId,
+    () => props.clipContext?.clipId ?? null,
+    () => props.clipContext?.sourceId ?? null,
+  ],
   () => {
-    const model = props.readModel
-    return [
-      model.projectId,
-      model.modelRevision,
-      model.channel,
-      'clipId' in model ? model.clipId : model.trackId,
-      'activeClipId' in model ? model.activeClipId : model.clipId,
-    ]
+    if (!(pointerInputAdapter?.cancel() ?? false)) interactionSession.cancel()
+    activeInteractionConfiguration = null
+    setSelectedEventIds([])
   },
-  () => pointerInputAdapter?.cancel(),
 )
+watch(
+  () => props.readModel.modelRevision,
+  (revision) => {
+    if (interactionState.value.pointerId !== null) pointerInputAdapter?.cancel()
+    interactionSession.notifyAuthorityRevision(revision)
+    reconcileSelection()
+  },
+)
+
+function hasSelection(): boolean {
+  return selectedEventIds.value.length > 0
+}
+
+function hasCancellableInteraction(): boolean {
+  return interactionState.value.pointerId !== null
+}
+
+function clearSelectionOrCancelInteraction(): boolean {
+  if (hasCancellableInteraction()) {
+    if (!(pointerInputAdapter?.cancel() ?? false)) interactionSession.cancel()
+    activeInteractionConfiguration = null
+    emit('completed')
+    return true
+  }
+  if (!hasSelection()) return false
+  setSelectedEventIds([])
+  emit('completed')
+  return true
+}
+
+function removeSelectedEvents(): boolean {
+  let removal: ReturnType<typeof resolvePianoRollSustainPedalRemoval>
+  try {
+    removal = resolvePianoRollSustainPedalRemoval(resolveEditingScope(), selectedEventIds.value)
+  } catch (cause) {
+    emit('failure', cause)
+    return hasSelection()
+  }
+  if (removal === null) return false
+
+  try {
+    projectMidiSustainPedal.removeEvents({
+      baseRevision: removal.baseRevision,
+      clipId: removal.clipId,
+      eventIds: removal.eventIds,
+    })
+    setSelectedEventIds([])
+    emit('completed')
+  } catch (cause) {
+    emit('failure', cause)
+  }
+  return true
+}
+
+defineExpose({
+  clearSelectionOrCancelInteraction,
+  hasCancellableInteraction,
+  hasSelection,
+  removeSelectedEvents,
+})
 
 onMounted(() => {
   const surface = laneSurface.value
@@ -325,52 +488,73 @@ onMounted(() => {
     pointerInputAdapter = createPianoRollSemanticPointerInputAdapter({
       observer: {
         onError: ({ cause }) => {
-          activePlacementConfiguration = null
+          activeInteractionConfiguration = null
+          interactionSession.cancel()
           emit('failure', cause)
         },
         onInput: (input) => {
+          const currentViewport = viewport.value
           if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
+            surface.focus({ preventScroll: true })
             emit('requestFocus')
-            const currentViewport = viewport.value
             const model = props.readModel
-            activePlacementConfiguration =
-              props.pencilEnabled && currentViewport !== null
-                ? Object.freeze({
-                    activeClipId: 'clipId' in model ? model.clipId : model.activeClipId,
-                    channel: model.channel,
-                    grid: props.grid,
-                    modelRevision: model.modelRevision,
-                    snapEnabled: props.snapEnabled,
-                    viewport: currentViewport,
-                  })
-                : null
-            return
+            if (currentViewport === null) return
+            try {
+              activeInteractionConfiguration = Object.freeze({
+                activeClipId: 'clipId' in model ? model.clipId : model.activeClipId,
+                channel: model.channel,
+                modelRevision: model.modelRevision,
+                scope: resolveEditingScope(),
+              })
+            } catch (cause) {
+              activeInteractionConfiguration = null
+              emit('failure', cause)
+              return
+            }
           }
-          if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL) {
-            activePlacementConfiguration = null
-            return
+          const configuration = activeInteractionConfiguration
+          const outcome = interactionSession.handlePointerInput(
+            input,
+            input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN &&
+              configuration !== null &&
+              currentViewport !== null
+              ? {
+                  grid: props.grid,
+                  scope: configuration.scope,
+                  selectedEventIds: selectedEventIds.value,
+                  snapEnabled: props.snapEnabled,
+                  tool: props.pencilEnabled
+                    ? PIANO_ROLL_INTERACTION_TOOL.PENCIL
+                    : PIANO_ROLL_INTERACTION_TOOL.CURSOR,
+                  viewport: currentViewport,
+                }
+              : undefined,
+          )
+          if (outcome.failure !== null) emit('failure', outcome.failure)
+          if (outcome.intent !== null) {
+            if (
+              outcome.intent.type === PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.PLACE_EVENT &&
+              configuration !== null
+            ) {
+              const placement = outcome.intent.placement
+              emit(
+                'placement',
+                Object.freeze({
+                  ...placement,
+                  activeClipId: configuration.activeClipId,
+                  channel: configuration.channel,
+                  modelRevision: configuration.modelRevision,
+                }),
+              )
+            } else {
+              handleInteractionIntent(outcome.intent)
+            }
           }
-          if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.END) return
-
-          const configuration = activePlacementConfiguration
-          activePlacementConfiguration = null
-          if (configuration === null) return
-          const placement = resolvePianoRollSustainPedalPencilPlacement({
-            grid: configuration.grid,
-            pointerInput: input,
-            snapEnabled: configuration.snapEnabled,
-            viewport: configuration.viewport,
-          })
-          if (placement !== null) {
-            emit(
-              'placement',
-              Object.freeze({
-                ...placement,
-                activeClipId: configuration.activeClipId,
-                channel: configuration.channel,
-                modelRevision: configuration.modelRevision,
-              }),
-            )
+          if (
+            input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.END ||
+            input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL
+          ) {
+            activeInteractionConfiguration = null
           }
         },
       },
@@ -392,9 +576,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  activePlacementConfiguration = null
+  activeInteractionConfiguration = null
   pointerInputAdapter?.dispose()
   pointerInputAdapter = null
+  unsubscribeInteractionSession()
+  interactionSession.dispose()
   resizeObserver?.disconnect()
   resizeObserver = null
   window.removeEventListener('resize', handleWindowResize)
@@ -407,7 +593,9 @@ onUnmounted(() => {
     class="piano-roll-sustain-pedal-lane"
     :class="{ 'piano-roll-sustain-pedal-lane--pencil': props.pencilEnabled }"
     :aria-label="props.label"
+    :data-interaction-status="interactionState.status"
     role="group"
+    tabindex="0"
   >
     <span
       v-if="thresholdStyle"
@@ -445,13 +633,16 @@ onUnmounted(() => {
       :class="{
         'piano-roll-sustain-pedal-lane__event--down': event.pedalDown,
         'piano-roll-sustain-pedal-lane__event--inactive': !event.active,
+        'piano-roll-sustain-pedal-lane__event--preview': event.preview,
+        'piano-roll-sustain-pedal-lane__event--selected': event.selected,
         'piano-roll-sustain-pedal-lane__event--terminal': !event.affectsPlayback,
       }"
       :data-piano-roll-sustain-pedal-event-id="event.event.id"
       :style="event.style"
-      :aria-label="`Sustain Pedal value ${event.event.value} at tick ${event.timelineTick}${
+      :aria-label="`Sustain Pedal value ${event.value} at tick ${event.timelineTick}${
         event.affectsPlayback ? '' : ', terminal endpoint'
-      }`"
+      }${event.selected ? ', selected' : ''}`"
+      :aria-pressed="event.selected"
     ></button>
     <span class="piano-roll-sustain-pedal-lane__accessible-status" aria-live="polite">
       {{ accessibleSummary }}
@@ -477,6 +668,11 @@ onUnmounted(() => {
 
 .piano-roll-sustain-pedal-lane--pencil {
   cursor: crosshair;
+}
+
+.piano-roll-sustain-pedal-lane:focus-visible {
+  outline: 2px solid var(--sd-color-border-focus);
+  outline-offset: -2px;
 }
 
 .piano-roll-sustain-pedal-lane__threshold {
@@ -563,6 +759,15 @@ onUnmounted(() => {
 
 .piano-roll-sustain-pedal-lane__event--inactive {
   opacity: 0.54;
+}
+
+.piano-roll-sustain-pedal-lane__event--preview {
+  z-index: 4;
+}
+
+.piano-roll-sustain-pedal-lane__event--selected {
+  outline: 2px solid var(--sd-color-border-focus);
+  outline-offset: 2px;
 }
 
 .piano-roll-sustain-pedal-lane__event--terminal {

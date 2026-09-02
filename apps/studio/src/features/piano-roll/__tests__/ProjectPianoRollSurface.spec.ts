@@ -3,6 +3,7 @@ import {
   createInitialProjectSession,
   createMidiNoteRecord,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiVelocity,
   parseNoteId,
@@ -204,8 +205,11 @@ function createUnavailableSustainPedalContext(): ProjectMidiSustainPedalVueConte
   }
   return Object.freeze({
     projectMidiSustainPedal: Object.freeze<ProjectMidiSustainPedalCoordinator>({
+      moveEvents: unavailable,
       placeInClip: unavailable,
       placeOnTrack: unavailable,
+      removeEvents: unavailable,
+      replaceEventValue: unavailable,
     }),
   })
 }
@@ -1185,6 +1189,180 @@ describe('ProjectPianoRollSurface', () => {
     expect(
       fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
     ).toEqual([])
+
+    wrapper.unmount()
+    keyboard.keyboardShortcuts.dispose()
+  })
+
+  it('moves, replaces and removes one selected CC64 event through focused Studio actions', async () => {
+    installSurfaceEnvironment()
+    const fixture = createInteractiveFixture('surface-sustain-pedal-edit')
+    const noteId = fixture.projectMidiNotes.addMidiNote({
+      clipId: fixture.presentation.clipId,
+      clipStartTick: parseTick(480),
+      pitch: parseMidiPitch(60),
+      requestedDurationTick: parsePositiveTick(240),
+    }).noteId
+    const placed = fixture.projectMidiSustainPedal.placeInClip({
+      baseRevision: fixture.session.modelRevision,
+      channel: parseMidiChannel(0),
+      clipId: fixture.presentation.clipId,
+      clipTick: parseTick(960),
+      value: parseMidiControlValue(0),
+    })
+    const presentation = createProjectPianoRollPresentation(
+      fixture.session.getSnapshot(),
+      fixture.presentation.clipId,
+    )
+    if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected editable Sustain Pedal presentation')
+    }
+    const keyboard = createKeyboardFixture()
+    const pinia = createPinia()
+    usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
+    const wrapper = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      props: {
+        barSpanTick: parsePositiveTick(3_840),
+        presentation,
+        session: markRaw(fixture.session),
+        timeSignatureNumerator: 4,
+      },
+      global: {
+        plugins: [pinia],
+        provide: {
+          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiNotes: fixture.projectMidiNotes,
+          }),
+          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
+            projectMidiSustainPedal: fixture.projectMidiSustainPedal,
+          }),
+          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+        },
+      },
+    })
+    await nextTick()
+
+    const note = wrapper.get(`[data-piano-roll-note-id="${noteId}"]`)
+    dispatchPointer(note.element, 'pointerdown', { pointerId: 70 })
+    dispatchPointer(note.element, 'pointerup', { pointerId: 70 })
+    await nextTick()
+    expect(note.classes()).toContain('sd-piano-roll-dom-note--selected')
+
+    const lane = wrapper.get('.piano-roll-sustain-pedal-lane')
+    let marker = wrapper.get(`[data-piano-roll-sustain-pedal-event-id="${placed.eventId}"]`)
+    const horizontalDeltaTick = 960
+    const originX = (960 / presentation.context.clipSpanTick) * 960
+    const horizontalDeltaX = (horizontalDeltaTick / presentation.context.clipSpanTick) * 960
+    const beforeMove = fixture.session
+      .getSnapshot()
+      .midiSustainPedalEventPartitions.flatMap(({ events }) => events)[0]!
+    const revisionBeforeMove = fixture.session.modelRevision
+
+    dispatchPointer(marker.element, 'pointerdown', {
+      clientX: originX,
+      clientY: 250,
+      pointerId: 72,
+    })
+    dispatchPointer(lane.element, 'pointermove', {
+      clientX: originX + horizontalDeltaX,
+      clientY: 250,
+      pointerId: 72,
+    })
+    await nextTick()
+    expect(marker.classes()).toContain('piano-roll-sustain-pedal-lane__event--preview')
+    dispatchPointer(lane.element, 'pointerup', {
+      clientX: originX + horizontalDeltaX,
+      clientY: 250,
+      pointerId: 72,
+    })
+    await nextTick()
+
+    expect(fixture.session.modelRevision).toBe(revisionBeforeMove + 1)
+    expect(
+      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toContainEqual({ ...beforeMove, tick: beforeMove.tick + horizontalDeltaTick })
+    expect(lane.attributes('data-interaction-status')).toBe('awaiting-authority')
+    expect(marker.classes()).toContain('piano-roll-sustain-pedal-lane__event--selected')
+
+    let refreshed = createProjectPianoRollPresentation(
+      fixture.session.getSnapshot(),
+      presentation.clipId,
+    )
+    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected refreshed Sustain Pedal move presentation')
+    }
+    await wrapper.setProps({ presentation: refreshed })
+    await nextTick()
+    expect(lane.attributes('data-interaction-status')).toBe('idle')
+    expect(wrapper.get(`[data-piano-roll-note-id="${noteId}"]`).classes()).toContain(
+      'sd-piano-roll-dom-note--selected',
+    )
+
+    marker = wrapper.get(`[data-piano-roll-sustain-pedal-event-id="${placed.eventId}"]`)
+    const revisionBeforeValue = fixture.session.modelRevision
+    dispatchPointer(marker.element, 'pointerdown', {
+      clientX: originX + horizontalDeltaX,
+      clientY: 250,
+      pointerId: 73,
+    })
+    dispatchPointer(lane.element, 'pointermove', {
+      clientX: originX + horizontalDeltaX,
+      clientY: 125,
+      pointerId: 73,
+    })
+    dispatchPointer(lane.element, 'pointerup', {
+      clientX: originX + horizontalDeltaX,
+      clientY: 125,
+      pointerId: 73,
+    })
+    await nextTick()
+
+    expect(fixture.session.modelRevision).toBe(revisionBeforeValue + 1)
+    expect(
+      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toContainEqual({
+      ...beforeMove,
+      tick: beforeMove.tick + horizontalDeltaTick,
+      value: 64,
+    })
+
+    refreshed = createProjectPianoRollPresentation(
+      fixture.session.getSnapshot(),
+      presentation.clipId,
+    )
+    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+      throw new Error('Expected refreshed Sustain Pedal value presentation')
+    }
+    await wrapper.setProps({ presentation: refreshed })
+    await nextTick()
+
+    const authoritativeMarker = wrapper.get(
+      `[data-piano-roll-sustain-pedal-event-id="${placed.eventId}"]`,
+    )
+    expect(authoritativeMarker.classes()).toContain(
+      'piano-roll-sustain-pedal-lane__event--selected',
+    )
+    expect(document.activeElement).toBe(lane.element)
+    const revisionBeforeRemove = fixture.session.modelRevision
+    const removeEvent = keyboard.bindingRegistry.dispatch('Delete')
+    expect(removeEvent.defaultPrevented).toBe(true)
+    expect(fixture.session.modelRevision).toBe(revisionBeforeRemove + 1)
+    expect(
+      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toEqual([])
+    expect(wrapper.get(`[data-piano-roll-note-id="${noteId}"]`).classes()).toContain(
+      'sd-piano-roll-dom-note--selected',
+    )
+
+    fixture.session.undo()
+    expect(
+      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toContainEqual({
+      ...beforeMove,
+      tick: beforeMove.tick + horizontalDeltaTick,
+      value: 64,
+    })
 
     wrapper.unmount()
     keyboard.keyboardShortcuts.dispose()

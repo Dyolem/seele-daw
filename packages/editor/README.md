@@ -10,8 +10,8 @@
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
 > Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；`common` / `browser`
 > 还已完成显式 Channel 的 CC64 Value Lane、Pencil Placement、Event Selection、主导轴 Move /
-> Replace Value 与 authority handoff 基础。Studio 已接入 Note 编辑闭环和 CC64 Lane Pencil Add，
-> 但尚未接入 CC64 Event 的选择、移动、改值与删除。
+> Replace Value 与 authority handoff 基础。Studio 已接入 Note 编辑闭环，以及 CC64 Lane 的 Add、
+> Selection、Move、Replace Value 与 Remove。
 
 ## 包定位
 
@@ -189,9 +189,9 @@ Add Command 与失败提示。Event 编辑的 Editor 后续基础还提供：
 - 绝对 Grid Snap、动态 `Alt` 临时绕过、Source 边界 clamp 与不跳值纵向 Delta；
 - Preview、取消、重复 End 抑制、单 Intent 与 commit revision authority handoff。
 
-这一基础仍不执行 Project Command，也不拥有当前 Channel。Studio 尚未渲染 CC64 Selection /
-Preview，亦未把 Move、Replace Value 或 Remove Intent 接入 Coordinator；不能把内部契约描述为
-用户可用。完整边界和术语见
+这一基础仍不执行 Project Command，也不拥有当前 Channel。Studio 负责渲染瞬态 Selection /
+Marker Preview，并把 Move、Replace Value 与 Remove Intent 映射为每手势一个 Project Command；
+完整边界和术语见
 [Piano Roll CC64 Lane Foundation](./docs/piano-roll-sustain-pedal-lane-foundation.md)与
 [Piano Roll CC64 Event Editing Foundation](./docs/piano-roll-sustain-pedal-event-editing-foundation.md)。
 
@@ -238,8 +238,8 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 6. **进行中**：同一 Project 模型的 Track 全局 / Clip Focus 双 Scope；共享 Track Read Model、
    原子 Clip / Note 放置与默认 Track Surface 已完成，可见模式切换与双模式 Playhead / Follow
    尚待后续批次。
-7. **进行中**：CC64 Sustain Pedal Lane 的 Editor Snapshot 投影、Value Lane 坐标、类型化
-   Browser Hit 与 Pencil Placement 已完成；Studio 可见纵向闭环尚待下一独立批次。
+7. **已完成**：CC64 Sustain Pedal Lane 的 Editor Snapshot 投影、Value Lane 坐标、类型化
+   Browser Hit、Pencil Placement、Event Selection、主导轴 Transform 与 Studio 可见写入闭环。
 8. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
 9. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
 

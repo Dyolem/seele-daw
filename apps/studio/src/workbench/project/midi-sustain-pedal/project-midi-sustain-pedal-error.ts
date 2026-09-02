@@ -3,6 +3,7 @@ import type { ClipId, MidiSourceId, Tick, TrackId } from '@seele-daw/project-cor
 export type ProjectMidiSustainPedalErrorCode =
   | 'active-project-not-ready'
   | 'clip-placement-stale'
+  | 'event-edit-stale'
   | 'target-clip-looped'
   | 'target-clip-not-found'
   | 'target-clip-outside-track'

@@ -8,6 +8,9 @@ import {
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   createAddMidiSustainPedalEventCommand,
+  createMoveMidiSustainPedalEventsCommand,
+  createRemoveMidiSustainPedalEventsCommand,
+  createReplaceMidiSustainPedalEventValueCommand,
   parseMidiChannel,
   parseMidiControlValue,
   parseMidiSustainPedalEventId,
@@ -21,6 +24,7 @@ import {
   type ProjectSession,
   type ProjectSnapshot,
   type Tick,
+  type TickDelta,
   type TrackId,
 } from '@seele-daw/project-core'
 
@@ -56,9 +60,53 @@ export interface PlacedMidiSustainPedalEventResult {
   readonly eventId: MidiSustainPedalEventId
 }
 
+interface EditMidiSustainPedalEventsInput {
+  readonly baseRevision: ModelRevision
+  readonly clipId: ClipId
+}
+
+export interface MoveMidiSustainPedalEventsInput extends EditMidiSustainPedalEventsInput {
+  readonly deltaTick: TickDelta
+  readonly eventIds: readonly MidiSustainPedalEventId[]
+}
+
+export interface MovedMidiSustainPedalEventsResult {
+  readonly clipId: ClipId
+  readonly commit: ProjectCommit
+  readonly deltaTick: TickDelta
+  readonly eventIds: readonly MidiSustainPedalEventId[]
+}
+
+export interface RemoveMidiSustainPedalEventsInput extends EditMidiSustainPedalEventsInput {
+  readonly eventIds: readonly MidiSustainPedalEventId[]
+}
+
+export interface RemovedMidiSustainPedalEventsResult {
+  readonly clipId: ClipId
+  readonly commit: ProjectCommit
+  readonly eventIds: readonly MidiSustainPedalEventId[]
+}
+
+export interface ReplaceMidiSustainPedalEventValueInput extends EditMidiSustainPedalEventsInput {
+  readonly eventId: MidiSustainPedalEventId
+  readonly value: MidiControlValue
+}
+
+export interface ReplacedMidiSustainPedalEventValueResult {
+  readonly clipId: ClipId
+  readonly commit: ProjectCommit
+  readonly eventId: MidiSustainPedalEventId
+  readonly value: MidiControlValue
+}
+
 export interface ProjectMidiSustainPedalCoordinator {
+  moveEvents(input: MoveMidiSustainPedalEventsInput): MovedMidiSustainPedalEventsResult | null
   placeInClip(input: PlaceMidiSustainPedalEventInClipInput): PlacedMidiSustainPedalEventResult
   placeOnTrack(input: PlaceMidiSustainPedalEventOnTrackInput): PlacedMidiSustainPedalEventResult
+  removeEvents(input: RemoveMidiSustainPedalEventsInput): RemovedMidiSustainPedalEventsResult
+  replaceEventValue(
+    input: ReplaceMidiSustainPedalEventValueInput,
+  ): ReplacedMidiSustainPedalEventValueResult | null
 }
 
 interface ReadyProjectAuthority {
@@ -87,14 +135,21 @@ function requireReadyProject(
 function requireCurrentRevision(
   snapshot: ProjectSnapshot,
   baseRevision: ModelRevision,
-  scope: 'clip' | 'track',
+  scope: 'clip' | 'edit' | 'track',
   details: { readonly clipId?: ClipId; readonly trackId?: TrackId },
 ): void {
   if (snapshot.modelRevision === baseRevision) return
 
+  const errorCode =
+    scope === 'clip'
+      ? 'clip-placement-stale'
+      : scope === 'track'
+        ? 'track-placement-stale'
+        : 'event-edit-stale'
+  const target = scope === 'clip' ? 'Clip' : scope === 'track' ? 'Track' : 'Piano Roll'
   throw new ProjectMidiSustainPedalError(
-    scope === 'clip' ? 'clip-placement-stale' : 'track-placement-stale',
-    `The ${scope === 'clip' ? 'Clip' : 'Track'} changed before the Sustain Pedal event could be placed. Try the gesture again.`,
+    errorCode,
+    `The ${target} changed before the Sustain Pedal edit could be committed. Try the gesture again.`,
     details,
   )
 }
@@ -170,11 +225,41 @@ function executePlacement(
   return Object.freeze({ clipId: input.clipId, commit: result.commit, eventId })
 }
 
+function requireEditableEventTarget(
+  dependencies: ProjectMidiSustainPedalCoordinatorDependencies,
+  input: EditMidiSustainPedalEventsInput,
+) {
+  const { session, snapshot } = requireReadyProject(dependencies)
+  requireCurrentRevision(snapshot, input.baseRevision, 'edit', { clipId: input.clipId })
+  const clip = requireClip(snapshot, input.clipId)
+  const source = requireClipSource(snapshot, clip)
+  return Object.freeze({ clip, session, source })
+}
+
 class ProjectMidiSustainPedalCoordinatorImpl implements ProjectMidiSustainPedalCoordinator {
   readonly #dependencies: ProjectMidiSustainPedalCoordinatorDependencies
 
   constructor(dependencies: ProjectMidiSustainPedalCoordinatorDependencies) {
     this.#dependencies = dependencies
+  }
+
+  moveEvents(input: MoveMidiSustainPedalEventsInput): MovedMidiSustainPedalEventsResult | null {
+    const { clip, session, source } = requireEditableEventTarget(this.#dependencies, input)
+    const command = createMoveMidiSustainPedalEventsCommand({
+      baseRevision: input.baseRevision,
+      deltaTick: input.deltaTick,
+      eventIds: input.eventIds,
+      sourceId: source.id,
+    })
+    const result = session.execute(command)
+    if (result.status === PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE) return null
+
+    return Object.freeze({
+      clipId: clip.id,
+      commit: result.commit,
+      deltaTick: command.deltaTick,
+      eventIds: command.eventIds,
+    })
   }
 
   placeInClip(input: PlaceMidiSustainPedalEventInClipInput): PlacedMidiSustainPedalEventResult {
@@ -274,6 +359,46 @@ class ProjectMidiSustainPedalCoordinatorImpl implements ProjectMidiSustainPedalC
       sourceId: source.id,
       sourceTick: pianoRollTrackProjectTickToSourceTick(projection, projectTick),
       value: input.value,
+    })
+  }
+
+  removeEvents(input: RemoveMidiSustainPedalEventsInput): RemovedMidiSustainPedalEventsResult {
+    const { clip, session, source } = requireEditableEventTarget(this.#dependencies, input)
+    const command = createRemoveMidiSustainPedalEventsCommand({
+      baseRevision: input.baseRevision,
+      eventIds: input.eventIds,
+      sourceId: source.id,
+    })
+    const result = session.execute(command)
+    if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      throw new Error('Sustain Pedal event removal unexpectedly produced no Project change')
+    }
+
+    return Object.freeze({
+      clipId: clip.id,
+      commit: result.commit,
+      eventIds: command.eventIds,
+    })
+  }
+
+  replaceEventValue(
+    input: ReplaceMidiSustainPedalEventValueInput,
+  ): ReplacedMidiSustainPedalEventValueResult | null {
+    const { clip, session, source } = requireEditableEventTarget(this.#dependencies, input)
+    const command = createReplaceMidiSustainPedalEventValueCommand({
+      baseRevision: input.baseRevision,
+      eventId: input.eventId,
+      sourceId: source.id,
+      value: input.value,
+    })
+    const result = session.execute(command)
+    if (result.status === PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE) return null
+
+    return Object.freeze({
+      clipId: clip.id,
+      commit: result.commit,
+      eventId: command.eventId,
+      value: command.value,
     })
   }
 }

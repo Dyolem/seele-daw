@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-02，Expression Quality EQ1–EQ3B 已通过审核，Expression Quality Integration V1 完成收口
+> 最近更新：2026-09-02，Built-in Multi-Instrument Score Playback V1 已批准，MI0 / MI1A 实施待审核
 >
-> 当前阶段：Audio Quality Foundation V1A、CC64 与 Expression Quality Integration V1 已完成；下一阶段正在规划多乐器 Soundbank 接入
+> 当前阶段：Audio Quality Foundation V1A、CC64 与 Expression Quality Integration V1 已完成；多乐器阶段正在建立契约与可复用的本地资产准备边界
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -96,6 +96,7 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
 | `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、踏板 PCM、非播放态尾音清理及未来 WAV 声音尾部边界均已通过。                                                         |
+| `SCORE-INSTRUMENTS`    | 总谱多乐器发声            | **尚未实现** | 阶段契约与配置驱动的本地资产准备内核已进入审核；当前尚未增加第二个 Soundbank、Program 路由、乐器选择 UI 或多音源播放能力。                                              |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
@@ -927,8 +928,11 @@ File 导入是独立交换格式入口，不替代 Project File。
 ### 音源与声音
 
 - 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的完整 Catalog / Indexes 扫描、
-  运行时安装与音色选择；当前只支持由开发工具规范化后的同源 Manifest/WAV，且该镜像不属于产品
-  资源，Vite 生产构建禁止把 public 内容复制到 dist。
+  运行时安装与音色选择；MI1A 已建立待审核的配置驱动准备内核，但唯一真实消费者仍是
+  Studio Grand，尚未形成产品 Catalogue 或第二个可播放 Soundbank。当前只支持由开发工具
+  规范化后的同源 Manifest/WAV，且该镜像不属于产品资源，Vite 生产构建禁止把 public 内容复制到
+  dist。阶段边界见
+  [Built-in Multi-Instrument Score Playback V1](packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-phase-plan.md)。
 - M4A 自动协商、远程 / 安装式 Soundbank 获取与可分发内置资产；当前 Studio 只从本地 Vite dev
   同源路径准备 Manifest/WAV。
 - JSON 合成器定义的解析与合成引擎。

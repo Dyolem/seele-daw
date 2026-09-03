@@ -143,7 +143,12 @@ apps/studio/public/soundbanks/generated/studio-grand/
 - 输出共 32 个文件：30 个 WAV、一个 Manifest 与一个 preparation report；
 - Manifest 保留 30 个 Zone，并把可播放范围显式裁剪为 MIDI `21...108`；
 - `manifest.json` SHA-256 为
-  `f0566a4573a63d252221a9cc53ca9fee194c187bbe4ccf44405a604b5eb45e98`。
+  `7e9303dc189c31109b94f7df665cac73b0a5afd89dee5767fed477c2b539e06f`。
+
+该 Manifest 哈希在 MI5 中因全部规范化 WAV 改用确定性 URL 安全资源名而刷新；30 枚 WAV
+内容哈希、Zone 选择、Envelope 与声音数据均未变化。单音源 preparation report schema version 2
+保留原始 Archive Key，完整修正见
+[Built-in Multi-Instrument Score Playback V1 收口报告](./built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
 首次执行通过同目录 staging 后原子发布。若目标目录已存在，工具只接受目录集合、文件集合与
 全部内容哈希完全一致的结果；缺失、额外或漂移文件都会失败，不自动覆盖。相同输入重复执行已经

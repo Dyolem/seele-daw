@@ -1,6 +1,7 @@
 # Multi-Soundbank Runtime Resource Gate V1
 
-> Status: MI4 implementation pending review
+> Status: MI4 reviewed and committed as `8072aca`; local report refreshed by the MI5 URL-safe
+> asset normalization without changing decoded audio totals
 >
 > Date: 2026-09-03
 
@@ -22,7 +23,8 @@
   用户跨项目或反复换音色后保留整套历史资源。
 
 MI4 为解码缓存增加按 Resource 计算的 LRU 总量预算。Studio 默认保留上限为
-`201,326,592` bytes（`192 MiB`）；Manifest 总量只有 `266,018` bytes，继续在应用生命周期保留。
+`201,326,592` bytes（`192 MiB`）；MI5 URL 安全资源名刷新后的 Manifest 总量只有
+`268,280` bytes，继续在应用生命周期保留。
 
 ## 2. 本地参考总谱测量
 
@@ -35,7 +37,9 @@ pnpm --filter @seele-daw/audio-web measure:score-core-runtime-cache-local
 命令读取 developer-local `generated/<soundbankId>/manifest.json` 与实际 WAV Header，只测量脚本中
 冻结的 Pitch 集合，不读取 ZIP 大小来猜测 AudioBuffer。输出位于被 Git 忽略的
 `apps/studio/public/soundbanks/measurements/score-core/runtime-cache-estimate.json`；本轮报告
-SHA-256 为 `db8cd0402e336569b8dae1daffc9e8846b78350309ff993f8296b6ae595e2b98`。
+SHA-256 为 `fd43fc796d4d01d88523d942e90466cd41fe385645e5d7b3c0e4ec4d8a553978`。该哈希在
+MI5 中因 Manifest 改用 URL 安全资源名而刷新；参考 WAV 内容哈希集合、资源数和 decoded bytes
+均未变化。
 
 参考集合故意同时覆盖 22 个 Soundbank：Piano 使用五音窗口，20 个旋律 / 定音打击音色各使用三枚
 代表 Pitch，Drum Kit 使用 Kick、Snare、Closed / Open Hi-hat 与 Crash。多个 Pitch 选择到同一 Zone
@@ -96,11 +100,11 @@ Studio 的初始与选择性策略继续由 `ProjectPlaybackCoordinator` 决定�
 - 既有 `project-playback-coordinator.spec.ts` 固定 Active Project 切换取消 handoff，以及选择性
   Replace 失败不停止无关 Track。
 
-本轮验证通过 Audio Web 23 个测试文件 / 158 项、Studio 64 / 415、两个包的 Type Check、根级
+MI4 提交前验证通过 Audio Web 23 个测试文件 / 158 项、Studio 64 / 415、两个包的 Type Check、根级
 `pnpm lint`、Studio Production Build 与 soundbank dist boundary。本地测量第二次执行保持
 `current`；按分批门禁约定未运行完整 `pnpm check`。
 
-MI4 不证明 22 个真实音色同时混合时不削波，也不证明 Loop 接缝、Envelope、CC64、鼓件 Choke 或
-音色对应在真实浏览器中听感正确。这些仍由 MI5 的合法最小总谱 fixture、Chromium PCM 与人工听测
-门禁完成。若未来遥测表明固定 `192 MiB` 不适合不同设备，应新增可解释的内存压力 / 设备策略，
-不能把浏览器 GC 观察或任意超时当成声音事实。
+MI4 本身不证明 22 个真实音色同时混合时不削波，也不证明 Loop 接缝、Envelope、CC64、鼓件 Choke
+或音色对应在真实浏览器中听感正确。MI5 随后用合法最小总谱与 Chromium PCM 补齐代表场景的自动
+门禁，人工听测仍为 `not-run`。若未来遥测表明固定 `192 MiB` 不适合不同设备，应新增可解释的
+内存压力 / 设备策略，不能把浏览器 GC 观察或任意超时当成声音事实。

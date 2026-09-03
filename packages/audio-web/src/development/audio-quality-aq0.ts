@@ -1,6 +1,8 @@
 export {
   AUDIO_QUALITY_AQ0_REPORT_SCHEMA,
+  AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ,
   AUDIO_QUALITY_AQ0_VELOCITY_VECTOR,
+  audioQualitySecondToFrame,
   runAudioQualityAq0BrowserBaseline,
 } from './audio-quality-aq0/browser-report'
 export type {
@@ -25,6 +27,11 @@ export type {
   AudioQualityExpressionEq2StressMeasurement,
   AudioQualityExpressionEq2TriggerMeasurement,
 } from './audio-quality-aq0/expression-eq2-browser-report'
+export { renderAudioQualityPlans } from './audio-quality-aq0/offline-render'
+export type {
+  AudioQualityOfflineRenderOptions,
+  AudioQualityOfflineRenderResult,
+} from './audio-quality-aq0/offline-render'
 export {
   countAudioQualityClippedFrames,
   measureAudioQualityAq0Channel,

@@ -53,10 +53,14 @@ MI3A 进一步接入 21 个精确 Program、Channel 10 和无声 Program Placeho
 [Studio MIDI Program Import Routing V1](../../apps/studio/docs/midi-program-import-routing-v1.md)。
 MI3B 把来源初始 CC7 / CC10 转成现有 Track Gain / Pan；精确听觉与兼容边界见
 [MIDI Initial Channel Controls V1](../project-midi/docs/midi-initial-channel-controls-v1.md)。
-MI4 已完成待审核实现：Studio 默认用 `192 MiB` LRU 总量预算约束应用级解码缓存，并补齐多
+MI4 已提交为 `8072aca`：Studio 默认用 `192 MiB` LRU 总量预算约束应用级解码缓存，并补齐多
 Soundbank 并发、稳定总谱复用、Abort、失败重试、局部失败与应用 dispose 门禁；测量与边界见
 [Multi-Soundbank Runtime Resource Gate V1](./docs/multi-soundbank-runtime-resource-gate-v1.md)。MI5
-总谱 PCM 与人工听测仍未完成，因此不能把导入路由或资源门禁视为已经通过听觉验收。
+已完成待审核实现：原创 Type 1 总谱经 Encoder / Decoder、Project MIDI、Playback 和真实七音源
+Runtime 在 Chromium 离线渲染，18 项路由、控制、Peak、Tail、预算和清理检查通过；同时把来源名
+含 `#` 的本地 WAV 规范化为 URL 安全资源名。人工听测仍为 `not-run`，因此不能把自动门禁冒充
+听觉验收。完整证据见
+[Built-in Multi-Instrument Score Playback V1 收口报告](./docs/built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
@@ -74,6 +78,8 @@ Catalog / Index / Mapping / Archive，只原子发布完整的新目录；已存
 内容上完全一致，冲突时拒绝覆盖。`prepare:studio-grand-local` 与
 `prepare:general-midi-percussion-local` 保留定向入口；
 `prepare:score-core-local` 按独立失败边界顺序准备 22 个 Soundbank，并生成不可变本地库存报告。
+规范化输出使用确定性的 URL 安全 WAV 文件名，单音源 preparation report schema version 2 另存
+原始 Archive Key 与完整内容哈希；这项寻址转换不修改 PCM 或 Manifest 控制语义。
 
 Batch 4B.1 的生产资源准备边界保持在包内：
 

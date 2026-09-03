@@ -1,6 +1,7 @@
 # General MIDI Percussion Compatibility Policy V1
 
-> Status: MI1C reviewed and committed as `fddeb3e`; MI2 committed as `f13df2f`; updated for MI3A
+> Status: MI1C reviewed and committed as `fddeb3e`; MI2 committed as `f13df2f`; refreshed for
+> MI5 URL-safe asset names
 >
 > Date: 2026-09-03
 >
@@ -80,15 +81,16 @@ MI1C 本地结果：
 | One-shot Zone           | 47                                                                 |
 | Exclusive Group Zone    | 3（MIDI `42 / 44 / 46`）                                           |
 | Loop Zone               | 0                                                                  |
-| Manifest bytes          | 31,292                                                             |
-| Manifest SHA-256        | `44de3d03cb7a4bb0ebb21ac057bb18bb8000bf6d27240e38cf4ec3732bec32d0` |
-| Preparation report hash | `4d7bc5406b5b7543f5ef804ef6617ba29aef5f0cd19b29b8bda5690279406de2` |
-| Score Core report hash  | `763fe7cfe0280833dfc2fc51b952197ec899bed4cdebb4c4517c19ad9537efa6` |
+| Manifest bytes          | 31,459                                                             |
+| Manifest SHA-256        | `61d3c00b60c98eb0b92f8a1b727533d00f8481642c32feef9b222d873068c1c4` |
+| Preparation report hash | `578f7329f3e892792fea5726aee278521eb799b24361a80afddb2286cdeb1d80` |
+| Score Core report hash  | `6faff68a9c7adf521195a809d405f6b7b849047fbb19397247eedc8fb071b82b` |
 
 Score Core 汇总报告升级为 schema version 2，并为每个条目记录命名 `manifestPolicy`。连续两次完整
 准备中，22 个 Soundbank 均为 `current`，汇总报告第二次也为 `current`。与 MI1B 相比，Archive、
 WAV、Zone 数、Loop 数和解码内存均不变；只有 GM Percussion 的 Manifest 控制语义与相应报告发生
-变化。工具仍拒绝覆盖任何未审阅的冲突目录。
+变化。MI5 因 URL 安全资源名再次刷新 Manifest / report 哈希，但 47 枚 WAV 和全部 Trigger / Group
+语义不变。工具仍拒绝覆盖任何未审阅的冲突目录。
 
 自动验证同时覆盖：政策身份与 47 Pitch 前置条件、47 个 One-shot、仅三个 Hi-hat Group、来源控制
 原样返回、未知政策提前失败，以及 Runtime 上“旧 One-shot 被新同组 Voice 快速 Choke、新 Voice
@@ -98,4 +100,5 @@ WAV、Zone 数、Loop 数和解码内存均不变；只有 GM Percussion 的 Man
 
 MI2 让用户能在 Studio Inspector 手动选择这套鼓组，并从同一 Catalogue 派生本地资源位置；MI3A
 让导入总谱的 Channel 10 自动选择它。Velocity 仍只调整单层 Sample 增益；没有 Round Robin、
-Velocity Layer、鼓组 Mixer、Room Mic 或新增效果。MI5 再进行真实总谱听测和混合 Peak 门禁。
+Velocity Layer、鼓组 Mixer、Room Mic 或新增效果。MI5 已通过含 Channel 10 的真实总谱自动混合
+Peak、路由与资源清理门禁；人工鼓件尾部和 Hi-hat Choke 听测仍为 `not-run`。

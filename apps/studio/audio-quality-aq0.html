@@ -4,17 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/src/assets/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Seele Audio Quality Foundation and Expression Gate</title>
+    <title>Seele Audio Quality and Multi-Instrument Score Gate</title>
   </head>
   <body>
     <main class="audition-shell">
       <header class="audition-header">
         <div>
-          <p class="eyebrow">Developer-only · Audio Quality Foundation + Expression</p>
-          <h1>V1A 与 CC64 表达力合成 PCM 质量报告</h1>
+          <p class="eyebrow">Developer-only · Audio Quality + Multi-Instrument Score</p>
+          <h1>合成基线与真实总谱 PCM 质量报告</h1>
           <p class="lede">
-            本页使用浏览器 OfflineAudioContext、自有合成 PCM 和生产 Sample Voice Runtime 生成结构化
-            报告；不读取 Project 或本地 Soundbank，也不会进入 Studio 生产构建。
+            本页使用浏览器 OfflineAudioContext 与生产 Sample Voice Runtime。第一部分保留自有合成 PCM
+            基线；第二部分从 Studio Catalogue 读取开发者本地 Soundbank，执行原始 MI5 最小总谱。
+            页面与本地采样资产都不会进入 Studio 生产构建。
           </p>
         </div>
         <output id="run-status" class="status" data-kind="idle">尚未运行</output>
@@ -39,6 +40,81 @@
           <button id="copy-report" type="button" class="secondary" disabled>复制报告 JSON</button>
         </div>
         <pre id="report-output" class="result" tabindex="0">等待运行。</pre>
+      </section>
+
+      <section class="panel" aria-labelledby="score-report-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Built-in Multi-Instrument · MI5</p>
+            <h2 id="score-report-title">真实音源最小总谱门禁</h2>
+          </div>
+          <span class="badge">7 soundbanks · 48 kHz</span>
+        </div>
+        <p>
+          原始 Type 1 MIDI fixture 经过真实 Encoder / Decoder、Project MIDI Import、Studio Program
+          与 Channel 10 路由、Playback Compiler / Scheduler，再由生产资源缓存和 Voice Runtime
+          离线渲染。它覆盖 Piano、Strings、Brass、Woodwind、Bass、Timpani、GM Percussion、CC64、
+          初始 CC7 / CC10、持续 Loop、one-shot、Hi-hat choke 与一个可见静音占位音色。
+        </p>
+        <div class="button-row">
+          <button id="run-score-report" type="button">运行真实音源总谱报告</button>
+          <button id="copy-score-report" type="button" class="secondary" disabled>
+            复制总谱报告 JSON
+          </button>
+          <button id="download-score-midi" type="button" class="secondary">
+            下载最小总谱 MIDI
+          </button>
+        </div>
+        <pre id="score-report-output" class="result" tabindex="0">
+等待运行；需要先准备 developer-local score-core Soundbank。</pre
+        >
+      </section>
+
+      <section class="panel" aria-labelledby="score-listening-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Human listening · auditable status</p>
+            <h2 id="score-listening-title">总谱人工听测记录</h2>
+          </div>
+          <span class="badge">Headphones recommended</span>
+        </div>
+        <p>
+          下载上面的 MIDI 并导入 Studio 后逐项试听。自动 PCM 不能替代对音色对应、接缝、释放感和
+          声部平衡的主观判断；尚未试听时必须保留为 not-run。
+        </p>
+        <div class="observation-grid">
+          <label class="field field-wide">
+            <span>听测状态</span>
+            <select id="score-review-status">
+              <option value="not-run" selected>not-run · 尚未试听</option>
+              <option value="passed">passed · 全部可接受</option>
+              <option value="failed">failed · 存在可闻问题</option>
+            </select>
+          </label>
+          <label class="field field-wide">
+            <span>音色对应与起音（Timbre mapping / Attack）</span>
+            <textarea id="score-attack-observation" rows="3"></textarea>
+          </label>
+          <label class="field field-wide">
+            <span>持续音与循环接缝（Sustain / Loop seam）</span>
+            <textarea id="score-loop-observation" rows="3"></textarea>
+          </label>
+          <label class="field field-wide">
+            <span>松键与踏板抬起（Key release / Pedal up）</span>
+            <textarea id="score-release-observation" rows="3"></textarea>
+          </label>
+          <label class="field field-wide">
+            <span>鼓件尾部与踩镲截音（Drum tail / Hi-hat choke）</span>
+            <textarea id="score-drum-observation" rows="3"></textarea>
+          </label>
+          <label class="field field-wide">
+            <span>声像与声部平衡（Pan / Section balance）</span>
+            <textarea id="score-balance-observation" rows="3"></textarea>
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="copy-score-review" type="button" class="secondary">复制人工听测 JSON</button>
+        </div>
       </section>
     </main>
 

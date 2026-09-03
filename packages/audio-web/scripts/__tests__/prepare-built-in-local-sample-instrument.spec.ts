@@ -15,7 +15,7 @@ import {
 import { BUILT_IN_LOCAL_MANIFEST_POLICY } from '../built-in-local-manifest-policy'
 
 const SOURCE_SLUG = 'fixture-strings-v1'
-const SAMPLE_FILE_NAME = '060-Fixture-Strings'
+const SAMPLE_FILE_NAME = '060-Fixture#Strings'
 const SOURCE_DIRECTORY = `soundbanks/MIDISampleSynth/${SOURCE_SLUG}`
 const temporaryRoots: string[] = []
 const textEncoder = new TextEncoder()
@@ -157,8 +157,8 @@ async function createPreparationFixture(): Promise<PreparationFixture> {
         midiNumber: 60,
         minRange: 60,
         urls: {
-          m4a: `https://static.example.test/${SAMPLE_FILE_NAME}.m4a`,
-          wav: `https://static.example.test/${SAMPLE_FILE_NAME}.wav`,
+          m4a: `https://static.example.test/${encodeURIComponent(SAMPLE_FILE_NAME)}.m4a`,
+          wav: `https://static.example.test/${encodeURIComponent(SAMPLE_FILE_NAME)}.wav`,
         },
       },
     ],
@@ -233,6 +233,7 @@ describe('built-in local Sample Instrument preparation', () => {
   it('creates deterministic normalized output and recognizes an identical rerun', async () => {
     const fixture = await createPreparationFixture()
     const first = await prepareBuiltInLocalSampleInstrument(fixture)
+    const normalizedSampleFileName = `sample-0001-${sha256(createFixtureWav()).slice(0, 12)}.wav`
 
     expect(first).toMatchObject({ outputDirectory: fixture.outputDirectory, status: 'created' })
     expect(first.inventory).toEqual({
@@ -263,7 +264,7 @@ describe('built-in local Sample Instrument preparation', () => {
       'samples',
     ])
     expect(await readdir(join(first.outputDirectory, 'samples'))).toEqual([
-      `${SAMPLE_FILE_NAME}.wav`,
+      normalizedSampleFileName,
     ])
     const manifestBytes = await readFile(join(first.outputDirectory, 'manifest.json'))
     const reportBytes = await readFile(join(first.outputDirectory, 'preparation-report.json'))
@@ -273,7 +274,7 @@ describe('built-in local Sample Instrument preparation', () => {
       soundbankId: 'fixture-strings',
       zones: [
         {
-          resource: { key: `samples/${SAMPLE_FILE_NAME}.wav` },
+          resource: { key: `samples/${normalizedSampleFileName}` },
           selector: { kind: 'exact-midi', pitch: 60 },
         },
       ],
@@ -287,6 +288,13 @@ describe('built-in local Sample Instrument preparation', () => {
         }),
       ]),
       productPitchRange: { maximumPitch: 60, minimumPitch: 60 },
+      resources: [
+        {
+          relativePath: `samples/${normalizedSampleFileName}`,
+          sourceArchiveKey: `${SAMPLE_FILE_NAME}.wav`,
+        },
+      ],
+      schemaVersion: 2,
       soundbankId: 'fixture-strings',
     })
     const firstHashes = [sha256(manifestBytes), sha256(reportBytes)]

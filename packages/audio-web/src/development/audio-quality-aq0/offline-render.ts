@@ -32,7 +32,7 @@ export interface AudioQualityOfflineRenderOptions {
   readonly acceptedScheduleOutcomes?: readonly SampleInstrumentVoiceScheduleOutcome[]
   readonly createPreparedResources: (
     context: OfflineAudioContext,
-  ) => PreparedAudibleMidiSampleResources
+  ) => PreparedAudibleMidiSampleResources | Promise<PreparedAudibleMidiSampleResources>
   readonly onScheduled?: (
     runtime: SampleInstrumentVoiceRuntime,
     results: readonly SampleInstrumentVoiceScheduleResult[],
@@ -117,11 +117,15 @@ export async function renderAudioQualityPlans(
     AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ,
   )
   const contextAdapter = createOfflineRuntimeContextAdapter(context)
-  const runtime = new SampleInstrumentVoiceRuntime({
-    output: createOutput(context, contextAdapter.audioContext),
-    preparedResources: options.createPreparedResources(context),
-  })
+  let runtime: SampleInstrumentVoiceRuntime | null = null
   try {
+    // Real developer-local Soundbanks require asynchronous Fetch/decode before scheduling.
+    // The same production Runtime and output calibration remain authoritative after preparation.
+    const preparedResources = await options.createPreparedResources(context)
+    runtime = new SampleInstrumentVoiceRuntime({
+      output: createOutput(context, contextAdapter.audioContext),
+      preparedResources,
+    })
     runtime.advanceGeneration(1 as ScheduledSampleVoicePlan['engineGeneration'])
     const results: SampleInstrumentVoiceScheduleResult[] = []
     const acceptedScheduleOutcomes = options.acceptedScheduleOutcomes ?? ['scheduled']
@@ -154,7 +158,7 @@ export async function renderAudioQualityPlans(
     })
   } catch (error) {
     contextAdapter.finishScheduling()
-    runtime.dispose()
+    runtime?.dispose()
     throw error
   }
 }

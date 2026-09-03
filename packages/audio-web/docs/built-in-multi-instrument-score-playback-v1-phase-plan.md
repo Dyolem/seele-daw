@@ -2,7 +2,8 @@
 
 > Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C committed as
 > `fddeb3e`; MI2 committed as `f13df2f`; MI3A committed as `cd043b9`; MI3B committed as
-> `5b62b68`; MI4 implementation pending review
+> `5b62b68`; MI4 committed as `8072aca`; MI5 implementation pending review, automated browser
+> gate and full root check passed, human listening remains `not-run`
 >
 > Date: 2026-09-03
 >
@@ -242,6 +243,9 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 - 人工听测记录音色对应、起音、持续 Loop 接缝、松键、鼓件尾部、Hi-hat choke、声像和声部平衡。
 - 运行完整根级 `pnpm check`、Studio Production Build 与 soundbank dist boundary；更新 PRODUCT、
   README 和收口报告后等待审核。
+
+本批实现、Chromium PCM 数值、URL 安全资源名兼容修正、人工听测状态和剩余边界见
+[Built-in Multi-Instrument Score Playback V1 收口报告](./built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
 ## 6. 质量与失败矩阵
 

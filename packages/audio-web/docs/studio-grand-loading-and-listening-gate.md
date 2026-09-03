@@ -59,7 +59,8 @@ apps/studio/public/soundbanks/measurements/studio-grand/loading-estimate.json
 ```
 
 报告绑定 Manifest SHA-256
-`f0566a4573a63d252221a9cc53ca9fee194c187bbe4ccf44405a604b5eb45e98`。相同输入重复执行为
+`7e9303dc189c31109b94f7df665cac73b0a5afd89dee5767fed477c2b539e06f`。该哈希在 MI5 中因 URL 安全
+资源名刷新，WAV 内容与测量数值未变。相同输入重复执行为
 幂等；若已有报告内容漂移，工具失败而不自动覆盖。
 
 ## 3. 浏览器 Fetch / decode smoke

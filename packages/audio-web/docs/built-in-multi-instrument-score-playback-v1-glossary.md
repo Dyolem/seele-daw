@@ -75,22 +75,23 @@
 
 ## 4. 本地资产、安全与资源成本
 
-| 中文             | 英文                        | 在本阶段中的准确含义                                                                                                                  |
-| ---------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| 开发者本地资产   | Developer-local Assets      | 只在本机开发和试听使用、被 Git 与生产构建排除的 Catalog、Mapping、Archive 和生成 WAV。它们不是可发布产品资产。                        |
-| 来源指纹         | Input Fingerprint / SHA-256 | 对每个审核输入文件记录的内容摘要。摘要变化表示来源发生漂移，必须重新审核，不能自动接受。                                              |
-| 规范化           | Normalization               | 把来源 Mapping/WAV 转换成严格、可寻址的 Seele Manifest/WAV 目录。它不是音频响度 normalization。                                       |
-| 生成目录         | Generated Asset Directory   | `public/soundbanks/generated/<id>/` 下的开发输出。现有目录必须逐文件相同；工具不会覆盖冲突内容。                                      |
-| 临时发布目录     | Staging Directory           | 新输出先完整写入的临时目录，全部成功后再原子 rename。失败只清理本次 staging。                                                         |
-| ZIP 安全预算     | Restricted ZIP Budget       | 对压缩包大小、Entry 数、单 Entry 解压大小、总解压大小和压缩率的限制，用于防止异常或恶意归档耗尽资源。                                 |
-| 资源字节预算     | Resource Byte Budget        | 浏览器 Fetch 单个 Manifest/WAV 允许的最大编码字节。它不是整套 ZIP 大小，也不是解码后内存。                                            |
-| 编码大小         | Encoded Byte Length         | WAV 文件在磁盘/网络中的字节数。PCM WAV 通常压缩很少，但仍与解码后的 Float32 内存不同。                                                |
-| 解码内存         | Decoded Float32 Memory      | AudioBuffer 按声道和帧保存 Float32 所需的内存。总谱同时用多个 Soundbank 时，这是比 ZIP 总大小更关键的运行时成本。                     |
-| 缓存保留预算     | Cache Retention Budget      | 允许资源缓存为了下次播放继续引用的解码内存上限。它不包含当前 Prepared Runtime 必须持有的 AudioBuffer，因此不是浏览器进程总内存上限。  |
-| 最近最少使用淘汰 | Least Recently Used / LRU   | 缓存超出保留预算时先移除最长时间没有命中的 Resource 引用；命中会把该项提升为最近使用。淘汰不会销毁仍被活动 Voice 引用的 AudioBuffer。 |
-| 按需音高准备     | Pitch-demand Preparation    | 只加载当前 Playback Plan 实际用到 Pitch 对应的 WAV，而不是打开项目就解码整套音源库。                                                  |
-| 资源定位器       | Asset Locator               | Studio 根据 `soundbankId` 提供同源 asset base 的边界。Audio Web 不扫描 Catalogue，也不猜路径。                                        |
-| 分发边界         | Distribution Boundary       | Vite Production Build 必须继续排除本地 Soundbank、试听页和开发报告；通过本地播放不代表获得再分发权。                                  |
+| 中文             | 英文                        | 在本阶段中的准确含义                                                                                                                     |
+| ---------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 开发者本地资产   | Developer-local Assets      | 只在本机开发和试听使用、被 Git 与生产构建排除的 Catalog、Mapping、Archive 和生成 WAV。它们不是可发布产品资产。                           |
+| 来源指纹         | Input Fingerprint / SHA-256 | 对每个审核输入文件记录的内容摘要。摘要变化表示来源发生漂移，必须重新审核，不能自动接受。                                                 |
+| 规范化           | Normalization               | 把来源 Mapping/WAV 转换成严格、可寻址的 Seele Manifest/WAV 目录。它不是音频响度 normalization。                                          |
+| 生成目录         | Generated Asset Directory   | `public/soundbanks/generated/<id>/` 下的开发输出。现有目录必须逐文件相同；工具不会覆盖冲突内容。                                         |
+| 临时发布目录     | Staging Directory           | 新输出先完整写入的临时目录，全部成功后再原子 rename。失败只清理本次 staging。                                                            |
+| ZIP 安全预算     | Restricted ZIP Budget       | 对压缩包大小、Entry 数、单 Entry 解压大小、总解压大小和压缩率的限制，用于防止异常或恶意归档耗尽资源。                                    |
+| 资源字节预算     | Resource Byte Budget        | 浏览器 Fetch 单个 Manifest/WAV 允许的最大编码字节。它不是整套 ZIP 大小，也不是解码后内存。                                               |
+| 编码大小         | Encoded Byte Length         | WAV 文件在磁盘/网络中的字节数。PCM WAV 通常压缩很少，但仍与解码后的 Float32 内存不同。                                                   |
+| 解码内存         | Decoded Float32 Memory      | AudioBuffer 按声道和帧保存 Float32 所需的内存。总谱同时用多个 Soundbank 时，这是比 ZIP 总大小更关键的运行时成本。                        |
+| 缓存保留预算     | Cache Retention Budget      | 允许资源缓存为了下次播放继续引用的解码内存上限。它不包含当前 Prepared Runtime 必须持有的 AudioBuffer，因此不是浏览器进程总内存上限。     |
+| 最近最少使用淘汰 | Least Recently Used / LRU   | 缓存超出保留预算时先移除最长时间没有命中的 Resource 引用；命中会把该项提升为最近使用。淘汰不会销毁仍被活动 Voice 引用的 AudioBuffer。    |
+| 按需音高准备     | Pitch-demand Preparation    | 只加载当前 Playback Plan 实际用到 Pitch 对应的 WAV，而不是打开项目就解码整套音源库。                                                     |
+| 资源定位器       | Asset Locator               | Studio 根据 `soundbankId` 提供同源 asset base 的边界。Audio Web 不扫描 Catalogue，也不猜路径。                                           |
+| URL 安全资源名   | URL-safe Resource Name      | 规范化输出只使用不会被浏览器解释为 fragment 或 query 的确定性文件名。来源名可含 `#` 等字符，但只保留在审计映射，不能直接充当 HTTP 路径。 |
+| 分发边界         | Distribution Boundary       | Vite Production Build 必须继续排除本地 Soundbank、试听页和开发报告；通过本地播放不代表获得再分发权。                                     |
 
 ## 5. 常见误解
 
@@ -108,3 +109,5 @@
 - **近似映射不等于错误**：经过审核且明确告知时，它是有限音源集的产品选择；不告知才是静默
   兼容性问题。
 - **本地可播放不等于可发布**：来源许可与生产分发是独立门禁。
+- **资源改名不等于音频归一化**：URL 安全文件名只改变 Manifest 的寻址方式；WAV 内容哈希不变，也不
+  改变响度、PCM、Loop 或 Envelope。

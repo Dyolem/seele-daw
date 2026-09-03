@@ -44,7 +44,12 @@ import {
 } from '#internal/development/audio-quality-aq0/offline-render'
 import type { SampleInstrumentVoiceRuntimeStatistics } from '#internal/sample-instrument/voice/voice-runtime'
 
-export { AUDIO_QUALITY_AQ0_REPORT_SCHEMA, AUDIO_QUALITY_AQ0_VELOCITY_VECTOR }
+export {
+  AUDIO_QUALITY_AQ0_REPORT_SCHEMA,
+  AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ,
+  AUDIO_QUALITY_AQ0_VELOCITY_VECTOR,
+  audioQualitySecondToFrame,
+}
 
 interface AudioQualityAq0RenderedWindowMeasurement {
   readonly channelMeasurements: readonly AudioQualityAq0ChannelMeasurement[]

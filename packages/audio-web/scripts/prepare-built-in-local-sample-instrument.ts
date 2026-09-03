@@ -136,6 +136,10 @@ interface PreparedOutputFile {
   readonly sha256: string
 }
 
+interface PreparedResourceOutput extends PreparedOutputFile {
+  readonly sourceArchiveKey: string
+}
+
 interface ValidatedDefinition extends BuiltInLocalSampleInstrumentDefinition {
   readonly expectedInputSha256ByPath: ReadonlyMap<string, string>
 }
@@ -340,14 +344,19 @@ function archiveEntryMap(
 function createManifest(
   mappingInput: unknown,
   wavMetadataByFileName: ReadonlyMap<string, SupportedWavMetadata>,
+  resourceKeyByFileName: ReadonlyMap<string, string>,
   definition: ValidatedDefinition,
 ): SampleInstrumentManifestV1 {
   const manifest = adaptBuiltInMidiSampleSynthMapping(mappingInput, {
     resolveWavResource: ({ fileName }) => {
       const metadata = wavMetadataByFileName.get(fileName)
       if (metadata === undefined) throw new TypeError(`WAV metadata is missing for ${fileName}`)
+      const resourceKey = resourceKeyByFileName.get(fileName)
+      if (resourceKey === undefined) {
+        throw new TypeError(`normalized WAV resource key is missing for ${fileName}`)
+      }
       return {
-        key: `samples/${fileName}.wav`,
+        key: resourceKey,
         sourceSampleRateHz: metadata.sampleRateHz,
       }
     },
@@ -384,26 +393,38 @@ function prepareResourceOutputs(
 ): {
   readonly metadataByFileName: ReadonlyMap<string, SupportedWavMetadata>
   readonly metadataByResourceKey: ReadonlyMap<string, SupportedWavMetadata>
-  readonly outputs: readonly PreparedOutputFile[]
+  readonly outputs: readonly PreparedResourceOutput[]
+  readonly resourceKeyByFileName: ReadonlyMap<string, string>
 } {
   const metadataByFileName = new Map<string, SupportedWavMetadata>()
   const metadataByResourceKey = new Map<string, SupportedWavMetadata>()
-  const outputs = sampleFileNames.map((fileName): PreparedOutputFile => {
+  const resourceKeyByFileName = new Map<string, string>()
+  const outputs = sampleFileNames.map((fileName, index): PreparedResourceOutput => {
     const archiveKey = `${fileName}.wav`
     const bytes = entriesByKey.get(archiveKey)
     if (bytes === undefined) {
       fail('missing-archive-entry', 'decoded Archive entry is missing', archiveKey)
     }
     const metadata = parseSupportedWavMetadata(bytes)
-    const relativePath = `samples/${archiveKey}`
+    const digest = sha256(bytes)
+    // Source names may contain URL delimiters such as '#'. The normalized product
+    // asset name is deliberately opaque, deterministic, and safe in browser paths.
+    const relativePath = `samples/sample-${String(index + 1).padStart(4, '0')}-${digest.slice(0, 12)}.wav`
     metadataByFileName.set(fileName, metadata)
     metadataByResourceKey.set(relativePath, metadata)
-    return Object.freeze({ bytes, relativePath, sha256: sha256(bytes) })
+    resourceKeyByFileName.set(fileName, relativePath)
+    return Object.freeze({
+      bytes,
+      relativePath,
+      sha256: digest,
+      sourceArchiveKey: archiveKey,
+    })
   })
   return Object.freeze({
     metadataByFileName,
     metadataByResourceKey,
     outputs: Object.freeze(outputs),
+    resourceKeyByFileName,
   })
 }
 
@@ -567,7 +588,12 @@ export async function prepareBuiltInLocalSampleInstrument(
   }
 
   const resources = prepareResourceOutputs(mappingInventory.sampleFileNames, entriesByKey)
-  const manifest = createManifest(mappingInput, resources.metadataByFileName, definition)
+  const manifest = createManifest(
+    mappingInput,
+    resources.metadataByFileName,
+    resources.resourceKeyByFileName,
+    definition,
+  )
   assertManifestResourceDurations(manifest, resources.metadataByResourceKey)
   const manifestBytes = jsonBytes(manifest)
   const manifestOutput = Object.freeze({
@@ -578,7 +604,7 @@ export async function prepareBuiltInLocalSampleInstrument(
 
   const report = {
     schema: 'seele.local-sample-instrument-preparation-report',
-    schemaVersion: 1,
+    schemaVersion: 2,
     soundbankId: definition.soundbankId,
     sourceSlug: selection.sourceSlug,
     generalMidiProgram: selection.generalMidiProgram,
@@ -614,6 +640,7 @@ export async function prepareBuiltInLocalSampleInstrument(
         relativePath: output.relativePath,
         sampleRateHz: metadata.sampleRateHz,
         sha256: output.sha256,
+        sourceArchiveKey: output.sourceArchiveKey,
       }
     }),
   }

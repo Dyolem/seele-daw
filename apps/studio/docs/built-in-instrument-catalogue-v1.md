@@ -81,8 +81,8 @@ Missing 不会改写 Project Fact。若未知 Sample Device 含合法 `soundbank
   初始 CC7 / CC10 映射到 Track Channel，不改变 Catalogue 身份。
 - Instrument Browser、搜索、Preset、Preview Audition、远程安装、Action Catalogue 与用户 Keymap
   继续延期。
-- 本批只接通目录、显式选择与位置派生；多 Soundbank Cache、混合 Peak 和人工总谱听测仍由
-  MI4 / MI5 验收。
+- 本批只接通目录、显式选择与位置派生；多 Soundbank Cache 与自动混合 Peak 随后分别由 MI4 /
+  MI5 验收，人工总谱听测仍为 `not-run`。
 
 ## 5. MI2 自动验证
 

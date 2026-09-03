@@ -91,5 +91,5 @@ Program 后，前后 Note 会进入不同 normalized Track 的行为。
 - 根级 `pnpm lint` 已通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint；
 - Studio Production Build 与 soundbank dist boundary 通过，本地 Soundbank 未进入 `dist`。
 
-本批不执行人工声音试听，也不重复完整根级 `pnpm check`；多音源资源压力、混合 Peak 与总谱听测
-仍由 MI4 / MI5 完成。
+本批不执行人工声音试听，也不重复完整根级 `pnpm check`；多音源资源压力与自动混合 Peak 随后
+由 MI4 / MI5 完成，总谱人工听测仍为 `not-run`。

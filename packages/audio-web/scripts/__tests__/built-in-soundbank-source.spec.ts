@@ -79,6 +79,7 @@ describe('built-in Soundbank source selection', () => {
   it('resolves one canonical source without retaining remote URLs', () => {
     const fixture = createFixture()
     const selection = resolveBuiltInSoundbankSource({
+      expectedCanonicalForProgram: true,
       expectedGeneralMidiProgram: 0,
       generalMidiIndex: fixture.generalMidiIndex,
       selectedCatalog: fixture.selectedCatalog,
@@ -87,6 +88,8 @@ describe('built-in Soundbank source selection', () => {
     })
 
     expect(selection).toEqual({
+      canonicalForProgram: true,
+      canonicalSoundbankSlug: SOURCE_SLUG,
       catalogRelativePath: `${DIRECTORY}/${SOURCE_SLUG}.catalog.json`,
       displayName: 'Studio Grand',
       embeddedMappingEntryKey: `${SOURCE_SLUG}.json`,
@@ -97,6 +100,27 @@ describe('built-in Soundbank source selection', () => {
     })
     expect(JSON.stringify(selection)).not.toContain('https://')
     expect(() => validateBuiltInSoundbankCatalog(fixture.soundbankCatalog, selection)).not.toThrow()
+  })
+
+  it('resolves one explicitly reviewed non-canonical Program candidate', () => {
+    const fixture = createFixture()
+    fixture.generalMidiIndex[0].canonicalSoundbank = 'canonical-piano-source'
+    fixture.generalMidiIndex[0].soundbanks[0]!.isCanonicalForProgram = false
+    fixture.soundbankMap.bySlug[SOURCE_SLUG]!.generalMidi.canonicalSoundbank =
+      'canonical-piano-source'
+    fixture.soundbankMap.bySlug[SOURCE_SLUG]!.generalMidi.isCanonicalForProgram = false
+
+    const selection = resolveBuiltInSoundbankSource({
+      expectedCanonicalForProgram: false,
+      expectedGeneralMidiProgram: 0,
+      generalMidiIndex: fixture.generalMidiIndex,
+      selectedCatalog: fixture.selectedCatalog,
+      soundbankMap: fixture.soundbankMap,
+      sourceSlug: SOURCE_SLUG,
+    })
+
+    expect(selection.canonicalForProgram).toBe(false)
+    expect(selection.canonicalSoundbankSlug).toBe('canonical-piano-source')
   })
 
   it.each([
@@ -124,6 +148,7 @@ describe('built-in Soundbank source selection', () => {
 
     expect(() =>
       resolveBuiltInSoundbankSource({
+        expectedCanonicalForProgram: true,
         expectedGeneralMidiProgram: 0,
         generalMidiIndex: fixture.generalMidiIndex,
         selectedCatalog: fixture.selectedCatalog,

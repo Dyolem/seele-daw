@@ -10,22 +10,24 @@
 
 ## 1. MIDI 文件与乐器路由
 
-| 中文           | 英文                                 | 在本阶段中的准确含义                                                                                                                     |
-| -------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 总谱 MIDI      | Score MIDI / Multi-track MIDI        | 含多个声部 Track 的 Standard MIDI File，例如钢琴、弦乐、铜管、木管和打击乐。MIDI 保存演奏指令，不自带可听 WAV 音色。                     |
-| 标准 MIDI 文件 | Standard MIDI File / SMF             | `.mid` / `.midi` 文件格式。它可保存 Note、Program、Controller、Tempo 等事件，但不会规定播放器必须使用哪套采样素材。                      |
-| MIDI Track     | MIDI Track                           | 文件中的事件轨。Decoder 可能把一个来源 Track 按 Channel 和 Program 拆成多个 normalized Track。它不等同于 Seele Project Track。           |
-| 规范化 Track   | Normalized Track                     | Decoder 保证只对应一个 MIDI Channel 和一个当前 Program 的中立 Track。它让创建 Project Instrument Track 时可以选择一个初始音源。          |
-| MIDI Channel   | MIDI Channel                         | MIDI 逻辑通道，协议值为 `0...15`，用户通常看到 `1...16`。Note 与 Controller 是否互相影响，首先由 Channel 决定。                          |
-| Channel 10     | MIDI Channel 10 / Percussion Channel | 用户看到的第 10 通道，代码值为 `9`。General MIDI 通常把它用于鼓组；不同 Pitch 代表不同鼓件，而不是同一乐器的不同音高。                   |
-| 音色编号       | Program Change / Program Number      | `0...127` 的 MIDI 乐器编号。用户手册常写成 `1...128`，因此阅读日志和界面时必须注意是否零基。Program 只表达期望乐器类别，不包含声音数据。 |
-| 动态换音色     | Mid-track Program Change             | 播放途中改变 Program。当前 Decoder 会按 `[Program, Channel]` 拆分事件；V1 不把它保存为可编辑的时间线 Program Fact。                      |
-| 通用 MIDI      | General MIDI / GM                    | 对 Program 名称、Channel 10 鼓件 Pitch 等作约定的兼容标准。支持部分 GM Program 不等于完整 GM、GS 或 XG 兼容。                            |
-| 音色库选择     | Bank Select / CC0 + CC32             | Program 之外选择 Bank 的两个 Controller。V1 不应用它们，仍以诊断报告，不能只看 Program 就声称支持来源 Bank。                             |
-| 主音量         | Channel Volume / CC7                 | MIDI Channel 的音量控制。V1 只把首个 Note 前最后生效的值转换成 Project Track 初始 Gain；后续动态变化尚不是 Automation。                  |
-| 声像           | Pan / CC10                           | 声音在左右声道间的位置。值 `64` 是中心；V1 只转换初始值，播放中的连续变化延期。                                                          |
-| 表情           | Expression / CC11                    | 常用于在 CC7 基础上塑造乐句动态。V1 尚未实现，因此总谱可能有正确音色但缺少渐强、渐弱和呼吸感。                                           |
-| 调制轮         | Modulation / CC1                     | 常用于弦乐或管乐的颤音、动态层或演奏法控制。V1 尚未实现，不能把来源 CC1 当作已经听见。                                                   |
+| 中文           | 英文                                 | 在本阶段中的准确含义                                                                                                                           |
+| -------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 总谱 MIDI      | Score MIDI / Multi-track MIDI        | 含多个声部 Track 的 Standard MIDI File，例如钢琴、弦乐、铜管、木管和打击乐。MIDI 保存演奏指令，不自带可听 WAV 音色。                           |
+| 标准 MIDI 文件 | Standard MIDI File / SMF             | `.mid` / `.midi` 文件格式。它可保存 Note、Program、Controller、Tempo 等事件，但不会规定播放器必须使用哪套采样素材。                            |
+| MIDI Track     | MIDI Track                           | 文件中的事件轨。Decoder 可能把一个来源 Track 按 Channel 和 Program 拆成多个 normalized Track。它不等同于 Seele Project Track。                 |
+| 规范化 Track   | Normalized Track                     | Decoder 保证只对应一个 MIDI Channel 和一个当前 Program 的中立 Track。它让创建 Project Instrument Track 时可以选择一个初始音源。                |
+| MIDI Channel   | MIDI Channel                         | MIDI 逻辑通道，协议值为 `0...15`，用户通常看到 `1...16`。Note 与 Controller 是否互相影响，首先由 Channel 决定。                                |
+| Channel 10     | MIDI Channel 10 / Percussion Channel | 用户看到的第 10 通道，代码值为 `9`。General MIDI 通常把它用于鼓组；不同 Pitch 代表不同鼓件，而不是同一乐器的不同音高。                         |
+| 音色编号       | Program Change / Program Number      | `0...127` 的 MIDI 乐器编号。用户手册常写成 `1...128`，因此阅读日志和界面时必须注意是否零基。Program 只表达期望乐器类别，不包含声音数据。       |
+| 来源索引身份   | Source-index Identity                | 本地资产目录把某个 Sample 来源记录在哪个 Program 下、是否为 canonical。它用于验证资产来源，不必等于 Seele 将来接收 MIDI 时采用的产品路由。     |
+| 产品导入路由   | Product Import Route                 | Seele 对来源 MIDI Program 或 Channel 10 作出的产品映射。例如 Muted Trumpet 可以路由 Program 59，同时其审核资产仍是 Program 56 下的 candidate。 |
+| 动态换音色     | Mid-track Program Change             | 播放途中改变 Program。当前 Decoder 会按 `[Program, Channel]` 拆分事件；V1 不把它保存为可编辑的时间线 Program Fact。                            |
+| 通用 MIDI      | General MIDI / GM                    | 对 Program 名称、Channel 10 鼓件 Pitch 等作约定的兼容标准。支持部分 GM Program 不等于完整 GM、GS 或 XG 兼容。                                  |
+| 音色库选择     | Bank Select / CC0 + CC32             | Program 之外选择 Bank 的两个 Controller。V1 不应用它们，仍以诊断报告，不能只看 Program 就声称支持来源 Bank。                                   |
+| 主音量         | Channel Volume / CC7                 | MIDI Channel 的音量控制。V1 只把首个 Note 前最后生效的值转换成 Project Track 初始 Gain；后续动态变化尚不是 Automation。                        |
+| 声像           | Pan / CC10                           | 声音在左右声道间的位置。值 `64` 是中心；V1 只转换初始值，播放中的连续变化延期。                                                                |
+| 表情           | Expression / CC11                    | 常用于在 CC7 基础上塑造乐句动态。V1 尚未实现，因此总谱可能有正确音色但缺少渐强、渐弱和呼吸感。                                                 |
+| 调制轮         | Modulation / CC1                     | 常用于弦乐或管乐的颤音、动态层或演奏法控制。V1 尚未实现，不能把来源 CC1 当作已经听见。                                                         |
 
 ## 2. Project、Catalogue 与 Soundbank
 

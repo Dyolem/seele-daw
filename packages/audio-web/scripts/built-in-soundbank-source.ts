@@ -17,6 +17,7 @@ import {
 const MIDI_SAMPLE_SYNTH_ENGINE = 'MIDISampleSynth'
 
 export interface BuiltInSoundbankSourceRequest {
+  readonly expectedCanonicalForProgram: boolean
   readonly expectedGeneralMidiProgram: number
   readonly generalMidiIndex: unknown
   readonly selectedCatalog: unknown
@@ -25,6 +26,8 @@ export interface BuiltInSoundbankSourceRequest {
 }
 
 export interface BuiltInSoundbankSourceSelection {
+  readonly canonicalForProgram: boolean
+  readonly canonicalSoundbankSlug: string
   readonly catalogRelativePath: string
   readonly displayName: string
   readonly embeddedMappingEntryKey: string
@@ -151,6 +154,8 @@ function validateGeneralMidiIndex(
   input: unknown,
   expectedProgram: number,
   sourceSlug: string,
+  expectedCanonicalForProgram: boolean,
+  expectedCanonicalSoundbankSlug: string,
 ): void {
   const root = readDataObject(input, '$generalMidiIndex')
   const programPath = `$generalMidiIndex.${expectedProgram}`
@@ -168,7 +173,7 @@ function validateGeneralMidiIndex(
   )
   assertEqual(
     readNonBlankStringProperty(program, 'canonicalSoundbank', programPath),
-    sourceSlug,
+    expectedCanonicalSoundbankSlug,
     `${programPath}.canonicalSoundbank`,
   )
 
@@ -187,19 +192,16 @@ function validateGeneralMidiIndex(
       MIDI_SAMPLE_SYNTH_ENGINE,
       `${path}.engine`,
     )
-    assertEqual(
-      readBoolean(
-        readRequiredValue(candidate, 'isCanonicalForProgram', path),
-        `${path}.isCanonicalForProgram`,
-      ),
-      true,
+    const canonicalForProgram = readBoolean(
+      readRequiredValue(candidate, 'isCanonicalForProgram', path),
       `${path}.isCanonicalForProgram`,
     )
+    assertEqual(canonicalForProgram, expectedCanonicalForProgram, `${path}.isCanonicalForProgram`)
   }
   if (matchCount === 0)
-    fail('missing-source', `${programPath}.soundbanks`, 'canonical entry is absent')
+    fail('missing-source', `${programPath}.soundbanks`, 'source entry is absent')
   if (matchCount > 1) {
-    fail('ambiguous-source', `${programPath}.soundbanks`, 'canonical entry appears more than once')
+    fail('ambiguous-source', `${programPath}.soundbanks`, 'source entry appears more than once')
   }
 }
 
@@ -208,6 +210,10 @@ function resolveSource(request: BuiltInSoundbankSourceRequest): BuiltInSoundbank
     throw new StructuredDataError('$request.expectedGeneralMidiProgram', 'expected an integer')
   }
   const sourceSlug = readNonBlankString(request.sourceSlug, '$request.sourceSlug')
+  const expectedCanonicalForProgram = readBoolean(
+    request.expectedCanonicalForProgram,
+    '$request.expectedCanonicalForProgram',
+  )
   const root = readDataObject(request.soundbankMap, '$soundbankMap')
   const bySlug = readObjectProperty(root, 'bySlug', '$soundbankMap')
   const entryPath = `$soundbankMap.bySlug.${sourceSlug}`
@@ -278,18 +284,24 @@ function resolveSource(request: BuiltInSoundbankSourceRequest): BuiltInSoundbank
     request.expectedGeneralMidiProgram,
     `${entryPath}.generalMidi.programChange`,
   )
-  assertEqual(
-    readNonBlankStringProperty(generalMidi, 'canonicalSoundbank', `${entryPath}.generalMidi`),
-    sourceSlug,
-    `${entryPath}.generalMidi.canonicalSoundbank`,
+  const canonicalSoundbankSlug = readNonBlankStringProperty(
+    generalMidi,
+    'canonicalSoundbank',
+    `${entryPath}.generalMidi`,
+  )
+  const canonicalForProgram = readBoolean(
+    readRequiredValue(generalMidi, 'isCanonicalForProgram', `${entryPath}.generalMidi`),
+    `${entryPath}.generalMidi.isCanonicalForProgram`,
   )
   assertEqual(
-    readBoolean(
-      readRequiredValue(generalMidi, 'isCanonicalForProgram', `${entryPath}.generalMidi`),
-      `${entryPath}.generalMidi.isCanonicalForProgram`,
-    ),
-    true,
+    canonicalForProgram,
+    expectedCanonicalForProgram,
     `${entryPath}.generalMidi.isCanonicalForProgram`,
+  )
+  assertEqual(
+    canonicalSoundbankSlug === sourceSlug,
+    canonicalForProgram,
+    `${entryPath}.generalMidi.canonicalSoundbank`,
   )
 
   validateSelectedCatalogEntry(
@@ -298,9 +310,17 @@ function resolveSource(request: BuiltInSoundbankSourceRequest): BuiltInSoundbank
     displayName,
     wavArchiveFileName,
   )
-  validateGeneralMidiIndex(request.generalMidiIndex, request.expectedGeneralMidiProgram, sourceSlug)
+  validateGeneralMidiIndex(
+    request.generalMidiIndex,
+    request.expectedGeneralMidiProgram,
+    sourceSlug,
+    expectedCanonicalForProgram,
+    canonicalSoundbankSlug,
+  )
 
   const selection = Object.freeze({
+    canonicalForProgram,
+    canonicalSoundbankSlug,
     catalogRelativePath: readSafeRelativePath(
       catalogFile,
       'relativePath',

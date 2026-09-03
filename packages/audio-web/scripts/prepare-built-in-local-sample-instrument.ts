@@ -41,6 +41,7 @@ export interface BuiltInLocalSampleInstrumentInputFingerprint {
 
 export interface BuiltInLocalSampleInstrumentDefinition {
   readonly archiveLimits: RestrictedZipArchiveLimits
+  readonly expectedCanonicalForProgram: boolean
   readonly expectedGeneralMidiProgram: number
   readonly expectedInputFingerprints: readonly BuiltInLocalSampleInstrumentInputFingerprint[]
   readonly expectedSourceDisplayName: string
@@ -59,8 +60,32 @@ export interface PrepareBuiltInLocalSampleInstrumentOptions {
 }
 
 export interface BuiltInLocalSampleInstrumentPreparationResult {
+  readonly inventory: BuiltInLocalSampleInstrumentPreparationInventory
   readonly outputDirectory: string
   readonly status: 'created' | 'current'
+}
+
+export interface BuiltInLocalSampleInstrumentPreparationInventory {
+  readonly archive: {
+    readonly compressedByteLength: number
+    readonly entryCount: number
+    readonly totalUncompressedByteLength: number
+  }
+  readonly manifest: {
+    readonly byteLength: number
+    readonly exclusiveGroupZoneCount: number
+    readonly loopZoneCount: number
+    readonly oneShotZoneCount: number
+    readonly sha256: string
+    readonly zoneCount: number
+  }
+  readonly resources: {
+    readonly count: number
+    readonly decodedFloat32ByteLength: number
+    readonly encodedByteLength: number
+    readonly maximumDecodedFloat32ByteLength: number
+    readonly maximumEncodedByteLength: number
+  }
 }
 
 export type BuiltInLocalSampleInstrumentPreparationErrorCode =
@@ -191,6 +216,9 @@ function validateDefinition(
   localSoundbankRoot: string,
 ): ValidatedDefinition {
   parseSoundbankId(definition.soundbankId)
+  if (typeof definition.expectedCanonicalForProgram !== 'boolean') {
+    fail('invalid-definition', 'expectedCanonicalForProgram must be a boolean')
+  }
   assertNonBlankString(definition.expectedSourceDisplayName, 'expectedSourceDisplayName')
   assertNonBlankString(definition.sourceSlug, 'sourceSlug')
   if (
@@ -453,6 +481,7 @@ export async function prepareBuiltInLocalSampleInstrument(
   }
 
   const selection = resolveBuiltInSoundbankSource({
+    expectedCanonicalForProgram: definition.expectedCanonicalForProgram,
     expectedGeneralMidiProgram: definition.expectedGeneralMidiProgram,
     generalMidiIndex: parseJson(generalMidiIndex.bytes, generalMidiIndex.relativePath),
     selectedCatalog: parseJson(selectedCatalog.bytes, selectedCatalog.relativePath),
@@ -570,5 +599,40 @@ export async function prepareBuiltInLocalSampleInstrument(
   })
   const outputs = Object.freeze([manifestOutput, reportOutput, ...resources.outputs])
   const status = await publishOutputs(outputDirectory, definition.generatedDirectoryName, outputs)
-  return Object.freeze({ outputDirectory, status })
+  const decodedResourceByteLengths = resources.outputs.map((output) => {
+    const metadata = resources.metadataByResourceKey.get(output.relativePath)
+    if (metadata === undefined) throw new TypeError(`${output.relativePath}: metadata is missing`)
+    return metadata.frameCount * metadata.channelCount * Float32Array.BYTES_PER_ELEMENT
+  })
+  const inventory = Object.freeze({
+    archive: Object.freeze({
+      compressedByteLength: archive.archiveByteLength,
+      entryCount: archive.entries.length,
+      totalUncompressedByteLength: archive.totalUncompressedByteLength,
+    }),
+    manifest: Object.freeze({
+      byteLength: manifestOutput.bytes.byteLength,
+      exclusiveGroupZoneCount: manifest.zones.filter((zone) => zone.exclusiveGroup !== null).length,
+      loopZoneCount: manifest.zones.filter((zone) => zone.loop.kind !== 'none').length,
+      oneShotZoneCount: manifest.zones.filter((zone) => zone.triggerMode === 'one-shot').length,
+      sha256: manifestOutput.sha256,
+      zoneCount: manifest.zones.length,
+    }),
+    resources: Object.freeze({
+      count: resources.outputs.length,
+      decodedFloat32ByteLength: decodedResourceByteLengths.reduce(
+        (total, byteLength) => total + byteLength,
+        0,
+      ),
+      encodedByteLength: resources.outputs.reduce(
+        (total, output) => total + output.bytes.byteLength,
+        0,
+      ),
+      maximumDecodedFloat32ByteLength: Math.max(...decodedResourceByteLengths),
+      maximumEncodedByteLength: Math.max(
+        ...resources.outputs.map((output) => output.bytes.byteLength),
+      ),
+    }),
+  })
+  return Object.freeze({ inventory, outputDirectory, status })
 }

@@ -18,6 +18,7 @@
     "lint": "pnpm --workspace-root lint",
     "lint:fix": "pnpm --workspace-root lint:fix",
     "measure:studio-grand-local": "jiti scripts/measure-studio-grand-local-assets.ts",
+    "prepare:score-core-local": "jiti scripts/prepare-score-core-local-assets.ts",
     "prepare:studio-grand-local": "jiti scripts/prepare-studio-grand-local-assets.ts",
     "type-check": "tsc -p tsconfig.json && tsc -p tsconfig.tools.json",
     "test:run": "vitest run --environment node"

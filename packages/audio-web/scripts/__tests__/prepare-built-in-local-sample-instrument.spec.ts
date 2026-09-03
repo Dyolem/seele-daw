@@ -202,6 +202,7 @@ async function createPreparationFixture(): Promise<PreparationFixture> {
         maximumEntryCount: 4,
         maximumTotalUncompressedByteLength: 32 * 1_024,
       }),
+      expectedCanonicalForProgram: true,
       expectedGeneralMidiProgram: 48,
       expectedInputFingerprints: Object.freeze(
         inputs.map(([relativePath, bytes]) =>
@@ -231,7 +232,29 @@ describe('built-in local Sample Instrument preparation', () => {
     const fixture = await createPreparationFixture()
     const first = await prepareBuiltInLocalSampleInstrument(fixture)
 
-    expect(first).toEqual({ outputDirectory: fixture.outputDirectory, status: 'created' })
+    expect(first).toMatchObject({ outputDirectory: fixture.outputDirectory, status: 'created' })
+    expect(first.inventory).toEqual({
+      archive: {
+        compressedByteLength: expect.any(Number),
+        entryCount: 2,
+        totalUncompressedByteLength: expect.any(Number),
+      },
+      manifest: {
+        byteLength: expect.any(Number),
+        exclusiveGroupZoneCount: 0,
+        loopZoneCount: 0,
+        oneShotZoneCount: 0,
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+        zoneCount: 1,
+      },
+      resources: {
+        count: 1,
+        decodedFloat32ByteLength: 16,
+        encodedByteLength: 52,
+        maximumDecodedFloat32ByteLength: 16,
+        maximumEncodedByteLength: 52,
+      },
+    })
     expect((await readdir(first.outputDirectory)).sort()).toEqual([
       'manifest.json',
       'preparation-report.json',

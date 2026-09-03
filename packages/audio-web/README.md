@@ -40,10 +40,12 @@ Studio Composition Root 补齐 Paused / Stopped 尾音 Handle 清理，真实 St
 
 后续 [Built-in Multi-Instrument Score Playback V1](./docs/built-in-multi-instrument-score-playback-v1-phase-plan.md)
 已获批准，相关 MIDI、采样与资源术语见
-[多乐器总谱发声 V1 术语表](./docs/built-in-multi-instrument-score-playback-v1-glossary.md)。当前 MI0 / MI1A
-只建立阶段契约和配置驱动的开发者本地资产准备内核；Studio Grand 入口已变成一份薄 Definition，
-但它仍是唯一真实消费者。这里尚未增加第二个 Soundbank、Program / Channel 10 导入路由、乐器选择
-UI 或多音源 Runtime，因此不能把准备工具视为已经交付的总谱播放功能。
+[多乐器总谱发声 V1 术语表](./docs/built-in-multi-instrument-score-playback-v1-glossary.md)。MI0 / MI1A
+已提交为 `f7af1db`；MI1B 已冻结并规范化 22 个开发者本地 Score Core Soundbank，逐音源身份、
+控制语义和资源证据见
+[Built-in Score Core Soundbank Audit](./docs/built-in-score-core-soundbank-audit.md)。当前 Studio Grand
+仍是唯一产品消费者；这里尚未增加 Program / Channel 10 导入路由、乐器选择 UI 或多音源 Runtime，
+因此不能把开发资产准备视为已经交付的总谱播放功能。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
@@ -55,10 +57,11 @@ UI 或多音源 Runtime，因此不能把准备工具视为已经交付的总谱
 Seele 自身的规范语义见
 [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](./docs/seele-supported-sfz-profile-v1.md)。
 
-MI1A 的通用准备内核要求每个内置 Definition 显式冻结 Soundbank ID、来源身份、GM Program、产品
-音域、ZIP 安全预算和六个输入 SHA-256。它在规范化前交叉验证 Catalog / Index / Mapping / Archive，
-只原子发布完整的新目录；已存在目录必须在文件集合和逐文件内容上完全一致，冲突时拒绝覆盖。现有
-`prepare:studio-grand-local` 命令仍是唯一入口，并以原输出逐字节 `current` 作为兼容门禁。
+通用准备内核要求每个内置 Definition 显式冻结 Soundbank ID、来源身份、来源 Program 与
+canonical/candidate 角色、产品音域、ZIP 安全预算和六个输入 SHA-256。它在规范化前交叉验证
+Catalog / Index / Mapping / Archive，只原子发布完整的新目录；已存在目录必须在文件集合和逐文件
+内容上完全一致，冲突时拒绝覆盖。`prepare:studio-grand-local` 保留单音源入口；
+`prepare:score-core-local` 按独立失败边界顺序准备 22 个 Soundbank，并生成不可变本地库存报告。
 
 Batch 4B.1 的生产资源准备边界保持在包内：
 

@@ -1,6 +1,6 @@
 # Built-in Multi-Instrument Score Playback V1 阶段计划
 
-> Status: Approved; MI0 / MI1A implementation pending review
+> Status: MI0 / MI1A reviewed and committed as `f7af1db`; MI1B implementation pending review
 >
 > Date: 2026-09-02
 >
@@ -137,8 +137,8 @@ Catalogue 属于 Studio Composition Root 的不可变产品配置，不属于 Pr
 ### MI1A — 配置驱动的本地规范化核心
 
 - 把 Studio Grand 专用 orchestration 提取为包内工具核心；真实消费者仍只有 Studio Grand。
-- 每个 Definition 显式提供 `soundbankId`、来源 slug、预期显示名、GM Program、产品音域、生成目录、
-  ZIP 预算和全部六个输入文件的 SHA-256。
+- 每个 Definition 显式提供 `soundbankId`、来源 slug、预期显示名、来源 GM Program 与
+  canonical/candidate 角色、产品音域、生成目录、ZIP 预算和全部六个输入文件的 SHA-256。
 - 只允许写入 `generated/<single-safe-segment>`；来源路径必须保持在本地 Soundbank Root 内。
 - 规范化前验证 Catalog / Index / Mapping / Archive 身份、外部与内嵌 Mapping 一致性、精确 Archive
   Entry 集合、WAV 格式/时长和音域覆盖。
@@ -157,6 +157,11 @@ MI1A 不增加第二个 Soundbank、不改变 Manifest schema、不修改声音�
 - 建立汇总清单，但各音源 Definition 仍是各自完整的失败边界；一个来源漂移不批准其他条目。
 - 实测浏览器单资源上限、Manifest 上限、编码字节和 decoded Float32 预算，再决定是否调整当前
   `64 KiB / 4 MiB` 限制，不能按 ZIP 总大小猜测。
+
+MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
+[Built-in Score Core Soundbank Audit](./built-in-score-core-soundbank-audit.md)。本批只建立开发资产，
+不会提前接入 Studio Catalogue；其中 GM Percussion 的原始 gated Manifest 必须等 MI1C 转换后
+才能成为产品候选。
 
 ### MI1C — General MIDI Percussion 兼容政策
 

@@ -2,6 +2,8 @@
 
 > Status: Batch 4A.1b reviewed and committed as `07f4218`
 >
+> Last verified: 2026-09-02 by the MI1B shared Score Core definition; implementation pending review
+>
 > Asset classification: developer-local validation fixture; not a Seele distributable asset
 >
 > Recorded: 2026-08-12
@@ -84,6 +86,7 @@ Studio Grand 与其余 288 个 MIDISampleSynth 的 Mapping / Archive 全量字�
 | `catalog/selected-soundbanks.json`     | 434,872    | `a1925bfec6e389fd37a901e21d571bdfd0ccfec162f3809c8fae95eaf268a924` |
 | `indexes/by-general-midi-program.json` | 81,737     | `12e42ec8d9131973317ae805c5d120426b95ec8abdda87f596e355dd39a0df66` |
 | `indexes/soundbank-map.json`           | 1,498,666  | `58e800e66415f24665926a945f732f93ac4abb99923d0d078f96e94aa140138d` |
+| `studio-grand-v2-v4.catalog.json`      | 954        | `95ac74b53e1f96831f50f7a79c441672c0cd23dfedc371e71769b66d76d244ea` |
 | `studio-grand-v2-v4.mapping.json`      | 12,817     | `8627c855c32d85eba4899b0b29deaa76e84b9f7ff11f49c5e2b3256b950d913b` |
 | `studio-grand-v2-v4-wav.zip`           | 22,249,268 | `55f5c6b2aec430f245f83b485d4f6df9a06f4ca3167aaa779b81eb0c0134a1a9` |
 
@@ -94,7 +97,8 @@ contract 与听觉审阅明确决定。
 
 ## 本地规范化产物
 
-Batch 4A.1b 提供显式开发工具，不让 Studio 启动流程扫描原始 Catalog、Indexes 或 ZIP：
+Batch 4A.1b 提供显式开发工具，不让 Studio 启动流程扫描原始 Catalog、Indexes 或 ZIP。MI1B 将
+同一配置迁入共享 Score Core Definition，但保持这个单音源命令与生成结果：
 
 ```sh
 pnpm --filter @seele-daw/audio-web prepare:studio-grand-local

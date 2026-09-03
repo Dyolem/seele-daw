@@ -4,7 +4,8 @@ import { defineStore } from 'pinia'
 import { defineComponent, h, onUnmounted } from 'vue'
 import { createMemoryHistory, createRouter, useRouter, type Router } from 'vue-router'
 import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
-import { decodeStudioGrandDeviceState } from '@seele-daw/playback'
+import { decodeSampleInstrumentDeviceState } from '@seele-daw/playback'
+import { PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE } from '@seele-daw/project-midi'
 import { describe, expect, it, vi } from 'vitest'
 
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
@@ -14,6 +15,7 @@ import {
   type StudioKeyboardShortcutVueContext,
 } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
+import { decodeMidiProgramPlaceholderDeviceState } from '@/workbench/instrument/midi-import-instrument-policy'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
   ACTIVE_PROJECT_PHASE,
@@ -442,7 +444,7 @@ describe('StudioApplication', () => {
     application.dispose()
   })
 
-  it('composes local MIDI bytes into a validated Project with the default Studio Grand', async () => {
+  it('composes local MIDI bytes through the Studio Program and Channel 10 policy', async () => {
     const fixture = createRuntimeFixture()
     const bytes = new Uint8Array([0x4d, 0x54, 0x68, 0x64])
     const document: MidiFileDocument = {
@@ -459,6 +461,30 @@ describe('StudioApplication', () => {
           channel: 0,
           programNumber: 0,
           notes: [{ tick: 0, durationTicks: 960, pitch: 60, velocity: 100, releaseVelocity: 0 }],
+          controlChanges: [],
+          pitchBends: [],
+        },
+        {
+          name: 'Violin',
+          channel: 1,
+          programNumber: 40,
+          notes: [{ tick: 0, durationTicks: 960, pitch: 67, velocity: 90, releaseVelocity: 0 }],
+          controlChanges: [],
+          pitchBends: [],
+        },
+        {
+          name: 'Drums',
+          channel: 9,
+          programNumber: 0,
+          notes: [{ tick: 0, durationTicks: 120, pitch: 36, velocity: 110, releaseVelocity: 0 }],
+          controlChanges: [],
+          pitchBends: [],
+        },
+        {
+          name: 'Unsupported Synth',
+          channel: 2,
+          programNumber: 80,
+          notes: [{ tick: 0, durationTicks: 960, pitch: 72, velocity: 80, releaseVelocity: 0 }],
           controlChanges: [],
           pitchBends: [],
         },
@@ -485,11 +511,23 @@ describe('StudioApplication', () => {
     expect(fixture.createFromSession).toHaveBeenCalledOnce()
     const importedSession = fixture.createFromSession.mock.calls[0]?.[0]
     if (importedSession === undefined) throw new Error('Expected the imported Project Session')
-    const importedDevice = importedSession.getSnapshot().devices[0]
-    if (importedDevice === undefined) throw new Error('Expected the imported Instrument Device')
-    expect(decodeStudioGrandDeviceState(importedDevice)).toEqual({
-      soundbankId: 'studio-grand',
+    const importedDevices = importedSession.getSnapshot().devices
+    expect(importedDevices.slice(0, 3).map(decodeSampleInstrumentDeviceState)).toEqual([
+      { soundbankId: 'studio-grand' },
+      { soundbankId: 'solo-violin' },
+      { soundbankId: 'general-midi-percussion' },
+    ])
+    expect(decodeMidiProgramPlaceholderDeviceState(importedDevices[3]!)).toEqual({
+      channel: 2,
+      programNumber: 80,
     })
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_UNAVAILABLE,
+        sourceProgramNumber: 80,
+        sourceTrackIndex: 3,
+      }),
+    ])
     application.dispose()
   })
 

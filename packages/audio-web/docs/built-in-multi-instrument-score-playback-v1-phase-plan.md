@@ -1,7 +1,7 @@
 # Built-in Multi-Instrument Score Playback V1 阶段计划
 
 > Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C committed as
-> `fddeb3e`; MI2 implementation pending review
+> `fddeb3e`; MI2 committed as `f13df2f`; MI3A implementation pending review
 >
 > Date: 2026-09-03
 >
@@ -17,9 +17,9 @@ Studio Grand。
 Velocity、Envelope、Loop、复音和 CC64 术语仍以
 [Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)为准。
 
-## 1. 当前事实与问题
+## 1. 阶段起点事实与问题
 
-当前架构已经具备多乐器所需的大部分底层边界：
+本节保留 MI0 规划时的起点。当前架构当时已经具备多乐器所需的大部分底层边界：
 
 - Instrument Track 保存通用 `seele.sample-instrument` Device Descriptor，其中 V1 opaque state
   只含稳定 `soundbankId`；Project Core 不需要增加音源专用字段或升级 Project File。
@@ -201,7 +201,11 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 - Channel 10 优先走 Percussion 路由；旋律 Track 使用 Program 路由。
 - “导入为新项目”与“导入为当前项目的新 Track”共用同一 Factory 和诊断政策。
 - 同一来源 Track 的中途 Program Change 继续沿用 Decoder 已有 `[Program, Channel]` 规范化拆分；
-  本阶段不新增动态 Program Change Project Fact。
+  `midi-file` 回归 fixture 固定前后 Note 的拆分行为，本阶段不新增动态 Program Change Project
+  Fact 或跨拆分 Track 的 Controller State Chase。
+
+本批的通用映射结果契约、21 个精确 Program、Channel 10 优先级、无声占位及兼容边界见
+[Studio MIDI Program Import Routing V1](../../../apps/studio/docs/midi-program-import-routing-v1.md)。
 
 ### MI3B — 初始 CC7 / CC10
 

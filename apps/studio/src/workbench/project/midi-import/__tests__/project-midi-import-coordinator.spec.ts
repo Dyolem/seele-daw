@@ -7,10 +7,15 @@ import {
   parseTimeSignatureEventId,
 } from '@seele-daw/project-core'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
-import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
-import type {
-  ProjectMidiImportIdFactory,
-  ProjectMidiInstrumentDeviceFactory,
+import {
+  createStudioGrandDeviceDescriptor,
+  decodeSampleInstrumentDeviceState,
+} from '@seele-daw/playback'
+import {
+  PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
+  PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
+  type ProjectMidiImportIdFactory,
+  type ProjectMidiInstrumentDeviceFactory,
 } from '@seele-daw/project-midi'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -23,6 +28,10 @@ import {
   createCheckpointIdFactory,
 } from '@/workbench/project/__tests__/active-project-test-support'
 import { createActiveProjectService } from '@/workbench/project/active-project-service'
+import {
+  createStudioMidiImportInstrumentDevice,
+  decodeMidiProgramPlaceholderDeviceState,
+} from '@/workbench/instrument/midi-import-instrument-policy'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
@@ -66,9 +75,10 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
   const read = vi.fn<LocalFileByteReader['read']>(async () => bytes)
   const decode = vi.fn<MidiFileDecoder['decode']>(() => document)
   const createId = vi.fn<ProjectMidiImportIdFactory>(({ kind, ordinal }) => `${kind}-${ordinal}`)
-  const createInstrumentDevice = vi.fn<ProjectMidiInstrumentDeviceFactory>(({ id }) =>
-    createStudioGrandDeviceDescriptor(id),
-  )
+  const createInstrumentDevice = vi.fn<ProjectMidiInstrumentDeviceFactory>(({ id }) => ({
+    device: createStudioGrandDeviceDescriptor(id),
+    mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
+  }))
   const createRandomValue = vi.fn<() => number>(() => 0)
   const createFromSession = vi.fn<
     ProjectMidiImportCoordinatorDependencies['activeProject']['createFromSession']
@@ -214,6 +224,42 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(fixture.activeSession.getSnapshot().trackOrder).toEqual([])
   })
 
+  it('uses the Studio Program and Channel 10 policy for current-Project Track import', async () => {
+    const baseTrack = createMidiDocument().tracks[0]!
+    const fixture = createFixture(
+      createMidiDocument({
+        tracks: [
+          { ...baseTrack, name: 'Violin', channel: 0, programNumber: 40 },
+          { ...baseTrack, name: 'Drums', channel: 9, programNumber: 47 },
+          { ...baseTrack, name: 'Unsupported Synth', channel: 2, programNumber: 80 },
+        ],
+      }),
+    )
+    fixture.createInstrumentDevice.mockImplementation(createStudioMidiImportInstrumentDevice)
+
+    const result = await fixture.coordinator.importLocalFileAsNewTracks(
+      new File([], 'score.mid'),
+      parseTick(0),
+    )
+    const devices = fixture.activeSession.getSnapshot().devices
+
+    expect(devices.slice(0, 2).map(decodeSampleInstrumentDeviceState)).toEqual([
+      { soundbankId: 'solo-violin' },
+      { soundbankId: 'general-midi-percussion' },
+    ])
+    expect(decodeMidiProgramPlaceholderDeviceState(devices[2]!)).toEqual({
+      channel: 2,
+      programNumber: 80,
+    })
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_UNAVAILABLE,
+        sourceProgramNumber: 80,
+        sourceTrackIndex: 2,
+      }),
+    )
+  })
+
   it('lets ActiveProject derive dirty and return to its save point after one Undo', async () => {
     const session = createInitialProjectSession({
       projectId: parseProjectId('active-current-project'),
@@ -233,7 +279,10 @@ describe('ProjectMidiImportCoordinator', () => {
     const coordinator = createProjectMidiImportCoordinator({
       activeProject,
       createId: ({ kind, ordinal }) => `active-import-${kind}-${ordinal}`,
-      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createInstrumentDevice: ({ id }) => ({
+        device: createStudioGrandDeviceDescriptor(id),
+        mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
+      }),
       createRandomValue: () => 0,
       decoder: { decode: () => document },
       fileReader: { read: async () => bytes },

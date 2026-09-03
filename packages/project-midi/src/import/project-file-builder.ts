@@ -116,6 +116,7 @@ export function createImportedProjectFile(
     input.createTrackColor,
     mappedTracks,
     allocator,
+    diagnostics,
   )
   const collections: ProjectFileCollections = {
     trackOrder: [],

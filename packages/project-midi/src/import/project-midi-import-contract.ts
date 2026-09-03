@@ -42,9 +42,34 @@ export interface ProjectMidiInstrumentDeviceFactoryInput {
   readonly importedTrackIndex: number
 }
 
+export const PROJECT_MIDI_INSTRUMENT_MAPPING_KIND = {
+  APPROXIMATE: 'approximate',
+  EXACT: 'exact',
+  UNAVAILABLE: 'unavailable',
+} as const
+
+export type ProjectMidiInstrumentMappingKind =
+  (typeof PROJECT_MIDI_INSTRUMENT_MAPPING_KIND)[keyof typeof PROJECT_MIDI_INSTRUMENT_MAPPING_KIND]
+
+export type ProjectMidiInstrumentDeviceFactoryResult =
+  | {
+      readonly device: DeviceDescriptor
+      readonly mappingKind: typeof PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT
+    }
+  | {
+      readonly appliedInstrumentName: string
+      readonly device: DeviceDescriptor
+      readonly mappingKind: typeof PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE
+    }
+  | {
+      readonly device: DeviceDescriptor
+      readonly mappingKind: typeof PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.UNAVAILABLE
+    }
+
+/** Lets the host own Instrument policy while keeping Project MIDI diagnostics deterministic. */
 export type ProjectMidiInstrumentDeviceFactory = (
   input: ProjectMidiInstrumentDeviceFactoryInput,
-) => DeviceDescriptor
+) => ProjectMidiInstrumentDeviceFactoryResult
 
 export interface ProjectMidiTrackColorFactoryInput {
   readonly sourceTrack: MidiFileTrack
@@ -63,7 +88,8 @@ export const PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE = {
   KEY_SIGNATURES_NOT_IMPORTED: 'key-signatures-not-imported',
   NOTE_DURATIONS_EXPANDED: 'note-durations-expanded',
   PITCH_BENDS_NOT_IMPORTED: 'pitch-bends-not-imported',
-  PROGRAM_NOT_APPLIED: 'program-not-applied',
+  PROGRAM_APPROXIMATED: 'program-approximated',
+  PROGRAM_UNAVAILABLE: 'program-unavailable',
   PROJECT_NAME_ADJUSTED: 'project-name-adjusted',
   RELEASE_VELOCITIES_NOT_IMPORTED: 'release-velocities-not-imported',
   SUSTAIN_PEDAL_EVENTS_COLLAPSED: 'sustain-pedal-events-collapsed',
@@ -88,6 +114,7 @@ export interface ProjectMidiImportDiagnostic {
   readonly projectTick?: number
   readonly controllerNumbers?: readonly number[]
   readonly sourceProgramNumber?: number
+  readonly appliedInstrumentName?: string
   readonly originalName?: string
   readonly importedName?: string
 }
@@ -102,7 +129,7 @@ export interface ProjectMidiImportSummary {
 
 /**
  * A complete, invariant-valid Project Session that has not entered an application lifecycle yet.
- * MI3 decides whether and how it becomes an ActiveProjectService project and first checkpoint.
+ * The composition host decides whether it becomes an active project and durable checkpoint.
  */
 export interface ProjectMidiImportDraft {
   readonly session: ProjectSession

@@ -429,6 +429,10 @@ describe('Audible MIDI Compiler', () => {
       createFixtureDevice('device-va', 'seele.va-synth'),
       createFixtureDevice('device-slot', 'seele.instrument-slot'),
       createFixtureDevice('device-third-party', 'third-party.instrument'),
+      createFixtureDevice('device-program-placeholder', 'seele.midi-program-placeholder', true, {
+        channel: 2,
+        programNumber: 80,
+      }),
       createFixtureDevice('device-disabled-sample', 'seele.sample-instrument', false, {
         soundbankId: 'dark-grand-v4',
       }),
@@ -451,6 +455,7 @@ describe('Audible MIDI Compiler', () => {
       'instrument-engine-unsupported',
       'instrument-engine-unsupported',
       'instrument-not-selected',
+      'instrument-runtime-missing',
       'instrument-runtime-missing',
       'instrument-disabled',
       'invalid-sample-instrument-state',

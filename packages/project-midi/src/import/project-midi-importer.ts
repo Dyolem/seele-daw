@@ -112,6 +112,7 @@ export function createProjectMidiTrackImportDraft(
     input.createTrackColor,
     mappedTracks,
     allocator,
+    diagnostics,
     input.placementTick,
   )
   let command

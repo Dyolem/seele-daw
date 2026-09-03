@@ -31,7 +31,10 @@ Composition Root 可以知道并装配全部领域包与浏览器实现。
   项目切换和计划替换都会停止 Timer、使 Voice 失效并释放 Project playback lifetime；
 - Studio-owned Built-in Instrument Catalogue 同时派生 Inspector 显示与 22 个 developer-local
   asset base，避免名称和 URL Map 漂移；production build 仍不复制 public Soundbank；
+- 两种 Standard MIDI File 导入入口共用 Studio-owned Program / Channel 10 路由；未审核 Program
+  保存无声、可见且可由 Inspector 显式替换的 Placeholder，不回退 Studio Grand；
 - Soundbank 资源缺失会在播放准备时明确失败，不能回滚已经合法提交的 Instrument Replace。
 
 完整规则见
-[Studio Built-in Instrument Catalogue V1](../../docs/built-in-instrument-catalogue-v1.md)。
+[Studio Built-in Instrument Catalogue V1](../../docs/built-in-instrument-catalogue-v1.md)和
+[Studio MIDI Program Import Routing V1](../../docs/midi-program-import-routing-v1.md)。

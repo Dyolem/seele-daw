@@ -6,9 +6,11 @@ import {
   type ProjectFileDTO,
 } from '@seele-daw/project-core'
 import {
+  PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   createProjectMidiImportDraft,
   type ProjectMidiImportDiagnosticCode,
+  type ProjectMidiInstrumentDeviceFactory,
   type ProjectMidiTrackColorFactory,
 } from '#internal/index'
 import {
@@ -283,9 +285,6 @@ describe('createProjectMidiImportDraft', () => {
       findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PITCH_BENDS_NOT_IMPORTED),
     ).toBeDefined()
     expect(
-      findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_NOT_APPLIED),
-    ).toMatchObject({ sourceProgramNumber: 40 })
-    expect(
       findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.RELEASE_VELOCITIES_NOT_IMPORTED),
     ).toMatchObject({ eventCount: 1 })
     expect(
@@ -296,6 +295,52 @@ describe('createProjectMidiImportDraft', () => {
     ).toBeDefined()
     expect(Object.isFrozen(draft.diagnostics)).toBe(true)
     expect(Object.isFrozen(draft.diagnostics[0])).toBe(true)
+  })
+
+  it('reports only host-declared approximate and unavailable Program mappings', () => {
+    const createInstrumentDevice = vi.fn<ProjectMidiInstrumentDeviceFactory>((input) => {
+      const exact = createTestInstrumentDevice(input)
+      if (input.sourceTrack.programNumber === 40) {
+        return {
+          appliedInstrumentName: 'Violin',
+          device: exact.device,
+          mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE,
+        }
+      }
+      return {
+        device: exact.device,
+        mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.UNAVAILABLE,
+      }
+    })
+    const draft = createProjectMidiImportDraft(
+      createImportInput(
+        createMidiDocument({
+          tracks: [
+            createMidiTrack({ name: 'Approximate', programNumber: 40 }),
+            createMidiTrack({ name: 'Unavailable', programNumber: 80 }),
+          ],
+        }),
+        { createInstrumentDevice },
+      ),
+    )
+
+    expect(draft.diagnostics).toEqual([
+      {
+        appliedInstrumentName: 'Violin',
+        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_APPROXIMATED,
+        message: 'MIDI Program 41 was mapped to the reviewed approximate Instrument Violin.',
+        sourceProgramNumber: 40,
+        sourceTrackIndex: 0,
+      },
+      {
+        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_UNAVAILABLE,
+        message:
+          'MIDI Program 81 has no reviewed Instrument mapping and was imported as a silent placeholder.',
+        sourceProgramNumber: 80,
+        sourceTrackIndex: 1,
+      },
+    ])
+    expect(createInstrumentDevice).toHaveBeenCalledTimes(2)
   })
 
   it('preserves CC64 timing, expands Clip bounds, and diagnoses Project-tick collisions', () => {

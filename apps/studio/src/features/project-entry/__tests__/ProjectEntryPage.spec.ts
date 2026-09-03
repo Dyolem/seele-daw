@@ -186,8 +186,8 @@ describe('ProjectEntryPage', () => {
       createImportResult({
         diagnostics: Object.freeze([
           Object.freeze({
-            code: 'program-not-applied',
-            message: 'The source program was retained only as an import diagnostic.',
+            code: 'program-unavailable',
+            message: 'The source program was imported as a silent placeholder.',
             sourceTrackIndex: 0,
             sourceProgramNumber: 40,
           }),

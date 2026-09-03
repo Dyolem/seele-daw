@@ -1,6 +1,6 @@
 # Built-in Score Core Soundbank Audit
 
-> Status: MI1B reviewed and committed as `7c36a17`; MI1C committed as `fddeb3e`; updated for MI2
+> Status: MI1B reviewed and committed as `7c36a17`; MI1C committed as `fddeb3e`; updated for MI3A
 >
 > Date: 2026-09-03
 >
@@ -13,8 +13,8 @@
 [Built-in Multi-Instrument Score Playback V1 阶段计划](./built-in-multi-instrument-score-playback-v1-phase-plan.md)。
 
 本文件只证明本地资产可以被确定性规范化，不单独证明 Studio 选择、Program 导入路由或产品分发。
-MI2 另行接入 Studio 手动选择；本批生成的 Manifest/WAV 和库存 JSON 全部位于被 Git 忽略、被
-production build 排除的 `apps/studio/public/soundbanks`。
+MI2 / MI3A 已分别接入 Studio 手动选择与导入路由；本批生成的 Manifest/WAV 和库存 JSON 全部位于
+被 Git 忽略、被 production build 排除的 `apps/studio/public/soundbanks`。
 
 ## 1. 冻结身份与路由意图
 
@@ -22,7 +22,7 @@ production build 排除的 `apps/studio/public/soundbanks`。
 `scripts/built-in-score-core-local-instruments.ts`。每个条目冻结：
 
 - 来源无关的 Seele `soundbankId`、产品显示名与乐器族；
-- 未来 MI3 使用的 Program 或 Channel 10 路由意图；
+- MI3A 使用的 Program 或 Channel 10 路由意图；
 - 当前本地来源 slug、来源索引 Program 与 canonical/candidate 角色；
 - 产品可寻址 Pitch 范围、逐来源 ZIP 安全预算；
 - 公共 Catalog、GM Index、Soundbank Map，以及独立 Catalog、Mapping、WAV Archive 共六个输入的
@@ -128,7 +128,7 @@ MiB；Manifest 使用 KiB。
   来源身份与 47 个 exact-key 前置条件后，将全部 Zone 转为 one-shot，并只给 MIDI `42 / 44 / 46`
   增加对称 fast Hi-hat Choke。政策与证据见
   [General MIDI Percussion Compatibility Policy V1](./general-midi-percussion-compatibility-policy-v1.md)。
-  该资产转换本身不等于 Studio Catalogue 或 Channel 10 产品路由；MI2 只接入前者，后者仍延期。
+  该资产转换本身不等于 Studio Catalogue 或 Channel 10 产品路由；两者分别由 MI2 与 MI3A 接入。
 - 本批没有试听 22 个音色，也没有测量实际多声部混合 Peak。音色对应、极端移调、Loop 接缝、尾音
   和声部平衡属于 MI5 人工听测与 PCM 门禁，不能由指纹或资源统计替代。
 - 当前来源许可证据仍不足以支持随产品分发；所有输出继续只是开发者本地验证资产。
@@ -138,6 +138,6 @@ MiB；Manifest 使用 KiB。
 MI1B 可以批准的结论仅为：22 个来源已经通过固定身份、六输入指纹、独立安全预算、Manifest/WAV
 规范化、资源统计和幂等发布门禁；现有 Studio Grand 输出逐字节不变。
 
-它不代表 MIDI Program 或 Channel 10 已经自动接通。MI1C 已在本地资产边界完成 General MIDI
-Percussion 的 one-shot / choke 兼容转换；MI2 随后用 Studio Catalogue 与可见 Instrument 选择器
-消费这些已审核身份。多 Soundbank Runtime 测量与总谱听测仍属于 MI4 / MI5 门禁。
+它本身不代表 MIDI Program 或 Channel 10 已经自动接通。MI1C 已在本地资产边界完成 General MIDI
+Percussion 的 one-shot / choke 兼容转换；MI2 / MI3A 随后用 Studio Catalogue、可见 Instrument
+选择器与导入路由消费这些已审核身份。多 Soundbank Runtime 测量与总谱听测仍属于 MI4 / MI5 门禁。

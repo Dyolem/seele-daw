@@ -91,18 +91,6 @@ function addUnsupportedFactDiagnostics(
       }),
     )
   }
-  if (imported && track.programNumber !== 0) {
-    diagnostics.push(
-      createDiagnostic({
-        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_NOT_APPLIED,
-        message:
-          'The MIDI program was retained only as an import diagnostic; the supplied default instrument was used.',
-        sourceTrackIndex,
-        sourceProgramNumber: track.programNumber,
-      }),
-    )
-  }
-
   const releaseVelocityCount = track.notes.filter((note) => note.releaseVelocity !== 0).length
   if (imported && releaseVelocityCount > 0) {
     diagnostics.push(

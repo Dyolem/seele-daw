@@ -66,7 +66,7 @@ describe('Project MIDI Track import feedback', () => {
       feedback,
       createResult([
         PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.TEMPO_EVENTS_NOT_IMPORTED,
-        PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_NOT_APPLIED,
+        PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_UNAVAILABLE,
       ]),
     )
 

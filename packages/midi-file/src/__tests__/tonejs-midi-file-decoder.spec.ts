@@ -3,6 +3,7 @@ import { MidiFileCodecError, ToneJsMidiFileDecoder } from '#internal/index'
 import {
   createSmfFixture,
   RUNNING_STATUS_NOTE_OFF_FIXTURE,
+  TYPE_ZERO_MID_TRACK_PROGRAM_CHANGE_FIXTURE,
   TYPE_ONE_MUSICAL_FIXTURE,
   TYPE_ZERO_MULTI_CHANNEL_FIXTURE,
 } from '#internal/__tests__/fixtures/standard-midi-file-fixtures'
@@ -69,6 +70,45 @@ describe('ToneJsMidiFileDecoder', () => {
       },
       {
         channel: 1,
+        programNumber: 40,
+        notes: [
+          {
+            tick: 120,
+            durationTicks: 120,
+            pitch: 65,
+            velocity: 90,
+            releaseVelocity: 0,
+          },
+        ],
+      },
+    ])
+  })
+
+  it('normalizes a mid-track Program Change on one channel into separate tracks', () => {
+    const document = new ToneJsMidiFileDecoder().decode(TYPE_ZERO_MID_TRACK_PROGRAM_CHANGE_FIXTURE)
+
+    expect(
+      document.tracks.map((track) => ({
+        channel: track.channel,
+        programNumber: track.programNumber,
+        notes: track.notes,
+      })),
+    ).toEqual([
+      {
+        channel: 0,
+        programNumber: 0,
+        notes: [
+          {
+            tick: 0,
+            durationTicks: 120,
+            pitch: 60,
+            velocity: 100,
+            releaseVelocity: 0,
+          },
+        ],
+      },
+      {
+        channel: 0,
         programNumber: 40,
         notes: [
           {

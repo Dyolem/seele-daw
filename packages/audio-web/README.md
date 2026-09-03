@@ -49,8 +49,9 @@ General MIDI Percussion 来源实现 47 个 one-shot 与 MIDI `42 / 44 / 46` Hi-
 MI2 已在 Studio 接入由同一目录驱动的 22 项 Inspector 选择与 developer-local asset location；
 具体边界见
 [Studio Built-in Instrument Catalogue V1](../../apps/studio/docs/built-in-instrument-catalogue-v1.md)。
-Program / Channel 10 自动导入路由与多音源 Runtime 门禁仍未完成，因此不能把手动选择视为已经
-交付完整总谱播放。
+MI3A 进一步接入 21 个精确 Program、Channel 10 和无声 Program Placeholder，详见
+[Studio MIDI Program Import Routing V1](../../apps/studio/docs/midi-program-import-routing-v1.md)。
+多音源 Runtime 门禁仍未完成，因此不能把导入路由视为已经通过总谱听觉验收。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录

@@ -14,7 +14,10 @@ import {
   type ProjectId,
   type ProjectSession,
 } from '@seele-daw/project-core'
-import { createProjectMidiImportDraft } from '@seele-daw/project-midi'
+import {
+  PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
+  createProjectMidiImportDraft,
+} from '@seele-daw/project-midi'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowReadonly, shallowRef, type ShallowRef } from 'vue'
@@ -455,7 +458,10 @@ describe('ProjectWorkspacePage', () => {
     const imported = createProjectMidiImportDraft({
       document,
       createId: ({ kind, ordinal }) => `tempo-map-${kind}-${ordinal}`,
-      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createInstrumentDevice: ({ id }) => ({
+        device: createStudioGrandDeviceDescriptor(id),
+        mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
+      }),
       createTrackColor: () => null,
     })
     const session = imported.session
@@ -613,7 +619,10 @@ describe('ProjectWorkspacePage', () => {
     const imported = createProjectMidiImportDraft({
       document,
       createId: ({ kind, ordinal }) => `long-import-${kind}-${ordinal}`,
-      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createInstrumentDevice: ({ id }) => ({
+        device: createStudioGrandDeviceDescriptor(id),
+        mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
+      }),
       createTrackColor: () => null,
     })
     const projectId = imported.session.getSnapshot().project.id

@@ -74,6 +74,10 @@ generic Device Definition、factory 与 decoder 已由 MI2 的 Studio Catalogue 
 消费者，因此从包根公开。它们只定义 Project Instrument Fact 的播放侧身份，不代表任一
 Soundbank 已经能加载或发声；显示名称、乐器族与 asset location 仍由 Studio 拥有。
 
+MI3A 的 `seele.midi-program-placeholder` 仍是 Studio-owned 导入兼容事实，不扩展 Sample
+Instrument schema。Compiler 对它不生成 Track Playback Plan，因此未支持 Program 保持无声、其他
+可播放 Track 继续工作；Studio Inspector 负责把它与未知 Missing Device 区分并提供显式替换入口。
+
 Batch 2A 还在包内建立了 `time/` 边界：
 
 - `ProjectSecond`、`ProjectDurationSecond` 与 `ContinuousTickPosition` 保持不同时间含义，不把

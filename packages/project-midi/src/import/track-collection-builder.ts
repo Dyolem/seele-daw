@@ -27,23 +27,28 @@ import {
   type Tick,
 } from '@seele-daw/project-core'
 import {
+  PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
+  PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   PROJECT_MIDI_IMPORT_ENTITY_KIND,
+  type ProjectMidiImportDiagnostic,
   type ProjectMidiInstrumentDeviceFactory,
+  type ProjectMidiInstrumentDeviceFactoryResult,
   type ProjectMidiTrackColorFactory,
 } from '#internal/import/project-midi-import-contract'
 import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
-import type { ImportIdAllocator } from '#internal/import/import-support'
+import { createDiagnostic, type ImportIdAllocator } from '#internal/import/import-support'
 import type { MappedTrack } from '#internal/import/track-mapper'
 
 function createInstrumentDevice(
   createDevice: ProjectMidiInstrumentDeviceFactory,
   mappedTrack: MappedTrack,
   deviceId: ReturnType<typeof parseDeviceId>,
-): DeviceDescriptor {
-  let descriptor: DeviceDescriptor
+): ProjectMidiInstrumentDeviceFactoryResult {
+  let result: ProjectMidiInstrumentDeviceFactoryResult
+  let device: DeviceDescriptor
 
   try {
-    descriptor = createDevice(
+    result = createDevice(
       Object.freeze({
         id: deviceId,
         sourceTrack: mappedTrack.sourceTrack,
@@ -51,9 +56,27 @@ function createInstrumentDevice(
         importedTrackIndex: mappedTrack.importedTrackIndex,
       }),
     )
-    if (descriptor === null || typeof descriptor !== 'object') {
-      throw new TypeError('Instrument device factory must return a DeviceDescriptor')
+    if (result === null || typeof result !== 'object') {
+      throw new TypeError('Instrument device factory must return a mapping result')
     }
+    if (result.device === null || typeof result.device !== 'object') {
+      throw new TypeError('Instrument device mapping result must include a DeviceDescriptor')
+    }
+    if (
+      result.mappingKind !== PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT &&
+      result.mappingKind !== PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE &&
+      result.mappingKind !== PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.UNAVAILABLE
+    ) {
+      throw new TypeError('Instrument device mapping result has an unknown mapping kind')
+    }
+    if (
+      result.mappingKind === PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE &&
+      (typeof result.appliedInstrumentName !== 'string' ||
+        result.appliedInstrumentName.trim().length === 0)
+    ) {
+      throw new TypeError('Approximate instrument mappings require an applied Instrument name')
+    }
+    device = createDeviceDescriptor(result.device)
   } catch (cause) {
     throw new ProjectMidiImportError(
       'instrument-device-factory-failed',
@@ -63,19 +86,56 @@ function createInstrumentDevice(
     )
   }
 
-  if (descriptor.id !== deviceId) {
+  if (device.id !== deviceId) {
     throw new ProjectMidiImportError(
       'instrument-device-factory-failed',
       'The instrument device factory returned a descriptor with a different ID.',
       {
         entityKind: PROJECT_MIDI_IMPORT_ENTITY_KIND.DEVICE,
         sourceTrackIndex: mappedTrack.sourceTrackIndex,
-        value: descriptor.id,
+        value: device.id,
       },
     )
   }
 
-  return createDeviceDescriptor(descriptor)
+  if (result.mappingKind === PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE) {
+    return Object.freeze({
+      appliedInstrumentName: result.appliedInstrumentName.trim(),
+      device,
+      mappingKind: result.mappingKind,
+    })
+  }
+  return Object.freeze({ device, mappingKind: result.mappingKind })
+}
+
+function addInstrumentMappingDiagnostic(
+  result: ProjectMidiInstrumentDeviceFactoryResult,
+  mappedTrack: MappedTrack,
+  diagnostics: ProjectMidiImportDiagnostic[],
+): void {
+  if (result.mappingKind === PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT) return
+
+  if (result.mappingKind === PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE) {
+    diagnostics.push(
+      createDiagnostic({
+        appliedInstrumentName: result.appliedInstrumentName,
+        code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_APPROXIMATED,
+        message: `MIDI Program ${mappedTrack.sourceTrack.programNumber + 1} was mapped to the reviewed approximate Instrument ${result.appliedInstrumentName}.`,
+        sourceProgramNumber: mappedTrack.sourceTrack.programNumber,
+        sourceTrackIndex: mappedTrack.sourceTrackIndex,
+      }),
+    )
+    return
+  }
+
+  diagnostics.push(
+    createDiagnostic({
+      code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_UNAVAILABLE,
+      message: `MIDI Program ${mappedTrack.sourceTrack.programNumber + 1} has no reviewed Instrument mapping and was imported as a silent placeholder.`,
+      sourceProgramNumber: mappedTrack.sourceTrack.programNumber,
+      sourceTrackIndex: mappedTrack.sourceTrackIndex,
+    }),
+  )
 }
 
 function createTrackColor(
@@ -107,6 +167,7 @@ export function createImportedTrackCollection(
   createColor: ProjectMidiTrackColorFactory,
   mappedTracks: readonly MappedTrack[],
   allocator: ImportIdAllocator,
+  diagnostics: ProjectMidiImportDiagnostic[],
   placementTick: Tick = ZERO_TICK,
 ): readonly InstrumentTrackCollectionEntry[] {
   try {
@@ -168,7 +229,9 @@ export function createImportedTrackCollection(
         sourceOffsetTick: parseTick(0),
         loop: null,
       })
-      const instrumentDevice = createInstrumentDevice(createDevice, mappedTrack, deviceId)
+      const instrumentMapping = createInstrumentDevice(createDevice, mappedTrack, deviceId)
+      addInstrumentMappingDiagnostic(instrumentMapping, mappedTrack, diagnostics)
+      const instrumentDevice = instrumentMapping.device
       const color = createTrackColor(createColor, mappedTrack)
       const track = createInstrumentTrackRecord({
         id: trackId,

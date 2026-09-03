@@ -176,6 +176,10 @@ function selectBuiltInInstrument(soundbankIdInput: unknown): void {
           <p v-else-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY">
             This legacy Track has no sound selected.
           </p>
+          <p v-else-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.UNAVAILABLE">
+            This MIDI Program has no reviewed built-in sound. The Track stays silent until you
+            choose a replacement.
+          </p>
           <template v-else>
             <p>The saved Instrument definition is not available. Its Project fact is preserved.</p>
             <code

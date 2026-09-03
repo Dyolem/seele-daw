@@ -1,11 +1,11 @@
 # General MIDI Percussion Compatibility Policy V1
 
-> Status: MI1C reviewed and committed as `fddeb3e`; MI2 manual selection pending review
+> Status: MI1C reviewed and committed as `fddeb3e`; MI2 committed as `f13df2f`; updated for MI3A
 >
 > Date: 2026-09-03
 >
-> Product availability: developer-local asset; manual Studio selection is provided by MI2, while
-> Channel 10 import routing remains pending
+> Product availability: developer-local asset; manual Studio selection is provided by MI2 and
+> Channel 10 import routing by MI3A
 
 本文记录 `general-midi-percussion-v1` 的来源约束、Manifest 转换和用户预期听觉。相关基础术语见
 [多乐器总谱发声 V1 术语表](./built-in-multi-instrument-score-playback-v1-glossary.md)，通用
@@ -96,7 +96,6 @@ WAV、Zone 数、Loop 数和解码内存均不变；只有 GM Percussion 的 Man
 
 ## 5. 仍未交付
 
-MI2 只让用户能在 Studio Inspector 手动选择这套鼓组，并从同一 Catalogue 派生本地资源位置；
-它不会自动解释 MIDI Channel 10。Velocity 仍只调整单层 Sample 增益；没有 Round Robin、Velocity
-Layer、鼓组 Mixer、Room Mic 或新增效果。MI3A 才会让导入总谱的 Channel 10 自动选择它，MI5
-再进行真实总谱听测和混合 Peak 门禁。
+MI2 让用户能在 Studio Inspector 手动选择这套鼓组，并从同一 Catalogue 派生本地资源位置；MI3A
+让导入总谱的 Channel 10 自动选择它。Velocity 仍只调整单层 Sample 增益；没有 Round Robin、
+Velocity Layer、鼓组 Mixer、Room Mic 或新增效果。MI5 再进行真实总谱听测和混合 Peak 门禁。

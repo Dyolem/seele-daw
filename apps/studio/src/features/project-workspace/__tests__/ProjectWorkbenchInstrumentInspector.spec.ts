@@ -281,6 +281,25 @@ describe('Project Workbench Instrument Inspector', () => {
     )
   })
 
+  it('explains an unsupported imported MIDI Program as a silent, repairable Track', () => {
+    const { wrapper } = mountInspector({
+      selectedTrack: createTrack({
+        deviceTypeId: parseDeviceTypeId('seele.midi-program-placeholder'),
+        displayName: 'MIDI Program 81 unavailable',
+        soundbankId: null,
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.UNAVAILABLE,
+      }),
+    })
+
+    const instrument = wrapper.get('[aria-label="Track instrument"]')
+    expect(instrument.text()).toContain('MIDI Program 81 unavailable')
+    expect(instrument.text()).toContain('The Track stays silent until you choose a replacement.')
+    expect(instrument.text()).not.toContain('saved Instrument definition is not available')
+    expect(instrument.get('[aria-label="Built-in instrument"]').text()).toContain(
+      'Choose a replacement',
+    )
+  })
+
   it('keeps a rejected selection visible and reports the failure through the Toast channel', async () => {
     const { selectBuiltInInstrument, toasts, wrapper } = mountInspector({
       selectedTrack: createTrack({

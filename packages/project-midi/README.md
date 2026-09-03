@@ -25,18 +25,23 @@ File V2 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
   因而让导入 Note 按当前 Project Tempo Map 播放，并分别产生非阻断的时间轴所有权诊断；
 - CC64 不烘焙进 Note 长度。含 Note 的 Track 会把 CC64 映射到独立 Project Fact；PPQ 换算后落在
   同一 Project Tick 的多条 CC64 确定性保留来源顺序最后一条并产生汇总诊断。只有控制器而没有
-  Note 的 Track 仍不创建 Instrument Track；其他 CC、Pitch Bend、非零 Release Velocity、非默认
-  Program、Key Signature 和文本事件继续产生非阻断诊断；
+  Note 的 Track 仍不创建 Instrument Track；其他 CC、Pitch Bend、非零 Release Velocity、Key
+  Signature 和文本事件继续产生非阻断诊断；
+- 每条已导入 normalized Track 的 Program / Channel 音源决定由宿主工厂返回 `exact`、
+  `approximate` 或 `unavailable` 结果。精确映射不产生 Program 丢失提示；近似映射与不可用占位分别
+  产生精确的非阻断诊断。本包不再根据“非零 Program”无条件报告音源未应用；
 - `@tonejs/midi` 在 Codec 边界已经完成 Note On / Off 配对。中立 Document 当前不携带原始孤立
   Note 事件，因此本桥接层不虚构无法从输入观察到的配对诊断。
 
-## 默认音源与生命周期边界
+## 音源映射与生命周期边界
 
 本包不会 import Playback，也不认识 `studio-grand` 或 Studio 调色板。调用方必须提供
-`createInstrumentDevice` 与 `createTrackColor` 工厂；Studio Composition Root 用
-`createStudioGrandDeviceDescriptor` 组合该端口，从而落实“导入 Track 默认持久化 Studio Grand”
-的产品规则，并用当前 Track 创建调色板落实宿主视觉策略。不同宿主或测试可以提供其他合法 Device
-Descriptor 与 Project Color，而无需修改 MIDI 映射；Clip `color: null` 保持“继承 Track”的语义。
+`createInstrumentDevice` 与 `createTrackColor` 工厂。前者接收完整 normalized `sourceTrack` 并返回
+Device Descriptor 及 Program 映射结果；宿主负责保证 `unavailable` Descriptor 实际无声，
+`project-midi` 只验证结果形状并生成统一诊断。Studio Composition Root 用自己的冻结 Catalogue
+落实 21 个 GM Program、Channel 10 Percussion 与可见无声占位规则，并用当前 Track 创建调色板
+落实宿主视觉策略。不同宿主或测试可以提供其他合法 Device Descriptor、映射政策与 Project Color，
+而无需把产品目录下沉到本包；Clip `color: null` 保持“继承 Track”的语义。
 
 新项目导入返回的 `ProjectMidiImportDraft` 中 Session revision 为 0、History 为空；调用方可以用
 `ActiveProjectService.createFromSession` 原子保存首个 Checkpoint 并切换 Active Project。当前项目

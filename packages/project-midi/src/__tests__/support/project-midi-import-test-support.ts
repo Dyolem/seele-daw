@@ -1,10 +1,11 @@
 import type { MidiFileDocument, MidiFileNote, MidiFileTrack } from '@seele-daw/midi-file'
 import { createDeviceDescriptor, parseDeviceTypeId, type DeviceId } from '@seele-daw/project-core'
-import type {
-  CreateProjectMidiImportDraftInput,
-  ProjectMidiImportIdFactory,
-  ProjectMidiInstrumentDeviceFactory,
-  ProjectMidiTrackColorFactory,
+import {
+  PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
+  type CreateProjectMidiImportDraftInput,
+  type ProjectMidiImportIdFactory,
+  type ProjectMidiInstrumentDeviceFactory,
+  type ProjectMidiTrackColorFactory,
 } from '#internal/index'
 
 export function createMidiNote(overrides: Partial<MidiFileNote> = {}): MidiFileNote {
@@ -47,15 +48,17 @@ export function createMidiDocument(overrides: Partial<MidiFileDocument> = {}): M
 export const createDeterministicImportId: ProjectMidiImportIdFactory = ({ kind, ordinal }) =>
   `${kind}-${ordinal}`
 
-export const createTestInstrumentDevice: ProjectMidiInstrumentDeviceFactory = ({ id }) =>
-  createDeviceDescriptor({
+export const createTestInstrumentDevice: ProjectMidiInstrumentDeviceFactory = ({ id }) => ({
+  device: createDeviceDescriptor({
     id,
     typeId: parseDeviceTypeId('test.default-instrument'),
     definitionVersion: 1,
     enabled: true,
     parameters: {},
     opaqueState: { presetId: 'test-default' },
-  })
+  }),
+  mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
+})
 
 export const createTestTrackColor: ProjectMidiTrackColorFactory = () => null
 

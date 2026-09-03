@@ -1,6 +1,6 @@
 # Studio Built-in Instrument Catalogue V1
 
-> Status: MI2 implementation pending review
+> Status: MI2 reviewed and committed as `f13df2f`; updated for MI3A
 >
 > Date: 2026-09-03
 >
@@ -28,11 +28,14 @@ Instrument 选择。MIDI、Soundbank、Catalogue 与 Missing Instrument 等术�
 
 ## 2. 单一目录来源
 
-冻结的 `BUILT_IN_INSTRUMENT_CATALOGUE` 属于 Studio Composition Root 配置。每个条目只保存：
+冻结的 `BUILT_IN_INSTRUMENT_CATALOGUE` 属于 Studio Composition Root 配置。MI2 中每个条目保存：
 
 - 稳定、来源无关的 `soundbankId`；
 - Inspector 显示名与乐器族；
 - developer-local、same-origin asset base pathname。
+
+MI3A 在同一条目上增加经过审核的零基 GM Program 路由，General MIDI Percussion 则保存独立的
+Channel 10 路由角色；没有另建一份平行 Program 表。
 
 Inspector Presentation 和 Browser Playback Runtime 都从这份目录派生，不能分别维护音色名称与
 URL Map。Project Core 只保存通用 Device Descriptor；Playback 只解码 `soundbankId`；Audio Web
@@ -74,7 +77,8 @@ Missing 不会改写 Project Fact。若未知 Sample Device 含合法 `soundbank
 - developer-local Soundbank 继续由 `.gitignore` 排除，Studio production dist guard 继续禁止复制
   整棵本地资产。
 - 本批不升级 Project File schema，不迁移旧项目，也不把未知 Device 回退为钢琴。
-- MIDI Program、Channel 10 自动路由和不可用 Program 占位属于 MI3A；初始 CC7 / CC10 属于 MI3B。
+- MIDI Program、Channel 10 自动路由和不可用 Program 占位由 MI3A 接入；初始 CC7 / CC10 仍属于
+  MI3B。
 - Instrument Browser、搜索、Preset、Preview Audition、远程安装、Action Catalogue 与用户 Keymap
   继续延期。
 - 本批只接通目录、显式选择与位置派生；多 Soundbank Cache、混合 Peak 和人工总谱听测仍由

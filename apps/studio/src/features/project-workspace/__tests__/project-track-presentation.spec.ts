@@ -26,6 +26,10 @@ import {
   PROJECT_TRACK_INSTRUMENT_STATUS,
   createProjectTrackPresentations,
 } from '@/features/project-workspace/project-track-presentation'
+import {
+  MIDI_PROGRAM_PLACEHOLDER_DEVICE_DEFINITION,
+  createMidiProgramPlaceholderDeviceDescriptor,
+} from '@/workbench/instrument/midi-import-instrument-policy'
 import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/project/track/project-track-coordinator'
 
 function createSession(): ProjectSession {
@@ -90,6 +94,15 @@ describe('Project Track presentation', () => {
     )
     addInstrumentTrack(
       session,
+      'Unsupported Program',
+      createMidiProgramPlaceholderDeviceDescriptor(
+        parseDeviceId('device-program-placeholder-presentation'),
+        2,
+        80,
+      ),
+    )
+    addInstrumentTrack(
+      session,
       'Legacy Slot',
       createDeviceDescriptor({
         id: parseDeviceId('device-legacy-slot-presentation'),
@@ -133,6 +146,12 @@ describe('Project Track presentation', () => {
         displayName: 'Missing instrument',
         soundbankId: 'unknown-orchestral-bank',
         status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
+      },
+      {
+        deviceTypeId: MIDI_PROGRAM_PLACEHOLDER_DEVICE_DEFINITION.typeId,
+        displayName: 'MIDI Program 81 unavailable',
+        soundbankId: null,
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.UNAVAILABLE,
       },
       {
         deviceTypeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,

@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   BUILT_IN_INSTRUMENT_CATALOGUE,
   BUILT_IN_INSTRUMENT_CATALOGUE_GROUPS,
+  BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND,
   DEFAULT_BUILT_IN_INSTRUMENT,
+  GENERAL_MIDI_PERCUSSION_INSTRUMENT,
+  findBuiltInInstrumentByProgramNumber,
   findBuiltInInstrumentCatalogueEntry,
 } from '@/workbench/instrument/built-in-instrument-catalogue'
 
@@ -32,6 +35,30 @@ const EXPECTED_IDENTITIES = [
   ['general-midi-percussion', 'General MIDI Percussion', 'drum-kit'],
 ] as const
 
+const EXPECTED_PROGRAM_ROUTES = [
+  [0, 'studio-grand'],
+  [32, 'acoustic-bass'],
+  [40, 'solo-violin'],
+  [41, 'viola-section'],
+  [42, 'cello-section'],
+  [43, 'double-bass-section'],
+  [44, 'string-ensemble-tremolo'],
+  [45, 'string-ensemble-pizzicato'],
+  [46, 'orchestral-harp'],
+  [48, 'string-ensemble'],
+  [56, 'trumpet'],
+  [59, 'muted-trumpet'],
+  [57, 'trombone'],
+  [58, 'tuba'],
+  [60, 'french-horn'],
+  [61, 'brass-ensemble'],
+  [68, 'oboe'],
+  [70, 'bassoon'],
+  [71, 'clarinet'],
+  [73, 'flute'],
+  [47, 'timpani'],
+] as const
+
 describe('built-in Instrument Catalogue', () => {
   it('freezes the reviewed 22-entry product identity, presentation, and asset mapping', () => {
     expect(
@@ -48,7 +75,45 @@ describe('built-in Instrument Catalogue', () => {
       22,
     )
     expect(BUILT_IN_INSTRUMENT_CATALOGUE.every((entry) => Object.isFrozen(entry))).toBe(true)
+    expect(
+      BUILT_IN_INSTRUMENT_CATALOGUE.every(({ midiImportRoute }) =>
+        Object.isFrozen(midiImportRoute),
+      ),
+    ).toBe(true)
     expect(Object.isFrozen(BUILT_IN_INSTRUMENT_CATALOGUE)).toBe(true)
+  })
+
+  it('owns the reviewed GM Program and Channel 10 routes without duplicate Programs', () => {
+    const programRoutes = BUILT_IN_INSTRUMENT_CATALOGUE.flatMap(
+      ({ midiImportRoute, soundbankId }) =>
+        midiImportRoute.kind === 'program'
+          ? [[midiImportRoute.programNumber, soundbankId] as const]
+          : [],
+    )
+
+    expect(programRoutes).toEqual(EXPECTED_PROGRAM_ROUTES)
+    expect(new Set(programRoutes.map(([programNumber]) => programNumber)).size).toBe(
+      programRoutes.length,
+    )
+    expect(
+      BUILT_IN_INSTRUMENT_CATALOGUE.filter(
+        ({ midiImportRoute }) => midiImportRoute.kind === 'program',
+      ).every(
+        ({ midiImportRoute }) =>
+          midiImportRoute.kind === 'program' &&
+          midiImportRoute.mappingKind === BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND.EXACT,
+      ),
+    ).toBe(true)
+    expect(GENERAL_MIDI_PERCUSSION_INSTRUMENT).toBe(BUILT_IN_INSTRUMENT_CATALOGUE.at(-1))
+    expect(GENERAL_MIDI_PERCUSSION_INSTRUMENT.midiImportRoute).toEqual({
+      kind: 'percussion-channel',
+    })
+    for (const [programNumber, soundbankId] of EXPECTED_PROGRAM_ROUTES) {
+      expect(findBuiltInInstrumentByProgramNumber(programNumber)?.soundbankId).toBe(soundbankId)
+    }
+    expect(findBuiltInInstrumentByProgramNumber(1)).toBeNull()
+    expect(findBuiltInInstrumentByProgramNumber(128)).toBeNull()
+    expect(findBuiltInInstrumentByProgramNumber('40')).toBeNull()
   })
 
   it('groups the same entries for the Inspector without creating a second identity mapping', () => {

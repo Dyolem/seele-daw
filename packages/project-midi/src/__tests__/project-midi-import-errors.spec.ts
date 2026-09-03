@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { parseDeviceId } from '@seele-daw/project-core'
-import { ProjectMidiImportError, createProjectMidiImportDraft } from '#internal/index'
+import {
+  PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
+  ProjectMidiImportError,
+  createProjectMidiImportDraft,
+} from '#internal/index'
 import {
   createImportInput,
   createInstrumentDeviceWithId,
@@ -134,8 +138,24 @@ describe('Project MIDI import failures', () => {
       () =>
         createProjectMidiImportDraft(
           createImportInput(createMidiDocument(), {
-            createInstrumentDevice: () =>
-              createInstrumentDeviceWithId(parseDeviceId('different-device')),
+            createInstrumentDevice: () => ({
+              device: createInstrumentDeviceWithId(parseDeviceId('different-device')),
+              mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
+            }),
+          }),
+        ),
+      'instrument-device-factory-failed',
+    )
+
+    expectImportError(
+      () =>
+        createProjectMidiImportDraft(
+          createImportInput(createMidiDocument(), {
+            createInstrumentDevice: ({ id }) => ({
+              appliedInstrumentName: ' ',
+              device: createInstrumentDeviceWithId(id),
+              mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE,
+            }),
           }),
         ),
       'instrument-device-factory-failed',

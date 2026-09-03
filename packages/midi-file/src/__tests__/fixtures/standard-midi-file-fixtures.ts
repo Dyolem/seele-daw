@@ -124,6 +124,34 @@ export const TYPE_ZERO_MULTI_CHANNEL_FIXTURE = createSmfFixture(0, 120, [
   ],
 ])
 
+export const TYPE_ZERO_MID_TRACK_PROGRAM_CHANGE_FIXTURE = createSmfFixture(0, 120, [
+  [
+    0x00,
+    0xc0,
+    0x00,
+    0x00,
+    0x90,
+    0x3c,
+    0x64,
+    0x78,
+    0x80,
+    0x3c,
+    0x00,
+    0x00,
+    0xc0,
+    0x28,
+    0x00,
+    0x90,
+    0x41,
+    0x5a,
+    0x78,
+    0x80,
+    0x41,
+    0x00,
+    ...END_OF_TRACK,
+  ],
+])
+
 export const RUNNING_STATUS_NOTE_OFF_FIXTURE = createSmfFixture(0, 120, [
   [0x00, 0x90, 0x3c, 0x64, 0x78, 0x3c, 0x00, ...END_OF_TRACK],
 ])

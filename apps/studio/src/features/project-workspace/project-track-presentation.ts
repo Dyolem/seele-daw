@@ -9,12 +9,14 @@ import type {
 import { decodeSampleInstrumentDeviceState, type SoundbankId } from '@seele-daw/playback'
 
 import { findBuiltInInstrumentCatalogueEntry } from '@/workbench/instrument/built-in-instrument-catalogue'
+import { decodeMidiProgramPlaceholderDeviceState } from '@/workbench/instrument/midi-import-instrument-policy'
 import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/project/track/project-track-coordinator'
 
 export const PROJECT_TRACK_INSTRUMENT_STATUS = Object.freeze({
   EMPTY: 'empty',
   MISSING: 'missing',
   READY: 'ready',
+  UNAVAILABLE: 'unavailable',
 } as const)
 
 export type ProjectTrackInstrumentStatus =
@@ -63,6 +65,16 @@ function createInstrumentPresentation(
       displayName: 'No instrument selected',
       soundbankId: null,
       status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
+    })
+  }
+
+  const programPlaceholderState = decodeMidiProgramPlaceholderDeviceState(device)
+  if (programPlaceholderState !== null) {
+    return Object.freeze({
+      deviceTypeId: device.typeId,
+      displayName: `MIDI Program ${programPlaceholderState.programNumber + 1} unavailable`,
+      soundbankId: null,
+      status: PROJECT_TRACK_INSTRUMENT_STATUS.UNAVAILABLE,
     })
   }
 

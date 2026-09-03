@@ -1,6 +1,5 @@
 import { ToneJsMidiFileDecoder, type MidiFileDecoder } from '@seele-daw/midi-file'
 import { BrowserLocalFileByteReader, type LocalFileByteReader } from '@seele-daw/platform-browser'
-import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 import type { ProjectMidiImportIdFactory } from '@seele-daw/project-midi'
 import { createPinia } from 'pinia'
 import {
@@ -24,6 +23,7 @@ import {
 } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
 import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
 import { STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { createStudioMidiImportInstrumentDevice } from '@/workbench/instrument/midi-import-instrument-policy'
 import {
   createBrowserActiveProjectRuntime,
   type BrowserActiveProjectRuntime,
@@ -245,7 +245,7 @@ export function composeStudioApplication(
     const projectMidiImport = createProjectMidiImportCoordinator({
       activeProject: projectRuntime.activeProject,
       createId: composition.createProjectMidiImportId ?? (() => createBrowserProjectEntityId()),
-      createInstrumentDevice: ({ id }) => createStudioGrandDeviceDescriptor(id),
+      createInstrumentDevice: createStudioMidiImportInstrumentDevice,
       createRandomValue: composition.createRandomValue ?? Math.random,
       decoder: composition.midiFileDecoder ?? new ToneJsMidiFileDecoder(),
       fileReader: composition.midiFileReader ?? new BrowserLocalFileByteReader(),

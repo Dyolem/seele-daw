@@ -4,6 +4,7 @@ export {
   createProjectMidiTrackImportDraft,
 } from './import/project-midi-importer'
 export {
+  PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   PROJECT_MIDI_IMPORT_ENTITY_KIND,
 } from './import/project-midi-import-contract'
@@ -20,6 +21,8 @@ export type {
   ProjectMidiTrackImportDraft,
   ProjectMidiInstrumentDeviceFactory,
   ProjectMidiInstrumentDeviceFactoryInput,
+  ProjectMidiInstrumentDeviceFactoryResult,
+  ProjectMidiInstrumentMappingKind,
   ProjectMidiTrackColorFactory,
   ProjectMidiTrackColorFactoryInput,
 } from './import/project-midi-import-contract'

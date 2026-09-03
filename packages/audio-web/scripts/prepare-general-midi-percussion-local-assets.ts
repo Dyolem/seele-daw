@@ -1,0 +1,19 @@
+import { dirname, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { GENERAL_MIDI_PERCUSSION_LOCAL_INSTRUMENT } from './built-in-score-core-local-instruments'
+import { prepareBuiltInLocalSampleInstrument } from './prepare-built-in-local-sample-instrument'
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+const localSoundbankRoot = resolve(repositoryRoot, 'apps/studio/public/soundbanks')
+
+const result = await prepareBuiltInLocalSampleInstrument({
+  definition: GENERAL_MIDI_PERCUSSION_LOCAL_INSTRUMENT.preparation,
+  localSoundbankRoot,
+})
+const relativeOutputDirectory = relative(repositoryRoot, result.outputDirectory)
+console.log(
+  result.status === 'created'
+    ? `Prepared General MIDI Percussion local assets in ${relativeOutputDirectory}.`
+    : `General MIDI Percussion local assets are already current in ${relativeOutputDirectory}.`,
+)

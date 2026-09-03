@@ -527,6 +527,46 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources[2]?.stops.at(-1)).toBeCloseTo(4.4 + STOP_SAFETY_SECOND)
   })
 
+  it('fast-chokes an older one-shot voice when another member of its symmetric group starts', () => {
+    const hiHatGroup = Object.freeze({ groupId: 7, offByGroupId: 7, offMode: 'fast' as const })
+    const zones = Object.freeze([
+      createZone('one-shot-open-hat', 70, {
+        exclusiveGroup: hiHatGroup,
+        triggerMode: 'one-shot',
+      }),
+      createZone('one-shot-closed-hat', 71, {
+        exclusiveGroup: hiHatGroup,
+        triggerMode: 'one-shot',
+      }),
+    ])
+    const { context, runtime } = createRuntime({
+      preparedResources: createPreparedResources(zones),
+    })
+
+    runtime.schedule(
+      createPlan('open-hat', 70, {
+        startPlaybackClockSecond: 1,
+        releasePlaybackClockSecond: 1.05,
+      }),
+    )
+    runtime.schedule(
+      createPlan('closed-hat', 71, {
+        startPlaybackClockSecond: 2,
+        releasePlaybackClockSecond: 2.05,
+      }),
+    )
+
+    expect(context.gainNodes[0]?.gain.events).toContainEqual({
+      kind: 'linear-ramp',
+      time: 2 + FAST_RELEASE_SECOND,
+      value: 0,
+    })
+    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(
+      2 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+    )
+    expect(context.bufferSources[1]?.stops).toEqual([])
+  })
+
   it('moves a sustain loop into its unlooped tail when normal mutex release starts early', () => {
     const { context, runtime } = createRuntime()
     runtime.schedule(

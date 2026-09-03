@@ -4,6 +4,10 @@ import type {
   BuiltInLocalSampleInstrumentDefinition,
   BuiltInLocalSampleInstrumentInputFingerprint,
 } from './prepare-built-in-local-sample-instrument'
+import {
+  BUILT_IN_LOCAL_MANIFEST_POLICY,
+  type BuiltInLocalManifestPolicy,
+} from './built-in-local-manifest-policy'
 
 const MEBIBYTE = 1_024 * 1_024
 
@@ -65,6 +69,7 @@ interface InstrumentInput {
   readonly expectedSourceDisplayName: string
   readonly expectedSourceGeneralMidiProgram: number
   readonly family: BuiltInScoreCoreInstrumentFamily
+  readonly manifestPolicy?: BuiltInLocalManifestPolicy
   readonly plannedRoute: BuiltInScoreCorePlannedRoute
   readonly productDisplayName: string
   readonly productPitchRange: {
@@ -117,6 +122,7 @@ function createInstrument(input: InstrumentInput): BuiltInScoreCoreLocalInstrume
     expectedInputFingerprints: createInputFingerprints(input.sourceSlug, input.sourceHashes),
     expectedSourceDisplayName: input.expectedSourceDisplayName,
     generatedDirectoryName: input.soundbankId,
+    manifestPolicy: input.manifestPolicy ?? BUILT_IN_LOCAL_MANIFEST_POLICY.preserveSourceControlsV1,
     productPitchRange: Object.freeze({ ...input.productPitchRange }),
     soundbankId,
     sourceSlug: input.sourceSlug,
@@ -603,6 +609,7 @@ export const BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS = Object.freeze([
     expectedSourceDisplayName: 'General MIDI Percussion',
     expectedSourceGeneralMidiProgram: -1,
     family: 'drum-kit',
+    manifestPolicy: BUILT_IN_LOCAL_MANIFEST_POLICY.generalMidiPercussionV1,
     plannedRoute: { channel: 9, kind: 'percussion-channel' },
     productDisplayName: 'General MIDI Percussion',
     productPitchRange: { maximumPitch: 81, minimumPitch: 35 },
@@ -622,4 +629,12 @@ export const STUDIO_GRAND_LOCAL_INSTRUMENT =
   ) ??
   (() => {
     throw new TypeError('Score Core instrument list is missing Studio Grand')
+  })()
+
+export const GENERAL_MIDI_PERCUSSION_LOCAL_INSTRUMENT =
+  BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS.find(
+    ({ preparation }) => preparation.soundbankId === 'general-midi-percussion',
+  ) ??
+  (() => {
+    throw new TypeError('Score Core instrument list is missing General MIDI Percussion')
   })()

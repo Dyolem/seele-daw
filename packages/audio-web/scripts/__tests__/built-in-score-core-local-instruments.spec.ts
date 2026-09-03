@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS } from '../built-in-score-core-local-instruments'
+import { BUILT_IN_LOCAL_MANIFEST_POLICY } from '../built-in-local-manifest-policy'
 
 const EXPECTED_SOUNDBANK_IDS = [
   'acoustic-bass',
@@ -83,9 +84,17 @@ describe('built-in Score Core local instruments', () => {
       preparation: {
         expectedCanonicalForProgram: true,
         expectedGeneralMidiProgram: -1,
+        manifestPolicy: BUILT_IN_LOCAL_MANIFEST_POLICY.generalMidiPercussionV1,
         productPitchRange: { maximumPitch: 81, minimumPitch: 35 },
       },
     })
+
+    expect(
+      BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS.filter(
+        ({ preparation }) =>
+          preparation.manifestPolicy === BUILT_IN_LOCAL_MANIFEST_POLICY.preserveSourceControlsV1,
+      ),
+    ).toHaveLength(21)
   })
 
   it('uses the source-authored keyboard coverage without copying the piano range', () => {

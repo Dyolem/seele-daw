@@ -12,6 +12,7 @@ import {
   prepareBuiltInLocalSampleInstrument,
   type BuiltInLocalSampleInstrumentPreparationInventory,
 } from './prepare-built-in-local-sample-instrument'
+import type { BuiltInLocalManifestPolicy } from './built-in-local-manifest-policy'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const localSoundbankRoot = resolve(repositoryRoot, 'apps/studio/public/soundbanks')
@@ -23,6 +24,7 @@ const inventoryReportPath = resolve(
 interface PreparedScoreCoreInstrument {
   readonly family: BuiltInScoreCoreInstrumentFamily
   readonly inventory: BuiltInLocalSampleInstrumentPreparationInventory
+  readonly manifestPolicy: BuiltInLocalManifestPolicy
   readonly plannedRoute: BuiltInScoreCorePlannedRoute
   readonly productDisplayName: string
   readonly productPitchRange: {
@@ -105,6 +107,7 @@ for (const instrument of BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS) {
     Object.freeze({
       family: instrument.family,
       inventory: result.inventory,
+      manifestPolicy: instrument.preparation.manifestPolicy,
       plannedRoute: instrument.plannedRoute,
       productDisplayName: instrument.productDisplayName,
       productPitchRange: instrument.preparation.productPitchRange,
@@ -120,7 +123,7 @@ for (const instrument of BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS) {
 
 const report = {
   schema: 'seele.local-score-core-preparation-inventory',
-  schemaVersion: 1,
+  schemaVersion: 2,
   instrumentCount: instruments.length,
   aggregate: {
     archiveCompressedByteLength: sum(

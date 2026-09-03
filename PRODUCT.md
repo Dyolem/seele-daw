@@ -96,7 +96,7 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
 | `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、踏板 PCM、非播放态尾音清理及未来 WAV 声音尾部边界均已通过。                                                         |
-| `SCORE-INSTRUMENTS`    | 总谱多乐器发声            | **尚未实现** | 22 个本地 Score Core Soundbank Definition 与资产报告已进入审核；当前尚未建立 Studio Catalogue、Program 路由、乐器选择 UI 或多音源产品播放能力。                         |
+| `SCORE-INSTRUMENTS`    | 总谱多乐器发声            | **尚未实现** | 22 个本地 Score Core Soundbank 已完成 MI1B 规范化；MI1C 已在开发资产中加入 GM 鼓组 one-shot / Hi-hat Choke，但尚无 Studio Catalogue、Program 路由或多音源产品播放。     |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
@@ -928,7 +928,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 ### 音源与声音
 
 - 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的完整 Catalog / Indexes 扫描、
-  运行时安装与音色选择；MI1B 已用配置驱动准备内核规范化 22 个开发者本地 Soundbank，但唯一
+  运行时安装与音色选择；MI1B 已用配置驱动准备内核规范化 22 个开发者本地 Soundbank，MI1C 已为
+  固定 GM Percussion 来源生成 one-shot 与 Hi-hat Choke Manifest，但唯一
   产品消费者仍是 Studio Grand，尚未形成 Studio Catalogue 或第二个可选择 Soundbank。当前只支持
   由开发工具规范化后的同源 Manifest/WAV，且该镜像不属于产品资源，Vite 生产构建禁止把 public
   内容复制到 dist。阶段边界见

@@ -24,6 +24,12 @@ import {
   validateBuiltInSoundbankCatalog,
 } from './built-in-soundbank-source'
 import {
+  BUILT_IN_LOCAL_MANIFEST_POLICY,
+  BuiltInLocalManifestPolicyError,
+  applyBuiltInLocalManifestPolicy,
+  type BuiltInLocalManifestPolicy,
+} from './built-in-local-manifest-policy'
+import {
   assertManifestPitchCoverage,
   assertManifestResourceDurations,
   constrainManifestToPitchRange,
@@ -46,6 +52,7 @@ export interface BuiltInLocalSampleInstrumentDefinition {
   readonly expectedInputFingerprints: readonly BuiltInLocalSampleInstrumentInputFingerprint[]
   readonly expectedSourceDisplayName: string
   readonly generatedDirectoryName: string
+  readonly manifestPolicy: BuiltInLocalManifestPolicy
   readonly productPitchRange: {
     readonly maximumPitch: number
     readonly minimumPitch: number
@@ -92,6 +99,7 @@ export type BuiltInLocalSampleInstrumentPreparationErrorCode =
   | 'archive-mapping-mismatch'
   | 'input-fingerprint-mismatch'
   | 'invalid-definition'
+  | 'manifest-policy-mismatch'
   | 'missing-archive-entry'
   | 'output-conflict'
   | 'source-identity-mismatch'
@@ -222,6 +230,12 @@ function validateDefinition(
   assertNonBlankString(definition.expectedSourceDisplayName, 'expectedSourceDisplayName')
   assertNonBlankString(definition.sourceSlug, 'sourceSlug')
   if (
+    definition.manifestPolicy !== BUILT_IN_LOCAL_MANIFEST_POLICY.preserveSourceControlsV1 &&
+    definition.manifestPolicy !== BUILT_IN_LOCAL_MANIFEST_POLICY.generalMidiPercussionV1
+  ) {
+    fail('invalid-definition', 'manifestPolicy must name a supported reviewed policy')
+  }
+  if (
     !Number.isInteger(definition.expectedGeneralMidiProgram) ||
     definition.expectedGeneralMidiProgram < -1 ||
     definition.expectedGeneralMidiProgram > 127
@@ -344,12 +358,24 @@ function createManifest(
     definition.productPitchRange.minimumPitch,
     definition.productPitchRange.maximumPitch,
   )
+  let policyApplied: SampleInstrumentManifestV1
+  try {
+    policyApplied = applyBuiltInLocalManifestPolicy(constrained, {
+      policy: definition.manifestPolicy,
+      sourceSlug: definition.sourceSlug,
+    })
+  } catch (error) {
+    if (error instanceof BuiltInLocalManifestPolicyError) {
+      fail('manifest-policy-mismatch', error.detail)
+    }
+    throw error
+  }
   assertManifestPitchCoverage(
-    constrained,
+    policyApplied,
     definition.productPitchRange.minimumPitch,
     definition.productPitchRange.maximumPitch,
   )
-  return constrained
+  return policyApplied
 }
 
 function prepareResourceOutputs(

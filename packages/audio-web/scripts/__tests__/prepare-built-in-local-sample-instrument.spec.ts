@@ -12,6 +12,7 @@ import {
   prepareBuiltInLocalSampleInstrument,
   type BuiltInLocalSampleInstrumentDefinition,
 } from '../prepare-built-in-local-sample-instrument'
+import { BUILT_IN_LOCAL_MANIFEST_POLICY } from '../built-in-local-manifest-policy'
 
 const SOURCE_SLUG = 'fixture-strings-v1'
 const SAMPLE_FILE_NAME = '060-Fixture-Strings'
@@ -211,6 +212,7 @@ async function createPreparationFixture(): Promise<PreparationFixture> {
       ),
       expectedSourceDisplayName: 'Fixture Strings',
       generatedDirectoryName: 'fixture-strings',
+      manifestPolicy: BUILT_IN_LOCAL_MANIFEST_POLICY.preserveSourceControlsV1,
       productPitchRange: Object.freeze({ maximumPitch: 60, minimumPitch: 60 }),
       soundbankId: parseSoundbankId('fixture-strings'),
       sourceSlug: SOURCE_SLUG,
@@ -351,6 +353,26 @@ describe('built-in local Sample Instrument preparation', () => {
     expect(relative(fixture.localSoundbankRoot, fixture.outputDirectory)).toBe(
       'generated/fixture-strings',
     )
+  })
+
+  it('rejects an unknown Manifest policy before reading or writing assets', async () => {
+    const fixture = await createPreparationFixture()
+
+    await expect(
+      prepareBuiltInLocalSampleInstrument({
+        ...fixture,
+        definition: Object.freeze({
+          ...fixture.definition,
+          manifestPolicy:
+            'unreviewed-policy' as BuiltInLocalSampleInstrumentDefinition['manifestPolicy'],
+        }),
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<BuiltInLocalSampleInstrumentPreparationError>>({
+        code: 'invalid-definition',
+      }),
+    )
+    await expect(access(fixture.outputDirectory)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('rejects absolute input fingerprint paths before publication', async () => {

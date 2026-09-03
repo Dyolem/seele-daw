@@ -1,8 +1,8 @@
 # Built-in Multi-Instrument Score Playback V1 阶段计划
 
-> Status: MI0 / MI1A reviewed and committed as `f7af1db`; MI1B implementation pending review
+> Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C implementation pending review
 >
-> Date: 2026-09-02
+> Date: 2026-09-03
 >
 > Scope owner: Studio Composition Root、`@seele-daw/project-midi`、
 > `@seele-daw/playback` 与 `@seele-daw/audio-web`
@@ -173,6 +173,10 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 - Timpani 仍是普通 melodic gated instrument，不继承 Drum Kit 政策；
 - 转换只匹配已记录来源身份和精确 Pitch，不扩大通用 Mapping Adapter 的猜测能力。
 
+实现与本地证据见
+[General MIDI Percussion Compatibility Policy V1](./general-midi-percussion-compatibility-policy-v1.md)。
+本批仍只生成开发者本地 Manifest；Studio Catalogue 与 Channel 10 产品路由分别留给 MI2 / MI3A。
+
 ### MI2 — Studio Catalogue 与 Instrument 选择
 
 - 增加 Studio-owned、冻结且可测试的内置 Instrument Catalogue；同一条目同时提供 Inspector
@@ -227,6 +231,7 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 | 场景                           | 必须行为                                                                     |
 | ------------------------------ | ---------------------------------------------------------------------------- |
 | Definition 输入指纹变化        | 规范化前失败；不发布新目录。                                                 |
+| 专用 Manifest 政策前置条件漂移 | 报 `manifest-policy-mismatch`；不猜测、不产生部分输出。                      |
 | ZIP 多出、缺少、重复或大小超限 | 失败关闭；不信任未声明 Entry。                                               |
 | 已生成目录与新结果不同         | 报 `output-conflict`；不覆盖用户或审核资产。                                 |
 | 已支持音源资源缺失             | 首次 Play 失败并说明 Soundbank；不回退钢琴。                                 |

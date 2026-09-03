@@ -1,8 +1,8 @@
 # Built-in Score Core Soundbank Audit
 
-> Status: MI1B implementation pending review
+> Status: MI1B reviewed and committed as `7c36a17`; updated with MI1C implementation pending review
 >
-> Date: 2026-09-02
+> Date: 2026-09-03
 >
 > Asset classification: developer-local validation fixtures; not Seele distributable assets
 
@@ -78,15 +78,16 @@ MiB；Manifest 使用 KiB。
 | `bassoon`                   | Bassoon                 | P70 / 70 canonical   | 21…119 |       14 / 14 |    0.02 |         5.02 / 15 |      5.29 / 10.57 |     10.5 |
 | `clarinet`                  | Clarinet                | P71 / 71 canonical   | 21…119 |       16 / 16 |    0.08 |        10.78 / 17 |     11.50 / 22.99 |     11.8 |
 | `flute`                     | Flute                   | P73 / 73 canonical   | 21…119 |       16 / 16 |    0.08 |         7.78 / 17 |      8.35 / 16.69 |     11.6 |
-| `general-midi-percussion`   | General MIDI Percussion | Ch 10 / -1 canonical |  35…81 |        47 / 0 |   0.133 |         4.26 / 48 |      6.67 / 13.33 |     30.2 |
+| `general-midi-percussion`   | General MIDI Percussion | Ch 10 / -1 canonical |  35…81 |        47 / 0 |   0.133 |         4.26 / 48 |      6.67 / 13.33 |     30.6 |
 
 ## 3. 集合预算与现有限制
 
 本地库存报告：
 
 - 路径：`measurements/score-core/preparation-inventory.json`；
-- Schema：`seele.local-score-core-preparation-inventory` version 1；
-- SHA-256：`6ac6c501d3f35b7d63190aab313e00387a9cae250698448b81a262f289aaeb4e`。
+- Schema：`seele.local-score-core-preparation-inventory` version 2；MI1C 新增每个条目的命名
+  `manifestPolicy`；
+- SHA-256：`763fe7cfe0280833dfc2fc51b952197ec899bed4cdebb4c4517c19ad9537efa6`。
 
 集合实测为：
 
@@ -95,16 +96,17 @@ MiB；Manifest 使用 KiB。
 | Soundbank             |                                 22 |
 | Zone / WAV Resource   |                          362 / 362 |
 | Loop Zone             |                                217 |
+| One-shot / Group Zone |                             47 / 3 |
 | 生成文件              |                                406 |
 | Archive 压缩总字节    |                        194,322,921 |
 | Archive 解压总字节    |                        223,880,912 |
 | WAV 编码总字节        |                        223,705,752 |
 | 完整集合 Float32 估算 | 447,379,648 bytes（约 426.65 MiB） |
-| Manifest 总字节       |                            265,637 |
+| Manifest 总字节       |                            266,018 |
 
 当前 Studio 加载上限无需因 MI1B 立即放宽：
 
-- 最大 Manifest 是 General MIDI Percussion 的 `30,911` bytes，低于当前 `64 KiB`；
+- 最大 Manifest 是 General MIDI Percussion 的 `31,292` bytes，低于当前 `64 KiB`；
 - 最大单 WAV 编码资源是 Tremolo Strings 的 `2,272,752` bytes，低于当前 `4 MiB`；
 - 最大单 WAV 解码 Float32 是 `4,545,416` bytes；最大完整 Soundbank 是 Tremolo Strings 的
   `78,330,376` bytes；
@@ -122,9 +124,11 @@ MiB；Manifest 使用 KiB。
   `loopStart = loopEnd = 0` 被正确解释为 no-loop，不伪造循环。
 - MI1B 没有增加力度层、Round Robin、Release Sample、CC1、CC11、动态 CC7/10 或 Articulation；
   Velocity 仍只改变单层 Sample 的增益。
-- General MIDI Percussion 的来源 Mapping 仍被标记为普通 instrument；因此当前原始 Manifest 的
-  47 个 Zone 仍是 gated、没有 Exclusive Group。它只能作为资产审计输入，不能在 MI1C 前进入
-  Studio Catalogue。MI1C 必须显式转换为 one-shot，并为 MIDI `42 / 44 / 46` 增加 Hi-hat Choke。
+- General MIDI Percussion 的来源 Mapping 仍被标记为普通 instrument；MI1C 的命名政策已经在严格
+  来源身份与 47 个 exact-key 前置条件后，将全部 Zone 转为 one-shot，并只给 MIDI `42 / 44 / 46`
+  增加对称 fast Hi-hat Choke。政策与证据见
+  [General MIDI Percussion Compatibility Policy V1](./general-midi-percussion-compatibility-policy-v1.md)。
+  这仍不是 Studio Catalogue 或 Channel 10 产品路由。
 - 本批没有试听 22 个音色，也没有测量实际多声部混合 Peak。音色对应、极端移调、Loop 接缝、尾音
   和声部平衡属于 MI5 人工听测与 PCM 门禁，不能由指纹或资源统计替代。
 - 当前来源许可证据仍不足以支持随产品分发；所有输出继续只是开发者本地验证资产。
@@ -134,6 +138,6 @@ MiB；Manifest 使用 KiB。
 MI1B 可以批准的结论仅为：22 个来源已经通过固定身份、六输入指纹、独立安全预算、Manifest/WAV
 规范化、资源统计和幂等发布门禁；现有 Studio Grand 输出逐字节不变。
 
-它不代表用户已经能选择这些乐器，也不代表 MIDI Program 或 Channel 10 已经接通。下一批 MI1C
-先完成 General MIDI Percussion 的 one-shot / choke 兼容转换，然后 MI2 才建立 Studio Catalogue
-与可见 Instrument 选择。
+它不代表用户已经能选择这些乐器，也不代表 MIDI Program 或 Channel 10 已经接通。MI1C 已在本地
+资产边界完成 General MIDI Percussion 的 one-shot / choke 兼容转换，审核通过后下一批 MI2 才建立
+Studio Catalogue 与可见 Instrument 选择。

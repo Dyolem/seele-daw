@@ -2,7 +2,7 @@
 
 > Status: Active reference for the approved V1 phase
 >
-> Date: 2026-09-02
+> Date: 2026-09-03
 
 本文用直白中文解释多乐器总谱接入中反复出现的 MIDI、采样音源、资源和兼容性术语。它不要求
 读者预先了解音频行业。Velocity、dBFS、Envelope、Voice Stealing、CC64 和声音尾部等基础概念
@@ -49,27 +49,29 @@
 
 ## 3. 采样、控制文件与发声
 
-| 中文       | 英文                            | 在本阶段中的准确含义                                                                                                                  |
-| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| 控制文件   | Mapping / Instrument Definition | 描述 Pitch 范围、根音高、Loop、Envelope、One-shot、Choke 等规则的数据。MIDI 文件不包含这些采样播放规则。                              |
-| 兼容适配器 | Compatibility Adapter           | 把某一种已审计来源控制数据转换成 Seele Manifest。来源特有推断必须留在这里，不能污染 Project 或通用 Runtime。                          |
-| 清单       | Sample Instrument Manifest      | Audio Web 接受的严格 Seele V1 运行时契约。它只保留经过支持和验证的 Zone / Resource 语义，不保留远程 URL。                             |
-| 区域       | Zone                            | 一条“哪些 Pitch 选哪枚 Sample，并如何播放”的规则。一个 Soundbank 通常包含多个 Zone。                                                  |
-| 选择范围   | Selector / Key Range            | Zone 覆盖的单个 MIDI Pitch 或连续 Pitch 范围。总谱出现未覆盖 Pitch 时应明确失败，不能选择随机 Sample。                                |
-| 根音高     | Root MIDI Pitch                 | WAV 原始录音对应的 MIDI Pitch。目标音高与根音高差决定播放速率和移调。                                                                 |
-| 采样素材   | Sample / WAV Resource           | 真正被浏览器解码和播放的音频文件。MIDI Velocity 或 Program 本身都不是 Sample。                                                        |
-| 采样循环   | Sample Loop                     | 在一枚 WAV 的指定区间重复播放，让持续弦乐或管乐不因素材结束而断声。Studio Grand 没有 Loop，不代表其他 Soundbank 不能有。              |
-| 持续循环   | Continuous Loop                 | Gate Release 后仍继续循环，再由 Envelope 淡出。它适合某些持续素材，但不等于 Sustain Pedal。                                           |
-| 延音循环   | Sustain Loop                    | Gate 保持时循环，最终 Release 后离开循环并播放非循环尾部。它仍是 Sample 规则，不是 CC64 本身。                                        |
-| 一次性触发 | One-shot                        | Note On 后让素材自然播完，普通 Note Off 和 CC64 不提前截断。鼓件常用，但不是所有短音都自动是 One-shot。                               |
-| 门控发声   | Gated Voice                     | Note / Pedal 的最终 Gate Release 决定何时进入 Release Envelope。钢琴、持续弦乐和管乐候选通常走该路径。                                |
-| 互斥组     | Exclusive Group / Mutex Group   | 一组 Voice 可互相关闭。例如 Closed Hi-hat 会截断正在响的 Open Hi-hat。它不是全局同 Pitch 重触发政策。                                 |
-| 截音       | Choke                           | 新鼓件触发后快速结束互斥组中的旧 Voice。Hi-hat 是典型场景；Timpani 不应误套同一政策。                                                 |
-| 演奏法     | Articulation                    | Long Bow、Staccato、Pizzicato、Muted 等发音方式。不同 Program 或 Soundbank 可以近似表达，但 V1 没有 Key Switch 或 Articulation Lane。 |
-| 键位切换   | Key Switch                      | 用特定低音 Note 切换 Articulation 的控制方式。V1 不支持；不能把这些控制 Note 当成普通音乐 Note 播放后声称正确。                       |
-| 力度层     | Velocity Layer                  | 同一 Pitch 随 Velocity 选择不同 Sample。当前核心 Soundbank 与 Manifest V1 仍没有这项能力；Velocity 只影响增益。                       |
-| 同音轮换   | Round Robin                     | 同一 Pitch/力度连续触发时轮换多枚 Sample，减少“机关枪感”。它需要多素材和选择规则，V1 不支持。                                         |
-| 松键采样   | Release Sample                  | Note Off / Gate Release 时额外触发的素材。普通 Release Envelope 只是降低当前 Voice 增益，两者不能混为一谈。                           |
+| 中文         | 英文                            | 在本阶段中的准确含义                                                                                                                  |
+| ------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 控制文件     | Mapping / Instrument Definition | 描述 Pitch 范围、根音高、Loop、Envelope、One-shot、Choke 等规则的数据。MIDI 文件不包含这些采样播放规则。                              |
+| 兼容适配器   | Compatibility Adapter           | 把某一种已审计来源控制数据转换成 Seele Manifest。来源特有推断必须留在这里，不能污染 Project 或通用 Runtime。                          |
+| 控制保留政策 | Preserve-source Controls Policy | 不修改 Adapter 已从来源控制文件得到的 Loop、Envelope、Trigger 或 Mutex。除 GM Percussion 外，本阶段的 Score Core 音源都走这一路径。   |
+| 专用兼容政策 | Reviewed Compatibility Policy   | 只对固定来源身份和精确前置条件应用的显式 Manifest 修正。条件漂移时失败，不凭乐器名称或文件夹进行通用猜测。                            |
+| 清单         | Sample Instrument Manifest      | Audio Web 接受的严格 Seele V1 运行时契约。它只保留经过支持和验证的 Zone / Resource 语义，不保留远程 URL。                             |
+| 区域         | Zone                            | 一条“哪些 Pitch 选哪枚 Sample，并如何播放”的规则。一个 Soundbank 通常包含多个 Zone。                                                  |
+| 选择范围     | Selector / Key Range            | Zone 覆盖的单个 MIDI Pitch 或连续 Pitch 范围。总谱出现未覆盖 Pitch 时应明确失败，不能选择随机 Sample。                                |
+| 根音高       | Root MIDI Pitch                 | WAV 原始录音对应的 MIDI Pitch。目标音高与根音高差决定播放速率和移调。                                                                 |
+| 采样素材     | Sample / WAV Resource           | 真正被浏览器解码和播放的音频文件。MIDI Velocity 或 Program 本身都不是 Sample。                                                        |
+| 采样循环     | Sample Loop                     | 在一枚 WAV 的指定区间重复播放，让持续弦乐或管乐不因素材结束而断声。Studio Grand 没有 Loop，不代表其他 Soundbank 不能有。              |
+| 持续循环     | Continuous Loop                 | Gate Release 后仍继续循环，再由 Envelope 淡出。它适合某些持续素材，但不等于 Sustain Pedal。                                           |
+| 延音循环     | Sustain Loop                    | Gate 保持时循环，最终 Release 后离开循环并播放非循环尾部。它仍是 Sample 规则，不是 CC64 本身。                                        |
+| 一次性触发   | One-shot                        | Note On 后让素材自然播完，普通 Note Off 和 CC64 不提前截断。鼓件常用，但不是所有短音都自动是 One-shot。                               |
+| 门控发声     | Gated Voice                     | Note / Pedal 的最终 Gate Release 决定何时进入 Release Envelope。钢琴、持续弦乐和管乐候选通常走该路径。                                |
+| 互斥组       | Exclusive Group / Mutex Group   | 一组 Voice 可互相关闭。例如 Closed Hi-hat 会截断正在响的 Open Hi-hat。它不是全局同 Pitch 重触发政策。                                 |
+| 截音         | Choke                           | 新鼓件触发后快速结束互斥组中的旧 Voice。Hi-hat 是典型场景；Timpani 不应误套同一政策。                                                 |
+| 演奏法       | Articulation                    | Long Bow、Staccato、Pizzicato、Muted 等发音方式。不同 Program 或 Soundbank 可以近似表达，但 V1 没有 Key Switch 或 Articulation Lane。 |
+| 键位切换     | Key Switch                      | 用特定低音 Note 切换 Articulation 的控制方式。V1 不支持；不能把这些控制 Note 当成普通音乐 Note 播放后声称正确。                       |
+| 力度层       | Velocity Layer                  | 同一 Pitch 随 Velocity 选择不同 Sample。当前核心 Soundbank 与 Manifest V1 仍没有这项能力；Velocity 只影响增益。                       |
+| 同音轮换     | Round Robin                     | 同一 Pitch/力度连续触发时轮换多枚 Sample，减少“机关枪感”。它需要多素材和选择规则，V1 不支持。                                         |
+| 松键采样     | Release Sample                  | Note Off / Gate Release 时额外触发的素材。普通 Release Envelope 只是降低当前 Voice 增益，两者不能混为一谈。                           |
 
 ## 4. 本地资产、安全与资源成本
 

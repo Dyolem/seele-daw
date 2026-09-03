@@ -17,6 +17,7 @@
     "format:check": "pnpm --workspace-root format:check",
     "lint": "pnpm --workspace-root lint",
     "lint:fix": "pnpm --workspace-root lint:fix",
+    "measure:score-core-runtime-cache-local": "jiti scripts/measure-score-core-runtime-cache-local.ts",
     "measure:studio-grand-local": "jiti scripts/measure-studio-grand-local-assets.ts",
     "prepare:general-midi-percussion-local": "jiti scripts/prepare-general-midi-percussion-local-assets.ts",
     "prepare:score-core-local": "jiti scripts/prepare-score-core-local-assets.ts",

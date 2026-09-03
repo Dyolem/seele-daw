@@ -1,6 +1,6 @@
 # Built-in Score Core Soundbank Audit
 
-> Status: MI1B reviewed and committed as `7c36a17`; MI1C committed as `fddeb3e`; updated for MI3A
+> Status: MI1B reviewed and committed as `7c36a17`; MI1C committed as `fddeb3e`; updated for MI4
 >
 > Date: 2026-09-03
 >
@@ -111,7 +111,9 @@ MiB；Manifest 使用 KiB。
 - 最大单 WAV 解码 Float32 是 `4,545,416` bytes；最大完整 Soundbank 是 Tremolo Strings 的
   `78,330,376` bytes；
 - Runtime 仍只准备 Playback Plan 实际 Pitch 需要的资源，不应在打开项目时解码完整 426.65 MiB
-  集合；跨 Soundbank Cache 的长期预算与淘汰政策继续由 MI4 基于真实总谱测量决定。
+  集合；MI4 已基于 22 音源参考集合增加 Studio 默认 `192 MiB` decoded Float32 LRU 保留预算，
+  证据见
+  [Multi-Soundbank Runtime Resource Gate V1](./multi-soundbank-runtime-resource-gate-v1.md)。
 
 每个 Definition 的 Archive、Entry 数、单 Entry、总解压大小均使用独立的向上取整 MiB 档位，
 而不是给所有来源共享最大的 64 MiB 预算。完整输入 SHA-256 与精确限制保存在机器可执行配置中；
@@ -140,4 +142,5 @@ MI1B 可以批准的结论仅为：22 个来源已经通过固定身份、六输
 
 它本身不代表 MIDI Program 或 Channel 10 已经自动接通。MI1C 已在本地资产边界完成 General MIDI
 Percussion 的 one-shot / choke 兼容转换；MI2 / MI3A 随后用 Studio Catalogue、可见 Instrument
-选择器与导入路由消费这些已审核身份。多 Soundbank Runtime 测量与总谱听测仍属于 MI4 / MI5 门禁。
+选择器与导入路由消费这些已审核身份。MI4 已完成多 Soundbank Runtime 资源测量待审核；总谱 PCM
+和人工听测仍属于 MI5 门禁。

@@ -17,6 +17,11 @@ const LOCATION = Object.freeze({
   assetBaseUrl: 'https://studio.test/assets/fixture-piano/',
   soundbankId: FIXTURE_SOUNDBANK_ID,
 })
+const SECOND_SOUNDBANK_ID = parseSoundbankId('fixture-strings')
+const SECOND_LOCATION = Object.freeze({
+  assetBaseUrl: 'https://studio.test/assets/fixture-strings/',
+  soundbankId: SECOND_SOUNDBANK_ID,
+})
 
 function createCache(
   fetchImplementation: typeof globalThis.fetch,
@@ -27,6 +32,7 @@ function createCache(
     expectedOrigin: 'https://studio.test',
     fetch: fetchImplementation,
     limits: {
+      maximumDecodedFloat32ByteLength: 4 * 1_024 * 1_024,
       maximumManifestByteLength: 64 * 1_024,
       maximumResourceByteLength: 4 * 1_024 * 1_024,
     },
@@ -104,6 +110,79 @@ describe('Sample Instrument resource cache', () => {
     )
     await expect(decodeCache.prepare(LOCATION, ['samples/high.wav'])).resolves.toBeDefined()
     expect(decodeAudioData).toHaveBeenCalledTimes(2)
+  })
+
+  it('bounds retained decoded resources with least-recently-used eviction', async () => {
+    const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = String(input)
+      if (url.endsWith('manifest.json')) {
+        return createManifestResponse(
+          url.includes('/fixture-strings/') ? SECOND_SOUNDBANK_ID : FIXTURE_SOUNDBANK_ID,
+        )
+      }
+      return new Response(createPcmWav())
+    })
+    const decodeAudioData = vi.fn<(audioData: ArrayBuffer) => Promise<AudioBuffer>>(async () =>
+      createDecodedAudioBuffer(),
+    )
+    const cache = new SampleInstrumentResourceCache({
+      audioContext: new FakeDecodeAudioContext(decodeAudioData) as unknown as BaseAudioContext,
+      expectedOrigin: 'https://studio.test',
+      fetch: fetchImplementation,
+      limits: {
+        maximumDecodedFloat32ByteLength: 1_600,
+        maximumManifestByteLength: 64 * 1_024,
+        maximumResourceByteLength: 4 * 1_024 * 1_024,
+      },
+    })
+
+    await cache.prepare(LOCATION, ['samples/low.wav'])
+    await cache.prepare(LOCATION, ['samples/high.wav'])
+    await cache.prepare(LOCATION, ['samples/low.wav'])
+    await cache.prepare(SECOND_LOCATION, ['samples/low.wav'])
+    await cache.prepare(LOCATION, ['samples/low.wav'])
+    await cache.prepare(LOCATION, ['samples/high.wav'])
+
+    expect(fetchImplementation).toHaveBeenCalledTimes(6)
+    expect(decodeAudioData).toHaveBeenCalledTimes(4)
+    expect(cache.statistics).toEqual({
+      activeRequestCount: 0,
+      decodedFloat32ByteLength: 1_600,
+      decodedResourceCount: 2,
+      encodedResourceByteLength: createPcmWav().byteLength * 2,
+      manifestCount: 2,
+    })
+  })
+
+  it('serves an oversized decoded resource without evicting reusable cached entries', async () => {
+    const fetchImplementation = createSuccessfulFetch()
+    const decodeAudioData = vi
+      .fn<(audioData: ArrayBuffer) => Promise<AudioBuffer>>()
+      .mockResolvedValueOnce(createDecodedAudioBuffer())
+      .mockResolvedValueOnce(createDecodedAudioBuffer(200))
+    const cache = new SampleInstrumentResourceCache({
+      audioContext: new FakeDecodeAudioContext(decodeAudioData) as unknown as BaseAudioContext,
+      expectedOrigin: 'https://studio.test',
+      fetch: fetchImplementation,
+      limits: {
+        maximumDecodedFloat32ByteLength: 800,
+        maximumManifestByteLength: 64 * 1_024,
+        maximumResourceByteLength: 4 * 1_024 * 1_024,
+      },
+    })
+
+    const retained = await cache.prepare(LOCATION, ['samples/low.wav'])
+    const oversized = await cache.prepare(LOCATION, ['samples/high.wav'])
+    const retainedAgain = await cache.prepare(LOCATION, ['samples/low.wav'])
+
+    expect(oversized.resources[0]?.audioBuffer.length).toBe(200)
+    expect(retainedAgain.resources[0]).toBe(retained.resources[0])
+    expect(fetchImplementation).toHaveBeenCalledTimes(3)
+    expect(decodeAudioData).toHaveBeenCalledTimes(2)
+    expect(cache.statistics).toMatchObject({
+      decodedFloat32ByteLength: 800,
+      decodedResourceCount: 1,
+    })
   })
 
   it('evicts a failed Manifest request so the same Soundbank can retry', async () => {
@@ -252,7 +331,11 @@ describe('Sample Instrument resource cache', () => {
       audioContext: new FakeDecodeAudioContext() as unknown as BaseAudioContext,
       expectedOrigin: 'https://studio.test',
       fetch: createSuccessfulFetch(),
-      limits: { maximumManifestByteLength: 8, maximumResourceByteLength: 8 },
+      limits: {
+        maximumDecodedFloat32ByteLength: 4 * 1_024 * 1_024,
+        maximumManifestByteLength: 8,
+        maximumResourceByteLength: 8,
+      },
     })
 
     await expect(cache.loadManifest(LOCATION)).rejects.toEqual(
@@ -265,7 +348,11 @@ describe('Sample Instrument resource cache', () => {
       audioContext: new FakeDecodeAudioContext() as unknown as BaseAudioContext,
       expectedOrigin: 'https://studio.test',
       fetch: createSuccessfulFetch(),
-      limits: { maximumManifestByteLength: 64 * 1_024, maximumResourceByteLength: 8 },
+      limits: {
+        maximumDecodedFloat32ByteLength: 4 * 1_024 * 1_024,
+        maximumManifestByteLength: 64 * 1_024,
+        maximumResourceByteLength: 8,
+      },
     })
     await expect(resourceCache.prepare(LOCATION, ['samples/low.wav'])).rejects.toEqual(
       expect.objectContaining<Partial<SampleInstrumentResourceCacheError>>({

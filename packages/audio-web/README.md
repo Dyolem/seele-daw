@@ -53,7 +53,10 @@ MI3A 进一步接入 21 个精确 Program、Channel 10 和无声 Program Placeho
 [Studio MIDI Program Import Routing V1](../../apps/studio/docs/midi-program-import-routing-v1.md)。
 MI3B 把来源初始 CC7 / CC10 转成现有 Track Gain / Pan；精确听觉与兼容边界见
 [MIDI Initial Channel Controls V1](../project-midi/docs/midi-initial-channel-controls-v1.md)。
-多音源 Runtime 门禁仍未完成，因此不能把导入路由视为已经通过总谱听觉验收。
+MI4 已完成待审核实现：Studio 默认用 `192 MiB` LRU 总量预算约束应用级解码缓存，并补齐多
+Soundbank 并发、稳定总谱复用、Abort、失败重试、局部失败与应用 dispose 门禁；测量与边界见
+[Multi-Soundbank Runtime Resource Gate V1](./docs/multi-soundbank-runtime-resource-gate-v1.md)。MI5
+总谱 PCM 与人工听测仍未完成，因此不能把导入路由或资源门禁视为已经通过听觉验收。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
@@ -80,8 +83,9 @@ Batch 4B.1 的生产资源准备边界保持在包内：
 - Manifest 与 WAV 都受调用方 byte budget 约束；WAV 在 `decodeAudioData` 前再次验证容器；
 - 同一资源的并发 Fetch/decode 共享；单个等待者取消不误伤其他等待者，最后一个离开才取消底层
   请求；失败请求不会永久污染缓存；
-- 成功 Manifest 与 AudioBuffer 由应用生命周期缓存拥有；准备结果为冻结数组，Project Runtime
-  dispose 不会误释放共享 AudioBuffer；应用 dispose 会中止 pending 请求并清空引用；
+- 成功 Manifest 由应用生命周期缓存拥有；AudioBuffer 使用调用方注入的 decoded Float32 LRU
+  总量预算，Studio 默认 `192 MiB`。准备结果为冻结数组，Project Runtime dispose 或缓存淘汰不会
+  误释放仍被其他 Runtime 引用的 AudioBuffer；应用 dispose 会中止 pending 请求并清空引用；
 - 本批只支持同源、可寻址 Manifest/WAV 首验，不扫描 Catalog，不加载整棵 Soundbank，也不创建
   AudioNode 或控制 Transport。
 

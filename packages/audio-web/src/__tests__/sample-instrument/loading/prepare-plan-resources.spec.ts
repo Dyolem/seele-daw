@@ -16,10 +16,16 @@ import {
 } from '#internal/__tests__/support/sample-instrument-resource-fixture'
 
 const TRACK_ID = 'track-fixture'
+const SECOND_TRACK_ID = 'track-fixture-strings'
+const SECOND_SOUNDBANK_ID = parseSoundbankId('fixture-strings')
 const UNAVAILABLE_SOUNDBANK_ID = parseSoundbankId('unavailable-fixture')
 const LOCATION = Object.freeze({
   assetBaseUrl: 'https://studio.test/assets/fixture-piano/',
   soundbankId: FIXTURE_SOUNDBANK_ID,
+})
+const SECOND_LOCATION = Object.freeze({
+  assetBaseUrl: 'https://studio.test/assets/fixture-strings/',
+  soundbankId: SECOND_SOUNDBANK_ID,
 })
 
 function createPlan(
@@ -104,21 +110,61 @@ function createPlanWithUnavailableInstrument(): AudibleMidiProjectPlan {
   }) as unknown as AudibleMidiProjectPlan
 }
 
+function createMultiInstrumentPlan(): AudibleMidiProjectPlan {
+  const base = createPlan([60, 60])
+  const firstTrack = base.tracks[0]!
+  const firstSpan = base.midiNoteSpans[0]!
+  const secondSpan = base.midiNoteSpans[1]!
+  return Object.freeze({
+    ...base,
+    midiNoteSpans: Object.freeze([
+      firstSpan,
+      Object.freeze({
+        ...secondSpan,
+        noteId: 'note-strings',
+        occurrenceKey: JSON.stringify([SECOND_TRACK_ID, 0]),
+        trackId: SECOND_TRACK_ID,
+      }),
+    ]),
+    tracks: Object.freeze([
+      firstTrack,
+      Object.freeze({
+        ...firstTrack,
+        instrument: Object.freeze({
+          ...firstTrack.instrument,
+          deviceId: 'device-strings',
+          soundbankId: SECOND_SOUNDBANK_ID,
+        }),
+        instrumentDeviceId: 'device-strings',
+        trackId: SECOND_TRACK_ID,
+      }),
+    ]),
+  }) as unknown as AudibleMidiProjectPlan
+}
+
+function createCache(
+  fetchImplementation: typeof globalThis.fetch,
+  context = new FakeDecodeAudioContext(),
+) {
+  return new SampleInstrumentResourceCache({
+    audioContext: context as unknown as BaseAudioContext,
+    expectedOrigin: 'https://studio.test',
+    fetch: fetchImplementation,
+    limits: {
+      maximumDecodedFloat32ByteLength: 4 * 1_024 * 1_024,
+      maximumManifestByteLength: 64 * 1_024,
+      maximumResourceByteLength: 4 * 1_024 * 1_024,
+    },
+  })
+}
+
 function createFixture() {
   const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input) =>
     String(input).endsWith('manifest.json')
       ? createManifestResponse()
       : new Response(createPcmWav()),
   )
-  const cache = new SampleInstrumentResourceCache({
-    audioContext: new FakeDecodeAudioContext() as unknown as BaseAudioContext,
-    expectedOrigin: 'https://studio.test',
-    fetch: fetchImplementation,
-    limits: {
-      maximumManifestByteLength: 64 * 1_024,
-      maximumResourceByteLength: 4 * 1_024 * 1_024,
-    },
-  })
+  const cache = createCache(fetchImplementation)
   const locator: AudibleMidiSampleResourceLocator = {
     locate: (soundbankId) => (soundbankId === FIXTURE_SOUNDBANK_ID ? LOCATION : null),
   }
@@ -160,6 +206,106 @@ describe('Audible MIDI Sample resource preparation', () => {
     expect(prepared.failures).toEqual([])
     expect(prepared.modelRevision).toBe(0)
     expect(fetchImplementation).not.toHaveBeenCalled()
+  })
+
+  it('prepares multiple Soundbanks concurrently and reuses the stable score resources', async () => {
+    const manifestResolvers = new Map<string, (response: Response) => void>()
+    const decodeAudioData = vi.fn<(audioData: ArrayBuffer) => Promise<AudioBuffer>>(async () =>
+      Object.freeze({
+        duration: 100 / 44_100,
+        length: 100,
+        numberOfChannels: 2,
+        sampleRate: 44_100,
+      } as AudioBuffer),
+    )
+    const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const url = String(input)
+      if (!url.endsWith('manifest.json')) return new Response(createPcmWav())
+      return new Promise<Response>((resolve) => manifestResolvers.set(url, resolve))
+    })
+    const cache = createCache(fetchImplementation, new FakeDecodeAudioContext(decodeAudioData))
+    const locator: AudibleMidiSampleResourceLocator = {
+      locate: (soundbankId) => {
+        if (soundbankId === FIXTURE_SOUNDBANK_ID) return LOCATION
+        if (soundbankId === SECOND_SOUNDBANK_ID) return SECOND_LOCATION
+        return null
+      },
+    }
+    const plan = createMultiInstrumentPlan()
+    const firstPreparation = prepareAudibleMidiSampleResources(plan, cache, locator)
+
+    await vi.waitFor(() => expect(manifestResolvers.size).toBe(2))
+    manifestResolvers.get(`${LOCATION.assetBaseUrl}manifest.json`)?.(
+      createManifestResponse(FIXTURE_SOUNDBANK_ID),
+    )
+    manifestResolvers.get(`${SECOND_LOCATION.assetBaseUrl}manifest.json`)?.(
+      createManifestResponse(SECOND_SOUNDBANK_ID),
+    )
+    const first = await firstPreparation
+    const second = await prepareAudibleMidiSampleResources(plan, cache, locator)
+
+    expect(first.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
+      FIXTURE_SOUNDBANK_ID,
+      SECOND_SOUNDBANK_ID,
+    ])
+    expect(second.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
+      FIXTURE_SOUNDBANK_ID,
+      SECOND_SOUNDBANK_ID,
+    ])
+    expect(fetchImplementation).toHaveBeenCalledTimes(4)
+    expect(decodeAudioData).toHaveBeenCalledTimes(2)
+    expect(cache.statistics).toEqual({
+      activeRequestCount: 0,
+      decodedFloat32ByteLength: 1_600,
+      decodedResourceCount: 2,
+      encodedResourceByteLength: createPcmWav().byteLength * 2,
+      manifestCount: 2,
+    })
+  })
+
+  it('aborts every pending Soundbank request without retaining a partial score load', async () => {
+    const resourceSignals: AbortSignal[] = []
+    const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+      const url = String(input)
+      if (url.endsWith('manifest.json')) {
+        return createManifestResponse(
+          url.includes('/fixture-strings/') ? SECOND_SOUNDBANK_ID : FIXTURE_SOUNDBANK_ID,
+        )
+      }
+      const signal = init?.signal
+      if (!(signal instanceof AbortSignal)) throw new TypeError('Fixture requires AbortSignal')
+      resourceSignals.push(signal)
+      return new Promise<Response>((_resolve, reject) =>
+        signal.addEventListener(
+          'abort',
+          () => reject(new DOMException('Fixture request aborted', 'AbortError')),
+          { once: true },
+        ),
+      )
+    })
+    const cache = createCache(fetchImplementation)
+    const locator: AudibleMidiSampleResourceLocator = {
+      locate: (soundbankId) => (soundbankId === FIXTURE_SOUNDBANK_ID ? LOCATION : SECOND_LOCATION),
+    }
+    const controller = new AbortController()
+    const preparation = prepareAudibleMidiSampleResources(
+      createMultiInstrumentPlan(),
+      cache,
+      locator,
+      { signal: controller.signal },
+    )
+
+    await vi.waitFor(() => expect(resourceSignals).toHaveLength(2))
+    controller.abort()
+
+    await expect(preparation).rejects.toEqual(expect.objectContaining({ code: 'aborted' }))
+    expect(resourceSignals.every(({ aborted }) => aborted)).toBe(true)
+    await vi.waitFor(() => expect(cache.statistics.activeRequestCount).toBe(0))
+    expect(cache.statistics).toMatchObject({
+      decodedFloat32ByteLength: 0,
+      decodedResourceCount: 0,
+      manifestCount: 2,
+    })
   })
 
   it('rejects an already-cancelled empty preparation without starting resource work', async () => {

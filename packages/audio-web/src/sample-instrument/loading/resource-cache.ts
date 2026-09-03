@@ -24,6 +24,8 @@ export interface SampleInstrumentResourceCacheOptions {
 }
 
 export interface SampleInstrumentResourceCacheLimits {
+  /** Maximum decoded Float32 bytes retained for reuse; active Runtimes may hold separate refs. */
+  readonly maximumDecodedFloat32ByteLength: number
   readonly maximumManifestByteLength: number
   readonly maximumResourceByteLength: number
 }
@@ -135,6 +137,10 @@ function assertPositiveSafeInteger(value: number, name: string): void {
 }
 
 function validateLimits(limits: SampleInstrumentResourceCacheLimits): void {
+  assertPositiveSafeInteger(
+    limits.maximumDecodedFloat32ByteLength,
+    'maximumDecodedFloat32ByteLength',
+  )
   assertPositiveSafeInteger(limits.maximumManifestByteLength, 'maximumManifestByteLength')
   assertPositiveSafeInteger(limits.maximumResourceByteLength, 'maximumResourceByteLength')
 }
@@ -186,7 +192,7 @@ function decodedFloat32ByteLength(resource: LoadedSampleInstrumentResource): num
 }
 
 /**
- * Application-lifetime cache for validated Sample Instrument manifests and decoded WAV resources.
+ * Application-lifetime cache for validated Manifests and budgeted LRU decoded WAV resources.
  * Individual callers may cancel their wait without invalidating another caller sharing the request.
  */
 export class SampleInstrumentResourceCache {
@@ -198,6 +204,8 @@ export class SampleInstrumentResourceCache {
   readonly #manifests = new Map<string, SampleInstrumentManifestV1>()
   readonly #resourceRequests = new Map<string, SharedRequest<LoadedSampleInstrumentResource>>()
   readonly #resources = new Map<string, LoadedSampleInstrumentResource>()
+  #decodedFloat32ByteLength = 0
+  #encodedResourceByteLength = 0
   #disposed = false
 
   constructor(options: SampleInstrumentResourceCacheOptions) {
@@ -218,15 +226,9 @@ export class SampleInstrumentResourceCache {
   get statistics(): SampleInstrumentResourceCacheStatistics {
     return Object.freeze({
       activeRequestCount: this.#manifestRequests.size + this.#resourceRequests.size,
-      decodedFloat32ByteLength: [...this.#resources.values()].reduce(
-        (total, resource) => total + decodedFloat32ByteLength(resource),
-        0,
-      ),
+      decodedFloat32ByteLength: this.#decodedFloat32ByteLength,
       decodedResourceCount: this.#resources.size,
-      encodedResourceByteLength: [...this.#resources.values()].reduce(
-        (total, resource) => total + resource.encodedByteLength,
-        0,
-      ),
+      encodedResourceByteLength: this.#encodedResourceByteLength,
       manifestCount: this.#manifests.size,
     })
   }
@@ -281,12 +283,12 @@ export class SampleInstrumentResourceCache {
     return Object.freeze({ manifest, resources: Object.freeze(resources) })
   }
 
-  /** Clears decoded buffers and pending resource work while retaining validated Manifests. */
+  /** Clears decoded cache refs and pending resource work while retaining validated Manifests. */
   clearDecodedResources(): void {
     this.#assertUsable()
     for (const request of this.#resourceRequests.values()) request.abortController.abort()
     this.#resourceRequests.clear()
-    this.#resources.clear()
+    this.#clearRetainedResources()
   }
 
   dispose(): void {
@@ -297,11 +299,47 @@ export class SampleInstrumentResourceCache {
     this.#manifestRequests.clear()
     this.#resourceRequests.clear()
     this.#manifests.clear()
-    this.#resources.clear()
+    this.#clearRetainedResources()
   }
 
   #assertUsable(): void {
     if (this.#disposed) fail('disposed', 'Sample Instrument resource cache is disposed')
+  }
+
+  #clearRetainedResources(): void {
+    this.#resources.clear()
+    this.#decodedFloat32ByteLength = 0
+    this.#encodedResourceByteLength = 0
+  }
+
+  #readRetainedResource(identity: string): LoadedSampleInstrumentResource | undefined {
+    const resource = this.#resources.get(identity)
+    if (resource === undefined) return undefined
+    // Map insertion order is the LRU order; a cache hit promotes the entry.
+    this.#resources.delete(identity)
+    this.#resources.set(identity, resource)
+    return resource
+  }
+
+  #retainResource(identity: string, resource: LoadedSampleInstrumentResource): void {
+    const decodedByteLength = decodedFloat32ByteLength(resource)
+    if (decodedByteLength > this.#limits.maximumDecodedFloat32ByteLength) return
+
+    while (
+      this.#decodedFloat32ByteLength + decodedByteLength >
+      this.#limits.maximumDecodedFloat32ByteLength
+    ) {
+      const oldestEntry = this.#resources.entries().next()
+      if (oldestEntry.done) break
+      const [oldestIdentity, oldestResource] = oldestEntry.value
+      this.#resources.delete(oldestIdentity)
+      this.#decodedFloat32ByteLength -= decodedFloat32ByteLength(oldestResource)
+      this.#encodedResourceByteLength -= oldestResource.encodedByteLength
+    }
+
+    this.#resources.set(identity, resource)
+    this.#decodedFloat32ByteLength += decodedByteLength
+    this.#encodedResourceByteLength += resource.encodedByteLength
   }
 
   async #joinRequest<T>(
@@ -440,14 +478,14 @@ export class SampleInstrumentResourceCache {
     this.#assertUsable()
     const identity = identityForResource(location, resourceKey)
     throwIfAborted(signal)
-    const cached = this.#resources.get(identity)
+    const cached = this.#readRetainedResource(identity)
     if (cached !== undefined) return cached
     return this.#joinRequest(
       this.#resourceRequests,
       identity,
       (requestSignal) => this.#fetchAndDecode(location, resourceKey, requestSignal),
       signal,
-      (resource) => this.#resources.set(identity, resource),
+      (resource) => this.#retainResource(identity, resource),
     )
   }
 

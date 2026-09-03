@@ -34,7 +34,10 @@ export interface BrowserProjectPlaybackRuntimeOptions {
   readonly resourceLimits?: SampleInstrumentResourceCacheLimits
 }
 
+// Retains over two MI4 reference-score working sets without retaining the 426.65 MiB catalogue.
+const DEFAULT_DECODED_CACHE_BYTE_LENGTH = 192 * 1_024 * 1_024
 const DEFAULT_RESOURCE_LIMITS = Object.freeze<SampleInstrumentResourceCacheLimits>({
+  maximumDecodedFloat32ByteLength: DEFAULT_DECODED_CACHE_BYTE_LENGTH,
   maximumManifestByteLength: 64 * 1_024,
   maximumResourceByteLength: 4 * 1_024 * 1_024,
 })

@@ -1,8 +1,8 @@
 # Built-in Multi-Instrument Score Playback V1 阶段计划
 
 > Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C committed as
-> `fddeb3e`; MI2 committed as `f13df2f`; MI3A committed as `cd043b9`; MI3B implementation pending
-> review
+> `fddeb3e`; MI2 committed as `f13df2f`; MI3A committed as `cd043b9`; MI3B committed as
+> `5b62b68`; MI4 implementation pending review
 >
 > Date: 2026-09-03
 >
@@ -225,6 +225,11 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 - 测量跨总谱重复 Play 后的 Manifest 数、decoded resource 数和 Float32 字节；若当前无界生命周期
   Cache 会保留过多历史音源，本批以测量驱动明确清理/预算政策。
 - 验证首次 Play 的配置资源失败为 fail-fast，选择性 Replace 的局部失败不停止无关 Track。
+
+本批的真实本地参考集合、`192 MiB` LRU 保留预算、并发 / 重试 / Abort / dispose 自动化证据及精确
+失败矩阵见
+[Multi-Soundbank Runtime Resource Gate V1](./multi-soundbank-runtime-resource-gate-v1.md)。该门禁只
+限制历史解码缓存，不把活动 Plan 内存或 MI5 听觉结果伪装成已经受控。
 
 ### MI5 — 总谱音质、听测与阶段收口
 

@@ -33,6 +33,8 @@ Composition Root 可以知道并装配全部领域包与浏览器实现。
   asset base，避免名称和 URL Map 漂移；production build 仍不复制 public Soundbank；
 - 两种 Standard MIDI File 导入入口共用 Studio-owned Program / Channel 10 路由；未审核 Program
   保存无声、可见且可由 Inspector 显式替换的 Placeholder，不回退 Studio Grand；
+- Project MIDI 同时把首个 Note 前或同 Tick 最终生效的 CC7 / CC10 写入现有 Track Gain / Pan；
+  后续动态控制保持诊断，不在 Studio 维护第二份 Controller 状态；
 - Soundbank 资源缺失会在播放准备时明确失败，不能回滚已经合法提交的 Instrument Replace。
 
 完整规则见

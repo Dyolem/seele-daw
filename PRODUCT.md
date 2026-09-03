@@ -4,9 +4,9 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-03，Built-in Multi-Instrument Score Playback MI2 已提交，MI3A 实施待审核
+> 最近更新：2026-09-03，Built-in Multi-Instrument Score Playback MI3A 已提交，MI3B 实施待审核
 >
-> 当前阶段：Studio 已接入 22 项内置乐器目录、手动选择及 MIDI Program / Channel 10 导入路由；初始 CC7 / CC10 尚未接入
+> 当前阶段：Studio 已接入多乐器选择、MIDI Program / Channel 10 路由及初始 CC7 / CC10；多 Soundbank Runtime 门禁尚未完成
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -81,7 +81,7 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 | 编号                   | 功能                      | 状态         | 当前边界                                                                                                                                                                |
 | ---------------------- | ------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PROJECT-ENTRY`        | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                                                                                    |
-| `MIDI-IMPORT`          | Standard MIDI File 导入   | **用户可用** | 可创建独立 clean 项目，或把含 Note 的来源 Track 连同其 CC64 作为一个原子 History 步骤追加到当前项目；Program / Channel 10 路由、阻断错误与非阻断诊断均已接入。          |
+| `MIDI-IMPORT`          | Standard MIDI File 导入   | **用户可用** | 可创建独立 clean 项目，或把含 Note 的来源 Track 连同其 CC64 与初始 CC7 / CC10 作为一个原子 History 步骤追加到当前项目；Program / Channel 10 路由与诊断已接入。          |
 | `PROJECT-LIFECYCLE`    | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                                                                         |
 | `PROJECT-NAVIGATION`   | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                                                                                |
 | `WORKBENCH-SHELL`      | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                                                                          |
@@ -97,7 +97,7 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
 | `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、踏板 PCM、非播放态尾音清理及未来 WAV 声音尾部边界均已通过。                                                         |
-| `SCORE-INSTRUMENTS`    | 总谱多乐器发声            | **局部可用** | 22 项 Studio Catalogue、手动选择、21 个精确 GM Program、Channel 10 与不可用 Program 占位已接入；初始 CC7 / CC10、Runtime 资源门禁及总谱听测仍未完成。                   |
+| `SCORE-INSTRUMENTS`    | 总谱多乐器发声            | **局部可用** | 22 项 Studio Catalogue、手动选择、21 个精确 GM Program、Channel 10、不可用 Program 占位及初始 CC7 / CC10 已接入；Runtime 资源门禁及总谱听测仍未完成。                   |
 | `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
 | `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
 | `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
@@ -128,7 +128,8 @@ Project Entry 是当前启动页，提供：
   Checkpoint 或活动 Session。
 - SMF 内嵌名称优先；缺失时使用本地文件名。普通导入 Track 按已审核的零基 GM Program 选择音源，
   Channel 10 优先使用 General MIDI Percussion；未支持 Program 保存可见无声占位，不回退 Studio
-  Grand。Bank Select 尚未应用并继续产生诊断。
+  Grand。首个 Note 前或同 Tick 最终生效的 CC7 / CC10 初始化 Track Gain / Pan；后续动态事件与
+  Bank Select 尚未应用并继续产生诊断。
 - 导入成功后项目已有首个 Checkpoint，进入 Workbench 时为 clean；不能精确表示的来源事实以
   非阻断诊断摘要呈现。
 - Workbench 项目菜单同时提供 `Import MIDI as new project` 与 `Import MIDI as new tracks`；
@@ -1000,7 +1001,8 @@ File 导入是独立交换格式入口，不替代 Project File。
     不自动保存。Tempo 是 Project 全局事实而不是 Track 属性：来源 Note 保持音乐 Tick 位置并按
     当前 Project Tempo Map 播放，来源 Tempo / 拍号不得静默覆盖或合并；两种模式共用 Studio
     Program / Channel 10 工厂：精确映射保存对应 Sample Device，未支持 Program 保存可见无声
-    Placeholder，不能回退 Studio Grand 或伪造不存在的 Soundbank。
+    Placeholder，不能回退 Studio Grand 或伪造不存在的 Soundbank；首个 Note 前或同 Tick 最终
+    生效的 CC7 / CC10 写入既有 Track Gain / Pan，后续事件不伪装成 Automation。
     “新 Track”入口打开文件选择器时把连续 Playhead 位置转换为最近的整数 Project Tick 并冻结；
     来源文件 tick 0 映射到该位置，不再按拍或小节二次吸附，并保留各 Track 的前导空白和相互时间
     偏移。
@@ -1112,7 +1114,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-09-03 | `SCORE-INSTRUMENTS`                                        | MI0 / MI1A 冻结总谱核心范围、术语、Program 三态与安全规范化内核；MI1B 准备并审计 22 个 developer-local Soundbank。                                               | `f7af1db`、`7c36a17`                       |
 | 2026-09-03 | `SCORE-INSTRUMENTS`                                        | MI1C 为固定 GM Percussion 来源建立 47 个 one-shot 与 MIDI 42 / 44 / 46 Hi-hat Choke 兼容政策。                                                                   | `fddeb3e`                                  |
 | 2026-09-03 | `INSTRUMENT-SELECTION`、`SCORE-INSTRUMENTS`                | MI2 接入 Studio-owned 22 项目录、分组 Reka UI Inspector 选择、通用 Sample Device 工厂与同源开发资产位置派生。                                                    | `f13df2f`                                  |
-| 2026-09-03 | `MIDI-IMPORT`、`SCORE-INSTRUMENTS`                         | MI3A 接入 21 个精确 GM Program、Channel 10 优先路由、通用三态映射诊断，以及可见、可保存、可修复的无声 Program Placeholder。                                      | 本批待审核                                 |
+| 2026-09-03 | `MIDI-IMPORT`、`SCORE-INSTRUMENTS`                         | MI3A 接入 21 个精确 GM Program、Channel 10 优先路由、通用三态映射诊断，以及可见、可保存、可修复的无声 Program Placeholder。                                      | `cd043b9`                                  |
+| 2026-09-03 | `MIDI-IMPORT`、`SCORE-INSTRUMENTS`                         | MI3B 把来源首个 Note 前或同 Tick 最终生效的 CC7 / CC10 写入 Track 初始 Gain / Pan，保留后续动态 Controller 的明确诊断。                                          | 本批待审核                                 |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1212,7 +1215,7 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   `General MIDI Percussion` 没有单词截断换行。未执行人工声音试听，也未在本独立批次重复完整
   `pnpm check`。该提交不包含 Program / Channel 10 自动路由。
 
-- Built-in Multi-Instrument Score Playback MI3A 已完成待审核实现：两种 MIDI 导入入口共用 Studio
+- Built-in Multi-Instrument Score Playback MI3A 已通过审核并提交为 `cd043b9`：两种 MIDI 导入入口共用 Studio
   Program / Channel 10 工厂；21 个已审核 GM Program 创建对应 Sample Device，零基 Channel `9`
   优先创建 General MIDI Percussion，未命中 Program 则保存严格 V1 无声 Placeholder 并产生
   `program-unavailable` 非阻断诊断。`project-midi` 同时建立 Exact / Approximate / Unavailable 通用
@@ -1220,6 +1223,15 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   26 项、MIDI File 3 / 15、Playback 9 / 107、Studio 64 / 412、受影响包 Type Check、根级
   `pnpm lint`、Studio Production Build 与 soundbank dist boundary 已通过；未执行人工声音试听或
   完整 `pnpm check`。
+
+- Built-in Multi-Instrument Score Playback MI3B 已完成待审核实现：两种导入模式从 normalized Track
+  首个 Note 的来源 Tick 派生初始 Channel 状态；CC7 线性映射到 Gain，CC10 以 `64` 为精确中心映射
+  到 Pan，缺失时保持 `1` / `0`。动态 CC7 / CC10 和其他未支持 Controller 继续保留事件数与编号
+  诊断；CC64 仍是独立 Project Fact。Project MIDI 3 个测试文件 / 29 项、Playback 9 / 107、Studio
+  64 / 412、受影响 Type Check、根级 `pnpm lint`、Studio Production Build 与 soundbank dist
+  boundary 已通过。详细证据见
+  [MIDI Initial Channel Controls V1](packages/project-midi/docs/midi-initial-channel-controls-v1.md)；未
+  执行人工试听、混合 Peak 门禁或完整 `pnpm check`。
 
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已

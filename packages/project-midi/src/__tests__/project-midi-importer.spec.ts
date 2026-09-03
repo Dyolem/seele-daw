@@ -82,6 +82,7 @@ describe('createProjectMidiImportDraft', () => {
       kind: 'instrument',
       name: 'Lead',
       color: '#23B26D',
+      channel: { gain: 1, pan: 0, muted: false, soloed: false },
       instrumentDeviceId: 'device-0',
     })
     expect(projectFile.clips['clip-0']).toMatchObject({
@@ -297,6 +298,94 @@ describe('createProjectMidiImportDraft', () => {
     expect(Object.isFrozen(draft.diagnostics[0])).toBe(true)
   })
 
+  it('maps the CC7 and CC10 boundaries at or before the first Note into Track Channel facts', () => {
+    const draft = createProjectMidiImportDraft(
+      createImportInput(
+        createMidiDocument({
+          tracks: [
+            createMidiTrack({ name: 'Defaults' }),
+            createMidiTrack({
+              name: 'Silent Left',
+              notes: [createMidiNote({ tick: 480 })],
+              controlChanges: [
+                { tick: 0, controller: 7, value: 0 },
+                { tick: 480, controller: 10, value: 0 },
+              ],
+            }),
+            createMidiTrack({
+              name: 'Unity Center',
+              controlChanges: [
+                { tick: 0, controller: 7, value: 127 },
+                { tick: 0, controller: 10, value: 64 },
+              ],
+            }),
+            createMidiTrack({
+              name: 'Right',
+              controlChanges: [{ tick: 0, controller: 10, value: 127 }],
+            }),
+            createMidiTrack({
+              name: 'Left Midpoint',
+              controlChanges: [{ tick: 0, controller: 10, value: 32 }],
+            }),
+            createMidiTrack({
+              name: 'Right Interior',
+              controlChanges: [{ tick: 0, controller: 10, value: 96 }],
+            }),
+          ],
+        }),
+      ),
+    )
+    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const channels = projectFile.trackOrder.map((trackId) => projectFile.tracks[trackId]?.channel)
+
+    expect(channels).toEqual([
+      { gain: 1, pan: 0, muted: false, soloed: false },
+      { gain: 0, pan: -1, muted: false, soloed: false },
+      { gain: 1, pan: 0, muted: false, soloed: false },
+      { gain: 1, pan: 1, muted: false, soloed: false },
+      { gain: 1, pan: -0.5, muted: false, soloed: false },
+      { gain: 1, pan: 32 / 63, muted: false, soloed: false },
+    ])
+    expect(
+      findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.CONTROL_CHANGES_NOT_IMPORTED),
+    ).toBeUndefined()
+  })
+
+  it('uses the last source-order control at the first Note Tick and diagnoses later controls', () => {
+    const draft = createProjectMidiImportDraft(
+      createImportInput(
+        createMidiDocument({
+          tracks: [
+            createMidiTrack({
+              notes: [createMidiNote({ tick: 960 }), createMidiNote({ tick: 480, pitch: 61 })],
+              controlChanges: [
+                { tick: 240, controller: 7, value: 40 },
+                { tick: 480, controller: 7, value: 90 },
+                { tick: 480, controller: 7, value: 80 },
+                { tick: 480, controller: 10, value: 127 },
+                { tick: 481, controller: 7, value: 127 },
+                { tick: 960, controller: 10, value: 0 },
+                { tick: 0, controller: 1, value: 5 },
+              ],
+            }),
+          ],
+        }),
+      ),
+    )
+    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const channel = projectFile.tracks['track-0']?.channel
+
+    expect(channel?.gain).toBeCloseTo(80 / 127, 12)
+    expect(channel?.pan).toBe(1)
+    expect(
+      findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.CONTROL_CHANGES_NOT_IMPORTED),
+    ).toMatchObject({
+      controllerNumbers: [1, 7, 10],
+      eventCount: 3,
+      sourceTrackIndex: 0,
+    })
+  })
+
   it('reports only host-declared approximate and unavailable Program mappings', () => {
     const createInstrumentDevice = vi.fn<ProjectMidiInstrumentDeviceFactory>((input) => {
       const exact = createTestInstrumentDevice(input)
@@ -406,14 +495,18 @@ describe('createProjectMidiImportDraft', () => {
     ])
   })
 
-  it('diagnoses CC64 that belongs to a control-only normalized Track', () => {
+  it('diagnoses CC64 and initial-channel controls that belong to a control-only Track', () => {
     const draft = createProjectMidiImportDraft(
       createImportInput(
         createMidiDocument({
           tracks: [
             createMidiTrack({
               notes: [],
-              controlChanges: [{ tick: 0, controller: 64, value: 127 }],
+              controlChanges: [
+                { tick: 0, controller: 64, value: 127 },
+                { tick: 0, controller: 7, value: 96 },
+                { tick: 0, controller: 10, value: 32 },
+              ],
             }),
           ],
         }),
@@ -423,6 +516,9 @@ describe('createProjectMidiImportDraft', () => {
     expect(
       findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.SUSTAIN_PEDAL_NOT_IMPORTED),
     ).toMatchObject({ eventCount: 1, sourceTrackIndex: 0 })
+    expect(
+      findDiagnostic(draft, PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.CONTROL_CHANGES_NOT_IMPORTED),
+    ).toMatchObject({ controllerNumbers: [7, 10], eventCount: 2, sourceTrackIndex: 0 })
   })
 
   it('disambiguates normalized tracks that share a source name', () => {

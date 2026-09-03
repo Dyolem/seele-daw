@@ -1,7 +1,8 @@
 # Built-in Multi-Instrument Score Playback V1 阶段计划
 
 > Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C committed as
-> `fddeb3e`; MI2 committed as `f13df2f`; MI3A implementation pending review
+> `fddeb3e`; MI2 committed as `f13df2f`; MI3A committed as `cd043b9`; MI3B implementation pending
+> review
 >
 > Date: 2026-09-03
 >
@@ -213,6 +214,9 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 - 导入 Track Collection 原子保存 Device、Gain、Pan、Clip、Note 与 CC64。
 - 对后续动态 CC7 / CC10 和其他未支持 CC 保留精确事件数量与 Controller 诊断。
 - 既有无 Controller 导入结果必须保持 Gain `1`、Pan `0`。
+
+本批的听觉预期、来源 Tick 选择、非对称 Pan 换算、原子事务、动态事件诊断与兼容边界见
+[MIDI Initial Channel Controls V1](../../project-midi/docs/midi-initial-channel-controls-v1.md)。
 
 ### MI4 — 多 Soundbank Runtime、资源与失败门禁
 

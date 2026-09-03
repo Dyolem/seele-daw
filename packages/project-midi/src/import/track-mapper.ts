@@ -4,6 +4,7 @@ import type {
   MidiFileNote,
   MidiFileTrack,
 } from '@seele-daw/midi-file'
+import { MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   type ProjectMidiImportDiagnostic,
@@ -11,8 +12,7 @@ import {
 import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 import { createDiagnostic, normalizeEntityName } from '#internal/import/import-support'
 import { convertMidiTickToProjectTick } from '#internal/import/ppq-converter'
-
-const SUSTAIN_PEDAL_CONTROLLER = 64
+import { mapTrackChannel, type MappedTrackChannel } from '#internal/import/track-channel-mapper'
 
 interface AbsoluteMappedNote {
   readonly sourceNoteIndex: number
@@ -41,21 +41,19 @@ export interface MappedTrack {
   readonly spanTick: number
   readonly notes: readonly AbsoluteMappedNote[]
   readonly sustainPedalEvents: readonly AbsoluteMappedSustainPedalEvent[]
+  readonly channel: MappedTrackChannel
 }
 
 function addUnsupportedFactDiagnostics(
   track: MidiFileTrack,
   sourceTrackIndex: number,
   imported: boolean,
+  unsupportedControlChanges: readonly MidiFileControlChange[],
   diagnostics: ProjectMidiImportDiagnostic[],
 ): void {
   const sustainEventCount = track.controlChanges.filter(
-    (event) => event.controller === SUSTAIN_PEDAL_CONTROLLER,
+    (event) => event.controller === MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER,
   ).length
-  const otherControlChanges = track.controlChanges.filter(
-    (event) => event.controller !== SUSTAIN_PEDAL_CONTROLLER,
-  )
-
   if (!imported && sustainEventCount > 0) {
     diagnostics.push(
       createDiagnostic({
@@ -64,20 +62,21 @@ function addUnsupportedFactDiagnostics(
           'Sustain pedal CC64 could not be imported because its normalized Track contains no Notes.',
         sourceTrackIndex,
         eventCount: sustainEventCount,
-        controllerNumbers: [SUSTAIN_PEDAL_CONTROLLER],
+        controllerNumbers: [MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER],
       }),
     )
   }
-  if (otherControlChanges.length > 0) {
+  if (unsupportedControlChanges.length > 0) {
     diagnostics.push(
       createDiagnostic({
         code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.CONTROL_CHANGES_NOT_IMPORTED,
-        message: 'Control-change events other than sustain are not Project facts in V1.',
+        message:
+          'Dynamic CC7 / CC10 and other unsupported control-change events are not Project facts in V1.',
         sourceTrackIndex,
-        eventCount: otherControlChanges.length,
-        controllerNumbers: [...new Set(otherControlChanges.map((event) => event.controller))].sort(
-          (left, right) => left - right,
-        ),
+        eventCount: unsupportedControlChanges.length,
+        controllerNumbers: [
+          ...new Set(unsupportedControlChanges.map((event) => event.controller)),
+        ].sort((left, right) => left - right),
       }),
     )
   }
@@ -141,7 +140,7 @@ function mapSustainPedalEvents(
   diagnostics: ProjectMidiImportDiagnostic[],
 ): readonly AbsoluteMappedSustainPedalEvent[] {
   const mapped = track.controlChanges.flatMap((event, sourceControlChangeIndex) =>
-    event.controller === SUSTAIN_PEDAL_CONTROLLER
+    event.controller === MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER
       ? [
           mapSustainPedalEvent(
             event,
@@ -174,7 +173,7 @@ function mapSustainPedalEvents(
           eventCount: group.length,
           projectTick,
           sourceTrackIndex,
-          controllerNumbers: [SUSTAIN_PEDAL_CONTROLLER],
+          controllerNumbers: [MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER],
         }),
       )
     }
@@ -325,7 +324,29 @@ export function mapTracks(
 
   document.tracks.forEach((track, sourceTrackIndex) => {
     const imported = track.notes.length > 0
-    addUnsupportedFactDiagnostics(track, sourceTrackIndex, imported, diagnostics)
+    const notes = track.notes.map((note, sourceNoteIndex) =>
+      mapNote(note, document.ppq, track.channel, sourceTrackIndex, sourceNoteIndex),
+    )
+    notes.sort(
+      (left, right) =>
+        left.startTick - right.startTick ||
+        left.pitch - right.pitch ||
+        left.endTick - right.endTick ||
+        left.velocity - right.velocity ||
+        left.sourceNoteIndex - right.sourceNoteIndex,
+    )
+    const firstNoteTick = track.notes.reduce<number | null>(
+      (current, note) => (current === null ? note.tick : Math.min(current, note.tick)),
+      null,
+    )
+    const channel = mapTrackChannel(track, firstNoteTick, sourceTrackIndex)
+    addUnsupportedFactDiagnostics(
+      track,
+      sourceTrackIndex,
+      imported,
+      channel.unsupportedControlChanges,
+      diagnostics,
+    )
     if (!imported) {
       diagnostics.push(
         createDiagnostic({
@@ -338,17 +359,6 @@ export function mapTracks(
     }
 
     const importedTrackIndex = mappedTracks.length
-    const notes = track.notes.map((note, sourceNoteIndex) =>
-      mapNote(note, document.ppq, track.channel, sourceTrackIndex, sourceNoteIndex),
-    )
-    notes.sort(
-      (left, right) =>
-        left.startTick - right.startTick ||
-        left.pitch - right.pitch ||
-        left.endTick - right.endTick ||
-        left.velocity - right.velocity ||
-        left.sourceNoteIndex - right.sourceNoteIndex,
-    )
 
     const sustainPedalEvents = mapSustainPedalEvents(
       track,
@@ -392,6 +402,7 @@ export function mapTracks(
       spanTick: endTick - startTick,
       notes,
       sustainPedalEvents,
+      channel,
     })
   })
   return mappedTracks

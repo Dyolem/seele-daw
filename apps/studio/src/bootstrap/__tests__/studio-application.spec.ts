@@ -461,7 +461,10 @@ describe('StudioApplication', () => {
           channel: 0,
           programNumber: 0,
           notes: [{ tick: 0, durationTicks: 960, pitch: 60, velocity: 100, releaseVelocity: 0 }],
-          controlChanges: [],
+          controlChanges: [
+            { tick: 0, controller: 7, value: 96 },
+            { tick: 0, controller: 10, value: 32 },
+          ],
           pitchBends: [],
         },
         {
@@ -521,6 +524,14 @@ describe('StudioApplication', () => {
       channel: 2,
       programNumber: 80,
     })
+    const importedTracks = importedSession.getSnapshot().tracks
+    expect(importedTracks[0]?.channel.gain).toBeCloseTo(96 / 127, 12)
+    expect(importedTracks[0]?.channel.pan).toBe(-0.5)
+    expect(importedTracks.slice(1).map(({ channel }) => channel)).toEqual([
+      { gain: 1, pan: 0, muted: false, soloed: false },
+      { gain: 1, pan: 0, muted: false, soloed: false },
+      { gain: 1, pan: 0, muted: false, soloed: false },
+    ])
     expect(result.diagnostics).toEqual([
       expect.objectContaining({
         code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_UNAVAILABLE,

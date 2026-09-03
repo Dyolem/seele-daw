@@ -102,6 +102,10 @@ describe('Audible MIDI Compiler', () => {
         soundbankId: 'studio-grand',
       },
     ])
+    expect(firstPlan.tracks.map(({ gain, pan }) => ({ gain, pan }))).toEqual([
+      { gain: 0.6, pan: 0.25 },
+      { gain: 0.8, pan: -0.25 },
+    ])
     expect(firstPlan.midiNoteSpans).toEqual([
       {
         occurrenceKey: createNoteOccurrenceKey(

@@ -1,6 +1,6 @@
 # Studio MIDI Program Import Routing V1
 
-> Status: MI3A implementation pending review
+> Status: MI3A reviewed and committed as `cd043b9`; updated for MI3B
 >
 > Date: 2026-09-03
 >
@@ -76,8 +76,11 @@ Program 后，前后 Note 会进入不同 normalized Track 的行为。
   Program Exact 宣称为完整 Bank 兼容。
 - Decoder 拆分 Program 时不会替 V1 在拆分后的 Track 间追赶此前已生效的 Controller 状态；在踏板
   按住期间换 Program 等边界输入，不能宣称已完整还原动态换音色语义。
-- 初始 CC7 Gain 与 CC10 Pan 属于 MI3B；动态 Program、CC7 / CC10、CC11、Pitch Bend、Aftertouch
-  和 Articulation 继续延期。
+- MI3B 把首个 Note 前或同 Tick 最终生效的 CC7 / CC10 转成 Track 初始 Gain / Pan；动态 Program、
+  后续 CC7 / CC10、CC11、Pitch Bend、Aftertouch 和 Articulation 继续延期。
+
+初始 Channel 控制的听觉与数值契约见
+[MIDI Initial Channel Controls V1](../../../packages/project-midi/docs/midi-initial-channel-controls-v1.md)。
 
 ## 5. 自动验证
 

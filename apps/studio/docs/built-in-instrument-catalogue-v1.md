@@ -1,6 +1,6 @@
 # Studio Built-in Instrument Catalogue V1
 
-> Status: MI2 reviewed and committed as `f13df2f`; updated for MI3A
+> Status: MI2 reviewed and committed as `f13df2f`; updated through MI3B
 >
 > Date: 2026-09-03
 >
@@ -77,8 +77,8 @@ Missing 不会改写 Project Fact。若未知 Sample Device 含合法 `soundbank
 - developer-local Soundbank 继续由 `.gitignore` 排除，Studio production dist guard 继续禁止复制
   整棵本地资产。
 - 本批不升级 Project File schema，不迁移旧项目，也不把未知 Device 回退为钢琴。
-- MIDI Program、Channel 10 自动路由和不可用 Program 占位由 MI3A 接入；初始 CC7 / CC10 仍属于
-  MI3B。
+- MIDI Program、Channel 10 自动路由和不可用 Program 占位由 MI3A 接入；MI3B 进一步把导入时的
+  初始 CC7 / CC10 映射到 Track Channel，不改变 Catalogue 身份。
 - Instrument Browser、搜索、Preset、Preview Audition、远程安装、Action Catalogue 与用户 Keymap
   继续延期。
 - 本批只接通目录、显式选择与位置派生；多 Soundbank Cache、混合 Peak 和人工总谱听测仍由

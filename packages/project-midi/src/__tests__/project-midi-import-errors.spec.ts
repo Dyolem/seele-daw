@@ -65,6 +65,25 @@ describe('Project MIDI import failures', () => {
     )
   })
 
+  it('rejects malformed initial Channel controls before creating Project facts', () => {
+    expect.hasAssertions()
+    expectImportError(
+      () =>
+        createProjectMidiImportDraft(
+          createImportInput(
+            createMidiDocument({
+              tracks: [
+                createMidiTrack({
+                  controlChanges: [{ tick: 0, controller: 7, value: 128 }],
+                }),
+              ],
+            }),
+          ),
+        ),
+      'invalid-midi-document',
+    )
+  })
+
   it.each([4.99, 999.01])('rejects tempo %s outside the current Project model range', (bpm) => {
     expect.hasAssertions()
     expectImportError(

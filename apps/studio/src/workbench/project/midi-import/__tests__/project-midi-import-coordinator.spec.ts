@@ -229,7 +229,16 @@ describe('ProjectMidiImportCoordinator', () => {
     const fixture = createFixture(
       createMidiDocument({
         tracks: [
-          { ...baseTrack, name: 'Violin', channel: 0, programNumber: 40 },
+          {
+            ...baseTrack,
+            name: 'Violin',
+            channel: 0,
+            programNumber: 40,
+            controlChanges: [
+              { tick: 0, controller: 7, value: 64 },
+              { tick: 0, controller: 10, value: 127 },
+            ],
+          },
           { ...baseTrack, name: 'Drums', channel: 9, programNumber: 47 },
           { ...baseTrack, name: 'Unsupported Synth', channel: 2, programNumber: 80 },
         ],
@@ -242,6 +251,7 @@ describe('ProjectMidiImportCoordinator', () => {
       parseTick(0),
     )
     const devices = fixture.activeSession.getSnapshot().devices
+    const tracks = fixture.activeSession.getSnapshot().tracks
 
     expect(devices.slice(0, 2).map(decodeSampleInstrumentDeviceState)).toEqual([
       { soundbankId: 'solo-violin' },
@@ -251,6 +261,12 @@ describe('ProjectMidiImportCoordinator', () => {
       channel: 2,
       programNumber: 80,
     })
+    expect(tracks[0]?.channel.gain).toBeCloseTo(64 / 127, 12)
+    expect(tracks[0]?.channel.pan).toBe(1)
+    expect(tracks.slice(1).map(({ channel }) => channel)).toEqual([
+      { gain: 1, pan: 0, muted: false, soloed: false },
+      { gain: 1, pan: 0, muted: false, soloed: false },
+    ])
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
         code: PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.PROGRAM_UNAVAILABLE,

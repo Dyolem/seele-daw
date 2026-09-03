@@ -25,8 +25,10 @@ File V2 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
   因而让导入 Note 按当前 Project Tempo Map 播放，并分别产生非阻断的时间轴所有权诊断；
 - CC64 不烘焙进 Note 长度。含 Note 的 Track 会把 CC64 映射到独立 Project Fact；PPQ 换算后落在
   同一 Project Tick 的多条 CC64 确定性保留来源顺序最后一条并产生汇总诊断。只有控制器而没有
-  Note 的 Track 仍不创建 Instrument Track；其他 CC、Pitch Bend、非零 Release Velocity、Key
-  Signature 和文本事件继续产生非阻断诊断；
+  Note 的 Track 仍不创建 Instrument Track；
+- 含 Note 的 Track 会把首个 Note Tick 之前或同 Tick 最后生效的 CC7 / CC10 转为现有 Track
+  Channel Gain / Pan；缺失时保持 `1` / `0`。首个 Note 之后的动态 CC7 / CC10、其他未支持 CC、
+  Pitch Bend、非零 Release Velocity、Key Signature 和文本事件继续产生非阻断诊断；
 - 每条已导入 normalized Track 的 Program / Channel 音源决定由宿主工厂返回 `exact`、
   `approximate` 或 `unavailable` 结果。精确映射不产生 Program 丢失提示；近似映射与不可用占位分别
   产生精确的非阻断诊断。本包不再根据“非零 Program”无条件报告音源未应用；
@@ -55,8 +57,12 @@ Tempo 不是 Track 级事实。“新项目”导入可以用来源 MIDI 的 Tem
 Project Tempo Map。调用方应把这项预期语义与其他未支持来源事实区分展示，不能把正常的 Project
 Tempo 所有权误报成导入失败。
 
-当前桥接层只实现 Standard MIDI File 到 Project 的 CC64 导入。Project MIDI Export Bridge 与
-Studio Export UI 尚未实现，因此不能从 Project 把 CC64 写回 `.mid` 文件。
+当前桥接层实现 Standard MIDI File 到 Project 的 Note、初始 CC7 / CC10 与 CC64 导入。Project
+MIDI Export Bridge 与 Studio Export UI 尚未实现，因此不能从 Project 把这些事实写回 `.mid`
+文件。
+
+初始 CC7 / CC10 的用户听觉、精确换算、事务、诊断和兼容边界见
+[MIDI Initial Channel Controls V1](./docs/midi-initial-channel-controls-v1.md)。
 
 `placementTick` 是调用方已经确定的导入锚点，本包不会再次 Snap 或读取 Transport。Studio 在打开
 文件选择器时把连续 Playhead 位置转换为最近的整数 Project Tick 并冻结，从而避免文件读取期间移动

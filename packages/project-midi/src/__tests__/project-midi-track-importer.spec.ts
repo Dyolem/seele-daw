@@ -64,7 +64,9 @@ describe('createProjectMidiTrackImportDraft', () => {
                 createMidiNote({ tick: 960, durationTicks: 480, pitch: 67 }),
               ],
               controlChanges: [
+                { tick: 0, controller: 7, value: 64 },
                 { tick: 240, controller: 64, value: 127 },
+                { tick: 480, controller: 10, value: 0 },
                 { tick: 1_200, controller: 64, value: 0 },
               ],
             }),
@@ -88,7 +90,12 @@ describe('createProjectMidiTrackImportDraft', () => {
       baseRevision: 0,
       insertAt: 2,
     })
-    expect(entry?.track).toMatchObject({ color: '#4F8CFF', id: 'track-0', name: 'Lead' })
+    expect(entry?.track).toMatchObject({
+      color: '#4F8CFF',
+      id: 'track-0',
+      name: 'Lead',
+      channel: { gain: 64 / 127, pan: -1, muted: false, soloed: false },
+    })
     expect(entry?.instrumentDevice.id).toBe('device-0')
     expect(clipGraph?.clip).toMatchObject({
       id: 'clip-0',
@@ -107,6 +114,11 @@ describe('createProjectMidiTrackImportDraft', () => {
       { id: 'midi-sustain-pedal-event-0', tick: 0, value: 127, channel: 2 },
       { id: 'midi-sustain-pedal-event-1', tick: 1_920, value: 0, channel: 2 },
     ])
+    expect(
+      draft.diagnostics.find(
+        ({ code }) => code === PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE.CONTROL_CHANGES_NOT_IMPORTED,
+      ),
+    ).toBeUndefined()
     expect(draft.importedTrackIds).toEqual(['track-0'])
     expect(createTrackColor).toHaveBeenCalledWith(
       expect.objectContaining({

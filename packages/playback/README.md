@@ -78,6 +78,10 @@ MI3A 的 `seele.midi-program-placeholder` 仍是 Studio-owned 导入兼容事实
 Instrument schema。Compiler 对它不生成 Track Playback Plan，因此未支持 Program 保持无声、其他
 可播放 Track 继续工作；Studio Inspector 负责把它与未知 Missing Device 区分并提供显式替换入口。
 
+MI3B 把来源初始 CC7 / CC10 转成已有 Track Channel Facts，不向 Playback 增加 MIDI Controller
+状态。Compiler 将这些 Gain / Pan 原样写入 Track Playback Plan，Audio Web 继续通过既有 Gain 与
+Stereo Panner 执行；播放中的动态 CC7 / CC10 仍未进入计划。
+
 Batch 2A 还在包内建立了 `time/` 边界：
 
 - `ProjectSecond`、`ProjectDurationSecond` 与 `ContinuousTickPosition` 保持不同时间含义，不把

@@ -29,5 +29,9 @@ Composition Root 可以知道并装配全部领域包与浏览器实现。
   Emits 接收展示状态与上报用户意图；
 - 首个 Play 用户手势才激活 AudioContext 和准备当前计划所需的同源 Manifest/WAV；应用退出、
   项目切换和计划替换都会停止 Timer、使 Voice 失效并释放 Project playback lifetime；
-- 当前本地 Studio Grand asset base 只服务 Vite dev 验证，production build 仍不复制 public
-  Soundbank；其他 Soundbank 若没有 Composition Root location，会以可见错误失败关闭。
+- Studio-owned Built-in Instrument Catalogue 同时派生 Inspector 显示与 22 个 developer-local
+  asset base，避免名称和 URL Map 漂移；production build 仍不复制 public Soundbank；
+- Soundbank 资源缺失会在播放准备时明确失败，不能回滚已经合法提交的 Instrument Replace。
+
+完整规则见
+[Studio Built-in Instrument Catalogue V1](../../docs/built-in-instrument-catalogue-v1.md)。

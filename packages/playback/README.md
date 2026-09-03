@@ -49,7 +49,8 @@ late / drop policy、资产加载和首个浏览器听觉验收均已按阶段 D
   Soundbank/Pitch，以及让 Voice Runtime 执行已排程事件；
 - Playback Clock parser、Plan / Transport / Scheduler outcome 与对应最小类型随真实 Studio
   消费者公开；TempoMap 实现、Compiler 内部 DTO 建造和未来写协议仍保持包内；
-
+- `SAMPLE_INSTRUMENT_DEVICE_DEFINITION`、通用 Descriptor factory / decoder 与
+  `SoundbankId` parser 供 Studio Instrument Catalogue 保存、投影已审核的 Sample Instrument；
 - `STUDIO_GRAND_DEVICE_DEFINITION` 固定 `typeId = seele.sample-instrument`、
   `definitionVersion = 1` 与显示名称 `Studio Grand`；
 - `createStudioGrandDeviceDescriptor(deviceId)` 创建唯一的持久化 V1 形状，其中
@@ -58,8 +59,8 @@ late / drop policy、资产加载和首个浏览器听觉验收均已按阶段 D
   版本、Parameters 或不兼容 State 返回 `null`，调用方据此显示 Missing，同时保留原始
   Descriptor；
 - Definition、factory 和 decoder 均不依赖 Vue、DOM、Web Audio、Soundbank URL 或浏览器资源。
-- `parseSoundbankId(value)` 与 branded `SoundbankId` 供 Audio Web 的 Manifest validator 复用同一
-  持久化身份约束，不公开 Catalog、路径或资源解析。
+- `parseSoundbankId(value)` 与 branded `SoundbankId` 供 Audio Web 和 Studio 复用同一持久化
+  身份约束，不公开 Catalogue、路径或资源解析。
 
 包内同时建立了整个 MIDISampleSynth 家族共用的 V1 schema：
 
@@ -69,9 +70,9 @@ late / drop policy、资产加载和首个浏览器听觉验收均已按阶段 D
 - Studio Grand factory 与严格 decoder 是上述 schema 的默认产品选择和精确特化，不是单独的
   Engine 类型。
 
-generic Device Definition、factory 与 decoder 仍是包内契约；跨包只额外公开上面的
-`SoundbankId` identity parser。它只定义 Project Instrument Fact 的播放侧身份，不代表任一
-Soundbank 已经能加载或发声。
+generic Device Definition、factory 与 decoder 已由 MI2 的 Studio Catalogue 成为真实跨包
+消费者，因此从包根公开。它们只定义 Project Instrument Fact 的播放侧身份，不代表任一
+Soundbank 已经能加载或发声；显示名称、乐器族与 asset location 仍由 Studio 拥有。
 
 Batch 2A 还在包内建立了 `time/` 边界：
 

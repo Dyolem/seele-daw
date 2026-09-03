@@ -10,6 +10,7 @@ import {
   type ProjectCommit,
   type TrackId,
 } from '@seele-daw/project-core'
+import { parseSoundbankId } from '@seele-daw/playback'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
@@ -66,6 +67,7 @@ interface MountShellOptions {
 const STUDIO_GRAND_INSTRUMENT = Object.freeze({
   deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
   displayName: 'Studio Grand',
+  soundbankId: parseSoundbankId('studio-grand'),
   status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
 })
 
@@ -95,7 +97,7 @@ function mountShell(options: MountShellOptions = {}) {
         trackId: parseTrackId('shell-created-track'),
       }),
     ),
-    useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
+    selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
   })
   const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })

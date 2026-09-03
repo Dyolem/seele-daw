@@ -16,7 +16,9 @@ import {
 } from '@seele-daw/project-core'
 import {
   STUDIO_GRAND_DEVICE_DEFINITION,
+  createSampleInstrumentDeviceDescriptor,
   createStudioGrandDeviceDescriptor,
+  parseSoundbankId,
 } from '@seele-daw/playback'
 import { describe, expect, it } from 'vitest'
 
@@ -63,12 +65,28 @@ function addInstrumentTrack(
 }
 
 describe('Project Track presentation', () => {
-  it('projects Studio Grand, a legacy empty Slot, and an unknown Device without rewriting facts', () => {
+  it('projects Catalogue, legacy empty, and unknown Instruments without rewriting facts', () => {
     const session = createSession()
     addInstrumentTrack(
       session,
       'Studio Grand',
       createStudioGrandDeviceDescriptor(parseDeviceId('device-studio-grand-presentation')),
+    )
+    addInstrumentTrack(
+      session,
+      'Violin',
+      createSampleInstrumentDeviceDescriptor(
+        parseDeviceId('device-violin-presentation'),
+        parseSoundbankId('solo-violin'),
+      ),
+    )
+    addInstrumentTrack(
+      session,
+      'Unknown Sample Bank',
+      createSampleInstrumentDeviceDescriptor(
+        parseDeviceId('device-unknown-sample-presentation'),
+        parseSoundbankId('unknown-orchestral-bank'),
+      ),
     )
     addInstrumentTrack(
       session,
@@ -101,16 +119,31 @@ describe('Project Track presentation', () => {
       {
         deviceTypeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
         displayName: 'Studio Grand',
+        soundbankId: 'studio-grand',
         status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
+      },
+      {
+        deviceTypeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
+        displayName: 'Violin',
+        soundbankId: 'solo-violin',
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
+      },
+      {
+        deviceTypeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
+        displayName: 'Missing instrument',
+        soundbankId: 'unknown-orchestral-bank',
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
       },
       {
         deviceTypeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
         displayName: 'No instrument selected',
+        soundbankId: null,
         status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
       },
       {
         deviceTypeId: parseDeviceTypeId('third-party.unavailable-instrument'),
         displayName: 'Missing instrument',
+        soundbankId: null,
         status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
       },
     ])
@@ -142,6 +175,7 @@ describe('Project Track presentation', () => {
     expect(createProjectTrackPresentations(session.getSnapshot())[0]?.instrument).toEqual({
       deviceTypeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
       displayName: 'Missing instrument',
+      soundbankId: null,
       status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
     })
   })

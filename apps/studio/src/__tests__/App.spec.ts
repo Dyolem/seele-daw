@@ -143,7 +143,7 @@ function createProjectTrackContext(): ProjectTrackVueContext {
           trackId: parseTrackId('app-created-track'),
         }),
       ),
-      useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
+      selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
     }),
   })
 }

@@ -243,7 +243,7 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
         trackId: parseTrackId('workspace-page-created-track'),
       }),
     ),
-    useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
+    selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
   })
   const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
   const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })

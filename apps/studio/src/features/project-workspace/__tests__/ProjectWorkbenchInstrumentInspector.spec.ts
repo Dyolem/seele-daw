@@ -7,7 +7,8 @@ import {
   parseTrackId,
   type ProjectCommit,
 } from '@seele-daw/project-core'
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { parseSoundbankId } from '@seele-daw/playback'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -43,9 +44,9 @@ function mountInspector(options: MountInspectorOptions) {
   const pinia = createPinia()
   const pianoRollPreferences = usePianoRollPreferencesStore(pinia)
   const toasts = useUiToastStore(pinia)
-  const useStudioGrand = vi.fn<ProjectTrackCoordinator['useStudioGrand']>()
+  const selectBuiltInInstrument = vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>()
   if (options.selectionFailure !== undefined) {
-    useStudioGrand.mockImplementation(() => {
+    selectBuiltInInstrument.mockImplementation(() => {
       throw options.selectionFailure
     })
   }
@@ -57,7 +58,7 @@ function mountInspector(options: MountInspectorOptions) {
           trackId: TRACK_ID,
         }),
       ),
-      useStudioGrand,
+      selectBuiltInInstrument,
     }),
   })
   const projectSession = createTestSession(parseProjectId('project-instrument-inspector'))
@@ -83,7 +84,7 @@ function mountInspector(options: MountInspectorOptions) {
   })
   mountedWrappers.push(wrapper)
 
-  return { pianoRollPreferences, projectSession, toasts, useStudioGrand, wrapper }
+  return { pianoRollPreferences, projectSession, selectBuiltInInstrument, toasts, wrapper }
 }
 
 function createTrack(
@@ -96,6 +97,27 @@ function createTrack(
     kind: 'instrument',
     name: 'Legacy Keys',
   })
+}
+
+async function openInstrumentSelector(wrapper: VueWrapper): Promise<HTMLElement> {
+  const trigger = wrapper.get<HTMLButtonElement>('[aria-label="Built-in instrument"]')
+  await trigger.trigger('keydown', { key: 'ArrowDown' })
+  await flushPromises()
+
+  const content = document.body.querySelector<HTMLElement>(
+    '.project-workbench__instrument-select-content',
+  )
+  if (content === null) throw new Error('Expected the Reka UI Instrument Select content')
+  return content
+}
+
+async function selectInstrument(wrapper: VueWrapper, soundbankId: string): Promise<void> {
+  const content = await openInstrumentSelector(wrapper)
+  const item = content.querySelector<HTMLElement>(`[data-soundbank-id="${soundbankId}"]`)
+  if (item === null) throw new Error(`Expected the ${soundbankId} Instrument option`)
+
+  item.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
+  await flushPromises()
 }
 
 afterEach(() => {
@@ -118,6 +140,7 @@ describe('Project Workbench Instrument Inspector', () => {
       selectedTrack: createTrack({
         deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
         displayName: 'Studio Grand',
+        soundbankId: parseSoundbankId('studio-grand'),
         status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
       }),
     })
@@ -151,7 +174,7 @@ describe('Project Workbench Instrument Inspector', () => {
     expect(projectSession.canUndo).toBe(false)
   })
 
-  it('keeps the legacy Slot action visible while its MIDI Clip is selected', async () => {
+  it('replaces a legacy Slot from the grouped Catalogue while its MIDI Clip is selected', async () => {
     const selectedClip: ProjectMidiClipPresentation = Object.freeze({
       color: null,
       id: parseClipId('clip-instrument-inspector'),
@@ -161,11 +184,12 @@ describe('Project Workbench Instrument Inspector', () => {
       startTick: parseTick(0),
       trackId: TRACK_ID,
     })
-    const { toasts, useStudioGrand, wrapper } = mountInspector({
+    const { selectBuiltInInstrument, toasts, wrapper } = mountInspector({
       selectedClip,
       selectedTrack: createTrack({
         deviceTypeId: parseDeviceTypeId('seele.instrument-slot'),
         displayName: 'No instrument selected',
+        soundbankId: null,
         status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
       }),
     })
@@ -176,17 +200,50 @@ describe('Project Workbench Instrument Inspector', () => {
       'No instrument selected',
     )
 
-    await wrapper.get('button').trigger('click')
+    const selector = wrapper.get<HTMLButtonElement>('[aria-label="Built-in instrument"]')
+    expect(selector.attributes('role')).toBe('combobox')
+    expect(selector.attributes('aria-expanded')).toBe('false')
+    expect(selector.text()).toContain('Choose a replacement')
+    expect(wrapper.find('select').exists()).toBe(false)
 
-    expect(useStudioGrand).toHaveBeenCalledExactlyOnceWith(TRACK_ID)
+    const content = await openInstrumentSelector(wrapper)
+    expect(selector.attributes('aria-expanded')).toBe('true')
+    expect(
+      [...content.querySelectorAll('.project-workbench__instrument-select-label')].map((label) =>
+        label.textContent?.trim(),
+      ),
+    ).toEqual(['Keyboard', 'Bass', 'Strings', 'Brass', 'Woodwind', 'Percussion', 'Drum kit'])
+    const items = content.querySelectorAll('.project-workbench__instrument-select-item')
+    expect(items).toHaveLength(22)
+    expect(
+      [...items].every(
+        (item) =>
+          item.querySelector('.project-workbench__instrument-select-indicator-slot') !== null &&
+          item.querySelector('.project-workbench__instrument-select-name') !== null,
+      ),
+    ).toBe(true)
+    expect(
+      content.querySelector('[data-soundbank-id="general-midi-percussion"]')?.textContent?.trim(),
+    ).toBe('General MIDI Percussion')
+
+    const violin = content.querySelector<HTMLElement>('[data-soundbank-id="solo-violin"]')
+    if (violin === null) throw new Error('Expected the Violin Instrument option')
+    violin.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
+    await flushPromises()
+
+    expect(selectBuiltInInstrument).toHaveBeenCalledExactlyOnceWith(
+      TRACK_ID,
+      parseSoundbankId('solo-violin'),
+    )
     expect(toasts.message).toBeNull()
   })
 
-  it('shows Studio Grand as the selected Project fact without a duplicate action', () => {
-    const { wrapper } = mountInspector({
+  it('shows and replaces the current Catalogue Instrument through the same selector', async () => {
+    const { selectBuiltInInstrument, wrapper } = mountInspector({
       selectedTrack: createTrack({
         deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
         displayName: 'Studio Grand',
+        soundbankId: parseSoundbankId('studio-grand'),
         status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
       }),
     })
@@ -194,14 +251,24 @@ describe('Project Workbench Instrument Inspector', () => {
     const instrument = wrapper.get('[aria-label="Track instrument"]')
     expect(instrument.text()).toContain('Studio Grand')
     expect(instrument.text()).toContain("Use the Transport to play this Track's MIDI notes.")
-    expect(instrument.find('button').exists()).toBe(false)
+    await flushPromises()
+    const selector = instrument.get<HTMLButtonElement>('[aria-label="Built-in instrument"]')
+    expect(selector.text()).toContain('Studio Grand')
+
+    await selectInstrument(wrapper, 'flute')
+
+    expect(selectBuiltInInstrument).toHaveBeenCalledExactlyOnceWith(
+      TRACK_ID,
+      parseSoundbankId('flute'),
+    )
   })
 
-  it('preserves and identifies an unavailable Device without offering silent replacement', () => {
+  it('preserves and identifies an unavailable Device while offering an explicit replacement', () => {
     const { wrapper } = mountInspector({
       selectedTrack: createTrack({
         deviceTypeId: parseDeviceTypeId('third-party.missing-instrument'),
         displayName: 'Missing instrument',
+        soundbankId: null,
         status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
       }),
     })
@@ -209,22 +276,30 @@ describe('Project Workbench Instrument Inspector', () => {
     const instrument = wrapper.get('[aria-label="Track instrument"]')
     expect(instrument.text()).toContain('Missing instrument')
     expect(instrument.text()).toContain('third-party.missing-instrument')
-    expect(instrument.find('button').exists()).toBe(false)
+    expect(instrument.get('[aria-label="Built-in instrument"]').text()).toContain(
+      'Choose a replacement',
+    )
   })
 
   it('keeps a rejected selection visible and reports the failure through the Toast channel', async () => {
-    const { toasts, useStudioGrand, wrapper } = mountInspector({
+    const { selectBuiltInInstrument, toasts, wrapper } = mountInspector({
       selectedTrack: createTrack({
         deviceTypeId: parseDeviceTypeId('seele.instrument-slot'),
         displayName: 'No instrument selected',
+        soundbankId: null,
         status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
       }),
       selectionFailure: new Error('The Track no longer exists'),
     })
 
-    await wrapper.get('button').trigger('click')
+    const selector = wrapper.get<HTMLButtonElement>('[aria-label="Built-in instrument"]')
+    await selectInstrument(wrapper, 'studio-grand')
 
-    expect(useStudioGrand).toHaveBeenCalledOnce()
+    expect(selectBuiltInInstrument).toHaveBeenCalledExactlyOnceWith(
+      TRACK_ID,
+      parseSoundbankId('studio-grand'),
+    )
+    expect(selector.text()).toContain('Choose a replacement')
     expect(wrapper.text()).toContain('No instrument selected')
     expect(toasts.message).toMatchObject({
       title: 'Instrument could not be selected',

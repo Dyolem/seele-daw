@@ -13,8 +13,12 @@ import {
   type ProjectSnapshot,
   type TrackId,
 } from '@seele-daw/project-core'
-import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
+import { createSampleInstrumentDeviceDescriptor, type SoundbankId } from '@seele-daw/playback'
 
+import {
+  DEFAULT_BUILT_IN_INSTRUMENT,
+  findBuiltInInstrumentCatalogueEntry,
+} from '@/workbench/instrument/built-in-instrument-catalogue'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
 import { ProjectTrackError } from '@/workbench/project/track/project-track-error'
@@ -30,7 +34,7 @@ export interface ProjectTrackCoordinatorDependencies {
 
 export interface ProjectTrackCoordinator {
   addInstrumentTrack(): AddedInstrumentTrackResult
-  useStudioGrand(trackId: TrackId): ProjectCommandExecutionResult
+  selectBuiltInInstrument(trackId: TrackId, soundbankId: SoundbankId): ProjectCommandExecutionResult
 }
 
 /** Identifies the committed Track so transient Workbench state can select it. */
@@ -93,8 +97,9 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
         muted: false,
         soloed: false,
       },
-      instrumentDevice: createStudioGrandDeviceDescriptor(
+      instrumentDevice: createSampleInstrumentDeviceDescriptor(
         parseDeviceId(this.#dependencies.createUniqueId()),
+        DEFAULT_BUILT_IN_INSTRUMENT.soundbankId,
       ),
       insertAt: snapshot.trackOrder.length,
     })
@@ -110,14 +115,26 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
     })
   }
 
-  useStudioGrand(trackId: TrackId): ProjectCommandExecutionResult {
+  selectBuiltInInstrument(
+    trackId: TrackId,
+    soundbankId: SoundbankId,
+  ): ProjectCommandExecutionResult {
     const activeState = this.#dependencies.activeProject.state
 
     if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
       throw new ProjectTrackError(
         'active-project-not-ready',
-        `Cannot select Studio Grand while the Active Project is ${activeState.phase}`,
+        `Cannot select an Instrument while the Active Project is ${activeState.phase}`,
         { phase: activeState.phase },
+      )
+    }
+
+    const catalogueEntry = findBuiltInInstrumentCatalogueEntry(soundbankId)
+    if (catalogueEntry === null) {
+      throw new ProjectTrackError(
+        'instrument-not-in-catalogue',
+        `Cannot select Soundbank ${soundbankId} because it is not in the Studio Instrument Catalogue`,
+        { soundbankId },
       )
     }
 
@@ -128,7 +145,7 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
     if (track === undefined) {
       throw new ProjectTrackError(
         'track-not-found',
-        `Cannot select Studio Grand because Track ${trackId} does not exist`,
+        `Cannot select ${catalogueEntry.displayName} because Track ${trackId} does not exist`,
         { trackId },
       )
     }
@@ -136,7 +153,7 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
     if (track.kind !== 'instrument') {
       throw new ProjectTrackError(
         'instrument-track-kind-mismatch',
-        `Cannot select Studio Grand for ${track.kind} Track ${trackId}`,
+        `Cannot select ${catalogueEntry.displayName} for ${track.kind} Track ${trackId}`,
         { trackId, trackKind: track.kind },
       )
     }
@@ -145,7 +162,10 @@ class ProjectTrackCoordinatorImpl implements ProjectTrackCoordinator {
       createReplaceInstrumentDeviceCommand({
         baseRevision: activeState.session.modelRevision,
         trackId: track.id,
-        instrumentDevice: createStudioGrandDeviceDescriptor(track.instrumentDeviceId),
+        instrumentDevice: createSampleInstrumentDeviceDescriptor(
+          track.instrumentDeviceId,
+          catalogueEntry.soundbankId,
+        ),
       }),
     )
   }

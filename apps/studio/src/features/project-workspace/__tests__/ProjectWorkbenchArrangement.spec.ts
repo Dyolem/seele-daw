@@ -14,6 +14,7 @@ import {
   type TempoEventRecord,
   type Tick,
 } from '@seele-daw/project-core'
+import { parseSoundbankId } from '@seele-daw/playback'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef, type ShallowRef } from 'vue'
@@ -52,6 +53,7 @@ const mountedWrappers: VueWrapper[] = []
 const STUDIO_GRAND_INSTRUMENT = Object.freeze({
   deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
   displayName: 'Studio Grand',
+  soundbankId: parseSoundbankId('studio-grand'),
   status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
 })
 
@@ -108,7 +110,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   const context: ProjectTrackVueContext = Object.freeze({
     projectTracks: Object.freeze({
       addInstrumentTrack,
-      useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
+      selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
     }),
   })
   const clipContext: ProjectClipVueContext = Object.freeze({

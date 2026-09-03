@@ -10,14 +10,13 @@ import {
   type SampleInstrumentResourceCacheLimits,
 } from '@seele-daw/audio-web'
 import {
-  STUDIO_GRAND_SOUNDBANK_ID,
-  parseSoundbankId,
   parsePlaybackClockSecond,
   type AudibleMidiProjectPlan,
   type ScheduledSampleVoicePlan,
   type SoundbankId,
 } from '@seele-daw/playback'
 
+import { BUILT_IN_INSTRUMENT_CATALOGUE } from '@/workbench/instrument/built-in-instrument-catalogue'
 import {
   PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE,
   type ProjectPlaybackInstrumentFailureMode,
@@ -186,14 +185,14 @@ export function createBrowserProjectPlaybackRuntime(
   return new BrowserProjectPlaybackRuntime(options)
 }
 
-/** Resolves the developer-local built-in asset URL used by the current audible validation slice. */
+/** Resolves the same developer-local asset paths owned by the Studio Instrument Catalogue. */
 export function createDefaultBuiltInSampleAssetLocations(
   origin: string,
 ): ReadonlyMap<SoundbankId, URL> {
-  return new Map<SoundbankId, URL>([
-    [
-      parseSoundbankId(STUDIO_GRAND_SOUNDBANK_ID),
-      new URL('/soundbanks/generated/studio-grand/', origin),
-    ],
-  ])
+  return new Map<SoundbankId, URL>(
+    BUILT_IN_INSTRUMENT_CATALOGUE.map(({ assetBasePathname, soundbankId }) => [
+      soundbankId,
+      new URL(assetBasePathname, origin),
+    ]),
+  )
 }

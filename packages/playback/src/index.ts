@@ -42,8 +42,13 @@ export type {
   AudibleMidiSchedulerPlanner,
   ScheduledSampleVoicePlan,
 } from './scheduler/audible-midi-scheduler'
-export { parseSoundbankId } from './sample-instrument-device'
-export type { SoundbankId } from './sample-instrument-device'
+export {
+  SAMPLE_INSTRUMENT_DEVICE_DEFINITION,
+  createSampleInstrumentDeviceDescriptor,
+  decodeSampleInstrumentDeviceState,
+  parseSoundbankId,
+} from './sample-instrument-device'
+export type { SampleInstrumentDeviceState, SoundbankId } from './sample-instrument-device'
 export {
   STUDIO_GRAND_DEVICE_DEFINITION,
   STUDIO_GRAND_SOUNDBANK_ID,

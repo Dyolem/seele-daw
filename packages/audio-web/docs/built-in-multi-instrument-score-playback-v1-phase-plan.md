@@ -1,6 +1,7 @@
 # Built-in Multi-Instrument Score Playback V1 阶段计划
 
-> Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C implementation pending review
+> Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C committed as
+> `fddeb3e`; MI2 implementation pending review
 >
 > Date: 2026-09-03
 >
@@ -188,6 +189,9 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
   旧 Descriptor 不变并显示 Toast。
 - 旧项目未知 Descriptor 保持 Missing 与 round-trip；新 Track 默认仍是 Studio Grand。
 - 不在本批预建 Action Catalogue、Command Palette、用户 Keymap 或完整 Instrument Browser。
+
+本批的 Studio 所有权、22 项目录、三态 Inspector、命令 / 资源失败分界与延期记录见
+[Studio Built-in Instrument Catalogue V1](../../../apps/studio/docs/built-in-instrument-catalogue-v1.md)。
 
 ### MI3A — Program / Channel 10 导入映射
 

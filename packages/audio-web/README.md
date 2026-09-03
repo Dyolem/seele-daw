@@ -41,13 +41,16 @@ Studio Composition Root 补齐 Paused / Stopped 尾音 Handle 清理，真实 St
 后续 [Built-in Multi-Instrument Score Playback V1](./docs/built-in-multi-instrument-score-playback-v1-phase-plan.md)
 已获批准，相关 MIDI、采样与资源术语见
 [多乐器总谱发声 V1 术语表](./docs/built-in-multi-instrument-score-playback-v1-glossary.md)。MI0 / MI1A
-已提交为 `f7af1db`，MI1B 已提交为 `7c36a17`；22 个开发者本地 Score Core Soundbank 的逐音源身份、
+已提交为 `f7af1db`，MI1B 已提交为 `7c36a17`，MI1C 已提交为 `fddeb3e`；22 个开发者本地 Score Core Soundbank 的逐音源身份、
 控制语义和资源证据见
 [Built-in Score Core Soundbank Audit](./docs/built-in-score-core-soundbank-audit.md)。MI1C 已为固定
 General MIDI Percussion 来源实现 47 个 one-shot 与 MIDI `42 / 44 / 46` Hi-hat Choke，政策见
 [General MIDI Percussion Compatibility Policy V1](./docs/general-midi-percussion-compatibility-policy-v1.md)。
-当前 Studio Grand 仍是唯一产品消费者；这里尚未增加 Program / Channel 10 导入路由、乐器选择 UI
-或多音源 Runtime，因此不能把开发资产准备视为已经交付的总谱播放功能。
+MI2 已在 Studio 接入由同一目录驱动的 22 项 Inspector 选择与 developer-local asset location；
+具体边界见
+[Studio Built-in Instrument Catalogue V1](../../apps/studio/docs/built-in-instrument-catalogue-v1.md)。
+Program / Channel 10 自动导入路由与多音源 Runtime 门禁仍未完成，因此不能把手动选择视为已经
+交付完整总谱播放。
 
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录

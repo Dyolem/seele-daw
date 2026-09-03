@@ -14,7 +14,7 @@ describe('ProjectTrackVueContext', () => {
     const context: ProjectTrackVueContext = {
       projectTracks: Object.freeze({
         addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(),
-        useStudioGrand: vi.fn<ProjectTrackCoordinator['useStudioGrand']>(),
+        selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
       }),
     }
     const providedApp = createApp({ render: () => null })

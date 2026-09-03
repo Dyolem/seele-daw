@@ -6,8 +6,9 @@ import type {
   TrackId,
   TrackRecord,
 } from '@seele-daw/project-core'
-import { STUDIO_GRAND_DEVICE_DEFINITION, decodeStudioGrandDeviceState } from '@seele-daw/playback'
+import { decodeSampleInstrumentDeviceState, type SoundbankId } from '@seele-daw/playback'
 
+import { findBuiltInInstrumentCatalogueEntry } from '@/workbench/instrument/built-in-instrument-catalogue'
 import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/project/track/project-track-coordinator'
 
 export const PROJECT_TRACK_INSTRUMENT_STATUS = Object.freeze({
@@ -22,6 +23,7 @@ export type ProjectTrackInstrumentStatus =
 export interface ProjectTrackInstrumentPresentation {
   readonly deviceTypeId: DeviceTypeId | null
   readonly displayName: string
+  readonly soundbankId: SoundbankId | null
   readonly status: ProjectTrackInstrumentStatus
 }
 
@@ -50,6 +52,7 @@ function createInstrumentPresentation(
     return Object.freeze({
       deviceTypeId: null,
       displayName: 'Missing instrument',
+      soundbankId: null,
       status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
     })
   }
@@ -58,14 +61,18 @@ function createInstrumentPresentation(
     return Object.freeze({
       deviceTypeId: device.typeId,
       displayName: 'No instrument selected',
+      soundbankId: null,
       status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
     })
   }
 
-  if (decodeStudioGrandDeviceState(device) !== null) {
+  const sampleInstrumentState = decodeSampleInstrumentDeviceState(device)
+  const catalogueEntry = findBuiltInInstrumentCatalogueEntry(sampleInstrumentState?.soundbankId)
+  if (sampleInstrumentState !== null && catalogueEntry !== null) {
     return Object.freeze({
       deviceTypeId: device.typeId,
-      displayName: STUDIO_GRAND_DEVICE_DEFINITION.displayName,
+      displayName: catalogueEntry.displayName,
+      soundbankId: catalogueEntry.soundbankId,
       status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
     })
   }
@@ -73,6 +80,7 @@ function createInstrumentPresentation(
   return Object.freeze({
     deviceTypeId: device.typeId,
     displayName: 'Missing instrument',
+    soundbankId: sampleInstrumentState?.soundbankId ?? null,
     status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
   })
 }

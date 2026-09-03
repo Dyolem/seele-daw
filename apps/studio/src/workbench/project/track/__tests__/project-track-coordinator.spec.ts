@@ -15,7 +15,13 @@ import {
   parseTrackId,
   type ProjectSession,
 } from '@seele-daw/project-core'
-import { STUDIO_GRAND_DEVICE_DEFINITION, decodeStudioGrandDeviceState } from '@seele-daw/playback'
+import {
+  STUDIO_GRAND_DEVICE_DEFINITION,
+  createSampleInstrumentDeviceDescriptor,
+  decodeSampleInstrumentDeviceState,
+  decodeStudioGrandDeviceState,
+  parseSoundbankId,
+} from '@seele-daw/playback'
 import { describe, expect, it } from 'vitest'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -172,11 +178,11 @@ describe('ProjectTrackCoordinator', () => {
     const session = createSession('legacy-slot')
     const { deviceId, trackId } = addLegacyInstrumentSlotTrack(session, 'selection')
     const coordinator = createProjectTrackCoordinator(createDependencies(session, [], 0))
-    const result = coordinator.useStudioGrand(trackId)
+    const result = coordinator.selectBuiltInInstrument(trackId, parseSoundbankId('solo-violin'))
 
     expect(result.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)
     if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
-      throw new Error('Expected Studio Grand selection to commit')
+      throw new Error('Expected Violin selection to commit')
     }
 
     expect(result.commit.delta.changes).toEqual([
@@ -186,17 +192,17 @@ describe('ProjectTrackCoordinator', () => {
         deviceId,
       }),
     ])
-    expect(decodeStudioGrandDeviceState(session.getSnapshot().devices[0]!)).toEqual({
-      soundbankId: 'studio-grand',
+    expect(decodeSampleInstrumentDeviceState(session.getSnapshot().devices[0]!)).toEqual({
+      soundbankId: 'solo-violin',
     })
 
     const projectFile = createProjectFileDTO(session.getSnapshot())
     const reloaded = createProjectSessionFromProjectFile(projectFile)
     expect(
-      decodeStudioGrandDeviceState(
+      decodeSampleInstrumentDeviceState(
         reloaded.getSnapshot().devices.find((device) => device.id === deviceId)!,
       ),
-    ).toEqual({ soundbankId: 'studio-grand' })
+    ).toEqual({ soundbankId: 'solo-violin' })
 
     session.undo()
     expect(session.getSnapshot().devices.find((device) => device.id === deviceId)).toEqual(
@@ -209,10 +215,57 @@ describe('ProjectTrackCoordinator', () => {
 
     session.redo()
     expect(
-      decodeStudioGrandDeviceState(
+      decodeSampleInstrumentDeviceState(
         session.getSnapshot().devices.find((device) => device.id === deviceId)!,
       ),
-    ).toEqual({ soundbankId: 'studio-grand' })
+    ).toEqual({ soundbankId: 'solo-violin' })
+  })
+
+  it('explicitly replaces an unknown Sample Soundbank without changing the Device identity', () => {
+    const session = createSession('missing-sample')
+    const trackId = parseTrackId('track-missing-sample')
+    const deviceId = parseDeviceId('device-missing-sample')
+    const addResult = session.execute(
+      createAddInstrumentTrackCommand({
+        baseRevision: session.modelRevision,
+        trackId,
+        name: 'Unknown Sample',
+        color: null,
+        channel: {
+          gain: parseLinearGain(1),
+          pan: parseBipolarValue(0),
+          muted: false,
+          soloed: false,
+        },
+        instrumentDevice: createSampleInstrumentDeviceDescriptor(
+          deviceId,
+          parseSoundbankId('unknown-orchestral-bank'),
+        ),
+        insertAt: 0,
+      }),
+    )
+    if (addResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      throw new Error('Expected missing Sample fixture to commit')
+    }
+    const coordinator = createProjectTrackCoordinator(createDependencies(session, []))
+
+    const result = coordinator.selectBuiltInInstrument(trackId, parseSoundbankId('flute'))
+
+    expect(result.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)
+    expect(session.getSnapshot().tracks[0]).toMatchObject({
+      id: trackId,
+      instrumentDeviceId: deviceId,
+      kind: 'instrument',
+    })
+    expect(session.getSnapshot().devices[0]?.id).toBe(deviceId)
+    expect(decodeSampleInstrumentDeviceState(session.getSnapshot().devices[0]!)).toEqual({
+      soundbankId: 'flute',
+    })
+
+    session.undo()
+    expect(decodeSampleInstrumentDeviceState(session.getSnapshot().devices[0]!)).toEqual({
+      soundbankId: 'unknown-orchestral-bank',
+    })
   })
 
   it('returns no-change when Studio Grand is already selected', () => {
@@ -226,7 +279,10 @@ describe('ProjectTrackCoordinator', () => {
     )
     const track = coordinator.addInstrumentTrack()
     const contentStateId = session.contentStateId
-    const result = coordinator.useStudioGrand(track.trackId)
+    const result = coordinator.selectBuiltInInstrument(
+      track.trackId,
+      parseSoundbankId('studio-grand'),
+    )
 
     expect(result).toEqual({
       status: PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE,
@@ -304,7 +360,12 @@ describe('ProjectTrackCoordinator', () => {
         phase: ACTIVE_PROJECT_PHASE.IDLE,
       }),
     )
-    expect(() => coordinator.useStudioGrand(parseTrackId('track-not-ready'))).toThrowError(
+    expect(() =>
+      coordinator.selectBuiltInInstrument(
+        parseTrackId('track-not-ready'),
+        parseSoundbankId('studio-grand'),
+      ),
+    ).toThrowError(
       expect.objectContaining<Partial<ProjectTrackError>>({
         code: 'active-project-not-ready',
         phase: ACTIVE_PROJECT_PHASE.IDLE,
@@ -312,12 +373,14 @@ describe('ProjectTrackCoordinator', () => {
     )
   })
 
-  it('rejects Studio Grand selection for a missing Track without changing the Session', () => {
+  it('rejects a built-in Instrument selection for a missing Track without changing the Session', () => {
     const session = createSession('missing-selection-track')
     const coordinator = createProjectTrackCoordinator(createDependencies(session, [], 0))
     const trackId = parseTrackId('track-missing-selection')
 
-    expect(() => coordinator.useStudioGrand(trackId)).toThrowError(
+    expect(() =>
+      coordinator.selectBuiltInInstrument(trackId, parseSoundbankId('studio-grand')),
+    ).toThrowError(
       expect.objectContaining<Partial<ProjectTrackError>>({
         code: 'track-not-found',
         trackId,
@@ -325,6 +388,27 @@ describe('ProjectTrackCoordinator', () => {
     )
     expect(session.modelRevision).toBe(0)
     expect(session.getSnapshot().tracks).toEqual([])
+  })
+
+  it('rejects an unknown Soundbank before changing the selected Track Device', () => {
+    const session = createSession('unknown-selection')
+    const coordinator = createProjectTrackCoordinator(
+      createDependencies(session, ['track-unknown-selection', 'device-unknown-selection']),
+    )
+    const { trackId } = coordinator.addInstrumentTrack()
+    const contentStateId = session.contentStateId
+
+    expect(() =>
+      coordinator.selectBuiltInInstrument(trackId, parseSoundbankId('unknown-soundbank')),
+    ).toThrowError(
+      expect.objectContaining<Partial<ProjectTrackError>>({
+        code: 'instrument-not-in-catalogue',
+        soundbankId: parseSoundbankId('unknown-soundbank'),
+      }),
+    )
+    expect(session.modelRevision).toBe(1)
+    expect(session.contentStateId).toBe(contentStateId)
+    expect(decodeStudioGrandDeviceState(session.getSnapshot().devices[0]!)).not.toBeNull()
   })
 
   it('rejects invalid randomness before consuming entity identities or mutating the Session', () => {

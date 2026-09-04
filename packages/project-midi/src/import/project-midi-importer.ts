@@ -87,6 +87,12 @@ function createImportSummary(
 ): ProjectMidiImportSummary {
   return Object.freeze({
     sourceFormat: document.format,
+    sourceEnvelope: Object.freeze({
+      schemaVersion: document.sourceEnvelope.schemaVersion,
+      container: Object.freeze({ ...document.sourceEnvelope.container }),
+      messageProtocol: document.sourceEnvelope.messageProtocol,
+      semanticEvidence: Object.freeze({ ...document.sourceEnvelope.semanticEvidence }),
+    }),
     sourcePpq: document.ppq,
     sourceTrackCount: document.tracks.length,
     importedTrackCount: mappedTracks.length,

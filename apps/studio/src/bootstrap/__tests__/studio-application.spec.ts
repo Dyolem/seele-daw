@@ -1,4 +1,8 @@
-import type { MidiFileDecoder, MidiFileDocument } from '@seele-daw/midi-file'
+import {
+  createStandardMidiFileSourceEnvelope,
+  type MidiFileDecoder,
+  type MidiFileDocument,
+} from '@seele-daw/midi-file'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
 import { defineStore } from 'pinia'
 import { defineComponent, h, onUnmounted } from 'vue'
@@ -449,6 +453,7 @@ describe('StudioApplication', () => {
     const bytes = new Uint8Array([0x4d, 0x54, 0x68, 0x64])
     const document: MidiFileDocument = {
       format: 1,
+      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
       name: 'Composed Import',
       ppq: 960,
       tempos: [{ tick: 0, bpm: 120 }],

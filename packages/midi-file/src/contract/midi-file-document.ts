@@ -1,4 +1,6 @@
-export type MidiFileFormat = 0 | 1
+import type { MidiFileFormat, MidiSourceEnvelope } from '#internal/contract/midi-source-envelope'
+
+export type { MidiFileFormat } from '#internal/contract/midi-source-envelope'
 
 export interface MidiFileTempoEvent {
   readonly tick: number
@@ -67,6 +69,7 @@ export interface MidiFileTrack {
  */
 export interface MidiFileDocument {
   readonly format: MidiFileFormat
+  readonly sourceEnvelope: MidiSourceEnvelope
   readonly name: string
   readonly ppq: number
   readonly tempos: readonly MidiFileTempoEvent[]

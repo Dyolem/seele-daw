@@ -1,4 +1,8 @@
-import type { MidiFileDecoder, MidiFileDocument } from '@seele-daw/midi-file'
+import {
+  createStandardMidiFileSourceEnvelope,
+  type MidiFileDecoder,
+  type MidiFileDocument,
+} from '@seele-daw/midi-file'
 import {
   createInitialProjectSession,
   parseProjectId,
@@ -50,6 +54,7 @@ import { createProjectTrackCoordinator } from '@/workbench/project/track/project
 function createMidiDocument(overrides: Partial<MidiFileDocument> = {}): MidiFileDocument {
   return {
     format: 1,
+    sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
     name: '',
     ppq: 960,
     tempos: [{ tick: 0, bpm: 120 }],
@@ -162,6 +167,7 @@ describe('ProjectMidiImportCoordinator', () => {
       diagnostics: [],
       summary: {
         sourceFormat: 1,
+        sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
         sourcePpq: 960,
         sourceTrackCount: 1,
         importedTrackCount: 1,
@@ -210,7 +216,11 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(result).toMatchObject({
       projectId: before.project.id,
       importedTrackIds: ['track-0'],
-      summary: { importedTrackCount: 1, importedNoteCount: 1 },
+      summary: {
+        importedTrackCount: 1,
+        importedNoteCount: 1,
+        sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+      },
     })
     expect(after.project).toBe(before.project)
     expect(after.tempoEvents).toEqual(before.tempoEvents)

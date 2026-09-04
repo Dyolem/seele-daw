@@ -14,6 +14,19 @@ describe('ToneJsMidiFileDecoder', () => {
 
     expect(document).toEqual({
       format: 1,
+      sourceEnvelope: {
+        schemaVersion: 1,
+        container: {
+          format: 1,
+          kind: 'standard-midi-file',
+          timeDivision: 'ppq',
+        },
+        messageProtocol: 'midi-1.0',
+        semanticEvidence: {
+          reason: 'profile-declarations-not-inspected',
+          status: 'unresolved',
+        },
+      },
       name: 'Song',
       ppq: 480,
       tempos: [{ tick: 0, bpm: 120 }],
@@ -47,6 +60,10 @@ describe('ToneJsMidiFileDecoder', () => {
     const document = new ToneJsMidiFileDecoder().decode(TYPE_ZERO_MULTI_CHANNEL_FIXTURE)
 
     expect(document.format).toBe(0)
+    expect(document.sourceEnvelope.container.format).toBe(0)
+    expect(Object.isFrozen(document.sourceEnvelope)).toBe(true)
+    expect(Object.isFrozen(document.sourceEnvelope.container)).toBe(true)
+    expect(Object.isFrozen(document.sourceEnvelope.semanticEvidence)).toBe(true)
     expect(document.ppq).toBe(120)
     expect(
       document.tracks.map((track) => ({

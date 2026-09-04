@@ -1,4 +1,5 @@
 import type { MidiFileDocument } from '#internal/contract/midi-file-document'
+import { assertMidiSourceEnvelope } from '#internal/contract/midi-source-envelope'
 import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { parseSmfKeySignatureOffset } from '#internal/adapters/midi-file-js/smf-key-signature'
 
@@ -16,6 +17,12 @@ export function assertEncodableMidiFileDocument(document: MidiFileDocument): voi
       'The built-in MIDI encoder emits Standard MIDI File format 1 only.',
       { operation: 'encode', format: document.format },
     )
+  }
+
+  try {
+    assertMidiSourceEnvelope(document.sourceEnvelope, document.format)
+  } catch {
+    fail('Invalid or inconsistent MIDI Source Envelope')
   }
 
   assertIntegerInRange(document.ppq, 1, MAX_PPQ, 'PPQ')

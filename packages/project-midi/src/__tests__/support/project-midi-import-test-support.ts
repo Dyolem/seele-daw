@@ -1,4 +1,9 @@
-import type { MidiFileDocument, MidiFileNote, MidiFileTrack } from '@seele-daw/midi-file'
+import {
+  createStandardMidiFileSourceEnvelope,
+  type MidiFileDocument,
+  type MidiFileNote,
+  type MidiFileTrack,
+} from '@seele-daw/midi-file'
 import { createDeviceDescriptor, parseDeviceTypeId, type DeviceId } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
@@ -34,6 +39,7 @@ export function createMidiTrack(overrides: Partial<MidiFileTrack> = {}): MidiFil
 export function createMidiDocument(overrides: Partial<MidiFileDocument> = {}): MidiFileDocument {
   return {
     format: 1,
+    sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
     name: 'Imported Song',
     ppq: 480,
     tempos: [{ tick: 0, bpm: 120 }],

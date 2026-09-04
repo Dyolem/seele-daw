@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MidiFileDocument } from '#internal/contract/midi-file-document'
+import { createStandardMidiFileSourceEnvelope } from '#internal/contract/midi-source-envelope'
 import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { ToneJsMidiFileDecoder } from '#internal/adapters/tonejs-midi/tonejs-midi-file-decoder'
 import { StandardMidiFileEncoder } from '#internal/adapters/midi-file-js/standard-midi-file-encoder'
@@ -7,6 +8,7 @@ import { parseMidi } from 'midi-file'
 
 const DOCUMENT: MidiFileDocument = {
   format: 1,
+  sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
   name: 'Round Trip',
   ppq: 960,
   tempos: [{ tick: 0, bpm: 120 }],
@@ -87,6 +89,17 @@ describe('StandardMidiFileEncoder', () => {
         code: 'invalid-midi-document',
         details: { operation: 'encode' },
       }),
+    )
+  })
+
+  it('rejects a Source Envelope that disagrees with the document format', () => {
+    expect(() =>
+      new StandardMidiFileEncoder().encode({
+        ...DOCUMENT,
+        sourceEnvelope: createStandardMidiFileSourceEnvelope(0),
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
     )
   })
 

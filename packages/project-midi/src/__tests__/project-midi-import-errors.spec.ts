@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
 import { parseDeviceId } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
@@ -18,6 +19,32 @@ function expectImportError(run: () => unknown, code: ProjectMidiImportError['cod
 }
 
 describe('Project MIDI import failures', () => {
+  it('rejects a missing or inconsistent MIDI Source Envelope', () => {
+    expect.hasAssertions()
+    expectImportError(
+      () =>
+        createProjectMidiImportDraft(
+          createImportInput(
+            createMidiDocument({
+              sourceEnvelope: undefined as never,
+            }),
+          ),
+        ),
+      'invalid-midi-document',
+    )
+    expectImportError(
+      () =>
+        createProjectMidiImportDraft(
+          createImportInput(
+            createMidiDocument({
+              sourceEnvelope: createStandardMidiFileSourceEnvelope(0),
+            }),
+          ),
+        ),
+      'invalid-midi-document',
+    )
+  })
+
   it('rejects source PPQ outside the Standard MIDI File range', () => {
     expect.hasAssertions()
     expectImportError(

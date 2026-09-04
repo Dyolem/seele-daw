@@ -1,4 +1,4 @@
-import type { MidiFileDocument } from '@seele-daw/midi-file'
+import { createStandardMidiFileSourceEnvelope, type MidiFileDocument } from '@seele-daw/midi-file'
 import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 import {
   createInitialProjectSession,
@@ -444,6 +444,7 @@ describe('ProjectWorkspacePage', () => {
   it('shows the current Playhead Tempo for multi-Tempo projects without allowing edits', async () => {
     const document: MidiFileDocument = {
       format: 1,
+      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
       name: 'Tempo Map Project',
       ppq: 960,
       tempos: [
@@ -591,6 +592,7 @@ describe('ProjectWorkspacePage', () => {
   it('extends a long imported MIDI song through eight complete Timeline tail bars', async () => {
     const document: MidiFileDocument = {
       format: 1,
+      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
       name: 'Long Imported Song',
       ppq: 960,
       tempos: [{ tick: 0, bpm: 120 }],
@@ -658,6 +660,7 @@ describe('ProjectWorkspacePage', () => {
         importedNoteCount: 32,
         importedTrackCount: 2,
         sourceFormat: 1,
+        sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
         sourcePpq: 480,
         sourceTrackCount: 2,
       }),
@@ -721,6 +724,7 @@ describe('ProjectWorkspacePage', () => {
         importedNoteCount: 12,
         importedTrackCount: 1,
         sourceFormat: 1,
+        sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
         sourcePpq: 480,
         sourceTrackCount: 1,
       }),

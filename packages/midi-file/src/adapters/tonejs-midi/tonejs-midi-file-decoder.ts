@@ -7,6 +7,7 @@ import type {
   MidiFileTrack,
 } from '#internal/contract/midi-file-document'
 import type { MidiFileDecoder } from '#internal/contract/midi-file-codec'
+import { createStandardMidiFileSourceEnvelope } from '#internal/contract/midi-source-envelope'
 import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { readSupportedSmfHeader } from '#internal/adapters/tonejs-midi/smf-header'
 import { ToneJsMidi } from '#internal/adapters/tonejs-midi/tonejs-midi-module'
@@ -23,6 +24,7 @@ export class ToneJsMidiFileDecoder implements MidiFileDecoder {
       const midi = new ToneJsMidi(bytes)
       return {
         format: smfHeader.format,
+        sourceEnvelope: createStandardMidiFileSourceEnvelope(smfHeader.format),
         name: midi.name,
         ppq: smfHeader.ppq,
         tempos: midi.header.tempos.map((event) => ({

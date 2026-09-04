@@ -78,21 +78,21 @@
 
 ## 4. 覆盖、协议与语义解释
 
-| 中文          | 英文                        | 在本阶段中的准确含义                                                                                                                                 |
-| ------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 音符出现      | Note Occurrence             | Project Note 经 Clip 投影后在 Playback Plan 中的一次具体出现。重复 Clip 可让同一来源 Note 产生多个 Occurrence；隔离其中一个不等于删除 Project Note。 |
-| 音高覆盖      | Pitch / Note Coverage       | 当前 Soundbank Manifest 是否有 Zone 能处理某个 MIDI Pitch。覆盖是执行能力事实，不等于该 Pitch 的音乐语义一定正确。                                   |
-| 无匹配区域    | No Matching Zone            | `no-matching-zone` 的直白含义：控制文件没有覆盖该次 Pitch。它不自动等于 Keyswitch、错误音符、鼓组扩展或超出演奏音域。                                |
-| 单次隔离      | Per-occurrence Isolation    | 只跳过明确未覆盖的 Occurrence，继续准备和播放其他可覆盖 Note；不同于让整份 Plan、整条 Track 或整个 Soundbank 都失败。                                |
-| 来源证据封套  | MIDI Source Envelope        | 后续用于保存文件/容器、消息协议、声明 Profile、版本、适用范围和来源身份等证据的中立概念；MI6A 尚未实现。                                             |
-| 语义绑定      | MIDI Semantic Binding       | 后续把明确来源证据绑定为 Note、Drum、Articulation 或其他控制语义的版本化中立契约。证据不足时结果必须保持 Unknown。                                   |
-| 解释配置      | Interpretation Profile      | 面向旧 MIDI 文件或特定生态的显式解释规则，例如审核过的 GM2 Drum Map 或厂商 Articulation Map。它是语义绑定的一种证据来源，不是文件里天然存在的真相。  |
-| 通用包        | Universal MIDI Packet / UMP | MIDI 2.0 使用的消息封装；它也能承载 MIDI 1.0 Channel Voice 消息。看到 UMP 不能自动推断文件已声明某个乐器或演奏法 Profile。                           |
-| 能力询问      | MIDI-CI                     | 实时设备间的 Capability Inquiry，可协商 Protocol、Profiles 与 Property Exchange。它是会话协议，不是 `.mid` 文件的“版本 2”标记。                      |
-| MIDI 配置     | MIDI-CI Profile             | 设备明确声明支持的一组标准化功能及适用范围。只有匹配版本和范围的声明才能参与自动语义绑定，不能由 Pitch 猜出。                                        |
-| 属性交换      | MIDI-CI Property Exchange   | MIDI-CI 中交换设备属性数据的机制。它可能为未来绑定提供证据，但不能替代 Project Fact 或离线文件自己的来源记录。                                       |
-| MIDI 片段文件 | MIDI Clip File              | 面向 MIDI 2.0/UMP 片段交换的文件方向；它与传统 Standard MIDI File 是不同容器路线，需要独立检测和导入适配。                                           |
-| 未知语义      | Unknown Semantics           | 事件数值有效，但现有证据不足以唯一解释用途。正确行为是保留并提示，而不是自动删除、移调或套用 Keyswitch / Drum Map。                                  |
+| 中文          | 英文                        | 在本阶段中的准确含义                                                                                                                                                       |
+| ------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 音符出现      | Note Occurrence             | Project Note 经 Clip 投影后在 Playback Plan 中的一次具体出现。重复 Clip 可让同一来源 Note 产生多个 Occurrence；隔离其中一个不等于删除 Project Note。                       |
+| 音高覆盖      | Pitch / Note Coverage       | 当前 Soundbank Manifest 是否有 Zone 能处理某个 MIDI Pitch。覆盖是执行能力事实，不等于该 Pitch 的音乐语义一定正确。                                                         |
+| 无匹配区域    | No Matching Zone            | `no-matching-zone` 的直白含义：控制文件没有覆盖该次 Pitch。它不自动等于 Keyswitch、错误音符、鼓组扩展或超出演奏音域。                                                      |
+| 单次隔离      | Per-occurrence Isolation    | 只跳过明确未覆盖的 Occurrence，继续准备和播放其他可覆盖 Note；不同于让整份 Plan、整条 Track 或整个 Soundbank 都失败。                                                      |
+| 来源证据封套  | MIDI Source Envelope        | MI6B 用于携带文件/容器、消息协议和语义证据状态的中立契约；这里的 Envelope 不是控制声音起落的 ADSR 包络。当前只证明 SMF / PPQ / MIDI 1.0，并明确标记 Profile 声明尚未检查。 |
+| 语义绑定      | MIDI Semantic Binding       | 后续把明确来源证据绑定为 Note、Drum、Articulation 或其他控制语义的版本化中立契约。证据不足时结果必须保持 Unknown。                                                         |
+| 解释配置      | Interpretation Profile      | 面向旧 MIDI 文件或特定生态的显式解释规则，例如审核过的 GM2 Drum Map 或厂商 Articulation Map。它是语义绑定的一种证据来源，不是文件里天然存在的真相。                        |
+| 通用包        | Universal MIDI Packet / UMP | MIDI 2.0 使用的消息封装；它也能承载 MIDI 1.0 Channel Voice 消息。看到 UMP 不能自动推断文件已声明某个乐器或演奏法 Profile。                                                 |
+| 能力询问      | MIDI-CI                     | 实时设备间的 Capability Inquiry，可协商 Protocol、Profiles 与 Property Exchange。它是会话协议，不是 `.mid` 文件的“版本 2”标记。                                            |
+| MIDI 配置     | MIDI-CI Profile             | 设备明确声明支持的一组标准化功能及适用范围。只有匹配版本和范围的声明才能参与自动语义绑定，不能由 Pitch 猜出。                                                              |
+| 属性交换      | MIDI-CI Property Exchange   | MIDI-CI 中交换设备属性数据的机制。它可能为未来绑定提供证据，但不能替代 Project Fact 或离线文件自己的来源记录。                                                             |
+| MIDI 片段文件 | MIDI Clip File              | 面向 MIDI 2.0/UMP 片段交换的文件方向；它与传统 Standard MIDI File 是不同容器路线，需要独立检测和导入适配。                                                                 |
+| 未知语义      | Unknown Semantics           | 事件数值有效，但现有证据不足以唯一解释用途。正确行为是保留并提示，而不是自动删除、移调或套用 Keyswitch / Drum Map。                                                        |
 
 ## 5. 本地资产、安全与资源成本
 
@@ -138,3 +138,5 @@
   这种语义；否则它仍是 Unknown。
 - **MIDI-CI 不等于 MIDI 文件版本**：MIDI-CI 面向实时设备能力协商；离线 SMF、MIDI Clip 和未来
   容器必须分别识别，不能用是否支持 MIDI-CI 代替文件格式检测。
+- **“尚未检查声明”不等于“没有声明”**：当前 Source Envelope 只记录 Decoder 的证据能力边界；在
+  后续检查 Profile / 厂商元数据之前，不能把 `unresolved` 当成 GM、非 GM 或无演奏法控制的结论。

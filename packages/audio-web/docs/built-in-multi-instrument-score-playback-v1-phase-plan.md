@@ -4,7 +4,7 @@
 > `fddeb3e`; MI2 committed as `f13df2f`; MI3A committed as `cd043b9`; MI3B committed as
 > `5b62b68`; MI4 committed as `8072aca`; MI5 reviewed and committed as `5c541dc`, automated
 > browser gate and full root check passed, human listening remains `not-run`; post-closure MI6A
-> Note Coverage Isolation implementation pending review with full root check passed
+> Note Coverage Isolation reviewed and committed as `041e945` with full root check passed
 >
 > Date: 2026-09-04
 >

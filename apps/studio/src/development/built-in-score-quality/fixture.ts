@@ -1,6 +1,7 @@
 import {
   StandardMidiFileEncoder,
   ToneJsMidiFileDecoder,
+  createStandardMidiFileSourceEnvelope,
   type MidiFileControlChange,
   type MidiFileDocument,
   type MidiFileNote,
@@ -137,6 +138,7 @@ function track(input: {
 export function createBuiltInScoreQualityMidiDocument(): MidiFileDocument {
   return Object.freeze({
     format: 1,
+    sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
     keySignatures: Object.freeze([]),
     name: 'Seele MI5 Multi-Instrument Quality Score',
     ppq: 480,

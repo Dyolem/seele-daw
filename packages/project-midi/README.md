@@ -8,6 +8,8 @@ File V2 加载边界和完整 Model invariant 校验、但尚未进入 Studio �
 
 ## 当前导入规则
 
+- 输入必须带有与 Document format 一致的 MIDI Source Envelope；导入摘要保存其不可变副本并交给
+  Studio，但不把来源容器或协议元数据写入 Project Snapshot、History 或 Project File；
 - 来源 PPQ 使用整数有理数换算到 Project PPQ 960；Note 起点和终点独立四舍五入；
 - 四舍五入后为零长度的 Note 扩为一个 Project tick，并产生汇总诊断；
 - 一个含 Note 的 normalized MIDI Track 创建一个 Instrument Track、一个非循环 Clip 和一个独占
@@ -60,6 +62,10 @@ Tempo 所有权误报成导入失败。
 当前桥接层实现 Standard MIDI File 到 Project 的 Note、初始 CC7 / CC10 与 CC64 导入。Project
 MIDI Export Bridge 与 Studio Export UI 尚未实现，因此不能从 Project 把这些事实写回 `.mid`
 文件。
+
+MIDI Source Envelope 当前只证明传统 SMF / PPQ / MIDI 1.0，并明确标记 Profile 声明尚未检查；它
+不是 GM 或演奏法判断。完整契约与后续路线见
+[MIDI Source Envelope V1](../midi-file/docs/midi-source-envelope-v1.md)。
 
 初始 CC7 / CC10 的用户听觉、精确换算、事务、诊断和兼容边界见
 [MIDI Initial Channel Controls V1](./docs/midi-initial-channel-controls-v1.md)。

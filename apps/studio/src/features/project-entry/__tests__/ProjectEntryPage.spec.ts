@@ -1,3 +1,4 @@
+import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
 import { parseProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -45,6 +46,7 @@ function createImportResult(
     diagnostics: Object.freeze([]),
     summary: Object.freeze({
       sourceFormat: 1,
+      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
       sourcePpq: 480,
       sourceTrackCount: 2,
       importedTrackCount: 2,

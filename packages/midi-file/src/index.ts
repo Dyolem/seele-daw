@@ -14,6 +14,20 @@ export type {
   MidiFileTimeSignatureEvent,
   MidiFileTrack,
 } from './contract/midi-file-document'
+export {
+  MIDI_SOURCE_CONTAINER_KIND,
+  MIDI_SOURCE_ENVELOPE_SCHEMA_VERSION,
+  MIDI_SOURCE_MESSAGE_PROTOCOL,
+  MIDI_SOURCE_SEMANTIC_EVIDENCE_REASON,
+  MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS,
+  assertMidiSourceEnvelope,
+  createStandardMidiFileSourceEnvelope,
+} from './contract/midi-source-envelope'
+export type {
+  MidiSourceEnvelope,
+  StandardMidiFileSourceContainer,
+  UnresolvedMidiSourceSemanticEvidence,
+} from './contract/midi-source-envelope'
 export { MidiFileCodecError } from './errors/midi-file-codec-error'
 export type {
   MidiFileCodecErrorCode,

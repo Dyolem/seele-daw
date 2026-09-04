@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
 import {
   createProjectFileDTO,
   createProjectSessionFromProjectFile,
@@ -67,11 +68,16 @@ describe('createProjectMidiImportDraft', () => {
 
     expect(draft.summary).toEqual({
       sourceFormat: 1,
+      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
       sourcePpq: 480,
       sourceTrackCount: 1,
       importedTrackCount: 1,
       importedNoteCount: 2,
     })
+    expect(draft.summary.sourceEnvelope).not.toBe(document.sourceEnvelope)
+    expect(Object.isFrozen(draft.summary.sourceEnvelope)).toBe(true)
+    expect(Object.isFrozen(draft.summary.sourceEnvelope.container)).toBe(true)
+    expect(Object.isFrozen(draft.summary.sourceEnvelope.semanticEvidence)).toBe(true)
     expect(draft.diagnostics).toEqual([])
     expect(draft.session.modelRevision).toBe(0)
     expect(draft.session.canUndo).toBe(false)

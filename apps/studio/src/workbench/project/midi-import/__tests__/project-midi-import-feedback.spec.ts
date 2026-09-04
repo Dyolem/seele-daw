@@ -1,3 +1,4 @@
+import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
 import { PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE } from '@seele-daw/project-midi'
 import { parseProjectId } from '@seele-daw/project-core'
 import type { ProjectMidiImportDiagnosticCode } from '@seele-daw/project-midi'
@@ -27,6 +28,7 @@ function createResult(
       importedNoteCount: 8,
       importedTrackCount: 1,
       sourceFormat: 1 as const,
+      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
       sourcePpq: 480,
       sourceTrackCount: 1,
     }),

@@ -1,7 +1,7 @@
 # Built-in Multi-Instrument Score Playback V1 收口报告
 
 > Status: MI5 reviewed and committed as `5c541dc`; automated browser gate passed; human listening
-> `not-run`; post-closure MI6A Note Coverage Isolation implementation pending review
+> `not-run`; post-closure MI6A Note Coverage Isolation reviewed and committed as `041e945`
 >
 > Date: 2026-09-03
 

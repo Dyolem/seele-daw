@@ -1,6 +1,6 @@
 # MIDI Note Coverage Isolation V1
 
-> Status: MI6A implementation pending review; full root check passed
+> Status: MI6A reviewed and committed as `041e945`; full root check passed
 >
 > Date: 2026-09-04
 >
@@ -113,7 +113,8 @@ soundbank dist boundary。该结果验证调度和失败边界，不代表新增
 
 ## 6. 明确延期
 
-- MIDI Source Envelope 与导入证据持久化；
+- MIDI Source Envelope 的最小瞬态契约由后续 MI6B 实现；Profile 声明检查、语义绑定与 Project
+  持久化仍延期；
 - 用户选择或编辑 Interpretation Profile / Drum Map / Articulation Map；
 - Keyswitch、Program/Bank 时间线、CC1、CC11、Pitch Bend、Aftertouch、MPE；
 - MIDI 2.0 UMP、MIDI Clip File、SMF2 Container 与实时 MIDI-CI 会话；

@@ -1,4 +1,4 @@
-import type { MidiFileDocument } from '@seele-daw/midi-file'
+import { assertMidiSourceEnvelope, type MidiFileDocument } from '@seele-daw/midi-file'
 import {
   MAX_ENTITY_NAME_LENGTH,
   parseClipId,
@@ -109,6 +109,17 @@ export function requireNormalizedMidiDocument(document: MidiFileDocument): void 
       'invalid-midi-document',
       'Project MIDI import accepts normalized SMF format 0 or format 1 documents.',
       { value: document.format },
+    )
+  }
+
+  try {
+    assertMidiSourceEnvelope(document.sourceEnvelope, document.format)
+  } catch (cause) {
+    throw new ProjectMidiImportError(
+      'invalid-midi-document',
+      'Project MIDI import requires a supported MIDI Source Envelope consistent with the document.',
+      { value: document.sourceEnvelope },
+      { cause },
     )
   }
   assertSourcePpq(document.ppq)

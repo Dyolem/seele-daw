@@ -121,6 +121,7 @@ export interface ProjectMidiImportDiagnostic {
 
 export interface ProjectMidiImportSummary {
   readonly sourceFormat: MidiFileDocument['format']
+  readonly sourceEnvelope: MidiFileDocument['sourceEnvelope']
   readonly sourcePpq: number
   readonly sourceTrackCount: number
   readonly importedTrackCount: number

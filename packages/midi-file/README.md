@@ -8,6 +8,8 @@ Codec 的对象投影成 Seele 自有的 `MidiFileDocument`，并提供可独立
 
 - `ToneJsMidiFileDecoder` 使用固定版本的 `@tonejs/midi` 解析 SMF；
 - 接受 Type 0 / Type 1 与 PPQ time division；
+- 为每个成功解析的 Document 建立不可变 MIDI Source Envelope，明确记录 SMF 格式、PPQ、MIDI 1.0
+  消息协议，以及 Profile 声明“尚未检查”的证据状态；
 - 明确拒绝 Type 2、SMPTE division 和损坏的 Header；
 - 保留 tick-domain Note、Tempo、Time Signature、Key Signature、文本事件、Program、Channel、
   Control Change、Pitch Bend 与 End of Track tick；
@@ -23,10 +25,15 @@ Note Off 配对为 Note。`MidiFileDocument.tracks` 明确表示这种规范化�
 截断；在 Studio Export 接入前必须单独确认 UTF-8 与外部 DAW 兼容策略。Decoder 现阶段保留第三方
 返回的字节字符串，不宣称已经识别来源文件的字符集。
 
+Source Envelope 的字段、瞬态生命周期、失败边界与后续语义证据路线见
+[MIDI Source Envelope V1](./docs/midi-source-envelope-v1.md)。`profile-declarations-not-inspected`
+不等于“文件没有 Profile”；当前 Decoder 不会据此选择 Keyswitch、Drum Map 或 Articulation。
+
 ## 边界
 
 - 本包不依赖 `project-core`，也不包含 Track、Clip、Project ID、默认音源或 PPQ 960 产品规则；
 - Project 导入与导出映射属于独立 `project-midi` bridge，不进入本包；
+- Source Envelope 是中立解析证据，不是 Project Fact；本包不会把它写入 Project File；
 - Studio / Browser 负责读取或下载字节，本包不访问 DOM、File、Blob 或 URL；
 - `Midi`、`Track`、`Note` 等 `@tonejs/midi` 类型不得从公开入口导出。
 

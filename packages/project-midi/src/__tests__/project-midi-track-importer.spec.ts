@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
 import {
   PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
@@ -80,6 +81,7 @@ describe('createProjectMidiTrackImportDraft', () => {
 
     expect(draft.summary).toEqual({
       sourceFormat: 1,
+      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
       sourcePpq: 480,
       sourceTrackCount: 1,
       importedTrackCount: 1,

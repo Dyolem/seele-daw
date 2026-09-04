@@ -1,7 +1,7 @@
 # Built-in Multi-Instrument Score Playback V1 收口报告
 
-> Status: MI5 implementation pending review; automated browser gate passed; human listening
-> `not-run`
+> Status: MI5 reviewed and committed as `5c541dc`; automated browser gate passed; human listening
+> `not-run`; post-closure MI6A Note Coverage Isolation implementation pending review
 >
 > Date: 2026-09-03
 
@@ -10,6 +10,10 @@
 等同于主观音质优秀，也不扩张为完整 General MIDI、管弦乐演奏法或可分发音源承诺。相关术语见
 [多乐器总谱发声 V1 术语表](./built-in-multi-instrument-score-playback-v1-glossary.md)和
 [Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。
+
+真实用户总谱随后暴露的“单个合法 Pitch 无匹配 Zone 会阻断整份计划”问题，不回写本报告的 MI5
+PCM 结论；它作为增量兼容批次记录在
+[MIDI Note Coverage Isolation V1](./midi-note-coverage-isolation-v1.md)。
 
 ## 1. 最小总谱与真实执行路径
 

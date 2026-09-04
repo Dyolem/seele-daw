@@ -1,6 +1,7 @@
 import {
   parseSoundbankId,
   type AudibleMidiProjectPlan,
+  type ScheduledSampleVoicePlan,
   type SoundbankId,
 } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
@@ -114,7 +115,10 @@ class FakeBrowserAudioContext {
   }
 }
 
-function createPlan(soundbankIds: readonly SoundbankId[]): AudibleMidiProjectPlan {
+function createPlan(
+  soundbankIds: readonly SoundbankId[],
+  pitches: readonly number[] = soundbankIds.map(() => 60),
+): AudibleMidiProjectPlan {
   return Object.freeze({
     arrangementEndTick: 960,
     diagnostics: Object.freeze([]),
@@ -127,7 +131,7 @@ function createPlan(soundbankIds: readonly SoundbankId[]): AudibleMidiProjectPla
           endTick: 480,
           noteId: `note-${index}`,
           occurrenceKey: JSON.stringify([`track-${index}`, index]),
-          pitch: 60,
+          pitch: pitches[index] ?? 60,
           releaseTick: 480,
           sourceId: `source-${index}`,
           startTick: 0,
@@ -224,6 +228,78 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     expect(context.decodeAudioData).toHaveBeenCalledTimes(2)
     runtime.dispose()
     expect(context.closeCallCount).toBe(1)
+  })
+
+  it('isolates an uncovered occurrence while retaining covered resources for the same Soundbank', async () => {
+    const context = new FakeBrowserAudioContext()
+    const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input) =>
+      String(input).endsWith('manifest.json')
+        ? createManifestResponse(FIRST_SOUNDBANK_ID)
+        : new Response(createPcmWav()),
+    )
+    const runtime = createBrowserProjectPlaybackRuntime({
+      assetBaseBySoundbank: createAssetLocations(),
+      audioContextFactory: () => context.asAudioContext(),
+      expectedOrigin: 'https://studio.example.test',
+      fetch: fetchImplementation,
+    })
+    const plan = createPlan([FIRST_SOUNDBANK_ID, FIRST_SOUNDBANK_ID], [47, 60])
+
+    const prepared = await runtime.prepare(plan, new AbortController().signal, {
+      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+    })
+
+    expect(prepared.preparationFailures).toEqual([])
+    expect(prepared.unsupportedNoteOccurrences).toEqual([
+      expect.objectContaining({
+        occurrenceKey: plan.midiNoteSpans[0]?.occurrenceKey,
+        pitch: 47,
+        reason: 'no-matching-zone',
+        soundbankId: FIRST_SOUNDBANK_ID,
+      }),
+    ])
+    expect(
+      prepared.schedule({
+        occurrenceKey: plan.midiNoteSpans[0]?.occurrenceKey,
+        soundbankId: FIRST_SOUNDBANK_ID,
+      } as ScheduledSampleVoicePlan),
+    ).toBeNull()
+    expect(fetchImplementation).toHaveBeenCalledTimes(2)
+    prepared.dispose()
+    runtime.dispose()
+  })
+
+  it('prepares an all-uncovered Plan without fetching a WAV resource', async () => {
+    const context = new FakeBrowserAudioContext()
+    const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input) => {
+      if (!String(input).endsWith('manifest.json')) {
+        throw new Error('An all-uncovered Plan must not request a WAV resource')
+      }
+      return createManifestResponse(FIRST_SOUNDBANK_ID)
+    })
+    const runtime = createBrowserProjectPlaybackRuntime({
+      assetBaseBySoundbank: createAssetLocations(),
+      audioContextFactory: () => context.asAudioContext(),
+      expectedOrigin: 'https://studio.example.test',
+      fetch: fetchImplementation,
+    })
+    const plan = createPlan([FIRST_SOUNDBANK_ID], [33])
+
+    const prepared = await runtime.prepare(plan, new AbortController().signal, {
+      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+    })
+
+    expect(prepared.unsupportedNoteOccurrences).toEqual([
+      expect.objectContaining({
+        occurrenceKey: plan.midiNoteSpans[0]?.occurrenceKey,
+        pitch: 33,
+        reason: 'no-matching-zone',
+      }),
+    ])
+    expect(fetchImplementation).toHaveBeenCalledOnce()
+    expect(context.decodeAudioData).not.toHaveBeenCalled()
+    prepared.dispose()
+    runtime.dispose()
   })
 
   it('fails the initial plan, isolates a selective resource failure, and permits retry', async () => {

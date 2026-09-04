@@ -1,4 +1,4 @@
-import type { AudibleMidiProjectPlan, SoundbankId } from '@seele-daw/playback'
+import type { AudibleMidiProjectPlan, MidiNoteSpanPlan, SoundbankId } from '@seele-daw/playback'
 
 import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
 import type {
@@ -9,7 +9,7 @@ import type {
 } from '#internal/sample-instrument/loading/resource-cache'
 import {
   SampleInstrumentZoneSelectionError,
-  collectSampleInstrumentResourceKeysForPitches,
+  findSampleInstrumentZoneForPitch,
 } from '#internal/sample-instrument/loading/zone-selection'
 
 export interface AudibleMidiSampleResourceLocator {
@@ -26,6 +26,23 @@ export interface PreparedAudibleMidiSampleResources {
   readonly failures: readonly AudibleMidiSamplePreparationFailure[]
   readonly instruments: readonly PreparedAudibleMidiSampleInstrument[]
   readonly modelRevision: AudibleMidiProjectPlan['modelRevision']
+  readonly unsupportedNoteOccurrences: readonly AudibleMidiUnsupportedSampleNoteOccurrence[]
+}
+
+export const AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON = Object.freeze({
+  NO_MATCHING_ZONE: 'no-matching-zone',
+} as const)
+
+export type AudibleMidiUnsupportedSampleNoteReason =
+  (typeof AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON)[keyof typeof AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON]
+
+/** Objective per-occurrence coverage result; it deliberately makes no musical interpretation. */
+export interface AudibleMidiUnsupportedSampleNoteOccurrence {
+  readonly occurrenceKey: MidiNoteSpanPlan['occurrenceKey']
+  readonly pitch: MidiNoteSpanPlan['pitch']
+  readonly reason: AudibleMidiUnsupportedSampleNoteReason
+  readonly soundbankId: SoundbankId
+  readonly trackId: MidiNoteSpanPlan['trackId']
 }
 
 export const AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE = Object.freeze({
@@ -83,9 +100,9 @@ function fail(
   throw new AudibleMidiSamplePreparationError(code, message, soundbankId)
 }
 
-function collectPitchesBySoundbank(
+function collectNoteSpansBySoundbank(
   plan: AudibleMidiProjectPlan,
-): ReadonlyMap<SoundbankId, readonly number[]> {
+): ReadonlyMap<SoundbankId, readonly MidiNoteSpanPlan[]> {
   const routes = new Map<(typeof plan.tracks)[number]['trackId'], (typeof plan.tracks)[number]>()
   for (const track of plan.tracks) {
     if (routes.has(track.trackId)) {
@@ -93,7 +110,7 @@ function collectPitchesBySoundbank(
     }
     routes.set(track.trackId, track)
   }
-  const pitchesBySoundbank = new Map<SoundbankId, Set<number>>()
+  const spansBySoundbank = new Map<SoundbankId, MidiNoteSpanPlan[]>()
   for (const span of plan.midiNoteSpans) {
     const route = routes.get(span.trackId)
     if (route === undefined) {
@@ -106,21 +123,69 @@ function collectPitchesBySoundbank(
       )
     }
     const soundbankId = route.instrument.soundbankId
-    let pitches = pitchesBySoundbank.get(soundbankId)
-    if (pitches === undefined) {
-      pitches = new Set<number>()
-      pitchesBySoundbank.set(soundbankId, pitches)
+    let spans = spansBySoundbank.get(soundbankId)
+    if (spans === undefined) {
+      spans = []
+      spansBySoundbank.set(soundbankId, spans)
     }
-    pitches.add(span.pitch)
+    spans.push(span)
   }
   return new Map(
-    [...pitchesBySoundbank]
+    [...spansBySoundbank]
       .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([soundbankId, pitches]) => [
+      .map(([soundbankId, spans]) => [
         soundbankId,
-        Object.freeze([...pitches].sort((a, b) => a - b)),
+        Object.freeze(
+          [...spans].sort((left, right) => {
+            if (left.occurrenceKey < right.occurrenceKey) return -1
+            if (left.occurrenceKey > right.occurrenceKey) return 1
+            return 0
+          }),
+        ),
       ]),
   )
+}
+
+function partitionSampleResourcesForNoteSpans(
+  manifest: SampleInstrumentManifestV1,
+  soundbankId: SoundbankId,
+  spans: readonly MidiNoteSpanPlan[],
+): {
+  readonly resourceKeys: readonly string[]
+  readonly unsupportedNoteOccurrences: readonly AudibleMidiUnsupportedSampleNoteOccurrence[]
+} {
+  const resourceKeys = new Set<string>()
+  const unsupportedNoteOccurrences: AudibleMidiUnsupportedSampleNoteOccurrence[] = []
+
+  for (const span of spans) {
+    let zone: ReturnType<typeof findSampleInstrumentZoneForPitch>
+    try {
+      zone = findSampleInstrumentZoneForPitch(manifest, span.pitch)
+    } catch (error) {
+      if (error instanceof SampleInstrumentZoneSelectionError && error.code === 'invalid-pitch') {
+        fail('invalid-pitch', `Audible MIDI Plan contains invalid pitch ${error.pitch}`)
+      }
+      throw error
+    }
+    if (zone === null) {
+      unsupportedNoteOccurrences.push(
+        Object.freeze({
+          occurrenceKey: span.occurrenceKey,
+          pitch: span.pitch,
+          reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
+          soundbankId,
+          trackId: span.trackId,
+        }),
+      )
+      continue
+    }
+    resourceKeys.add(zone.resource.key)
+  }
+
+  return Object.freeze({
+    resourceKeys: Object.freeze([...resourceKeys].sort()),
+    unsupportedNoteOccurrences: Object.freeze(unsupportedNoteOccurrences),
+  })
 }
 
 function requireLocation(
@@ -177,6 +242,7 @@ type InstrumentPreparationResult =
   | {
       readonly kind: 'prepared'
       readonly instrument: PreparedAudibleMidiSampleInstrument
+      readonly unsupportedNoteOccurrences: readonly AudibleMidiUnsupportedSampleNoteOccurrence[]
     }
   | {
       readonly kind: 'failed'
@@ -206,32 +272,22 @@ export async function prepareAudibleMidiSampleResources(
       fail('invalid-plan-status', 'Audible MIDI Plan has an unknown status')
   }
 
-  const pitchesBySoundbank = collectPitchesBySoundbank(plan)
+  const spansBySoundbank = collectNoteSpansBySoundbank(plan)
   const results = await Promise.all(
-    [...pitchesBySoundbank].map(async ([soundbankId, pitches]) => {
+    [...spansBySoundbank].map(async ([soundbankId, spans]) => {
       try {
         const location = requireLocation(locator, soundbankId)
         const manifest = await cache.loadManifest(location, signal)
-        let resourceKeys: readonly string[]
-        try {
-          resourceKeys = collectSampleInstrumentResourceKeysForPitches(manifest, pitches)
-        } catch (error) {
-          if (error instanceof SampleInstrumentZoneSelectionError) {
-            if (error.code === 'invalid-pitch') {
-              fail('invalid-pitch', `Audible MIDI Plan contains invalid pitch ${error.pitch}`)
-            }
-            fail(
-              'unsupported-pitch',
-              `${soundbankId} does not cover MIDI pitch ${error.pitch}`,
-              soundbankId,
-            )
-          }
-          throw error
-        }
+        const { resourceKeys, unsupportedNoteOccurrences } = partitionSampleResourcesForNoteSpans(
+          manifest,
+          soundbankId,
+          spans,
+        )
         const prepared = await cache.prepare(location, resourceKeys, signal)
         return Object.freeze<InstrumentPreparationResult>({
           instrument: createPreparedInstrument(soundbankId, prepared),
           kind: 'prepared',
+          unsupportedNoteOccurrences,
         })
       } catch (cause) {
         if (
@@ -249,14 +305,18 @@ export async function prepareAudibleMidiSampleResources(
   )
   const failures: AudibleMidiSamplePreparationFailure[] = []
   const instruments: PreparedAudibleMidiSampleInstrument[] = []
+  const unsupportedNoteOccurrences: AudibleMidiUnsupportedSampleNoteOccurrence[] = []
   for (const result of results) {
-    if (result.kind === 'prepared') instruments.push(result.instrument)
-    else failures.push(result.failure)
+    if (result.kind === 'prepared') {
+      instruments.push(result.instrument)
+      unsupportedNoteOccurrences.push(...result.unsupportedNoteOccurrences)
+    } else failures.push(result.failure)
   }
 
   return Object.freeze({
     failures: Object.freeze(failures),
     instruments: Object.freeze(instruments),
     modelRevision: plan.modelRevision,
+    unsupportedNoteOccurrences: Object.freeze(unsupportedNoteOccurrences),
   })
 }

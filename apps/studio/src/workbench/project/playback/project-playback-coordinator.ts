@@ -54,6 +54,7 @@ import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback
 export interface ProjectPlaybackPreparedRuntime {
   readonly modelRevision: ModelRevision
   readonly preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[]
+  readonly unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[]
   advanceGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void
   allNotesOff(): void
   dispose(): void
@@ -72,6 +73,14 @@ export type ProjectPlaybackInstrumentFailureMode =
 export interface ProjectPlaybackInstrumentPreparationFailure {
   readonly cause: unknown
   readonly soundbankId: SoundbankId
+}
+
+export interface ProjectPlaybackUnsupportedNoteOccurrence {
+  readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey']
+  readonly pitch: ScheduledSampleVoicePlan['pitch']
+  readonly reason: 'no-matching-zone'
+  readonly soundbankId: SoundbankId
+  readonly trackId: ScheduledSampleVoicePlan['trackId']
 }
 
 export interface ProjectPlaybackPreparationOptions {
@@ -156,6 +165,10 @@ const SCHEDULER_WAKE_CADENCE_MILLISECOND = SCHEDULER_WAKE_CADENCE_SECOND * 1_000
 const EMPTY_PREPARATION_FAILURES = Object.freeze<
   readonly ProjectPlaybackInstrumentPreparationFailure[]
 >([])
+const EMPTY_UNSUPPORTED_NOTE_OCCURRENCES = Object.freeze<
+  readonly ProjectPlaybackUnsupportedNoteOccurrence[]
+>([])
+const MAXIMUM_UNSUPPORTED_NOTE_SUMMARY_ITEMS = 6
 const ZERO_VISUAL_POSITION_TICK = 0 as ProjectPlaybackVisualPosition['positionTick']
 
 const UNAVAILABLE_STATE = Object.freeze<ProjectPlaybackState>({
@@ -196,15 +209,61 @@ function feedbackForFailure(cause: unknown): ProjectPlaybackFeedback {
   return Object.freeze({ kind: 'error', message })
 }
 
-function feedbackForPreparationFailures(
+function feedbackForPreparationResults(
   failures: readonly ProjectPlaybackInstrumentPreparationFailure[],
+  unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[],
 ): ProjectPlaybackFeedback | null {
-  if (failures.length === 0) return null
-  const soundbankIds = [...new Set(failures.map(({ soundbankId }) => soundbankId))]
+  const messages: string[] = []
+  if (failures.length > 0) {
+    const soundbankIds = [...new Set(failures.map(({ soundbankId }) => soundbankId))]
+    messages.push(
+      `Instrument resources could not be loaded for ${soundbankIds.join(', ')}; affected tracks are silent.`,
+    )
+  }
+  if (unsupportedNoteOccurrences.length > 0) {
+    const countsBySoundbank = new Map<SoundbankId, Map<number, number>>()
+    for (const occurrence of unsupportedNoteOccurrences) {
+      let countsByPitch = countsBySoundbank.get(occurrence.soundbankId)
+      if (countsByPitch === undefined) {
+        countsByPitch = new Map()
+        countsBySoundbank.set(occurrence.soundbankId, countsByPitch)
+      }
+      countsByPitch.set(occurrence.pitch, (countsByPitch.get(occurrence.pitch) ?? 0) + 1)
+    }
+    const summaryItems = [...countsBySoundbank]
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .flatMap(([soundbankId, countsByPitch]) =>
+        [...countsByPitch]
+          .sort(([left], [right]) => left - right)
+          .map(([pitch, count]) => `${soundbankId} MIDI ${pitch}${count > 1 ? ` ×${count}` : ''}`),
+      )
+    const visibleItems = summaryItems.slice(0, MAXIMUM_UNSUPPORTED_NOTE_SUMMARY_ITEMS)
+    const hiddenItemCount = summaryItems.length - visibleItems.length
+    const hiddenSummary = hiddenItemCount > 0 ? `; plus ${hiddenItemCount} more` : ''
+    const eventLabel = unsupportedNoteOccurrences.length === 1 ? 'event was' : 'events were'
+    messages.push(
+      `${unsupportedNoteOccurrences.length} MIDI note ${eventLabel} skipped because the selected instrument control files do not cover those pitches: ${visibleItems.join('; ')}${hiddenSummary}.`,
+    )
+  }
+  if (messages.length === 0) return null
   return Object.freeze({
     kind: 'warning',
-    message: `Instrument resources could not be loaded for ${soundbankIds.join(', ')}; affected tracks are silent.`,
+    message: messages.join(' '),
   })
+}
+
+function hasSampleCoveredNoteOccurrence(
+  plan: AudibleMidiProjectPlan,
+  unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[],
+): boolean {
+  if (plan.midiNoteSpans.length === 0) return false
+  if (unsupportedNoteOccurrences.length === 0) return true
+  const unsupportedOccurrenceKeys = new Set(
+    unsupportedNoteOccurrences.map(({ occurrenceKey }) => occurrenceKey),
+  )
+  return plan.midiNoteSpans.some(
+    ({ occurrenceKey }) => !unsupportedOccurrenceKeys.has(occurrenceKey),
+  )
 }
 
 function createState(input: {
@@ -344,6 +403,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #pendingPlan: AudibleMidiProjectPlan | null = null
   #pendingStartLocatedDuringLoading = false
   #runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
+  #runtimeUnsupportedNoteOccurrences = EMPTY_UNSUPPORTED_NOTE_OCCURRENCES
   #suppressedOccurrenceKeys = new Set<ScheduledSampleVoicePlan['occurrenceKey']>()
   #suppressedTrackIds = new Set<ScheduledSampleVoicePlan['trackId']>()
   #state: ProjectPlaybackState = UNAVAILABLE_STATE
@@ -499,6 +559,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
       this.#preparedRuntime = preparedRuntime
       this.#runtimePreparationFailures = preparedRuntime.preparationFailures
+      this.#runtimeUnsupportedNoteOccurrences = preparedRuntime.unsupportedNoteOccurrences
       const transport = this.#transport
       if (transport === null || this.#scheduler === null) {
         throw new ProjectPlaybackError(
@@ -515,6 +576,12 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         this.#pendingStartLocatedDuringLoading = false
         this.#publishTransportState(pendingSnapshot)
         return true
+      }
+
+      if (!hasSampleCoveredNoteOccurrence(plan, this.#runtimeUnsupportedNoteOccurrences)) {
+        this.#pendingStartLocatedDuringLoading = false
+        this.#publishTransportState(pendingSnapshot)
+        return false
       }
 
       const transition = transport.play()
@@ -664,7 +731,14 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   #resumePreparedPlayback(): boolean {
     const transport = this.#transport
     const runtime = this.#preparedRuntime
-    if (transport === null || runtime === null || this.#scheduler === null) return false
+    const plan = this.#plan
+    if (transport === null || runtime === null || this.#scheduler === null || plan === null) {
+      return false
+    }
+    if (!hasSampleCoveredNoteOccurrence(plan, this.#runtimeUnsupportedNoteOccurrences)) {
+      this.#publishTransportState(transport.getSnapshot())
+      return false
+    }
 
     try {
       const transition = transport.play()
@@ -911,11 +985,17 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
         phase = PROJECT_PLAYBACK_PHASE.STOPPED
         break
     }
-    const preparationFeedback = feedbackForPreparationFailures(this.#runtimePreparationFailures)
+    const preparationFeedback = feedbackForPreparationResults(
+      this.#runtimePreparationFailures,
+      this.#runtimeUnsupportedNoteOccurrences,
+    )
     this.#publish(
       createState({
         diagnostics: plan.diagnostics,
-        failureCause: preparationFeedback === null ? undefined : this.#runtimePreparationFailures,
+        failureCause:
+          this.#runtimePreparationFailures.length === 0
+            ? undefined
+            : this.#runtimePreparationFailures,
         feedback: preparationFeedback ?? undefined,
         phase,
         plan,
@@ -948,6 +1028,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#pendingPlan = null
     this.#pendingStartLocatedDuringLoading = false
     this.#runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
+    this.#runtimeUnsupportedNoteOccurrences = EMPTY_UNSUPPORTED_NOTE_OCCURRENCES
     this.#suppressedOccurrenceKeys.clear()
     this.#suppressedTrackIds.clear()
     this.#transport = null
@@ -1324,6 +1405,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
     this.#preparedRuntime = nextRuntime
     this.#runtimePreparationFailures = nextRuntime.preparationFailures
+    this.#runtimeUnsupportedNoteOccurrences = nextRuntime.unsupportedNoteOccurrences
     this.#retiredRuntimes.add(previousRuntime)
     this.#scheduler = createAudibleMidiSchedulerPlanner(nextPlan, {
       lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
@@ -1400,6 +1482,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
       this.#preparedRuntime = null
       this.#runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
+      this.#runtimeUnsupportedNoteOccurrences = EMPTY_UNSUPPORTED_NOTE_OCCURRENCES
       this.#scheduler = createAudibleMidiSchedulerPlanner(nextPlan, {
         lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
         wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,

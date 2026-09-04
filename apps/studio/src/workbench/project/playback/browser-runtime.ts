@@ -58,9 +58,11 @@ function resolvePreparationFailureMode(
 class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRuntime {
   readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision']
   readonly preparationFailures: ProjectPlaybackPreparedRuntime['preparationFailures']
+  readonly unsupportedNoteOccurrences: ProjectPlaybackPreparedRuntime['unsupportedNoteOccurrences']
   readonly #voiceRuntime: SampleInstrumentVoiceRuntime
   readonly #audioContext: AudioContext
   readonly #unavailableSoundbankIds: ReadonlySet<SoundbankId>
+  readonly #unsupportedOccurrenceKeys: ReadonlySet<ScheduledSampleVoicePlan['occurrenceKey']>
 
   constructor(
     preparedResources: PreparedAudibleMidiSampleResources,
@@ -69,10 +71,14 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
   ) {
     this.modelRevision = preparedResources.modelRevision
     this.preparationFailures = preparedResources.failures
+    this.unsupportedNoteOccurrences = preparedResources.unsupportedNoteOccurrences
     this.#voiceRuntime = voiceRuntime
     this.#audioContext = audioContext
     this.#unavailableSoundbankIds = new Set(
       preparedResources.failures.map(({ soundbankId }) => soundbankId),
+    )
+    this.#unsupportedOccurrenceKeys = new Set(
+      preparedResources.unsupportedNoteOccurrences.map(({ occurrenceKey }) => occurrenceKey),
     )
   }
 
@@ -93,7 +99,12 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
   }
 
   schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
-    if (this.#unavailableSoundbankIds.has(plan.soundbankId)) return null
+    if (
+      this.#unavailableSoundbankIds.has(plan.soundbankId) ||
+      this.#unsupportedOccurrenceKeys.has(plan.occurrenceKey)
+    ) {
+      return null
+    }
     const result = this.#voiceRuntime.schedule(plan)
     if (result.outcome !== 'scheduled' || result.token === null) return null
     const token = result.token

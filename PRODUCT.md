@@ -68,6 +68,11 @@ One-shot / Choke、CC64、初始 Gain / Pan、预算和清理检查通过。混�
 为零，因此没有改变现有 gain staging 或加入隐藏 limiter。该自动结果不代表 22 个音色已通过人工
 试听；听测状态仍为 `not-run`。
 
+MI6A Note Coverage Isolation 已进入待审核实现：合法 MIDI Pitch 没有命中所选音源 Manifest Zone
+时，只跳过该次 Note Occurrence 并汇总 Warning，其他可覆盖 Note 继续播放；如果全部 Note 均未
+覆盖，Transport 保持 Stopped 而不进入 Failed。Project Fact、Project File schema 和底层严格
+Sample Voice Runtime 不变，也不会从低音 Pitch 猜测 Keyswitch、鼓组扩展或错误音符。
+
 当前 Sample Voice Runtime 已采用带 `-36 dB` 下限的平方 Velocity 响应、Project Master 后独立
 `-12 dB` 输出校准、Manifest Envelope/Loop/Trigger 语义，以及每个乐器设备 64 个、项目 Runtime
 128 个发声槽和最多 16 个偷音退场尾音。导入的二值 CC64 已能按 Channel 延后 gated Voice 的最终
@@ -1131,7 +1136,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-09-03 | `MIDI-IMPORT`、`SCORE-INSTRUMENTS`                         | MI3A 接入 21 个精确 GM Program、Channel 10 优先路由、通用三态映射诊断，以及可见、可保存、可修复的无声 Program Placeholder。                                      | `cd043b9`                                  |
 | 2026-09-03 | `MIDI-IMPORT`、`SCORE-INSTRUMENTS`                         | MI3B 把来源首个 Note 前或同 Tick 最终生效的 CC7 / CC10 写入 Track 初始 Gain / Pan，保留后续动态 Controller 的明确诊断。                                          | `5b62b68`                                  |
 | 2026-09-03 | `AUDIO-QUALITY`、`SCORE-INSTRUMENTS`                       | MI4 用真实 Score Core 参考集合校准 `192 MiB` decoded Float32 LRU 缓存预算，并门禁多 Soundbank 并发、复用、Abort、重试与局部失败。                                | `8072aca`                                  |
-| 2026-09-03 | `AUDIO-QUALITY`、`SCORE-INSTRUMENTS`                       | MI5 用原创 Type 1 总谱通过真实七音源 Chromium PCM 门禁，并把来源名含 URL 分隔符的 WAV 规范化为可追溯的安全资源名；人工听测保持 `not-run`。                       | 本批待审核                                 |
+| 2026-09-03 | `AUDIO-QUALITY`、`SCORE-INSTRUMENTS`                       | MI5 用原创 Type 1 总谱通过真实七音源 Chromium PCM 门禁，并把来源名含 URL 分隔符的 WAV 规范化为可追溯的安全资源名；人工听测保持 `not-run`。                       | `5c541dc`                                  |
+| 2026-09-04 | `PLAYBACK`、`SCORE-INSTRUMENTS`                            | MI6A 将合法但无匹配 Manifest Zone 的 MIDI Note 按 Occurrence 隔离并汇总 Warning；不猜语义、不改 Project Fact，全部未覆盖时保持 Stopped。                         | 本批待审核                                 |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1259,7 +1265,7 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   [Multi-Soundbank Runtime Resource Gate V1](packages/audio-web/docs/multi-soundbank-runtime-resource-gate-v1.md)；
   MI5 已继续执行真实混合门禁。
 
-- Built-in Multi-Instrument Score Playback MI5 已完成待审核实现：原创 `747` bytes Type 1 MIDI 经
+- Built-in Multi-Instrument Score Playback MI5 已通过审核并提交为 `5c541dc`：原创 `747` bytes Type 1 MIDI 经
   Encoder / Decoder、Project MIDI、Studio Program / Channel 10 路由、Playback Compiler /
   Scheduler 与生产 Sample Runtime 渲染七个真实 Soundbank。Chromium 18 项自动检查全部通过；
   混合 Peak 为 `-12.893738 dBFS`、零削波，尾窗为数字静音，渲染后 Voice / Node 为零，缓存
@@ -1270,7 +1276,17 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   Build 与 soundbank dist boundary。详细证据见
   [Built-in Multi-Instrument Score Playback V1 收口报告](packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
-- Built-in Preset Catalogue and General MIDI Routing V1 已完成待审核实现。Studio 的 Reka UI
+- MIDI Note Coverage Isolation MI6A 已完成待审核实现：Audio Web 按 Soundbank 与 Note
+  Occurrence 对严格 Manifest 覆盖进行分区，只准备命中 Zone 的 WAV，并把未命中项记录为客观
+  `no-matching-zone`；Browser Runtime 只跳过精确 Occurrence，Studio 以非失败 Warning 汇总
+  Soundbank / Pitch / 次数。部分覆盖计划继续 Playing；全部未覆盖计划保持 Stopped 并复用已准备
+  Runtime。非法 Pitch、损坏资源和直接绕过准备层的 Voice 调度仍严格失败。Project Fact 与文件
+  schema 不变；未来语义恢复必须走版本化 `MIDI Semantic Binding` 证据，不能从 Pitch 猜
+  Keyswitch。最终 `pnpm check` 已通过 157 个测试文件 / 1,370 项测试、全工作区 Type Check、
+  Studio Production Build 与 soundbank dist boundary。详细边界与术语见
+  [MIDI Note Coverage Isolation V1](packages/audio-web/docs/midi-note-coverage-isolation-v1.md)。
+
+- Built-in Preset Catalogue and General MIDI Routing V1 已通过审核并提交为 `000aa9f`。Studio 的 Reka UI
   左目录 / 右选项浮层展示 15 类、439 个来源 Preset：289 个 MIDISampleSynth 可播放，139 个
   VASynth 与 11 个 FMSynth 点击只发 Warning 且不改变 Track。独立的 128 项 GM 导入路由包含
   108 项采样映射（63 Exact / 45 Approximate）和 20 项合成器 Runtime 暂缺，使用 289 项采样目录

@@ -483,6 +483,77 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(runtime.disposeCount).toBe(1)
   })
 
+  it('keeps covered Notes playing and reports uncovered occurrences without a failure state', async () => {
+    const projectId = parseProjectId('project-playback-note-coverage-partial')
+    const session = createPlayableSession(projectId)
+    requireCommitted(
+      session,
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        durationTick: parsePositiveTick(240),
+        noteId: SECOND_NOTE_ID,
+        pitch: parseMidiPitch(64),
+        sourceId: SOURCE_ID,
+        startTick: parseTick(480),
+        velocity: parseMidiVelocity(100),
+      }),
+    )
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    runtime.unsupportedNotePitches = [64]
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer: new ManualProjectPlaybackTimer(),
+    })
+
+    await expect(coordinator.play()).resolves.toBe(true)
+
+    expect(runtime.prepared[0]?.scheduled).toEqual([expect.objectContaining({ pitch: 60 })])
+    expect(coordinator.state).toMatchObject({
+      failureCause: null,
+      feedback: {
+        kind: 'warning',
+        message: expect.stringContaining('MIDI 64'),
+      },
+      phase: 'playing',
+    })
+    coordinator.dispose()
+  })
+
+  it('stays stopped when every Note occurrence lacks a matching Sample Zone', async () => {
+    const projectId = parseProjectId('project-playback-note-coverage-empty')
+    const session = createPlayableSession(projectId)
+    const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
+    const runtime = new ControlledProjectPlaybackRuntime()
+    runtime.unsupportedNotePitches = [60]
+    const timer = new ManualProjectPlaybackTimer()
+    const coordinator = createProjectPlaybackCoordinator({
+      activeProject: activeProject.service,
+      runtime,
+      timer,
+    })
+
+    await expect(coordinator.play()).resolves.toBe(false)
+
+    expect(coordinator.state).toMatchObject({
+      failureCause: null,
+      feedback: {
+        kind: 'warning',
+        message: expect.stringContaining('1 MIDI note event was skipped'),
+      },
+      phase: 'stopped',
+    })
+    expect(runtime.prepared[0]?.generations).toEqual([])
+    expect(runtime.prepared[0]?.scheduled).toEqual([])
+    expect(timer.callbacks.size).toBe(0)
+
+    await expect(coordinator.play()).resolves.toBe(false)
+    expect(runtime.prepared).toHaveLength(1)
+    coordinator.dispose()
+  })
+
   it('silently previews a Playing locate and resumes from the committed target', async () => {
     const projectId = parseProjectId('project-playback-locate-playing')
     const session = createPlayableSession(projectId)

@@ -69,6 +69,13 @@ Runtime 在 Chromium 离线渲染，18 项路由、控制、Peak、Tail、预算
 听觉验收。完整证据见
 [Built-in Multi-Instrument Score Playback V1 收口报告](./docs/built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
+真实总谱后续发现的合法 MIDI Pitch 无匹配 Manifest Zone 问题由
+[MIDI Note Coverage Isolation V1](./docs/midi-note-coverage-isolation-v1.md) 作为 MI6A 增量批次处理：
+资源准备保留逐 Note Occurrence 的 `no-matching-zone` 记录，Studio 只跳过对应 Voice Plan 并汇总
+Warning，其他可覆盖 Note 继续播放；全部 Note 未覆盖时保持 Stopped。Sample Voice Runtime 仍严格
+拒绝任何绕过准备层的未覆盖 Pitch，Project Fact 与文件 schema 不变。该批也冻结未来
+`MIDI Semantic Binding` 必须基于文件/协议/Profile/版本/范围证据，不能从低音 Pitch 猜 Keyswitch。
+
 本地资产的来源链、指纹和分发边界见
 [Studio Grand 本地验证资产记录](./docs/studio-grand-local-validation-assets.md)，其中同时记录
 4A.1b 的生成命令、ZIP 安全预算和本地输出结果。

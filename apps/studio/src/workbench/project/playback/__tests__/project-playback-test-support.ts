@@ -4,6 +4,7 @@ import type {
   ProjectPlaybackPreparationOptions,
   ProjectPlaybackRuntimePort,
   ProjectPlaybackTimerPort,
+  ProjectPlaybackUnsupportedNoteOccurrence,
   ProjectPlaybackVoiceHandle,
 } from '@/workbench/project/playback/project-playback-coordinator'
 import type {
@@ -77,8 +78,12 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
   disposeCount = 0
   currentTime = 0 as PlaybackClockSecond
   readonly preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[]
+  readonly unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[]
   readonly #unavailableSoundbankIds: ReadonlySet<
     ProjectPlaybackInstrumentPreparationFailure['soundbankId']
+  >
+  readonly #unsupportedOccurrenceKeys: ReadonlySet<
+    ProjectPlaybackUnsupportedNoteOccurrence['occurrenceKey']
   >
   readonly #voicesRemainActiveDuringRelease: boolean
 
@@ -86,10 +91,15 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
     readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision'],
     preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = [],
     voicesRemainActiveDuringRelease = false,
+    unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[] = [],
   ) {
     this.preparationFailures = Object.freeze([...preparationFailures])
+    this.unsupportedNoteOccurrences = Object.freeze([...unsupportedNoteOccurrences])
     this.#unavailableSoundbankIds = new Set(
       preparationFailures.map(({ soundbankId }) => soundbankId),
+    )
+    this.#unsupportedOccurrenceKeys = new Set(
+      unsupportedNoteOccurrences.map(({ occurrenceKey }) => occurrenceKey),
     )
     this.#voicesRemainActiveDuringRelease = voicesRemainActiveDuringRelease
   }
@@ -114,7 +124,12 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
   }
 
   schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
-    if (this.#unavailableSoundbankIds.has(plan.soundbankId)) return null
+    if (
+      this.#unavailableSoundbankIds.has(plan.soundbankId) ||
+      this.#unsupportedOccurrenceKeys.has(plan.occurrenceKey)
+    ) {
+      return null
+    }
     this.scheduled.push(plan)
     const handle = new ManualProjectPlaybackVoiceHandle(
       plan.engineGeneration,
@@ -135,6 +150,7 @@ export class ControlledProjectPlaybackRuntime implements ProjectPlaybackRuntimeP
   disposeCount = 0
   failure: unknown = null
   preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = []
+  unsupportedNotePitches: readonly number[] = []
   voicesRemainActiveDuringRelease = false
 
   async prepare(
@@ -146,10 +162,27 @@ export class ControlledProjectPlaybackRuntime implements ProjectPlaybackRuntimeP
     this.signals.push(signal)
     this.preparationOptions.push(options)
     if (this.failure !== null) throw this.failure
+    const unsupportedPitches = new Set(this.unsupportedNotePitches)
+    const unsupportedNoteOccurrences: ProjectPlaybackUnsupportedNoteOccurrence[] = []
+    for (const span of plan.midiNoteSpans) {
+      if (!unsupportedPitches.has(span.pitch)) continue
+      const route = plan.tracks.find(({ trackId }) => trackId === span.trackId)
+      if (route === undefined) throw new Error(`Missing Track route ${span.trackId}`)
+      unsupportedNoteOccurrences.push(
+        Object.freeze({
+          occurrenceKey: span.occurrenceKey,
+          pitch: span.pitch,
+          reason: 'no-matching-zone',
+          soundbankId: route.instrument.soundbankId,
+          trackId: span.trackId,
+        }),
+      )
+    }
     const runtime = new ManualPreparedPlaybackRuntime(
       plan.modelRevision,
       this.preparationFailures,
       this.voicesRemainActiveDuringRelease,
+      unsupportedNoteOccurrences,
     )
     runtime.currentTime = this.currentTime
     this.prepared.push(runtime)

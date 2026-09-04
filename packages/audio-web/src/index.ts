@@ -3,12 +3,15 @@ export { WebAudioContextRuntime } from './context/audio-context-runtime'
 export type { ActiveWebAudioOutput } from './context/audio-context-runtime'
 export {
   AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE,
+  AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON,
   prepareAudibleMidiSampleResources,
 } from './sample-instrument/loading/prepare-plan-resources'
 export type {
   AudibleMidiSamplePreparationFailure,
   AudibleMidiSamplePreparationFailureMode,
   AudibleMidiSampleResourceLocator,
+  AudibleMidiUnsupportedSampleNoteOccurrence,
+  AudibleMidiUnsupportedSampleNoteReason,
   PrepareAudibleMidiSampleResourcesOptions,
   PreparedAudibleMidiSampleResources,
 } from './sample-instrument/loading/prepare-plan-resources'

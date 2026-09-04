@@ -2,10 +2,11 @@
 
 > Status: MI0 / MI1A committed as `f7af1db`; MI1B committed as `7c36a17`; MI1C committed as
 > `fddeb3e`; MI2 committed as `f13df2f`; MI3A committed as `cd043b9`; MI3B committed as
-> `5b62b68`; MI4 committed as `8072aca`; MI5 implementation pending review, automated browser
-> gate and full root check passed, human listening remains `not-run`
+> `5b62b68`; MI4 committed as `8072aca`; MI5 reviewed and committed as `5c541dc`, automated
+> browser gate and full root check passed, human listening remains `not-run`; post-closure MI6A
+> Note Coverage Isolation implementation pending review with full root check passed
 >
-> Date: 2026-09-03
+> Date: 2026-09-04
 >
 > Scope owner: Studio Composition Root、`@seele-daw/project-midi`、
 > `@seele-daw/playback` 与 `@seele-daw/audio-web`
@@ -247,6 +248,18 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 本批实现、Chromium PCM 数值、URL 安全资源名兼容修正、人工听测状态和剩余边界见
 [Built-in Multi-Instrument Score Playback V1 收口报告](./built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
+### MI6A — Note Coverage Isolation 兼容性加固
+
+真实总谱验证后发现：某个合法 MIDI Pitch 没有命中所选 Manifest Zone 时，旧资源准备会让整份
+Playback 失败。MI6A 作为收口后的增量加固，只隔离该次 Note Occurrence，继续播放同一 Track 与
+其他 Track 中有覆盖的 Note；全未覆盖计划保持 Stopped 并显示非失败 Warning。
+
+本批不从 Pitch 猜测 Keyswitch、GM2 Drum Map、错误音符或真实演奏范围。原始 Project Fact 保持
+不变，Audio Web 输出 `no-matching-zone` 结构化记录，Studio 按稳定身份跳过并汇总反馈，底层
+Sample Voice Runtime 继续严格拒绝未覆盖 Pitch。完整行为、失败矩阵、术语和后续
+`MIDI Semantic Binding` 证据顺序见
+[MIDI Note Coverage Isolation V1](./midi-note-coverage-isolation-v1.md)。
+
 ## 6. 质量与失败矩阵
 
 | 场景                           | 必须行为                                                                     |
@@ -261,6 +274,7 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 | 未知旧 Device                  | 原样保存，显示 Missing，不静默替换。                                         |
 | Channel 10                     | 使用 GM Percussion；短 Note Off/CC64 不截断 one-shot。                       |
 | 持续管弦音色                   | 只执行 Manifest 声明的 Loop；不因 Studio Grand 无 Loop 而禁用其他音源 Loop。 |
+| 合法 Pitch 无匹配 Zone         | 只隔离对应 Note Occurrence 并汇总 Warning；不得阻断其他可覆盖 Note。         |
 | 总谱资源较大                   | 只准备计划实际 Pitch；测量并约束解码缓存，不能一次默认加载完整音源库。       |
 | 播放失败                       | 不回滚合法 Project Commit、Import 或 Instrument Replace。                    |
 

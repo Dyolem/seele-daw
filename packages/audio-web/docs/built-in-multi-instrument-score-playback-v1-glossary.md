@@ -60,7 +60,7 @@
 | 专用兼容政策 | Reviewed Compatibility Policy   | 只对固定来源身份和精确前置条件应用的显式 Manifest 修正。条件漂移时失败，不凭乐器名称或文件夹进行通用猜测。                            |
 | 清单         | Sample Instrument Manifest      | Audio Web 接受的严格 Seele V1 运行时契约。它只保留经过支持和验证的 Zone / Resource 语义，不保留远程 URL。                             |
 | 区域         | Zone                            | 一条“哪些 Pitch 选哪枚 Sample，并如何播放”的规则。一个 Soundbank 通常包含多个 Zone。                                                  |
-| 选择范围     | Selector / Key Range            | Zone 覆盖的单个 MIDI Pitch 或连续 Pitch 范围。总谱出现未覆盖 Pitch 时应明确失败，不能选择随机 Sample。                                |
+| 选择范围     | Selector / Key Range            | Zone 覆盖的单个 MIDI Pitch 或连续 Pitch 范围。未覆盖 Pitch 只隔离对应 Note Occurrence；底层 Runtime 仍严格拒绝随机 Sample 回退。      |
 | 根音高       | Root MIDI Pitch                 | WAV 原始录音对应的 MIDI Pitch。目标音高与根音高差决定播放速率和移调。                                                                 |
 | 采样素材     | Sample / WAV Resource           | 真正被浏览器解码和播放的音频文件。MIDI Velocity 或 Program 本身都不是 Sample。                                                        |
 | 采样循环     | Sample Loop                     | 在一枚 WAV 的指定区间重复播放，让持续弦乐或管乐不因素材结束而断声。Studio Grand 没有 Loop，不代表其他 Soundbank 不能有。              |
@@ -76,7 +76,25 @@
 | 同音轮换     | Round Robin                     | 同一 Pitch/力度连续触发时轮换多枚 Sample，减少“机关枪感”。它需要多素材和选择规则，V1 不支持。                                         |
 | 松键采样     | Release Sample                  | Note Off / Gate Release 时额外触发的素材。普通 Release Envelope 只是降低当前 Voice 增益，两者不能混为一谈。                           |
 
-## 4. 本地资产、安全与资源成本
+## 4. 覆盖、协议与语义解释
+
+| 中文          | 英文                        | 在本阶段中的准确含义                                                                                                                                 |
+| ------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 音符出现      | Note Occurrence             | Project Note 经 Clip 投影后在 Playback Plan 中的一次具体出现。重复 Clip 可让同一来源 Note 产生多个 Occurrence；隔离其中一个不等于删除 Project Note。 |
+| 音高覆盖      | Pitch / Note Coverage       | 当前 Soundbank Manifest 是否有 Zone 能处理某个 MIDI Pitch。覆盖是执行能力事实，不等于该 Pitch 的音乐语义一定正确。                                   |
+| 无匹配区域    | No Matching Zone            | `no-matching-zone` 的直白含义：控制文件没有覆盖该次 Pitch。它不自动等于 Keyswitch、错误音符、鼓组扩展或超出演奏音域。                                |
+| 单次隔离      | Per-occurrence Isolation    | 只跳过明确未覆盖的 Occurrence，继续准备和播放其他可覆盖 Note；不同于让整份 Plan、整条 Track 或整个 Soundbank 都失败。                                |
+| 来源证据封套  | MIDI Source Envelope        | 后续用于保存文件/容器、消息协议、声明 Profile、版本、适用范围和来源身份等证据的中立概念；MI6A 尚未实现。                                             |
+| 语义绑定      | MIDI Semantic Binding       | 后续把明确来源证据绑定为 Note、Drum、Articulation 或其他控制语义的版本化中立契约。证据不足时结果必须保持 Unknown。                                   |
+| 解释配置      | Interpretation Profile      | 面向旧 MIDI 文件或特定生态的显式解释规则，例如审核过的 GM2 Drum Map 或厂商 Articulation Map。它是语义绑定的一种证据来源，不是文件里天然存在的真相。  |
+| 通用包        | Universal MIDI Packet / UMP | MIDI 2.0 使用的消息封装；它也能承载 MIDI 1.0 Channel Voice 消息。看到 UMP 不能自动推断文件已声明某个乐器或演奏法 Profile。                           |
+| 能力询问      | MIDI-CI                     | 实时设备间的 Capability Inquiry，可协商 Protocol、Profiles 与 Property Exchange。它是会话协议，不是 `.mid` 文件的“版本 2”标记。                      |
+| MIDI 配置     | MIDI-CI Profile             | 设备明确声明支持的一组标准化功能及适用范围。只有匹配版本和范围的声明才能参与自动语义绑定，不能由 Pitch 猜出。                                        |
+| 属性交换      | MIDI-CI Property Exchange   | MIDI-CI 中交换设备属性数据的机制。它可能为未来绑定提供证据，但不能替代 Project Fact 或离线文件自己的来源记录。                                       |
+| MIDI 片段文件 | MIDI Clip File              | 面向 MIDI 2.0/UMP 片段交换的文件方向；它与传统 Standard MIDI File 是不同容器路线，需要独立检测和导入适配。                                           |
+| 未知语义      | Unknown Semantics           | 事件数值有效，但现有证据不足以唯一解释用途。正确行为是保留并提示，而不是自动删除、移调或套用 Keyswitch / Drum Map。                                  |
+
+## 5. 本地资产、安全与资源成本
 
 | 中文             | 英文                        | 在本阶段中的准确含义                                                                                                                     |
 | ---------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -96,7 +114,7 @@
 | URL 安全资源名   | URL-safe Resource Name      | 规范化输出只使用不会被浏览器解释为 fragment 或 query 的确定性文件名。来源名可含 `#` 等字符，但只保留在审计映射，不能直接充当 HTTP 路径。 |
 | 分发边界         | Distribution Boundary       | Vite Production Build 必须继续排除本地 Soundbank、试听页和开发报告；通过本地播放不代表获得再分发权。                                     |
 
-## 5. 常见误解
+## 6. 常见误解
 
 - **MIDI Program 不等于声音**：Program 只说明期望乐器；实际听感来自 Soundbank、Mapping、WAV、
   Velocity、Controller 和 Runtime。
@@ -114,3 +132,9 @@
 - **本地可播放不等于可发布**：来源许可与生产分发是独立门禁。
 - **资源改名不等于音频归一化**：URL 安全文件名只改变 Manifest 的寻址方式；WAV 内容哈希不变，也不
   改变响度、PCM、Loop 或 Envelope。
+- **合法 MIDI Pitch 不等于当前音源一定能发声**：协议允许 `0...127`，但 Manifest 可以只覆盖真实
+  演奏范围或一套固定鼓件；MI6A 隔离未覆盖 Occurrence，不伪造 Sample。
+- **低音 Note 不自动等于 Keyswitch**：只有明确、版本化且适用范围匹配的 Profile / Map 才能建立
+  这种语义；否则它仍是 Unknown。
+- **MIDI-CI 不等于 MIDI 文件版本**：MIDI-CI 面向实时设备能力协商；离线 SMF、MIDI Clip 和未来
+  容器必须分别识别，不能用是否支持 MIDI-CI 代替文件格式检测。

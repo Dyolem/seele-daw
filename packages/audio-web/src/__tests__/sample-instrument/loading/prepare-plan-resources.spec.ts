@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE,
+  AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON,
   AudibleMidiSamplePreparationError,
   prepareAudibleMidiSampleResources,
   type AudibleMidiSampleResourceLocator,
@@ -185,6 +186,7 @@ describe('Audible MIDI Sample resource preparation', () => {
       FIXTURE_SOUNDBANK_ID,
     ])
     expect(prepared.failures).toEqual([])
+    expect(prepared.unsupportedNoteOccurrences).toEqual([])
     expect(prepared.instruments[0]?.resources.map(({ key }) => key)).toEqual([
       'samples/high.wav',
       'samples/low.wav',
@@ -204,6 +206,7 @@ describe('Audible MIDI Sample resource preparation', () => {
 
     expect(prepared.instruments).toEqual([])
     expect(prepared.failures).toEqual([])
+    expect(prepared.unsupportedNoteOccurrences).toEqual([])
     expect(prepared.modelRevision).toBe(0)
     expect(fetchImplementation).not.toHaveBeenCalled()
   })
@@ -344,6 +347,57 @@ describe('Audible MIDI Sample resource preparation', () => {
         soundbankId: UNAVAILABLE_SOUNDBANK_ID,
       }),
     ])
+    expect(prepared.unsupportedNoteOccurrences).toEqual([])
+  })
+
+  it('isolates valid uncovered Note occurrences and prepares only covered resources', async () => {
+    const { cache, fetchImplementation, locator } = createFixture()
+
+    const prepared = await prepareAudibleMidiSampleResources(
+      createPlan([47, 48, 73, 73]),
+      cache,
+      locator,
+    )
+
+    expect(prepared.failures).toEqual([])
+    expect(prepared.instruments[0]?.resources.map(({ key }) => key)).toEqual(['samples/low.wav'])
+    expect(prepared.unsupportedNoteOccurrences).toEqual([
+      {
+        occurrenceKey: JSON.stringify([TRACK_ID, 0]),
+        pitch: 47,
+        reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
+        soundbankId: FIXTURE_SOUNDBANK_ID,
+        trackId: TRACK_ID,
+      },
+      {
+        occurrenceKey: JSON.stringify([TRACK_ID, 2]),
+        pitch: 73,
+        reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
+        soundbankId: FIXTURE_SOUNDBANK_ID,
+        trackId: TRACK_ID,
+      },
+      {
+        occurrenceKey: JSON.stringify([TRACK_ID, 3]),
+        pitch: 73,
+        reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
+        soundbankId: FIXTURE_SOUNDBANK_ID,
+        trackId: TRACK_ID,
+      },
+    ])
+    expect(fetchImplementation).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns an empty-resource Instrument when every valid Note occurrence is uncovered', async () => {
+    const { cache, fetchImplementation, locator } = createFixture()
+
+    const prepared = await prepareAudibleMidiSampleResources(createPlan([0, 33]), cache, locator)
+
+    expect(prepared.failures).toEqual([])
+    expect(prepared.instruments).toEqual([
+      expect.objectContaining({ resources: [], soundbankId: FIXTURE_SOUNDBANK_ID }),
+    ])
+    expect(prepared.unsupportedNoteOccurrences).toHaveLength(2)
+    expect(fetchImplementation).toHaveBeenCalledTimes(1)
   })
 
   it.each([
@@ -401,13 +455,6 @@ describe('Audible MIDI Sample resource preparation', () => {
         return prepareAudibleMidiSampleResources(createPlan([60]), cache, {
           locate: () => ({ ...LOCATION, soundbankId: parseSoundbankId('wrong-soundbank') }),
         })
-      },
-    },
-    {
-      code: 'unsupported-pitch',
-      run: async () => {
-        const { cache, locator } = createFixture()
-        return prepareAudibleMidiSampleResources(createPlan([73]), cache, locator)
       },
     },
     {

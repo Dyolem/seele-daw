@@ -34,13 +34,14 @@ export interface BrowserProjectPlaybackRuntimeOptions {
   readonly resourceLimits?: SampleInstrumentResourceCacheLimits
 }
 
-// Retains over two MI4 reference-score working sets without retaining the 426.65 MiB catalogue.
+// Retains over two MI4 reference-score working sets without retaining the full Preset catalogue.
 const DEFAULT_DECODED_CACHE_BYTE_LENGTH = 192 * 1_024 * 1_024
 export const DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS =
   Object.freeze<SampleInstrumentResourceCacheLimits>({
     maximumDecodedFloat32ByteLength: DEFAULT_DECODED_CACHE_BYTE_LENGTH,
     maximumManifestByteLength: 64 * 1_024,
-    maximumResourceByteLength: 4 * 1_024 * 1_024,
+    // The reviewed 289-Preset snapshot peaks at 4,659,232 encoded bytes for one WAV.
+    maximumResourceByteLength: 8 * 1_024 * 1_024,
   })
 
 function resolvePreparationFailureMode(

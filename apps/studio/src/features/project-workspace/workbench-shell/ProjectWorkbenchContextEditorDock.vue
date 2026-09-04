@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { parseSoundbankId } from '@seele-daw/playback'
-import CheckmarkIcon from '~icons/fluent/checkmark-16-regular'
-import ChevronDownIcon from '~icons/fluent/chevron-down-16-regular'
-import ChevronUpIcon from '~icons/fluent/chevron-up-16-regular'
 import DismissIcon from '~icons/fluent/dismiss-16-regular'
 import FullScreenMaximizeIcon from '~icons/fluent/full-screen-maximize-16-regular'
 import FullScreenMinimizeIcon from '~icons/fluent/full-screen-minimize-16-regular'
@@ -12,22 +9,6 @@ import MidiIcon from '~icons/fluent/midi-24-regular'
 import OptionsIcon from '~icons/fluent/options-20-regular'
 import MinimizeIcon from '~icons/fluent/subtract-16-regular'
 import { computed } from 'vue'
-import {
-  SelectContent,
-  SelectGroup,
-  SelectIcon,
-  SelectItem,
-  SelectItemIndicator,
-  SelectItemText,
-  SelectLabel,
-  SelectPortal,
-  SelectRoot,
-  SelectScrollDownButton,
-  SelectScrollUpButton,
-  SelectTrigger,
-  SelectValue,
-  SelectViewport,
-} from 'reka-ui'
 
 import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/ProjectPianoRollTrackSurface.vue'
@@ -49,10 +30,11 @@ import {
   PROJECT_WORKBENCH_DOCK_MODE,
   type ProjectWorkbenchDockMode,
 } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
+import BuiltInInstrumentPicker from '@/features/project-workspace/workbench-shell/BuiltInInstrumentPicker.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import { BUILT_IN_INSTRUMENT_CATALOGUE_GROUPS } from '@/workbench/instrument/built-in-instrument-catalogue'
+import type { RuntimeUnavailableBuiltInInstrumentPreset } from '@/workbench/instrument/built-in-instrument-catalogue'
 import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
 
 interface ProjectWorkbenchContextEditorDockProps {
@@ -130,6 +112,13 @@ function selectBuiltInInstrument(soundbankIdInput: unknown): void {
     )
   }
 }
+
+function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrumentPreset): void {
+  toasts.warning(
+    'Instrument is not supported yet',
+    `${preset.displayName} requires the ${preset.engine} runtime. The current Track was not changed.`,
+  )
+}
 </script>
 
 <template>
@@ -192,68 +181,13 @@ function selectBuiltInInstrument(soundbankIdInput: unknown): void {
           </template>
           <div class="project-workbench__instrument-selector">
             <span>Built-in sound</span>
-            <SelectRoot
-              :model-value="selectedBuiltInInstrumentId"
-              @update:model-value="selectBuiltInInstrument"
-            >
-              <SelectTrigger
-                class="project-workbench__instrument-select-trigger"
-                aria-label="Built-in instrument"
-              >
-                <SelectValue :placeholder="instrumentSelectorPlaceholder">
-                  {{ instrumentSelectorText }}
-                </SelectValue>
-                <SelectIcon class="project-workbench__instrument-select-icon">
-                  <UiIcon :icon="ChevronDownIcon" :size="16" />
-                </SelectIcon>
-              </SelectTrigger>
-
-              <SelectPortal>
-                <SelectContent
-                  class="project-workbench__instrument-select-content"
-                  position="popper"
-                  align="start"
-                  :side-offset="4"
-                  :collision-padding="12"
-                >
-                  <SelectScrollUpButton class="project-workbench__instrument-select-scroll">
-                    <UiIcon :icon="ChevronUpIcon" :size="16" />
-                  </SelectScrollUpButton>
-                  <SelectViewport class="project-workbench__instrument-select-viewport">
-                    <SelectGroup
-                      v-for="group in BUILT_IN_INSTRUMENT_CATALOGUE_GROUPS"
-                      :key="group.family"
-                      class="project-workbench__instrument-select-group"
-                    >
-                      <SelectLabel class="project-workbench__instrument-select-label">
-                        {{ group.displayName }}
-                      </SelectLabel>
-                      <SelectItem
-                        v-for="instrument in group.instruments"
-                        :key="instrument.soundbankId"
-                        class="project-workbench__instrument-select-item"
-                        :data-soundbank-id="instrument.soundbankId"
-                        :value="instrument.soundbankId"
-                      >
-                        <span class="project-workbench__instrument-select-indicator-slot">
-                          <SelectItemIndicator
-                            class="project-workbench__instrument-select-indicator"
-                          >
-                            <UiIcon :icon="CheckmarkIcon" :size="16" />
-                          </SelectItemIndicator>
-                        </span>
-                        <SelectItemText class="project-workbench__instrument-select-name">
-                          {{ instrument.displayName }}
-                        </SelectItemText>
-                      </SelectItem>
-                    </SelectGroup>
-                  </SelectViewport>
-                  <SelectScrollDownButton class="project-workbench__instrument-select-scroll">
-                    <UiIcon :icon="ChevronDownIcon" :size="16" />
-                  </SelectScrollDownButton>
-                </SelectContent>
-              </SelectPortal>
-            </SelectRoot>
+            <BuiltInInstrumentPicker
+              :placeholder="selectedBuiltInInstrumentId.length === 0"
+              :selected-soundbank-id="selectedBuiltInInstrumentId"
+              :trigger-text="instrumentSelectorText"
+              @select="selectBuiltInInstrument"
+              @unavailable="reportUnavailableInstrument"
+            />
           </div>
         </section>
       </div>
@@ -514,143 +448,6 @@ function selectBuiltInInstrument(soundbankIdInput: unknown): void {
   color: var(--sd-color-text-muted);
   font-size: var(--sd-font-size-xs);
   font-weight: 650;
-}
-
-.project-workbench__instrument-select-trigger {
-  display: flex;
-  gap: var(--sd-space-2);
-  align-items: center;
-  justify-content: space-between;
-  min-inline-size: 0;
-  inline-size: 100%;
-  block-size: var(--sd-control-height-sm);
-  padding-inline: var(--sd-space-2);
-  border: 1px solid var(--sd-color-border-default);
-  border-radius: var(--sd-radius-sm);
-  color: var(--sd-color-text-primary);
-  background: var(--sd-color-control-secondary);
-  font: inherit;
-  font-size: var(--sd-font-size-xs);
-  text-align: start;
-  cursor: pointer;
-}
-
-.project-workbench__instrument-select-trigger:hover,
-.project-workbench__instrument-select-trigger[data-state='open'] {
-  border-color: var(--sd-color-border-strong);
-  background: var(--sd-color-control-secondary-hover);
-}
-
-.project-workbench__instrument-select-trigger[data-placeholder] {
-  color: var(--sd-color-text-muted);
-}
-
-.project-workbench__instrument-select-trigger:focus-visible {
-  outline: 2px solid var(--sd-color-border-focus);
-  outline-offset: 1px;
-}
-
-.project-workbench__instrument-select-icon {
-  display: inline-flex;
-  flex: 0 0 auto;
-  color: var(--sd-color-text-muted);
-  transition: transform var(--sd-motion-duration-fast) var(--sd-motion-easing-standard);
-}
-
-.project-workbench__instrument-select-trigger[data-state='open']
-  .project-workbench__instrument-select-icon {
-  transform: rotate(180deg);
-}
-
-:global(.project-workbench__instrument-select-content) {
-  z-index: var(--sd-layer-popover);
-  min-inline-size: var(--reka-select-trigger-width);
-  max-block-size: min(28rem, var(--reka-select-content-available-height));
-  overflow: hidden;
-  border: 1px solid var(--sd-color-border-strong);
-  border-radius: var(--sd-radius-md);
-  color: var(--sd-color-text-primary);
-  background: var(--sd-color-surface-overlay);
-  box-shadow: var(--sd-shadow-overlay);
-  outline: none;
-  animation: project-instrument-select-in var(--sd-motion-duration-normal)
-    var(--sd-motion-easing-standard);
-}
-
-:global(.project-workbench__instrument-select-viewport) {
-  padding: var(--sd-space-1);
-}
-
-:global(.project-workbench__instrument-select-group + .project-workbench__instrument-select-group) {
-  padding-block-start: var(--sd-space-1);
-  margin-block-start: var(--sd-space-1);
-  border-top: 1px solid var(--sd-color-border-subtle);
-}
-
-:global(.project-workbench__instrument-select-label) {
-  padding: var(--sd-space-2) var(--sd-space-2) var(--sd-space-1);
-  color: var(--sd-color-text-muted);
-  font-size: var(--sd-font-size-xs);
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-:global(.project-workbench__instrument-select-item) {
-  display: grid;
-  grid-template-columns: 1rem minmax(0, 1fr);
-  gap: var(--sd-space-2);
-  align-items: center;
-  min-block-size: var(--sd-control-height-sm);
-  padding: var(--sd-space-1) var(--sd-space-2);
-  border-radius: var(--sd-radius-sm);
-  outline: none;
-  font-size: var(--sd-font-size-xs);
-  cursor: pointer;
-}
-
-:global(.project-workbench__instrument-select-name) {
-  min-inline-size: 0;
-  overflow-wrap: normal;
-  white-space: nowrap;
-  word-break: normal;
-}
-
-:global(.project-workbench__instrument-select-item[data-highlighted]) {
-  background: var(--sd-color-control-ghost-hover);
-}
-
-:global(.project-workbench__instrument-select-item[data-state='checked']) {
-  color: var(--sd-color-border-focus);
-}
-
-:global(.project-workbench__instrument-select-indicator-slot),
-:global(.project-workbench__instrument-select-indicator) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-:global(.project-workbench__instrument-select-indicator-slot) {
-  inline-size: 1rem;
-  block-size: 1rem;
-}
-
-:global(.project-workbench__instrument-select-scroll) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  block-size: var(--sd-control-height-sm);
-  color: var(--sd-color-text-muted);
-  background: var(--sd-color-surface-overlay);
-  cursor: default;
-}
-
-@keyframes project-instrument-select-in {
-  from {
-    opacity: 0;
-    transform: translateY(calc(var(--sd-space-1) * -1));
-  }
 }
 
 .project-workbench__context-editor {

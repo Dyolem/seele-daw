@@ -1,0 +1,4401 @@
+{
+  "schema": "seele.built-in-instrument-preset-source-snapshot",
+  "schemaVersion": 1,
+  "sourceSha256": {
+    "catalogue": "a1925bfec6e389fd37a901e21d571bdfd0ccfec162f3809c8fae95eaf268a924",
+    "generalMidiIndex": "12e42ec8d9131973317ae805c5d120426b95ec8abdda87f596e355dd39a0df66",
+    "soundbankMap": "58e800e66415f24665926a945f732f93ac4abb99923d0d078f96e94aa140138d"
+  },
+  "presets": [
+    {
+      "categoryId": "guitars",
+      "displayName": "12 String Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 25,
+      "isCanonicalForProgram": false,
+      "soundbankId": "12-string-guitar",
+      "sourcePresetId": "12-string-guitar-v2-v4",
+      "subtitle": "Acoustic Guitar"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "303 Acid",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "303-acid-v4",
+      "subtitle": "Synth Basses"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "606",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "606",
+      "sourcePresetId": "606-kit-v3-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "'62 P-Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": true,
+      "soundbankId": "62-p-bass",
+      "sourcePresetId": "62-p-bass-v3-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "8 Bit Chiptune",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "8-bit-chiptune",
+      "sourcePresetId": "8-bit-chiptune-kit-v3-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "808-bass-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Boom",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "808-boom-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Buzz",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "808-buzz-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Distortion",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "808-distortion-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Greed",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "808-greed-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Kick",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "808-kick-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "808",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "808",
+      "sourcePresetId": "808-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Saturated Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "808-saturated-bass",
+      "sourcePresetId": "808-saturated-bass-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "80s Square Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "80s-square-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "909",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "909",
+      "sourcePresetId": "909-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Abstract Hip Hop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "abstract-hip-hop",
+      "sourcePresetId": "abstract-hip-hop-kit-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Accordion",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 21,
+      "isCanonicalForProgram": true,
+      "soundbankId": "accordion",
+      "sourcePresetId": "accordion-v3-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Acid Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "acid-bass",
+      "sourcePresetId": "acid-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Acoustic Bass Legato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 32,
+      "isCanonicalForProgram": true,
+      "soundbankId": "acoustic-bass",
+      "sourcePresetId": "acoustic-bass-legato-v2-v4",
+      "subtitle": "Acoustic Bass"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Acoustic Bass Staccato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 32,
+      "isCanonicalForProgram": false,
+      "soundbankId": "acoustic-bass-staccato",
+      "sourcePresetId": "acoustic-bass-staccato-v3-v4",
+      "subtitle": "Acoustic Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Afro Cuban Percussion",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "afro-cuban-percussion",
+      "sourcePresetId": "afro-cuban-percussion",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Ahh Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 52,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ahh-synth",
+      "sourcePresetId": "ahh-synth-v3-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Airy Keys",
+      "engine": "VASynth",
+      "generalMidiProgram": 90,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "airy-keys-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Aka Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "aka-bass-v4",
+      "subtitle": "Synth Basses"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Alien Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "alien-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Alto Saxophone",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 65,
+      "isCanonicalForProgram": true,
+      "soundbankId": "alto-saxophone",
+      "sourcePresetId": "alto-saxophone-v2-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Ambient Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ambient-lead",
+      "sourcePresetId": "ambient-lead-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Analog Desk",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "analog-desk",
+      "sourcePresetId": "analog-desk-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Arcade Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "arcade-lead-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Atlanta Hip Hop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "atlanta-hip-hop",
+      "sourcePresetId": "atlanta-hip-hop-kit-v3-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Atlantis Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "atlantispad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Atmosphere Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": "atmosphere-pad",
+      "sourcePresetId": "atmosphere-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Attack Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "attack-bass",
+      "sourcePresetId": "attack-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Axe Lead Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "axe-lead-guitar",
+      "sourcePresetId": "axe-lead-guitar-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "B3 Hamm",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": false,
+      "soundbankId": "b3-hamm",
+      "sourcePresetId": "b3-hammond-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Bagpipe",
+      "engine": "FMSynth",
+      "generalMidiProgram": 109,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "bagpipe-v2-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Ballad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ballad",
+      "sourcePresetId": "ballad-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Banjo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 105,
+      "isCanonicalForProgram": true,
+      "soundbankId": "banjo",
+      "sourcePresetId": "banjo-v3-v4",
+      "subtitle": "Acoustic Guitar"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Bass Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "bass-lead-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Long Bows",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 43,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-long-bows",
+      "sourcePresetId": "basses-long-bows-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Pizzicato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-pizzicato",
+      "sourcePresetId": "basses-pizzicato-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Short Bows",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-short-bows",
+      "sourcePresetId": "basses-short-bows-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Tremolo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-tremolo",
+      "sourcePresetId": "basses-tremolo-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Bassoon",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 70,
+      "isCanonicalForProgram": true,
+      "soundbankId": "bassoon",
+      "sourcePresetId": "bassoon-v3-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Bedroom",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bedroom",
+      "sourcePresetId": "bedroom-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Beginning Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "beginning-lead",
+      "sourcePresetId": "beginning-lead-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Bells",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 112,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bells",
+      "sourcePresetId": "bells-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Berlin Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 93,
+      "isCanonicalForProgram": false,
+      "soundbankId": "berlin-lead",
+      "sourcePresetId": "berlin-lead-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Big Synth Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "big-synth-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Blip Perc",
+      "engine": "VASynth",
+      "generalMidiProgram": 117,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "blip-perc-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Blown Bottle",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 76,
+      "isCanonicalForProgram": true,
+      "soundbankId": "blown-bottle",
+      "sourcePresetId": "blown-bottle-v2-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Blues",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "blues",
+      "sourcePresetId": "blues-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Bodyrocking Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "bodyrocking-bass-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Boog Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "boog-bass-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Boom Bap Classic",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "boom-bap-classic",
+      "sourcePresetId": "boom-bap-kit-2-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Boom Bap",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "boom-bap",
+      "sourcePresetId": "boom-bap-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Boom Bap Urban",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "boom-bap-urban",
+      "sourcePresetId": "boom-bap-urban-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Borealis Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 90,
+      "isCanonicalForProgram": false,
+      "soundbankId": "borealis-pad",
+      "sourcePresetId": "borealis-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Bouzouki Hard",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 105,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bouzouki-hard",
+      "sourcePresetId": "bouzouki-hard-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Bouzouki Soft",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 105,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bouzouki-soft",
+      "sourcePresetId": "bouzouki-soft-v3-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Breakcore",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "breakcore",
+      "sourcePresetId": "breakcore-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Bright Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bright-piano",
+      "sourcePresetId": "bright-piano-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Brooklyn",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "brooklyn",
+      "sourcePresetId": "brooklyn-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Brush",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "brush",
+      "sourcePresetId": "brush-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Brute Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "brute-bass-v4",
+      "subtitle": "Synth Basses"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Car Stereo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "car-stereo",
+      "sourcePresetId": "car-stereo-v3-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cello Section",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 42,
+      "isCanonicalForProgram": true,
+      "soundbankId": "cello-section",
+      "sourcePresetId": "cello-section-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cellos Pizzicato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cellos-pizzicato",
+      "sourcePresetId": "cellos-pizzicato-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cellos Short Bows",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 42,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cellos-short-bows",
+      "sourcePresetId": "cellos-short-bows-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cellos Tremolo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cellos-tremolo",
+      "sourcePresetId": "cellos-tremolo-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Cheeky Boom",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "cheeky-boom-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Chill Wave",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "chill-wave",
+      "sourcePresetId": "chill-wave-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Chill Wave Synth",
+      "engine": "VASynth",
+      "generalMidiProgram": 90,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "chill-wave-synth-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Chip Hat",
+      "engine": "VASynth",
+      "generalMidiProgram": 115,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "chip-hat-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Chip Organ",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "chip-organ-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Choir Male Ahh",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 52,
+      "isCanonicalForProgram": false,
+      "soundbankId": "choir-male-ahh",
+      "sourcePresetId": "choir-male-ahh-v3-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Choir Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 91,
+      "isCanonicalForProgram": true,
+      "soundbankId": "choir-synth",
+      "sourcePresetId": "choir-synth-v2-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Chonky Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "chonky-bass-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Chorus Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": false,
+      "soundbankId": "chorus-organ",
+      "sourcePresetId": "chorus-organ-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Church Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 19,
+      "isCanonicalForProgram": true,
+      "soundbankId": "church-organ",
+      "sourcePresetId": "church-organ-v3-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Cinematic Classic",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cinematic-classic",
+      "sourcePresetId": "cinematic-kit-v3-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Cinematic Vast",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cinematic-vast",
+      "sourcePresetId": "cinematic-vast-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "City Keys",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "city-keys-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Clap Slap",
+      "engine": "VASynth",
+      "generalMidiProgram": 115,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "clap-slap-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Clarinet",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 71,
+      "isCanonicalForProgram": true,
+      "soundbankId": "clarinet",
+      "sourcePresetId": "clarinet-v3-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Classic House",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-house",
+      "sourcePresetId": "classic-house-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Classic Rock",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-rock",
+      "sourcePresetId": "classic-rock-kit-v2-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Classic Rock Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-rock-organ",
+      "sourcePresetId": "classic-rock-organ-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Classic Synth Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-synth-bass",
+      "sourcePresetId": "classic-synth-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Clean 5th Sine Organ",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "clean-5th-sine-organ-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Clean Break",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-break",
+      "sourcePresetId": "clean-break-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar Hard",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-guitar-hard",
+      "sourcePresetId": "clean-guitar-hard-v3-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar Muted",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 28,
+      "isCanonicalForProgram": true,
+      "soundbankId": "clean-guitar-muted",
+      "sourcePresetId": "clean-guitar-muted-v2-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar Soft",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-guitar-soft",
+      "sourcePresetId": "clean-guitar-soft-v3-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": true,
+      "soundbankId": "clean-guitar",
+      "sourcePresetId": "clean-guitar-v3-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Power Chord",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 29,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-power-chord",
+      "sourcePresetId": "clean-power-chord-v2-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Clicky Bit",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "clicky-bit-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Cloud Fluff",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "cloud-fluff-v3-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Colossal Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "colossal-lead-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Compton",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "compton",
+      "sourcePresetId": "compton-kit-v2-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Helicopter Orchestra",
+      "engine": "VASynth",
+      "generalMidiProgram": 85,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "copterorchestra-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Country",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "country",
+      "sourcePresetId": "country-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "DaFunky Crunch",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "dafunky-crunch-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dance Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dance-lead",
+      "sourcePresetId": "dance-lead-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Dark Grand",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dark-grand",
+      "sourcePresetId": "dark-grand-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Dark Hip Hop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dark-hip-hop",
+      "sourcePresetId": "dark-hip-hop-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Dark Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 16,
+      "isCanonicalForProgram": true,
+      "soundbankId": "dark-organ",
+      "sourcePresetId": "dark-organ-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Daylight Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 26,
+      "isCanonicalForProgram": false,
+      "soundbankId": "daylight-guitar",
+      "sourcePresetId": "daylight-guitar-v3-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Deep House",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": true,
+      "soundbankId": "deep-house-bass",
+      "sourcePresetId": "deep-house-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Deep House Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "deep-house-synth",
+      "sourcePresetId": "deep-house-synth-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Desert Chaser",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "desert-chaser-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Detuned Tapper",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "detuned-tapper-v4-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Dirty Growl",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "dirty-growl-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dirty Legato Saw",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "dirty-legato-saw-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dirty Porto 5th",
+      "engine": "VASynth",
+      "generalMidiProgram": 86,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "dirty-porto-5th-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Dirty Wub",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "dirty-wub-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Divebomb",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "divebomb-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Djent Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "djent-guitar",
+      "sourcePresetId": "djent-guitar-v2-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "DNB",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dnb",
+      "sourcePresetId": "dnb-kit-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Double Bass Section",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 43,
+      "isCanonicalForProgram": true,
+      "soundbankId": "double-bass-section",
+      "sourcePresetId": "double-bass-section-v2-v4",
+      "subtitle": "Acoustic Bass"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Dream Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 94,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "dream-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Dreamy Bells",
+      "engine": "VASynth",
+      "generalMidiProgram": 94,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "dreamy-bells-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Drive Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "drive-bass",
+      "sourcePresetId": "drive-bass-v4-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Drive",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "drive",
+      "sourcePresetId": "drive-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Dry",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dry",
+      "sourcePresetId": "dry-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Duality Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "duality-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Dub Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dub-bass",
+      "sourcePresetId": "dub-bass-v3-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dub Supersaw",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dub-supersaw",
+      "sourcePresetId": "dub-supersaw-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Dubstep",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dubstep",
+      "sourcePresetId": "dubstep-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dubstep Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dubstep-lead",
+      "sourcePresetId": "dubstep-lead-v3-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Dumpy",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dumpy",
+      "sourcePresetId": "dumpy-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Dustbin Acid",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "dustbin-acid-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "EDM",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "edm",
+      "sourcePresetId": "edm-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Electric Bass Legato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "electric-bass-legato",
+      "sourcePresetId": "electric-bass-legato-v3-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Electric Bass Staccato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "electric-bass-staccato",
+      "sourcePresetId": "electric-bass-staccato-v4-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Electric Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 4,
+      "isCanonicalForProgram": true,
+      "soundbankId": "electric-piano",
+      "sourcePresetId": "electric-piano-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Electro Pop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "electro-pop",
+      "sourcePresetId": "electro-pop-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Electro Saw Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "electro-saw-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Electro Splat",
+      "engine": "VASynth",
+      "generalMidiProgram": 123,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "electro-splat-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Empire",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "empire",
+      "sourcePresetId": "empire-kit-v2-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Evolve Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 39,
+      "isCanonicalForProgram": false,
+      "soundbankId": "evolve-bass",
+      "sourcePresetId": "evolve-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Evolve Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": true,
+      "soundbankId": "evolve-pad",
+      "sourcePresetId": "evolve-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Exceedingly Nice",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "exceedingly-nice-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Eyelash Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 82,
+      "isCanonicalForProgram": true,
+      "soundbankId": "eyelash-synth",
+      "sourcePresetId": "eyelash-synth-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Fancy Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fancy-bass",
+      "sourcePresetId": "fancy-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Fanfare Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 16,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fanfare-organ",
+      "sourcePresetId": "fanfare-organ-v3-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Fat 90's",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fat-90-s",
+      "sourcePresetId": "fat-90s-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Fat 'n Dirty",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fat-n-dirty",
+      "sourcePresetId": "fat-n-dirty-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Feed the Fifth",
+      "engine": "VASynth",
+      "generalMidiProgram": 70,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "feed-the-fifth-v4",
+      "subtitle": "Pads"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Felt Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": "felt-piano",
+      "sourcePresetId": "felt-piano-v2-v4",
+      "subtitle": "Felt Piano"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Female Ooh",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 53,
+      "isCanonicalForProgram": true,
+      "soundbankId": "female-ooh",
+      "sourcePresetId": "female-ooh-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Finesse",
+      "engine": "VASynth",
+      "generalMidiProgram": 91,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "finesse-pad-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Fizzy Interrupt",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "fizzy-interrupt-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Flare",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "flare",
+      "sourcePresetId": "flare-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Flow Saw",
+      "engine": "VASynth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "flow-saw-v4",
+      "subtitle": "Pads"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Flugelhorn",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "flugelhorn",
+      "sourcePresetId": "flugelhorn-v2-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Flute",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 73,
+      "isCanonicalForProgram": true,
+      "soundbankId": "flute",
+      "sourcePresetId": "flute-v2-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "FM Gamelan",
+      "engine": "FMSynth",
+      "generalMidiProgram": 14,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "fm-gamelan-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "FM Keys",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fm-keys",
+      "sourcePresetId": "fm-keys-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "FM Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fm-lead",
+      "sourcePresetId": "fm-lead-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "FM Mulch",
+      "engine": "FMSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "fm-mulch-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "FM Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 93,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fm-pad",
+      "sourcePresetId": "fm-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "FM Quad",
+      "engine": "FMSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "fm-quad-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "FM String",
+      "engine": "FMSynth",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "fm-string-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "FM Tines",
+      "engine": "FMSynth",
+      "generalMidiProgram": 4,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "fm-tines-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Freestyle",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "freestyle",
+      "sourcePresetId": "freestyle-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "French Horn",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 60,
+      "isCanonicalForProgram": true,
+      "soundbankId": "french-horn",
+      "sourcePresetId": "french-horn-v2-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Full Brass Staccato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 61,
+      "isCanonicalForProgram": false,
+      "soundbankId": "full-brass-staccato",
+      "sourcePresetId": "full-brass-staccato-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Full Brass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 61,
+      "isCanonicalForProgram": true,
+      "soundbankId": "brass-ensemble",
+      "sourcePresetId": "full-brass-v2-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Long Bows",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": false,
+      "soundbankId": "full-strings-long-bows",
+      "sourcePresetId": "full-strings-long-bows-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Pizzicato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": true,
+      "soundbankId": "string-ensemble-pizzicato",
+      "sourcePresetId": "full-strings-pizzicato-v3-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Short Bows",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": false,
+      "soundbankId": "full-strings-short-bows",
+      "sourcePresetId": "full-strings-short-bows-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Tremolo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": true,
+      "soundbankId": "string-ensemble-tremolo",
+      "sourcePresetId": "full-strings-tremolo-v3-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Funk Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 26,
+      "isCanonicalForProgram": false,
+      "soundbankId": "funk-guitar",
+      "sourcePresetId": "funk-guitar",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Funk",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "funk",
+      "sourcePresetId": "funk-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Funky Phat Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "funky-phat-lead-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Funky Slap",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 36,
+      "isCanonicalForProgram": false,
+      "soundbankId": "funky-slap",
+      "sourcePresetId": "funky-slap-v2-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Funky Clav",
+      "engine": "VASynth",
+      "generalMidiProgram": 7,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "funky-tone-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Fusion",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fusion",
+      "sourcePresetId": "fusion-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Future Keys",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-keys",
+      "sourcePresetId": "future-keys-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Future Pop Stab",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-pop-stab",
+      "sourcePresetId": "future-pop-stab-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Future Redux Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 39,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-redux-bass",
+      "sourcePresetId": "future-redux-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Future Trap",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-trap",
+      "sourcePresetId": "future-trap-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Retro Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "g-funk-lead-v4-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "G-Funk Sine",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "g-funk-sine-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "General MIDI Drums",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "general-midi-drums-hiphop",
+      "sourcePresetId": "general-midi-drums-hiphop-v3-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "General MIDI Percussion",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": true,
+      "soundbankId": "general-midi-percussion",
+      "sourcePresetId": "general-midi-drums-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "G-Funk Saw",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "gfunk-saw-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Glitch",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "glitch",
+      "sourcePresetId": "glitch-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Glitch Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "glitch-lead",
+      "sourcePresetId": "glitch-lead-v3-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Glockenspiel",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 9,
+      "isCanonicalForProgram": true,
+      "soundbankId": "glockenspiel",
+      "sourcePresetId": "glockenspiel-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Grand Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": "grand-piano",
+      "sourcePresetId": "grand-piano-v4-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Grime Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "grime-bass",
+      "sourcePresetId": "grime-bass-v4-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Groove",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "groove",
+      "sourcePresetId": "groove-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Growler Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "growler-bass",
+      "sourcePresetId": "growler-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Dirty Power Chord",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "guitar-power-chord",
+      "sourcePresetId": "guitar-power-chord-v2-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Hadda Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "hadda-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Halcyon 5th",
+      "engine": "VASynth",
+      "generalMidiProgram": 86,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "halcyon-5th-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Hammered Dulcimer",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 15,
+      "isCanonicalForProgram": true,
+      "soundbankId": "hammered-dulcimer",
+      "sourcePresetId": "hammered-dulcimer-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Hard Rock",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hard-rock",
+      "sourcePresetId": "hard-rock-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Hardcore Square Unison",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "hardcore-square-unison-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Hardstyle",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hardstyle",
+      "sourcePresetId": "hardstyle-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Hardstyle Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "hardstyle-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Harmonica",
+      "engine": "FMSynth",
+      "generalMidiProgram": 21,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "harmonica-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Harp",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 46,
+      "isCanonicalForProgram": true,
+      "soundbankId": "orchestral-harp",
+      "sourcePresetId": "harp-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Sawtooth Harp",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 6,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sawtooth-harp",
+      "sourcePresetId": "harpsichord-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Harris Wobble",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "harris-wobble-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Hazy Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 94,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "hazy-pad-v4",
+      "subtitle": "Pads"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Heart Keys",
+      "engine": "VASynth",
+      "generalMidiProgram": 8,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "heart-keys-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Heavy 808 Kick",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "heavy-808-kick-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Heavy Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": true,
+      "soundbankId": "heavy-lead",
+      "sourcePresetId": "heavy-lead-v3-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Hip Hop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hip-hop",
+      "sourcePresetId": "hip-hop-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Honky Tonk Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 3,
+      "isCanonicalForProgram": true,
+      "soundbankId": "honky-tonk-piano",
+      "sourcePresetId": "honky-tonk-piano-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "HOT Pop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hot-pop",
+      "sourcePresetId": "hot-pop-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "House Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "house-bass",
+      "sourcePresetId": "house-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Chiptune Chords",
+      "engine": "VASynth",
+      "generalMidiProgram": 86,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "house-chords-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "House Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 20,
+      "isCanonicalForProgram": false,
+      "soundbankId": "house-organ",
+      "sourcePresetId": "house-organ-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Hyper FM",
+      "engine": "FMSynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "hyper-fm-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Hyper Pop Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hyper-pop-synth",
+      "sourcePresetId": "hyper-pop-synth-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Hyperbrite Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hyperbrite-piano",
+      "sourcePresetId": "hyperbrite-piano-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "IDM",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "idm",
+      "sourcePresetId": "idm-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Indie Rock",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "indie-rock",
+      "sourcePresetId": "indie-rock-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Industrial",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "industrial",
+      "sourcePresetId": "industrial-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "James Alister",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "james-alister",
+      "sourcePresetId": "james-alister-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Jazz Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "jazz-bass",
+      "sourcePresetId": "jazz-bass-v2-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Jazz Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 26,
+      "isCanonicalForProgram": true,
+      "soundbankId": "jazz-guitar",
+      "sourcePresetId": "jazz-guitar-v2-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Jazz",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "jazz",
+      "sourcePresetId": "jazz-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Jersey Club",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "jersey-club",
+      "sourcePresetId": "jersey-club-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Kalimba",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 108,
+      "isCanonicalForProgram": true,
+      "soundbankId": "kalimba",
+      "sourcePresetId": "kalimba-v3-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Kantele",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 107,
+      "isCanonicalForProgram": false,
+      "soundbankId": "kantele",
+      "sourcePresetId": "kantele-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Kaytran Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "kaytran-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Kick Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "kick-bass-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Kira Kira Synth",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "kira-kira-synth-v4",
+      "subtitle": "Synths"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Koto",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 107,
+      "isCanonicalForProgram": true,
+      "soundbankId": "koto",
+      "sourcePresetId": "koto-v3-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Laser Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "laser-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Lately Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lately-bass",
+      "sourcePresetId": "lately-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Latin",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "latin",
+      "sourcePresetId": "latin-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "LCD",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lcd",
+      "sourcePresetId": "lcd-kit-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Leadviathan",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "leadviathan-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Leadzilla",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "leadzilla-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Ukulele",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 24,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ukulele",
+      "sourcePresetId": "lil-ukelele-v3-v4",
+      "subtitle": "Acoustic Guitar"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Live",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "live",
+      "sourcePresetId": "live-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Lofi Hop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lofi-hop",
+      "sourcePresetId": "lo-fi-hop-kit-v2-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Psychedelic",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "psychedelic",
+      "sourcePresetId": "lo-fi-kit-v2-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Lofi Mallets",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "lofi-mallets-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Lofi Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 2,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lofi-piano",
+      "sourcePresetId": "lofi-piano-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Lofi Saw",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "lofi-saw-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Log Drum",
+      "engine": "FMSynth",
+      "generalMidiProgram": 114,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "log-drum-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Lush Vocals",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 91,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lush-vocals",
+      "sourcePresetId": "lush-vocals-v2-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Major Portamento",
+      "engine": "VASynth",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "major-portamento-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Male Ooh",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 53,
+      "isCanonicalForProgram": false,
+      "soundbankId": "male-ooh",
+      "sourcePresetId": "male-ooh-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Mandolin",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 24,
+      "isCanonicalForProgram": false,
+      "soundbankId": "mandolin",
+      "sourcePresetId": "mandolin-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Marimba",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 12,
+      "isCanonicalForProgram": true,
+      "soundbankId": "marimba",
+      "sourcePresetId": "marimba-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Matt",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "matt",
+      "sourcePresetId": "matt-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Melodica",
+      "engine": "FMSynth",
+      "generalMidiProgram": 20,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "melodica-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Metal Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "metal-guitar",
+      "sourcePresetId": "metal-guitar-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Mew Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "mew-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Minor Portamento",
+      "engine": "VASynth",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "minor-portamento-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Modern Hip Hop Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "modern-hip-hop-bass",
+      "sourcePresetId": "modern-hip-hop-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Modern Metal",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "modern-metal",
+      "sourcePresetId": "modern-metal-kit-v2-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Mook Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "mook-bass",
+      "sourcePresetId": "moog-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Motorcity",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "motorcity",
+      "sourcePresetId": "motorcity-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Movie Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "movie-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Nails",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nails",
+      "sourcePresetId": "nails-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Natty",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "natty",
+      "sourcePresetId": "natty-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Neo Soul",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "neo-soul",
+      "sourcePresetId": "neo-soul-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Neo Soul Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": "neo-soul-pad",
+      "sourcePresetId": "neo-soul-pad-v3-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Neptunian",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "neptunian",
+      "sourcePresetId": "neptunian-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "New Age Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": true,
+      "soundbankId": "new-age-synth",
+      "sourcePresetId": "new-age-synth-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "New Breed Clav",
+      "engine": "FMSynth",
+      "generalMidiProgram": 6,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "new-breed-clav-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "New Wave",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "new-wave",
+      "sourcePresetId": "new-wave-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Nifty",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nifty",
+      "sourcePresetId": "nifty-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Nocturne Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 94,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "nocturne-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Noir Chord",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "noir-chord-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Nu Disco Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 36,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nu-disco-bass",
+      "sourcePresetId": "nu-disco-bass-v3-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Nu House",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nu-house",
+      "sourcePresetId": "nu-house-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Nylon Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 24,
+      "isCanonicalForProgram": true,
+      "soundbankId": "nylon-guitar",
+      "sourcePresetId": "nylon-guitar-v2-v4",
+      "subtitle": "Acoustic Guitar"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Oboe",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 68,
+      "isCanonicalForProgram": true,
+      "soundbankId": "oboe",
+      "sourcePresetId": "oboe-v3-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Ocean Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "ocean-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Ol' Dusty",
+      "engine": "VASynth",
+      "generalMidiProgram": 92,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "ol-dusty-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "One Key Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "one-key-bass-v4",
+      "subtitle": "Synth Basses"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Otama",
+      "engine": "VASynth",
+      "generalMidiProgram": 54,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "otamatone-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Overdriven Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 29,
+      "isCanonicalForProgram": true,
+      "soundbankId": "overdriven-guitar",
+      "sourcePresetId": "overdriven-guitar-v2-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Overdriven Power Chord",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 29,
+      "isCanonicalForProgram": false,
+      "soundbankId": "overdriven-power-chord",
+      "sourcePresetId": "overdriven-power-chord-v2-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Pan Flute",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 75,
+      "isCanonicalForProgram": true,
+      "soundbankId": "pan-flute",
+      "sourcePresetId": "pan-flute-v4-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Pant Flapper",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "pant-flapper-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Paper",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "paper",
+      "sourcePresetId": "paper-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Party Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "party-bass",
+      "sourcePresetId": "party-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Percussion Plonk",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "percussion-plonk",
+      "sourcePresetId": "percussion-plonk-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Phonk Bell Dirty",
+      "engine": "VASynth",
+      "generalMidiProgram": 118,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "phonk-bell-dirty-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Phonk Bell Classic",
+      "engine": "VASynth",
+      "generalMidiProgram": 118,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "phonk-bell-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Pike",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "pike-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Pillow",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "pillow",
+      "sourcePresetId": "pillow-kit-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Nova Pluck",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nova-pluck",
+      "sourcePresetId": "plucked-lead-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Plucked Vaporbass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "plucked-vaporbass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Pop Rock",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "pop-rock",
+      "sourcePresetId": "pop-rock-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Porto Reese",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "porto-reese-bass-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Post Punk",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "post-punk",
+      "sourcePresetId": "post-punk-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Prince",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "prince",
+      "sourcePresetId": "prince-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Pumped Up Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "pumped-up-bass",
+      "sourcePresetId": "pumped-up-bass-v2-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Pumping Anthem",
+      "engine": "VASynth",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "pumping-anthem-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Punchy Jazz Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "punchy-jazz-bass",
+      "sourcePresetId": "punchy-jazz-bass-v3-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Punchy",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "punchy",
+      "sourcePresetId": "punchy-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Puppet",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "puppet",
+      "sourcePresetId": "puppet-pad-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Pure Saw",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "pure-saw-v4",
+      "subtitle": "Synths"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Pure Sine",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "pure-sine-v4",
+      "subtitle": "Synths"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Pure Square",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "pure-square-v4",
+      "subtitle": "Synths"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Pure Triangle",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "pure-triangle-v4",
+      "subtitle": "Synths"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "R-N1C3",
+      "engine": "VASynth",
+      "generalMidiProgram": 84,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "r-n1c3-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Raw",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "raw",
+      "sourcePresetId": "raw-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Reggae",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "reggae",
+      "sourcePresetId": "reggae-kit",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Retro Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "retro-bass-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Retro Juno Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "retro-juno-pad",
+      "sourcePresetId": "retro-juno-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Retro Pick Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "retro-pick-bass",
+      "sourcePresetId": "retro-pick-bass-v2-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Retro Synth Brass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 62,
+      "isCanonicalForProgram": false,
+      "soundbankId": "retro-synth-brass",
+      "sourcePresetId": "retro-synth-brass-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Mellow EP",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "mellow-ep",
+      "sourcePresetId": "rhodes-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Rhythm Partner",
+      "engine": "VASynth",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "rhythm-partner-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Ripped Cabinet",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "ripped-cabinet-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "R&B",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "r-b",
+      "sourcePresetId": "rnb-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Rock",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "rock",
+      "sourcePresetId": "rock-kit-v2-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Rock Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": true,
+      "soundbankId": "rock-organ",
+      "sourcePresetId": "rock-organ-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Rumble Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "rumble-bass",
+      "sourcePresetId": "rumble-bass-v4-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Sable Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sable-bass-v4",
+      "subtitle": "Synth Basses"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "SawSine",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sawsine-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Seamless Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "seamless-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "special-effects",
+      "displayName": "SFX",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sfx",
+      "sourcePresetId": "sfx-pad",
+      "subtitle": "Sound Effect"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Shadow Bells",
+      "engine": "VASynth",
+      "generalMidiProgram": 93,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "shadow-bells-v5-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Shadow Soft",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "shadow-soft-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Simple Organ",
+      "engine": "VASynth",
+      "generalMidiProgram": 20,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "simple-organ-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Sine Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sine-bass-v5-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Sinister Trap",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sinister-trap",
+      "sourcePresetId": "sinister-trap-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Siren Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "siren-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Sitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 104,
+      "isCanonicalForProgram": true,
+      "soundbankId": "sitar",
+      "sourcePresetId": "sitar-v3-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Skyline Keys",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "skyline-keys-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Slap Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 36,
+      "isCanonicalForProgram": true,
+      "soundbankId": "slap-bass",
+      "sourcePresetId": "slap-bass-v2-v4",
+      "subtitle": "Electric Bass"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Smooth Brass Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 62,
+      "isCanonicalForProgram": false,
+      "soundbankId": "smooth-brass-pad",
+      "sourcePresetId": "smooth-brass-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Smooth Fuzzy Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 91,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "smooth-fuzzy-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Smooth Reese",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "smooth-reese-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Soft Bells",
+      "engine": "VASynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "soft-bells-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Soft Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 94,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "soft-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Soft Sine Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "soft-sine-bass-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Solid Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 39,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "solid-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Solo Female Ahh",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 52,
+      "isCanonicalForProgram": false,
+      "soundbankId": "solo-female-ahh",
+      "sourcePresetId": "solo-female-ahh-v4-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Solo Violin",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 40,
+      "isCanonicalForProgram": true,
+      "soundbankId": "solo-violin",
+      "sourcePresetId": "solo-violin-v3-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Song of Strings",
+      "engine": "VASynth",
+      "generalMidiProgram": 93,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "song-of-strings-v4",
+      "subtitle": "Pads"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Sora Keys",
+      "engine": "VASynth",
+      "generalMidiProgram": 90,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sora-keys-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Soul",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "soul",
+      "sourcePresetId": "soul-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Space Bot",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 54,
+      "isCanonicalForProgram": false,
+      "soundbankId": "space-bot",
+      "sourcePresetId": "space-bot-v2-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Space Wobble",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "space-wobble-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Sparkle Keys",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sparkle-keys-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Acoustic Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 25,
+      "isCanonicalForProgram": true,
+      "soundbankId": "sparkling-acoustic",
+      "sourcePresetId": "sparkling-acoustic-v2-v4",
+      "subtitle": "Acoustic Guitar"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Square Sub Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "square-sub-bass",
+      "sourcePresetId": "square-sub-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Steel Drum",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 114,
+      "isCanonicalForProgram": true,
+      "soundbankId": "steel-drum",
+      "sourcePresetId": "steel-drum-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Steve Jackson",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "steve-jackson",
+      "sourcePresetId": "steve-jackson-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Stratosphere Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "stratosphere-pad-v3-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "String Orchestra Pizz",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "string-orchestra-pizz",
+      "sourcePresetId": "string-orchestra-pizz-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "String Orchestra Stacc",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 48,
+      "isCanonicalForProgram": false,
+      "soundbankId": "string-orchestra-stacc",
+      "sourcePresetId": "string-orchestra-stacc-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "String Orchestra",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 48,
+      "isCanonicalForProgram": true,
+      "soundbankId": "string-ensemble",
+      "sourcePresetId": "string-orchestra-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "String Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": false,
+      "soundbankId": "string-pad",
+      "sourcePresetId": "string-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Studio Grand",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": true,
+      "soundbankId": "studio-grand",
+      "sourcePresetId": "studio-grand-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Harpsichord",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 6,
+      "isCanonicalForProgram": true,
+      "soundbankId": "studio-harpsichord",
+      "sourcePresetId": "studio-harpsichord-v3-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Sub Rattle",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sub-rattle-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Sub Shaker",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sub-shaker-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Sub Texture",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sub-texture",
+      "sourcePresetId": "sub-texture-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Subtle Rattle",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "subtle-rattle",
+      "sourcePresetId": "subtle-rattle-v2-v4",
+      "subtitle": "808s"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Sun Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 90,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "sun-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Sunset Brass",
+      "engine": "VASynth",
+      "generalMidiProgram": 62,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "sunset-brass-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Super Saw",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": true,
+      "soundbankId": null,
+      "sourcePresetId": "super-saw-v3-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Swell Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": false,
+      "soundbankId": "swell-pad",
+      "sourcePresetId": "swell-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "synth",
+      "sourcePresetId": "synth-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Synth Organ",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 20,
+      "isCanonicalForProgram": false,
+      "soundbankId": "synth-organ",
+      "sourcePresetId": "synth-organ-v3-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Synth Strings",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": true,
+      "soundbankId": "synth-strings",
+      "sourcePresetId": "synth-strings-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Tabla",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 116,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tabla",
+      "sourcePresetId": "tabla-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Taiko",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 116,
+      "isCanonicalForProgram": true,
+      "soundbankId": "taiko",
+      "sourcePresetId": "taiko-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Tape Saw",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "tape-sawtooth-v2-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Techno Brute",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "techno-brute",
+      "sourcePresetId": "techno-brute-kit-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Techno Throwback",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "techno-throwback",
+      "sourcePresetId": "techno-throwback-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Tennis Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "tennis-bass-v4",
+      "subtitle": "Synth Basses"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Tenor Saxophone",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 66,
+      "isCanonicalForProgram": true,
+      "soundbankId": "tenor-saxophone",
+      "sourcePresetId": "tenor-saxophone-v3-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Textures",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "textures",
+      "sourcePresetId": "textures-kit-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "The Seventh",
+      "engine": "VASynth",
+      "generalMidiProgram": 90,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "the-seventh-v4",
+      "subtitle": "Pads"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Thick Air Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "thick-air-pad-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Thick Dust",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "thick-dust-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Thriller Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "thriller-bass",
+      "sourcePresetId": "thriller-bass-v4-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Thump",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "thump",
+      "sourcePresetId": "thump-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Timaeus Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "timaeus-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Timpani",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 47,
+      "isCanonicalForProgram": true,
+      "soundbankId": "timpani",
+      "sourcePresetId": "timpani-v3-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Tokyo Sunset",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "tokyo-sunset-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Trance Pluck",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "trance-pluck-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Trap",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trap",
+      "sourcePresetId": "trap-kit",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Trash",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trash",
+      "sourcePresetId": "trash-kit-v4",
+      "subtitle": "Drum Kit"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Hard",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": true,
+      "soundbankId": "trombone",
+      "sourcePresetId": "trombone-hard-v4-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Soft",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trombone-soft",
+      "sourcePresetId": "trombone-soft-v4-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Staccato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trombone-staccato",
+      "sourcePresetId": "trombone-staccato-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Concert Hall",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trombone-concert-hall",
+      "sourcePresetId": "trombone-v2-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Tropical House Bass",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tropical-house-bass",
+      "sourcePresetId": "tropical-house-bass-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": true,
+      "soundbankId": "trumpet",
+      "sourcePresetId": "trumpet-clean-v3-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Cup Mute",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-cup-mute",
+      "sourcePresetId": "trumpet-cup-mute-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Harmon Mute",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-harmon-mute",
+      "sourcePresetId": "trumpet-harmon-mute-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Staccato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-staccato",
+      "sourcePresetId": "trumpet-staccato-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Straight Mute",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "muted-trumpet",
+      "sourcePresetId": "trumpet-straight-mute-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Concert Hall",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-concert-hall",
+      "sourcePresetId": "trumpet-v2-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Tuba Legato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 58,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tuba-legato",
+      "sourcePresetId": "tuba-legato-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Tuba Staccato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 58,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tuba-staccato",
+      "sourcePresetId": "tuba-staccato-v2-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Tuba",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 58,
+      "isCanonicalForProgram": true,
+      "soundbankId": "tuba",
+      "sourcePresetId": "tuba-v3-v4",
+      "subtitle": "Brass Instrument"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Tubular Bells",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 14,
+      "isCanonicalForProgram": true,
+      "soundbankId": "tubular-bells",
+      "sourcePresetId": "tubular-bells-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Twang Guitar",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": false,
+      "soundbankId": "twang-guitar",
+      "sourcePresetId": "twang-guitar-v3-v4",
+      "subtitle": "Electric Guitar"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Two Saw Detune",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "two-saw-detune-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Uber Lead",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "uber-lead",
+      "sourcePresetId": "uber-lead-v3-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Ultraphat 808",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ultraphat-808",
+      "sourcePresetId": "ultra-808-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Upright Piano",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 1,
+      "isCanonicalForProgram": true,
+      "soundbankId": "upright-piano",
+      "sourcePresetId": "upright-piano-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Vapor Lead",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "vapor-lead-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Vibraphone",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 11,
+      "isCanonicalForProgram": true,
+      "soundbankId": "vibraphone",
+      "sourcePresetId": "vibraphone-v3-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Vintage Hip Hop",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "vintage-hip-hop",
+      "sourcePresetId": "vintage-hip-hop-kit-v2-v4",
+      "subtitle": "Drum Pads"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Vintage Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": false,
+      "soundbankId": "vintage-pad",
+      "sourcePresetId": "vintage-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Vintage Pop Stabs",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "vintage-pop-stabs",
+      "sourcePresetId": "vintage-pop-stabs-v3-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Vintage Swell Bass",
+      "engine": "VASynth",
+      "generalMidiProgram": 39,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "vintage-swell-bass-v2-v4",
+      "subtitle": "Synth Bass"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Vintage Four",
+      "engine": "VASynth",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "vintagefour-v3-v4",
+      "subtitle": "Synth Lead"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Viola Section",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 41,
+      "isCanonicalForProgram": true,
+      "soundbankId": "viola-section",
+      "sourcePresetId": "viola-section-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Viola Solo Pizzicato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "viola-solo-pizzicato",
+      "sourcePresetId": "viola-solo-pizzicato-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Viola Solo Tremolo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "viola-solo-tremolo",
+      "sourcePresetId": "viola-solo-tremolo-v2-v4",
+      "subtitle": "String instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violas Long Bows",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 41,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violas-long-bows",
+      "sourcePresetId": "violas-long-bows-v3-v4",
+      "subtitle": "String instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violas Short Bows",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 41,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violas-short-bows",
+      "sourcePresetId": "violas-short-bows-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violas Tremolo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violas-tremolo",
+      "sourcePresetId": "violas-tremolo-v2-v4",
+      "subtitle": "String instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violin Section",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 40,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violin-section",
+      "sourcePresetId": "violin-section-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violin Solo Pizzicato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violin-solo-pizzicato",
+      "sourcePresetId": "violin-solo-pizzicato-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violin Solo Tremolo",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violin-solo-tremolo",
+      "sourcePresetId": "violin-solo-tremolo-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violins Pizzicato",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violins-pizzicato",
+      "sourcePresetId": "violins-pizzicato-v2-v4",
+      "subtitle": "String Instrument"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Virtual Vox",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 54,
+      "isCanonicalForProgram": false,
+      "soundbankId": "virtual-vox",
+      "sourcePresetId": "virtual-vox-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Vision Synth",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "vision-synth-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Vista Synth",
+      "engine": "VASynth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "vista-synth-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Wah RnB",
+      "engine": "VASynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "wah-rnb-pad-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Wailer Synth",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "wailer-synth",
+      "sourcePresetId": "wailer-synth-v2-v4",
+      "subtitle": "Voice"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Warm Pad",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": true,
+      "soundbankId": "warm-pad",
+      "sourcePresetId": "warm-pad-v2-v4",
+      "subtitle": "Synth Pad"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Welcome Pad",
+      "engine": "VASynth",
+      "generalMidiProgram": 93,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "welcome-pad-v2-v4",
+      "subtitle": "Synth Keyboard"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Whistle",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 78,
+      "isCanonicalForProgram": true,
+      "soundbankId": "whistle",
+      "sourcePresetId": "whistle-v3-v4",
+      "subtitle": "Wind Instrument"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Whirly",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "whirly",
+      "sourcePresetId": "wurlitzer-v2-v4",
+      "subtitle": "Piano"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Xylophone",
+      "engine": "MIDISampleSynth",
+      "generalMidiProgram": 13,
+      "isCanonicalForProgram": true,
+      "soundbankId": "xylophone",
+      "sourcePresetId": "xylophone-v2-v4",
+      "subtitle": "Percussion"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Zoom R2D2",
+      "engine": "VASynth",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": null,
+      "sourcePresetId": "zoom-r2d2-v4",
+      "subtitle": "Synth Lead"
+    }
+  ]
+}

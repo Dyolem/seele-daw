@@ -38,11 +38,14 @@
 | 采样乐器设备 | Sample Instrument Device        | `seele.sample-instrument` V1 Descriptor。它的 opaque state 只保存 `soundbankId`，不保存完整 Manifest、WAV 或浏览器对象。            |
 | 音源身份     | Soundbank ID                    | Seele 保存并路由音源的稳定产品 ID，例如既有 `studio-grand`。它不是来源下载 slug、文件夹路径或 GM Program。                          |
 | 音源         | Soundbank                       | 一套乐器控制定义及其采样素材。例如 Violin 与 Cello 是不同 Soundbank；一个 Soundbank 可用多枚 WAV 覆盖不同 Pitch。                   |
-| 内置音源目录 | Built-in Instrument Catalogue   | Studio 拥有的冻结配置，记录可选 Soundbank、显示名、乐器族、GM 映射和本地 asset base。它不进入 Project Core 或 Pinia。               |
-| 乐器族       | Instrument Family               | Piano、Strings、Brass、Woodwind、Bass、Percussion 等 UI 分组。它帮助浏览，不改变 Playback 语义。                                    |
+| 来源 Preset  | Source Preset                   | 来源音色库中的一个具体声音配置。完整目录有 439 项；它不等同于 GM Program，也不保证 Seele 已实现其 Engine。                          |
+| 内置音源目录 | Built-in Instrument Catalogue   | Studio 从完整 Preset Snapshot 派生的 289 项可播放 Soundbank、显示名和本地 asset base。它不进入 Project Core 或 Pinia。              |
+| 乐器类别     | Instrument Category             | 来源目录的 Piano、Strings、Synth Leads、Drum Kit 等 15 个 UI 分组。它帮助浏览，不改变 Playback 语义。                               |
+| 发声引擎     | Sound Engine / Runtime          | 执行某类音色控制数据的代码。现有 Sample Voice Runtime 执行 MIDISampleSynth；VASynth 与 FMSynth 需要不同的合成算法，当前尚未实现。   |
 | 精确映射     | Exact Program Mapping           | 来源 Program 与已审核 Soundbank 的乐器语义直接对应。它不表示采样品质或演奏法与来源设备完全相同。                                    |
 | 近似映射     | Approximate Program Mapping     | V1 没有精确音源，但明确审核某个相近音色作为替代。导入必须告诉用户来源 Program 与实际选择，不能静默伪装。                            |
 | 不可用占位   | Unavailable Program Placeholder | Project 保存来源 Program，但 Track 无声并显示可修复状态。它不是损坏资产，也不是隐藏的 Studio Grand fallback。                       |
+| 运行时暂缺   | Runtime unavailable             | 已有候选 Preset，但其 VASynth / FMSynth 执行器尚未实现。手动点击只提示且不改 Track；MIDI 导入保存不可用占位。                       |
 | 缺失乐器     | Missing Instrument              | Project Descriptor 未知、不兼容，或已声明资源实际缺失。它与“产品明确不支持这个 Program”的占位原因不同。                             |
 | 静默回退     | Silent Fallback                 | 系统不提示就换成另一个音色，例如把所有未知 Program 播成钢琴。这里的“silent”指没有告知，不是无声；V1 明确禁止这种行为。              |
 | 音色替换     | Instrument Replace              | 用既有 Project Command 改变 Track 的 Instrument Device，同时保持 Device ID 和 Track topology。一次用户选择只形成一个 History 步骤。 |
@@ -53,7 +56,7 @@
 | ------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | 控制文件     | Mapping / Instrument Definition | 描述 Pitch 范围、根音高、Loop、Envelope、One-shot、Choke 等规则的数据。MIDI 文件不包含这些采样播放规则。                              |
 | 兼容适配器   | Compatibility Adapter           | 把某一种已审计来源控制数据转换成 Seele Manifest。来源特有推断必须留在这里，不能污染 Project 或通用 Runtime。                          |
-| 控制保留政策 | Preserve-source Controls Policy | 不修改 Adapter 已从来源控制文件得到的 Loop、Envelope、Trigger 或 Mutex。除 GM Percussion 外，本阶段的 Score Core 音源都走这一路径。   |
+| 控制保留政策 | Preserve-source Controls Policy | 不修改 Adapter 已从来源控制文件得到的 Loop、Envelope、Trigger 或 Mutex。除专用 GM Percussion 外，当前接入的采样音源都走这一路径。     |
 | 专用兼容政策 | Reviewed Compatibility Policy   | 只对固定来源身份和精确前置条件应用的显式 Manifest 修正。条件漂移时失败，不凭乐器名称或文件夹进行通用猜测。                            |
 | 清单         | Sample Instrument Manifest      | Audio Web 接受的严格 Seele V1 运行时契约。它只保留经过支持和验证的 Zone / Resource 语义，不保留远程 URL。                             |
 | 区域         | Zone                            | 一条“哪些 Pitch 选哪枚 Sample，并如何播放”的规则。一个 Soundbank 通常包含多个 Zone。                                                  |

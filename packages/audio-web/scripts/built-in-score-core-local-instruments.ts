@@ -26,16 +26,23 @@ const COMMON_INPUT_FINGERPRINTS = Object.freeze([
   }),
 ] satisfies readonly BuiltInLocalSampleInstrumentInputFingerprint[])
 
-export type BuiltInScoreCoreInstrumentFamily =
+export type BuiltInLocalInstrumentFamily =
   | 'bass'
   | 'brass'
   | 'drum-kit'
+  | 'effects'
+  | 'ethnic'
+  | 'guitar'
   | 'keyboard'
   | 'percussion'
   | 'strings'
+  | 'synth'
+  | 'voices'
   | 'woodwind'
 
-export type BuiltInScoreCorePlannedRoute =
+export type BuiltInScoreCoreInstrumentFamily = BuiltInLocalInstrumentFamily
+
+export type BuiltInLocalInstrumentPlannedRoute =
   | {
       readonly kind: 'general-midi-program'
       readonly programNumber: number
@@ -44,13 +51,20 @@ export type BuiltInScoreCorePlannedRoute =
       readonly channel: 9
       readonly kind: 'percussion-channel'
     }
+  | {
+      readonly kind: 'manual-preset'
+      readonly sourceCategoryId: string
+    }
 
-export interface BuiltInScoreCoreLocalInstrument {
-  readonly family: BuiltInScoreCoreInstrumentFamily
-  readonly plannedRoute: BuiltInScoreCorePlannedRoute
+export interface BuiltInLocalSampleInstrument {
+  readonly family: BuiltInLocalInstrumentFamily
+  readonly plannedRoute: BuiltInLocalInstrumentPlannedRoute
   readonly preparation: BuiltInLocalSampleInstrumentDefinition
   readonly productDisplayName: string
 }
+
+export type BuiltInScoreCorePlannedRoute = BuiltInLocalInstrumentPlannedRoute
+export type BuiltInScoreCoreLocalInstrument = BuiltInLocalSampleInstrument
 
 interface SourceHashes {
   readonly archive: string
@@ -58,7 +72,7 @@ interface SourceHashes {
   readonly mapping: string
 }
 
-interface InstrumentInput {
+export interface BuiltInLocalInstrumentInput {
   readonly archiveBudget: {
     readonly maximumArchiveMebibyte: number
     readonly maximumEntryCount: number
@@ -68,14 +82,14 @@ interface InstrumentInput {
   readonly expectedCanonicalForProgram: boolean
   readonly expectedSourceDisplayName: string
   readonly expectedSourceGeneralMidiProgram: number
-  readonly family: BuiltInScoreCoreInstrumentFamily
+  readonly family: BuiltInLocalInstrumentFamily
   readonly manifestPolicy?: BuiltInLocalManifestPolicy
-  readonly plannedRoute: BuiltInScoreCorePlannedRoute
+  readonly plannedRoute: BuiltInLocalInstrumentPlannedRoute
   readonly productDisplayName: string
   readonly productPitchRange: {
     readonly maximumPitch: number
     readonly minimumPitch: number
-  }
+  } | null
   readonly soundbankId: string
   readonly sourceHashes: SourceHashes
   readonly sourceSlug: string
@@ -106,7 +120,9 @@ function createInputFingerprints(
   ])
 }
 
-function createInstrument(input: InstrumentInput): BuiltInScoreCoreLocalInstrument {
+export function createBuiltInLocalInstrument(
+  input: BuiltInLocalInstrumentInput,
+): BuiltInLocalSampleInstrument {
   const soundbankId = parseSoundbankId(input.soundbankId)
   const preparation = Object.freeze({
     archiveLimits: Object.freeze({
@@ -123,7 +139,8 @@ function createInstrument(input: InstrumentInput): BuiltInScoreCoreLocalInstrume
     expectedSourceDisplayName: input.expectedSourceDisplayName,
     generatedDirectoryName: input.soundbankId,
     manifestPolicy: input.manifestPolicy ?? BUILT_IN_LOCAL_MANIFEST_POLICY.preserveSourceControlsV1,
-    productPitchRange: Object.freeze({ ...input.productPitchRange }),
+    productPitchRange:
+      input.productPitchRange === null ? null : Object.freeze({ ...input.productPitchRange }),
     soundbankId,
     sourceSlug: input.sourceSlug,
   } satisfies BuiltInLocalSampleInstrumentDefinition)
@@ -134,6 +151,8 @@ function createInstrument(input: InstrumentInput): BuiltInScoreCoreLocalInstrume
     productDisplayName: input.productDisplayName,
   })
 }
+
+const createInstrument = createBuiltInLocalInstrument
 
 export const BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS = Object.freeze([
   createInstrument({

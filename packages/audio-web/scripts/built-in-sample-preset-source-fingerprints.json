@@ -1,0 +1,3770 @@
+{
+  "schema": "seele.built-in-sample-preset-source-fingerprints",
+  "schemaVersion": 1,
+  "commonSourceSha256": {
+    "catalogue": "a1925bfec6e389fd37a901e21d571bdfd0ccfec162f3809c8fae95eaf268a924",
+    "generalMidiIndex": "12e42ec8d9131973317ae805c5d120426b95ec8abdda87f596e355dd39a0df66",
+    "soundbankMap": "58e800e66415f24665926a945f732f93ac4abb99923d0d078f96e94aa140138d"
+  },
+  "inputFileCount": 870,
+  "inputSetSha256": "179c26c7e23a0f9b6ebed3d802f2179cc681f9d8f617032788b837bc5b523555",
+  "sources": [
+    {
+      "categoryId": "guitars",
+      "displayName": "12 String Guitar",
+      "generalMidiProgram": 25,
+      "isCanonicalForProgram": false,
+      "soundbankId": "12-string-guitar",
+      "sourceHashes": {
+        "archive": "e4232012fdec1dc53277aeb52e2c587f88f5b62246aec5141fd3f61a332e3b97",
+        "catalog": "edad031dce1b698882c2d11dc37d4c49a78cf42d824fafd00ec36ff2d5f4d038",
+        "mapping": "f035ba5ea97227e0e7f10084446c47e079ae50762caac5e13e5e9e04ebbd8fe0"
+      },
+      "sourcePresetId": "12-string-guitar-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "606",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "606",
+      "sourceHashes": {
+        "archive": "2659e83a813a465be271f945eb4eede1d2e2298e27ee62c17edab4a710b446f0",
+        "catalog": "a8dc87057c40ac4635364e4eef7114342c7ff2859304484299c87b1f094346b1",
+        "mapping": "26069f99715d6706e054bf285793b0008cb576633b69dc4721013c94f38bbd7d"
+      },
+      "sourcePresetId": "606-kit-v3-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "'62 P-Bass",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": true,
+      "soundbankId": "62-p-bass",
+      "sourceHashes": {
+        "archive": "a39f5b96c2d4b487897e0d5513c83e1c65f56835225610d75186132abaebd81a",
+        "catalog": "ee5746ce6f9982ce46baebd3bba3f60254651d96f7642e812b3c19b26dc5bb08",
+        "mapping": "8def56faaf99fd6ac8c54064fe899fffa906c65836acf6568dc1b4d5753b29f4"
+      },
+      "sourcePresetId": "62-p-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "8 Bit Chiptune",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "8-bit-chiptune",
+      "sourceHashes": {
+        "archive": "f30c3bba90d7a7e28d108a018e7e60bbb6222227133643874859f76ef4d71c94",
+        "catalog": "ea7dff74c4e224a6a3aa3d3ed8512668200ddc2c67bbcefb7cbd6384e7a7e2ab",
+        "mapping": "9a20a8cc1a304f10d57d08b12d01d28e69c3cc3bc08ca5a0a88b1ec1ddd797fb"
+      },
+      "sourcePresetId": "8-bit-chiptune-kit-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "808",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "808",
+      "sourceHashes": {
+        "archive": "77f59ea169d63138a31aee336150830658ecf05c9b849369f95c81b3b8f04b19",
+        "catalog": "10c01b4bd588eb44829a0e724d0a5cfb92a905b03cbb10100a07efbbb77b0146",
+        "mapping": "35bc0b38beaf2bb62df6c6d093c82476bd4f7463d06277627ee4bef7ec5c84ae"
+      },
+      "sourcePresetId": "808-kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "808 Saturated Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "808-saturated-bass",
+      "sourceHashes": {
+        "archive": "c6b24b2a6b14a2a644fdcfff85155969bec59573e778f2b921a6f232abb777a6",
+        "catalog": "93909438619d011a5f7775a37472a792e13cb9ee0b9154764e725f52e41706f6",
+        "mapping": "42a3d99abb1ae750660e820a6900f4833db94be49bc2a24af79af3729a3e55d4"
+      },
+      "sourcePresetId": "808-saturated-bass-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "909",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "909",
+      "sourceHashes": {
+        "archive": "c6b31be33258d0b352e088ddcdfd3396d74bcb4ee76ed7fad92d6326ad24506a",
+        "catalog": "d32934704b2e7074b83e59511867bc0bad7483083840791ed0625a54f2530467",
+        "mapping": "b0a4451a02255d6a5652907805a68aa03a9c311fd9e279cae5ce1fd3435b1fb8"
+      },
+      "sourcePresetId": "909-kit-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Abstract Hip Hop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "abstract-hip-hop",
+      "sourceHashes": {
+        "archive": "d36a53b0b35d7f2338da22dbe04d204b82cb56d548dbda6550681b3da9461b8f",
+        "catalog": "5965bc357b84e93d9b95e734e2ea392a809de4958c1be6302534f6b550c184dc",
+        "mapping": "92de6bc5a73b8448cedbc80e0a50af0c68d47fa63f54df63b884910f7960451d"
+      },
+      "sourcePresetId": "abstract-hip-hop-kit-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Accordion",
+      "generalMidiProgram": 21,
+      "isCanonicalForProgram": true,
+      "soundbankId": "accordion",
+      "sourceHashes": {
+        "archive": "93309a1bfd11805bd8401343fb394d5168540c0b4daa52181e35f64990386c15",
+        "catalog": "0c289970109b1233e2431b0ac690f429b18023a3bae516c957afeea91c350cab",
+        "mapping": "8bc91571d826736e6299cce3d43ccb2869225c8806810fa9e82dd362ba60a9f4"
+      },
+      "sourcePresetId": "accordion-v3-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Acid Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "acid-bass",
+      "sourceHashes": {
+        "archive": "e1711cc8a576a1b672cbb50b05ebff8936abda1311fd0442d6e85f9d2b320639",
+        "catalog": "dafb33cb9cfe72c9907f331b8014f608e1ac7c0d284f54c7d5853840d69d017f",
+        "mapping": "3d14af830a821b722241e6f0e215a393724a6d5b45304af78b8a68b8d3012630"
+      },
+      "sourcePresetId": "acid-bass-v2-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Acoustic Bass Legato",
+      "generalMidiProgram": 32,
+      "isCanonicalForProgram": true,
+      "soundbankId": "acoustic-bass",
+      "sourceHashes": {
+        "archive": "e0b3e869601ec1cc666fed401c1ec74ecfea9a3730899b70eee3361282f85e31",
+        "catalog": "a5345be4d35973288c6b0eaac6c0efe5684f2dd74713b68c62cf3b8dffd2837c",
+        "mapping": "a8014cbf963cdc9dc92f31326784f75bc630be6d0e5e5eb9aeefabb271e899cf"
+      },
+      "sourcePresetId": "acoustic-bass-legato-v2-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Acoustic Bass Staccato",
+      "generalMidiProgram": 32,
+      "isCanonicalForProgram": false,
+      "soundbankId": "acoustic-bass-staccato",
+      "sourceHashes": {
+        "archive": "36282546d4fea0a5389755f56cbeef4e69982ae48476bac3c11ec4115b499ca4",
+        "catalog": "64a9af7a46d14bf20a6898b5769caf6ca8d46eede47ce32d39cd5046ce9caf17",
+        "mapping": "25613aa50c110ef765f9c89fdb9c7d7391e5f0c0c743ba5df745e66bff391eae"
+      },
+      "sourcePresetId": "acoustic-bass-staccato-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Afro Cuban Percussion",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "afro-cuban-percussion",
+      "sourceHashes": {
+        "archive": "6f2f4f5cf5de0f31b053394bc330dc3e78762355b507e874efebe0214b74024b",
+        "catalog": "02c690c7a9cfe673d285a411985aa937ecebf3370462175624392ff76a779d60",
+        "mapping": "d8e790565e679e04a3d8e4de8bc27ec66c27fe0979e816dde71792886cb21966"
+      },
+      "sourcePresetId": "afro-cuban-percussion"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Ahh Synth",
+      "generalMidiProgram": 52,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ahh-synth",
+      "sourceHashes": {
+        "archive": "06f4271a7798467ad0244da2db594ec2e8ff61e54ef6b9f022934ac2bff71314",
+        "catalog": "7e79fc14d85445caef5c91ed2412aa1861ef2a186d0ae3b9949ad3cc7fea9cce",
+        "mapping": "8fa650a04a7f166ddede0861dddaaf2f83e578a0afff5b1681a123f2e951592e"
+      },
+      "sourcePresetId": "ahh-synth-v3-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Alto Saxophone",
+      "generalMidiProgram": 65,
+      "isCanonicalForProgram": true,
+      "soundbankId": "alto-saxophone",
+      "sourceHashes": {
+        "archive": "9f7afd0806cb36eff2fef4cbf303ffb0ec94723adf2f94f4682d49c53cb44f88",
+        "catalog": "5fe37d7098308f01a5f64150aaa0536e1626536b3ece66eb0c08312c13fb0f1c",
+        "mapping": "57f5b43dbb3799e32932b0da3899feed35736f982da481ecf77dd6cf447f4bd3"
+      },
+      "sourcePresetId": "alto-saxophone-v2-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Ambient Lead",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ambient-lead",
+      "sourceHashes": {
+        "archive": "85cc01ec7244353be142b6b7196a9c5c5de76d50ba6a0f56ce43a26402e94a48",
+        "catalog": "c85173d0b7551ac81e98ca7c76b10afea1b62b83628161b37e5796e009b8170b",
+        "mapping": "48e204d80ccfd33fea455e4f77faaa6cf0ca6f90d39dbdfcf36f89c028365942"
+      },
+      "sourcePresetId": "ambient-lead-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Analog Desk",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "analog-desk",
+      "sourceHashes": {
+        "archive": "14832fa70f9fd46832019f259117b11ec235859bb28a9cffaf900aa5c2627b31",
+        "catalog": "38e839572da37e4b99aa9259cd0778db3dff6b9b69ef1270071357d35643a534",
+        "mapping": "0826e291b3e7a8a1915050e18c2911108c500e162f686f09ff23462846250200"
+      },
+      "sourcePresetId": "analog-desk-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Atlanta Hip Hop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "atlanta-hip-hop",
+      "sourceHashes": {
+        "archive": "84ca969d3ec4cd7e82f95729fcc4add1ab1e6eefb44443ee8640729e2815731f",
+        "catalog": "71380efcdacf65ced8477013de36e9e1bcd199b7e01b20091572960eb092cc84",
+        "mapping": "0ee6a740536ffe7c325b669e80ab68f5b182ac5223674370fc25f2e458543bd3"
+      },
+      "sourcePresetId": "atlanta-hip-hop-kit-v3-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Atmosphere Pad",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": "atmosphere-pad",
+      "sourceHashes": {
+        "archive": "b529e1e2ea40901bf69334910f33f04bc671ccf32e8c8d27e640c333b681d500",
+        "catalog": "26581704ae99293526b71f6387e78e91cee5742c9d859f12d56dfeb3887cbcd5",
+        "mapping": "63eef0841bb92e241c048b296993f418db2308a42b02e65c69e1f56d3baa3506"
+      },
+      "sourcePresetId": "atmosphere-pad-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Attack Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "attack-bass",
+      "sourceHashes": {
+        "archive": "e698cf3b92a7211e011651a993b58eb4df63a4761fc9e2a9494792fe4fffc1c2",
+        "catalog": "d9d40e98ff9b472e629da40e2cde5d798e29c27748b1ebcc3b80220c0c91b46a",
+        "mapping": "25f1833ecb5f262aa2037d0233ffc31106a3b9d9454510d7416134d5a566699b"
+      },
+      "sourcePresetId": "attack-bass-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Axe Lead Guitar",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "axe-lead-guitar",
+      "sourceHashes": {
+        "archive": "05a4be4ce3ce7ecfe363127460b1eda5a7d8e7559d13ea4e079adc1e25fb99a2",
+        "catalog": "a14162932f830b58479ac055ced6c8593b5654b438412a3c718dff5fecfd127e",
+        "mapping": "1ef4edbb3ca9cc2c90b92269f09f89bd7e9493a9b2dc2ef61c70bc97c7e6ef3c"
+      },
+      "sourcePresetId": "axe-lead-guitar-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "B3 Hamm",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": false,
+      "soundbankId": "b3-hamm",
+      "sourceHashes": {
+        "archive": "6f86a5bdeac078d44f2e1a7558f9343a25183791f31cd4a73a24bf4ae893d92b",
+        "catalog": "d5de71fedec09f0ec0dc1647d207d3f106039bd19af4d898c1bef6560c8f7269",
+        "mapping": "a0f5ec2f92f731a8b2c8962b1c749b05472d5ac9b4ce43d26a8e97f77d3fad51"
+      },
+      "sourcePresetId": "b3-hammond-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Ballad",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ballad",
+      "sourceHashes": {
+        "archive": "2989e053ad634724a97690cc922f167e54ef770905ab7b2fc029d19697f99a4d",
+        "catalog": "87cffb904aa28d00f814f0405fabbbdfe5f54e4bcf5381cd97f46956ba16fc0d",
+        "mapping": "158e92d1f6437efc0d2e3f0c2a8f9bfd8d272b28f31e2e15ad280e97b0b85e1c"
+      },
+      "sourcePresetId": "ballad-kit-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Banjo",
+      "generalMidiProgram": 105,
+      "isCanonicalForProgram": true,
+      "soundbankId": "banjo",
+      "sourceHashes": {
+        "archive": "f79de008d873dddaba7997a4b198c33ed7a0d2540c34ed418b30e8186ebdb92b",
+        "catalog": "3a88f7a11649725082027967b92ae55830e34681bdb05f71d910afbb1e6d43c6",
+        "mapping": "aa0160c3c3922fb6d4bb55d89e4add6c1229ce8aa92f4c36076ed65bb0df8894"
+      },
+      "sourcePresetId": "banjo-v3-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Long Bows",
+      "generalMidiProgram": 43,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-long-bows",
+      "sourceHashes": {
+        "archive": "f718991aca6c433fdcc914dd3a3672353826b628f9865fce66be6b54a2329a59",
+        "catalog": "2d2f247fdbbed7d724bab514ae31368baaba678a7c8d4c1d49c0cff74556e93d",
+        "mapping": "2c66de0d30e0f47938182dba3c0cea80796395c5d2efacba3030a59b6cab7880"
+      },
+      "sourcePresetId": "basses-long-bows-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Pizzicato",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-pizzicato",
+      "sourceHashes": {
+        "archive": "f8776ff911eea9036132bb0b43dd7f991e807e01e6c1fb6f0643bba89cbb5498",
+        "catalog": "1089ffc61fbd0bcc921a953bf979d43f962b2deca1eefcb86499ad08261a0a5e",
+        "mapping": "9233dd713941ae2a17b18671d05410312d9a98f6885101de2fc7c355b304b3c4"
+      },
+      "sourcePresetId": "basses-pizzicato-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Short Bows",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-short-bows",
+      "sourceHashes": {
+        "archive": "eafc64f02fce49d3cc4b503602c52b8d41218f270c1624341ff67d1578c520ae",
+        "catalog": "f428edd0838363857650645027f075139a375d77d2d56494f96e315560574c50",
+        "mapping": "240fe83af67cf919b98feaf28217e2664e7602c3a220aba46313de610b8a2da0"
+      },
+      "sourcePresetId": "basses-short-bows-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Basses Tremolo",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "basses-tremolo",
+      "sourceHashes": {
+        "archive": "0cf4aa954f78e04e64d199ab12b960ec65c8498a081dfdc1b7dba8fea77a415e",
+        "catalog": "94a5e0093e94a0a6afe844f98e3ef4ca5eae2d0746d924a5b164c70e326c204a",
+        "mapping": "ddbcaf1e935cd440aec196559a0edcc4250480b660ac933768dbeccbc3f96c23"
+      },
+      "sourcePresetId": "basses-tremolo-v2-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Bassoon",
+      "generalMidiProgram": 70,
+      "isCanonicalForProgram": true,
+      "soundbankId": "bassoon",
+      "sourceHashes": {
+        "archive": "d9b75e77e5bf7a8b2ccd08f40021aa1fb980ea77a7e3b1cff1289903e9d3143e",
+        "catalog": "a6a654539397726092fe720a33326473d0a53012ee0b045cc09ad5317393bf83",
+        "mapping": "09e6f4f0acd10999d2d8b8757013ca0bd222c7f7b69373c272f994ef2ec4d63f"
+      },
+      "sourcePresetId": "bassoon-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Bedroom",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bedroom",
+      "sourceHashes": {
+        "archive": "7b53064278c399cb4ce7a58fd054734744067a3330bb94e50e94f4caf9faf446",
+        "catalog": "b37bf1f8373cf64e635146918593801606939277e329ba6b52a7a3e3c4ee7823",
+        "mapping": "3a1cd97ffcec57f38904bb6899a1dfd9c8b9a48c231e14523db343d702f6dd17"
+      },
+      "sourcePresetId": "bedroom-kit-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Beginning Lead",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "beginning-lead",
+      "sourceHashes": {
+        "archive": "4bf0d988a08f4162fe53c4018b6ccacbbd0e753ce4ba3984b209fc976292f508",
+        "catalog": "1bdc443c5bece4db23b66945a462a57b24d58c24e3be52fc42b240a746810f2a",
+        "mapping": "b6847c10743e0c8e7606c4f4962da5adea852979435806e039e630d15b9928da"
+      },
+      "sourcePresetId": "beginning-lead-v2-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Bells",
+      "generalMidiProgram": 112,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bells",
+      "sourceHashes": {
+        "archive": "2285e3e468f3f85780fc866c5badad78f5c9d469514e0a0fe76ffe447ce65546",
+        "catalog": "5e5c39e6898ab9884d8e31d6070bb0237b8c1e4e41ca2962b235b3e9424e59e5",
+        "mapping": "2e276df98bf64cacecbaeb4ba01594e67320461f07428e62eef2fbfda73ed5e4"
+      },
+      "sourcePresetId": "bells-v2-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Berlin Lead",
+      "generalMidiProgram": 93,
+      "isCanonicalForProgram": false,
+      "soundbankId": "berlin-lead",
+      "sourceHashes": {
+        "archive": "fab11ce46ee67bf7314e68cef4885dff99fe46d6b2d1c45ddc4ab27499bb154b",
+        "catalog": "7aebc21fcd03d06e3ee78ca7ecb79c6a3f8ba523e60b810fdad3c51642386c56",
+        "mapping": "a32689443a35b87c1170abdfd85c8ead3b19586c2c24486885673617366ee5ff"
+      },
+      "sourcePresetId": "berlin-lead-v2-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Blown Bottle",
+      "generalMidiProgram": 76,
+      "isCanonicalForProgram": true,
+      "soundbankId": "blown-bottle",
+      "sourceHashes": {
+        "archive": "34614d3e44392e85739a52ca71db2e2976a3da34fe0ed6fe074915f0dca888c3",
+        "catalog": "038cf4421eaa4dec7e5361adb53f8769fa6c9211002e0e9c6b6f149525c7a802",
+        "mapping": "ad2dacb5bc74d1347f7cb2b93b726ed9a0ad9f7cccbabb084cbbe68d1b0f3fde"
+      },
+      "sourcePresetId": "blown-bottle-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Blues",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "blues",
+      "sourceHashes": {
+        "archive": "0e448de49e30f83f3ae0e9da83433c37006c4b9edbfa87672c802a933312de8c",
+        "catalog": "1c7cf184238c53a1dff0eb735a1ff2535123e9756ec3b196e6d529e7d2c5b2e6",
+        "mapping": "a6927b8957a85ec654743fc5cf1a716cf8aa7aa6e344daa4dcdae18084c05b56"
+      },
+      "sourcePresetId": "blues-kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Boom Bap Classic",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "boom-bap-classic",
+      "sourceHashes": {
+        "archive": "01e677391997785d3794fab45c378ce83b65a63564523ac927cf7cb902aaa93a",
+        "catalog": "8c4bbe186d1cd87802cf1c2699d619bd99f44322d2c0f875245ce9d83a134fc8",
+        "mapping": "e4e560f09a7fdd1f21754988477825197b9fc451bc71f0dfc2c0f7bdfde2d41e"
+      },
+      "sourcePresetId": "boom-bap-kit-2-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Boom Bap",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "boom-bap",
+      "sourceHashes": {
+        "archive": "e0215d37f2ac2cfd0ec629085f182ab92f5a43a3af4a459ce31bc29ed946f375",
+        "catalog": "c4bc557f92fb0db944a1a133dcf69400df0ac8a6e99fa3447b5f8ba16397d983",
+        "mapping": "2811bb9c921fd11d698a41986b576b40b4556a4846ae72166dd32893d3e80f09"
+      },
+      "sourcePresetId": "boom-bap-kit-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Boom Bap Urban",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "boom-bap-urban",
+      "sourceHashes": {
+        "archive": "02957daca0c9a8f0a29f4a44ee0b7414d3000c12381f99233cd26df86a867ecb",
+        "catalog": "1de6693cf5dfea3d5515fce7af0920fc8366118ac3c2eb471f0d349ef0b86ed9",
+        "mapping": "fa1584fae942355c1b259cc1e6279404e6b8a56eb3eb5b14969c28067ffc4253"
+      },
+      "sourcePresetId": "boom-bap-urban-kit-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Borealis Pad",
+      "generalMidiProgram": 90,
+      "isCanonicalForProgram": false,
+      "soundbankId": "borealis-pad",
+      "sourceHashes": {
+        "archive": "071c21cd3fa23df20a57a587907142642492ad0b488300f8197ed4feeeb0392a",
+        "catalog": "9b8f239857032d980a11d8d43724af87d4a6c9d9a560b18328254b874195f675",
+        "mapping": "165d64c61a6441bb6fc2b89ece2953e3eadc4ae89461a422df6ccb89ff4a560d"
+      },
+      "sourcePresetId": "borealis-pad-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Bouzouki Hard",
+      "generalMidiProgram": 105,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bouzouki-hard",
+      "sourceHashes": {
+        "archive": "3c4fe02baa770661a972e1b967874276d76fbce4fe0d54aa2620911c46d0d962",
+        "catalog": "7c449e2d7f2df872cd9246133b9f82e5f6599daae79db359b4da44ed527e1d0a",
+        "mapping": "5fe09f9e9844495245a2a6977e3b4fd6713e18ad1b7297fbfbf459014e548160"
+      },
+      "sourcePresetId": "bouzouki-hard-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Bouzouki Soft",
+      "generalMidiProgram": 105,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bouzouki-soft",
+      "sourceHashes": {
+        "archive": "7f4f1a44f1d7bbc09dcb9cd00118dc8fc0b8b21b3f8f556b7b7195ad3fc684e1",
+        "catalog": "b21eef4c6e4d02e6f3c44c5fa7f08aec5f0036ea624055aa993e883f6b32f050",
+        "mapping": "4f151c45cade420e41e2ecff19947d3f2b0e1ce63641a94b0cc084673add2df1"
+      },
+      "sourcePresetId": "bouzouki-soft-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Breakcore",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "breakcore",
+      "sourceHashes": {
+        "archive": "fa54aea179e843cb44faf57eea24808e611b133086dbf85784ad060cea1586ac",
+        "catalog": "d15e711d5db9f38ab59190c584d0e737550b876c4c3a861e59ba97da5938c29b",
+        "mapping": "2893ca5a6f9fbd9427799dd2fe4f0f377ec889b65d1f4a8c13c4c9b8fb1a9d0e"
+      },
+      "sourcePresetId": "breakcore-kit-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Bright Piano",
+      "generalMidiProgram": 1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "bright-piano",
+      "sourceHashes": {
+        "archive": "9ee9529d085956463fc093ebe7249f69dd434fe16c3539640c4ef53345d22dac",
+        "catalog": "f615799bc3e1d2fcaae11f86ef92950ba8bf93fa3f8efd90bacd725f36c07ac9",
+        "mapping": "6bd31430f541bec3346c2ed78a8e401bce721a959f4fb9fcd3cb30ee72610602"
+      },
+      "sourcePresetId": "bright-piano-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Brooklyn",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "brooklyn",
+      "sourceHashes": {
+        "archive": "9c5e2282b1ce508e9014d08cbf7a6c07323c19ffb11f8b0c1f716d8e2f15adab",
+        "catalog": "d578d4261e77466261d6fbb01d39972fc5fdc89ff4c35118ba4cb0ad8aae03dd",
+        "mapping": "dbddfc070fbe452ef76f2be699b347a4df91410d1a939f0be9edc2956f6e2084"
+      },
+      "sourcePresetId": "brooklyn-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Brush",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "brush",
+      "sourceHashes": {
+        "archive": "2c14e6e5f1e45e96292721fe44d822d0864132e6bd609edace50b6370dd7993d",
+        "catalog": "77e1bf19e92ea56e47483d914f60ca52713f3e823c8d05cf88aab2f4717d5943",
+        "mapping": "c697906514ac98ba442ff0dd29a46348cc656a7bf8bc7d1d4bad07bc25f32d7b"
+      },
+      "sourcePresetId": "brush-kit"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Car Stereo",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "car-stereo",
+      "sourceHashes": {
+        "archive": "8ce61ae480bfc4521d2e73cbcf55bc9b16cfed6cc1e85ce1905065ce6ae529fa",
+        "catalog": "aa25a588ba327e1000a017b9859850fcd7edf7da484a968f83d96e032d731577",
+        "mapping": "afe46f3ad1b612c45709afc0de2e0d4252d19dd7ed1c248a94461baa49f57cfa"
+      },
+      "sourcePresetId": "car-stereo-v3-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cello Section",
+      "generalMidiProgram": 42,
+      "isCanonicalForProgram": true,
+      "soundbankId": "cello-section",
+      "sourceHashes": {
+        "archive": "59079aaec730f3e2224089c1007968c092db798dd64face8c061a98db7c586b5",
+        "catalog": "dc4e87d0c98085008daa10410527b646d8fffb11b35696d2c9c864cccc39fb72",
+        "mapping": "10e7871d9c0397e3bf3792108a62cfbb4c4973e315d58dc2980fd442edc33e33"
+      },
+      "sourcePresetId": "cello-section-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cellos Pizzicato",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cellos-pizzicato",
+      "sourceHashes": {
+        "archive": "98b144641aca11966a923ca187742e20c6633ca79aaa301c1498e4869e5c417e",
+        "catalog": "34339d7200856ec161c3d27c5dc093c205a5784022bf2aa9874906edf80c521a",
+        "mapping": "ef105622f0f6b8431e74485452dda759f7c812e4b53c7f3f82d5567b87d4bc73"
+      },
+      "sourcePresetId": "cellos-pizzicato-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cellos Short Bows",
+      "generalMidiProgram": 42,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cellos-short-bows",
+      "sourceHashes": {
+        "archive": "1f3544e0b68724aab72370658d52b41ae58d7319705ebe575496277a13e68eab",
+        "catalog": "6c520d830fc1d66d748deb5785c3e19fa84526e46cc5812c05ee19640b6888c9",
+        "mapping": "dbd3055eaa29fa59f3b819de3edd706b9c04927a7fd16f245d7a1dc028ee16d3"
+      },
+      "sourcePresetId": "cellos-short-bows-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Cellos Tremolo",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cellos-tremolo",
+      "sourceHashes": {
+        "archive": "476fdf70d7c4bac4f117d0478b8f7f363914dd97a3db7aeb79089882743aa348",
+        "catalog": "f8fec2ad010962c3dedbb3498b04cc62c00f161508a0d07933db80af5c0b7f56",
+        "mapping": "3316e4a78c2003589866b71597c1512bb5e8a189703fa44501578bef4b738eb2"
+      },
+      "sourcePresetId": "cellos-tremolo-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Chill Wave",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "chill-wave",
+      "sourceHashes": {
+        "archive": "4125c17ec20377d257945a33ad97ba17ca1949f3eb4a7c26c73888ec61ef7fd7",
+        "catalog": "e4559c1e3e503f1256a064a59ddd7d77df892152db15f09d646a31145bfb6504",
+        "mapping": "de516fec9a08d9e26afb945f3cbc7f7b1bf07a218289bef1e698da446d8e0bdc"
+      },
+      "sourcePresetId": "chill-wave-kit-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Choir Male Ahh",
+      "generalMidiProgram": 52,
+      "isCanonicalForProgram": false,
+      "soundbankId": "choir-male-ahh",
+      "sourceHashes": {
+        "archive": "758ceb79ad3a9e6f9717319a61cff8de5a93269dbf707c1ee96ba4cb09fe659f",
+        "catalog": "5ab1b17fd995fe3c8b69dd3b5826953bbfe4130c96efffce2f12998f760de307",
+        "mapping": "bd654e6458816c6eb94ee5d49bbedb2497b723161cc8ed9fb061062a4caf92c8"
+      },
+      "sourcePresetId": "choir-male-ahh-v3-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Choir Synth",
+      "generalMidiProgram": 91,
+      "isCanonicalForProgram": true,
+      "soundbankId": "choir-synth",
+      "sourceHashes": {
+        "archive": "c27afdd4e820921c1d9096ef3987e4b7f5c85fc49f1b8968ff6b72d826b0b403",
+        "catalog": "204c40445d8797faa483e7fd52a48f94b62b7e3a9d31303e3ef0cd6cc3d9bc4b",
+        "mapping": "2cf099ff697958de95159f4ff97747b28ddcc738b07720c6916a92c201b5e200"
+      },
+      "sourcePresetId": "choir-synth-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Chorus Organ",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": false,
+      "soundbankId": "chorus-organ",
+      "sourceHashes": {
+        "archive": "797db4d80eb1b3576a01ea2110284a159c8ecdea5195051ebf956c0b20a5b87d",
+        "catalog": "0c7faa8bffff9c1fd919c82a803fb3c86f8e1850d8da2cd162342d8e8f778cc4",
+        "mapping": "28ffe9c3e42c8b6b5113d6f64b08dc4cbd15d45078fec3c8a21ca1e068461a8e"
+      },
+      "sourcePresetId": "chorus-organ-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Church Organ",
+      "generalMidiProgram": 19,
+      "isCanonicalForProgram": true,
+      "soundbankId": "church-organ",
+      "sourceHashes": {
+        "archive": "f64e41dd1ed2914eed0aae6a899a178cf30e7ef5f6551ef1bdd428f2da7acef4",
+        "catalog": "052fbd9e82e2fa048756eb1e28c2046ac840fc564bfaa53b487ddf2be61ad45a",
+        "mapping": "0782da4ac2e71b1f5a9aebba1ff4f8c9cff96715459921cc6ad9093a59a93c01"
+      },
+      "sourcePresetId": "church-organ-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Cinematic Classic",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cinematic-classic",
+      "sourceHashes": {
+        "archive": "16dcb483555082ad2e9e223824418c5d30a96745c4b7bb32137178d96bb034b7",
+        "catalog": "198b35bcbbe0ffccc69a0cd4f3075feb56bd60769bcfeef807773ed815d11f86",
+        "mapping": "d73be6d82c161600c61d3b8a6cbb566446e4479df8095a028c3aa1b4b5d7724c"
+      },
+      "sourcePresetId": "cinematic-kit-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Cinematic Vast",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "cinematic-vast",
+      "sourceHashes": {
+        "archive": "a4407ddecc1be63149d9566a16664c96da0cbdddf285208a331d5d7c92ddaccb",
+        "catalog": "8d87046cddec0091cc27089281437bddd0bd490273094f8f62de8c67dba399fc",
+        "mapping": "ddfb37e07b8846ac5e4ab1d289e83863d1311992ff24458e2b51ee5f1aa881f5"
+      },
+      "sourcePresetId": "cinematic-vast-kit-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Clarinet",
+      "generalMidiProgram": 71,
+      "isCanonicalForProgram": true,
+      "soundbankId": "clarinet",
+      "sourceHashes": {
+        "archive": "112894890e7148796086f2e287fff977a860d186a50278d0cf8701589646db30",
+        "catalog": "a8d8f85c3b402fe577931c2aeb31b1f76ba3a8a042a74f611e90804c87ddfc18",
+        "mapping": "8faa332616e3d17be94a3af91e504d0a3f135964efc8317715583c3bb6492ae9"
+      },
+      "sourcePresetId": "clarinet-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Classic House",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-house",
+      "sourceHashes": {
+        "archive": "8f217271d4d17821acca18d4f5d1f5e2de0fcad0735d65fe15f0473e10497f44",
+        "catalog": "befa7a123f042a933a44ef8295e5113c87866da3ef2096744a4123f8043a0adb",
+        "mapping": "e23c2a88c19374c15876014a4cee28ae62c1d590ff63d9fda8d76f34f12ea5fc"
+      },
+      "sourcePresetId": "classic-house-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Classic Rock",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-rock",
+      "sourceHashes": {
+        "archive": "99ab605bd523cf2e4a34f115955a55cc33786b8465d8d27ac458a8875b2dbf95",
+        "catalog": "9db548dd6d73a067a63333a623c5c6d571709dd7334cdf674f5ae47aacd632a6",
+        "mapping": "0ac69ce17f4c68da62dc3eadff49cd76d4c35f01cee9180338a0e8b09f946f6c"
+      },
+      "sourcePresetId": "classic-rock-kit-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Classic Rock Organ",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-rock-organ",
+      "sourceHashes": {
+        "archive": "5489999b09e09f51e3618e0ff05b6e73fa288be1cc41001cc7eefabbc124c156",
+        "catalog": "763a64d588e0f396fbdf845cc9690a7039278fb114ff8d59cba464ac97938926",
+        "mapping": "3ed3a10d8d533d61b770217a736500c7dbab66ac21e5791dfcffe7668d2da840"
+      },
+      "sourcePresetId": "classic-rock-organ-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Classic Synth Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "classic-synth-bass",
+      "sourceHashes": {
+        "archive": "4880265570b52ef2881d684230ff78bbc36bc940daa591087413c924be195129",
+        "catalog": "0b72a71a8cf6cd30175e539508f5aa9d32a1755589fae59cf32db9d4e3f6e9f8",
+        "mapping": "e55b36b95be72d8e6c7af8727303709f5178e1ddc151b2cc1424155745ae2a26"
+      },
+      "sourcePresetId": "classic-synth-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Clean Break",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-break",
+      "sourceHashes": {
+        "archive": "a45fab9dee9395abe852bbbef0aef6dbc00012e1d4cc7143016a6cfb69d41e00",
+        "catalog": "1e484aba7b1acfaf3998285eca537c48ad39ff4aba9de57669820ec7010f8d82",
+        "mapping": "d9f25198ed71e4c397f1bfa90d0f0b14556df38c9faf9f07fa2c5214b4389e52"
+      },
+      "sourcePresetId": "clean-break-kit-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar Hard",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-guitar-hard",
+      "sourceHashes": {
+        "archive": "d792ac9bd5755d736f32c66a95f0dd607c4237ccbea1380a0e283ee51c4c868a",
+        "catalog": "94cb41faef37f2cb11b6fb84f75e980cd2b7dd27e205a9525415a64d978b4fdb",
+        "mapping": "5004289188882f46b4d510032c09ee08d64e6d5a02fb73b3983631f1fc694bde"
+      },
+      "sourcePresetId": "clean-guitar-hard-v3-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar Muted",
+      "generalMidiProgram": 28,
+      "isCanonicalForProgram": true,
+      "soundbankId": "clean-guitar-muted",
+      "sourceHashes": {
+        "archive": "807f18d3827eacff16d7841b0c4c5e561cd088c2e4e0f3c93b4d77d96d684b57",
+        "catalog": "6ca51fd807b743b456c87b1d56b8a9fc76b49f79d3ff51155acc7b6fccdae971",
+        "mapping": "33dee44c26d260e10c9c82e76da5ef002126e5154f251a4d6e98549091941044"
+      },
+      "sourcePresetId": "clean-guitar-muted-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar Soft",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-guitar-soft",
+      "sourceHashes": {
+        "archive": "afc0b2ea220e3598d29acc6fccd7f4bfd386c62253da92f9d2e20add80862e86",
+        "catalog": "21a49536ceca55c688a67ce6c1b1472119fea17121c1b349b72b314dcf30ddfa",
+        "mapping": "6ff113e2b708728b79674d93057e75925b0afe2ad0e19ad5286b41e629ecacba"
+      },
+      "sourcePresetId": "clean-guitar-soft-v3-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Guitar",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": true,
+      "soundbankId": "clean-guitar",
+      "sourceHashes": {
+        "archive": "c8d5fc71270a36b8a47141427cf306e948e16d8f1f5e750584c0e06c4d39d028",
+        "catalog": "9a3283d027e99ec562e108a35558f6ef398cfa03219f7262e377c4c81749ce58",
+        "mapping": "5b37520425d1c8b592ee4de24e166f95f37c10eb38728141b43f7cece7cb5cc3"
+      },
+      "sourcePresetId": "clean-guitar-v3-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Clean Power Chord",
+      "generalMidiProgram": 29,
+      "isCanonicalForProgram": false,
+      "soundbankId": "clean-power-chord",
+      "sourceHashes": {
+        "archive": "24cf2a6e69454112657f884a4fa7eb60baf84021222197e80e87bb7cc9f3c1ce",
+        "catalog": "94932637c32e0a2884b086ed0b000c6f8ec84533bd74ec1a6ede896ae0fa6720",
+        "mapping": "5588c507e5bea90f863d41f061dc9bbc9b951abe8fa9712cb7b5dce3665d9488"
+      },
+      "sourcePresetId": "clean-power-chord-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Compton",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "compton",
+      "sourceHashes": {
+        "archive": "4789dc83307fccb9e64fbbc6107aebc46c59d019df99bb3f54f78a9e8241001e",
+        "catalog": "3acecd6afd920c7ce41b4e07e2c10222f68f7c87e892e2f58bd58f9afc812f3b",
+        "mapping": "51780c0f09baa32d9dedbcf010d027b2b9080f9bd88264125d0781dc5e6d48c9"
+      },
+      "sourcePresetId": "compton-kit-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Country",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "country",
+      "sourceHashes": {
+        "archive": "67346c871207dfa649b892f07ad6959f5f3fa26d931961c7c00f060c0b642d06",
+        "catalog": "e48ab0664aba7fd023dd6a343b8c133caec8a968290c33fb288c6c18dec295b7",
+        "mapping": "faa11eb248afde9f7d6ff6da9ccaf669f2dca630ccce3d3cc8a52b0e413d7166"
+      },
+      "sourcePresetId": "country-kit"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dance Lead",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dance-lead",
+      "sourceHashes": {
+        "archive": "57c57f79e21472b2f34505758261ba07d7815c8a37d7ca692b948f2835e7fc5f",
+        "catalog": "1a92a313c22eb7cf6e0ab8db6dd49e0e71219e497207b6cd90fd6c1924969b0b",
+        "mapping": "2b710c315060ccaf8d960220f926b6c5a1f0cb970f1b0a10119cc0b2f2cc233f"
+      },
+      "sourcePresetId": "dance-lead-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Dark Grand",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dark-grand",
+      "sourceHashes": {
+        "archive": "6c9410df32c506b6d06ab2e9787e2c8dfa4ae6c8f17d1cc3a9a74d54132f1af9",
+        "catalog": "5287e81aeb4b8383762eed240c3c38e44728a91f9c96166260fdf401101d0112",
+        "mapping": "458152923babfa8bcb0cc6b264009999d42769b04ee196265e0ed76f23162c7e"
+      },
+      "sourcePresetId": "dark-grand-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Dark Hip Hop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dark-hip-hop",
+      "sourceHashes": {
+        "archive": "406872efa5032e82e2f230aaa8e4534ff099226230b5ee45260c0f9d43e6e6c5",
+        "catalog": "b8d9360909d4fce4bd1a1f99a515d0fc6b02642a4ca0cc3181953e1da73214c1",
+        "mapping": "a9d3f973b900ec808db6787d6b9c9ebb65c860d6a83e6556de6f3a9afae2bf7e"
+      },
+      "sourcePresetId": "dark-hip-hop-kit"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Dark Organ",
+      "generalMidiProgram": 16,
+      "isCanonicalForProgram": true,
+      "soundbankId": "dark-organ",
+      "sourceHashes": {
+        "archive": "26db4a26942ceb04cfb09937095e8ca85631ad1b54ec85813cb2b5caec537610",
+        "catalog": "4754b797b6f5a9352a8a008d4270e7e1d31732eb65082544502071553712801b",
+        "mapping": "5207220ea3b0f286cc54e402a499671b9d17afe6a0e23fe3328a48553da1cf4a"
+      },
+      "sourcePresetId": "dark-organ-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Daylight Guitar",
+      "generalMidiProgram": 26,
+      "isCanonicalForProgram": false,
+      "soundbankId": "daylight-guitar",
+      "sourceHashes": {
+        "archive": "53134ec1ef79ee8848d9c2dfc36d02d4b22bb0ac3989671aa0448f4047dfe949",
+        "catalog": "e4918c6f816b775e2d78fff73ff506af397aaf60c89fa5c110c9a1f418058c0f",
+        "mapping": "55adf96699683a030db1868e198a6dbc2726e06e7bcf074d5ca00526e69dc9c7"
+      },
+      "sourcePresetId": "daylight-guitar-v3-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Deep House",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": true,
+      "soundbankId": "deep-house-bass",
+      "sourceHashes": {
+        "archive": "8fcd660d5fc7adb852fe66241d5c473d0ac2a330b74f2a90302ff65d77801e8e",
+        "catalog": "7d36abc7e67d496fd2d6d0055dc2f8b1dfe080b133efff8720d36f75e874d7b2",
+        "mapping": "951dd45c01439db515a47e0a868944151cc8606a10f65a81bf7c090b1f7a57f9"
+      },
+      "sourcePresetId": "deep-house-bass-v3-v4"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Deep House Synth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "deep-house-synth",
+      "sourceHashes": {
+        "archive": "d3657e913fcc0189315d5a6954366ba793598ecc5775d5b50ea6dd83c09dbdc1",
+        "catalog": "ff42684715e53fd6e01ec0f4648aa2b59ca126e03f42f3baa444e6737ee1ffd8",
+        "mapping": "b97a72ffec97d2efba70b0c2a51b8133936ffad2e4044927a2d4a4d469d48567"
+      },
+      "sourcePresetId": "deep-house-synth-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Djent Guitar",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "djent-guitar",
+      "sourceHashes": {
+        "archive": "07f2c02610a6f88fdd5896514cd345323f8df05d7a8fb8d89b1b15792236cf79",
+        "catalog": "a414a7f52ac143bbcf46793ac0c4dff238e556ee28898096e89d5fcae28989d0",
+        "mapping": "483068cd9a88a7c054673b0ce7b1bf940d3cbc706535e7865e2bd1ffea1994fb"
+      },
+      "sourcePresetId": "djent-guitar-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "DNB",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dnb",
+      "sourceHashes": {
+        "archive": "d387ee6068333763028566add6ad523bd2ded82ca57f9e5d475323da7f193768",
+        "catalog": "20bd880e924d5af780ef7053c6356a668e5df19d5bdd8225215b0a69637be17c",
+        "mapping": "e93db82976e482241175bda9714ef8e96a3ed0a7a0b924de39b5fd3ec1d7efa7"
+      },
+      "sourcePresetId": "dnb-kit-v2-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Double Bass Section",
+      "generalMidiProgram": 43,
+      "isCanonicalForProgram": true,
+      "soundbankId": "double-bass-section",
+      "sourceHashes": {
+        "archive": "a901579e8b9234a6269a0d8e7ad4d42ce10c89eefdd737608271796e58d65877",
+        "catalog": "e6821b2376d702fdbdddd6bb0da3548f79d6bdf340a52c5953e42454b74c9430",
+        "mapping": "9b054466a6a2e593ecccc3782ba7cbdab818330c867a9408930f516d4a06037f"
+      },
+      "sourcePresetId": "double-bass-section-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Drive Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "drive-bass",
+      "sourceHashes": {
+        "archive": "c2d9201b91fb395b75ea46d03b53253316cf0b465262b51ba0d9fc2f2b6528ce",
+        "catalog": "69e2197b3096b91c9fce5001bb8146bfbdc3c22b1711c83634f7024fa010763a",
+        "mapping": "bed19ef36eb47231ce1f110c3c619037b06b3dbe64502c998c890ae8204140e1"
+      },
+      "sourcePresetId": "drive-bass-v4-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Drive",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "drive",
+      "sourceHashes": {
+        "archive": "1a4e829fdbfcdae115d802005f084699e8f788c6d6b5a9e7bac158d5e4024fd4",
+        "catalog": "58b96c43a27039f4bd7195eee4a72d6d80ea7d444e59bf8a7f360fb07e82eaf9",
+        "mapping": "ce1a942a959abc8824a5596246b864125da33813fa46f36f4fca122acb426436"
+      },
+      "sourcePresetId": "drive-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Dry",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dry",
+      "sourceHashes": {
+        "archive": "0c5655c0e49a8c4120159c91ffbc5b3f9983ca85e33915888f171778be165ad1",
+        "catalog": "927fe9a11197d6198c81433dc0a07635b28b8aff3da32bf492a691aaf63c140a",
+        "mapping": "c1fe20b7cffab9840cdfe5dccab8f9cd731f9c9faffa5d68da0d02b82245ecb4"
+      },
+      "sourcePresetId": "dry-kit"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Dub Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dub-bass",
+      "sourceHashes": {
+        "archive": "b97e785e420d18e235c97473afee9fe3657494e6b8e7caac076ff65b4bb091e2",
+        "catalog": "11446c16a90c36ac331e7335aaace5b3c5613201bd6daf58799eb2eb89c811c1",
+        "mapping": "b88c0389fe940bb233f3c67ed985e71ca84c2c99ecf3380a23b665f05cc5e843"
+      },
+      "sourcePresetId": "dub-bass-v3-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dub Supersaw",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dub-supersaw",
+      "sourceHashes": {
+        "archive": "b7f17c7be557f41e3f5ada66e17ed6b98b8d10c4eed8c50abb00bca000b14066",
+        "catalog": "dcc356e7fd8e2d4be10dddf80f75fa7f825aef7e9d4abc6f5c61e691856cba59",
+        "mapping": "4ef24a8811b855a71b8a39d59cd200922d145b5134fe30e66a577d18eb44b773"
+      },
+      "sourcePresetId": "dub-supersaw-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Dubstep",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dubstep",
+      "sourceHashes": {
+        "archive": "1d88d4e45fb8696cf34e4f521f8dce509af20357f2ee685214bf972e0213897f",
+        "catalog": "8e3b7a4d05c7097a587c47ea2d19b67c9c63ec33537d2dd699ec9e503daafbc6",
+        "mapping": "04e8a1ed2ebf34fa47c56df4219977f5d0e3c7a7bf4fb4bbb3af608327045421"
+      },
+      "sourcePresetId": "dubstep-kit"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Dubstep Lead",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dubstep-lead",
+      "sourceHashes": {
+        "archive": "4bedf14da0cd070c47e99851dd07bcab13392235be44793da2d08cae59dc0dfa",
+        "catalog": "db11eaff099ff388cc2c09a87639ab486cd6283127cbc9cda9ac303407b6dbcd",
+        "mapping": "1979504f967983d51b30eeddc7cb1ce7a7479cd28bd832eb1e4ac65a00775176"
+      },
+      "sourcePresetId": "dubstep-lead-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Dumpy",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "dumpy",
+      "sourceHashes": {
+        "archive": "117d17f3f85201a46b2e45f2894234b3ebc8ab4bc05d16836059c64c9b2d657c",
+        "catalog": "683be5a9962dee603eb8b20bc38be0e52b10abd314a99360ffa60751e887a9f5",
+        "mapping": "a3528e18437dc088c001e0ccee45de4da0360a75604ceb5d0aef1a28e503e91c"
+      },
+      "sourcePresetId": "dumpy-kit-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "EDM",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "edm",
+      "sourceHashes": {
+        "archive": "2506bed6da0c790e33a346e64a016a2f833fc1ff2587b6cb0724ef11b8725cbc",
+        "catalog": "19cf896828fda70a1b9a46c32823b0b31d8f0e281f0a6f708b9773f35e16b657",
+        "mapping": "96cc489c36e047eb97d9f21071ae3cc4c6b98511136b68069dfe2f5a5903ea04"
+      },
+      "sourcePresetId": "edm-kit"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Electric Bass Legato",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "electric-bass-legato",
+      "sourceHashes": {
+        "archive": "02ead5a99098f282e299b6aab746d3d0f82951e066099d9c5463c1dbce483d58",
+        "catalog": "7aafce871c1f4e488c760e017464b353112de6e2210bc794ccbe3e4ad1634a22",
+        "mapping": "4695821eb9f55e73ec1a7c505689c6ac21e97ba99395ead000a4da375a1dcbe7"
+      },
+      "sourcePresetId": "electric-bass-legato-v3-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Electric Bass Staccato",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "electric-bass-staccato",
+      "sourceHashes": {
+        "archive": "15f63f7e437e23beb40f74adebc9745bc41b670b2c0e7c806d263aaebce43343",
+        "catalog": "cc1ad036c3f6a4703b8df7a286fb9acaf4094cab92523e21e2e677aba2579f6a",
+        "mapping": "a8c08cc7176d63c3b10f4de43a662af29ec8c317462e3e4d66b2b6697937d451"
+      },
+      "sourcePresetId": "electric-bass-staccato-v4-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Electric Piano",
+      "generalMidiProgram": 4,
+      "isCanonicalForProgram": true,
+      "soundbankId": "electric-piano",
+      "sourceHashes": {
+        "archive": "30a3c68d3c2aaf970b5f804a60a06d193094ffdd2ca7f7112dd9c6e835c7265c",
+        "catalog": "02b846a58027153b65b9545afe8235549294c9adf526911778130897a4f67d91",
+        "mapping": "73ebe0eb6d2edb27e69adc8c77ff6b57d39df5dc603387bea245c7c431577568"
+      },
+      "sourcePresetId": "electric-piano-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Electro Pop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "electro-pop",
+      "sourceHashes": {
+        "archive": "0fc1b97d83d9bf98bd529241648bf89f9041c187fc9e47596ca8b246600e1442",
+        "catalog": "19682bdbde45a1fa60b352933028b9c61bfa60fceff512a4b6da5744544dd3ce",
+        "mapping": "cd7345ce7115396e26aa1204fb8bf4d9e132709162a7a3831b9728b25021a39c"
+      },
+      "sourcePresetId": "electro-pop-kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Empire",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "empire",
+      "sourceHashes": {
+        "archive": "4fe604d8e1df631c85bc72e2d2a60d0084fcd747bfa6454f2b20a3a9b6e97057",
+        "catalog": "ce0dc21af2d0d5353bf416f7ff1fcfd6911c2b07573d2b742cd27dc4a4424eba",
+        "mapping": "d8314899169d3054b5dcaadaa9fe1a00ee847003880a8e718a50738fa2348129"
+      },
+      "sourcePresetId": "empire-kit-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Evolve Bass",
+      "generalMidiProgram": 39,
+      "isCanonicalForProgram": false,
+      "soundbankId": "evolve-bass",
+      "sourceHashes": {
+        "archive": "41014dd2ad7143bb6b5132f3e24f2a67f6e24b0eec7246b7c82154f2d2215944",
+        "catalog": "c07c8012d5ce10e592a0e4fde2a189b599378bbb4dcd79e2615fe5ae7a913add",
+        "mapping": "ae888079223f19745ed74d5edb5b72e02dba0ff090838deb2ac96f094e374cda"
+      },
+      "sourcePresetId": "evolve-bass-v3-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Evolve Pad",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": true,
+      "soundbankId": "evolve-pad",
+      "sourceHashes": {
+        "archive": "044ce55d8b18fd8877fea0a37fc66d2d5b49a750aaef531935dc56ba3a3ce8a7",
+        "catalog": "9f15537ce23bbc70f48d3d3e62c71d13e8138c37a04f7d513a82d7de8023b71d",
+        "mapping": "6b0a423a4160e24019cfb91fb8f40cf61456136f9760084b0ff05e85e3a5b29a"
+      },
+      "sourcePresetId": "evolve-pad-v2-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Eyelash Synth",
+      "generalMidiProgram": 82,
+      "isCanonicalForProgram": true,
+      "soundbankId": "eyelash-synth",
+      "sourceHashes": {
+        "archive": "08323a482bf433a6cbdae4681b38edcfb2c0430697c8d4355f7a80751b619217",
+        "catalog": "761ad25db80d8bc2af6161bd822b117db0902c80ee69539d0655854a79e291db",
+        "mapping": "f44a0e2424dc2f3f04bc9ef7f890348f8e3cccd5ecd006f6c63cba6b28ee0ec4"
+      },
+      "sourcePresetId": "eyelash-synth-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Fancy Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fancy-bass",
+      "sourceHashes": {
+        "archive": "18f5044ba03a10e0b8433978152e6de563b088071768e69aaa9f363d1d1ed24c",
+        "catalog": "e8d63c8d5d11ca8db041d355f5e9056831ad014ac7ab2474cae857dc3098589b",
+        "mapping": "b203c4d9a6fc6cb94b1438fa3583163670978f9d1a6438b672a0270375b983d7"
+      },
+      "sourcePresetId": "fancy-bass-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Fanfare Organ",
+      "generalMidiProgram": 16,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fanfare-organ",
+      "sourceHashes": {
+        "archive": "d4a6e0849d7f10a57f7cc97881fbfb478b4999306fdb0df27ba24a4c3e3a2618",
+        "catalog": "7691672c39d3d760b01777b3a249047df7d9cffb51a6b496d644c26603c4cb00",
+        "mapping": "7e470b32e4682663746be27dc5d2c131dcc458f187808711d2f642439ae3be53"
+      },
+      "sourcePresetId": "fanfare-organ-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Fat 90's",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fat-90-s",
+      "sourceHashes": {
+        "archive": "c0f435103e9596891e6ccf7778ee33791ea0c8c9f65f953772411358382c325b",
+        "catalog": "9c8456b3582e729c4215b96f8c6f1d7f8ab54d619fcf30f20f3b616c939dc9e7",
+        "mapping": "b2907358dea54b15c35ebe431189834d0ffbf93de449f3ef5d86ff73a25e7bce"
+      },
+      "sourcePresetId": "fat-90s-kit-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Fat 'n Dirty",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fat-n-dirty",
+      "sourceHashes": {
+        "archive": "1999abfa2a0b4bd2d47b6fda997458d16a1ada0a4de38f47fcee855806222cdd",
+        "catalog": "a543739c6fbb6ff33781cabee15770701bdc5c000f5b9f25e228786d1be110ab",
+        "mapping": "858554dfdf88b491eb460b51c10536afcae7e52c4795871796958a4edce1fce4"
+      },
+      "sourcePresetId": "fat-n-dirty-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Felt Piano",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": "felt-piano",
+      "sourceHashes": {
+        "archive": "761bdc6a587d518af65943977a9252170438eb4cb7e8f8edb92af984610c63b7",
+        "catalog": "ef18b5aaca491fc5ee3f9a74461b5253e896f24769e621b145f6a68bd7f5e13f",
+        "mapping": "87d1dcff86ec0df947369ba32373883b9d5761bc09b400549db2815c7fa9ae04"
+      },
+      "sourcePresetId": "felt-piano-v2-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Female Ooh",
+      "generalMidiProgram": 53,
+      "isCanonicalForProgram": true,
+      "soundbankId": "female-ooh",
+      "sourceHashes": {
+        "archive": "2e2dbe9ed1d3b8fe1f612f2552835b6b377a92912e6d5892be936eaa1d1fb264",
+        "catalog": "c185dd2aea65b32539577b382c9aba8c6c6f31682c6467f760542b098fe8be8f",
+        "mapping": "8e48fcf6e67f236126d63d2cdd62ab3bc5feffbf5d803db1c9f01adb8d545d2f"
+      },
+      "sourcePresetId": "female-ooh-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Flare",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "flare",
+      "sourceHashes": {
+        "archive": "eeea716ba47715072c54febc082537b449dae1656b331e7595deff7028becec7",
+        "catalog": "f6a7af942456e09330fbc3add41ab8b6b79a71e2c07648d151259cdd732c57aa",
+        "mapping": "79e8548a247a2dedc077c4b1e51e830af5c8dc4865a58cc5415359173c40c397"
+      },
+      "sourcePresetId": "flare-kit-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Flugelhorn",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "flugelhorn",
+      "sourceHashes": {
+        "archive": "36386506833724c97cd598a60e9d799a513bed6bf579841f89060747076faa76",
+        "catalog": "155e82d25787286d348227aa3a594c374abe789162ede2d1507cb7cb5c1fc6a4",
+        "mapping": "287334ce6dfccdd8a0876dc414438cec1381c43a32a171c67ac7cb97cded9974"
+      },
+      "sourcePresetId": "flugelhorn-v2-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Flute",
+      "generalMidiProgram": 73,
+      "isCanonicalForProgram": true,
+      "soundbankId": "flute",
+      "sourceHashes": {
+        "archive": "d041ac1b3edce33073c848e81f2b10031ebea4322fe6ae2d58d15ecdef4d16f7",
+        "catalog": "b23ffecce59f53cfde6a1aab7fdd414967bcebc7d10281686ebd9fd2c44a0952",
+        "mapping": "cb45b854f675c44c9de948ad888e1bfe12ba213ad1e58cc5e1f3f11334715cbf"
+      },
+      "sourcePresetId": "flute-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "FM Keys",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fm-keys",
+      "sourceHashes": {
+        "archive": "627e568f2efc0ddb38f007e5eaada011414b9d0adb460e73cdcfc534479cdbf5",
+        "catalog": "d86297d414e4923cf632bbdec93f98bf6cdcc6452f91f98416c72e953f05fd48",
+        "mapping": "55fa5f3f94533ef213784c024fd34720eda570c5bdac6880aee9da5ffe9a5e22"
+      },
+      "sourcePresetId": "fm-keys-v2-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "FM Lead",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fm-lead",
+      "sourceHashes": {
+        "archive": "cb6e4ff7c5639cc2d861266ed22588f8b860e52b06c2e8f816f1a56e256d92e9",
+        "catalog": "157ce45f03331f3cb297ca148028ae2c166b6204ec76c4071224e1e5ee8d30ff",
+        "mapping": "2c1f5c200f21764ac428ca202c70fd49d5d5cd47cd28db579624e3e75d6f7ada"
+      },
+      "sourcePresetId": "fm-lead-v2-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "FM Pad",
+      "generalMidiProgram": 93,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fm-pad",
+      "sourceHashes": {
+        "archive": "6f1d2a7f10c776eda96715d2107ba4f772a54584eab1006f330af211f2ba614e",
+        "catalog": "4a64b8052ff555040bb362b171bf16c0be31ec7207bd285239916834a79d6da7",
+        "mapping": "03a7057ae791541e64f74af9c943145713e3eb4fe71412036a08c85be425cb23"
+      },
+      "sourcePresetId": "fm-pad-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Freestyle",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "freestyle",
+      "sourceHashes": {
+        "archive": "b5fda9ce4f0d42670e1013d888638b43e95e7543e784ac472e06852f75eb5a13",
+        "catalog": "000c597331daab05cac42b0a77589ed34c2d859f137c1c70c8a21b4b0f910183",
+        "mapping": "2f598c1280b66328ce118d66ea49b65ea315ce6b94c4d963387148c34d01b1e0"
+      },
+      "sourcePresetId": "freestyle-kit"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "French Horn",
+      "generalMidiProgram": 60,
+      "isCanonicalForProgram": true,
+      "soundbankId": "french-horn",
+      "sourceHashes": {
+        "archive": "773b9d68f1567efa640a1ba92573209c0d791c380d30359b44949ad8c8898cfb",
+        "catalog": "f5270caf6d2f78e04b328074692ebc504954b350dc9be130c17df6089928cd48",
+        "mapping": "f0d43156881393a8860845736dc4a449e490aa11fc4dcd8f96c0bfa84471eaf2"
+      },
+      "sourcePresetId": "french-horn-v2-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Full Brass Staccato",
+      "generalMidiProgram": 61,
+      "isCanonicalForProgram": false,
+      "soundbankId": "full-brass-staccato",
+      "sourceHashes": {
+        "archive": "de00d8e2ac48bd24857ef348b0725ad57ac6b90970eef0109a144653952da5af",
+        "catalog": "a5256df6743d3858e718dc32bd8113ed08d434e6ea8dba51ffa7d8bb1db8db20",
+        "mapping": "ecbc3d625c62329f0077d3b18d1161cbdab684bcaa7fb118f138fe95fbd558c2"
+      },
+      "sourcePresetId": "full-brass-staccato-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Full Brass",
+      "generalMidiProgram": 61,
+      "isCanonicalForProgram": true,
+      "soundbankId": "brass-ensemble",
+      "sourceHashes": {
+        "archive": "bb0dd08c99e45d15db8aecd7dcfa609c4c74ae336d414db747a499ad7a622b8b",
+        "catalog": "4c139db5aba0cafb5c9a15845090eb60c277c910ac582a451b9b2b210ff061d9",
+        "mapping": "a0c065bd4d66c14a551d933cb111d60b401bbe0f6733a71a11eeacae1d07bbd3"
+      },
+      "sourcePresetId": "full-brass-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Long Bows",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": false,
+      "soundbankId": "full-strings-long-bows",
+      "sourceHashes": {
+        "archive": "7ce0847173b89c3331225a48312b3916ac457c9165a3c240dc7fb7569afdbd4b",
+        "catalog": "80164f454e1ddfae6b38ad88f6feebfd03061ec28cfcc8f0e793e990db43f796",
+        "mapping": "f880261f3e77b0b5cc22ada194f50a653e7bb476487e29d3f5cd72ac0ddfe45f"
+      },
+      "sourcePresetId": "full-strings-long-bows-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Pizzicato",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": true,
+      "soundbankId": "string-ensemble-pizzicato",
+      "sourceHashes": {
+        "archive": "7017925f5b7a42c604d861024ba4b84027519f8d6b2a26d5b9455b003de61792",
+        "catalog": "0bd107f04643bdc977cfb2b19b62334907197aede3066481add123c245b28b2a",
+        "mapping": "61564c2a4304d220ca6fd616bcccae567fa8c3782b50a4b636b721e59aabb7b9"
+      },
+      "sourcePresetId": "full-strings-pizzicato-v3-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Short Bows",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": false,
+      "soundbankId": "full-strings-short-bows",
+      "sourceHashes": {
+        "archive": "56cadc344f70abdf08756016f19b8b38da85b276f2c938c1f009cc97c1986c87",
+        "catalog": "44d224caa1ada6bf9c597d4a87bcbfddac6aed2b523d9f1739a32ce4cb248d39",
+        "mapping": "cf9828f9726c10cc406bc51c7d78baad906af1b224b05089b0e03f38bbeda0fe"
+      },
+      "sourcePresetId": "full-strings-short-bows-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Full Strings Tremolo",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": true,
+      "soundbankId": "string-ensemble-tremolo",
+      "sourceHashes": {
+        "archive": "04ef3f9db0a396ba99d330d59fe7d24aaf9807ee2d00b6604140297bb381771e",
+        "catalog": "2927b87cdf32c23dc5b56adb87174a8dc1b20ed400d41e5eb76d8d3cb6eaab3c",
+        "mapping": "0ba9f9a960cc18a565ad7ced6d3212c93588d5aefb9dfa2bc7a1182768ab55fe"
+      },
+      "sourcePresetId": "full-strings-tremolo-v3-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Funk Guitar",
+      "generalMidiProgram": 26,
+      "isCanonicalForProgram": false,
+      "soundbankId": "funk-guitar",
+      "sourceHashes": {
+        "archive": "6b79ef1410a05e001a6b9cf3a729c9ab52b2484f0f42d7f0ab932677ecabe6ee",
+        "catalog": "584699ac2b8dc0152ec2507d0b6db54f2f6e578db24265bdfe0b067e73a249cf",
+        "mapping": "e5e6a8e927b0aad54a3ec5df98941a786967c6381a3c826d2189dba2d5868168"
+      },
+      "sourcePresetId": "funk-guitar"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Funk",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "funk",
+      "sourceHashes": {
+        "archive": "887dc6022c272474296d12623bb4d929249c69fcd84f08ad673b02acee70152c",
+        "catalog": "ffb7ae08939a5aea680a6469871e132367618531f9639cba6575c609c8342c5e",
+        "mapping": "1446f6972c9c741f1c9e191d137fb11f3dc8f1d4382b940a23bbd7be398dab49"
+      },
+      "sourcePresetId": "funk-kit"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Funky Slap",
+      "generalMidiProgram": 36,
+      "isCanonicalForProgram": false,
+      "soundbankId": "funky-slap",
+      "sourceHashes": {
+        "archive": "b0ee6241858fb6a5daa9de104079bab2e7ae0f8213df95c56eba418faad93e21",
+        "catalog": "0d21455db6aab6817218db9966e689888ed790034fddae379faa89b7e88e9e3a",
+        "mapping": "6ecf1bc98b15faafa27cbd012fdd21a5f53fbe9ee616526b3778c271864d9c1f"
+      },
+      "sourcePresetId": "funky-slap-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Fusion",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "fusion",
+      "sourceHashes": {
+        "archive": "9aaea20bd0adb5e2e3433745cf93eaff612d9ca865cf818590277c6d88ed1d90",
+        "catalog": "5846e216b11d363b6db74d447cded3541f52212434c994333b47e29532624ad2",
+        "mapping": "beb3c2aeae9bedf7083f7f7b7943798728874b77d787ddb3829c8e49e3b7d109"
+      },
+      "sourcePresetId": "fusion-kit"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Future Keys",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-keys",
+      "sourceHashes": {
+        "archive": "4c122dcd9d980a899cfca56a96f7a1977b0ff547f47018db369638af1aec3406",
+        "catalog": "7add1485fbb758f86f13f477c45c1199ee737bc07a50efa8470c51431a1015d6",
+        "mapping": "aecc11f8df97ac91bac885bffb44711f9f647e6a5f62ff691ab0a4f92bc7e18d"
+      },
+      "sourcePresetId": "future-keys-v2-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Future Pop Stab",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-pop-stab",
+      "sourceHashes": {
+        "archive": "470c3bd8cf5c4eabacaee750ee0be82461af02b6e79fd883de0048cec9f7b5c1",
+        "catalog": "a36ed81fdb5793de2caff53f5a263a177762e07e6660c186b947d1d51014b984",
+        "mapping": "ba12827fa4b0208601544be960b79504cbec7f5c5001338f6c57cd68988b34fe"
+      },
+      "sourcePresetId": "future-pop-stab-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Future Redux Bass",
+      "generalMidiProgram": 39,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-redux-bass",
+      "sourceHashes": {
+        "archive": "a57ccbbefac4f2dd16a0654a3b41fc9a6eb6a8cdc581681e7d4b3aa4a840bb00",
+        "catalog": "2241fb2bb2629a28a3af24917f8a4bb0c225a099de6b7aaa2fca49c1b7a536b1",
+        "mapping": "fbf820f53941524613ec778cecbcb2f5b1556f27cd966f75cb4a289b444b4d0e"
+      },
+      "sourcePresetId": "future-redux-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Future Trap",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "future-trap",
+      "sourceHashes": {
+        "archive": "c6ff9b6f8d4ce3230d3aa9a12afc68ec0593c45f2492bd4287c3f90e877a1409",
+        "catalog": "0810d3a71d36264e4142d8e35e5d6769f16989208c0379552ed5d93a0eb51ab5",
+        "mapping": "adfa75889703e53d7701ebcf48942f7da59fbe2b63ea137c1dcafd02167eb5ad"
+      },
+      "sourcePresetId": "future-trap-kit-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "General MIDI Drums",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "general-midi-drums-hiphop",
+      "sourceHashes": {
+        "archive": "452425e788cf08d37d47c4f44adcecb1a329cf7b3b09d6669697117c7b2155e7",
+        "catalog": "c4f7d3c8518435c259f4fcf902c4bde022f967ac4350c8f57bde31f8a900d677",
+        "mapping": "5edd5bb392f7e60d0dbb073065395dc946e482409dbc3156d59027e44b9e2a01"
+      },
+      "sourcePresetId": "general-midi-drums-hiphop-v3-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "General MIDI Percussion",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": true,
+      "soundbankId": "general-midi-percussion",
+      "sourceHashes": {
+        "archive": "a46165b0ffe22fbfca8be45c7c97d51a29dc89cedfab0fa71db80a815a306795",
+        "catalog": "2770546278465328d1c68e05f520f6190667c2ca7fda90b52d475ecb3c7a4c81",
+        "mapping": "b664bad3129fc78c552d13b66c01d191688090b0d2501932b143e24f4e4e1ae0"
+      },
+      "sourcePresetId": "general-midi-drums-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Glitch",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "glitch",
+      "sourceHashes": {
+        "archive": "73b31cf41e9de6253e38b9a31ebc25fbcb640df20a5460e254b1e06301f36a8c",
+        "catalog": "33405c0aeef84ea881855bf406dcf2d83bf4edd7425cf94ca6ada77e160bfc26",
+        "mapping": "f0451c3b6a9ec6845551b4be80d47338ee2109ebd38508b885b1fa7c2f69284e"
+      },
+      "sourcePresetId": "glitch-kit"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Glitch Lead",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "glitch-lead",
+      "sourceHashes": {
+        "archive": "fbe38f8ad47884ee3a362caf03250c8ae0da9b777cdade8ebf4c9b6887c2eed6",
+        "catalog": "7ee568721cee0b4ec038c514501066aa07710f3067988e7ea3fe3a136b9068f2",
+        "mapping": "0bfb58510f3aae7fc02aa8791426c628c25f2eecd61348539a52cbf3bb0690c8"
+      },
+      "sourcePresetId": "glitch-lead-v3-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Glockenspiel",
+      "generalMidiProgram": 9,
+      "isCanonicalForProgram": true,
+      "soundbankId": "glockenspiel",
+      "sourceHashes": {
+        "archive": "10a1f87228565560baa015bd1cfe5421f0d87217f945c1d92ef864b64ceef9ce",
+        "catalog": "e16dba1f46ef3483617118e8e63629f09356b02e4b380488ac13734413eeee77",
+        "mapping": "63f13a5447ce09def988ea5f601c7d0915955192cdd1ff7b18253d1d6168a996"
+      },
+      "sourcePresetId": "glockenspiel-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Grand Piano",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": false,
+      "soundbankId": "grand-piano",
+      "sourceHashes": {
+        "archive": "134ce8bf6f0f3c85c35e7e8353e050f7e557163d9f2a509962a4b1d8d1206ade",
+        "catalog": "47eb443a00568731ba0e0783225221fbb439043ebc0a4118c035a6affd6f9129",
+        "mapping": "0cb9f651a00fc5acbd4c684ad64d886b13504e74219965d87708242f5af2e630"
+      },
+      "sourcePresetId": "grand-piano-v4-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Grime Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "grime-bass",
+      "sourceHashes": {
+        "archive": "5d7b2e5eab82a4e89dc2ef96aca822e3bc37036ffeb44a65f1eadbae6a1753b8",
+        "catalog": "ea947d3a85489ea4c7f12f5a586d04ef34cb9ee39782ab5eceef0d6900d92a3c",
+        "mapping": "874fbd7d27b9a8d8fcf5a633a718e674d49641cda58f5278bf727ec707b6fde9"
+      },
+      "sourcePresetId": "grime-bass-v4-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Groove",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "groove",
+      "sourceHashes": {
+        "archive": "8482daa87c7c8e3f96affbcf194c39d27c70ad1426386a6a680fdb264527feff",
+        "catalog": "2a072843cafc144b9f7a6f4e9680cf877ae42ca1b5e8b32b4bcc0d10b429c1ef",
+        "mapping": "0b71cb3666ca075078dd47d313c3c61965b69fa7aba792842b2bedde72603001"
+      },
+      "sourcePresetId": "groove-kit-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Growler Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "growler-bass",
+      "sourceHashes": {
+        "archive": "adbff0c9cbd33c740cdebe171400e1922079580a4f0982efbe5717e276235431",
+        "catalog": "69db29552e4247978c7347dce923683f8cd56f28500a4245fd653b6c0221e6a0",
+        "mapping": "e5f81e7ad73ca51275c8abf3115bb09a01b091e2f612607ebb90f788d2331077"
+      },
+      "sourcePresetId": "growler-bass-v3-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Dirty Power Chord",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "guitar-power-chord",
+      "sourceHashes": {
+        "archive": "aaa26cd9c511def568a5211eeb5533b3c607114989934f3dd9dfddc6433182f1",
+        "catalog": "8218da23a4bfdbff49d97597a43adc7f2eb642849e1486af2e16133a28780c07",
+        "mapping": "fc113c97b5558e6f025eddc4edaf05992de0e8667d834d0620ceff3dd7f4ade6"
+      },
+      "sourcePresetId": "guitar-power-chord-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Hammered Dulcimer",
+      "generalMidiProgram": 15,
+      "isCanonicalForProgram": true,
+      "soundbankId": "hammered-dulcimer",
+      "sourceHashes": {
+        "archive": "c684e501ceff7057e72c4c6e401a534809902d2d04fd9e36c40dc28594b02274",
+        "catalog": "7d716bd83bdf9bf7934d76a4dd48743654096f310a32d8afb9d03a093b517b58",
+        "mapping": "b9f370113392ad27838f1d348891daa91d4eae12078932908f88066d88236814"
+      },
+      "sourcePresetId": "hammered-dulcimer-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Hard Rock",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hard-rock",
+      "sourceHashes": {
+        "archive": "536d96aa2b50f6ebed2d661026454e75cab82f57d8d3b609489914c586974f59",
+        "catalog": "e03807e8ff06622935f360995300bdcc1120df71f812e73263cd6481ec3dc7dc",
+        "mapping": "e3120d781708ba9fccd9801f9a52c40e743c196610ee95446cfed267f553c365"
+      },
+      "sourcePresetId": "hard-rock-kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Hardstyle",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hardstyle",
+      "sourceHashes": {
+        "archive": "be945c20fc5354fd91ceac30d40e642277d7e9fa11a861c25955e323fda7e171",
+        "catalog": "15717611758875716b3940a3178a5c70217f603eb9bf3f811e75fa506d47a5a9",
+        "mapping": "73a9e1a1e0cc911120e3712a0155f22a8a76ad162be264fa6f9ebf9ef216f059"
+      },
+      "sourcePresetId": "hardstyle-kit-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Harp",
+      "generalMidiProgram": 46,
+      "isCanonicalForProgram": true,
+      "soundbankId": "orchestral-harp",
+      "sourceHashes": {
+        "archive": "a8a1b2e05b0e324109b6786fea264568f58ca02bef519795384610820cb5470c",
+        "catalog": "bf3688f6b7ac8acb692bb2b7a553033104566ecaf430938fd75f431bc68a62fd",
+        "mapping": "f1e7e20e13d79ec83638bdbbcf43cdc0d1c4ae41d15782349fad32032def539d"
+      },
+      "sourcePresetId": "harp-v2-v4"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Sawtooth Harp",
+      "generalMidiProgram": 6,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sawtooth-harp",
+      "sourceHashes": {
+        "archive": "e8a8652156fcc00573536f8d090c017aa6961c8703e097cf050b5e7e4c1c0fc2",
+        "catalog": "740ecb55f604c4af2e4a6fe43e78b9ba74215296aa707e73ffe8eb406bc5f1e3",
+        "mapping": "e44e9ef0d983cac636718ed87f879affb7be04bc501a917e66edb6c0d1aa81a1"
+      },
+      "sourcePresetId": "harpsichord-v2-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Heavy Lead",
+      "generalMidiProgram": 87,
+      "isCanonicalForProgram": true,
+      "soundbankId": "heavy-lead",
+      "sourceHashes": {
+        "archive": "38a242b104aeeed7d94dd6cd65f1993bbf38912db5982a7157092e0125c6d24f",
+        "catalog": "b703a671701601f61150fba77649aac0104e6705440fccb1fb024967082bcae0",
+        "mapping": "eed63c41800497dbd31b1aca9b638a4ecee0341e4ad28697cb52c8a11d5a5130"
+      },
+      "sourcePresetId": "heavy-lead-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Hip Hop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hip-hop",
+      "sourceHashes": {
+        "archive": "d6917f0f11b3c166825dee5f56603d3c496be84c0098d95f27a3f8864da9e18c",
+        "catalog": "19c2f880c080cb596aeafa1df5a080cd7c1cca3eab6bda0dcaf36493b47e59a8",
+        "mapping": "d9f3126c2d874861fcce990f315d99c86db4816cc944fd30cd052083d2238c4c"
+      },
+      "sourcePresetId": "hip-hop-kit"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Honky Tonk Piano",
+      "generalMidiProgram": 3,
+      "isCanonicalForProgram": true,
+      "soundbankId": "honky-tonk-piano",
+      "sourceHashes": {
+        "archive": "f2b55ab320cfc93d073016b8a551596ec70493b63790b761e7f6a9c9ed975964",
+        "catalog": "da4031e0599f515a23d0598c6d5301433e77b49b7ea2cd981b442b7f2526023c",
+        "mapping": "2e1f5619efa27882c6b5fffeccd4cfe5c8eba3f2008e4507c78c900043a949da"
+      },
+      "sourcePresetId": "honky-tonk-piano-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "HOT Pop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hot-pop",
+      "sourceHashes": {
+        "archive": "6a4cca0c7f3bf139bf266fed22ef21b23851af79b4aeace4295989c92fc61cb8",
+        "catalog": "33fe0b20c7c2b1d0c754cc6a98b41d8a264a8f2c98fe5d102f34a87808a48474",
+        "mapping": "4b3b3d67e7ac08804d159f80b96a4ed8ee12bc98a4ee9f116453e7a30c43908f"
+      },
+      "sourcePresetId": "hot-pop-kit-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "House Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "house-bass",
+      "sourceHashes": {
+        "archive": "492aae7883b161d621763ab5d280e6185c8e629339c89b5d9d91ae46da646359",
+        "catalog": "f2bebf199e5bffc6f6ab3aff22405afcabed8580bd17de2a76d94353d18d139b",
+        "mapping": "c2832542afe4cb13a21319f7cc2de3048b687a2d91e16d2ca8c9c82cf640f266"
+      },
+      "sourcePresetId": "house-bass-v3-v4"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "House Organ",
+      "generalMidiProgram": 20,
+      "isCanonicalForProgram": false,
+      "soundbankId": "house-organ",
+      "sourceHashes": {
+        "archive": "18e878d8a00a5dce6ea327b7f526d871860194f30f7de92d28d9615b05135f42",
+        "catalog": "d59def76442c69d185c0853fe8575d5fff826ebedb0dd3cd5c98324f98d4b1b0",
+        "mapping": "5906cfc52d3f7ae6f8653dab63deb25eae0ff1aac3b860f7b25b19ae1e526d54"
+      },
+      "sourcePresetId": "house-organ-v2-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Hyper Pop Synth",
+      "generalMidiProgram": 81,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hyper-pop-synth",
+      "sourceHashes": {
+        "archive": "5f04228e2d1c547c40e0e7e08ff4d37d7e1ea5b00cb7634e90072f48df493b82",
+        "catalog": "b53042a031ab2bc6efa0944430f4d2a2f1702ec9230c5d3262821e163b530b80",
+        "mapping": "67d24ddfef3ae2fe59c81405fd261bc5d80cd2a4aeaeb6ddba7a6970866f04de"
+      },
+      "sourcePresetId": "hyper-pop-synth-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Hyperbrite Piano",
+      "generalMidiProgram": 1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "hyperbrite-piano",
+      "sourceHashes": {
+        "archive": "f8f68432dfd85dfe2662e280ddee4792b8f07617caf8ec96ab6b97f44ba05863",
+        "catalog": "aaea339120bcd0dad8dc6bc2d586df27f0b3ac6a0802cdf1ccf93a4ca2429370",
+        "mapping": "3ea6284b3f0e002e869a9482a9cdf2e1993a83b0bc7a3bde09ad6a151954d567"
+      },
+      "sourcePresetId": "hyperbrite-piano-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "IDM",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "idm",
+      "sourceHashes": {
+        "archive": "d9de0a7b4ca911715ade9c22d4546d33bdec632dde31c5cd2ce7b19c62f7d4f1",
+        "catalog": "ad51ae46d48b0f976dc5bfa5de2f82eb06c3b4fc4b3457f0ea9c5c10dff84f1b",
+        "mapping": "e39b591aa02c2b497fcb94383b32c1be15fbd9e32b0f272a8c6e86537dec99db"
+      },
+      "sourcePresetId": "idm-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Indie Rock",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "indie-rock",
+      "sourceHashes": {
+        "archive": "6934458dd5f611b1e86bf06acb9a674d8d39283063688428373ce53854926ba2",
+        "catalog": "e00e08df351af8c0ecb9f7fd461cd9dad39aaa58e18b4e43cb12953914a9c177",
+        "mapping": "bc65ee3a084703d3746aec06f18e32d6d3824d890a1487026e5c0fa84dcb9059"
+      },
+      "sourcePresetId": "indie-rock-kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Industrial",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "industrial",
+      "sourceHashes": {
+        "archive": "74452f362fe67643cd2df367d4281adc50b7bec9480c0da8a4a58a625ea71692",
+        "catalog": "f0df6b3ffffcb9423910562ac66e4c30954f49e22be2cce991ad70a1b7950ad1",
+        "mapping": "02d2b2838caa88fbfc168ab9ff3b6f859382a4a08be4e041d7b6bb4d64c3fef0"
+      },
+      "sourcePresetId": "industrial-kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "James Alister",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "james-alister",
+      "sourceHashes": {
+        "archive": "ba9916320ad6ec71eee57e5652175660bb7d3891c6df0339397aa7bb38c07e60",
+        "catalog": "44bafbeccb4250205220b5c10ddcfe0f27de8166d3133948ca07cb5110613e52",
+        "mapping": "c18a724a331b3ded8d29b6938bb60a667b7b1dce1a2682e9650e095c2ea32979"
+      },
+      "sourcePresetId": "james-alister-kit-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Jazz Bass",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "jazz-bass",
+      "sourceHashes": {
+        "archive": "62177ff6d056b49d3a08c1d409a09e7de0a26504cf238bc8c2953785b3166949",
+        "catalog": "e4b43c341d1bdb8169ac25269df0c7544685c06ec9bae8847def87eb4bcb2e25",
+        "mapping": "258e9da84333a2f7f705b7ea1653e55f62f21e2f060bb7944308a0fc350359a4"
+      },
+      "sourcePresetId": "jazz-bass-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Jazz Guitar",
+      "generalMidiProgram": 26,
+      "isCanonicalForProgram": true,
+      "soundbankId": "jazz-guitar",
+      "sourceHashes": {
+        "archive": "26d2cd092ba6da2c867c95df8e9269ce58b4ac4ae2def5fff513d2aa583273cf",
+        "catalog": "ecaaca8cff8c3a9e3853aea67e67c5cd1ef72bf9a4c01bf83fc9dc4f90b3108c",
+        "mapping": "71484a47005ce14843ccf6ae12f33e223a01fad073b7c3542da6097edef680f9"
+      },
+      "sourcePresetId": "jazz-guitar-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Jazz",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "jazz",
+      "sourceHashes": {
+        "archive": "0fc08d7b88b75ec55a8ea3248ea2464b49f4ac7e7d66123727b6ddaac58bc107",
+        "catalog": "7f73f030f26ce7171025d984d1d36e5ae214b76e09c2fecfef82f7fb434edeb8",
+        "mapping": "522504ca8fd2a62682a67c43fb8e2a7d3efb4029157d0eb4de5c6b33cd702721"
+      },
+      "sourcePresetId": "jazz-kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Jersey Club",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "jersey-club",
+      "sourceHashes": {
+        "archive": "6997ca222a36d7ad57c1b9f48e7b89f56fc9b3f2a86e0f0befd9b98928ba2e4c",
+        "catalog": "6555f24c2fdf0f14bbc37d0b9dee0d83455c8643c3500e9e5f858821d2faeaab",
+        "mapping": "f13c60d8e5aec69df7a271e8114942cad2a28914de8f6e377e7333e1f3bd5fee"
+      },
+      "sourcePresetId": "jersey-club-kit-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Kalimba",
+      "generalMidiProgram": 108,
+      "isCanonicalForProgram": true,
+      "soundbankId": "kalimba",
+      "sourceHashes": {
+        "archive": "aae25231bca86fc2971efd81cc94211eaa3aac589f00d20826e2a5a0538cff14",
+        "catalog": "f109791e6dc44525fba348840358911fbf10885eaaae1fb61cbc9aa7e046d761",
+        "mapping": "aa17c2944afcd0dd7ef75aeed7a108c33d21841f6ec4df8d05ab6af50048e46a"
+      },
+      "sourcePresetId": "kalimba-v3-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Kantele",
+      "generalMidiProgram": 107,
+      "isCanonicalForProgram": false,
+      "soundbankId": "kantele",
+      "sourceHashes": {
+        "archive": "2ba39685f8c18b193d995456c70b7d875d32849fc30f55e1d772ad03e36469a0",
+        "catalog": "a8ec730c56f33af287eba53902332ad2e24a6c12d1899041b058a687d891ab0f",
+        "mapping": "0e8d986fe14c2da3b4cfc3764acce7779767fd106023c699455f1227e264cb07"
+      },
+      "sourcePresetId": "kantele-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Koto",
+      "generalMidiProgram": 107,
+      "isCanonicalForProgram": true,
+      "soundbankId": "koto",
+      "sourceHashes": {
+        "archive": "a21ce353c0327947ce731b32e5a2ef466a825969c3c558b2ed5beab826072395",
+        "catalog": "a2b28855d8450a4842f4ccf9c1048f337e3f67c8f78384be75327dc7624a4ecb",
+        "mapping": "8e8612675ba95830e521d011ac8dd396f06d73babe06fb2e39ba5aed9428e0a6"
+      },
+      "sourcePresetId": "koto-v3-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Lately Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lately-bass",
+      "sourceHashes": {
+        "archive": "c07cdacf17a156c51faf94d095e7736708d69a46cf98b096b76de74c324d3b8a",
+        "catalog": "6e4283ad2680e3042487bcec8fa31467332cf488ec21c0459a6a8aa7e8d66907",
+        "mapping": "df6f38d15608083ee728ecaa60aecf59ba9d4c898e380d39a4bcd5add9465d1f"
+      },
+      "sourcePresetId": "lately-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Latin",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "latin",
+      "sourceHashes": {
+        "archive": "99eaa18bfdbbdff11e23af4e5fbaea374cf702d921db815d0bd6d5c7b5aa2f6d",
+        "catalog": "515b1918779e63476dfaf3eedf6f143c72e49ddfc03d912667351155bd58ddcc",
+        "mapping": "b3d51e4a96eff65d57de5927e018fc37cc7b5ba96bf41c3ec2217c1b13ea1956"
+      },
+      "sourcePresetId": "latin-kit"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "LCD",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lcd",
+      "sourceHashes": {
+        "archive": "ac8eeada34ed9523d6916c2dd98a6702ddcaef795b09d8661daf466b7994b2e0",
+        "catalog": "0fdd117484b17a29f7c083c7fed68352d702183d4cad379e47222cefb09aecd0",
+        "mapping": "6da40f17005eab1c75cc896a2f18351bf76520fd397600bfc249bfefe5c3fe70"
+      },
+      "sourcePresetId": "lcd-kit-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Ukulele",
+      "generalMidiProgram": 24,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ukulele",
+      "sourceHashes": {
+        "archive": "535a52bc9072d2f5f42b49e778e45f6130fad454dad7c247117d697d717f7123",
+        "catalog": "82de39901d509697613b4b64851205c14b6757e509e8ab364a84858de3ef2917",
+        "mapping": "a38eba37f827c9e62b9bccf7d8c226c507b70a13deb6fdaae76553c291e4e0da"
+      },
+      "sourcePresetId": "lil-ukelele-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Live",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "live",
+      "sourceHashes": {
+        "archive": "5180bb54f584590c11cba067a1aa72e03cfa36100dae6ffd9bd9329a5cedd7a8",
+        "catalog": "6945468e6cc7a6ecb9d5a8822d2be03c669d7998b95a2c539e644ddbf54be0ea",
+        "mapping": "c9a5b9fdc923be9124bb2e8c10a672cc22dea7f82c954956864799d5b1e7a8ff"
+      },
+      "sourcePresetId": "live-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Lofi Hop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lofi-hop",
+      "sourceHashes": {
+        "archive": "28645bea441668cf544bfd3cce8f91de7f9c5f353e160dd80961a10a4d15311e",
+        "catalog": "cb16fc0f498e696ac718698c0d5cfa2343ced844f85f51ae1c1d6af5b9614964",
+        "mapping": "38a8cdec25d99036936f5e430d0233b58c36c23c715461f2d9e6e6c45ffbc0a4"
+      },
+      "sourcePresetId": "lo-fi-hop-kit-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Psychedelic",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "psychedelic",
+      "sourceHashes": {
+        "archive": "aa1c60c89d945e2d44da0e9a65b066f368d6e5ebe4b0d6d77c419e462f1f0db7",
+        "catalog": "7a55830d1558ae628c3456e537a78d2aca88b3651f6f7cdcdf588aafac48d657",
+        "mapping": "08a26fb291dea01c6a8135b4a9f0be981fbeed5c59900a630e3085273c628184"
+      },
+      "sourcePresetId": "lo-fi-kit-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Lofi Piano",
+      "generalMidiProgram": 2,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lofi-piano",
+      "sourceHashes": {
+        "archive": "bc0d4d11a2f5103d2ced06fe66fad6415193e2a66ceeff1e27960902a9143bbd",
+        "catalog": "f52282797a3437e0539b4af349133066f7256118cd58a605e3526f54a1a83091",
+        "mapping": "08163ee3254d177347781756dce13b73f0020c0a1fc1e814e99513eea86ba607"
+      },
+      "sourcePresetId": "lofi-piano-v2-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Lush Vocals",
+      "generalMidiProgram": 91,
+      "isCanonicalForProgram": false,
+      "soundbankId": "lush-vocals",
+      "sourceHashes": {
+        "archive": "7141df77f83ebd9a24225c3ccd1ccd1b0548da5930d44baf20c396597e40f120",
+        "catalog": "4aeba29fb9fbd9d8faa51c654475464364849c945eb5355514aff73ad6170c7b",
+        "mapping": "9f9724ba8d98f4e2ec8ffcded1d2e0e61edc54c221c6a265ff1b785826c9b694"
+      },
+      "sourcePresetId": "lush-vocals-v2-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Male Ooh",
+      "generalMidiProgram": 53,
+      "isCanonicalForProgram": false,
+      "soundbankId": "male-ooh",
+      "sourceHashes": {
+        "archive": "f5f26ecf78953055c660398a160725168c9b5df1dd496988467cec945738ee3d",
+        "catalog": "282cb5175bf016000e0b0482a4f1256ec88a8cff9de972461f342da0e85052a1",
+        "mapping": "42d6b2918a6860fde71d646c06487a71afb590a93cf72923210f05548270ec2e"
+      },
+      "sourcePresetId": "male-ooh-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Mandolin",
+      "generalMidiProgram": 24,
+      "isCanonicalForProgram": false,
+      "soundbankId": "mandolin",
+      "sourceHashes": {
+        "archive": "a7384524c7ff2a35cab3addc25f68e5068ec42ed2ad414f6521fa2519e04c5a3",
+        "catalog": "b39753e0432815f88e9a130f3b0bf85b4c0e108876cdb5de69e8f6b7e6b03f58",
+        "mapping": "1e46a0d0b4c26ef0786c9ae39c21be9e78f86a56c7c8567862272977cf1efb1a"
+      },
+      "sourcePresetId": "mandolin-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Marimba",
+      "generalMidiProgram": 12,
+      "isCanonicalForProgram": true,
+      "soundbankId": "marimba",
+      "sourceHashes": {
+        "archive": "65d0b0ca1e2dd0708b4b599eb9753e8332e453733ae9e0e2e728dac0fe2a2718",
+        "catalog": "cdf2811b53b5283e1cf9304565c3bc4ccadf73e87e77b591e488e54fd06a1746",
+        "mapping": "0fc261fdd8c13f8e67e1f9d7f4c0fca28c63da0b0df6947cf5f926c1e9d56a2b"
+      },
+      "sourcePresetId": "marimba-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Matt",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "matt",
+      "sourceHashes": {
+        "archive": "4cd29016d1f901698fa3892776784c33a26e55fe3b52f529e7190410c602a0c6",
+        "catalog": "5293b37b94fa53400251465e76bea478dba541b3d3bbcc98677652e5114af4e9",
+        "mapping": "61b9942df6eebf49962c6025eda3a043e48ed2fcd317713d2fc5b675c3b46b23"
+      },
+      "sourcePresetId": "matt-kit-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Metal Guitar",
+      "generalMidiProgram": 30,
+      "isCanonicalForProgram": false,
+      "soundbankId": "metal-guitar",
+      "sourceHashes": {
+        "archive": "a4cd12716a69b5d6e5744f2a049afc8a4309ae7233686d0db8e6478d3638ec27",
+        "catalog": "dacba034ec77e1cfc3974cdfb2b0fda605d3754c0313d3b450e8d94a085c8c99",
+        "mapping": "c5bec680adae844595ab9b7bfd5398bd8b6347ac7cef2e8b15e5b97b1771d340"
+      },
+      "sourcePresetId": "metal-guitar-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Modern Hip Hop Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "modern-hip-hop-bass",
+      "sourceHashes": {
+        "archive": "bfb181fc4f7ecb26e3a40391e8d1d987f587a9887df9cb4a5ecc7e2c33201ad3",
+        "catalog": "6b9e86495bee8d0630ccee84d9baea191e6c37413899e2a45c3140b99e1e1484",
+        "mapping": "d81d40d2b93bcbde2c29ba8115931ee1dbd81ffa1d85a45b99321f3cc01b73bd"
+      },
+      "sourcePresetId": "modern-hip-hop-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Modern Metal",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "modern-metal",
+      "sourceHashes": {
+        "archive": "0ba29dd56030ce9a9bdeab54f71ad81bd54ad92ac4e987ebb3ae948839b239ee",
+        "catalog": "f2687c6ee732e9eaee34513d71d5036b81af399dc9d66badce385cc1189d921c",
+        "mapping": "e6e307f205636e2d0cbfd3f5e819377e0009bb68d0864a96fe9a2c952a1a9b4d"
+      },
+      "sourcePresetId": "modern-metal-kit-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Mook Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "mook-bass",
+      "sourceHashes": {
+        "archive": "b1f2ad5a0572848d113563d5f1a4c63710703faecbafee8d5e08d49533f7ba6c",
+        "catalog": "b269b35411ded296dab12fc8dfb619c359908769b9c7761b1bfa0953de809694",
+        "mapping": "6c1855c209b2339106676073f85ea6554b12e9c192e4e9236805c139ae7004db"
+      },
+      "sourcePresetId": "moog-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Motorcity",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "motorcity",
+      "sourceHashes": {
+        "archive": "71504a571798a8125164ccd22cf2823e980dbc429262152dba5dce28bd4f212d",
+        "catalog": "cdc85cf3d5a3c9d06f9b247e64891d4b6b5f3ab6e9bf8f5327976e28f81f6826",
+        "mapping": "a5b0b31b124cf3a3285edb70b7e1f3ae31f0e0bba4ae46df3809741dd31177be"
+      },
+      "sourcePresetId": "motorcity-kit-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Nails",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nails",
+      "sourceHashes": {
+        "archive": "1d511c131731103676a834bc23883632b19f28fe409c5fbc410844688981ac6a",
+        "catalog": "81fb60cac7520d782dae027fb4f3b686fb4153c1f5aabe137597f9bb70cded69",
+        "mapping": "e5ee37d2a16869506c39d0e4b8ec1b2e6748f15ec1468c11ba927901a48739ff"
+      },
+      "sourcePresetId": "nails-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Natty",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "natty",
+      "sourceHashes": {
+        "archive": "37a0492dc80c0510605bce77eceb90b2fd778b5942c4d7fc2e6b3a0ba8f9080d",
+        "catalog": "0264985c98d0d42d2a5fcfcfdb646dd417016689b9dd42a434d84706e40c6f66",
+        "mapping": "c1db655d309b2b0d35e321a4c1ea6309f1c96c46d9823c530e194403675a4e00"
+      },
+      "sourcePresetId": "natty-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Neo Soul",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "neo-soul",
+      "sourceHashes": {
+        "archive": "edd0e128fed6a07b24fe32125f91bc02023b842ea4b061655f14227c8c7e7c8f",
+        "catalog": "59abe467ae39de0402a9f94a709844da53b369854a133d16e8f3dd7d782dfd3f",
+        "mapping": "617c3ecbc9eff98409a67455dd0192b0f8f908ad41e8c464d8b11c75323e6ea5"
+      },
+      "sourcePresetId": "neo-soul-kit-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Neo Soul Pad",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": false,
+      "soundbankId": "neo-soul-pad",
+      "sourceHashes": {
+        "archive": "777737c799f24da39ed9750ba2102166f9ed9fcc51622f0d89d424630a456817",
+        "catalog": "760dd91192a95a247400b91787e6fd37c79b1810ededc3368457f4ef83c7dca5",
+        "mapping": "a1df74d37ac6a8e33bc179b8c3f55d6e87a10821602bb969f0f5c3ee414e4e7c"
+      },
+      "sourcePresetId": "neo-soul-pad-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Neptunian",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "neptunian",
+      "sourceHashes": {
+        "archive": "a544c108a61ad428e69e59822c4634e101fed18c4580d7732669500dfd936ccb",
+        "catalog": "50aeec5d7501f397b6fbfac3bee4339245a57fd511d78726fbbbfae359c1a6d4",
+        "mapping": "8d1d3e49af9c0d97ba02ae99178667087a56107f45e1ac0a55345b88f1c7d66e"
+      },
+      "sourcePresetId": "neptunian-kit-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "New Age Synth",
+      "generalMidiProgram": 88,
+      "isCanonicalForProgram": true,
+      "soundbankId": "new-age-synth",
+      "sourceHashes": {
+        "archive": "ff862422b639297161d830aea44f2de5ae4167437f766f80c4f9fb16dd292e0b",
+        "catalog": "661a662cf723cb63d5199180546c2df62be5e1e323207e875db9c6efcd763906",
+        "mapping": "e6ed743c50a8e9f24239127bb06cbbe82e501f22d1f9bec144af641f20ba0220"
+      },
+      "sourcePresetId": "new-age-synth-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "New Wave",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "new-wave",
+      "sourceHashes": {
+        "archive": "80dcd0507b98cba26c04c5a91cd4f901458cfcbd6e9e95439bf6157eb9a088c3",
+        "catalog": "ad2e6962b72836832773715c77948854e17fc9ab5537bb2f28bda492e5ce1374",
+        "mapping": "ba84f1e2de90a613ae3afed3e2bcf7fa5167aae13e5bcd64cff38a97eca18f08"
+      },
+      "sourcePresetId": "new-wave-kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Nifty",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nifty",
+      "sourceHashes": {
+        "archive": "2cfa1728f6c43867aaf5cb7c04f52426c732a2da8ba4786a39ba440fe8f78aa7",
+        "catalog": "78be79ba0bbc6c7811b4c6dbc03bb2a4d714debeec6a04524983395c33bfcf34",
+        "mapping": "b3bca504ba9b573703b1dea1a80eb5b31deb3e24a753202746601de26b915dba"
+      },
+      "sourcePresetId": "nifty-kit-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Nu Disco Bass",
+      "generalMidiProgram": 36,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nu-disco-bass",
+      "sourceHashes": {
+        "archive": "fed51f6e19a2e60a060eeeea462d2b9f55338fa0001f7bf3f9026d16be304dfb",
+        "catalog": "02dd076762f1978cba71912aa5cc6c3886429b62d2e08ace7c2ff139a2b4affa",
+        "mapping": "49f977240f044428b8eb6741408d1dbdc44f01f23e6270df8626b8402dea73c0"
+      },
+      "sourcePresetId": "nu-disco-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Nu House",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nu-house",
+      "sourceHashes": {
+        "archive": "5b3a9bac46c029f7c22a86d88d4fc7e6692adabaa534a768cac97a2960407e40",
+        "catalog": "5aea7fb7e1683056fcd3eb456384fcb8799edf57edd89e856850ae6b0e2dd99e",
+        "mapping": "2359ad4cd67de2e28a2f1ff33472b01615fc83a883bd93a5536e11324a826f9e"
+      },
+      "sourcePresetId": "nu-house-kit"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Nylon Guitar",
+      "generalMidiProgram": 24,
+      "isCanonicalForProgram": true,
+      "soundbankId": "nylon-guitar",
+      "sourceHashes": {
+        "archive": "d84aba20d416a699a0e19a5ef679c577242f0766d4e56b1ed59105e52fd4e819",
+        "catalog": "e50d6d9deffae18b5d0e11dba0d24b650f46e9ad6f17612dc29e49b3f571eb5e",
+        "mapping": "37f726bab79517dbe24a197c4a9cf5d1b6591bd0f8bc22a7d27950eae8649760"
+      },
+      "sourcePresetId": "nylon-guitar-v2-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Oboe",
+      "generalMidiProgram": 68,
+      "isCanonicalForProgram": true,
+      "soundbankId": "oboe",
+      "sourceHashes": {
+        "archive": "97cbc196f675184ad278df8435adeddf6e951bb208f36dae354656f2e3ac2f2e",
+        "catalog": "6b09f7999dee0dfcd161174e5e496e14d5c6dfee5993f89b0a38256706dd88f6",
+        "mapping": "a9e2374a76fd48b93cf553b0907ab818d51ac1176da11fb05d8d833b8d2cf6bc"
+      },
+      "sourcePresetId": "oboe-v3-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Overdriven Guitar",
+      "generalMidiProgram": 29,
+      "isCanonicalForProgram": true,
+      "soundbankId": "overdriven-guitar",
+      "sourceHashes": {
+        "archive": "919460378f138df739643299df64e04712407c0dca25f799218286c71c28b76a",
+        "catalog": "6cb90cc0e6ae641207211b1703371e4f6afd1e42049727adb728622f6966c2c3",
+        "mapping": "02714cd9b65eeaeb1d0cb8d4cf5b66e722c0aca94eb1984100d0188a71679db0"
+      },
+      "sourcePresetId": "overdriven-guitar-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Overdriven Power Chord",
+      "generalMidiProgram": 29,
+      "isCanonicalForProgram": false,
+      "soundbankId": "overdriven-power-chord",
+      "sourceHashes": {
+        "archive": "d78b10575a62fec80e1cc857e3fae50252eb4aba38b27d03f5dd9012f09fa275",
+        "catalog": "c18275d4f32ec2be012c2ed52b8a4bd0e8c3a5b57516ff1578df21611e0ccf20",
+        "mapping": "3729c9163d55c0c8c2b06ef5284d56fa540573041251aae404e8b2baf3ebd3fa"
+      },
+      "sourcePresetId": "overdriven-power-chord-v2-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Pan Flute",
+      "generalMidiProgram": 75,
+      "isCanonicalForProgram": true,
+      "soundbankId": "pan-flute",
+      "sourceHashes": {
+        "archive": "2588f1c980f6a2ce11f723051677605829e9e57abeabf38f5e4b6bb009c7d0f6",
+        "catalog": "7a0aa022d8e77ddc8d6aca8664e9899211946db95e5503cf5359319066389df7",
+        "mapping": "8663a2f5b26e9e8ad6e5860bf3d8251ccdda9bd167cc1c7f4cc03f3c76616d33"
+      },
+      "sourcePresetId": "pan-flute-v4-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Paper",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "paper",
+      "sourceHashes": {
+        "archive": "d166eb9ae41462ddae242523e59f80da8582c22707644fe74e220b5b9b15ff5e",
+        "catalog": "785a785b01876a6e5fbe8231f0b6a63f08786c4224e7642d321d4b154b3d2dbf",
+        "mapping": "4d4ea46a50266f2f7f647cd0bc7e23db72c42371b2e8cc353ec5d9f6df55998e"
+      },
+      "sourcePresetId": "paper-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Party Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "party-bass",
+      "sourceHashes": {
+        "archive": "be4f92696f1c52749afb46b35be3ea9a2149e8027ef7dc14b67775cdd6851b92",
+        "catalog": "6e02e59a0725ffe990d9a6f9ec7bbb739505a8efc99c64729d6a3a7113dcc86c",
+        "mapping": "f540e99980d8de656be3a40e11022301519ebac0f4166112a428e2f8e44703cf"
+      },
+      "sourcePresetId": "party-bass-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Percussion Plonk",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "percussion-plonk",
+      "sourceHashes": {
+        "archive": "9d8a546f49b32692b7f2bec1a897f266a5dcd732472b5d38b7256fae76635981",
+        "catalog": "e4533bae6f0458d5e67f2e99ecac3d5eb6c9a21dc9117d76d22eb0e1d375cdcc",
+        "mapping": "3a3c60fcea40cc53b67d28681e3d81ea394f29fc59bfad982f24f26c8e632104"
+      },
+      "sourcePresetId": "percussion-plonk-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Pillow",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "pillow",
+      "sourceHashes": {
+        "archive": "52e5fa873652360f7b7a726e00142a27d0574d07372f28192308709773e6f32d",
+        "catalog": "f491f0c8d98aaa57d63f0e25b2b5ffd02645b71db92f905aa2b00c302ad2fe41",
+        "mapping": "bab88811d3733af372fd7526e86ff4d203d106f29acbdefe35e7535bee048fa0"
+      },
+      "sourcePresetId": "pillow-kit-v4"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Nova Pluck",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "nova-pluck",
+      "sourceHashes": {
+        "archive": "f704a7e3a718a9ccd2d206ce3a52f2f7d70c5bcce57433a4893945323074959c",
+        "catalog": "909f9f0ca6939e6ba4f98f9a79d87a0fcfecf45bf10405f7aec3c76a0fea074e",
+        "mapping": "8bdbae0368514d9d4896060658f97d1036de3b3259d9c61e5884c48e36967c88"
+      },
+      "sourcePresetId": "plucked-lead-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Pop Rock",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "pop-rock",
+      "sourceHashes": {
+        "archive": "18f6e6b0e224f1a58f7322c97be89b8ed86d5a70dfa5d13e1e20b86dcc18e2e5",
+        "catalog": "547af80fdf212170a1ba59549622e86bac1c8f62a868d74810343175c68b1468",
+        "mapping": "6fabe711b9e22ec26a447eb22f7af37aba8432f4ef6a197dc7ce42e13fe2161e"
+      },
+      "sourcePresetId": "pop-rock-kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Post Punk",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "post-punk",
+      "sourceHashes": {
+        "archive": "6cbacade05f27d952da9cc653ae243fe7e54ac4f3e4bbefdf62da8e068eb2f34",
+        "catalog": "3b68b49c217908b576460c8eed617c0cddf3ec317cf93325eef203983bcce87a",
+        "mapping": "1475b1531a33743735b2b42a0a2b1476d251696ced85cb088f509202bcd2f809"
+      },
+      "sourcePresetId": "post-punk-kit-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Prince",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "prince",
+      "sourceHashes": {
+        "archive": "97f1e76798839b0d02cecd158b0ce393dbdee0245fc791900c05555fdc7790df",
+        "catalog": "523f7c832cb30e5fae0210fb0498d2fdc6de9b42f32a57a07f883d6817c7f67b",
+        "mapping": "a2c681306d893f45164498312118d1c2d67d0209e5fcb27e89bd4574301ff028"
+      },
+      "sourcePresetId": "prince-kit"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Pumped Up Bass",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "pumped-up-bass",
+      "sourceHashes": {
+        "archive": "af16ed96d1da5a4e5f9f0f1a16bed046ad79da600157651172feb100e56df371",
+        "catalog": "1d542bf6699c1528b252f243a876baf6597ea7c5e1851d963138cfce4f030809",
+        "mapping": "3867374828ee1b0a1e4f37927fd0012ad05f6e60a1c469a3a38c4f2777eb98a4"
+      },
+      "sourcePresetId": "pumped-up-bass-v2-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Punchy Jazz Bass",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "punchy-jazz-bass",
+      "sourceHashes": {
+        "archive": "227ff5df3f3c40b3392340453e412dcbbd5d227282c860d68f2e0185e9c282ed",
+        "catalog": "a4c30794b8c63059d96ded4d4118300d8966d5b382239d3c34a1c9947b6e3fd6",
+        "mapping": "ccf4c001d89ad8db4d89b22348f2022b72c19e6a6a0ef0a11965a29706076de0"
+      },
+      "sourcePresetId": "punchy-jazz-bass-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Punchy",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "punchy",
+      "sourceHashes": {
+        "archive": "de865f3b205cd0afce13784445e4f535c5de5721508bcdec4aef3574ced0a722",
+        "catalog": "3faa00957e073f57ba26f25c11f07aa7f07316f0d8382a9af80623d5e0bb42b8",
+        "mapping": "af4d03dbdc5823c484c50ff96554ff9d24ad4b03047584c3b83bbd28c01b0c18"
+      },
+      "sourcePresetId": "punchy-kit-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Puppet",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "puppet",
+      "sourceHashes": {
+        "archive": "f6e8a7df19e1ab2f3abc0a48a69d7ba6875b1ee4d7bc0e93f965a605237f155a",
+        "catalog": "036ede700101728bbd647790afe9bf4c7315d9fc3ade7a70e046c3486b6d38fe",
+        "mapping": "90833379cd98c9d405b3bb4d781d1618e434e8824ed14f68d8647c338fc5224b"
+      },
+      "sourcePresetId": "puppet-pad-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Raw",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "raw",
+      "sourceHashes": {
+        "archive": "d48bd0190a1f70c359706ae71cfd7748d215393f6d20f31184d111f44dfc0c73",
+        "catalog": "f00ae57b53745d572f74be512a782cc20700467b5820fe41a651f192c0991424",
+        "mapping": "8601c998abd2d344f4ad5df24b99df33cbc16250c7756d23a8efdd950a534353"
+      },
+      "sourcePresetId": "raw-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Reggae",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "reggae",
+      "sourceHashes": {
+        "archive": "98c1573a1c09ebe3bca0ee9c7ee2bda6a3eb0a3c032201602dd269778e800460",
+        "catalog": "4601e016dcaab6451d74c59c384cf9983cfa499d8fdb19aea9c94d18990f4fbf",
+        "mapping": "f873d14bafd894ce186ae9c3c8708a4c420fa1ac816fcfe2c753e733afcfdb83"
+      },
+      "sourcePresetId": "reggae-kit"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Retro Juno Pad",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "retro-juno-pad",
+      "sourceHashes": {
+        "archive": "901690a73bff4078a24ff9aebe31e05df00ecebc0ed576bbeee0f8d28342dfff",
+        "catalog": "66aa795f00bc6b0821f833245ad7731ecb140b3a80854034e5da9dbab5243327",
+        "mapping": "eadb68300fe588c4f2baed3007ee645e7823c85078414527a18b28cba6cf5732"
+      },
+      "sourcePresetId": "retro-juno-pad-v2-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Retro Pick Bass",
+      "generalMidiProgram": 33,
+      "isCanonicalForProgram": false,
+      "soundbankId": "retro-pick-bass",
+      "sourceHashes": {
+        "archive": "61a9d2482be1980e6178208eaf8b2992f4d7ffb1ba3361be8c1efaf5487d424e",
+        "catalog": "2dca1156f4e68fa0172d1494e840497738abd6f39155a4369e1c0be4e2f0c71f",
+        "mapping": "0a60d872899bf05cb798b598eeabfe7457fade1d38f610fada47ee59cad638b4"
+      },
+      "sourcePresetId": "retro-pick-bass-v2-v4"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Retro Synth Brass",
+      "generalMidiProgram": 62,
+      "isCanonicalForProgram": false,
+      "soundbankId": "retro-synth-brass",
+      "sourceHashes": {
+        "archive": "31bcc51a055d8aa672763797f5b8b8ddc19c83c1ad01cd07abf0a389fce2ef4a",
+        "catalog": "ad46574f8f3e58d149e1b95202975ba0447bdcaac1dbb659bf23390e05bc807e",
+        "mapping": "9eaead7fc7a829c6066cd8d2008e2faf34cd77e284cc07289588b0095a5ea722"
+      },
+      "sourcePresetId": "retro-synth-brass-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Mellow EP",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "mellow-ep",
+      "sourceHashes": {
+        "archive": "ebed6b00c6fe51937398e877a11d9d7de9d9dddecc8e68fb378243f523f6980a",
+        "catalog": "a3faefaa50b14ddf4b733b9ce2ce89fcae87141b5a52bf42de8a5d08040a5702",
+        "mapping": "f48ebfddf5acb9f13ceb0ce9691735b414355fe4dc0b7cc29839517d39ab9139"
+      },
+      "sourcePresetId": "rhodes-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "R&B",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "r-b",
+      "sourceHashes": {
+        "archive": "6b012007a6c529bf5436e973b3f49a926cfa8103a973d73db36c54a0a2d6097b",
+        "catalog": "a87fbb864ce6e6f13b9b1f03a087002938de9fefd9c887fe687bc2d3996b57ff",
+        "mapping": "3044ee0eea859472150c5efebc6bdb282efa3f6a44dd713dd07e9fd6e6959020"
+      },
+      "sourcePresetId": "rnb-kit-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Rock",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "rock",
+      "sourceHashes": {
+        "archive": "694d40927f57211b12477095aa89e8b7b966aebb97da67c302bb6dc779325390",
+        "catalog": "1395c839b117de9deb99c042364720bb11b98c5567f3300f94251f239f4d34ac",
+        "mapping": "a20cbcb50b42dc52527d7936cb40eb06b2c26628838157d4c610a945a07563f5"
+      },
+      "sourcePresetId": "rock-kit-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Rock Organ",
+      "generalMidiProgram": 18,
+      "isCanonicalForProgram": true,
+      "soundbankId": "rock-organ",
+      "sourceHashes": {
+        "archive": "d1992d893290664d116ee1ba580089032bb38ba90c249470bd105043845ff85f",
+        "catalog": "fb6c56f31802150493f1d2dbe1778a6776da1c1da33150dec3d45cc0cb890816",
+        "mapping": "a49fa317214dcd51276905fd787b64697c4ea36d62b434dbd74374cc1c8e74e6"
+      },
+      "sourcePresetId": "rock-organ-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Rumble Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "rumble-bass",
+      "sourceHashes": {
+        "archive": "9d628f398abcbfbe0e46c707db55af51dc6cb919b89cf0b919fbecf17a0b05bd",
+        "catalog": "123d840dd0c35e9364adf3e624c7ae1f791766f1941f7c9fbbf5f6b3d51078a4",
+        "mapping": "1db10eafb5936d40aa029a7c35842864004b5af57282b77452979ae3d0a6a142"
+      },
+      "sourcePresetId": "rumble-bass-v4-v4"
+    },
+    {
+      "categoryId": "special-effects",
+      "displayName": "SFX",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sfx",
+      "sourceHashes": {
+        "archive": "85c538ad4e0a431c9264e7923cc703161330b411c35ae01d47f84c57335691f8",
+        "catalog": "c021f5a9bb9f2efb6a9e584ffa621afe11d44ecd3d4eaa62009173fd7c9a6fe2",
+        "mapping": "1c6a8abd6263f414474b1caf63f1eccb3a868be07faca19cf4e73beeee0d3ccd"
+      },
+      "sourcePresetId": "sfx-pad"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Sinister Trap",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sinister-trap",
+      "sourceHashes": {
+        "archive": "703a4e3a1c2dd52a92631c5e61da12c3519079e137847d4047865a8e89dfb031",
+        "catalog": "62c8ac92a933a1c7488a60c5e2d3281e963bb530a56bc77f65164a0fd988b8df",
+        "mapping": "45aac363ba6031519ea6b3c7687705af3352bb6771b4b621344d8d11f8c191f9"
+      },
+      "sourcePresetId": "sinister-trap-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Sitar",
+      "generalMidiProgram": 104,
+      "isCanonicalForProgram": true,
+      "soundbankId": "sitar",
+      "sourceHashes": {
+        "archive": "502a8f9efe04d7cb8f73dd605b4a6876f0aeaa49c1b004be03092b5d3f3b38e6",
+        "catalog": "73b8e61957b2033c87889c75ec44a839d159c695f3a25a61bded525d80958e3f",
+        "mapping": "3ca7dc9d948562cf2985428de28ee77913934378f247727a1df5a6d94ae816e8"
+      },
+      "sourcePresetId": "sitar-v3-v4"
+    },
+    {
+      "categoryId": "bass",
+      "displayName": "Slap Bass",
+      "generalMidiProgram": 36,
+      "isCanonicalForProgram": true,
+      "soundbankId": "slap-bass",
+      "sourceHashes": {
+        "archive": "c4c04ca0835536fe96dfaf80e2ed3c420cb4e66117e4ba579422b0c8916d094c",
+        "catalog": "f4e5e986a3400d159c52a04b111a06a94f2ca977de386f5785f6ff38e7c48cc4",
+        "mapping": "8cfa9c1b96defc0116f56f6dfde58de3c8c1bb8b0250982b31f45531ffe157b5"
+      },
+      "sourcePresetId": "slap-bass-v2-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Smooth Brass Pad",
+      "generalMidiProgram": 62,
+      "isCanonicalForProgram": false,
+      "soundbankId": "smooth-brass-pad",
+      "sourceHashes": {
+        "archive": "312ffa4908fffc90c5ed8fc37e398415935e409bb839aaa7140624b40c3dc1c5",
+        "catalog": "1087e2eef5ce25da032d337a02ca7a05e47544430d31bfb84b8aa55da254dfc2",
+        "mapping": "2ea5d0494364a9b2f9b4365257a331a5da3c8558be800c6f1459dad3bdeeb9fc"
+      },
+      "sourcePresetId": "smooth-brass-pad-v2-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Solo Female Ahh",
+      "generalMidiProgram": 52,
+      "isCanonicalForProgram": false,
+      "soundbankId": "solo-female-ahh",
+      "sourceHashes": {
+        "archive": "0a7d7497f5172e65675788efe50a569a62b920ccb70b6da9f44eb9b40b2bf298",
+        "catalog": "79cef46dbd5f1b533a028f9c7d737c1a8ba40068f3a7582538650f5c2fbbf6f1",
+        "mapping": "2c9c3d730048df789af0933e7b26df2a99eebead13d63b5a1e7969ab4ba8f14f"
+      },
+      "sourcePresetId": "solo-female-ahh-v4-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Solo Violin",
+      "generalMidiProgram": 40,
+      "isCanonicalForProgram": true,
+      "soundbankId": "solo-violin",
+      "sourceHashes": {
+        "archive": "b0f52eceb8b5a133f6d8b4e985de707f5034ce8bb8fb9e2e8d987e4ccaebd561",
+        "catalog": "d8843de2aa18c36d1aeea4fba0bac15f4a820502d8f476274feed7440ee49c20",
+        "mapping": "a190d0cf4feef4eaf04e10c5ec7913583b82089ba9ecb751f60964a1532871ff"
+      },
+      "sourcePresetId": "solo-violin-v3-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Soul",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "soul",
+      "sourceHashes": {
+        "archive": "95b7cef305c62df4373fc260236cdc4a69918bf233320224cde608e54bdce340",
+        "catalog": "69b200d2e59c8c2f25c74bff2a661fb790fc6259766591609e5c94c70ffca55f",
+        "mapping": "d860c19d2820f9a05bb87e40939a4ee2c96291c76327c0dee9ab1c14e0398d89"
+      },
+      "sourcePresetId": "soul-kit-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Space Bot",
+      "generalMidiProgram": 54,
+      "isCanonicalForProgram": false,
+      "soundbankId": "space-bot",
+      "sourceHashes": {
+        "archive": "eb7c3fe024ad6bba7dbd2bdd7212a72c91fddf422c056e1e95f26eaa8bd6f93c",
+        "catalog": "f4881e8c69fe65fc49dabb5d45593e730ee2b01937443a7e250e577773a65e60",
+        "mapping": "c09c3e0aa3a33a8dd2c23f0f7a075a417072cb65fab534d8e9d69e0d5822fb9a"
+      },
+      "sourcePresetId": "space-bot-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Acoustic Guitar",
+      "generalMidiProgram": 25,
+      "isCanonicalForProgram": true,
+      "soundbankId": "sparkling-acoustic",
+      "sourceHashes": {
+        "archive": "a848b3e94bd737a3da8957bd5df9d2c9294bbf8b8957336bbf6b45d75bbeed24",
+        "catalog": "26f5432a45d1d77c781c4754842270066b683b0f3e633a32153241ecaa2e8b80",
+        "mapping": "fa74777915972cc83ed6be0140a33697d2902be9f6c13a7ea7839558bbf7bb61"
+      },
+      "sourcePresetId": "sparkling-acoustic-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Square Sub Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "square-sub-bass",
+      "sourceHashes": {
+        "archive": "729184e0452aad29dc246953002fe2bff213e46789558dd26002b20be69577ca",
+        "catalog": "a2c75e7c7f86ace236a3a6da9776b13e769ab282bbfb96e82c2d3570847de7ca",
+        "mapping": "10ad1b95d9b7aa59e0019c760b914d95a5b5351305d3ec557cdba267e2450daf"
+      },
+      "sourcePresetId": "square-sub-bass-v3-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Steel Drum",
+      "generalMidiProgram": 114,
+      "isCanonicalForProgram": true,
+      "soundbankId": "steel-drum",
+      "sourceHashes": {
+        "archive": "e284cae8d5e1cb53d58754b7e9d6d179c88ce83c062e22aaf488bd78d43f88b8",
+        "catalog": "7021db0b7d40636fde128730dd4d7a1289658841ddd661a52237eca84af5f50b",
+        "mapping": "eb3144b9b39de8e37063de29b5114bce67b6daaf12bd3e42e1c2aec60f7dcc37"
+      },
+      "sourcePresetId": "steel-drum-v2-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Steve Jackson",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "steve-jackson",
+      "sourceHashes": {
+        "archive": "b0b02873d089565d5522eefdb7abbcb531b73c89c168084487ba6e605746d670",
+        "catalog": "3d015f53bca1ad341c656d3a51ebec888329873c31a3ed44a1901a965b0142bb",
+        "mapping": "262beec3546f5335237ed3274ad39232ed0daca515142088c490c3ffa911607b"
+      },
+      "sourcePresetId": "steve-jackson-kit-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "String Orchestra Pizz",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "string-orchestra-pizz",
+      "sourceHashes": {
+        "archive": "848d096537411965820a563e1e79f692fcf32e7932cb26fe3abe227fab48c79c",
+        "catalog": "e2a608e881058eac4a2935f5c240c715b45c2ffb0ded5ee558559ff24d1a5039",
+        "mapping": "5e246deada3350e612a6896ce8f5ed51979da453a2b5097dcc8e0f3f54480948"
+      },
+      "sourcePresetId": "string-orchestra-pizz-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "String Orchestra Stacc",
+      "generalMidiProgram": 48,
+      "isCanonicalForProgram": false,
+      "soundbankId": "string-orchestra-stacc",
+      "sourceHashes": {
+        "archive": "99c6fb92919b4aa6981e39192e08cd2fbe0a9ba6a9de01008b830c2c5c7e6bfe",
+        "catalog": "94596d7343d20423c00e824defd02d2efe0a9c70aa437a4852c6478b5fb7dfb8",
+        "mapping": "cb3bec0e52db46e2c39d757a6f68fb1506e16dcb72ca97a9bae4cdfaaf91ec1a"
+      },
+      "sourcePresetId": "string-orchestra-stacc-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "String Orchestra",
+      "generalMidiProgram": 48,
+      "isCanonicalForProgram": true,
+      "soundbankId": "string-ensemble",
+      "sourceHashes": {
+        "archive": "114506e1eb58d576a93dc652b2fccc858058a441990cbd10539a2888bcb06b5f",
+        "catalog": "a2c4116a209adb91c22c21cdb7506ccb781275e8a81d592a56b86c55cce677b1",
+        "mapping": "c628557e5dc83b9c0b9357625d3fa284edfcc344340c40f22bd322daddfcbc3c"
+      },
+      "sourcePresetId": "string-orchestra-v2-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "String Pad",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": false,
+      "soundbankId": "string-pad",
+      "sourceHashes": {
+        "archive": "475279b1c70873808eff5c7771da7affe465c718bd7ea0d360402b7f2c071b0e",
+        "catalog": "c290463cb7eb0ab5dc1af68dfe85c8c4a25dc1a776073b49499ca6a7a02951b7",
+        "mapping": "a0bb8bb735d981bc1574155f162980e218fdc8632ca831aea933d881a90b4984"
+      },
+      "sourcePresetId": "string-pad-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Studio Grand",
+      "generalMidiProgram": 0,
+      "isCanonicalForProgram": true,
+      "soundbankId": "studio-grand",
+      "sourceHashes": {
+        "archive": "55f5c6b2aec430f245f83b485d4f6df9a06f4ca3167aaa779b81eb0c0134a1a9",
+        "catalog": "95ac74b53e1f96831f50f7a79c441672c0cd23dfedc371e71769b66d76d244ea",
+        "mapping": "8627c855c32d85eba4899b0b29deaa76e84b9f7ff11f49c5e2b3256b950d913b"
+      },
+      "sourcePresetId": "studio-grand-v2-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Harpsichord",
+      "generalMidiProgram": 6,
+      "isCanonicalForProgram": true,
+      "soundbankId": "studio-harpsichord",
+      "sourceHashes": {
+        "archive": "559e458b3408f467101c24f854a330f9926193d0f5edb278dfb4957192119e82",
+        "catalog": "9b97c94474f613445a4e4f48dd9d906ee7102eed707b5bab8711d3f6817acb62",
+        "mapping": "25f5bebffe51b6a48cd23c220d7be7f753611bdf2211682b63e5eaabe8d6727b"
+      },
+      "sourcePresetId": "studio-harpsichord-v3-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Sub Texture",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "sub-texture",
+      "sourceHashes": {
+        "archive": "a81b1798d4463fa598961a4ae72688c90ab51d84fa4a2eb488c1f0b9d3547bf9",
+        "catalog": "2028e0cb7ca4368045de4cfde1e94ea5150d394435064e6d7927029af30ff9dd",
+        "mapping": "d67a3ca95fc4995f9c6715c443355019432b208bc0046d7e6251ee107a5a46e5"
+      },
+      "sourcePresetId": "sub-texture-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Subtle Rattle",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "subtle-rattle",
+      "sourceHashes": {
+        "archive": "82740344a73d9b69c49945155d93a2fb051e83ecdf20f3325ab5977a2e565739",
+        "catalog": "f6f90b7f9af4debfd3a22a7c38ea22dbd7fd51fbe43855b2ba5c5f9c976766cd",
+        "mapping": "44f5b280744c31513cce1ffe2f3aa5239af1598af0736c045b3f747753002c10"
+      },
+      "sourcePresetId": "subtle-rattle-v2-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Swell Pad",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": false,
+      "soundbankId": "swell-pad",
+      "sourceHashes": {
+        "archive": "5ab7b6e7ca753fa1fad2d6e5ee1a47f25b68a7766f24b95eb64b403138c3526b",
+        "catalog": "2180ae9fbae9c019c654dd908a36c559c05739f1c4b7aa6cec3b586d3071b616",
+        "mapping": "c2b88e78053271f9eca75698a55bdbca0d16f60e35765fee07dd24abc09e431c"
+      },
+      "sourcePresetId": "swell-pad-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Synth",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "synth",
+      "sourceHashes": {
+        "archive": "4980c9b956e9e72d0964082f9bcc6ddbbe2b44f52ae0fc1102b45622ef292bd0",
+        "catalog": "21cfa37015dc3abf17fcfe9242eb1972019e92108cf6ea2f5daa94f99f1de994",
+        "mapping": "22972069dc1b57e0c50e7f43e82869fec21619075237d3f27352ecfb839ace6a"
+      },
+      "sourcePresetId": "synth-kit"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Synth Organ",
+      "generalMidiProgram": 20,
+      "isCanonicalForProgram": false,
+      "soundbankId": "synth-organ",
+      "sourceHashes": {
+        "archive": "0e5cb1602631a4f355d168f651b99be5b2fcfeaecbfd34d534b319dab1445117",
+        "catalog": "34abcfdaa42a0971a2c508b6d8cf21f4c5dd6d35b484ad8cedb8c4efb934f597",
+        "mapping": "65be5a42baeb326377ca516c26894db1b02695e8765d9e60cc5916a22294925b"
+      },
+      "sourcePresetId": "synth-organ-v3-v4"
+    },
+    {
+      "categoryId": "synth-keys",
+      "displayName": "Synth Strings",
+      "generalMidiProgram": 50,
+      "isCanonicalForProgram": true,
+      "soundbankId": "synth-strings",
+      "sourceHashes": {
+        "archive": "022d088b8e62a7428df80d6e85cea2578920d9292cfa4f1d1dbf22f0b144a48b",
+        "catalog": "03619e7af4e47ee7c457e3b5c02bd8a092ca7a1a0880cae7f7a157ef2620d2ca",
+        "mapping": "3b040068c92f2dfd74ab2784505d789cf7bd97d9c4a397a356b407b070a180e8"
+      },
+      "sourcePresetId": "synth-strings-v2-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Tabla",
+      "generalMidiProgram": 116,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tabla",
+      "sourceHashes": {
+        "archive": "8d82c8d67b76cd6a191a0074ebc1e31eb66249318f65c4cf68212c3889428953",
+        "catalog": "13602212aec544eb8cd6b078401e06e70ae052ce8b0f87694b85943d8d8ee4e7",
+        "mapping": "3a2d8f1510308562b89dc829f29bd83c01f6e3c1d3c0f9c9794d97cb6cc9179a"
+      },
+      "sourcePresetId": "tabla-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Taiko",
+      "generalMidiProgram": 116,
+      "isCanonicalForProgram": true,
+      "soundbankId": "taiko",
+      "sourceHashes": {
+        "archive": "365ed80c773647503601e74cba57e3898d51273f5ca0e239db4d8fd10b020dce",
+        "catalog": "c8b96ff38b4591e2df4625c751e5bc49d2d7a33f2889ae23345da6bd592d87b1",
+        "mapping": "f105a059cb19d99be7568e9c252642b9296b018e4ed600c1016794fb7c4ca5c2"
+      },
+      "sourcePresetId": "taiko-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Techno Brute",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "techno-brute",
+      "sourceHashes": {
+        "archive": "fd3f167b04e354aa03ea3156d146b42bee8324c1da4aee4172cde06e82ae83eb",
+        "catalog": "49deca57a053c04cb82f94a8ea8c3a984967ac27e544bf1c9d29f700f75e387d",
+        "mapping": "10916ef21d113d9596efb5e4e1a9eed96abd948bdae254855aa0a4f14f45ced3"
+      },
+      "sourcePresetId": "techno-brute-kit-v2-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Techno Throwback",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "techno-throwback",
+      "sourceHashes": {
+        "archive": "87e56e4923e5992efc43ff2a37b49de592d944fd5e7cbce34e6e910f9a9d59e1",
+        "catalog": "25ff9c8c3075310901b8923c04ee96756009475ef3f6681239a285d3055f3b1c",
+        "mapping": "ff3e522505f25bdf35fec0ddb9016634570dda09dde59cd2311db5c5009d7782"
+      },
+      "sourcePresetId": "techno-throwback-kit"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Tenor Saxophone",
+      "generalMidiProgram": 66,
+      "isCanonicalForProgram": true,
+      "soundbankId": "tenor-saxophone",
+      "sourceHashes": {
+        "archive": "d9f14badc4f84606b556998ea7249cd59ac1f54150f64e41ed2466b4fff699b4",
+        "catalog": "afd0ade432f724683a8b40cf91c19f53b72e192409eea9adf3d71c2c122b7db6",
+        "mapping": "67a43038d6a80a048e4a4f9832290b423b752e53bc3251448c220c1394660511"
+      },
+      "sourcePresetId": "tenor-saxophone-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Textures",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "textures",
+      "sourceHashes": {
+        "archive": "6d578a19d5a613ef44beb37194f1ec927f623e0cc3ef833dd312b3b9587748ce",
+        "catalog": "5578038b05949326f747a70fecb841b7bf30ea47c1367ea29a2dd947b40c9dcd",
+        "mapping": "df1bd39e39730a1a9e043af58db50be0927556679875e034b09f94eb99ed729f"
+      },
+      "sourcePresetId": "textures-kit-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Thriller Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "thriller-bass",
+      "sourceHashes": {
+        "archive": "c2cde87b80ecc8c44d736df49f5d2a4865d5bb82e2aa6a5b4049ea32c249153c",
+        "catalog": "6ef04d9bb363ae346dea40742ae8fc93f6b9194b333e813017a2f9fa0c4cdb54",
+        "mapping": "5185dc5093f262778fb078dcc0ef334a2ca12e98343ad1de2b75d58dc9a6edd0"
+      },
+      "sourcePresetId": "thriller-bass-v4-v4"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Thump",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "thump",
+      "sourceHashes": {
+        "archive": "bdcb23bebf55d04d1dc3e70b8514fef666727a425c16b4f4438c440c708ba5b5",
+        "catalog": "b06c50cefec8e72206f9b196aceb74d6078e197c734b555a8879744543c90d52",
+        "mapping": "be7ce88fd39135d12c230d346c84042a6620c4c7fcf2de292e64f86bf8715166"
+      },
+      "sourcePresetId": "thump-kit-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Timpani",
+      "generalMidiProgram": 47,
+      "isCanonicalForProgram": true,
+      "soundbankId": "timpani",
+      "sourceHashes": {
+        "archive": "878234862905ecf376b002788241225509c3639dc9baa3678e1a948bff431a27",
+        "catalog": "5ba29e08f025630a4115a3eb87248e0efdf3ef028b58cbdbb8b02cb7573a8588",
+        "mapping": "12418244e5ba15e8e999febc70328fe5f4ca3d450ad28a6c511ced272a20c364"
+      },
+      "sourcePresetId": "timpani-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Trap",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trap",
+      "sourceHashes": {
+        "archive": "b097fe2e48b1b4ab12db054536f081856c2ecb101625d67985dda12783d7df31",
+        "catalog": "992ba1b92dd524190d397aed5fa73e948e37bbb300f389a48fa23686c862395b",
+        "mapping": "aeecf5d06fdf9a45c1b7a5b12e88b9ee0b8ef8d66c066cc26ba1272ceadd0f2a"
+      },
+      "sourcePresetId": "trap-kit"
+    },
+    {
+      "categoryId": "drum-kit",
+      "displayName": "Trash",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trash",
+      "sourceHashes": {
+        "archive": "e966056ed5d840d09bdc9df7479595d4f3037b53d26048e9648ffa1481cc188c",
+        "catalog": "b74b0407e03f11f7bd541e560ee203695643c199911d47c64c2cfbe5340bbc2f",
+        "mapping": "2b10e1afbc5355c5c747a8e04176531c52620a5a37e2151d889a36ea7a6b77a9"
+      },
+      "sourcePresetId": "trash-kit-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Hard",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": true,
+      "soundbankId": "trombone",
+      "sourceHashes": {
+        "archive": "30f43801806f597a786a62e64c9000b85e898f5447fbfba21b81b2a70653b370",
+        "catalog": "bab0019c3afde76d89008481a0970829f3e4e1b725594ab709c73398d4c263c6",
+        "mapping": "f28ef0dccdcfe203555a20bd99994af002328dcaed8a3ebdc93ab3dc8f015c7e"
+      },
+      "sourcePresetId": "trombone-hard-v4-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Soft",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trombone-soft",
+      "sourceHashes": {
+        "archive": "81acd9fdd5eb491f0bc55592abf94aff723812ea7049c7545de8dc492b44ceeb",
+        "catalog": "1bdbba229e33b4220aa357395dd357e73c151fa85b4aa9681e031a126cc9916e",
+        "mapping": "bcb8c6f3a62e6b8f6cfc489e269e30456bd6550ffc6ca05e6c216544e6473374"
+      },
+      "sourcePresetId": "trombone-soft-v4-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Staccato",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trombone-staccato",
+      "sourceHashes": {
+        "archive": "83fa815f7500added27613763648104aaaa357ef6877a9fa8089c28e4aa063bb",
+        "catalog": "a4df2195b8c45b7c82934a1224b9b7cdb8df7880afa265231bbbdcb4d1e246fb",
+        "mapping": "a0a7c93b9e0686186f052610e3c7a9f1683894b6fb33ebee17877076045c2396"
+      },
+      "sourcePresetId": "trombone-staccato-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trombone Concert Hall",
+      "generalMidiProgram": 57,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trombone-concert-hall",
+      "sourceHashes": {
+        "archive": "328f9c5c2d4a3c436f055e9ed4183318d81c91e388691c56107204fa0786052d",
+        "catalog": "8408523a458adb7b3e353f6a53ec6f5e658ad8e7dec46b1189dfb48b21d77be4",
+        "mapping": "6fa3d54e63f58ce3239354350c5264b8289472cfbf5496ceabbb5c28905f9b8a"
+      },
+      "sourcePresetId": "trombone-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Tropical House Bass",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tropical-house-bass",
+      "sourceHashes": {
+        "archive": "ba8dffb2dfd3bbe944eb660166ba4975bf6d1b761b2199f15bf8e1235b50dabb",
+        "catalog": "1a41c42cde7d2befa2dd1d5ec6494fa2f7ae643b7ac78fbf8c68e28454523741",
+        "mapping": "cbd02adb6b98ea156d10d02425f44b227d410c8e54ed14baf08c90f83c408f42"
+      },
+      "sourcePresetId": "tropical-house-bass-v3-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": true,
+      "soundbankId": "trumpet",
+      "sourceHashes": {
+        "archive": "4199f273bc1ad02c6b3e2e9748b8f1ecfbeb4b92b8e10831e228baabc84f55a7",
+        "catalog": "381ff5d42e615fda4e77aafa1852e17a304ab3a3364b5c8b3f79fdfec620f9c3",
+        "mapping": "6ef38da8a10abc201e5bd8e1c9caff28e0f39982544b34df025c1e74fcbb7e15"
+      },
+      "sourcePresetId": "trumpet-clean-v3-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Cup Mute",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-cup-mute",
+      "sourceHashes": {
+        "archive": "2a3ae04ab54522a572af206746b419797aaea53544a764ee831b83f772094ae2",
+        "catalog": "795bd01598d923fb31e03765ca1856f2280bfd5ccecaf964fcbbbee35739ac67",
+        "mapping": "7b36dae5dec0d801890b0ecf5eeab94727925f4b023405452356f606d0c458c9"
+      },
+      "sourcePresetId": "trumpet-cup-mute-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Harmon Mute",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-harmon-mute",
+      "sourceHashes": {
+        "archive": "76fdb10babed7ddc6751d024b78bfec844a12f59c67dc08d3511edf2531d0636",
+        "catalog": "a4ecfbe23e07387bfc88653b8b4718a7e27210078640ea2c564719360d2505e4",
+        "mapping": "a4408de9aab54d1a9610797959e88635b3a5961cb92cb727c637d1aa380925dc"
+      },
+      "sourcePresetId": "trumpet-harmon-mute-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Staccato",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-staccato",
+      "sourceHashes": {
+        "archive": "5f2159470e700517504592b3a320a2c76bb16ae14f5578c09d9c38c2feafb951",
+        "catalog": "1e0d719ae8a693ca2543805ce6cb3b42d1f1095be09ed92ce4c6b77773ab3e80",
+        "mapping": "5fa4b9dc944cb8c3925f26f990a4df8f7af39ddc34a5fd5e277296cee1a54d24"
+      },
+      "sourcePresetId": "trumpet-staccato-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Straight Mute",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "muted-trumpet",
+      "sourceHashes": {
+        "archive": "90abcd2010934dd11a124887c4e0a259c8c07b0426d6020d13628ea580cb2593",
+        "catalog": "c260582a2a3d05e2515af392b178d0b2b8c4d885f1e4b5b07b30641f8cb45190",
+        "mapping": "67972caa581149061b0f03d88ed90dc9d43b2bcb4d819eaf3c946de8e205956b"
+      },
+      "sourcePresetId": "trumpet-straight-mute-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Trumpet Concert Hall",
+      "generalMidiProgram": 56,
+      "isCanonicalForProgram": false,
+      "soundbankId": "trumpet-concert-hall",
+      "sourceHashes": {
+        "archive": "73d5811c4e786cbcf8d12ad0e8ad3edd84ddad90507bc383edc53bfff3c2e84d",
+        "catalog": "2d92f6a8ba0d8ac0849190ea6972d85c43fc8a7df25f4c1c7dc91a6fb7dd4186",
+        "mapping": "090289f67d443ca28064d65caa366f384ea2ac12ece2cbea98fb0bbc6d7dd2b6"
+      },
+      "sourcePresetId": "trumpet-v2-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Tuba Legato",
+      "generalMidiProgram": 58,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tuba-legato",
+      "sourceHashes": {
+        "archive": "a66f1eda0f26ea0d37c5c47c069397c53fdbdc4573a08c979133b258cc59a9f3",
+        "catalog": "93c51f86f53ff83a261c6fe0b5fd3cf12b3cff2486f02399bdc09bf3dc0af1e2",
+        "mapping": "e549b16b82216962670d25c601bd2b83faa93e9a02180f5f258149d5d61e09a3"
+      },
+      "sourcePresetId": "tuba-legato-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Tuba Staccato",
+      "generalMidiProgram": 58,
+      "isCanonicalForProgram": false,
+      "soundbankId": "tuba-staccato",
+      "sourceHashes": {
+        "archive": "0df979b369b23d8fcb11df1a106906023194b0e8effc87b4b1f40aed5f582b92",
+        "catalog": "b9ac388c0e66eff0dea68a62a916697fd05cd2061f9beb7115d34f3c7ba0bf02",
+        "mapping": "cd2c38e913c1670d3f4851f6a98c48c6990b0691e37741b155619ef9c129fb58"
+      },
+      "sourcePresetId": "tuba-staccato-v2-v4"
+    },
+    {
+      "categoryId": "brass",
+      "displayName": "Tuba",
+      "generalMidiProgram": 58,
+      "isCanonicalForProgram": true,
+      "soundbankId": "tuba",
+      "sourceHashes": {
+        "archive": "5c394d90369d2216566eb55ba57c4ccbfa146117f489dfd6648b0e22717204ad",
+        "catalog": "93155ad5b7bf0362e56b6a9300fad0d09fd63e6621200db75521dbd64e4a8f9d",
+        "mapping": "3ba99556c508b9f28032a0d1708680cd6cc4f69157313e100ce639a302812fa4"
+      },
+      "sourcePresetId": "tuba-v3-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Tubular Bells",
+      "generalMidiProgram": 14,
+      "isCanonicalForProgram": true,
+      "soundbankId": "tubular-bells",
+      "sourceHashes": {
+        "archive": "7a45b1a59d706482903d0dd146ee7faeda5f78a8f43543fe2a713c479f02f787",
+        "catalog": "221b5b1ddbaaf736bc7ddb8dda1ef291a8760fd58f51fd4e5a7d34ba78af995c",
+        "mapping": "7c435030f4a0be6b64ccfaba09cbe9a6f186badd0bcb9a615ef9fb87bd715c54"
+      },
+      "sourcePresetId": "tubular-bells-v2-v4"
+    },
+    {
+      "categoryId": "guitars",
+      "displayName": "Twang Guitar",
+      "generalMidiProgram": 27,
+      "isCanonicalForProgram": false,
+      "soundbankId": "twang-guitar",
+      "sourceHashes": {
+        "archive": "8a52322a5fd99ff817d0e99667e039f68dde04e0dc45f73a1033e4cc734e798d",
+        "catalog": "69dec67cc1e104ee5a05f2ac3fe071cde1188cb8cba0ea0b5ed0127e0806414b",
+        "mapping": "fbc9634720a44446c30e87b15531e5213520e618793a8a9507400ee2ffcb7530"
+      },
+      "sourcePresetId": "twang-guitar-v3-v4"
+    },
+    {
+      "categoryId": "synth-leads",
+      "displayName": "Uber Lead",
+      "generalMidiProgram": 80,
+      "isCanonicalForProgram": false,
+      "soundbankId": "uber-lead",
+      "sourceHashes": {
+        "archive": "2f89ad28233d5a4499ca5e3fc8f24ada07e9ee46bb58d647daafd5798f933e11",
+        "catalog": "5d5cc97b3643cbea010122bf48d7ba1f158fc3450d8d079d96713a5f81a43111",
+        "mapping": "14dbaf02a1e7a9e330562ef281b0ae3d3c02eb2e36109d849430647775533263"
+      },
+      "sourcePresetId": "uber-lead-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Ultraphat 808",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "ultraphat-808",
+      "sourceHashes": {
+        "archive": "b54899bfe6e55aee07bd6fe66d4d41c3057268159f7ac978d74d005cb6b5a6f5",
+        "catalog": "f2f4c42820d60cde7e33275706b178d0eb2bcf3f252ea51c0226d852855e08c3",
+        "mapping": "e553646f0c0950dcae0e40048390dd09a049d846ab55799d4a617b10cf3564e3"
+      },
+      "sourcePresetId": "ultra-808-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Upright Piano",
+      "generalMidiProgram": 1,
+      "isCanonicalForProgram": true,
+      "soundbankId": "upright-piano",
+      "sourceHashes": {
+        "archive": "f0cbd22acd2c3a14febefedc80a3fcef201ea0a79db8e44a38dab9a5901d277d",
+        "catalog": "e75a22a79bd983cde44fe0b49a77ccdb64219d1b16544b1d595d0c152d7cebc7",
+        "mapping": "2e4898e6b623ae44e56af7fe566be5044fb0fd29d0252c4530d8dc5c8dd3bb8c"
+      },
+      "sourcePresetId": "upright-piano-v2-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Vibraphone",
+      "generalMidiProgram": 11,
+      "isCanonicalForProgram": true,
+      "soundbankId": "vibraphone",
+      "sourceHashes": {
+        "archive": "47d9199dcf8e6fab2e45b6942ad7e811559a46630b831404c56374bc4ffde246",
+        "catalog": "d3bcf5fbcbc07179eb4687e28175a3e2bbeb4474d35f4f5f04209d96eff0e409",
+        "mapping": "c87fe8eb1db3f6c348f805fac46f35e86e3b80f9876e065acdd0bf406c60ea7b"
+      },
+      "sourcePresetId": "vibraphone-v3-v4"
+    },
+    {
+      "categoryId": "drum-pads",
+      "displayName": "Vintage Hip Hop",
+      "generalMidiProgram": -1,
+      "isCanonicalForProgram": false,
+      "soundbankId": "vintage-hip-hop",
+      "sourceHashes": {
+        "archive": "4c774f529d7a83342b9bb2cf14d47f895c2d383ce7a1a8f4f9f9626080ecae1e",
+        "catalog": "a2cae4f8e890874e1bc3ac54f4c49b5eb2feea8d280d9c4e31aac566e41f8f3c",
+        "mapping": "706cf90ed056c2b6691fb4acd11e87cfe996092fb0182ebff70ac4ee1ec4da68"
+      },
+      "sourcePresetId": "vintage-hip-hop-kit-v2-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Vintage Pad",
+      "generalMidiProgram": 95,
+      "isCanonicalForProgram": false,
+      "soundbankId": "vintage-pad",
+      "sourceHashes": {
+        "archive": "6fe7d25e9b60b15337ac4dd458f50abdb8a0a5686ef066eb088e3e8b6e908b81",
+        "catalog": "d4f512130a65795dd97b3c362e459652e450edba0e1a308c598930c6dec7aec7",
+        "mapping": "e45d4a04ab624595c4e64a7c73b2752e81707fef03be223c2874794ff65f8a69"
+      },
+      "sourcePresetId": "vintage-pad-v2-v4"
+    },
+    {
+      "categoryId": "synth-bass",
+      "displayName": "Vintage Pop Stabs",
+      "generalMidiProgram": 38,
+      "isCanonicalForProgram": false,
+      "soundbankId": "vintage-pop-stabs",
+      "sourceHashes": {
+        "archive": "6ffcffee1befc6e6244b6917252e8aa6f9d034e2b73d174c7466f39415aaaaa0",
+        "catalog": "c8fa2e8084a3060d7d9293cec7861efe69fe3712dc6204a516f59a31580fe9e2",
+        "mapping": "c4cd4aa0ece8078f4857899cc28fa0130576fffd0824f3bc7638c3340ea030e0"
+      },
+      "sourcePresetId": "vintage-pop-stabs-v3-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Viola Section",
+      "generalMidiProgram": 41,
+      "isCanonicalForProgram": true,
+      "soundbankId": "viola-section",
+      "sourceHashes": {
+        "archive": "28080a8357402502ae1f6d1eda2e0ac46aa34ffe81d0d06c39017f09ab8d8e6b",
+        "catalog": "a083e3f3f70bb8588a68c463a6475bd1ca11e6693fd0c261b938c6051433170a",
+        "mapping": "339da00db81f3b41f2f34f1875309d720a27e163f77fa53bf8da7929f970e9ce"
+      },
+      "sourcePresetId": "viola-section-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Viola Solo Pizzicato",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "viola-solo-pizzicato",
+      "sourceHashes": {
+        "archive": "eb376c46f669a04a7774f1acab258cee9f7e133d6cd40d272c6a3a90ac26c65f",
+        "catalog": "f017384ff577f96eb50d7de34c504e68d9b938ed9b229d89e66d7ad14f5758d8",
+        "mapping": "000897cdb23a0650fa69f9ac9162697377ae237eb3eaf4e0dad4e524e4690adb"
+      },
+      "sourcePresetId": "viola-solo-pizzicato-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Viola Solo Tremolo",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "viola-solo-tremolo",
+      "sourceHashes": {
+        "archive": "915b5dac6a98d24ecf015f5e53c0096046b34bdd2a6f06f8af079d6394095c0b",
+        "catalog": "8e9b030ffb3277a22dd67abf072aa33603652046de1de33059aea0e8467f30b1",
+        "mapping": "9effec5760cb5ac34698151b31bc7c89cccb24e82d4f0b0cfa27dcc15d6cf911"
+      },
+      "sourcePresetId": "viola-solo-tremolo-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violas Long Bows",
+      "generalMidiProgram": 41,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violas-long-bows",
+      "sourceHashes": {
+        "archive": "476663d6ff4a7a3c5d46bf8c79aa7679d49f3d1f9e28a48f6e19a1b51accaa18",
+        "catalog": "3affa4eee23aa5bddf83cd6e13014896dafbc360af26a5dc81cfa183b7b7b086",
+        "mapping": "aa2a2232d7085de20694ab5351f541dc9d6ef43196a1605f8360743a85317cac"
+      },
+      "sourcePresetId": "violas-long-bows-v3-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violas Short Bows",
+      "generalMidiProgram": 41,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violas-short-bows",
+      "sourceHashes": {
+        "archive": "6b00aa5c3957b98ad876c5635ddb1ab54e22885ff1a281faaed9c9882dc97a7a",
+        "catalog": "1580e8e4550c66299a7d19761d8c6cdcea58394fb63aca60a6cf4366a116355a",
+        "mapping": "cf8c051b3ef8df22f513d0bb2a149088bbdb3d967a1fff3e0a99e79a4dcf91b0"
+      },
+      "sourcePresetId": "violas-short-bows-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violas Tremolo",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violas-tremolo",
+      "sourceHashes": {
+        "archive": "dc79704af391496d7858a2be3d0d64b413e5e6af39a85452705e0b8aca79b6a1",
+        "catalog": "a9b13b3dee36fb9aa7bc5697ee3214af4653b65f815ce6907eb8e7ba11a962be",
+        "mapping": "97b1ab8ee60f0867a6fefc915f6478e85709d6c6380bb632fe77edb054470524"
+      },
+      "sourcePresetId": "violas-tremolo-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violin Section",
+      "generalMidiProgram": 40,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violin-section",
+      "sourceHashes": {
+        "archive": "869e9e82456d2d010e3ab9d5e05453ab0441ac35af42d6dbadbe6fbf6e8004b0",
+        "catalog": "e8586fba60db666587b12c489880f375134b0d09c3898647e183400c606c07e2",
+        "mapping": "38223286b60c4883ec2a46a8a258fc5b3100ba81db74fb76f015b028461744d4"
+      },
+      "sourcePresetId": "violin-section-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violin Solo Pizzicato",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violin-solo-pizzicato",
+      "sourceHashes": {
+        "archive": "d5524f0bbcd492ee78ffdad5111ca3bf23ad3dda9831bd7822c2a36ea3810423",
+        "catalog": "b345f80be0fb769bffb948abb83ca7e8b2df076ca0c14ed30ffa3ad05a77666b",
+        "mapping": "2a32161dcb28874b2bbd1a1af60d9ce929e3977739312e34289bf0c26b311bad"
+      },
+      "sourcePresetId": "violin-solo-pizzicato-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violin Solo Tremolo",
+      "generalMidiProgram": 44,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violin-solo-tremolo",
+      "sourceHashes": {
+        "archive": "628fec40b031809cd8b22c57677303af8390f7513f6da6cc5d9916f6dadd9b4c",
+        "catalog": "d243d56cb166f0482fa86b688c06731640987cb29492f64c49d1a1aa32c1bff2",
+        "mapping": "2950a2a70647a521486217bf024895aa7d2fb106cd193014ae01178c79ecc941"
+      },
+      "sourcePresetId": "violin-solo-tremolo-v2-v4"
+    },
+    {
+      "categoryId": "strings",
+      "displayName": "Violins Pizzicato",
+      "generalMidiProgram": 45,
+      "isCanonicalForProgram": false,
+      "soundbankId": "violins-pizzicato",
+      "sourceHashes": {
+        "archive": "15fc3cdcbc6096a950935dfaefdd46253e264eff092793227a8fc6e22e7821f7",
+        "catalog": "823a6b4e32579c75982c54a53a4fb4eae28a5cce4bf60c358cc03a1daaf789bb",
+        "mapping": "058718fa05590d9faf84744d0f4e3ce986f06a553bc65e5ff065ae87c5cabd35"
+      },
+      "sourcePresetId": "violins-pizzicato-v2-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Virtual Vox",
+      "generalMidiProgram": 54,
+      "isCanonicalForProgram": false,
+      "soundbankId": "virtual-vox",
+      "sourceHashes": {
+        "archive": "e4e8f43af4c1df0e033b5843334839c310d90079218fc76d7b53bb6e4ddd4392",
+        "catalog": "34b4b6b8ce0619489d5cb5cbd40d020b828d67f26c2e29c8f68191652e294aa7",
+        "mapping": "49a5d4cdcbe2ad3c551b3d080391ff3fd927bfba17a009352642f2b0deefedbc"
+      },
+      "sourcePresetId": "virtual-vox-v4"
+    },
+    {
+      "categoryId": "voices",
+      "displayName": "Wailer Synth",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": false,
+      "soundbankId": "wailer-synth",
+      "sourceHashes": {
+        "archive": "28888df95db7af093c71ad69d8fb17655d13fd69be7dfcb40fbf2f43b727ff3a",
+        "catalog": "72bebe49f5a0aa41ebcb69219bfc5a2bc4e9945285b5d4af244fec35136f9843",
+        "mapping": "68f9eb81ccbc530398175ea23b52f1c1223cbe9d6fe8b5e9f2d3c1d330557e9b"
+      },
+      "sourcePresetId": "wailer-synth-v2-v4"
+    },
+    {
+      "categoryId": "synth-pads",
+      "displayName": "Warm Pad",
+      "generalMidiProgram": 89,
+      "isCanonicalForProgram": true,
+      "soundbankId": "warm-pad",
+      "sourceHashes": {
+        "archive": "122b21c86e6338b74ec281687f3b90f3bb70e57745dd50727a80dc5c4583c004",
+        "catalog": "1e30207bbd853050e48614f7e318d32231236d4af957b1bc6ba36fb92de17f68",
+        "mapping": "44994f47dd1f991d771e422c553bb7cc9e26a01a986002ff4ea806dbdaf9fd3d"
+      },
+      "sourcePresetId": "warm-pad-v2-v4"
+    },
+    {
+      "categoryId": "wind",
+      "displayName": "Whistle",
+      "generalMidiProgram": 78,
+      "isCanonicalForProgram": true,
+      "soundbankId": "whistle",
+      "sourceHashes": {
+        "archive": "a2c9b8f82426239256e0bde908655042b12e2ab88a84143d8236864748f997f3",
+        "catalog": "8b46844d13ccac406657b39459ad4ff350ca4741a771bcb8946ce845efd31510",
+        "mapping": "cc94c551c611b15e590eb2314a9752a4866d5fd34b4a20330396b1144ffeee59"
+      },
+      "sourcePresetId": "whistle-v3-v4"
+    },
+    {
+      "categoryId": "piano",
+      "displayName": "Whirly",
+      "generalMidiProgram": 5,
+      "isCanonicalForProgram": false,
+      "soundbankId": "whirly",
+      "sourceHashes": {
+        "archive": "8d6cf35d14180301e10dcc8758d4cc7341d2d37a6f2cdcd3c720a99f68575aea",
+        "catalog": "ea25af0a80e3aafa23f63605f9c927a671487b9487051e8ae2464b943e9b2b86",
+        "mapping": "ffec80e7efac8672b39591cdcb03498290f9013383fbe37806e64e8c7b8e5cc3"
+      },
+      "sourcePresetId": "wurlitzer-v2-v4"
+    },
+    {
+      "categoryId": "percussion",
+      "displayName": "Xylophone",
+      "generalMidiProgram": 13,
+      "isCanonicalForProgram": true,
+      "soundbankId": "xylophone",
+      "sourceHashes": {
+        "archive": "a1714cbb5c85817fbc46c16cf3b742752a677cfd4f7c5236c1cd0523ce18c988",
+        "catalog": "646a1d8f1cb86f9e3b1d69dc3984a8b7c176bd80c9b6a1459e782c12aec1a73b",
+        "mapping": "0caca2565dd424b4c2ea7c3f06fab55e907c78941cbd3470564612c7e1aac69a"
+      },
+      "sourcePresetId": "xylophone-v2-v4"
+    }
+  ]
+}

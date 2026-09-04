@@ -106,7 +106,7 @@ describe('built-in Score Core local instruments', () => {
     expect(
       nonPianoMelodic.every(
         ({ preparation }) =>
-          preparation.productPitchRange.minimumPitch === 21 &&
+          preparation.productPitchRange?.minimumPitch === 21 &&
           preparation.productPitchRange.maximumPitch === 119,
       ),
     ).toBe(true)

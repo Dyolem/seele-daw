@@ -24,6 +24,10 @@ import {
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
 import { PROJECT_WORKBENCH_DOCK_MODE } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
+import {
+  BUILT_IN_INSTRUMENT_PRESET_GROUPS,
+  findAvailableBuiltInInstrumentPreset,
+} from '@/workbench/instrument/built-in-instrument-catalogue'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
@@ -101,22 +105,29 @@ function createTrack(
 
 async function openInstrumentSelector(wrapper: VueWrapper): Promise<HTMLElement> {
   const trigger = wrapper.get<HTMLButtonElement>('[aria-label="Built-in instrument"]')
-  await trigger.trigger('keydown', { key: 'ArrowDown' })
+  await trigger.trigger('click')
   await flushPromises()
 
-  const content = document.body.querySelector<HTMLElement>(
-    '.project-workbench__instrument-select-content',
-  )
-  if (content === null) throw new Error('Expected the Reka UI Instrument Select content')
+  const content = document.body.querySelector<HTMLElement>('.built-in-instrument-picker__content')
+  if (content === null) throw new Error('Expected the Reka UI Instrument Popover content')
   return content
+}
+
+async function activateInstrumentCategory(content: HTMLElement, categoryId: string): Promise<void> {
+  const category = content.querySelector<HTMLButtonElement>(`[data-category-id="${categoryId}"]`)
+  if (category === null) throw new Error(`Expected the ${categoryId} Instrument category`)
+  category.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+  await flushPromises()
 }
 
 async function selectInstrument(wrapper: VueWrapper, soundbankId: string): Promise<void> {
   const content = await openInstrumentSelector(wrapper)
+  const preset = findAvailableBuiltInInstrumentPreset(soundbankId)
+  if (preset !== null) await activateInstrumentCategory(content, preset.categoryId)
   const item = content.querySelector<HTMLElement>(`[data-soundbank-id="${soundbankId}"]`)
   if (item === null) throw new Error(`Expected the ${soundbankId} Instrument option`)
 
-  item.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
+  item.click()
   await flushPromises()
 }
 
@@ -174,7 +185,7 @@ describe('Project Workbench Instrument Inspector', () => {
     expect(projectSession.canUndo).toBe(false)
   })
 
-  it('replaces a legacy Slot from the grouped Catalogue while its MIDI Clip is selected', async () => {
+  it('replaces a legacy Slot from the complete two-column Preset catalogue', async () => {
     const selectedClip: ProjectMidiClipPresentation = Object.freeze({
       color: null,
       id: parseClipId('clip-instrument-inspector'),
@@ -201,41 +212,80 @@ describe('Project Workbench Instrument Inspector', () => {
     )
 
     const selector = wrapper.get<HTMLButtonElement>('[aria-label="Built-in instrument"]')
-    expect(selector.attributes('role')).toBe('combobox')
+    expect(selector.attributes('aria-haspopup')).toBe('dialog')
     expect(selector.attributes('aria-expanded')).toBe('false')
     expect(selector.text()).toContain('Choose a replacement')
     expect(wrapper.find('select').exists()).toBe(false)
 
     const content = await openInstrumentSelector(wrapper)
     expect(selector.attributes('aria-expanded')).toBe('true')
+    expect(content.textContent).toContain('439 Presets · 289 playable')
     expect(
-      [...content.querySelectorAll('.project-workbench__instrument-select-label')].map((label) =>
-        label.textContent?.trim(),
+      [...content.querySelectorAll('.built-in-instrument-picker__family')].map((category) =>
+        [...category.querySelectorAll('span')].map((label) => label.textContent?.trim()),
       ),
-    ).toEqual(['Keyboard', 'Bass', 'Strings', 'Brass', 'Woodwind', 'Percussion', 'Drum kit'])
-    const items = content.querySelectorAll('.project-workbench__instrument-select-item')
-    expect(items).toHaveLength(22)
+    ).toEqual(
+      BUILT_IN_INSTRUMENT_PRESET_GROUPS.map((group) => [
+        group.displayName,
+        String(group.presets.length),
+      ]),
+    )
+    const items = content.querySelectorAll('.built-in-instrument-picker__option')
+    expect(items).toHaveLength(23)
     expect(
       [...items].every(
         (item) =>
-          item.querySelector('.project-workbench__instrument-select-indicator-slot') !== null &&
-          item.querySelector('.project-workbench__instrument-select-name') !== null,
+          item.querySelector('.built-in-instrument-picker__check') !== null &&
+          item.querySelector('.built-in-instrument-picker__names') !== null,
       ),
     ).toBe(true)
-    expect(
-      content.querySelector('[data-soundbank-id="general-midi-percussion"]')?.textContent?.trim(),
-    ).toBe('General MIDI Percussion')
 
-    const violin = content.querySelector<HTMLElement>('[data-soundbank-id="solo-violin"]')
-    if (violin === null) throw new Error('Expected the Violin Instrument option')
-    violin.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
+    await activateInstrumentCategory(content, 'drum-kit')
+    expect(content.querySelectorAll('.built-in-instrument-picker__option')).toHaveLength(46)
+    await activateInstrumentCategory(content, 'percussion')
+    expect(
+      content.querySelector('[data-soundbank-id="general-midi-percussion"]')?.textContent,
+    ).toContain('General MIDI Percussion')
+
+    await activateInstrumentCategory(content, 'piano')
+    content.querySelector<HTMLButtonElement>('[data-soundbank-id="dark-grand"]')?.click()
     await flushPromises()
 
     expect(selectBuiltInInstrument).toHaveBeenCalledExactlyOnceWith(
       TRACK_ID,
-      parseSoundbankId('solo-violin'),
+      parseSoundbankId('dark-grand'),
     )
     expect(toasts.message).toBeNull()
+  })
+
+  it('keeps the Track unchanged and explains a synth-runtime option', async () => {
+    const { selectBuiltInInstrument, toasts, wrapper } = mountInspector({
+      selectedTrack: createTrack({
+        deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
+        displayName: 'Studio Grand',
+        soundbankId: parseSoundbankId('studio-grand'),
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
+      }),
+    })
+    const content = await openInstrumentSelector(wrapper)
+    await activateInstrumentCategory(content, 'synth-leads')
+
+    const squareLead = content.querySelector<HTMLButtonElement>(
+      '[data-source-preset-id="80s-square-lead-v4"]',
+    )
+    expect(squareLead?.textContent).toContain('80s Square Lead')
+    expect(squareLead?.textContent).toContain('Not supported')
+    squareLead?.click()
+    await flushPromises()
+
+    expect(selectBuiltInInstrument).not.toHaveBeenCalled()
+    expect(toasts.message).toMatchObject({
+      title: 'Instrument is not supported yet',
+      description:
+        '80s Square Lead requires the VASynth runtime. The current Track was not changed.',
+      tone: 'warning',
+    })
+    expect(document.body.querySelector('.built-in-instrument-picker__content')).not.toBeNull()
   })
 
   it('shows and replaces the current Catalogue Instrument through the same selector', async () => {

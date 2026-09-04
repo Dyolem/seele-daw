@@ -51,6 +51,13 @@ MI2 已在 Studio 接入由同一目录驱动的 22 项 Inspector 选择与 deve
 [Studio Built-in Instrument Catalogue V1](../../apps/studio/docs/built-in-instrument-catalogue-v1.md)。
 MI3A 进一步接入 21 个精确 Program、Channel 10 和无声 Program Placeholder，详见
 [Studio MIDI Program Import Routing V1](../../apps/studio/docs/midi-program-import-routing-v1.md)。
+2026-09-04 的完整 GM 扩展进一步建立 128 项显式路由：108 项使用 86 个唯一
+MIDISampleSynth Soundbank，20 项因 VASynth / FMSynth Runtime 尚未实现而保持可见但不可播放；
+边界见
+[Studio Built-in Preset Catalogue and General MIDI Routing V1](../../apps/studio/docs/general-midi-built-in-routing-v1.md)。
+同一批修正进一步把手动目录扩展为来源提供的全部 439 个 Preset：289 个 MIDISampleSynth
+可由现有 Mapping Adapter 与 Sample Voice Runtime 执行，139 个 VASynth 与 11 个 FMSynth
+保持可见但暂不可播放。289 项采样目录与 GM 路由使用的 86 项子集互不混淆。
 MI3B 把来源初始 CC7 / CC10 转成现有 Track Gain / Pan；精确听觉与兼容边界见
 [MIDI Initial Channel Controls V1](../project-midi/docs/midi-initial-channel-controls-v1.md)。
 MI4 已提交为 `8072aca`：Studio 默认用 `192 MiB` LRU 总量预算约束应用级解码缓存，并补齐多
@@ -78,6 +85,11 @@ Catalog / Index / Mapping / Archive，只原子发布完整的新目录；已存
 内容上完全一致，冲突时拒绝覆盖。`prepare:studio-grand-local` 与
 `prepare:general-midi-percussion-local` 保留定向入口；
 `prepare:score-core-local` 按独立失败边界顺序准备 22 个 Soundbank，并生成不可变本地库存报告。
+`prepare:general-midi-local` 复用同一内核准备完整的 86 个唯一采样 Soundbank，并生成独立的本地
+库存报告。`prepare:built-in-presets-local` 准备完整 289 项 MIDISampleSynth Preset，复用上述
+86 项已审核定义并为其余 203 项保留来源原生 Pitch Selector；首次完整运行生成 4,664 个 Zone /
+Resource，约 2.756 GB WAV。这些命令都不改变 developer-local 与 production distribution
+boundary。
 规范化输出使用确定性的 URL 安全 WAV 文件名，单音源 preparation report schema version 2 另存
 原始 Archive Key 与完整内容哈希；这项寻址转换不修改 PCM 或 Manifest 控制语义。
 

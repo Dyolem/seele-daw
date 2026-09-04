@@ -56,7 +56,7 @@ export interface BuiltInLocalSampleInstrumentDefinition {
   readonly productPitchRange: {
     readonly maximumPitch: number
     readonly minimumPitch: number
-  }
+  } | null
   readonly soundbankId: SoundbankId
   readonly sourceSlug: string
 }
@@ -249,15 +249,20 @@ function validateDefinition(
       'expectedGeneralMidiProgram must be -1 for percussion or a Program from 0 through 127',
     )
   }
-  const { maximumPitch, minimumPitch } = definition.productPitchRange
-  if (
-    !Number.isInteger(minimumPitch) ||
-    !Number.isInteger(maximumPitch) ||
-    minimumPitch < 0 ||
-    maximumPitch > 127 ||
-    minimumPitch > maximumPitch
-  ) {
-    fail('invalid-definition', 'productPitchRange must be ordered MIDI pitches from 0 through 127')
+  if (definition.productPitchRange !== null) {
+    const { maximumPitch, minimumPitch } = definition.productPitchRange
+    if (
+      !Number.isInteger(minimumPitch) ||
+      !Number.isInteger(maximumPitch) ||
+      minimumPitch < 0 ||
+      maximumPitch > 127 ||
+      minimumPitch > maximumPitch
+    ) {
+      fail(
+        'invalid-definition',
+        'productPitchRange must be null or ordered MIDI pitches from 0 through 127',
+      )
+    }
   }
   if (
     definition.generatedDirectoryName.length === 0 ||
@@ -362,11 +367,14 @@ function createManifest(
     },
     soundbankId: definition.soundbankId,
   })
-  const constrained = constrainManifestToPitchRange(
-    manifest,
-    definition.productPitchRange.minimumPitch,
-    definition.productPitchRange.maximumPitch,
-  )
+  const constrained =
+    definition.productPitchRange === null
+      ? manifest
+      : constrainManifestToPitchRange(
+          manifest,
+          definition.productPitchRange.minimumPitch,
+          definition.productPitchRange.maximumPitch,
+        )
   let policyApplied: SampleInstrumentManifestV1
   try {
     policyApplied = applyBuiltInLocalManifestPolicy(constrained, {
@@ -379,11 +387,13 @@ function createManifest(
     }
     throw error
   }
-  assertManifestPitchCoverage(
-    policyApplied,
-    definition.productPitchRange.minimumPitch,
-    definition.productPitchRange.maximumPitch,
-  )
+  if (definition.productPitchRange !== null) {
+    assertManifestPitchCoverage(
+      policyApplied,
+      definition.productPitchRange.minimumPitch,
+      definition.productPitchRange.maximumPitch,
+    )
+  }
   return policyApplied
 }
 
@@ -608,10 +618,7 @@ export async function prepareBuiltInLocalSampleInstrument(
     soundbankId: definition.soundbankId,
     sourceSlug: selection.sourceSlug,
     generalMidiProgram: selection.generalMidiProgram,
-    productPitchRange: {
-      maximumPitch: definition.productPitchRange.maximumPitch,
-      minimumPitch: definition.productPitchRange.minimumPitch,
-    },
+    productPitchRange: definition.productPitchRange,
     archive: {
       compressedByteLength: archive.archiveByteLength,
       entryCount: archive.entries.length,

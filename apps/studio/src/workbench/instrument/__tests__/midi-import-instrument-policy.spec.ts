@@ -8,7 +8,10 @@ import { decodeSampleInstrumentDeviceState } from '@seele-daw/playback'
 import { PROJECT_MIDI_INSTRUMENT_MAPPING_KIND } from '@seele-daw/project-midi'
 import { describe, expect, it } from 'vitest'
 
-import { BUILT_IN_INSTRUMENT_CATALOGUE } from '@/workbench/instrument/built-in-instrument-catalogue'
+import {
+  BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND,
+  GENERAL_MIDI_PROGRAM_ROUTES,
+} from '@/workbench/instrument/built-in-instrument-catalogue'
 import {
   MIDI_PROGRAM_PLACEHOLDER_DEVICE_DEFINITION,
   createMidiProgramPlaceholderDeviceDescriptor,
@@ -37,19 +40,37 @@ function createPolicyResult(channel: number, programNumber: number) {
 }
 
 describe('Studio MIDI import Instrument policy', () => {
-  it('maps every reviewed melodic GM Program to its Catalogue Soundbank', () => {
-    const programEntries = BUILT_IN_INSTRUMENT_CATALOGUE.filter(
-      ({ midiImportRoute }) => midiImportRoute.kind === 'program',
+  it('maps every playable melodic GM Program to its reviewed sample route', () => {
+    const availableRoutes = GENERAL_MIDI_PROGRAM_ROUTES.filter(
+      (route) => route.availability === 'available',
+    )
+    const exactRoutes = availableRoutes.filter(
+      (route) => route.mappingKind === BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND.EXACT,
     )
 
-    for (const entry of programEntries) {
-      if (entry.midiImportRoute.kind !== 'program') throw new Error('Expected a Program route')
-      const result = createPolicyResult(0, entry.midiImportRoute.programNumber)
+    for (const route of exactRoutes) {
+      const result = createPolicyResult(0, route.programNumber)
 
       expect(result.mappingKind).toBe(PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT)
       expect(decodeSampleInstrumentDeviceState(result.device)).toEqual({
-        soundbankId: entry.soundbankId,
+        soundbankId: route.soundbankId,
       })
+      expect(result).not.toHaveProperty('appliedInstrumentName')
+      expect(Object.isFrozen(result)).toBe(true)
+    }
+
+    const approximateRoutes = availableRoutes.filter(
+      (route) => route.mappingKind === BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND.APPROXIMATE,
+    )
+
+    for (const route of approximateRoutes) {
+      const result = createPolicyResult(0, route.programNumber)
+
+      expect(result.mappingKind).toBe(PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE)
+      expect(decodeSampleInstrumentDeviceState(result.device)).toEqual({
+        soundbankId: route.soundbankId,
+      })
+      expect(result).toMatchObject({ appliedInstrumentName: route.sourceDisplayName })
       expect(Object.isFrozen(result)).toBe(true)
     }
   })
@@ -66,20 +87,26 @@ describe('Studio MIDI import Instrument policy', () => {
     },
   )
 
-  it('persists an unsupported melodic Program as a strict silent placeholder', () => {
-    const result = createPolicyResult(2, 80)
+  it('persists every synth-runtime Program as a strict silent placeholder', () => {
+    const unavailableRoutes = GENERAL_MIDI_PROGRAM_ROUTES.filter(
+      (route) => route.availability === 'runtime-unavailable',
+    )
 
-    expect(result.mappingKind).toBe(PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.UNAVAILABLE)
-    expect(result.device).toMatchObject({
-      typeId: MIDI_PROGRAM_PLACEHOLDER_DEVICE_DEFINITION.typeId,
-      enabled: true,
-      opaqueState: { channel: 2, programNumber: 80 },
-    })
-    expect(decodeSampleInstrumentDeviceState(result.device)).toBeNull()
-    expect(decodeMidiProgramPlaceholderDeviceState(result.device)).toEqual({
-      channel: 2,
-      programNumber: 80,
-    })
+    for (const route of unavailableRoutes) {
+      const result = createPolicyResult(2, route.programNumber)
+
+      expect(result.mappingKind).toBe(PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.UNAVAILABLE)
+      expect(result.device).toMatchObject({
+        typeId: MIDI_PROGRAM_PLACEHOLDER_DEVICE_DEFINITION.typeId,
+        enabled: true,
+        opaqueState: { channel: 2, programNumber: route.programNumber },
+      })
+      expect(decodeSampleInstrumentDeviceState(result.device)).toBeNull()
+      expect(decodeMidiProgramPlaceholderDeviceState(result.device)).toEqual({
+        channel: 2,
+        programNumber: route.programNumber,
+      })
+    }
   })
 
   it('rejects malformed or future placeholder shapes without guessing', () => {

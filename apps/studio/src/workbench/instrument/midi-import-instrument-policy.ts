@@ -16,7 +16,7 @@ import {
 import {
   BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND,
   GENERAL_MIDI_PERCUSSION_INSTRUMENT,
-  findBuiltInInstrumentByProgramNumber,
+  findGeneralMidiProgramRoute,
 } from '@/workbench/instrument/built-in-instrument-catalogue'
 
 const GENERAL_MIDI_PERCUSSION_CHANNEL = 9
@@ -94,12 +94,18 @@ export const createStudioMidiImportInstrumentDevice: ProjectMidiInstrumentDevice
   sourceTrack,
 }) => {
   // General MIDI reserves zero-based Channel 9 for percussion; its Program value is irrelevant.
-  const entry =
-    sourceTrack.channel === GENERAL_MIDI_PERCUSSION_CHANNEL
-      ? GENERAL_MIDI_PERCUSSION_INSTRUMENT
-      : findBuiltInInstrumentByProgramNumber(sourceTrack.programNumber)
+  if (sourceTrack.channel === GENERAL_MIDI_PERCUSSION_CHANNEL) {
+    return Object.freeze({
+      device: createSampleInstrumentDeviceDescriptor(
+        id,
+        GENERAL_MIDI_PERCUSSION_INSTRUMENT.soundbankId,
+      ),
+      mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
+    })
+  }
 
-  if (entry === null) {
+  const route = findGeneralMidiProgramRoute(sourceTrack.programNumber)
+  if (route === null || route.availability === 'runtime-unavailable') {
     return Object.freeze({
       device: createMidiProgramPlaceholderDeviceDescriptor(
         id,
@@ -110,13 +116,10 @@ export const createStudioMidiImportInstrumentDevice: ProjectMidiInstrumentDevice
     })
   }
 
-  const device = createSampleInstrumentDeviceDescriptor(id, entry.soundbankId)
-  if (
-    entry.midiImportRoute.kind === 'program' &&
-    entry.midiImportRoute.mappingKind === BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND.APPROXIMATE
-  ) {
+  const device = createSampleInstrumentDeviceDescriptor(id, route.soundbankId)
+  if (route.mappingKind === BUILT_IN_INSTRUMENT_PROGRAM_MAPPING_KIND.APPROXIMATE) {
     return Object.freeze({
-      appliedInstrumentName: entry.displayName,
+      appliedInstrumentName: route.sourceDisplayName,
       device,
       mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.APPROXIMATE,
     })

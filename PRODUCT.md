@@ -4,9 +4,10 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-03，Built-in Multi-Instrument Score Playback MI4 已提交，MI5 实施待审核
+> 最近更新：2026-09-04，完整 Built-in Preset Catalogue 扩展已实施待审核
 >
-> 当前阶段：Studio 已接入多乐器选择、MIDI Program / Channel 10 路由及初始 CC7 / CC10；MI5 真实总谱自动 PCM 门禁已通过待审核，人工听测仍为 `not-run`
+> 当前阶段：Studio 已接入 439 项来源 Preset 浏览、289 项采样音色、独立 MIDI Program /
+> Channel 10 路由及初始 CC7 / CC10；完整目录人工听测仍为 `not-run`
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -33,9 +34,10 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 
 1. 在 Project Entry 新建空项目、从 Standard MIDI File 创建项目、打开最近保存的项目，或在
    Workbench 把 MIDI 文件追加为当前项目的新 Track。
-2. 在 Workbench 创建默认选择 Studio Grand 的 Instrument Track；MIDI 导入按已审核 Program 与
-   Channel 10 选择音源；在 Inspector 从 22 项内置目录手动选择或替换音色，也可显式修复旧项目的
-   空 Instrument Slot、不可用 Program 占位与 Missing Instrument。
+2. 在 Workbench 创建默认选择 Studio Grand 的 Instrument Track；MIDI 导入按独立的 128 项 GM
+   Program 路由与 Channel 10 选择音源；在 Inspector 从 15 类、完整 439 项来源 Preset 的两栏目录
+   手动选择或替换音色，也可显式修复旧项目的空 Instrument Slot、不可用 Program 占位与 Missing
+   Instrument。
 3. 在 Instrument Track 的目标小节创建、选择并打开空 MIDI Clip。
 4. 在 Context Editor Dock 使用 Pencil 创建 MIDI Note，或用 Cursor 选择、切换、拖动和
    清空 Note Selection；Cursor 与 Pencil 都可拖动 Note 左右边缘调整长度。
@@ -55,7 +57,7 @@ Seele DAW 当前是一款面向桌面浏览器、数据保存在本地浏览器�
 12. 在应用内离开 dirty 项目时选择 Save、Discard 或 Cancel。
 13. 刷新页面后，从 Recent projects 重新打开最近的有效 Checkpoint。
 
-当前可听闭环使用 `apps/studio/public/soundbanks` 中开发者本机的 22 项 Score Core 验证资产；
+当前可听闭环可使用 `apps/studio/public/soundbanks` 中开发者本机的 289 项采样验证资产；
 Vite production build 仍禁止复制整棵 public，因此这些资产映射不是公开构建的可分发内置内容。
 没有本地资产、保存了目录之外的 Sample Instrument，或浏览器拒绝 AudioContext 时，Studio 会
 明确失败，不静默替换声音。
@@ -84,30 +86,30 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 
 ### 2.1 功能总览
 
-| 编号                   | 功能                      | 状态         | 当前边界                                                                                                                                                                                             |
-| ---------------------- | ------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PROJECT-ENTRY`        | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                                                                                                                 |
-| `MIDI-IMPORT`          | Standard MIDI File 导入   | **用户可用** | 可创建独立 clean 项目，或把含 Note 的来源 Track 连同其 CC64 与初始 CC7 / CC10 作为一个原子 History 步骤追加到当前项目；Program / Channel 10 路由与诊断已接入。                                       |
-| `PROJECT-LIFECYCLE`    | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                                                                                                      |
-| `PROJECT-NAVIGATION`   | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                                                                                                             |
-| `WORKBENCH-SHELL`      | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                                                                                                       |
-| `PROJECT-HISTORY`      | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、Instrument 选择、空 MIDI Clip、MIDI Note 编辑与 CC64 Event Add / Move / Replace Value / Remove。                                                                          |
-| `TRACK-CREATE`         | 创建 Instrument Track     | **用户可用** | 新 Track 默认持久化选择内置 Studio Grand。                                                                                                                                                           |
-| `INSTRUMENT-SELECTION` | 选择 Track Instrument     | **用户可用** | 从按乐器族分组的 22 项目录选择或替换 Ready / Empty / Missing Instrument；新 Track 默认 Studio Grand。                                                                                                |
-| `TRACK-SELECTION`      | Track 选择                | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。                                                                                                                                             |
-| `MIDI-CLIP-CREATE`     | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                                                                                                             |
-| `CONTEXT-EDITOR-DOCK`  | 上下文编辑器 Dock         | **局部可用** | 可调整布局并在 Track 全局时间轴与所选 Clip Focus Piano Roll 之间切换。                                                                                                                               |
-| `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                                                                                                      |
-| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                                                                                         |
-| `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                                                      |
-| `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                                                            |
-| `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。                              |
-| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、踏板 PCM、非播放态尾音清理及未来 WAV 声音尾部边界均已通过。                                                                                      |
-| `SCORE-INSTRUMENTS`    | 总谱多乐器发声            | **局部可用** | 22 项 Studio Catalogue、手动选择、21 个精确 GM Program、Channel 10、不可用 Program 占位及初始 CC7 / CC10 已接入；MI4 资源门禁已提交，MI5 真实总谱自动 PCM 门禁已通过待审核，人工听测仍为 `not-run`。 |
-| `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                                                |
-| `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                                                |
-| `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                                                   |
-| `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、Note 编辑、CC64 Event 编辑、Snap 与 Undo / Redo 已接入。                                                                                                   |
+| 编号                   | 功能                      | 状态         | 当前边界                                                                                                                                                                |
+| ---------------------- | ------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PROJECT-ENTRY`        | 项目入口与最近项目        | **用户可用** | 新建、最近项目列表、打开、失败重试。                                                                                                                                    |
+| `MIDI-IMPORT`          | Standard MIDI File 导入   | **用户可用** | 可创建独立 clean 项目，或把含 Note 的来源 Track 连同其 CC64 与初始 CC7 / CC10 作为一个原子 History 步骤追加到当前项目；Program / Channel 10 路由与诊断已接入。          |
+| `PROJECT-LIFECYCLE`    | 当前项目生命周期          | **用户可用** | Create、Open、Save、dirty 与 Session 生命周期。                                                                                                                         |
+| `PROJECT-NAVIGATION`   | dirty 导航确认            | **用户可用** | 应用内导航支持 Save / Discard / Cancel。                                                                                                                                |
+| `WORKBENCH-SHELL`      | DAW 工作台外壳            | **局部可用** | 全局栏、Transport、Arrangement、Track 区和编辑器 Dock 已成形。                                                                                                          |
+| `PROJECT-HISTORY`      | Undo / Redo               | **用户可用** | 当前覆盖 Instrument Track、Instrument 选择、空 MIDI Clip、MIDI Note 编辑与 CC64 Event Add / Move / Replace Value / Remove。                                             |
+| `TRACK-CREATE`         | 创建 Instrument Track     | **用户可用** | 新 Track 默认持久化选择内置 Studio Grand。                                                                                                                              |
+| `INSTRUMENT-SELECTION` | 选择 Track Instrument     | **用户可用** | 从两栏来源 Preset 目录浏览 439 项并选择 289 项采样音色；150 项合成器 Preset 会提示暂未支持；可替换 Ready / Empty / Missing Instrument，新 Track 默认 Studio Grand。     |
+| `TRACK-SELECTION`      | Track 选择                | **用户可用** | Track Header、Arrangement Lane、Inspector 和 Dock 联动。                                                                                                                |
+| `MIDI-CLIP-CREATE`     | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                                                                                |
+| `CONTEXT-EDITOR-DOCK`  | 上下文编辑器 Dock         | **局部可用** | 可调整布局并在 Track 全局时间轴与所选 Clip Focus Piano Roll 之间切换。                                                                                                  |
+| `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                                                                         |
+| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                                                            |
+| `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                         |
+| `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                               |
+| `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。 |
+| `AUDIO-QUALITY`        | Sample Voice 音质基础     | **内部就绪** | Velocity/输出校准、Envelope/Loop、重触发、有界复音、踏板 PCM、非播放态尾音清理及未来 WAV 声音尾部边界均已通过。                                                         |
+| `SCORE-INSTRUMENTS`    | 总谱多乐器发声            | **局部可用** | 独立 128 项 GM 路由使用 86 项采样子集；完整目录另含 289 项采样音色。Channel 10、近似 / 不可用诊断及初始 CC7 / CC10 已接入；扩展音色人工听测为 `not-run`。               |
+| `TEMPO-CONTROL`        | Project Tempo 主控        | **用户可用** | 单 Tempo 可输入 `5..999 BPM`、最多两位小数；多 Tempo 显示 Playhead 当前值但主控只读。                                                                                   |
+| `TEMPO-TRACK`          | Tempo Map 点编辑          | **用户可用** | 专用固定行支持点选、双击新增、单轴拖动、数值 BPM 编辑和非初始点删除；事实范围与瞬态可视范围相互独立。                                                                   |
+| `TIMELINE-LOCATE`      | 手动时间线定位            | **用户可用** | Arrangement Ruler 支持点击 / 静默拖动、边缘自动滚动、键盘定位和最后起始位置 Return；不含可听 Scrub 或 Note Chase。                                                      |
+| `PIANO-ROLL`           | 钢琴卷帘编辑器            | **局部可用** | 默认 Track 全局 Surface、可选 Clip Focus、Note 编辑、CC64 Event 编辑、Snap 与 Undo / Redo 已接入。                                                                      |
 
 ## 3. 项目入口与生命周期
 
@@ -563,8 +565,11 @@ Transport 发声。
 Track 上的 MIDI Clip，Instrument 状态和修复入口仍然可见：
 
 - 新 Track 或已经选择目录内定义的 Track 显示当前音色；新 Track 默认仍是 `Studio Grand`。
-- 基于 Reka UI 的应用内 `Built-in sound` 选择器按 Keyboard、Bass、Strings、Brass、Woodwind、
-  Percussion 与 Drum kit 分组展示 22 项已审核音色，不调用操作系统原生下拉菜单。
+- 基于 Reka UI Popover 与 Vertical Tabs 的应用内 `Built-in sound` 选择器，左侧展示来源目录的
+  15 个类别，右侧展示当前类别的全部 Preset，不调用操作系统原生下拉菜单。
+- 439 个来源 Preset 均可见；289 项 MIDISampleSynth 可播放。需要 VASynth 的 139 项与需要
+  FMSynth 的 11 项点击后只提示暂未支持，当前 Track 不变。名称和说明保持单行，空间不足时
+  整体省略，不做单词截断换行。
 - 旧项目中严格匹配 `seele.instrument-slot` V1 空 Descriptor 的 Track 显示
   `No instrument selected`，等待用户从同一选择器显式选择。
 - 用户选择后才执行一次 Instrument Device Replace Command；Device ID 与 Track topology 保持
@@ -577,15 +582,17 @@ Track 上的 MIDI Clip，Instrument 状态和修复入口仍然可见：
 - Command 失败时旧 Descriptor 保持不变，并通过 Toast 显示原因。
 - 展示始终从 Active Project 的 Snapshot 派生，不在 Pinia 或组件本地复制 Device Fact。
 
-V1 当前是按乐器族分组、由 Reka UI 提供可访问交互语义的最小应用内选择器，不伪装成完整
-Instrument Browser、搜索、Preset Library 或插件管理器；选择成功不会 Preview Audition，只有
-主 Timeline Transport 播放已有 MIDI Note。Catalogue Entry 已配置但本地 Manifest/WAV 缺失属于
-后续播放资源失败，不回滚合法的 Project Commit。
+V1 当前是按来源类别分组、由 Reka UI 提供可访问交互语义的固定内置 Preset Browser；它还没有
+跨字段搜索、Preview Audition、远程 Preset Library 或插件管理器。选择成功后只有主 Timeline
+Transport 播放已有 MIDI Note。Catalogue Entry 已配置但本地 Manifest/WAV 缺失属于后续播放
+资源失败，不回滚合法的 Project Commit。
 
 目录所有权、三态投影与命令 / 资源失败边界见
 [Studio Built-in Instrument Catalogue V1](apps/studio/docs/built-in-instrument-catalogue-v1.md)。
 Program / Channel 10 的导入优先级、占位事实与诊断边界见
 [Studio MIDI Program Import Routing V1](apps/studio/docs/midi-program-import-routing-v1.md)。
+完整 Preset 目录、独立 GM 路由、资产准备、控制元数据执行与合成器暂缺边界见
+[Studio Built-in Preset Catalogue and General MIDI Routing V1](apps/studio/docs/general-midi-built-in-routing-v1.md)。
 
 ### 6.3 `MIDI-CLIP-CREATE` 创建空 MIDI Clip
 
@@ -918,17 +925,17 @@ File 导入是独立交换格式入口，不替代 Project File。
 
 ### 8.5 Package 状态
 
-| Package                       | 当前能力                                                                                                                                                                                                                                                                                                                                                          |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、原子 Instrument Track 集合、含 populated Clip 新建、非循环 Clip 右扩加 Note、单 Note Resize 与 CC64 Add / Move / Remove / Replace Value 的 Command、Commit、Session、History、Query、Snapshot、Project File V2、V1 迁移与 Checkpoint。                                                                                       |
-| `@seele-daw/midi-file`        | Parser-neutral SMF Document、可替换 Decoder / Encoder Port、封装 `@tonejs/midi` 的 Type 0 / 1 PPQ Decoder 与确定性 Type 1 Encoder。                                                                                                                                                                                                                               |
-| `@seele-daw/project-midi`     | Standard MIDI File Document 与 Project Model 的 Note / CC64 导入映射、PPQ 换算、碰撞诊断、完整 Session Draft 与当前项目 Track Command Draft；不拥有 Browser、导出或项目生命周期。                                                                                                                                                                                 |
-| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store、Recent Project Catalog 与本地 File / Blob 字节读取 Adapter。                                                                                                                                                                                                                                                                       |
-| `apps/studio`                 | 项目入口、两种 Standard MIDI File 导入、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback、Arrangement Locate / Follow、22 项内置乐器目录与手动选择、Track / Clip 双模式 Piano Roll、Note 编辑，以及显式 Channel / Active Clip 的 CC64 Lane Add / Selection / Move / Replace Value / Remove；Track Cursor 完整 Note 编辑尚未接入。 |
-| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note 投影、Timeline Grid Snap、Note Interaction、Canvas Grid、DOM / Canvas Note Adapter，以及 CC64 Clip / Track Lane 投影、Value Viewport、Semantic Hit / Pointer、Selection、主导轴 Transform 与 authority handoff。                                                                      |
-| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、通用 Definition / factory / decoder、Studio Grand 默认特化、TempoMap、派生 Timeline 范围、具体 MIDI Plan Compiler、CC64 Channel 状态追赶与最终 Gate Release、Tick Locate / Return Anchor Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；不提供音频资源或 Studio Catalogue。     |
-| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与有界 LRU 应用级解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Velocity/输出校准、CC64 最终 Gate Release、loop、mutex、选择性 cancel、generation、有界复音、确定性 Voice Stealing、溢出诊断与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。      |
-| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                                                                  |
+| Package                       | 当前能力                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@seele-daw/project-core`     | 项目模型、Instrument Device Replace、原子 Instrument Track 集合、含 populated Clip 新建、非循环 Clip 右扩加 Note、单 Note Resize 与 CC64 Add / Move / Remove / Replace Value 的 Command、Commit、Session、History、Query、Snapshot、Project File V2、V1 迁移与 Checkpoint。                                                                                                                  |
+| `@seele-daw/midi-file`        | Parser-neutral SMF Document、可替换 Decoder / Encoder Port、封装 `@tonejs/midi` 的 Type 0 / 1 PPQ Decoder 与确定性 Type 1 Encoder。                                                                                                                                                                                                                                                          |
+| `@seele-daw/project-midi`     | Standard MIDI File Document 与 Project Model 的 Note / CC64 导入映射、PPQ 换算、碰撞诊断、完整 Session Draft 与当前项目 Track Command Draft；不拥有 Browser、导出或项目生命周期。                                                                                                                                                                                                            |
+| `@seele-daw/platform-browser` | IndexedDB V1 Checkpoint Store、Recent Project Catalog 与本地 File / Blob 字节读取 Adapter。                                                                                                                                                                                                                                                                                                  |
+| `apps/studio`                 | 项目入口、两种 Standard MIDI File 导入、生命周期、导航确认、Workbench Shell、Scoped Keyboard Shortcuts、Project Playback、Arrangement Locate / Follow、439 项来源 Preset 两栏目录与手动选择、独立 GM 导入路由、Track / Clip 双模式 Piano Roll、Note 编辑，以及显式 Channel / Active Clip 的 CC64 Lane Add / Selection / Move / Replace Value / Remove；Track Cursor 完整 Note 编辑尚未接入。 |
+| `@seele-daw/editor`           | 已提供 Piano Roll Clip / Viewport / Note Read Model、Track 全局 Clip / Note 投影、Timeline Grid Snap、Note Interaction、Canvas Grid、DOM / Canvas Note Adapter，以及 CC64 Clip / Track Lane 投影、Value Viewport、Semantic Hit / Pointer、Selection、主导轴 Transform 与 authority handoff。                                                                                                 |
+| `@seele-daw/playback`         | 浏览器无关的 Sample Instrument schema、通用 Definition / factory / decoder、Studio Grand 默认特化、TempoMap、派生 Timeline 范围、具体 MIDI Plan Compiler、CC64 Channel 状态追赶与最终 Gate Release、Tick Locate / Return Anchor Transport Mapping、Scheduler Planner、完整 Plan Reconciliation 与原位 generation handoff；不提供音频资源或 Studio Catalogue。                                |
+| `@seele-daw/audio-web`        | 已具备同源 Manifest/WAV 准备与有界 LRU 应用级解码缓存、可选按 Soundbank 局部失败、用户激活的 AudioContext / master output，以及 Manifest 驱动的 Sample Voice、Velocity/输出校准、CC64 最终 Gate Release、loop、mutex、选择性 cancel、generation、有界复音、确定性 Voice Stealing、溢出诊断与资源统计；已由 Studio 组合执行，生产构建仍不复制 Studio public。                                 |
+| `@seele-daw/type-utils`       | 提供 `Brand`、`ValueOf` 等无运行时共享类型工具。                                                                                                                                                                                                                                                                                                                                             |
 
 ## 9. 明确尚未提供的产品能力
 
@@ -947,17 +954,18 @@ File 导入是独立交换格式入口，不替代 Project File。
 
 ### 音源与声音
 
-- 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的完整 Catalog / Indexes 扫描
-  与运行时安装；MI1B 已用配置驱动规范化 22 个开发者本地 Soundbank，MI1C 已为固定 GM
+- 本地 `public/soundbanks/{catalog,indexes,soundbanks}` 开发资源镜像的运行时 Catalog 扫描
+  与安装；当前配置驱动工具已规范化 289 个开发者本地 MIDISampleSynth Soundbank，MI1C 已为固定 GM
   Percussion 来源生成 one-shot 与 Hi-hat Choke Manifest，MI2 已接通 Studio Catalogue、手动选择与
   同源位置派生。当前仍只支持由开发工具规范化后的资源，该镜像不属于产品资源，Vite 生产构建
   禁止把 public 内容复制到 dist。阶段边界见
   [Built-in Multi-Instrument Score Playback V1](packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-phase-plan.md)。
 - M4A 自动协商、远程 / 安装式 Soundbank 获取与可分发内置资产；当前 Studio 只从本地 Vite dev
   同源路径准备 Manifest/WAV。
-- JSON 合成器定义的解析与合成引擎。
-- 完整 Instrument Browser、搜索、Preview Audition、Preset Library、第三方 Device UI 与任意
-  Instrument 替换；当前只有按乐器族分组的 22 项内置选择器。
+- JSON 合成器定义的解析与 VASynth / FMSynth 合成引擎；完整 Preset 目录中的 139 个 VASynth、
+  11 个 FMSynth 当前只显示暂未支持，其中 20 个也是 GM 导入路由候选。
+- 跨字段 Instrument 搜索、Preview Audition、远程 Preset Library、第三方 Device UI 与插件管理；
+  当前固定两栏内置 Browser 已能浏览全部 439 个来源 Preset，并可选择 289 个采样音色。
 - 通用 Web Audio Graph、AudioWorklet 与电平；当前只有 Sample Voice 所需的最小 master output。
 - Velocity Layer、CC64 half-pedal 发声、共鸣、release sample、pedal noise 与物理钢琴建模；
   当前 Velocity 只改变单层 Sample 振幅，CC64 Lane
@@ -1261,6 +1269,16 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   1,357 项测试、全工作区 Type Check、Studio Production
   Build 与 soundbank dist boundary。详细证据见
   [Built-in Multi-Instrument Score Playback V1 收口报告](packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-closure-report.md)。
+
+- Built-in Preset Catalogue and General MIDI Routing V1 已完成待审核实现。Studio 的 Reka UI
+  左目录 / 右选项浮层展示 15 类、439 个来源 Preset：289 个 MIDISampleSynth 可播放，139 个
+  VASynth 与 11 个 FMSynth 点击只发 Warning 且不改变 Track。独立的 128 项 GM 导入路由包含
+  108 项采样映射（63 Exact / 45 Approximate）和 20 项合成器 Runtime 暂缺，使用 289 项采样目录
+  中的 86 个 Soundbank。完整本地准备复用既有 86 项并新增 203 项，生成 4,664 个 Zone /
+  Resource；幂等复跑时 289 项全部为 `current`。根级 `pnpm check` 已通过 157 个测试文件 /
+  1,365 项测试、Studio Production Build 与 soundbank dist boundary；真实浏览器布局与选择 smoke
+  也通过，完整目录人工听测仍为 `not-run`。资产继续被 Git 与 production dist 排除。详细边界见
+  [Studio Built-in Preset Catalogue and General MIDI Routing V1](apps/studio/docs/general-midi-built-in-routing-v1.md)。
 
 - MIDI Sustain Pedal CC64 Project Fact V1 已于 2026-08-28 通过审核并提交为 `d6fa7f4`；导入、
   Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`，Editor Lane Foundation 已

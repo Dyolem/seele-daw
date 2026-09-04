@@ -1,6 +1,7 @@
 # Studio MIDI Program Import Routing V1
 
-> Status: MI3A reviewed and committed as `cd043b9`; updated for MI3B
+> Status: MI3A reviewed and committed as `cd043b9`; extended through complete GM routing on
+> 2026-09-04
 >
 > Date: 2026-09-03
 >
@@ -13,18 +14,16 @@ Instrument Device。Program、Channel 10、精确映射、近似映射与不可�
 ## 1. 用户可见行为
 
 - “导入为新项目”和“导入为当前项目的新 Track”使用同一套 Studio 音源工厂。
-- 普通旋律 Track 按零基 GM Program 查询冻结目录；当前精确支持 Program
-  `0`、`32`、`40...48` 中已列出的核心弦乐与打击乐、`56...61` 中已列出的铜管，以及
-  `68`、`70`、`71`、`73`。
+- 普通旋律 Track 按零基 GM Program 查询完整的 128 项冻结路由；108 项使用 MIDISampleSynth，
+  其中 63 项 Exact、45 项 Approximate。
 - MIDI Channel 10（内部零基 Channel `9`）始终优先选择 `General MIDI Percussion`，来源
   Program 不会把鼓轨错误路由成旋律乐器。
-- 未审核 Program 不回退为 Studio Grand。Track 保存
+- 候选音色需要尚未实现 VASynth / FMSynth Runtime 的 20 个 Program 不回退为 Studio Grand。Track 保存
   `seele.midi-program-placeholder` V1 Device；Inspector 使用面向用户的一基编号，例如来源代码值
   `80` 显示为 `MIDI Program 81 unavailable`。Track 保持无声并可由用户从现有
   `Built-in sound` 选择器显式修复。
-- Exact 映射不产生 Program 丢失提示；Unavailable 产生一条包含来源 Track 与零基 Program 的
-  非阻断诊断。Project MIDI 已支持 Approximate 诊断契约，但当前 22 项目录没有审核任何近似路由，
-  因而不会把未审查的替代音色标为近似可用。
+- Exact 映射不产生 Program 丢失提示；Approximate 明确报告实际选择的 Preset；Unavailable 产生
+  一条包含来源 Track 与零基 Program 的非阻断诊断。
 
 新建空白 Instrument Track 的默认音色仍是 Studio Grand；这一默认值不参与 MIDI 文件导入路由。
 
@@ -39,7 +38,8 @@ MidiFileTrack { channel, programNumber }
   -> Inspector / Playback derived projection
 ```
 
-- Studio Catalogue 同时拥有可选 Soundbank 身份和导入路由；Project Core 不知道 GM Program。
+- Studio Composition Root 分别拥有完整可选 Preset Catalogue 与 GM 导入路由；Project Core
+  不知道 GM Program。
 - `@seele-daw/project-midi` 只定义通用 `exact | approximate | unavailable` 工厂结果并据此生成诊断，
   不依赖 Playback 或 Studio Catalogue。
 - Placeholder 的 opaque state 只保存 `{ channel, programNumber }`。严格 V1 Decoder 拒绝额外字段、
@@ -55,10 +55,11 @@ MidiFileTrack { channel, programNumber }
 
 1. 先验证 normalized MIDI Track 的 Channel 与 Program 值域。
 2. 若 Channel 为 `9`，使用 General MIDI Percussion，并返回 Exact。
-3. 否则查询 Catalogue 的 Program Route；当前 21 项均为 Exact。
-4. 未命中时创建 Program Placeholder，并返回 Unavailable。
-5. `project-midi` 在同一原子导入结果中加入 `program-unavailable`；未来只有 Studio 明确审核并返回
-   Approximate 时才加入 `program-approximated` 和实际 Instrument 名称。
+3. 否则查询完整 Program Route；available route 创建对应 Sample Device，并返回 Exact 或
+   Approximate。
+4. Runtime-unavailable route 创建 Program Placeholder，并返回 Unavailable。
+5. `project-midi` 在同一原子导入结果中按结果加入 `program-approximated` 或
+   `program-unavailable`；近似诊断包含实际 Preset 名称。
 
 `@tonejs/midi` 已在中立 Decoder 边界按 `[Program, Channel]` 规范化来源，因此同一 SMF Track
 出现多个 Channel 或 Program 时会形成多个 normalized Track。本批不增加动态 Program Change
@@ -93,3 +94,7 @@ Program 后，前后 Note 会进入不同 normalized Track 的行为。
 
 本批不执行人工声音试听，也不重复完整根级 `pnpm check`；多音源资源压力与自动混合 Peak 随后
 由 MI4 / MI5 完成，总谱人工听测仍为 `not-run`。
+
+完整 128 项路由、其使用的 86 个唯一采样资产，以及与 439 项手动 Preset 目录的区别见
+[Studio Built-in Preset Catalogue and General MIDI Routing V1](./general-midi-built-in-routing-v1.md)。
+MI3A 的 21 项 Exact 记录仍表示当时的历史范围。

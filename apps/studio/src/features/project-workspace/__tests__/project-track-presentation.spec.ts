@@ -137,7 +137,7 @@ describe('Project Track presentation', () => {
       },
       {
         deviceTypeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
-        displayName: 'Violin',
+        displayName: 'Solo Violin',
         soundbankId: 'solo-violin',
         status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
       },

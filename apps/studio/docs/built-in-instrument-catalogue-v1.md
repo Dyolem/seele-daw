@@ -1,6 +1,7 @@
 # Studio Built-in Instrument Catalogue V1
 
-> Status: MI2 reviewed and committed as `f13df2f`; updated through MI3B
+> Status: MI2 reviewed and committed as `f13df2f`; complete source Preset extension implemented,
+> pending review on 2026-09-04
 >
 > Date: 2026-09-03
 >
@@ -14,10 +15,13 @@ Instrument 选择。MIDI、Soundbank、Catalogue 与 Missing Instrument 等术�
 ## 1. 用户可见行为
 
 - 新建 Instrument Track 仍默认保存 `Studio Grand`，不会改变已有项目习惯。
-- Track Inspector 的 `Built-in sound` 选择器按 Keyboard、Bass、Strings、Brass、Woodwind、
-  Percussion 与 Drum kit 分组展示 22 个已审核音色。
-- 选择器使用 Reka UI Select 的 Trigger、Portal、分组、键盘导航与选中状态语义，并由 Studio
-  Piano Black token 绘制；macOS 等平台不会弹出与应用视觉割裂的系统原生下拉菜单。
+- Track Inspector 的 `Built-in sound` 选择器展示来源目录中的完整 439 项 Preset：289 项
+  MIDISampleSynth 可播放，139 项 VASynth 与 11 项 FMSynth 可见但暂不可播放。
+- 选择器使用 Reka UI Popover 与 Vertical Tabs：左侧是来源提供的 15 个类别，右侧是当前类别的
+  全部具体 Preset。它由 Studio Piano Black token 绘制；macOS 等平台不会弹出与应用视觉割裂的
+  系统原生下拉菜单。
+- Preset 名称与说明都保持单行，空间不足时整体省略；长目录在右侧独立滚动。点击不可用合成器
+  Preset 只给出暂未支持提示，不改变 Project Fact。
 - Ready、旧 Empty Slot 和 Missing Instrument 都可由用户显式选择一个内置音色；不会在打开项目
   或开始播放时自动替换。
 - 一次选择只执行一次既有 Instrument Device Replace Command，保持 Device ID 与 Track topology，
@@ -28,14 +32,18 @@ Instrument 选择。MIDI、Soundbank、Catalogue 与 Missing Instrument 等术�
 
 ## 2. 单一目录来源
 
-冻结的 `BUILT_IN_INSTRUMENT_CATALOGUE` 属于 Studio Composition Root 配置。MI2 中每个条目保存：
+冻结的 `BUILT_IN_INSTRUMENT_CATALOGUE` 属于 Studio Composition Root 配置。每个可播放资产条目
+保存：
 
 - 稳定、来源无关的 `soundbankId`；
-- Inspector 显示名与乐器族；
+- Inspector 显示名；
 - developer-local、same-origin asset base pathname。
 
-MI3A 在同一条目上增加经过审核的零基 GM Program 路由，General MIDI Percussion 则保存独立的
-Channel 10 路由角色；没有另建一份平行 Program 表。
+完整手动目录来自指纹固定的 439 项 Preset Snapshot；其中每个 MIDISampleSynth Preset 都对应
+唯一 `soundbankId`，由此派生 289 项可播放资产目录。用于 MIDI 导入的 128 项
+`GENERAL_MIDI_PROGRAM_ROUTES` 是另一套权威：其 108 个可播放 route 只覆盖这 289 项中的 86 个
+唯一 Soundbank，同一采样可服务多个近似 Program。General MIDI Percussion 还拥有独立 Channel
+10 路由角色。
 
 Inspector Presentation 和 Browser Playback Runtime 都从这份目录派生，不能分别维护音色名称与
 URL Map。Project Core 只保存通用 Device Descriptor；Playback 只解码 `soundbankId`；Audio Web
@@ -79,8 +87,8 @@ Missing 不会改写 Project Fact。若未知 Sample Device 含合法 `soundbank
 - 本批不升级 Project File schema，不迁移旧项目，也不把未知 Device 回退为钢琴。
 - MIDI Program、Channel 10 自动路由和不可用 Program 占位由 MI3A 接入；MI3B 进一步把导入时的
   初始 CC7 / CC10 映射到 Track Channel，不改变 Catalogue 身份。
-- Instrument Browser、搜索、Preset、Preview Audition、远程安装、Action Catalogue 与用户 Keymap
-  继续延期。
+- 完整固定 Preset 目录已经可浏览；跨字段搜索、Preview Audition、远程安装、插件管理、Action
+  Catalogue 与用户 Keymap 继续延期。
 - 本批只接通目录、显式选择与位置派生；多 Soundbank Cache 与自动混合 Peak 随后分别由 MI4 /
   MI5 验收，人工总谱听测仍为 `not-run`。
 
@@ -97,3 +105,7 @@ Missing 不会改写 Project Fact。若未知 Sample Device 含合法 `soundbank
 
 本批未执行人工声音试听；完整根级 `pnpm check` 继续保留给多乐器阶段门禁，不把手动选择自动
 解释为 Program 路由、Runtime 压力或听觉验收已经完成。
+
+完整 Preset 扩展、独立 GM 路由、289 项资产指纹、控制元数据执行边界和失败边界见
+[Studio Built-in Preset Catalogue and General MIDI Routing V1](./general-midi-built-in-routing-v1.md)。
+MI2 的 22 项验证记录仍是历史基线，不应被倒写成当时已经完成完整目录覆盖。

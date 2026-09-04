@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { BUILT_IN_INSTRUMENT_CATALOGUE } from '@/workbench/instrument/built-in-instrument-catalogue'
 import {
+  DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
   createBrowserProjectPlaybackRuntime,
   createDefaultBuiltInSampleAssetLocations,
 } from '@/workbench/project/playback/browser-runtime'
@@ -171,6 +172,9 @@ describe('Browser Project Playback Runtime built-in locations', () => {
   it('projects every Catalogue entry to its same-origin developer asset base', () => {
     const locations = createDefaultBuiltInSampleAssetLocations('https://studio.example.test')
 
+    expect(DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS.maximumResourceByteLength).toBe(
+      8 * 1_024 * 1_024,
+    )
     expect([...locations.keys()]).toEqual(
       BUILT_IN_INSTRUMENT_CATALOGUE.map(({ soundbankId }) => soundbankId),
     )

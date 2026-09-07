@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   assertMidiSourceEnvelope,
+  copyMidiSourceEnvelope,
   createStandardMidiFileSourceEnvelope,
+  createStandardMidiFileSourceEnvelopeWithEvidence,
 } from '#internal/contract/midi-source-envelope'
 
 describe('MIDI Source Envelope', () => {
@@ -46,5 +48,53 @@ describe('MIDI Source Envelope', () => {
     expect(() => assertMidiSourceEnvelope(createStandardMidiFileSourceEnvelope(0), 1)).toThrow(
       TypeError,
     )
+  })
+
+  it('validates and deeply copies inspected declaration evidence', () => {
+    const source = createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+      declarations: [
+        {
+          deviceId: 0x10,
+          kind: 'roland-gs-reset',
+          scope: 'file',
+          sourceEventIndex: 3,
+          sourceTrackIndex: 0,
+          tick: 0,
+        },
+      ],
+      inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+      status: 'inspected',
+      unclassifiedSystemExclusiveMessageCount: 2,
+    })
+    const copy = copyMidiSourceEnvelope(source)
+
+    expect(copy).toEqual(source)
+    expect(copy).not.toBe(source)
+    expect(copy.semanticEvidence).not.toBe(source.semanticEvidence)
+    if (copy.semanticEvidence.status !== 'inspected') {
+      throw new TypeError('Expected inspected evidence')
+    }
+    expect(Object.isFrozen(copy.semanticEvidence.declarations)).toBe(true)
+    expect(Object.isFrozen(copy.semanticEvidence.declarations[0])).toBe(true)
+  })
+
+  it('rejects invalid declaration locations and kind-specific device IDs', () => {
+    expect(() =>
+      createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+        declarations: [
+          {
+            deviceId: 0x20,
+            kind: 'roland-gs-reset',
+            scope: 'file',
+            sourceEventIndex: 0,
+            sourceTrackIndex: 0,
+            tick: 0,
+          },
+        ],
+        inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+        status: 'inspected',
+        unclassifiedSystemExclusiveMessageCount: 0,
+      }),
+    ).toThrow(TypeError)
   })
 })

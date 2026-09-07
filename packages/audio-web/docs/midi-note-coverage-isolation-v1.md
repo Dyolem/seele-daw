@@ -113,8 +113,8 @@ soundbank dist boundary。该结果验证调度和失败边界，不代表新增
 
 ## 6. 明确延期
 
-- MIDI Source Envelope 的最小瞬态契约由后续 MI6B 实现；Profile 声明检查、语义绑定与 Project
-  持久化仍延期；
+- MIDI Source Envelope 的最小瞬态契约由 MI6B 实现，五类 SMF MIDI 1.0 Mode Declaration 的限定
+  检查由 MI6C 实现；语义绑定与 Project 持久化仍延期；
 - 用户选择或编辑 Interpretation Profile / Drum Map / Articulation Map；
 - Keyswitch、Program/Bank 时间线、CC1、CC11、Pitch Bend、Aftertouch、MPE；
 - MIDI 2.0 UMP、MIDI Clip File、SMF2 Container 与实时 MIDI-CI 会话；

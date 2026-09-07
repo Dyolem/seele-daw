@@ -2,6 +2,7 @@ import {
   createAddInstrumentTrackCollectionCommand,
   createProjectSessionFromProjectFile,
 } from '@seele-daw/project-core'
+import { copyMidiSourceEnvelope } from '@seele-daw/midi-file'
 import {
   type CreateProjectMidiImportDraftInput,
   type CreateProjectMidiTrackImportDraftInput,
@@ -87,12 +88,7 @@ function createImportSummary(
 ): ProjectMidiImportSummary {
   return Object.freeze({
     sourceFormat: document.format,
-    sourceEnvelope: Object.freeze({
-      schemaVersion: document.sourceEnvelope.schemaVersion,
-      container: Object.freeze({ ...document.sourceEnvelope.container }),
-      messageProtocol: document.sourceEnvelope.messageProtocol,
-      semanticEvidence: Object.freeze({ ...document.sourceEnvelope.semanticEvidence }),
-    }),
+    sourceEnvelope: copyMidiSourceEnvelope(document.sourceEnvelope),
     sourcePpq: document.ppq,
     sourceTrackCount: document.tracks.length,
     importedTrackCount: mappedTracks.length,

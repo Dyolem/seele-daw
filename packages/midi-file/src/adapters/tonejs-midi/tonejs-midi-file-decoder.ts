@@ -7,8 +7,9 @@ import type {
   MidiFileTrack,
 } from '#internal/contract/midi-file-document'
 import type { MidiFileDecoder } from '#internal/contract/midi-file-codec'
-import { createStandardMidiFileSourceEnvelope } from '#internal/contract/midi-source-envelope'
+import { createStandardMidiFileSourceEnvelopeWithEvidence } from '#internal/contract/midi-source-envelope'
 import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
+import { inspectSmfMidi1ModeDeclarations } from '#internal/adapters/midi-file-js/smf-midi1-mode-declaration-inspector'
 import { readSupportedSmfHeader } from '#internal/adapters/tonejs-midi/smf-header'
 import { ToneJsMidi } from '#internal/adapters/tonejs-midi/tonejs-midi-module'
 import type { Track as ToneJsMidiTrack } from '@tonejs/midi'
@@ -19,12 +20,16 @@ const PITCH_BEND_CENTER = 8192
 export class ToneJsMidiFileDecoder implements MidiFileDecoder {
   decode(bytes: Uint8Array): MidiFileDocument {
     const smfHeader = readSupportedSmfHeader(bytes)
+    const semanticEvidence = inspectSmfMidi1ModeDeclarations(bytes)
 
     try {
       const midi = new ToneJsMidi(bytes)
       return {
         format: smfHeader.format,
-        sourceEnvelope: createStandardMidiFileSourceEnvelope(smfHeader.format),
+        sourceEnvelope: createStandardMidiFileSourceEnvelopeWithEvidence(
+          smfHeader.format,
+          semanticEvidence,
+        ),
         name: midi.name,
         ppq: smfHeader.ppq,
         tempos: midi.header.tempos.map((event) => ({

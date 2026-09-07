@@ -5,6 +5,11 @@ import type {
   MidiFileTextEvent,
   MidiFileTrack,
 } from '#internal/contract/midi-file-document'
+import {
+  MIDI_SOURCE_MODE_DECLARATION_KIND,
+  MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS,
+  type MidiSourceModeDeclaration,
+} from '#internal/contract/midi-source-envelope'
 import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { assertEncodableMidiFileDocument } from '#internal/adapters/midi-file-js/midi-file-document-validator'
 import { parseSmfKeySignatureOffset } from '#internal/adapters/midi-file-js/smf-key-signature'
@@ -19,6 +24,7 @@ import type {
 } from 'midi-file'
 
 const TRACK_NAME_PRIORITY = 0
+const MODE_DECLARATION_PRIORITY = 5
 const PROGRAM_CHANGE_PRIORITY = 10
 const CONTINUOUS_EVENT_PRIORITY = 20
 const NOTE_OFF_PRIORITY = 30
@@ -67,6 +73,18 @@ function encodeConductorTrack(document: MidiFileDocument): MidiEvent[] {
     type: 'trackName',
     text: document.name,
   })
+  const semanticEvidence = document.sourceEnvelope.semanticEvidence
+  if (semanticEvidence.status === MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS.INSPECTED) {
+    const declarations = [...semanticEvidence.declarations].sort(compareModeDeclarations)
+    for (const declaration of declarations) {
+      schedule(
+        events,
+        declaration.tick,
+        MODE_DECLARATION_PRIORITY,
+        encodeModeDeclaration(declaration),
+      )
+    }
+  }
   for (const tempo of document.tempos) {
     schedule(events, tempo.tick, CONTINUOUS_EVENT_PRIORITY, {
       deltaTime: 0,
@@ -93,6 +111,44 @@ function encodeConductorTrack(document: MidiFileDocument): MidiEvent[] {
     schedule(events, textEvent.tick, CONTINUOUS_EVENT_PRIORITY, encodeTextEvent(textEvent))
   }
   return finalizeTrack(events)
+}
+
+function compareModeDeclarations(
+  left: MidiSourceModeDeclaration,
+  right: MidiSourceModeDeclaration,
+): number {
+  return (
+    left.tick - right.tick ||
+    left.sourceTrackIndex - right.sourceTrackIndex ||
+    left.sourceEventIndex - right.sourceEventIndex ||
+    compareCodeUnitStrings(left.kind, right.kind)
+  )
+}
+
+function compareCodeUnitStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0
+}
+
+function encodeModeDeclaration(declaration: MidiSourceModeDeclaration): MidiEvent {
+  const common = { deltaTime: 0, type: 'sysEx' as const }
+  switch (declaration.kind) {
+    case MIDI_SOURCE_MODE_DECLARATION_KIND.GENERAL_MIDI_1_SYSTEM_ON:
+      return { ...common, data: [0x7e, declaration.deviceId, 0x09, 0x01, 0xf7] }
+    case MIDI_SOURCE_MODE_DECLARATION_KIND.GENERAL_MIDI_SYSTEM_OFF:
+      return { ...common, data: [0x7e, declaration.deviceId, 0x09, 0x02, 0xf7] }
+    case MIDI_SOURCE_MODE_DECLARATION_KIND.GENERAL_MIDI_2_SYSTEM_ON:
+      return { ...common, data: [0x7e, declaration.deviceId, 0x09, 0x03, 0xf7] }
+    case MIDI_SOURCE_MODE_DECLARATION_KIND.ROLAND_GS_RESET:
+      return {
+        ...common,
+        data: [0x41, declaration.deviceId, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7],
+      }
+    case MIDI_SOURCE_MODE_DECLARATION_KIND.YAMAHA_XG_SYSTEM_ON:
+      return {
+        ...common,
+        data: [0x43, 0x10 | declaration.deviceId, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
+      }
+  }
 }
 
 function encodeMusicTrack(track: MidiFileTrack): MidiEvent[] {

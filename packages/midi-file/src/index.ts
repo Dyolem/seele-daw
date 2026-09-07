@@ -18,13 +18,21 @@ export {
   MIDI_SOURCE_CONTAINER_KIND,
   MIDI_SOURCE_ENVELOPE_SCHEMA_VERSION,
   MIDI_SOURCE_MESSAGE_PROTOCOL,
+  MIDI_SOURCE_MODE_DECLARATION_KIND,
   MIDI_SOURCE_SEMANTIC_EVIDENCE_REASON,
   MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS,
+  MIDI_SOURCE_SEMANTIC_INSPECTION_POLICY,
   assertMidiSourceEnvelope,
+  copyMidiSourceEnvelope,
   createStandardMidiFileSourceEnvelope,
+  createStandardMidiFileSourceEnvelopeWithEvidence,
 } from './contract/midi-source-envelope'
 export type {
+  InspectedMidiSourceSemanticEvidence,
+  MidiSourceModeDeclaration,
+  MidiSourceModeDeclarationKind,
   MidiSourceEnvelope,
+  MidiSourceSemanticEvidence,
   StandardMidiFileSourceContainer,
   UnresolvedMidiSourceSemanticEvidence,
 } from './contract/midi-source-envelope'

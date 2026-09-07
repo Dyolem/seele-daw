@@ -51,6 +51,9 @@ Playback Runtime。
   Runtime 的音源；
 - CC、Pitch Bend、Aftertouch、SysEx 等尚无 Project Fact 的事件不得宣称完整往返；后续 Project
   bridge 批次已经补充 Sustain CC64 导入，但 Project Export Bridge 尚未补充对应导出；
+- 后续 MI6B / MI6C 已在瞬态 Source Envelope 中补充传统 SMF / MIDI 1.0 证据和五类精确 Mode
+  Declaration；任意 SysEx 仍不是 Project Fact，也没有通用无损 round-trip。当前 Encoder 遇到已知
+  未分类 SysEx 证据时必须拒绝，不能静默删除；
 - Export 输出全部创作事实，不受 Mute、Solo 或当前播放状态影响；
 - Gain、Pan、Device Descriptor 与其他 Seele 私有事实不写入 MIDI；
 - Loop Clip 在 V1 不静默丢弃，Project exporter 必须返回明确诊断或阻止导出。

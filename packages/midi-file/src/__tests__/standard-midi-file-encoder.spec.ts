@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { MidiFileDocument } from '#internal/contract/midi-file-document'
-import { createStandardMidiFileSourceEnvelope } from '#internal/contract/midi-source-envelope'
+import {
+  createStandardMidiFileSourceEnvelope,
+  createStandardMidiFileSourceEnvelopeWithEvidence,
+} from '#internal/contract/midi-source-envelope'
 import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { ToneJsMidiFileDecoder } from '#internal/adapters/tonejs-midi/tonejs-midi-file-decoder'
 import { StandardMidiFileEncoder } from '#internal/adapters/midi-file-js/standard-midi-file-encoder'
@@ -8,7 +11,12 @@ import { parseMidi } from 'midi-file'
 
 const DOCUMENT: MidiFileDocument = {
   format: 1,
-  sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+  sourceEnvelope: createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+    declarations: [],
+    inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+    status: 'inspected',
+    unclassifiedSystemExclusiveMessageCount: 0,
+  }),
   name: 'Round Trip',
   ppq: 960,
   tempos: [{ tick: 0, bpm: 120 }],
@@ -69,6 +77,86 @@ describe('StandardMidiFileEncoder', () => {
     expect(boundaryNoteEventTypes).toEqual(['noteOff', 'noteOn'])
   })
 
+  it('re-emits recognized mode declarations in deterministic conductor-track order', () => {
+    const bytes = new StandardMidiFileEncoder().encode({
+      ...DOCUMENT,
+      sourceEnvelope: createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+        declarations: [
+          {
+            deviceId: 0x0a,
+            kind: 'yamaha-xg-system-on',
+            scope: 'file',
+            sourceEventIndex: 4,
+            sourceTrackIndex: 2,
+            tick: 240,
+          },
+          {
+            deviceId: 0x05,
+            kind: 'general-midi-2-system-on',
+            scope: 'file',
+            sourceEventIndex: 2,
+            sourceTrackIndex: 1,
+            tick: 0,
+          },
+          {
+            deviceId: 0x7f,
+            kind: 'general-midi-1-system-on',
+            scope: 'file',
+            sourceEventIndex: 1,
+            sourceTrackIndex: 0,
+            tick: 0,
+          },
+          {
+            deviceId: 0x03,
+            kind: 'general-midi-system-off',
+            scope: 'file',
+            sourceEventIndex: 1,
+            sourceTrackIndex: 1,
+            tick: 0,
+          },
+          {
+            deviceId: 0x10,
+            kind: 'roland-gs-reset',
+            scope: 'file',
+            sourceEventIndex: 0,
+            sourceTrackIndex: 0,
+            tick: 0,
+          },
+        ],
+        inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+        status: 'inspected',
+        unclassifiedSystemExclusiveMessageCount: 0,
+      }),
+    })
+    const conductorEvents = parseMidi(bytes).tracks[0]!
+
+    expect(
+      conductorEvents
+        .filter((event) => event.type === 'sysEx')
+        .map((event) => ({ deltaTime: event.deltaTime, data: Array.from(event.data) })),
+    ).toEqual([
+      {
+        deltaTime: 0,
+        data: [0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7],
+      },
+      { deltaTime: 0, data: [0x7e, 0x7f, 0x09, 0x01, 0xf7] },
+      { deltaTime: 0, data: [0x7e, 0x03, 0x09, 0x02, 0xf7] },
+      { deltaTime: 0, data: [0x7e, 0x05, 0x09, 0x03, 0xf7] },
+      { deltaTime: 240, data: [0x43, 0x1a, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7] },
+    ])
+    const decodedEvidence = new ToneJsMidiFileDecoder().decode(bytes).sourceEnvelope
+      .semanticEvidence
+    expect(decodedEvidence).toMatchObject({ status: 'inspected' })
+    if (decodedEvidence.status !== 'inspected') throw new TypeError('Expected inspected evidence')
+    expect(decodedEvidence.declarations.map(({ kind, tick }) => ({ kind, tick }))).toEqual([
+      { kind: 'roland-gs-reset', tick: 0 },
+      { kind: 'general-midi-1-system-on', tick: 0 },
+      { kind: 'general-midi-system-off', tick: 0 },
+      { kind: 'general-midi-2-system-on', tick: 0 },
+      { kind: 'yamaha-xg-system-on', tick: 240 },
+    ])
+  })
+
   it('rejects type 0 output because the V1 encoder emits type 1', () => {
     expect(() => new StandardMidiFileEncoder().encode({ ...DOCUMENT, format: 0 })).toThrowError(
       expect.objectContaining<Partial<MidiFileCodecError>>({
@@ -97,6 +185,33 @@ describe('StandardMidiFileEncoder', () => {
       new StandardMidiFileEncoder().encode({
         ...DOCUMENT,
         sourceEnvelope: createStandardMidiFileSourceEnvelope(0),
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
+    )
+  })
+
+  it('rejects evidence that cannot be preserved by the current encoder', () => {
+    expect(() =>
+      new StandardMidiFileEncoder().encode({
+        ...DOCUMENT,
+        sourceEnvelope: createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+          declarations: [],
+          inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+          status: 'inspected',
+          unclassifiedSystemExclusiveMessageCount: 1,
+        }),
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
+    )
+    expect(() =>
+      new StandardMidiFileEncoder().encode({
+        ...DOCUMENT,
+        sourceEnvelope: createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+          reason: 'profile-declaration-inspection-failed',
+          status: 'unresolved',
+        }),
       }),
     ).toThrowError(
       expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),

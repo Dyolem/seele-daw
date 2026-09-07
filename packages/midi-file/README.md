@@ -9,7 +9,7 @@ Codec 的对象投影成 Seele 自有的 `MidiFileDocument`，并提供可独立
 - `ToneJsMidiFileDecoder` 使用固定版本的 `@tonejs/midi` 解析 SMF；
 - 接受 Type 0 / Type 1 与 PPQ time division；
 - 为每个成功解析的 Document 建立不可变 MIDI Source Envelope，明确记录 SMF 格式、PPQ、MIDI 1.0
-  消息协议，以及 Profile 声明“尚未检查”的证据状态；
+  消息协议，并按限定政策保留 GM1 / GM2 / GM Off / GS / XG Mode Declaration 与未分类 SysEx 计数；
 - 明确拒绝 Type 2、SMPTE division 和损坏的 Header；
 - 保留 tick-domain Note、Tempo、Time Signature、Key Signature、文本事件、Program、Channel、
   Control Change、Pitch Bend 与 End of Track tick；
@@ -18,16 +18,18 @@ Codec 的对象投影成 Seele 自有的 `MidiFileDocument`，并提供可独立
 
 `@tonejs/midi` 会把一个源 Track 按 Channel / Program 拆成多个 normalized Track，并把 Note On /
 Note Off 配对为 Note。`MidiFileDocument.tracks` 明确表示这种规范化结果，不承诺保留原始 chunk
-身份或原始事件顺序。当前投影也不是无损 SMF AST：SysEx、Aftertouch 与未识别 Meta Event 尚不在
-契约内。需要这些事实时，应扩展中立契约或替换 Adapter，而不是让第三方类型越过 package root。
+身份或原始事件顺序。当前投影也不是无损 SMF AST：只有五类精确 Mode Declaration 作为 Evidence
+保留；任意 SysEx 原始字节、Aftertouch 与未识别 Meta Event 尚不在事件契约内。需要这些事实时，应
+扩展中立契约或替换 Adapter，而不是让第三方类型越过 package root。
 
 当前第三方 SMF 文本实现按单字节字符串读写。Encoder 会拒绝超出 byte range 的文字，避免静默
 截断；在 Studio Export 接入前必须单独确认 UTF-8 与外部 DAW 兼容策略。Decoder 现阶段保留第三方
 返回的字节字符串，不宣称已经识别来源文件的字符集。
 
 Source Envelope 的字段、瞬态生命周期、失败边界与后续语义证据路线见
-[MIDI Source Envelope V1](./docs/midi-source-envelope-v1.md)。`profile-declarations-not-inspected`
-不等于“文件没有 Profile”；当前 Decoder 不会据此选择 Keyswitch、Drum Map 或 Articulation。
+[MIDI Source Envelope V1](./docs/midi-source-envelope-v1.md)和
+[SMF MIDI 1.0 Mode Declaration Evidence V1](./docs/smf-midi1-mode-declaration-evidence-v1.md)。即使识别
+到模式声明，当前 Decoder 也不会据此选择 Keyswitch、Drum Map 或 Articulation。
 
 ## 边界
 

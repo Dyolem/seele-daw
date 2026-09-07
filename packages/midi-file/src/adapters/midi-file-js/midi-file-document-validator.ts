@@ -1,5 +1,9 @@
 import type { MidiFileDocument } from '#internal/contract/midi-file-document'
-import { assertMidiSourceEnvelope } from '#internal/contract/midi-source-envelope'
+import {
+  MIDI_SOURCE_SEMANTIC_EVIDENCE_REASON,
+  MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS,
+  assertMidiSourceEnvelope,
+} from '#internal/contract/midi-source-envelope'
 import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { parseSmfKeySignatureOffset } from '#internal/adapters/midi-file-js/smf-key-signature'
 
@@ -23,6 +27,21 @@ export function assertEncodableMidiFileDocument(document: MidiFileDocument): voi
     assertMidiSourceEnvelope(document.sourceEnvelope, document.format)
   } catch {
     fail('Invalid or inconsistent MIDI Source Envelope')
+  }
+
+  const semanticEvidence = document.sourceEnvelope.semanticEvidence
+  if (
+    semanticEvidence.status === MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS.UNRESOLVED &&
+    semanticEvidence.reason ===
+      MIDI_SOURCE_SEMANTIC_EVIDENCE_REASON.PROFILE_DECLARATION_INSPECTION_FAILED
+  ) {
+    fail('Cannot encode a source whose MIDI mode declarations could not be inspected')
+  }
+  if (
+    semanticEvidence.status === MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS.INSPECTED &&
+    semanticEvidence.unclassifiedSystemExclusiveMessageCount > 0
+  ) {
+    fail('Cannot encode unclassified System Exclusive source messages without losing evidence')
   }
 
   assertIntegerInRange(document.ppq, 1, MAX_PPQ, 'PPQ')

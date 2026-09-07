@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
+import { createStandardMidiFileSourceEnvelopeWithEvidence } from '@seele-daw/midi-file'
 import {
   createProjectFileDTO,
   createProjectSessionFromProjectFile,
@@ -36,7 +36,23 @@ function findDiagnostic(
 
 describe('createProjectMidiImportDraft', () => {
   it('maps global ticks into one Track, Clip, Source, and validated fresh Session', () => {
+    const sourceEnvelope = createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+      declarations: [
+        {
+          deviceId: 0x7f,
+          kind: 'general-midi-1-system-on',
+          scope: 'file',
+          sourceEventIndex: 0,
+          sourceTrackIndex: 0,
+          tick: 0,
+        },
+      ],
+      inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+      status: 'inspected',
+      unclassifiedSystemExclusiveMessageCount: 0,
+    })
     const document = createMidiDocument({
+      sourceEnvelope,
       name: 'Source Name',
       ppq: 480,
       tempos: [{ tick: 0, bpm: 96 }],
@@ -68,7 +84,7 @@ describe('createProjectMidiImportDraft', () => {
 
     expect(draft.summary).toEqual({
       sourceFormat: 1,
-      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+      sourceEnvelope,
       sourcePpq: 480,
       sourceTrackCount: 1,
       importedTrackCount: 1,
@@ -78,6 +94,13 @@ describe('createProjectMidiImportDraft', () => {
     expect(Object.isFrozen(draft.summary.sourceEnvelope)).toBe(true)
     expect(Object.isFrozen(draft.summary.sourceEnvelope.container)).toBe(true)
     expect(Object.isFrozen(draft.summary.sourceEnvelope.semanticEvidence)).toBe(true)
+    if (draft.summary.sourceEnvelope.semanticEvidence.status !== 'inspected') {
+      throw new TypeError('Expected inspected evidence')
+    }
+    expect(Object.isFrozen(draft.summary.sourceEnvelope.semanticEvidence.declarations)).toBe(true)
+    expect(Object.isFrozen(draft.summary.sourceEnvelope.semanticEvidence.declarations[0])).toBe(
+      true,
+    )
     expect(draft.diagnostics).toEqual([])
     expect(draft.session.modelRevision).toBe(0)
     expect(draft.session.canUndo).toBe(false)

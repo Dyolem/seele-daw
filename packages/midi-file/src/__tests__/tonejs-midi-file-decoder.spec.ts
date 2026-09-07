@@ -3,6 +3,7 @@ import { MidiFileCodecError, ToneJsMidiFileDecoder } from '#internal/index'
 import {
   createSmfFixture,
   RUNNING_STATUS_NOTE_OFF_FIXTURE,
+  TYPE_ONE_MODE_DECLARATIONS_FIXTURE,
   TYPE_ZERO_MID_TRACK_PROGRAM_CHANGE_FIXTURE,
   TYPE_ONE_MUSICAL_FIXTURE,
   TYPE_ZERO_MULTI_CHANNEL_FIXTURE,
@@ -23,8 +24,10 @@ describe('ToneJsMidiFileDecoder', () => {
         },
         messageProtocol: 'midi-1.0',
         semanticEvidence: {
-          reason: 'profile-declarations-not-inspected',
-          status: 'unresolved',
+          declarations: [],
+          inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+          status: 'inspected',
+          unclassifiedSystemExclusiveMessageCount: 0,
         },
       },
       name: 'Song',
@@ -138,6 +141,26 @@ describe('ToneJsMidiFileDecoder', () => {
         ],
       },
     ])
+  })
+
+  it('retains exact MIDI 1.0 mode declarations as immutable source evidence', () => {
+    const document = new ToneJsMidiFileDecoder().decode(TYPE_ONE_MODE_DECLARATIONS_FIXTURE)
+    const evidence = document.sourceEnvelope.semanticEvidence
+
+    expect(evidence).toMatchObject({
+      status: 'inspected',
+      unclassifiedSystemExclusiveMessageCount: 1,
+    })
+    if (evidence.status !== 'inspected') throw new TypeError('Expected inspected evidence')
+    expect(evidence.declarations.map(({ kind }) => kind)).toEqual([
+      'general-midi-1-system-on',
+      'general-midi-system-off',
+      'general-midi-2-system-on',
+      'roland-gs-reset',
+      'yamaha-xg-system-on',
+    ])
+    expect(Object.isFrozen(evidence.declarations)).toBe(true)
+    expect(evidence.declarations.every(Object.isFrozen)).toBe(true)
   })
 
   it('inherits running-status and note-on velocity zero compatibility from the parser', () => {

@@ -63,9 +63,11 @@ Tempo 所有权误报成导入失败。
 MIDI Export Bridge 与 Studio Export UI 尚未实现，因此不能从 Project 把这些事实写回 `.mid`
 文件。
 
-MIDI Source Envelope 当前只证明传统 SMF / PPQ / MIDI 1.0，并明确标记 Profile 声明尚未检查；它
-不是 GM 或演奏法判断。完整契约与后续路线见
-[MIDI Source Envelope V1](../midi-file/docs/midi-source-envelope-v1.md)。
+MIDI Source Envelope 证明传统 SMF / PPQ / MIDI 1.0，并可携带限定检查得到的 GM1 / GM2 / GM
+Off / GS / XG Mode Declaration、来源位置和未分类 SysEx 计数。本包只验证并深度复制 Evidence，
+不据此改变 Program 路由、Note 或演奏法。完整契约与后续路线见
+[MIDI Source Envelope V1](../midi-file/docs/midi-source-envelope-v1.md)和
+[SMF MIDI 1.0 Mode Declaration Evidence V1](../midi-file/docs/smf-midi1-mode-declaration-evidence-v1.md)。
 
 初始 CC7 / CC10 的用户听觉、精确换算、事务、诊断和兼容边界见
 [MIDI Initial Channel Controls V1](./docs/midi-initial-channel-controls-v1.md)。

@@ -4,10 +4,10 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-04，MIDI Source Envelope MI6B 已实施待审核
+> 最近更新：2026-09-07，SMF MIDI 1.0 Mode Declaration Evidence MI6C 已审核
 >
 > 当前阶段：Studio 已接入 439 项来源 Preset 浏览、289 项采样音色、独立 MIDI Program /
-> Channel 10 路由、初始 CC7 / CC10 与最小 MIDI 来源证据传递；完整目录人工听测仍为 `not-run`
+> Channel 10 路由、初始 CC7 / CC10 与 MIDI 1.0 模式声明证据传递；完整目录人工听测仍为 `not-run`
 >
 > 适用范围：Studio 用户流程、Project Core 已接入能力及明确的产品限制
 
@@ -73,10 +73,15 @@ MI6A Note Coverage Isolation 已审核并提交为 `041e945`：合法 MIDI Pitch
 覆盖，Transport 保持 Stopped 而不进入 Failed。Project Fact、Project File schema 和底层严格
 Sample Voice Runtime 不变，也不会从低音 Pitch 猜测 Keyswitch、鼓组扩展或错误音符。
 
-MI6B MIDI Source Envelope 已实施待审核：Decoder 会为成功解析的传统 SMF 记录 Type 0 / 1、PPQ、
-MIDI 1.0 消息协议，以及 `profile-declarations-not-inspected` 的未解析语义证据。Project MIDI 验证并
+MI6B MIDI Source Envelope 已审核并提交为 `40ce3f3`：Decoder 会为成功解析的传统 SMF 记录 Type
+0 / 1、PPQ、MIDI 1.0 消息协议，以及 `profile-declarations-not-inspected` 的未解析语义证据。Project MIDI 验证并
 把不可变副本交给 Studio 导入结果，但不写入 Project Fact、Project File、History 或 Playback。
 这使后续 Profile 检查和语义绑定可以基于显式证据演进，同时不会把“尚未检查”误当成“没有声明”。
+
+MI6C 已审核：Source Envelope 的限定检查器可精确识别 GM1 On、GM Off、GM2 On、GS Reset 与
+XG System On，支持 SMF `F0` / `F7` 分片并保留 Tick、来源 Track / Event 与 Device ID。其他 SysEx
+只计为未分类，不推断含义；Project MIDI 和 Studio 继续只传递证据，不改变现有声音。当前 Encoder
+可确定性重写五类声明，但检查失败或存在未分类 SysEx 时会拒绝，避免静默丢失。
 
 当前 Sample Voice Runtime 已采用带 `-36 dB` 下限的平方 Velocity 响应、Project Master 后独立
 `-12 dB` 输出校准、Manifest Envelope/Loop/Trigger 语义，以及每个乐器设备 64 个、项目 Runtime
@@ -1143,7 +1148,8 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-09-03 | `AUDIO-QUALITY`、`SCORE-INSTRUMENTS`                       | MI4 用真实 Score Core 参考集合校准 `192 MiB` decoded Float32 LRU 缓存预算，并门禁多 Soundbank 并发、复用、Abort、重试与局部失败。                                | `8072aca`                                  |
 | 2026-09-03 | `AUDIO-QUALITY`、`SCORE-INSTRUMENTS`                       | MI5 用原创 Type 1 总谱通过真实七音源 Chromium PCM 门禁，并把来源名含 URL 分隔符的 WAV 规范化为可追溯的安全资源名；人工听测保持 `not-run`。                       | `5c541dc`                                  |
 | 2026-09-04 | `PLAYBACK`、`SCORE-INSTRUMENTS`                            | MI6A 将合法但无匹配 Manifest Zone 的 MIDI Note 按 Occurrence 隔离并汇总 Warning；不猜语义、不改 Project Fact，全部未覆盖时保持 Stopped。                         | `041e945`                                  |
-| 2026-09-04 | `MIDI-IMPORT`                                              | MI6B 建立 SMF / PPQ / MIDI 1.0 Source Envelope，并明确区分 Profile 声明尚未检查；只贯穿中立 Document、导入摘要与 Studio 结果，不升级 Project File。              | 本批待审核                                 |
+| 2026-09-04 | `MIDI-IMPORT`                                              | MI6B 建立 SMF / PPQ / MIDI 1.0 Source Envelope，并明确区分 Profile 声明尚未检查；只贯穿中立 Document、导入摘要与 Studio 结果，不升级 Project File。              | `40ce3f3`                                  |
+| 2026-09-07 | `MIDI-IMPORT`                                              | MI6C 精确检查五类 MIDI 1.0 Mode Declaration、重组 SysEx 分片并计数未分类消息；当前不建立 Semantic Binding，也不改变导入路由或发声。                              | 本批提交                                   |
 
 ## 13. 阶段收口与当前验证基线
 
@@ -1292,12 +1298,19 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   Studio Production Build 与 soundbank dist boundary。详细边界与术语见
   [MIDI Note Coverage Isolation V1](packages/audio-web/docs/midi-note-coverage-isolation-v1.md)。
 
-- MIDI Source Envelope MI6B 已实施待审核：`midi-file` 为 Type 0 / 1 PPQ 文件建立深度冻结的 SMF、
+- MIDI Source Envelope MI6B 已通过审核并提交为 `40ce3f3`：`midi-file` 为 Type 0 / 1 PPQ 文件建立深度冻结的 SMF、
   MIDI 1.0 与 `profile-declarations-not-inspected` 证据；`project-midi` 在写入任何 Project Fact 前
   验证格式一致性，并把防御性副本放入两种导入摘要，Studio 结果保持该证据。Project File V2、
   History、dirty 与 Playback 均不改变。完整 `pnpm check` 已通过 158 个测试文件 / 1,375 项测试、
   Studio Production Build 与 soundbank dist boundary。详细契约、术语和延期项见
   [MIDI Source Envelope V1](packages/midi-file/docs/midi-source-envelope-v1.md)。
+
+- SMF MIDI 1.0 Mode Declaration Evidence MI6C 已审核：限定检查器精确识别 GM1 On、GM Off、
+  GM2 On、GS Reset 与 XG System On，并保留位置化声明、Device ID 与未分类 SysEx 消息数。完整与
+  分片消息、近似字节拒绝、深度不可变传递及已识别声明的 Encoder 重写已有自动测试；当前不生成
+  Semantic Binding，不改变 Project Fact 或声音。完整 `pnpm check` 已通过 159 个测试文件 / 1,384
+  项测试、Studio Production Build 与 soundbank dist boundary。详细边界见
+  [SMF MIDI 1.0 Mode Declaration Evidence V1](packages/midi-file/docs/smf-midi1-mode-declaration-evidence-v1.md)。
 
 - Built-in Preset Catalogue and General MIDI Routing V1 已通过审核并提交为 `000aa9f`。Studio 的 Reka UI
   左目录 / 右选项浮层展示 15 类、439 个来源 Preset：289 个 MIDISampleSynth 可播放，139 个

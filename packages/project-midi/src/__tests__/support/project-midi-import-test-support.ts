@@ -10,8 +10,18 @@ import {
   type CreateProjectMidiImportDraftInput,
   type ProjectMidiImportIdFactory,
   type ProjectMidiInstrumentDeviceFactory,
+  type ProjectMidiSemanticBinding,
   type ProjectMidiTrackColorFactory,
 } from '#internal/index'
+
+export const UNINSPECTED_PROJECT_MIDI_SEMANTIC_BINDING = Object.freeze({
+  policy: 'smf-midi-1-mode-binding-v1',
+  reason: 'mode-declarations-not-inspected',
+  schemaVersion: 1,
+  scope: 'file',
+  sourceDeclarationIndexes: Object.freeze([]),
+  status: 'unresolved',
+} as const satisfies ProjectMidiSemanticBinding)
 
 export function createMidiNote(overrides: Partial<MidiFileNote> = {}): MidiFileNote {
   return {

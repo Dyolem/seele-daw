@@ -9,6 +9,7 @@ import type {
   Tick,
   TrackId,
 } from '@seele-daw/project-core'
+import type { ProjectMidiSemanticBinding } from '#internal/import/midi-semantic-binding'
 
 export const PROJECT_MIDI_IMPORT_ENTITY_KIND = {
   PROJECT: 'project',
@@ -122,6 +123,7 @@ export interface ProjectMidiImportDiagnostic {
 export interface ProjectMidiImportSummary {
   readonly sourceFormat: MidiFileDocument['format']
   readonly sourceEnvelope: MidiFileDocument['sourceEnvelope']
+  readonly semanticBinding: ProjectMidiSemanticBinding
   readonly sourcePpq: number
   readonly sourceTrackCount: number
   readonly importedTrackCount: number

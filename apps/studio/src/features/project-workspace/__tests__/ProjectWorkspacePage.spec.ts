@@ -78,6 +78,10 @@ import {
   type ProjectMidiImportVueContext,
 } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
+  NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
+  NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
+} from '@/workbench/project/midi-import/__tests__/support/project-midi-import-test-support'
+import {
   PROJECT_NAVIGATION_INTENT_KIND,
   type ProjectNavigationDecisionRequest,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
@@ -660,7 +664,8 @@ describe('ProjectWorkspacePage', () => {
         importedNoteCount: 32,
         importedTrackCount: 2,
         sourceFormat: 1,
-        sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+        sourceEnvelope: NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
+        semanticBinding: NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
         sourcePpq: 480,
         sourceTrackCount: 2,
       }),
@@ -724,7 +729,8 @@ describe('ProjectWorkspacePage', () => {
         importedNoteCount: 12,
         importedTrackCount: 1,
         sourceFormat: 1,
-        sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+        sourceEnvelope: NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
+        semanticBinding: NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
         sourcePpq: 480,
         sourceTrackCount: 1,
       }),

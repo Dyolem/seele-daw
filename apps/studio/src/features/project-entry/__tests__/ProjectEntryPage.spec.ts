@@ -1,4 +1,3 @@
-import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
 import { parseProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -27,6 +26,10 @@ import {
   PROJECT_MIDI_IMPORT_CONTEXT_KEY,
   type ProjectMidiImportVueContext,
 } from '@/workbench/project/midi-import/vue/project-midi-import-context'
+import {
+  NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
+  NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
+} from '@/workbench/project/midi-import/__tests__/support/project-midi-import-test-support'
 import type { RecentProjectSummary } from '@/workbench/project/project-catalog-reader'
 
 interface PageFixture {
@@ -46,7 +49,8 @@ function createImportResult(
     diagnostics: Object.freeze([]),
     summary: Object.freeze({
       sourceFormat: 1,
-      sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+      sourceEnvelope: NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
+      semanticBinding: NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
       sourcePpq: 480,
       sourceTrackCount: 2,
       importedTrackCount: 2,

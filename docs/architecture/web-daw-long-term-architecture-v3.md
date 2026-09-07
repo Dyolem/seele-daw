@@ -348,7 +348,9 @@ Clip 与 PPQ 960 换算由 `project-midi` 负责，不能反向进入 Codec。`p
 Document 与 Project Core 公开边界，不拥有 Browser File、Active Project 生命周期或 Studio Grand
 选择；Studio Composition Root 注入默认 Device 工厂。新项目导入由 bridge 产出可加载 Session；
 当前项目 Track 导入由 bridge 产出一个通用 Project Core 集合 Command。后者只携带 Track 内容图，
-不读取或替换目标 Project 的身份、Tempo 与拍号。
+不读取或替换目标 Project 的身份、Tempo 与拍号。来源 Mode Declaration 的客观 Evidence 仍属于
+`midi-file`；由 `project-midi` 派生的 Semantic Binding 只进入瞬态 Import Summary，Studio 可以读取
+它生成反馈，但 Project Core、Project File 与 Playback 不消费该结果。
 
 ### 8.2 拆包规则
 

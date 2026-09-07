@@ -64,10 +64,14 @@ MIDI Export Bridge 与 Studio Export UI 尚未实现，因此不能从 Project �
 文件。
 
 MIDI Source Envelope 证明传统 SMF / PPQ / MIDI 1.0，并可携带限定检查得到的 GM1 / GM2 / GM
-Off / GS / XG Mode Declaration、来源位置和未分类 SysEx 计数。本包只验证并深度复制 Evidence，
-不据此改变 Program 路由、Note 或演奏法。完整契约与后续路线见
+Off / GS / XG Mode Declaration、来源位置和未分类 SysEx 计数。本包会把 Evidence 保守分类成
+版本化 `semanticBinding`：单一模式可绑定，无声明保持未绑定，未分类 / 检查失败保持未解析，多模式
+或 On / Off 混合保持冲突。两种导入摘要都携带 Binding，但它不是 Project Fact，也不改变 Program
+路由、Note 或演奏法。完整契约与后续路线见
 [MIDI Source Envelope V1](../midi-file/docs/midi-source-envelope-v1.md)和
-[SMF MIDI 1.0 Mode Declaration Evidence V1](../midi-file/docs/smf-midi1-mode-declaration-evidence-v1.md)。
+[SMF MIDI 1.0 Mode Declaration Evidence V1](../midi-file/docs/smf-midi1-mode-declaration-evidence-v1.md)，
+Binding 政策、用户反馈与术语见
+[MIDI Semantic Binding V1](./docs/midi-semantic-binding-v1.md)。
 
 初始 CC7 / CC10 的用户听觉、精确换算、事务、诊断和兼容边界见
 [MIDI Initial Channel Controls V1](./docs/midi-initial-channel-controls-v1.md)。

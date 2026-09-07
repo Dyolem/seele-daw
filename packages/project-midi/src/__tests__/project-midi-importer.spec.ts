@@ -85,6 +85,14 @@ describe('createProjectMidiImportDraft', () => {
     expect(draft.summary).toEqual({
       sourceFormat: 1,
       sourceEnvelope,
+      semanticBinding: {
+        mode: 'general-midi-1',
+        policy: 'smf-midi-1-mode-binding-v1',
+        schemaVersion: 1,
+        scope: 'file',
+        sourceDeclarationIndexes: [0],
+        status: 'bound',
+      },
       sourcePpq: 480,
       sourceTrackCount: 1,
       importedTrackCount: 1,
@@ -101,6 +109,8 @@ describe('createProjectMidiImportDraft', () => {
     expect(Object.isFrozen(draft.summary.sourceEnvelope.semanticEvidence.declarations[0])).toBe(
       true,
     )
+    expect(Object.isFrozen(draft.summary.semanticBinding)).toBe(true)
+    expect(Object.isFrozen(draft.summary.semanticBinding.sourceDeclarationIndexes)).toBe(true)
     expect(draft.diagnostics).toEqual([])
     expect(draft.session.modelRevision).toBe(0)
     expect(draft.session.canUndo).toBe(false)

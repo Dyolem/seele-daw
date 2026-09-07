@@ -79,9 +79,13 @@ Program 后，前后 Note 会进入不同 normalized Track 的行为。
   按住期间换 Program 等边界输入，不能宣称已完整还原动态换音色语义。
 - MI3B 把首个 Note 前或同 Tick 最终生效的 CC7 / CC10 转成 Track 初始 Gain / Pan；动态 Program、
   后续 CC7 / CC10、CC11、Pitch Bend、Aftertouch 和 Articulation 继续延期。
+- MI6D 即使从来源 Mode Declaration 得到唯一 GM / GS / XG Binding，也只在导入反馈中显示检测结果；
+  本页的 Program / Channel 10 路由不会自动切换成尚未实现的 Bank、Drum Map 或 Articulation 政策。
 
 初始 Channel 控制的听觉与数值契约见
 [MIDI Initial Channel Controls V1](../../../packages/project-midi/docs/midi-initial-channel-controls-v1.md)。
+MI6D 的保守分类与冲突反馈见
+[MIDI Semantic Binding V1](../../../packages/project-midi/docs/midi-semantic-binding-v1.md)。
 
 ## 5. 自动验证
 

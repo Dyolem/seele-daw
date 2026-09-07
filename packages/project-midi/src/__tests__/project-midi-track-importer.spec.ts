@@ -24,6 +24,7 @@ import {
   createMidiDocument,
   createMidiNote,
   createMidiTrack,
+  UNINSPECTED_PROJECT_MIDI_SEMANTIC_BINDING,
 } from '#internal/__tests__/support/project-midi-import-test-support'
 
 function createTrackImportInput(
@@ -82,6 +83,7 @@ describe('createProjectMidiTrackImportDraft', () => {
     expect(draft.summary).toEqual({
       sourceFormat: 1,
       sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+      semanticBinding: UNINSPECTED_PROJECT_MIDI_SEMANTIC_BINDING,
       sourcePpq: 480,
       sourceTrackCount: 1,
       importedTrackCount: 1,

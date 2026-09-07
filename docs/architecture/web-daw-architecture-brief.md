@@ -55,7 +55,9 @@ Core 或 Browser；`project-midi` 独立拥有 MIDI Document 与 Project Model �
 项目生命周期写入。Workbench 菜单另提供“导入为新 Track”，Arrangement 末尾和空态也使用该
 意图：`project-midi` 生成完整 Track 所有权图，Project Core 以一个集合 Command 原子追加并形成一个
 History 步骤；来源 Tempo / 拍号不进入该模式，当前 Project 时间轴保持权威。阻断失败不留下部分
-项目事实，非阻断诊断通过共享摘要反馈。MIDI Export 仍留在后续批次。
+项目事实，非阻断诊断通过共享摘要反馈。MI6D 进一步由 `project-midi` 从 `midi-file` 的客观 Mode
+Evidence 派生瞬态、版本化 Semantic Binding，Studio 只展示检测或风险反馈；Binding 不进入 Project
+Fact，也不改变 Studio-owned Instrument 路由。MIDI Export 仍留在后续批次。
 
 Project Tempo Control V1 已通过
 `checkpoint/project-tempo-control-2026-08-25` 收口。其后的

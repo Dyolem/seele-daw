@@ -54,6 +54,8 @@ Playback Runtime。
 - 后续 MI6B / MI6C 已在瞬态 Source Envelope 中补充传统 SMF / MIDI 1.0 证据和五类精确 Mode
   Declaration；任意 SysEx 仍不是 Project Fact，也没有通用无损 round-trip。当前 Encoder 遇到已知
   未分类 SysEx 证据时必须拒绝，不能静默删除；
+- MI6D 又在 Project MIDI 导入摘要中加入文件级 Semantic Binding 与 Studio 风险反馈；它仍不成为
+  Project Fact，也不改变 Program / Channel 10 路由或补齐 Project Export Bridge；
 - Export 输出全部创作事实，不受 Mute、Solo 或当前播放状态影响；
 - Gain、Pan、Device Descriptor 与其他 Seele 私有事实不写入 MIDI；
 - Loop Clip 在 V1 不静默丢弃，Project exporter 必须返回明确诊断或阻止导出。

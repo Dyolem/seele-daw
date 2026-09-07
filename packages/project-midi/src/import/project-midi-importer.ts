@@ -13,6 +13,7 @@ import {
 } from '#internal/import/project-midi-import-contract'
 import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 import { ImportIdAllocator, requireNormalizedMidiDocument } from '#internal/import/import-support'
+import { createProjectMidiSemanticBinding } from '#internal/import/midi-semantic-binding'
 import { createImportedProjectFile } from '#internal/import/project-file-builder'
 import { createImportedTrackCollection } from '#internal/import/track-collection-builder'
 import {
@@ -86,9 +87,11 @@ function createImportSummary(
   document: CreateProjectMidiTrackImportDraftInput['document'],
   mappedTracks: ReturnType<typeof mapTracks>,
 ): ProjectMidiImportSummary {
+  const sourceEnvelope = copyMidiSourceEnvelope(document.sourceEnvelope)
   return Object.freeze({
     sourceFormat: document.format,
-    sourceEnvelope: copyMidiSourceEnvelope(document.sourceEnvelope),
+    sourceEnvelope,
+    semanticBinding: createProjectMidiSemanticBinding(sourceEnvelope),
     sourcePpq: document.ppq,
     sourceTrackCount: document.tracks.length,
     importedTrackCount: mappedTracks.length,

@@ -83,7 +83,7 @@ Pitch 数值只能说明消息携带了哪个键号，不能单独证明它是�
   -> Project Fact、控制语义或仍保持 Unknown
 ```
 
-`MIDI Semantic Binding` 是未来的内部中立契约，不等同于“MIDI 1.0 Interpretation Profile”：
+MI6D 已加入第一版文件级 `MIDI Semantic Binding`，它不等同于“MIDI 1.0 Interpretation Profile”：
 
 - MIDI 1.0 文件可由明确 GM / GM2 / GS / XG、厂商或用户指定配置提供绑定证据；
 - MIDI 2.0 文件可由 UMP、MIDI Clip 元数据或其他明确声明提供更丰富证据；

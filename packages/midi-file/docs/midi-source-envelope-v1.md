@@ -1,6 +1,6 @@
 # MIDI Source Envelope V1
 
-> Status: MI6B reviewed and committed as `40ce3f3`; MI6C extension reviewed
+> Status: MI6B reviewed and committed as `40ce3f3`; MI6C extension committed as `32a8f36`
 >
 > Date: 2026-09-04
 >
@@ -74,7 +74,8 @@ Encoder 接受同一中立 `MidiFileDocument`，因此会验证 Envelope 与 `do
 后续实现必须由真实纵向切片逐步扩展：
 
 1. MI6C 检查传统 SMF 中五类精确 GM / GM2 / GS / XG Mode Declaration，同时计数其他 SysEx；
-2. 后续建立版本化 `MIDI Semantic Binding`，记录证据来源、版本以及适用 Device / Group / Channel 范围；
+2. MI6D 建立第一版文件级 `MIDI Semantic Binding`，保留证据索引、政策版本和冲突状态；Device / Group /
+   Channel 细分范围仍等待真实切片；
 3. 只有绑定唯一且执行能力已实现时，才把事件解释成 Drum、Articulation、Keyswitch 或其他控制；
 4. MIDI 2.0 UMP、MIDI Clip / SMF2 等新容器使用各自 Decoder，不伪装成传统 SMF；
 5. 实时 MIDI-CI Discovery、Profiles 与 Property Exchange 属于设备会话证据，不作为 `.mid` 文件

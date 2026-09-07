@@ -1,6 +1,6 @@
 # SMF MIDI 1.0 Mode Declaration Evidence V1
 
-> Status: MI6C reviewed; full root check passed
+> Status: MI6C reviewed and committed as `32a8f36`; full root check passed
 >
 > Date: 2026-09-07
 >
@@ -82,8 +82,9 @@ SMF bytes
 - 没有模式声明的文件仍可能按 GM 习惯创作，现有 Program / Channel 10 兼容路由也不会在本批改变；
 - 即使绑定成功，只有已经实现的 Project Fact 与 Runtime 能力才能执行，不能伪造缺少的音源或控制。
 
-下一批 MI6D 才会从这些位置化声明生成保守、版本化、带冲突结果的绑定。MI6D 必须保留原始 Evidence，
-并继续把“无声明”“未分类”“检查失败”“互相冲突”区分开。
+MI6D 已在 `project-midi` 导入边界从这些位置化声明生成保守、版本化、带冲突结果的 Binding，同时
+保留原始 Evidence，并继续区分“无声明”“未分类”“检查失败”和“互相冲突”。它的政策与用户反馈见
+[MIDI Semantic Binding V1](../../project-midi/docs/midi-semantic-binding-v1.md)。
 
 ## 5. 术语速查
 
@@ -94,7 +95,7 @@ SMF bytes
 | Continuation Event       | SMF 用 `F7` 事件继续前一段尚未结束的 `F0` SysEx 数据                        |
 | Inspection Policy        | 本次检查承诺识别的有限消息集合，不等于“理解了所有 SysEx”                    |
 | Unclassified             | 看见了 SysEx，但当前政策不能精确分类；不等于错误或可以删除                  |
-| Semantic Binding         | 后续把证据转成可执行解释的独立步骤；Evidence 本身不会改变 Note              |
+| Semantic Binding         | MI6D 把证据分类成可绑定或风险状态；当前结果不会改变 Note 或声音             |
 
 ## 6. 自动验证门禁
 

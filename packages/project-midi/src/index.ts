@@ -8,6 +8,10 @@ export {
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   PROJECT_MIDI_IMPORT_ENTITY_KIND,
 } from './import/project-midi-import-contract'
+export {
+  PROJECT_MIDI_SEMANTIC_BINDING_REASON,
+  PROJECT_MIDI_SEMANTIC_BINDING_STATUS,
+} from './import/midi-semantic-binding'
 export type {
   CreateProjectMidiImportDraftInput,
   CreateProjectMidiTrackImportDraftInput,
@@ -26,6 +30,10 @@ export type {
   ProjectMidiTrackColorFactory,
   ProjectMidiTrackColorFactoryInput,
 } from './import/project-midi-import-contract'
+export type {
+  ProjectMidiSemanticBinding,
+  ProjectMidiSemanticMode,
+} from './import/midi-semantic-binding'
 export { ProjectMidiImportError } from './import/project-midi-import-error'
 export type {
   ProjectMidiImportErrorCode,

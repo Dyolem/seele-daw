@@ -1,5 +1,6 @@
 import {
   createStandardMidiFileSourceEnvelope,
+  createStandardMidiFileSourceEnvelopeWithEvidence,
   type MidiFileDecoder,
   type MidiFileDocument,
 } from '@seele-daw/midi-file'
@@ -27,6 +28,7 @@ import {
   createProjectMidiImportCoordinator,
   type ProjectMidiImportCoordinatorDependencies,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
+import { UNINSPECTED_PROJECT_MIDI_SEMANTIC_BINDING } from '@/workbench/project/midi-import/__tests__/support/project-midi-import-test-support'
 import {
   ControlledProjectCheckpointStore,
   createCheckpointIdFactory,
@@ -168,6 +170,7 @@ describe('ProjectMidiImportCoordinator', () => {
       summary: {
         sourceFormat: 1,
         sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+        semanticBinding: UNINSPECTED_PROJECT_MIDI_SEMANTIC_BINDING,
         sourcePpq: 960,
         sourceTrackCount: 1,
         importedTrackCount: 1,
@@ -181,6 +184,44 @@ describe('ProjectMidiImportCoordinator', () => {
     expect(fixture.decode.mock.invocationCallOrder[0]).toBeLessThan(
       fixture.createFromSession.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     )
+  })
+
+  it('forwards a bound source mode without overriding the injected Instrument policy', async () => {
+    const fixture = createFixture(
+      createMidiDocument({
+        sourceEnvelope: createStandardMidiFileSourceEnvelopeWithEvidence(1, {
+          declarations: [
+            {
+              deviceId: 0,
+              kind: 'yamaha-xg-system-on',
+              scope: 'file',
+              sourceEventIndex: 0,
+              sourceTrackIndex: 0,
+              tick: 0,
+            },
+          ],
+          inspectionPolicy: 'smf-midi-1-mode-declarations-v1',
+          status: 'inspected',
+          unclassifiedSystemExclusiveMessageCount: 0,
+        }),
+      }),
+    )
+
+    const result = await fixture.coordinator.importLocalFile(new File([], 'xg-score.mid'))
+    const session = fixture.createFromSession.mock.calls[0]?.[0]
+
+    expect(result.summary.semanticBinding).toEqual({
+      mode: 'yamaha-xg',
+      policy: 'smf-midi-1-mode-binding-v1',
+      schemaVersion: 1,
+      scope: 'file',
+      sourceDeclarationIndexes: [0],
+      status: 'bound',
+    })
+    expect(session?.getSnapshot().devices.map(decodeSampleInstrumentDeviceState)).toEqual([
+      { soundbankId: 'studio-grand' },
+    ])
+    expect(fixture.createInstrumentDevice).toHaveBeenCalledOnce()
   })
 
   it('validates the file before confirming the latest active Project and replacing it', async () => {
@@ -220,6 +261,7 @@ describe('ProjectMidiImportCoordinator', () => {
         importedTrackCount: 1,
         importedNoteCount: 1,
         sourceEnvelope: createStandardMidiFileSourceEnvelope(1),
+        semanticBinding: UNINSPECTED_PROJECT_MIDI_SEMANTIC_BINDING,
       },
     })
     expect(after.project).toBe(before.project)

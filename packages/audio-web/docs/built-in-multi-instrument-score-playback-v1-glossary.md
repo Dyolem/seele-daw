@@ -88,7 +88,11 @@
 | 系统专有消息  | System Exclusive / SysEx    | MIDI 的通用或厂商专有数据载体。MI6C 只精确识别五类系统模式消息，不把其他 SysEx 内容暴露为已理解事实。                                                |
 | 模式声明      | Mode Declaration            | 明确要求设备进入 GM1、GM2、GS、XG 或退出 GM 的 SysEx。它是来源 Evidence，不等于每个 Note 已有唯一解释。                                              |
 | 未分类消息    | Unclassified SysEx          | 检查器看见了 SysEx，但当前有限政策不能精确分类。它不等于损坏、无用或可以在导出时静默删除。                                                           |
-| 语义绑定      | MIDI Semantic Binding       | 后续把明确来源证据绑定为 Note、Drum、Articulation 或其他控制语义的版本化中立契约。证据不足时结果必须保持 Unknown。                                   |
+| 语义绑定      | MIDI Semantic Binding       | MI6D 先把 Mode Evidence 保守分类为 Bound、Unbound、Unresolved 或 Conflicted；当前结果只用于导入反馈，不改变声音。                                    |
+| 已绑定        | Bound                       | 所有可用声明只指向一种 GM1、GM2、GS 或 XG 模式；这只证明模式分类唯一，不表示该模式的全部功能已实现。                                                 |
+| 未绑定        | Unbound                     | 检查已得出“没有启用模式”，例如无声明或只有 GM Off；它与检查失败不同。                                                                                |
+| 未解析        | Unresolved                  | 声明未检查、检查失败或包含未分类 SysEx；当前证据不能安全得出唯一模式。                                                                               |
+| 冲突          | Conflicted                  | 已识别声明指向多种模式，或同时包含启用模式和 GM Off；V1 不猜测时间顺序中的赢家。                                                                     |
 | 解释配置      | Interpretation Profile      | 面向旧 MIDI 文件或特定生态的显式解释规则，例如审核过的 GM2 Drum Map 或厂商 Articulation Map。它是语义绑定的一种证据来源，不是文件里天然存在的真相。  |
 | 通用包        | Universal MIDI Packet / UMP | MIDI 2.0 使用的消息封装；它也能承载 MIDI 1.0 Channel Voice 消息。看到 UMP 不能自动推断文件已声明某个乐器或演奏法 Profile。                           |
 | 能力询问      | MIDI-CI                     | 实时设备间的 Capability Inquiry，可协商 Protocol、Profiles 与 Property Exchange。它是会话协议，不是 `.mid` 文件的“版本 2”标记。                      |

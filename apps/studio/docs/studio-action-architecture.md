@@ -1,6 +1,6 @@
 # Studio Action 架构
 
-> 状态：WA1 已实现并通过审核
+> 状态：WA1／WA2 已实现并通过审核
 >
 > 日期：2026-09-08
 
@@ -68,7 +68,7 @@ ActiveProjectService 的保存状态呈现；播放和编辑器失败沿用现�
 不会再次触发 Toast。
 
 目标替换、视图卸载和应用释放时，已接受但仍在等待的调用会立即以 `cancelled` 结束。
-旧调用随后返回的成功或拒绝结果，不会成为新目标的结果，也不会触发新的通知。这里的取消
+Action Coordinator 不会把旧调用随后返回的成功或拒绝结果当作新目标的结果，也不会据此触发通知。这里的取消
 不会撤销 Project Commit，也不会中止由 ActiveProjectService 持有的持久化操作。
 业务并发控制与 busy 状态仍由对应的 Service 或 Coordinator 负责。
 
@@ -79,12 +79,44 @@ Vue Presentation 直接读取业务 refs。
 
 ## 4. 本批次已贯通的调用链
 
+### 4.1 Workbench（WA1／WA2）
+
 Save 菜单项、Save 按钮和 `Mod+S` 都调用 `project.save`，并共用同一份 Presentation：
 dirty 时启用 Save；Saving 时显示忙碌并禁用；失败时提供 Retry save；当前内容成功持久化后
 禁用 Save。菜单快捷键文本和按钮提示统一使用键盘路由器按当前平台格式化的按键绑定。
 
-现有 Undo、Redo 和 Play/Pause 快捷键入口已使用应用装配的 Action 定义；它们在 Workbench
-中的其他控件将在 WA2 迁移。对应业务仍由 ProjectSession 和 Playback 持有。
+Undo、Redo 和 Play/Pause 的菜单项、Transport 按钮与既有快捷键共用 Action 定义。
+Project Menu 新增 History 和 Playback 分组，按钮名称、菜单文案、忙碌状态与禁用原因均从
+同一份 Presentation 派生。菜单快捷键和按钮提示都使用 Input Router 的平台化文案；
+未绑定快捷键的 Action 不显示虚构的键位。菜单高度受可用视口限制，内容较多时允许滚动。
+
+| Action ID                                | 入口与语义                                                         | 状态与执行权威                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `history.undo` / `history.redo`          | Menu、Transport、Keyboard；一次调用只执行一次 Undo／Redo           | ProjectSession                                                     |
+| `playback.toggle`                        | Menu、Transport、Keyboard；Play／Loading…／Pause，Loading 时禁用   | ProjectPlaybackCoordinator                                         |
+| `playback.return-to-last-start-position` | Menu、Transport；停止并返回上次开始位置，Loading 时仍可调用        | Coordinator 的 Return 能力与 Return Anchor                         |
+| `projects.show`                          | Project Menu、窄视口的 Back to projects；导航等待期间禁用重复调用  | Router 与既有导航确认；Page 只持有此次导航的 busy 状态             |
+| `project.import-midi`                    | Project Menu；选择文件并导入为新项目                               | 页面文件选择器、ProjectMidiImportCoordinator、ActiveProjectService |
+| `project.import-midi-tracks`             | Project Menu、Arrangement 空状态和尾部按钮；导入为当前项目的新轨道 | 页面文件选择器、ProjectMidiImportCoordinator                       |
+| `midi-editor.open`                       | View Menu、Transport；打开或恢复 MIDI editor，保留选择             | Workspace 的 Dock 状态与临时操作端口                               |
+
+WA2 新增的五个 Action 默认没有 Binding；显式提供合法 Binding 后仍通过同一路径调用。
+参数化的 Tempo、Add Track、音色选择，以及 Clip 双击后的上下文定位保留各自现有业务入口。
+
+MIDI 文件选择器必须在原始用户输入的同步调用栈中打开。页面的 `useProjectWorkbenchMidiImport`
+持有原生 input、选择／导入阶段和 pending resolver；两种导入 Action 共用这一阶段状态，
+完成结果覆盖文件选择和后续导入。取消选择或取消替换项目返回 `not-applied`；预期业务失败
+沿用导入反馈，Action 不重复通知。新轨道的放置 tick 在打开选择器时捕获。
+
+页面卸载、路由切换或新轨道导入的 Session 被替换时，等待立即取消，迟到的结果不再修改
+选择或产生反馈。新项目导入会主动激活新的 Session，使旧 Action 调用方的等待结束；
+已完成创建的业务流程仍继续反馈导入结果并导航到新项目。释放页面等待不会中止业务权威
+已经接管的解码、Project Command 或持久化。
+
+Dock 的 `checked` 直接读取 Workspace 当前状态；Shell 不再通过事件维护第二份开关状态。
+页面通过当前 Shell 的临时端口找到 Workspace，Action 定义仍属于应用生命周期。
+
+### 4.2 Piano Roll（WA1）
 
 Piano Roll 区分三个独立意图：
 
@@ -104,23 +136,26 @@ WA1 未实现右键菜单，也未确定右键选择策略。
 
 ## 5. 中英术语表
 
-| English                 | 中文               | 本项目含义与用户预期                                        |
-| ----------------------- | ------------------ | ----------------------------------------------------------- |
-| Action                  | 用户动作           | Save、Delete Selection 等单一意图；不等于一次事实写入。     |
-| Catalogue               | 动作目录           | 应用装配时固定的身份与说明；页面未打开也能查询。            |
-| Descriptor              | 静态描述           | 稳定 ID、名称与说明，不包含当前是否可用。                   |
-| Handler                 | 执行函数           | 调用业务权威完成意图；不会因入口不同重复实现。              |
-| Target / capability     | 操作目标／当前能力 | 当前项目或当前编辑对象的临时端口；切换后旧端口失效。        |
-| Presentation            | 呈现状态           | 可用、忙碌、勾选、名称与禁用原因；由现有权威派生。          |
-| Invocation source       | 调用来源           | Keyboard、Menu、Toolbar、Context Menu，用于区分入口和诊断。 |
-| Acceptance              | 接受调用           | 当前输入已被接管；后续仍可能取消或失败。                    |
-| Completion              | 完成结果           | 业务执行完成、未应用、失败或调用等待被取消。                |
-| Command                 | 项目命令           | Project Core 中参数完整的原子事实修改，支持 History。       |
-| Commit / History step   | 提交／历史步骤     | 一次合法事实变更及其撤销边界；Action 失败不能回滚它。       |
-| Binding / Keymap        | 按键绑定／键位表   | 输入组合与 Action ID 的映射；Action 可以没有快捷键。        |
-| Scope / input ownership | 作用域／输入所有权 | 决定当前按键由交互、编辑器、工作台或覆盖层处理。            |
-| Disposer / invalidation | 释放函数／失效     | 结束临时能力；旧组件的延迟清理不能移除新目标。              |
-| CC64 / Sustain Pedal    | 延音踏板控制器     | 按 MIDI Channel 编辑的踏板事件；与音符拥有各自选择。        |
+| English                 | 中文               | 本项目含义与用户预期                                                       |
+| ----------------------- | ------------------ | -------------------------------------------------------------------------- |
+| Action                  | 用户动作           | Save、Delete Selection 等单一意图；不等于一次事实写入。                    |
+| Catalogue               | 动作目录           | 应用装配时固定的身份与说明；页面未打开也能查询。                           |
+| Descriptor              | 静态描述           | 稳定 ID、名称与说明，不包含当前是否可用。                                  |
+| Handler                 | 执行函数           | 调用业务权威完成意图；不会因入口不同重复实现。                             |
+| Target / capability     | 操作目标／当前能力 | 当前项目或当前编辑对象的临时端口；切换后旧端口失效。                       |
+| Presentation            | 呈现状态           | 可用、忙碌、勾选、名称与禁用原因；由现有权威派生。                         |
+| Invocation source       | 调用来源           | Keyboard、Menu、Toolbar、Context Menu，用于区分入口和诊断。                |
+| Acceptance              | 接受调用           | 当前输入已被接管；后续仍可能取消或失败。                                   |
+| Completion              | 完成结果           | 业务执行完成、未应用、失败或调用等待被取消。                               |
+| Command                 | 项目命令           | Project Core 中参数完整的原子事实修改，支持 History。                      |
+| Commit / History step   | 提交／历史步骤     | 一次合法事实变更及其撤销边界；Action 失败不能回滚它。                      |
+| Binding / Keymap        | 按键绑定／键位表   | 输入组合与 Action ID 的映射；Action 可以没有快捷键。                       |
+| Scope / input ownership | 作用域／输入所有权 | 决定当前按键由交互、编辑器、工作台或覆盖层处理。                           |
+| Disposer / invalidation | 释放函数／失效     | 结束临时能力；旧组件的延迟清理不能移除新目标。                             |
+| CC64 / Sustain Pedal    | 延音踏板控制器     | 按 MIDI Channel 编辑的踏板事件；与音符拥有各自选择。                       |
+| Return Anchor           | 播放返回位置       | Playback Coordinator 持有的上次开始位置；Return 停止播放并返回该位置。     |
+| Native file chooser     | 原生文件选择器     | 在用户输入的同步调用栈中打开；取消选择不导入文件、不生成 Project Command。 |
+| Navigation guard        | 导航守卫           | Router 调用既有导航确认，处理尚未保存的变更；Projects Action 沿用该流程。  |
 
 键盘策略详见 [Studio 快捷键架构](./studio-keyboard-shortcut-architecture.md)。
 批次范围与进度见 [Workbench Action Catalogue V1 阶段计划](./workbench-action-catalogue-v1-phase-plan.md)。

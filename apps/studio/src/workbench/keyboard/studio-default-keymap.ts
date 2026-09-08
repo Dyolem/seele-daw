@@ -23,6 +23,11 @@ const DEFAULT_KEYMAP = {
     defineStudioKeyboardBinding('Escape'),
   ]),
   [STUDIO_ACTION.PLAYBACK_TOGGLE]: Object.freeze([defineStudioKeyboardBinding('Space')]),
+  [STUDIO_ACTION.PLAYBACK_RETURN_TO_START]: Object.freeze([]),
+  [STUDIO_ACTION.PROJECTS_SHOW]: Object.freeze([]),
+  [STUDIO_ACTION.PROJECT_IMPORT_MIDI]: Object.freeze([]),
+  [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS]: Object.freeze([]),
+  [STUDIO_ACTION.MIDI_EDITOR_OPEN]: Object.freeze([]),
   [STUDIO_ACTION.PROJECT_SAVE]: Object.freeze([defineStudioKeyboardBinding('Mod+S')]),
 } satisfies StudioKeyboardKeymap<StudioActionId>
 

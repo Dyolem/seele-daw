@@ -3,6 +3,8 @@
 > Updated: 2026-09-08
 >
 > WA1: implemented and approved
+>
+> WA2: implemented and approved
 
 ## Design decision
 
@@ -13,12 +15,12 @@ boolean-only execution results and combined Clear/Cancel intent are replaced in 
 
 ## Batches
 
-| Batch | Scope                                                                                                                                                                                      | State                                                                   |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| WA1   | Immutable definitions, dynamic target lifetimes, explicit invocation/completion, input routing, bilingual terms, Save menu/button/shortcut slice, migration of existing keyboard consumers | Implemented; approved                                                   |
-| WA2   | Remaining Workbench menus/buttons: Undo/Redo, Play/Pause, Return, Projects, both MIDI imports and opening the MIDI editor; shared presentation and shortcut text                           | Not started                                                             |
-| WA3   | Focused-editor menu consumers and Reka Context Menu; explicit Note/CC64 target and one-command deletion                                                                                    | Not started; right-click selection semantics require a product decision |
-| WA4   | Phase-wide regression, failure/release checks, menu and focus review, macOS manual smoke, closure report                                                                                   | Not started                                                             |
+| Batch | Scope                                                                                                                                                                                      | State                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| WA1   | Immutable definitions, dynamic target lifetimes, explicit invocation/completion, input routing, bilingual terms, Save menu/button/shortcut slice, migration of existing keyboard consumers | Implemented; approved                             |
+| WA2   | Remaining Workbench menus/buttons: Undo/Redo, Play/Pause, Return, Projects, both MIDI imports and opening the MIDI editor; shared presentation and shortcut text                           | Implemented; approved                             |
+| WA3   | Focused-editor menu consumers and Reka Context Menu; explicit Note/CC64 target and one-command deletion                                                                                    | Authorized; right-click selection policy approved |
+| WA4   | Phase-wide regression, failure/release checks, menu and focus review, macOS manual smoke, closure report                                                                                   | Not started                                       |
 
 Each batch stops for review. WA1 does not imply approval to implement WA2–WA4 continuously.
 Implementation and ownership are documented in [Studio Action Architecture](./studio-action-architecture.md).
@@ -53,10 +55,43 @@ checked for formatting and whitespace; they do not require rerunning the full te
 
 The phase-end macOS manual smoke remains in WA4; automated DOM tests do not claim to replace it.
 
+## WA2 implementation and verification
+
+Workbench menus, Transport controls, compact-layout navigation and Arrangement MIDI import buttons
+now invoke the same application Actions. History and Playback groups expose the existing operations
+in the Project menu. All consumers read the same presentation and platform-formatted shortcut hints;
+the five new Actions have no default binding.
+
+The page owns the native MIDI chooser and its pending completion. Chooser cancellation and rejected
+navigation settle without claiming a business change. Session replacement retires a pending track
+import's UI result; successful new-project import still completes its own route transition after
+activating the new Session. Dock presentation reads the Workspace owner directly instead of keeping
+a second open-state mirror in the Shell.
+
+Validation passed on 2026-09-08 against changes based on WA1 commit `a18a005`:
+
+| Gate                               | Result                                                            |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| Root `pnpm lint`                   | Architecture, workspace quality, format, Oxlint and ESLint passed |
+| Studio Type Check                  | Passed                                                            |
+| Complete Studio test suite         | 66 files / 481 tests passed                                       |
+| Studio Production Build            | Passed                                                            |
+| Distributable local-audio boundary | Passed                                                            |
+| `git diff --check`                 | Passed                                                            |
+
+The new regression cases verify History and playback across menu, toolbar and keyboard, Return
+during loading, guarded navigation cancellation/failure and retry, synchronous native chooser
+activation, shared MIDI busy state, late-result suppression, new-project navigation, and Dock
+opening/restoration without a Project fact change. Existing Save and Reka keyboard/focus regressions
+also pass. The build retains the existing large-chunk warning.
+
+WA2 was approved for a local commit on 2026-09-08. WA3 implementation and its right-click policy are
+approved: select an unselected Note or CC64 event first, retain multi-selection when clicking one of
+its members, and show no menu when there is no executable action. WA4 has not started; full-workspace
+`pnpm check` and macOS manual smoke remain phase-end gates.
+
 ## Deferred decisions and limits
 
-- The proposed right-click policy remains unapproved: select an unselected target first, retain an
-  existing multi-selection when clicking one of its members, and show no empty menu.
 - Keymap persistence, Settings, Recorder, sequences and Command Palette remain a possible V1B.
 - Parameterized Add Track, instrument choice and Tempo editing do not justify a generic Action bus.
 - ActiveProjectService, ProjectSession, History, Playback and editor selection retain ownership.

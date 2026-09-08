@@ -1,3 +1,4 @@
+import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { HotkeyManager } from '@tanstack/hotkeys'
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -8,7 +9,6 @@ import {
   STUDIO_ACTION_COMPLETED,
   type StudioActionFailure,
   type StudioActionCompletion,
-  createStudioActionPresentation,
 } from '@/workbench/actions/studio-action'
 import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
@@ -40,8 +40,7 @@ describe('Project menu keyboard ownership', () => {
         isDirty: true,
         projectId: 'menu-focus',
         projectName: 'Menu Focus',
-        saveAction: createStudioActionPresentation('Save'),
-        saveShortcut: '⌘S',
+        actionControls: presentProjectWorkbenchActions(runtime.actions, runtime.keyboard),
         saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
       },
       global: { provide: { [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime } },

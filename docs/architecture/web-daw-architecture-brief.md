@@ -97,7 +97,8 @@ UI 组件不直接修改项目。Undo、Autosave、播放同步都以一次 Proj
 Studio Action 是菜单、按钮和快捷键使用的用户意图与稳定 ID（旧文中的 Workbench Command）。
 应用装配静态目录，页面绑定当前业务目标；Handler 解析目标后调用既有业务权威，需要写入事实时
 才调用参数完整的 Project Command。键盘输入所有权、Action 接受调用、业务完成是独立边界。
-Save 三入口和既有快捷键已在 WA1 接入，其他菜单／按钮仍待迁移。详见
+WA1 的 Save 和既有快捷键、WA2 的其他 Workbench 菜单／按钮均已接入；文件选择器、导航
+等待与 Dock 端口属于当前页面，Project／Playback 权威保持原有归属。详见
 [Studio Action Architecture](../../apps/studio/docs/studio-action-architecture.md)。
 
 ## 3. 编辑与播放是项目的两个消费者

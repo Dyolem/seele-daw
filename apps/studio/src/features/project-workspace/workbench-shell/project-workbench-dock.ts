@@ -9,5 +9,10 @@ export type ProjectWorkbenchDockMode =
   (typeof PROJECT_WORKBENCH_DOCK_MODE)[keyof typeof PROJECT_WORKBENCH_DOCK_MODE]
 
 export interface ProjectWorkbenchWorkspaceHandle {
-  openContextEditor(): void
+  getMidiEditor(): ProjectWorkbenchMidiEditor | null
+}
+
+export interface ProjectWorkbenchMidiEditor {
+  isOpen(): boolean
+  open(): void
 }

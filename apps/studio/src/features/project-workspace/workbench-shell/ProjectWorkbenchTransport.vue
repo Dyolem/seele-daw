@@ -10,6 +10,8 @@ import RecordIcon from '~icons/fluent/record-20-regular'
 import SpeakerIcon from '~icons/fluent/speaker-2-20-regular'
 import SpinnerIcon from '~icons/fluent/spinner-ios-20-regular'
 import { computed } from 'vue'
+import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 
 import ProjectTempoControl from '@/features/project-workspace/tempo/ProjectTempoControl.vue'
 import type { ProjectTempoControlMode } from '@/features/project-workspace/tempo/tempo-control'
@@ -17,13 +19,8 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
 interface ProjectWorkbenchTransportProps {
-  readonly canRedo: boolean
-  readonly canUndo: boolean
-  readonly isContextEditorOpen: boolean
-  readonly playbackCanToggle: boolean
-  readonly playbackCanReturnToLastStartPosition: boolean
+  readonly actionControls: ProjectWorkbenchActionControls
   readonly playbackFeedback: string | null
-  readonly playbackPhase: 'failed' | 'loading' | 'paused' | 'playing' | 'stopped' | 'unavailable'
   readonly playbackTime: string
   readonly tempoDisplayBpm: string
   readonly tempoEditable: boolean
@@ -34,28 +31,15 @@ interface ProjectWorkbenchTransportProps {
 
 const props = defineProps<ProjectWorkbenchTransportProps>()
 const emit = defineEmits<{
-  openContextEditor: []
-  playbackReturnToLastStartPosition: []
-  playbackToggle: []
-  redo: []
+  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
   tempoCommit: [input: string]
   tempoEditStart: []
-  undo: []
 }>()
 
 const playbackIcon = computed(() => {
-  if (props.playbackPhase === 'loading') return SpinnerIcon
-  if (props.playbackPhase === 'playing') return PauseIcon
+  if (props.actionControls.togglePlayback.busy) return SpinnerIcon
+  if (props.actionControls.togglePlayback.checked) return PauseIcon
   return PlayIcon
-})
-
-const playbackLabel = computed(() => {
-  if (props.playbackPhase === 'loading') return 'Loading instrument…'
-  if (props.playbackPhase === 'playing') return 'Pause'
-  if (!props.playbackCanToggle && props.playbackFeedback !== null) {
-    return `Play — ${props.playbackFeedback}`
-  }
-  return 'Play'
 })
 </script>
 
@@ -64,16 +48,20 @@ const playbackLabel = computed(() => {
     <div class="project-workbench__transport-start">
       <div class="project-workbench__control-group" aria-label="Project history">
         <UiIconButton
-          :disabled="!props.canUndo"
+          :disabled="!props.actionControls.undo.enabled"
           :icon="ArrowUndoIcon"
-          label="Undo"
-          @click="emit('undo')"
+          :label="props.actionControls.undo.label"
+          :title="props.actionControls.undo.title"
+          :aria-description="props.actionControls.undo.disabledReason ?? undefined"
+          @click="emit('invokeAction', props.actionControls.undo.actionId, 'toolbar')"
         />
         <UiIconButton
-          :disabled="!props.canRedo"
+          :disabled="!props.actionControls.redo.enabled"
           :icon="ArrowRedoIcon"
-          label="Redo"
-          @click="emit('redo')"
+          :label="props.actionControls.redo.label"
+          :title="props.actionControls.redo.title"
+          :aria-description="props.actionControls.redo.disabledReason ?? undefined"
+          @click="emit('invokeAction', props.actionControls.redo.actionId, 'toolbar')"
         />
       </div>
 
@@ -95,18 +83,23 @@ const playbackLabel = computed(() => {
 
     <div class="project-workbench__playback-group" aria-label="Playback controls">
       <UiIconButton
-        :disabled="!props.playbackCanReturnToLastStartPosition"
+        :disabled="!props.actionControls.returnToStart.enabled"
         :icon="PreviousIcon"
-        label="Return to last start position"
-        @click="emit('playbackReturnToLastStartPosition')"
+        :label="props.actionControls.returnToStart.label"
+        :title="props.actionControls.returnToStart.title"
+        :aria-description="props.actionControls.returnToStart.disabledReason ?? undefined"
+        @click="emit('invokeAction', props.actionControls.returnToStart.actionId, 'toolbar')"
       />
       <UiIconButton
-        :disabled="!props.playbackCanToggle"
-        :class="{ 'project-workbench__playback-loading': props.playbackPhase === 'loading' }"
+        :disabled="!props.actionControls.togglePlayback.enabled"
+        :aria-busy="props.actionControls.togglePlayback.busy || undefined"
+        :class="{ 'project-workbench__playback-loading': props.actionControls.togglePlayback.busy }"
         :icon="playbackIcon"
-        :label="playbackLabel"
-        :pressed="props.playbackPhase === 'playing'"
-        @click="emit('playbackToggle')"
+        :label="props.actionControls.togglePlayback.label"
+        :title="props.actionControls.togglePlayback.title"
+        :aria-description="props.actionControls.togglePlayback.disabledReason ?? undefined"
+        :pressed="props.actionControls.togglePlayback.checked"
+        @click="emit('invokeAction', props.actionControls.togglePlayback.actionId, 'toolbar')"
       />
       <UiIconButton
         class="project-workbench__record-control"
@@ -131,9 +124,12 @@ const playbackLabel = computed(() => {
       </div>
       <UiIconButton
         :icon="PanelBottomIcon"
-        label="Open MIDI editor"
-        :pressed="props.isContextEditorOpen"
-        @click="emit('openContextEditor')"
+        :disabled="!props.actionControls.openMidiEditor.enabled"
+        :label="props.actionControls.openMidiEditor.label"
+        :title="props.actionControls.openMidiEditor.title"
+        :aria-description="props.actionControls.openMidiEditor.disabledReason ?? undefined"
+        :pressed="props.actionControls.openMidiEditor.checked"
+        @click="emit('invokeAction', props.actionControls.openMidiEditor.actionId, 'toolbar')"
       />
     </div>
   </section>

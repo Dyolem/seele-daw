@@ -17,13 +17,16 @@ import {
   deriveAudibleMidiTimelineRange,
 } from '@seele-daw/playback'
 import { computed, onBeforeUnmount, onUnmounted, shallowRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { isNavigationFailure, useRouter } from 'vue-router'
 
 import {
   createProjectPianoRollPresentation,
   createProjectPianoRollTrackPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
+import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
+import { useProjectWorkbenchMidiImport } from '@/features/project-workspace/actions/use-project-workbench-midi-import'
+import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import { createProjectMidiClipPresentations } from '@/features/project-workspace/project-clip-presentation'
 import {
   PROJECT_TEMPO_CONTROL_MODE,
@@ -38,15 +41,15 @@ import {
 } from '@/features/project-workspace/project-workbench-selection-store'
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
 import { formatProjectTimelineTime } from '@/features/project-workspace/timeline/presentation'
-import {
-  createProjectEntryLocation,
-  createProjectWorkspaceLocation,
-  PROJECT_ROUTE_QUERY,
-} from '@/router/project-routes'
+import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
-import { STUDIO_ACTION, type StudioActionSource } from '@/workbench/actions/studio-action'
+import {
+  STUDIO_ACTION_COMPLETED,
+  STUDIO_ACTION_NOT_APPLIED,
+  type StudioActionCompletion,
+} from '@/workbench/actions/studio-action'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 import { useProjectWorkbenchActionTarget } from '@/features/project-workspace/actions/project-workbench-action-context'
 import { createProjectClipBarRange } from '@/workbench/project/clip/project-clip-bar-range'
@@ -55,11 +58,6 @@ import {
   type FailedProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
 import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
-import {
-  reportProjectMidiImportSuccess,
-  reportProjectMidiTrackImportSuccess,
-} from '@/workbench/project/midi-import/project-midi-import-feedback'
-import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
@@ -92,7 +90,6 @@ const DEFAULT_TEMPO_CONTROL_PRESENTATION = Object.freeze<ProjectTempoControlPres
 
 const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
-const { projectMidiImport } = useProjectMidiImport()
 const { projectTempoEvents } = useProjectTempoEvents()
 const { actions, keyboard } = useStudioActions()
 const workbenchActionTarget = useProjectWorkbenchActionTarget()
@@ -107,13 +104,8 @@ const router = useRouter()
 const requestedProjectId = shallowRef<ProjectId | null>(null)
 const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
-const isImportingMidi = shallowRef(false)
-const midiFileInput = shallowRef<HTMLInputElement | null>(null)
-interface PendingMidiImport {
-  readonly placementTick: Tick | null
-  readonly target: 'new-project' | 'new-tracks'
-}
-const pendingMidiImport = shallowRef<PendingMidiImport | null>(null)
+const workbenchShell = shallowRef<ProjectWorkbenchWorkspaceHandle | null>(null)
+const isShowingProjects = shallowRef(false)
 const selectedTempoEventId = shallowRef<TempoEventId | null>(null)
 const projectPresentation = shallowRef<ProjectPresentation>({
   barSpanTick: DEFAULT_BAR_SPAN_TICK,
@@ -123,7 +115,6 @@ const projectPresentation = shallowRef<ProjectPresentation>({
   timeSignatureNumerator: 4,
 })
 let requestGeneration = 0
-let midiImportGeneration = 0
 let isUnmounted = false
 
 const readyProject = computed(() => {
@@ -133,6 +124,13 @@ const readyProject = computed(() => {
     ? activeState
     : null
 })
+const midiImport = useProjectWorkbenchMidiImport({
+  getRouteProjectId: () => props.projectId,
+  getReadyProject: () => readyProject.value,
+  // Continuous visual position becomes an authored integer tick, without musical grid snapping.
+  getPlacementTick: () => parseTick(Math.round(playbackVisualPosition.value.positionTick)),
+})
+const midiFileInput = midiImport.input
 const projectSnapshot = computed(() => readyProject.value?.session.getSnapshot() ?? null)
 const tempoEvents = computed((): readonly TempoEventRecord[] => {
   return projectSnapshot.value?.tempoEvents ?? Object.freeze([])
@@ -206,11 +204,6 @@ const playbackCanReturnToLastStartPosition = computed(() => {
   void playbackVisualPosition.value
   return projectPlayback.canReturnToLastStartPosition()
 })
-const playbackCanToggle = computed(
-  () =>
-    playbackState.value.phase !== PROJECT_PLAYBACK_PHASE.LOADING &&
-    (playbackState.value.planStatus === 'partial' || playbackState.value.planStatus === 'playable'),
-)
 
 function describeFailure(resolution: FailedProjectEntryResolution): string {
   const cause = resolution.failureCause
@@ -263,80 +256,14 @@ function retry(): void {
   void openRequestedProject(props.projectId)
 }
 
-function describeMidiImportFailure(failureCause: unknown): string {
-  if (failureCause instanceof Error && failureCause.message.trim().length > 0) {
-    return failureCause.message
-  }
-  return 'The MIDI file could not be imported. Please try another file.'
-}
-
-function requestMidiFile(target: 'new-project' | 'new-tracks'): void {
-  if (readyProject.value === null || isImportingMidi.value) return
-  const input = midiFileInput.value
-  if (input === null) return
-  pendingMidiImport.value = Object.freeze({
-    // The visual playhead is continuous, while authored Project facts use integer ticks. This
-    // nearest-tick conversion is representation normalization, not musical grid snapping.
-    placementTick:
-      target === 'new-tracks'
-        ? parseTick(Math.round(playbackVisualPosition.value.positionTick))
-        : null,
-    target,
-  })
-  input.click()
-}
-
-async function importSelectedMidiFile(): Promise<void> {
-  const input = midiFileInput.value
-  const file = input?.files?.item(0) ?? null
-  const request = pendingMidiImport.value
-  pendingMidiImport.value = null
-  if (input !== null) input.value = ''
-  if (file === null || request === null || readyProject.value === null || isImportingMidi.value) {
-    return
-  }
-
-  const generation = ++midiImportGeneration
-  isImportingMidi.value = true
+async function showProjects(): Promise<StudioActionCompletion> {
+  isShowingProjects.value = true
   try {
-    if (request.target === 'new-project') {
-      const result = await projectMidiImport.importLocalFileReplacingActiveProject(file)
-      if (isUnmounted || generation !== midiImportGeneration || result === null) return
-
-      reportProjectMidiImportSuccess(toasts, result)
-      await router.push(createProjectWorkspaceLocation(result.projectId))
-    } else {
-      if (request.placementTick === null) return
-      const result = await projectMidiImport.importLocalFileAsNewTracks(file, request.placementTick)
-      if (isUnmounted || generation !== midiImportGeneration) return
-
-      const firstTrackId = result.importedTrackIds[0]
-      if (firstTrackId !== undefined) workbenchSelection.selectTrack(firstTrackId)
-      reportProjectMidiTrackImportSuccess(toasts, result)
-    }
-  } catch (failureCause) {
-    if (!isUnmounted && generation === midiImportGeneration) {
-      toasts.danger('MIDI could not be imported', describeMidiImportFailure(failureCause))
-    }
+    const failure = await router.push(createProjectEntryLocation())
+    return isNavigationFailure(failure) ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED
   } finally {
-    if (!isUnmounted && generation === midiImportGeneration) isImportingMidi.value = false
+    isShowingProjects.value = false
   }
-}
-
-function saveProject(source: StudioActionSource): void {
-  actions.invoke(STUDIO_ACTION.PROJECT_SAVE, source)
-}
-
-function undoProject(): boolean {
-  const ready = readyProject.value
-  if (ready === null || !ready.session.canUndo) return false
-  return ready.session.undo() !== null
-}
-
-function redoProject(): boolean {
-  const ready = readyProject.value
-  if (ready === null || !ready.session.canRedo) return false
-  return ready.session.redo() !== null
 }
 
 function beginTempoEdit(): void {
@@ -491,16 +418,22 @@ const stopActionTarget = watch(
       getPlaybackState: () => playbackState.value,
       playback: projectPlayback,
       save: () => activeProject.save(),
+      canReturnToLastStartPosition: () => playbackCanReturnToLastStartPosition.value,
+      isShowingProjects: () => isShowingProjects.value,
+      showProjects,
+      getMidiImportPhase: () => midiImport.phase.value,
+      canChooseMidiFile: () => midiFileInput.value !== null,
+      importMidi: midiImport.request,
+      getMidiEditor: () => workbenchShell.value?.getMidiEditor() ?? null,
     })
   },
   { immediate: true, flush: 'sync' },
 )
-const saveAction = computed(() => {
+const actionControls = computed(() => {
   // The target's business refs are the reactive source; target slots own only identity.
   void readyProject.value
-  return actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE)
+  return presentProjectWorkbenchActions(actions, keyboard)
 })
-const saveShortcut = keyboard.displayBindingsFor(STUDIO_ACTION.PROJECT_SAVE).join(' / ')
 onBeforeUnmount(() => {
   stopActionTarget()
   releaseActionTarget?.()
@@ -597,8 +530,6 @@ onUnmounted(() => {
   }
   isUnmounted = true
   requestGeneration += 1
-  midiImportGeneration += 1
-  pendingMidiImport.value = null
   const projectId = requestedProjectId.value
   if (projectId !== null) workbenchSelection.leaveProject(projectId)
 })
@@ -612,31 +543,26 @@ onUnmounted(() => {
     accept=".mid,.midi,audio/midi,audio/x-midi"
     tabindex="-1"
     aria-hidden="true"
-    @change="importSelectedMidiFile"
+    @change="midiImport.importSelection"
+    @cancel="midiImport.cancelSelection"
   />
 
   <ProjectWorkbenchShell
     v-if="readyProject"
+    ref="workbenchShell"
+    :action-controls="actionControls"
     :bar-span-tick="projectPresentation.barSpanTick"
-    :can-redo="readyProject.session.canRedo"
-    :can-undo="readyProject.session.canUndo"
     :clips="clipPresentations"
     :is-dirty="readyProject.isDirty"
-    :is-midi-importing="isImportingMidi"
     :piano-roll-presentation="pianoRollPresentation"
     :piano-roll-track-presentation="pianoRollTrackPresentation"
-    :playback-can-toggle="playbackCanToggle"
-    :playback-can-return-to-last-start-position="playbackCanReturnToLastStartPosition"
     :playback-feedback="playbackState.feedback?.message ?? null"
-    :playback-phase="playbackState.phase"
     :playback-time="playbackTime"
     :project-id="readyProject.projectId"
     :project-name="projectPresentation.projectName"
     :project-session="readyProject.session"
     :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
     :save-status="readyProject.saveStatus"
-    :save-action="saveAction"
-    :save-shortcut="saveShortcut"
     :selected-tempo-event-id="selectedTempoEventId"
     :tempo-display-bpm="tempoControlPresentation.displayBpm"
     :tempo-editing-disabled="tempoEditingDisabled"
@@ -647,13 +573,7 @@ onUnmounted(() => {
     :time-signature-numerator="projectPresentation.timeSignatureNumerator"
     :timeline-end-tick="timelineEndTick"
     :tracks="trackPresentations"
-    @import-midi-as-new-project="requestMidiFile('new-project')"
-    @import-midi-as-new-tracks="requestMidiFile('new-tracks')"
-    @leave-project="router.push(createProjectEntryLocation())"
-    @playback-return-to-last-start-position="projectPlayback.returnToLastStartPosition()"
-    @playback-toggle="projectPlayback.togglePlayPause()"
-    @redo="redoProject"
-    @save="saveProject"
+    @invoke-action="actions.invoke"
     @tempo-commit="commitTempoInput"
     @tempo-edit-start="beginTempoEdit"
     @tempo-event-add="addTempoEvent"
@@ -662,7 +582,6 @@ onUnmounted(() => {
     @tempo-event-move="moveTempoEvent"
     @tempo-event-remove="removeTempoEvent"
     @tempo-event-select="selectTempoEvent"
-    @undo="undoProject"
   />
 
   <main v-else class="project-route-state" aria-labelledby="project-open-title">

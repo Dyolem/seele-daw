@@ -1,3 +1,4 @@
+import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import {
   createTempoEventRecord,
   parseClipId,
@@ -169,6 +170,12 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   const wrapper = mount(ProjectWorkbenchArrangement, {
     props: {
       barSpanTick: parsePositiveTick(3_840),
+      midiImportAction: {
+        ...createStudioActionPresentation('Import MIDI as new tracks…'),
+        actionId: STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
+        shortcut: '',
+        title: 'Import MIDI as new tracks…',
+      },
       clips: options.clips ?? Object.freeze([]),
       projectId,
       selectedTempoEventId: options.selectedTempoEventId ?? null,
@@ -918,11 +925,15 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(laneChildren[1]?.textContent).toContain('Import MIDI as new tracks')
     expect(laneChildren[1]?.textContent).not.toContain('Creates a separate local project')
     await withTrack.get('.project-workbench__midi-import-lane button').trigger('click')
-    expect(withTrack.emitted('importMidiAsNewTracks')).toHaveLength(1)
+    expect(withTrack.emitted('invokeAction')).toEqual([
+      [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'toolbar'],
+    ])
 
     const empty = mountArrangement().wrapper
     await empty.get('.project-workbench__empty-midi-import').trigger('click')
-    expect(empty.emitted('importMidiAsNewTracks')).toHaveLength(1)
+    expect(empty.emitted('invokeAction')).toEqual([
+      [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'toolbar'],
+    ])
   })
 
   it('keeps ordered Track and Lane pairs under one Arrangement scroll authority', () => {

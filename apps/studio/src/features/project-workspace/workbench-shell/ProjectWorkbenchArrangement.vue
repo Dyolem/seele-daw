@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import type { ProjectWorkbenchActionControl } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import {
   parseTick,
   type TempoBpm,
@@ -93,7 +95,7 @@ const props = withDefaults(
   defineProps<{
     readonly barSpanTick: Tick
     readonly clips: readonly ProjectMidiClipPresentation[]
-    readonly isMidiImporting?: boolean
+    readonly midiImportAction: ProjectWorkbenchActionControl
     readonly projectId: string
     readonly selectedTempoEventId?: TempoEventId | null
     readonly tempoEditingDisabled?: boolean
@@ -103,14 +105,13 @@ const props = withDefaults(
     readonly tracks: readonly ProjectTrackPresentation[]
   }>(),
   {
-    isMidiImporting: false,
     selectedTempoEventId: null,
     tempoEditingDisabled: false,
     tempoEvents: () => Object.freeze([]),
   },
 )
 const emit = defineEmits<{
-  importMidiAsNewTracks: []
+  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
   openMidiClip: []
   tempoEditStart: []
   tempoEventAdd: [bpm: TempoBpm, tick: Tick]
@@ -945,11 +946,13 @@ onUnmounted(() => {
               class="project-workbench__empty-midi-import"
               size="small"
               variant="secondary"
-              :busy="props.isMidiImporting"
-              @click="emit('importMidiAsNewTracks')"
+              :busy="props.midiImportAction.busy"
+              :disabled="!props.midiImportAction.enabled"
+              :title="props.midiImportAction.title"
+              @click="emit('invokeAction', props.midiImportAction.actionId, 'toolbar')"
             >
               <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
-              {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new tracks' }}
+              {{ props.midiImportAction.label }}
             </UiButton>
           </div>
         </div>
@@ -1001,11 +1004,13 @@ onUnmounted(() => {
               <UiButton
                 size="small"
                 variant="secondary"
-                :busy="props.isMidiImporting"
-                @click="emit('importMidiAsNewTracks')"
+                :busy="props.midiImportAction.busy"
+                :disabled="!props.midiImportAction.enabled"
+                :title="props.midiImportAction.title"
+                @click="emit('invokeAction', props.midiImportAction.actionId, 'toolbar')"
               >
                 <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
-                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new tracks' }}
+                {{ props.midiImportAction.label }}
               </UiButton>
             </div>
           </div>

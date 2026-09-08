@@ -1,6 +1,6 @@
 # Studio Keyboard Shortcut Architecture
 
-> 状态：WA1 替换已实现并通过审核
+> 状态：WA1／WA2 已实现并通过审核
 >
 > Date: 2026-09-08
 >
@@ -64,15 +64,19 @@ Composition Root 提供冻结 Keymap；Router 保存自己的不可变快照并�
 
 ## 4. 当前目录与绑定
 
-| Action ID                       | 默认 Binding               | Scope       | 业务能力                                     |
-| ------------------------------- | -------------------------- | ----------- | -------------------------------------------- |
-| `project.save`                  | `Mod+S`                    | Workbench   | Ready、dirty 且不在 Saving                   |
-| `history.undo`                  | `Mod+Z`                    | Workbench   | Session 可以 Undo                            |
-| `history.redo`                  | `Mod+Shift+Z`、`Control+Y` | Workbench   | Session 可以 Redo                            |
-| `playback.toggle`               | `Space`                    | Workbench   | 当前项目有可播放计划且不在 Loading           |
-| `piano-roll.selection.delete`   | `Delete`、`Backspace`      | Editor      | 当前 Note 或 CC64 选择非空且没有进行中的手势 |
-| `piano-roll.selection.clear`    | `Escape`                   | Editor      | 当前选择非空且没有进行中的手势               |
-| `piano-roll.interaction.cancel` | `Escape`                   | Interaction | 当前编辑目标有进行中的手势                   |
+| Action ID                                            | 默认 Binding               | Scope       | 业务能力                                                         |
+| ---------------------------------------------------- | -------------------------- | ----------- | ---------------------------------------------------------------- |
+| `project.save`                                       | `Mod+S`                    | Workbench   | Ready、dirty 且不在 Saving                                       |
+| `history.undo`                                       | `Mod+Z`                    | Workbench   | Session 可以 Undo                                                |
+| `history.redo`                                       | `Mod+Shift+Z`、`Control+Y` | Workbench   | Session 可以 Redo                                                |
+| `playback.toggle`                                    | `Space`                    | Workbench   | 当前项目有可播放计划且不在 Loading                               |
+| `playback.return-to-last-start-position`             | 未分配                     | Workbench   | Coordinator 允许 Return；Loading 不会禁用 Return                 |
+| `projects.show`                                      | 未分配                     | Workbench   | 当前项目 Ready，且没有正在等待的返回项目列表导航                 |
+| `project.import-midi` / `project.import-midi-tracks` | 未分配                     | Workbench   | 当前项目 Ready，文件选择器可用，且没有正在选择或导入的 MIDI 文件 |
+| `midi-editor.open`                                   | 未分配                     | Workbench   | 当前 Workspace 的 Dock 操作端口可用                              |
+| `piano-roll.selection.delete`                        | `Delete`、`Backspace`      | Editor      | 当前 Note 或 CC64 选择非空且没有进行中的手势                     |
+| `piano-roll.selection.clear`                         | `Escape`                   | Editor      | 当前选择非空且没有进行中的手势                                   |
+| `piano-roll.interaction.cancel`                      | `Escape`                   | Interaction | 当前编辑目标有进行中的手势                                       |
 
 `piano-roll.notes.remove` 被语义准确的 `piano-roll.selection.delete` 替代，旧 ID 没有持久化
 消费者。Cancel Interaction 不清空选择，Clear Selection 不兼任取消。Track 音符区域聚焦时，
@@ -94,5 +98,6 @@ Composition Root 提供冻结 Keymap；Router 保存自己的不可变快照并�
 动态 Binding 验证边界；未来 Settings 必须在字段旁显示无效输入并保留原值，不能把原始
 字符串断言为合法 Binding。损坏持久化覆盖的回退策略留给真正的 V1B 保存/加载切片实现。
 
-Workbench 其他菜单和按钮的统一调用在 WA2；右键菜单及其选择语义在 WA3。批次状态见
+Workbench 菜单、Transport 和 Arrangement 导入按钮已在 WA2 接入统一调用与 Presentation；
+右键菜单及其选择语义在 WA3。批次状态见
 [Workbench Action Catalogue V1 phase plan](./workbench-action-catalogue-v1-phase-plan.md)。

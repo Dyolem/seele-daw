@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import FolderOpenIcon from '~icons/fluent/folder-open-20-regular'
+import ArrowUndoIcon from '~icons/fluent/arrow-undo-20-regular'
+import ArrowRedoIcon from '~icons/fluent/arrow-redo-20-regular'
+import PauseIcon from '~icons/fluent/pause-20-regular'
+import PlayIcon from '~icons/fluent/play-20-regular'
+import PreviousIcon from '~icons/fluent/previous-20-regular'
+import SpinnerIcon from '~icons/fluent/spinner-ios-20-regular'
 import MenuIcon from '~icons/fluent/line-horizontal-3-20-regular'
 import MidiIcon from '~icons/fluent/midi-20-regular'
 import PanelBottomIcon from '~icons/fluent/panel-bottom-20-regular'
@@ -15,10 +21,8 @@ import {
   DropdownMenuTrigger,
 } from 'reka-ui'
 
-import type {
-  StudioActionPresentation,
-  StudioActionSource,
-} from '@/workbench/actions/studio-action'
+import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { useStudioKeyboardLayer } from '@/workbench/actions/vue/studio-action-context'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
@@ -29,27 +33,54 @@ import {
 } from '@/workbench/project/active-project-state'
 
 interface ProjectWorkbenchGlobalBarProps {
+  readonly actionControls: ProjectWorkbenchActionControls
   readonly isDirty: boolean
-  readonly isMidiImporting?: boolean
   readonly projectId: string
   readonly projectName: string
   readonly saveFailureMessage?: string | null
-  readonly saveAction: StudioActionPresentation
-  readonly saveShortcut: string
   readonly saveStatus: ActiveProjectSaveStatus
 }
 
 const props = withDefaults(defineProps<ProjectWorkbenchGlobalBarProps>(), {
-  isMidiImporting: false,
   saveFailureMessage: null,
 })
 const emit = defineEmits<{
-  importMidiAsNewProject: []
-  importMidiAsNewTracks: []
-  leaveProject: []
-  openContextEditor: []
-  save: [source: StudioActionSource]
+  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
 }>()
+
+const playbackIcon = computed(() => {
+  if (props.actionControls.togglePlayback.busy) return SpinnerIcon
+  return props.actionControls.togglePlayback.checked ? PauseIcon : PlayIcon
+})
+const menuGroups = computed(() => [
+  {
+    label: 'Project',
+    items: [
+      { action: props.actionControls.projects, icon: FolderOpenIcon },
+      { action: props.actionControls.save, icon: SaveIcon },
+      { action: props.actionControls.importMidiProject, icon: MidiIcon },
+      { action: props.actionControls.importMidiTracks, icon: MidiIcon },
+    ],
+  },
+  {
+    label: 'History',
+    items: [
+      { action: props.actionControls.undo, icon: ArrowUndoIcon },
+      { action: props.actionControls.redo, icon: ArrowRedoIcon },
+    ],
+  },
+  {
+    label: 'Playback',
+    items: [
+      { action: props.actionControls.togglePlayback, icon: playbackIcon.value },
+      { action: props.actionControls.returnToStart, icon: PreviousIcon },
+    ],
+  },
+  {
+    label: 'View',
+    items: [{ action: props.actionControls.openMidiEditor, icon: PanelBottomIcon }],
+  },
+])
 
 const isMenuOpen = shallowRef(false)
 useStudioKeyboardLayer(() => isMenuOpen.value)
@@ -72,52 +103,28 @@ const saveStatusTitle = computed(
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
           <DropdownMenuContent class="project-workbench__menu" align="start" :side-offset="8">
-            <DropdownMenuLabel class="project-workbench__menu-label"> Project </DropdownMenuLabel>
-            <DropdownMenuItem class="project-workbench__menu-item" @select="emit('leaveProject')">
-              <UiIcon :icon="FolderOpenIcon" :size="20" />
-              <span>Projects</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              class="project-workbench__menu-item"
-              :disabled="!props.saveAction.enabled"
-              @select="emit('save', 'menu')"
-              :title="props.saveAction.disabledReason ?? undefined"
-            >
-              <UiIcon :icon="SaveIcon" :size="20" />
-              <span>{{ props.saveAction.label }}</span>
-              <span v-if="props.saveShortcut" class="project-workbench__menu-shortcut">{{
-                props.saveShortcut
-              }}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              class="project-workbench__menu-item"
-              :disabled="props.isMidiImporting"
-              @select="emit('importMidiAsNewProject')"
-            >
-              <UiIcon :icon="MidiIcon" :size="20" />
-              <span>
-                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new project…' }}
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              class="project-workbench__menu-item"
-              :disabled="props.isMidiImporting"
-              @select="emit('importMidiAsNewTracks')"
-            >
-              <UiIcon :icon="MidiIcon" :size="20" />
-              <span>
-                {{ props.isMidiImporting ? 'Importing MIDI…' : 'Import MIDI as new tracks…' }}
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator class="project-workbench__menu-separator" />
-            <DropdownMenuLabel class="project-workbench__menu-label"> View </DropdownMenuLabel>
-            <DropdownMenuItem
-              class="project-workbench__menu-item"
-              @select="emit('openContextEditor')"
-            >
-              <UiIcon :icon="PanelBottomIcon" :size="20" />
-              <span>MIDI editor</span>
-            </DropdownMenuItem>
+            <template v-for="(group, index) in menuGroups" :key="group.label">
+              <DropdownMenuSeparator v-if="index > 0" class="project-workbench__menu-separator" />
+              <DropdownMenuLabel class="project-workbench__menu-label">{{
+                group.label
+              }}</DropdownMenuLabel>
+              <DropdownMenuItem
+                v-for="{ action, icon } in group.items"
+                :key="action.actionId"
+                class="project-workbench__menu-item"
+                :disabled="!action.enabled"
+                :aria-busy="action.busy || undefined"
+                :title="action.title"
+                :aria-description="action.disabledReason ?? undefined"
+                @select="emit('invokeAction', action.actionId, 'menu')"
+              >
+                <UiIcon :icon="icon" :size="20" />
+                <span>{{ action.label }}</span>
+                <span v-if="action.shortcut" class="project-workbench__menu-shortcut">{{
+                  action.shortcut
+                }}</span>
+              </DropdownMenuItem>
+            </template>
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenuRoot>
@@ -151,15 +158,15 @@ const saveStatusTitle = computed(
         class="project-workbench__save"
         size="small"
         variant="secondary"
-        :busy="props.saveAction.busy"
-        :title="props.saveAction.disabledReason ?? (props.saveShortcut || undefined)"
-        :disabled="!props.saveAction.enabled"
-        @click="emit('save', 'toolbar')"
+        :busy="props.actionControls.save.busy"
+        :title="props.actionControls.save.title"
+        :disabled="!props.actionControls.save.enabled"
+        @click="emit('invokeAction', props.actionControls.save.actionId, 'toolbar')"
       >
         <template #leading>
           <UiIcon :icon="SaveIcon" :size="16" />
         </template>
-        {{ props.saveAction.label }}
+        {{ props.actionControls.save.label }}
       </UiButton>
     </div>
   </header>
@@ -273,6 +280,8 @@ const saveStatusTitle = computed(
 :global(.project-workbench__menu) {
   z-index: var(--sd-layer-popover);
   min-inline-size: 14rem;
+  max-block-size: var(--reka-dropdown-menu-content-available-height);
+  overflow-y: auto;
   padding: var(--sd-space-2);
   border: 1px solid var(--sd-color-border-strong);
   border-radius: var(--sd-radius-lg);

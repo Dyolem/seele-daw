@@ -8,7 +8,8 @@ Composition Root 可以知道并装配全部领域包与浏览器实现。
 - `StudioActionCoordinator` 拥有静态目录、当前能力解析、调用接受与完成结果；
 - `StudioKeyboardInputRouter` 拥有键位、输入上下文和物理 Listener 生命周期；
 - Composition Root 装配 Feature Action 定义；页面和编辑器只提供临时业务目标；
-- 菜单、按钮和快捷键通过同一个 Action 调用业务权威，当前 Save 纵向切片已完成；
+- 菜单、按钮和快捷键通过同一个 Action 调用业务权威，Save 与 WA2 Workbench 入口已接入；
+- 文件选择器与导航等待由页面持有；Dock 能力直接读取 Workspace，均不成为应用状态副本；
 - Pinia 不保存 Handler、目标能力、pending resolver 或底层业务对象。
 
 详见 [Studio Action Architecture](../../docs/studio-action-architecture.md) 和

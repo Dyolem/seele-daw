@@ -18,7 +18,11 @@ import { nextTick, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
-import { createStudioActionPresentation } from '@/workbench/actions/studio-action'
+import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
+import {
+  presentProjectWorkbenchActions,
+  type ProjectWorkbenchActionControl,
+} from '@/features/project-workspace/actions/project-workbench-action-controls'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
@@ -142,31 +146,48 @@ function mountShell(options: MountShellOptions = {}) {
     state: playbackState,
     visualPosition: playbackVisualPosition,
   })
+  const actionFixture = createTestStudioActionRuntime()
+  const controls = presentProjectWorkbenchActions(
+    actionFixture.runtime.actions,
+    actionFixture.runtime.keyboard,
+  )
+  const enabled = (control: ProjectWorkbenchActionControl) => ({
+    ...control,
+    ...createStudioActionPresentation(control.label),
+    title: control.label,
+  })
+  const actionControls = {
+    ...controls,
+    undo: enabled(controls.undo),
+    togglePlayback: enabled(controls.togglePlayback),
+    projects: enabled(controls.projects),
+    importMidiProject: enabled(controls.importMidiProject),
+    importMidiTracks: enabled(controls.importMidiTracks),
+    openMidiEditor: { ...enabled(controls.openMidiEditor), checked: true },
+    save: {
+      ...controls.save,
+      ...createStudioActionPresentation(
+        options.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED ? 'Retry save' : 'Save',
+        options.isDirty ? null : 'All changes are saved.',
+      ),
+    },
+  }
 
   return mount(ProjectWorkbenchShell, {
     props: {
       barSpanTick: parsePositiveTick(3_840),
-      canRedo: false,
-      canUndo: true,
+      actionControls,
       clips: options.clips ?? Object.freeze([]),
       isDirty: options.isDirty ?? false,
       pianoRollPresentation: null,
       pianoRollTrackPresentation: null,
-      playbackCanToggle: true,
-      playbackCanReturnToLastStartPosition: false,
       playbackFeedback: null,
-      playbackPhase: 'stopped',
       playbackTime: '00:00.000',
       projectId: 'workbench-shell-project',
       projectName: 'Midnight Study',
       projectSession: createTestSession(parseProjectId('workbench-shell-project-session')),
       saveFailureMessage: options.saveFailureMessage,
       saveStatus: options.saveStatus ?? ACTIVE_PROJECT_SAVE_STATUS.IDLE,
-      saveAction: createStudioActionPresentation(
-        options.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED ? 'Retry save' : 'Save',
-        options.isDirty ? null : 'All changes are saved.',
-      ),
-      saveShortcut: 'display:Mod+S',
       tempoDisplayBpm: '120',
       tempoEditable: true,
       tempoMode: 'single',
@@ -178,7 +199,7 @@ function mountShell(options: MountShellOptions = {}) {
     global: {
       plugins: [pinia],
       provide: {
-        ...createTestStudioActionRuntime().provide,
+        ...actionFixture.provide,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
@@ -228,17 +249,27 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Undo"]').trigger('click')
     await wrapper.get('button[aria-label="Redo"]').trigger('click')
 
-    expect(wrapper.emitted('undo')).toHaveLength(1)
-    expect(wrapper.emitted('redo')).toBeUndefined()
+    expect(wrapper.emitted('invokeAction')).toEqual([[STUDIO_ACTION.HISTORY_UNDO, 'toolbar']])
   })
 
   it('projects playback state and emits enabled Transport intents', async () => {
     const wrapper = mountShell()
 
     await wrapper.setProps({
-      playbackCanReturnToLastStartPosition: true,
+      actionControls: {
+        ...wrapper.props('actionControls'),
+        returnToStart: {
+          ...wrapper.props('actionControls').returnToStart,
+          enabled: true,
+          disabledReason: null,
+        },
+        togglePlayback: {
+          ...wrapper.props('actionControls').togglePlayback,
+          label: 'Pause',
+          checked: true,
+        },
+      },
       playbackFeedback: 'Some content will be skipped.',
-      playbackPhase: 'playing',
       playbackTime: '01:02.345',
     })
 
@@ -250,8 +281,10 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Pause"]').trigger('click')
     await wrapper.get('button[aria-label="Return to last start position"]').trigger('click')
 
-    expect(wrapper.emitted('playbackToggle')).toHaveLength(1)
-    expect(wrapper.emitted('playbackReturnToLastStartPosition')).toHaveLength(1)
+    expect(wrapper.emitted('invokeAction')).toEqual([
+      [STUDIO_ACTION.PLAYBACK_TOGGLE, 'toolbar'],
+      [STUDIO_ACTION.PLAYBACK_RETURN_TO_START, 'toolbar'],
+    ])
   })
 
   it('renders the Project menu through its portal with the styled overlay classes', async () => {
@@ -265,8 +298,8 @@ describe('ProjectWorkbenchShell', () => {
     const menuItems = [
       ...(menu?.querySelectorAll<HTMLElement>('.project-workbench__menu-item') ?? []),
     ]
-    expect(menuItems).toHaveLength(5)
-    expect(menu?.querySelectorAll('.project-workbench__menu-separator')).toHaveLength(1)
+    expect(menuItems).toHaveLength(9)
+    expect(menu?.querySelectorAll('.project-workbench__menu-separator')).toHaveLength(3)
 
     const importAsProject = menuItems.find((item) =>
       item.textContent?.includes('Import MIDI as new project'),
@@ -282,7 +315,7 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('button[aria-label="Open project menu"]').attributes('aria-expanded')).toBe(
       'false',
     )
-    expect(wrapper.emitted('importMidiAsNewProject')).toHaveLength(1)
+    expect(wrapper.emitted('invokeAction')).toEqual([[STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'menu']])
 
     await wrapper.get('button[aria-label="Open project menu"]').trigger('click')
     await nextTick()
@@ -294,7 +327,10 @@ describe('ProjectWorkbenchShell', () => {
     }
     reopenedImportAsTracks.click()
     await nextTick()
-    expect(wrapper.emitted('importMidiAsNewTracks')).toHaveLength(1)
+    expect(wrapper.emitted('invokeAction')).toEqual([
+      [STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'menu'],
+      [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'menu'],
+    ])
 
     wrapper.unmount()
   })
@@ -314,7 +350,7 @@ describe('ProjectWorkbenchShell', () => {
 
     await wrapper.get('.project-workbench__save').trigger('click')
 
-    expect(wrapper.emitted('save')).toHaveLength(1)
+    expect(wrapper.emitted('invokeAction')).toEqual([[STUDIO_ACTION.PROJECT_SAVE, 'toolbar']])
   })
 
   it('moves the Context Editor through minimized, fullscreen, closed and restored modes', async () => {
@@ -347,15 +383,12 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Close MIDI editor"]').trigger('click')
     expect(workspace.attributes('data-dock-mode')).toBe('closed')
     expect(wrapper.find('.project-workbench__dock').exists()).toBe(false)
-    expect(wrapper.get('button[aria-label="Open MIDI editor"]').attributes('aria-pressed')).toBe(
-      'false',
-    )
+    expect(wrapper.vm.getMidiEditor()?.isOpen()).toBe(false)
 
-    await wrapper.get('button[aria-label="Open MIDI editor"]').trigger('click')
+    wrapper.vm.getMidiEditor()?.open()
+    await nextTick()
     expect(workspace.attributes('data-dock-mode')).toBe('docked')
-    expect(wrapper.get('button[aria-label="Open MIDI editor"]').attributes('aria-pressed')).toBe(
-      'true',
-    )
+    expect(wrapper.vm.getMidiEditor()?.isOpen()).toBe(true)
   })
 
   it('supports keyboard resizing through the semantic Splitter', async () => {

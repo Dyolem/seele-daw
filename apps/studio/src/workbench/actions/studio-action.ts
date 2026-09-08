@@ -5,7 +5,12 @@ export const STUDIO_ACTION = {
   PIANO_ROLL_SELECTION_CLEAR: 'piano-roll.selection.clear',
   PIANO_ROLL_SELECTION_DELETE: 'piano-roll.selection.delete',
   PLAYBACK_TOGGLE: 'playback.toggle',
+  PLAYBACK_RETURN_TO_START: 'playback.return-to-last-start-position',
+  PROJECTS_SHOW: 'projects.show',
+  PROJECT_IMPORT_MIDI: 'project.import-midi',
+  PROJECT_IMPORT_MIDI_TRACKS: 'project.import-midi-tracks',
   PROJECT_SAVE: 'project.save',
+  MIDI_EDITOR_OPEN: 'midi-editor.open',
 } as const
 
 export type StudioActionId = (typeof STUDIO_ACTION)[keyof typeof STUDIO_ACTION]

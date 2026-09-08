@@ -6,7 +6,9 @@ import type {
   TempoEventRecord,
   Tick,
 } from '@seele-daw/project-core'
-import { computed, onMounted, onUnmounted, shallowRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import type { ProjectWorkbenchActionControl } from '@/features/project-workspace/actions/project-workbench-action-controls'
 
 import type {
   ProjectPianoRollPresentation,
@@ -33,7 +35,7 @@ const props = withDefaults(
   defineProps<{
     readonly barSpanTick: Tick
     readonly clips: readonly ProjectMidiClipPresentation[]
-    readonly isMidiImporting?: boolean
+    readonly midiImportAction: ProjectWorkbenchActionControl
     readonly pianoRollPresentation: ProjectPianoRollPresentation | null
     readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
     readonly projectId: string
@@ -46,7 +48,6 @@ const props = withDefaults(
     readonly tracks: readonly ProjectTrackPresentation[]
   }>(),
   {
-    isMidiImporting: false,
     selectedTempoEventId: null,
     tempoEditingDisabled: false,
     tempoEvents: () => Object.freeze([]),
@@ -54,8 +55,7 @@ const props = withDefaults(
 )
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const emit = defineEmits<{
-  contextEditorOpenChange: [isOpen: boolean]
-  importMidiAsNewTracks: []
+  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
   tempoEditStart: []
   tempoEventAdd: [bpm: TempoBpm, tick: Tick]
   tempoEventBpmChange: [tempoEventId: TempoEventId, bpm: TempoBpm]
@@ -228,14 +228,6 @@ function handleSplitterKeydown(event: KeyboardEvent): void {
   event.preventDefault()
 }
 
-watch(
-  isContextEditorOpen,
-  (isOpen) => {
-    emit('contextEditorOpenChange', isOpen)
-  },
-  { immediate: true },
-)
-
 onMounted(() => {
   setDockHeight(dockHeight.value)
 })
@@ -244,7 +236,11 @@ onUnmounted(() => {
   resizeInteraction = null
 })
 
-defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
+const midiEditor = Object.freeze({
+  isOpen: () => isContextEditorOpen.value,
+  open: openContextEditor,
+})
+defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor })
 </script>
 
 <template>
@@ -259,7 +255,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN"
       :bar-span-tick="props.barSpanTick"
       :clips="props.clips"
-      :is-midi-importing="props.isMidiImporting"
+      :midi-import-action="props.midiImportAction"
       :project-id="props.projectId"
       :selected-tempo-event-id="props.selectedTempoEventId"
       :tempo-editing-disabled="props.tempoEditingDisabled"
@@ -267,7 +263,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ openContextEditor })
       :time-signature-numerator="props.timeSignatureNumerator"
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
-      @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
+      @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
       @open-midi-clip="openContextEditor"
       @tempo-edit-start="emit('tempoEditStart')"
       @tempo-event-add="(bpm, tick) => emit('tempoEventAdd', bpm, tick)"

@@ -14,6 +14,7 @@ import type {
   ProjectPianoRollTrackPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
+import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import type { ProjectTempoControlMode } from '@/features/project-workspace/tempo/tempo-control'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
@@ -22,32 +23,22 @@ import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-sh
 import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
-import type {
-  StudioActionPresentation,
-  StudioActionSource,
-} from '@/workbench/actions/studio-action'
+import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
 import type { ActiveProjectSaveStatus } from '@/workbench/project/active-project-state'
 
 interface ProjectWorkbenchShellProps {
+  readonly actionControls: ProjectWorkbenchActionControls
   readonly barSpanTick: Tick
-  readonly canRedo: boolean
-  readonly canUndo: boolean
   readonly clips: readonly ProjectMidiClipPresentation[]
   readonly isDirty: boolean
-  readonly isMidiImporting?: boolean
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
   readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
-  readonly playbackCanToggle: boolean
-  readonly playbackCanReturnToLastStartPosition: boolean
   readonly playbackFeedback: string | null
-  readonly playbackPhase: 'failed' | 'loading' | 'paused' | 'playing' | 'stopped' | 'unavailable'
   readonly playbackTime: string
   readonly projectId: string
   readonly projectName: string
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly saveFailureMessage?: string | null
-  readonly saveAction: StudioActionPresentation
-  readonly saveShortcut: string
   readonly saveStatus: ActiveProjectSaveStatus
   readonly selectedTempoEventId?: TempoEventId | null
   readonly tempoDisplayBpm: string
@@ -62,20 +53,13 @@ interface ProjectWorkbenchShellProps {
 }
 
 const props = withDefaults(defineProps<ProjectWorkbenchShellProps>(), {
-  isMidiImporting: false,
   saveFailureMessage: null,
   selectedTempoEventId: null,
   tempoEditingDisabled: false,
   tempoEvents: () => Object.freeze([]),
 })
 const emit = defineEmits<{
-  importMidiAsNewProject: []
-  importMidiAsNewTracks: []
-  leaveProject: []
-  playbackReturnToLastStartPosition: []
-  playbackToggle: []
-  redo: []
-  save: [source: StudioActionSource]
+  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
   tempoCommit: [input: string]
   tempoEditStart: []
   tempoEventAdd: [bpm: TempoBpm, tick: Tick]
@@ -84,70 +68,59 @@ const emit = defineEmits<{
   tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
   tempoEventRemove: [tempoEventId: TempoEventId]
   tempoEventSelect: [tempoEventId: TempoEventId]
-  undo: []
 }>()
 
 const workspace = shallowRef<ProjectWorkbenchWorkspaceHandle | null>(null)
-const isContextEditorOpen = shallowRef(true)
-
-function openContextEditor(): void {
-  workspace.value?.openContextEditor()
-}
+defineExpose<ProjectWorkbenchWorkspaceHandle>({
+  getMidiEditor: () => workspace.value?.getMidiEditor() ?? null,
+})
 </script>
 
 <template>
   <div class="project-workbench">
     <ProjectWorkbenchGlobalBar
+      :action-controls="props.actionControls"
       :is-dirty="props.isDirty"
-      :is-midi-importing="props.isMidiImporting"
       :project-id="props.projectId"
       :project-name="props.projectName"
       :save-failure-message="props.saveFailureMessage"
       :save-status="props.saveStatus"
-      :save-action="props.saveAction"
-      :save-shortcut="props.saveShortcut"
-      @leave-project="emit('leaveProject')"
-      @import-midi-as-new-project="emit('importMidiAsNewProject')"
-      @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
-      @open-context-editor="openContextEditor"
-      @save="emit('save', $event)"
+      @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
     />
 
     <ProjectWorkbenchTransport
-      :can-redo="props.canRedo"
-      :can-undo="props.canUndo"
-      :is-context-editor-open="isContextEditorOpen"
-      :playback-can-toggle="props.playbackCanToggle"
-      :playback-can-return-to-last-start-position="props.playbackCanReturnToLastStartPosition"
+      :action-controls="props.actionControls"
       :playback-feedback="props.playbackFeedback"
-      :playback-phase="props.playbackPhase"
       :playback-time="props.playbackTime"
       :tempo-display-bpm="props.tempoDisplayBpm"
       :tempo-editable="props.tempoEditable"
       :tempo-mode="props.tempoMode"
       :time-signature-denominator="props.timeSignatureDenominator"
       :time-signature-numerator="props.timeSignatureNumerator"
-      @open-context-editor="openContextEditor"
-      @playback-return-to-last-start-position="emit('playbackReturnToLastStartPosition')"
-      @playback-toggle="emit('playbackToggle')"
-      @redo="emit('redo')"
+      @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
       @tempo-commit="emit('tempoCommit', $event)"
       @tempo-edit-start="emit('tempoEditStart')"
-      @undo="emit('undo')"
     />
 
     <main class="project-workbench__main">
       <section class="project-workbench__compact-warning">
         <UiIcon :icon="OptionsIcon" :size="24" />
         <p>Seele Studio’s editing workspace requires a viewport at least 900 px wide.</p>
-        <UiButton variant="secondary" @click="emit('leaveProject')">Back to projects</UiButton>
+        <UiButton
+          variant="secondary"
+          :busy="props.actionControls.projects.busy"
+          :disabled="!props.actionControls.projects.enabled"
+          :title="props.actionControls.projects.title"
+          @click="emit('invokeAction', props.actionControls.projects.actionId, 'toolbar')"
+          >Back to projects</UiButton
+        >
       </section>
 
       <ProjectWorkbenchWorkspace
         ref="workspace"
         :bar-span-tick="props.barSpanTick"
         :clips="props.clips"
-        :is-midi-importing="props.isMidiImporting"
+        :midi-import-action="props.actionControls.importMidiTracks"
         :piano-roll-presentation="props.pianoRollPresentation"
         :piano-roll-track-presentation="props.pianoRollTrackPresentation"
         :project-id="props.projectId"
@@ -158,8 +131,7 @@ function openContextEditor(): void {
         :time-signature-numerator="props.timeSignatureNumerator"
         :timeline-end-tick="props.timelineEndTick"
         :tracks="props.tracks"
-        @context-editor-open-change="isContextEditorOpen = $event"
-        @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
+        @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
         @tempo-edit-start="emit('tempoEditStart')"
         @tempo-event-add="(bpm, tick) => emit('tempoEventAdd', bpm, tick)"
         @tempo-event-bpm-change="

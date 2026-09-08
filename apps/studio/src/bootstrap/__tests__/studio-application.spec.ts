@@ -303,7 +303,7 @@ describe('StudioApplication', () => {
     expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(
       true,
     )
-    expect(requireActionContext(actionContext).actions.catalogue).toHaveLength(7)
+    expect(requireActionContext(actionContext).actions.catalogue).toHaveLength(12)
     expect(requireProjectPlaybackContext(projectPlaybackContext).state.value.phase).toBe(
       'unavailable',
     )

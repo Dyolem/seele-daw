@@ -442,8 +442,12 @@ Track Cursor 的完整 Note 编辑也尚未接入。
 
 Workbench Action Catalogue WA1 已实现并通过审核：Save 菜单、Save 按钮和 `Mod+S` 调用同一个
 `project.save` Handler，读取同一份可用、保存中、重试名称和禁用原因；菜单显示平台化快捷键。
-Action 可以没有 Binding，未分配快捷键不影响菜单调用。既有其他快捷键已迁移到同一目录，
-其他 Workbench 菜单／按钮迁移属于 WA2。右键菜单及右键选择语义尚未实现或确认。
+WA2 已实现并通过审核：Undo／Redo、Play／Pause、Return、Projects、两种 MIDI Import 与
+Open MIDI Editor 的菜单和按钮已接入统一 Action。菜单新增 History／Playback 分组；
+Arrangement 导入按钮也使用同一份状态。导入期间阻止重复选择文件，取消选择可立即重试；
+Return 在播放加载期间仍可停止并返回起点，返回项目列表继续经过既有导航确认。
+Action 可以没有 Binding；本批新增五个 Action 默认不分配快捷键。右键菜单及右键选择语义
+尚未实现或确认。
 
 当前没有用户 Keymap、Shortcut Settings、Recorder、Sequence 或 Command Palette。动态输入
 验证边界已经就绪，持久化和损坏覆盖的回退策略需随实际 V1B 切片实现。

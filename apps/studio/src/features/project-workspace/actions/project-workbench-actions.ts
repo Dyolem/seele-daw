@@ -1,9 +1,11 @@
+import type { ProjectWorkbenchMidiEditor } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import {
   STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
   STUDIO_ACTION_NOT_APPLIED,
   createStudioActionPresentation,
   type StudioActionDefinition,
+  type StudioActionCompletion,
   type StudioActionDescriptor,
   type StudioActionResolution,
 } from '@/workbench/actions/studio-action'
@@ -23,6 +25,13 @@ export interface ProjectWorkbenchActionTarget {
   save(): Promise<void>
   readonly playback: ProjectPlaybackCoordinator
   getPlaybackState(): ProjectPlaybackState
+  canReturnToLastStartPosition(): boolean
+  isShowingProjects(): boolean
+  showProjects(): Promise<StudioActionCompletion>
+  getMidiImportPhase(): 'idle' | 'selecting' | 'importing'
+  canChooseMidiFile(): boolean
+  importMidi(target: 'new-project' | 'new-tracks'): Promise<StudioActionCompletion>
+  getMidiEditor(): ProjectWorkbenchMidiEditor | null
 }
 
 /** Business owners provide capability; keyboard focus is resolved by the input router. */
@@ -50,6 +59,44 @@ export function createProjectWorkbenchActions(
         }
       },
     })
+  }
+
+  function defineMidiImport(
+    actionId: StudioActionDescriptor['actionId'],
+    destination: 'new-project' | 'new-tracks',
+    label: string,
+  ): StudioActionDefinition {
+    return define({ actionId, label, description: label }, (target) => {
+      const phase = target.getMidiImportPhase()
+      const busy = phase !== 'idle'
+      let reason: string | null = null
+      let currentLabel = label
+      if (phase === 'selecting') {
+        reason = 'Finish choosing a MIDI file first.'
+        currentLabel = 'Choosing MIDI file…'
+      } else if (phase === 'importing') {
+        reason = 'A MIDI file is being imported.'
+        currentLabel = 'Importing MIDI…'
+      } else if (!target.canChooseMidiFile()) {
+        reason = 'The MIDI file chooser is unavailable.'
+      }
+      return {
+        presentation: createStudioActionPresentation(currentLabel, reason, { busy }),
+        execute: () => target.importMidi(destination),
+      }
+    })
+  }
+
+  function playbackCompletion(
+    target: ProjectWorkbenchActionTarget,
+    applied: boolean,
+  ): StudioActionCompletion {
+    if (applied) return STUDIO_ACTION_COMPLETED
+    const result = target.getPlaybackState()
+    if (result.phase === PROJECT_PLAYBACK_PHASE.FAILED) {
+      return { status: 'failed', cause: result.failureCause, reported: true }
+    }
+    return STUDIO_ACTION_NOT_APPLIED
   }
 
   return Object.freeze([
@@ -136,12 +183,71 @@ export function createProjectWorkbenchActions(
           presentation: createStudioActionPresentation(label, reason, { busy, checked: playing }),
           async execute() {
             const applied = playing ? target.playback.pause() : await target.playback.play()
-            if (applied) return STUDIO_ACTION_COMPLETED
-            const result = target.getPlaybackState()
-            if (result.phase === PROJECT_PLAYBACK_PHASE.FAILED) {
-              return { status: 'failed', cause: result.failureCause, reported: true }
-            }
-            return STUDIO_ACTION_NOT_APPLIED
+            return playbackCompletion(target, applied)
+          },
+        }
+      },
+    ),
+    define(
+      {
+        actionId: STUDIO_ACTION.PLAYBACK_RETURN_TO_START,
+        label: 'Return to last start position',
+        description: 'Stop playback and return to the last start position.',
+      },
+      (target) => ({
+        presentation: createStudioActionPresentation(
+          'Return to last start position',
+          target.canReturnToLastStartPosition() ? null : 'Already at the last start position.',
+        ),
+        execute: () => playbackCompletion(target, target.playback.returnToLastStartPosition()),
+      }),
+    ),
+    define(
+      {
+        actionId: STUDIO_ACTION.PROJECTS_SHOW,
+        label: 'Projects',
+        description: 'Return to the project list through the existing navigation guard.',
+      },
+      (target) => {
+        const busy = target.isShowingProjects()
+        return {
+          presentation: createStudioActionPresentation(
+            'Projects',
+            busy ? 'Project navigation is awaiting completion.' : null,
+            { busy },
+          ),
+          execute: () => target.showProjects(),
+        }
+      },
+    ),
+    defineMidiImport(
+      STUDIO_ACTION.PROJECT_IMPORT_MIDI,
+      'new-project',
+      'Import MIDI as new project…',
+    ),
+    defineMidiImport(
+      STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
+      'new-tracks',
+      'Import MIDI as new tracks…',
+    ),
+    define(
+      {
+        actionId: STUDIO_ACTION.MIDI_EDITOR_OPEN,
+        label: 'Open MIDI editor',
+        description: 'Open or restore the MIDI editor without changing the current selection.',
+      },
+      (target) => {
+        const editor = target.getMidiEditor()
+        return {
+          presentation: createStudioActionPresentation(
+            'Open MIDI editor',
+            editor === null ? 'The MIDI editor workspace is unavailable.' : null,
+            { checked: editor?.isOpen() ?? false },
+          ),
+          execute() {
+            if (editor === null) return STUDIO_ACTION_NOT_APPLIED
+            editor.open()
+            return STUDIO_ACTION_COMPLETED
           },
         }
       },

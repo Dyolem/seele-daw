@@ -1,6 +1,6 @@
 # Studio Action 架构
 
-> 状态：WA1／WA2 已实现并通过审核
+> 状态：WA1／WA2／WA3 已实现并通过审核；WA4 已获实施授权
 >
 > 日期：2026-09-08
 
@@ -12,7 +12,7 @@ Piano Roll 视图挂载后，绑定各自当前的业务操作目标。Action �
 它自己对应的绑定。
 
 ```text
-Menu / Toolbar ─────────────────────────┐
+Menu / Toolbar / Context Menu ──────────┐
 Keyboard → Browser Registry → Input Router
                                       ↓
                             Studio Action Coordinator
@@ -116,7 +116,7 @@ MIDI 文件选择器必须在原始用户输入的同步调用栈中打开。页
 Dock 的 `checked` 直接读取 Workspace 当前状态；Shell 不再通过事件维护第二份开关状态。
 页面通过当前 Shell 的临时端口找到 Workspace，Action 定义仍属于应用生命周期。
 
-### 4.2 Piano Roll（WA1）
+### 4.2 Piano Roll（WA1／WA3）
 
 Piano Roll 区分三个独立意图：
 
@@ -132,7 +132,44 @@ Track Scope 尚无完整的 Note 选择与编辑流程。焦点进入其 Note �
 选择；通过键盘聚焦 CC64 lane 时，会重新激活对应的选择目标。Track／Clip 替换时，
 不再依赖组件的卸载顺序来避免重复 Action ID。
 
-WA1 未实现右键菜单，也未确定右键选择策略。
+WA3 接入 Reka Context Menu，提供 Delete Selection 和 Clear Selection。右键选择策略已获
+确认：右键未选中的 Note 或 CC64 事件，先单选该对象；右键多选成员，保留原多选。背景区域
+有选择时操作该选择；没有可执行动作、存在进行中的手势或命中不可编辑对象时不显示菜单。
+选择变化仍归 Editor Session 或 CC64 Lane 管理，不写入 Project，也不建立新的选择 Store。
+
+Clip Focus 支持 Note 和 CC64 菜单；Track Scope 只支持 Active Clip 的 CC64 事件。非 Active
+Clip 的事件不会因右键而自动改变 Active Clip。CC64 DOM marker 同时携带事件 ID 和 Clip
+occurrence ID，避免同一 Source 事件在不同 Clip 中显示时被错当成当前可编辑 occurrence。
+Track Scope 的完整 Note 选择与编辑流程仍未实现。
+
+菜单通过发起视图返回的短期目标，记录当前 Action Binding 和用于恢复焦点的编辑区域。
+它只读取 Catalogue Presentation 与 Input Router 的平台化快捷键提示；Workbench 和编辑器
+菜单共用 `presentStudioAction()`，不再在不同 Feature 内复制文案拼接规则。菜单不保存
+Selection 副本，也不广播整份编辑器状态。没有 Binding 的 Action 仍可从菜单执行。
+
+Reka 拥有菜单开关、导航与 Escape；菜单打开期间持有键盘暂停能力。Escape 关闭菜单并将
+焦点恢复到原 Note 区域或 CC64 Lane，不清空选择。随后再次按 Escape 才路由到编辑器的
+Clear Selection。恢复位置由编辑器明确提供，连续右键不会错误记录上一层菜单的 DOM 焦点。
+关闭时只在原 Binding 仍有效的情况下恢复焦点，避免延迟聚焦旧视图。
+
+Session、Track、Clip、Source、CC64 Channel 或当前编辑种类替换时，旧 Binding 同步失效并
+关闭菜单。Clip Focus 重建 Editor Session 所依赖的 Clip window 变化也会使其失效。菜单
+调用前再次检查该 Binding；即使新视图先挂载、旧视图稍后才卸载，旧菜单或旧视图也不能借
+全局当前槽位操作新目标。选择消失后菜单自动关闭。删除仍调用现有集合 Command，多个
+Note 或 CC64 事件只产生一个 History step；Clear Selection 不改变 Project revision。
+
+### 4.3 菜单内容与交互的归属
+
+Project Menu、Add Track 和 Piano Roll Context Menu 通过 Reka 的 `as-child` 组合
+`UiMenuSurface`，由其原生 DOM 节点承接 scoped 样式。背景、边框、层级、间距、滚动与
+视口尺寸上限属于 Studio UI；`UiMenuItem` 统一普通命令项的文字、图标和快捷键提示布局。
+这些组件不依赖 Reka、Action Coordinator 或业务状态，不建立额外的菜单注册系统。
+Add Track 的多行菜单项与音色选择器使用各自的原生内容布局。
+
+Reka 继续负责触发、Portal、定位与碰撞处理、键盘导航、ARIA、Escape 和焦点管理。
+尺寸约束使用标准 CSS 视口单位与 Studio 令牌，不引用 Reka 的 available-width／height
+CSS 变量，也不为其建立别名。内容受视口限制并自行滚动；Reka 的 `prioritize-position`
+允许浮层在空间不足时调整位置，必要时覆盖触发区域，以保持内容可达。
 
 ## 5. 中英术语表
 

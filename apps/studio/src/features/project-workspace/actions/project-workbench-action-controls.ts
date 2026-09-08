@@ -1,29 +1,17 @@
+import { STUDIO_ACTION, type StudioActionId } from '@/workbench/actions/studio-action'
 import {
-  STUDIO_ACTION,
-  type StudioActionId,
-  type StudioActionPresentation,
-} from '@/workbench/actions/studio-action'
+  presentStudioAction,
+  type StudioActionControl,
+} from '@/workbench/actions/studio-action-control'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/studio-keyboard-input-router'
 
-export interface ProjectWorkbenchActionControl extends StudioActionPresentation {
-  readonly actionId: StudioActionId
-  readonly shortcut: string
-  readonly title: string
-}
-
-/** Menus and buttons share business presentation and platform-formatted hints. */
 export function presentProjectWorkbenchActions(
   actions: StudioActionCoordinator,
   keyboard: StudioKeyboardInputRouter,
 ) {
-  function present(actionId: StudioActionId): ProjectWorkbenchActionControl {
-    const presentation = actions.presentationFor(actionId)
-    const shortcut = keyboard.displayBindingsFor(actionId).join(' / ')
-    let title = presentation.label
-    if (shortcut) title += ` (${shortcut})`
-    if (presentation.disabledReason !== null) title += ` — ${presentation.disabledReason}`
-    return Object.freeze({ ...presentation, actionId, shortcut, title })
+  function present(actionId: StudioActionId): StudioActionControl {
+    return presentStudioAction(actions, keyboard, actionId)
   }
 
   return Object.freeze({

@@ -355,7 +355,7 @@ async function openProjectMenuItem(wrapper: VueWrapper, label: string): Promise<
   await flushPromises()
   const item = [
     ...document.body.querySelectorAll<HTMLElement>('.project-workbench__menu-item'),
-  ].find((entry) => entry.querySelector('span')?.textContent === label)
+  ].find((entry) => entry.querySelector('.ui-menu-item__label')?.textContent?.trim() === label)
   if (item === undefined) throw new Error(`Expected project menu item: ${label}`)
   return item
 }

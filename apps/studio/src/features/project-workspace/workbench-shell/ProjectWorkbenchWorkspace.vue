@@ -8,7 +8,7 @@ import type {
 } from '@seele-daw/project-core'
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
-import type { ProjectWorkbenchActionControl } from '@/features/project-workspace/actions/project-workbench-action-controls'
+import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 
 import type {
   ProjectPianoRollPresentation,
@@ -35,7 +35,7 @@ const props = withDefaults(
   defineProps<{
     readonly barSpanTick: Tick
     readonly clips: readonly ProjectMidiClipPresentation[]
-    readonly midiImportAction: ProjectWorkbenchActionControl
+    readonly midiImportAction: StudioActionControl
     readonly pianoRollPresentation: ProjectPianoRollPresentation | null
     readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
     readonly projectId: string

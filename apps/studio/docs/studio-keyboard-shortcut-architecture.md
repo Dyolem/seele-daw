@@ -1,6 +1,6 @@
 # Studio Keyboard Shortcut Architecture
 
-> 状态：WA1／WA2 已实现并通过审核
+> 状态：WA1／WA2／WA3 已实现并通过审核；WA4 已获实施授权
 >
 > Date: 2026-09-08
 >
@@ -47,9 +47,11 @@ Composition Root 提供冻结 Keymap；Router 保存自己的不可变快照并�
 4. Workbench。
 5. Global（当前没有该作用域的 Action）。
 
-导航确认的 pending 状态由 Composition Root 提供 Modal barrier；Project Menu 打开期间持有
-可嵌套的键盘暂停能力。Reka 继续负责菜单导航、Escape 关闭及焦点恢复。菜单显式选中 Save
-仍可调用同一 Action Handler。
+导航确认的 pending 状态由 Composition Root 提供 Modal barrier；Project Menu 和 Piano Roll
+Context Menu 打开期间持有可嵌套的键盘暂停能力。Reka 负责菜单导航与 Escape 关闭；编辑器
+在 Reka 的关闭焦点钩子中检查原 Binding 是否有效，再恢复到明确的 Note 区域或 CC64 Lane。
+菜单显式选中操作仍可调用同一 Action Handler。Context Menu 的 Escape 只关闭菜单，不会
+穿透到后台清空选择；关闭或卸载后释放键盘暂停能力。
 
 每个物理键位仅注册一次。Browser Adapter 先用同一平台规则标准化 Binding，因此 macOS 上
 `Mod+S` 与 `Meta+S` 会被识别为同一物理组合。相同 Scope 的冲突在任何物理注册前拒绝；
@@ -99,5 +101,5 @@ Composition Root 提供冻结 Keymap；Router 保存自己的不可变快照并�
 字符串断言为合法 Binding。损坏持久化覆盖的回退策略留给真正的 V1B 保存/加载切片实现。
 
 Workbench 菜单、Transport 和 Arrangement 导入按钮已在 WA2 接入统一调用与 Presentation；
-右键菜单及其选择语义在 WA3。批次状态见
+WA3 已接入 Note／CC64 右键选择菜单，未新增默认 Binding。批次状态见
 [Workbench Action Catalogue V1 phase plan](./workbench-action-catalogue-v1-phase-plan.md)。

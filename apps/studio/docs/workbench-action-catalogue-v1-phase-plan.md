@@ -5,6 +5,10 @@
 > WA1: implemented and approved
 >
 > WA2: implemented and approved
+>
+> WA3: implemented and approved
+>
+> WA4: authorized
 
 ## Design decision
 
@@ -15,14 +19,15 @@ boolean-only execution results and combined Clear/Cancel intent are replaced in 
 
 ## Batches
 
-| Batch | Scope                                                                                                                                                                                      | State                                             |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| WA1   | Immutable definitions, dynamic target lifetimes, explicit invocation/completion, input routing, bilingual terms, Save menu/button/shortcut slice, migration of existing keyboard consumers | Implemented; approved                             |
-| WA2   | Remaining Workbench menus/buttons: Undo/Redo, Play/Pause, Return, Projects, both MIDI imports and opening the MIDI editor; shared presentation and shortcut text                           | Implemented; approved                             |
-| WA3   | Focused-editor menu consumers and Reka Context Menu; explicit Note/CC64 target and one-command deletion                                                                                    | Authorized; right-click selection policy approved |
-| WA4   | Phase-wide regression, failure/release checks, menu and focus review, macOS manual smoke, closure report                                                                                   | Not started                                       |
+| Batch | Scope                                                                                                                                                                                      | State                 |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| WA1   | Immutable definitions, dynamic target lifetimes, explicit invocation/completion, input routing, bilingual terms, Save menu/button/shortcut slice, migration of existing keyboard consumers | Implemented; approved |
+| WA2   | Remaining Workbench menus/buttons: Undo/Redo, Play/Pause, Return, Projects, both MIDI imports and opening the MIDI editor; shared presentation and shortcut text                           | Implemented; approved |
+| WA3   | Focused-editor menu consumers and Reka Context Menu; explicit Note/CC64 target and one-command deletion                                                                                    | Implemented; approved |
+| WA4   | Phase-wide regression, failure/release checks, menu and focus review, macOS manual smoke, closure report                                                                                   | Authorized            |
 
-Each batch stops for review. WA1 does not imply approval to implement WA2–WA4 continuously.
+Each batch stops for review. WA3 was approved on 2026-09-08, with authorization to commit it locally
+and complete the remaining WA4 batch.
 Implementation and ownership are documented in [Studio Action Architecture](./studio-action-architecture.md).
 
 ## WA1 verification
@@ -85,10 +90,63 @@ activation, shared MIDI busy state, late-result suppression, new-project navigat
 opening/restoration without a Project fact change. Existing Save and Reka keyboard/focus regressions
 also pass. The build retains the existing large-chunk warning.
 
-WA2 was approved for a local commit on 2026-09-08. WA3 implementation and its right-click policy are
-approved: select an unselected Note or CC64 event first, retain multi-selection when clicking one of
-its members, and show no menu when there is no executable action. WA4 has not started; full-workspace
-`pnpm check` and macOS manual smoke remain phase-end gates.
+WA2 was approved and committed locally as `316df17` on 2026-09-08. WA3 was authorized with the
+approved policy: select an unselected Note or CC64 event first, retain multi-selection when clicking one of
+its members, and show no menu when there is no executable action. Full-workspace `pnpm check` and
+macOS manual smoke remain phase-end gates in WA4.
+
+## WA3 实现与验证
+
+右键菜单已接入统一 Action。Clip Focus 支持 Note／CC64，Track Scope 支持 Active Clip 的
+CC64。按已批准规则处理右键单选和保留多选；背景无选择、手势进行中、非 Active Clip 的
+CC64 occurrence 或未实现的 Track Note 编辑区域不显示菜单。删除继续使用既有集合
+Command，清空选择不改 Project。
+
+菜单从发起视图取得当前 Binding 和明确的焦点恢复区域。菜单打开期间暂停后台快捷键；
+Escape 关闭菜单并保留选择。当前目标失效后立即关闭，调用前再次检查身份，因此 Track／
+Clip 新旧视图短暂共存也不会误用新目标。Workbench 与 Context Menu 共用平台化提示投影。
+
+2026-09-08，基于 WA2 提交 `316df17` 的本批改动通过以下检查：
+
+| 检查                               | 结果                                                           |
+| ---------------------------------- | -------------------------------------------------------------- |
+| 根目录 `pnpm lint`                 | Architecture、Workspace Quality、Format、Oxlint、ESLint 均通过 |
+| Studio Type Check                  | 通过                                                           |
+| 完整 Studio 测试                   | 67 个文件／500 项测试通过，新增 19 项回归                      |
+| Studio Production Build            | 通过                                                           |
+| Distributable local-audio boundary | 通过                                                           |
+| `git diff --check`                 | 通过                                                           |
+
+新增回归覆盖右键替换单选、保留多选、Note／CC64 集合删除与 Undo／Redo、Clear 不写事实、
+空菜单抑制、非 Active Clip 与重复 Source event ID 的 occurrence 校验、Channel／Session／
+Clip／编辑种类替换、旧 Track 晚于新 Clip 卸载、连续右键的焦点恢复、进行中手势、未绑定
+Action 的菜单调用、失败后的重试，以及真实浏览器键盘 Adapter 下 Reka 的 Escape 所有权。
+构建仅保留既有 large-chunk warning。
+
+审核中的菜单样式修正：此前 Context Menu 的 Reka 内容节点未继承组件的 scoped
+attribute，导致浮层背景、层级等样式未命中。现由 Studio 自有 `UiMenuSurface` 和
+`UiMenuItem` 提供原生内容节点，通过 `as-child` 接入 Reka 的交互、定位与无障碍能力，
+不再用全局选择器补救浮层根节点的样式。背景沿用不透明的
+`--sd-color-surface-overlay`（`#1d2228`）。
+
+Project Menu 与 Add Track 共用该浮层；音色选择器也改为向 Reka 提供自有内容节点。
+这几处的尺寸约束均使用标准 CSS 视口单位与 Studio 令牌，移除了 Reka available-size
+CSS 变量引用。Reka 负责碰撞处理与位置调整，内容自行滚动。
+
+上述组合调整后，重新通过完整 Studio 67 个文件／500 项测试、根目录 `pnpm lint`、
+Studio Type Check、Production Build 与 dist boundary。既有页面回归的菜单定位器改为
+明确查找文案节点，避免假定首个 `span` 就是文字。
+
+浏览器交互验证使用 Codex 内置浏览器，后续也优先使用该浏览器，避免个人 Chrome 标签页
+干扰。已在 1280 × 720 正常视口与 960 × 420 短视口检查不透明背景、长菜单滚动和音色
+选择器两列滚动，并检查 600 × 420 窄视口的选择器尺寸边界。Project Menu 方向键导航、
+末项可达与 Escape 焦点恢复，以及 Note／CC64 右键菜单的高亮、底边避让、Escape 保留
+选择和 Clear Selection 均已核对。临时验证数据已通过 Undo 全部撤销，项目恢复 Saved；
+临时视口设置已恢复。
+
+WA3 于 2026-09-08 通过审核并获准本地提交，用户同时授权完成剩余 WA4。全工作区
+`pnpm check` 和 macOS 人工 smoke 在 WA4 执行，本批自动化 DOM 测试和针对性浏览器验证
+不替代阶段人工 smoke。
 
 ## Deferred decisions and limits
 

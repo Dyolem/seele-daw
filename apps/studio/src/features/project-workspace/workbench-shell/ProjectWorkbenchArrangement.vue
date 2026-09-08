@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
-import type { ProjectWorkbenchActionControl } from '@/features/project-workspace/actions/project-workbench-action-controls'
+import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import {
   parseTick,
   type TempoBpm,
@@ -95,7 +95,7 @@ const props = withDefaults(
   defineProps<{
     readonly barSpanTick: Tick
     readonly clips: readonly ProjectMidiClipPresentation[]
-    readonly midiImportAction: ProjectWorkbenchActionControl
+    readonly midiImportAction: StudioActionControl
     readonly projectId: string
     readonly selectedTempoEventId?: TempoEventId | null
     readonly tempoEditingDisabled?: boolean

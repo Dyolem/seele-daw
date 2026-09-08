@@ -446,8 +446,13 @@ WA2 已实现并通过审核：Undo／Redo、Play／Pause、Return、Projects、
 Open MIDI Editor 的菜单和按钮已接入统一 Action。菜单新增 History／Playback 分组；
 Arrangement 导入按钮也使用同一份状态。导入期间阻止重复选择文件，取消选择可立即重试；
 Return 在播放加载期间仍可停止并返回起点，返回项目列表继续经过既有导航确认。
-Action 可以没有 Binding；本批新增五个 Action 默认不分配快捷键。右键菜单及右键选择语义
-尚未实现或确认。
+Action 可以没有 Binding；WA2 新增五个 Action 默认不分配快捷键。
+
+WA3 已实现并通过审核：Clip Focus 的 Note／CC64，以及 Track Scope 中 Active Clip 的 CC64
+现在提供右键 Delete Selection／Clear Selection。右键未选中对象时先单选，右键多选成员时
+保留多选；没有可执行动作或命中不可编辑对象时不显示菜单。删除多个对象仍是一个 History
+step，清空选择不改 Project。菜单打开期间接管键盘，Escape 关闭后恢复到原编辑区域；切换
+编辑目标时旧菜单失效并关闭。Track Scope 的完整 Note 选择与编辑流程仍未实现。
 
 当前没有用户 Keymap、Shortcut Settings、Recorder、Sequence 或 Command Palette。动态输入
 验证边界已经就绪，持久化和损坏覆盖的回退策略需随实际 V1B 切片实现。

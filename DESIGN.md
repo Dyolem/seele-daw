@@ -857,6 +857,13 @@ Mute、Solo、Record Arm、Snap 和 Tool 都是持续状态，不应只在按下
 - 当前状态使用 Checkmark 或 Radio，不仅靠文字颜色。
 - 危险项与普通项分组，并使用明确名称。
 - 菜单打开后焦点进入菜单；Escape 关闭并返回触发按钮。
+- Reka 负责触发、定位、碰撞处理、键盘导航、ARIA 与焦点管理；Studio 自有组件通过
+  `as-child` 提供原生内容节点，并拥有背景、边框、间距、滚动和视口尺寸约束。
+- `UiMenuSurface` 统一命令菜单的浮层外观，`UiMenuItem` 提供文字、前置图标与尾部提示的
+  排列；Add Track 等复杂菜单项和音色选择器保留各自的内容布局。
+- 菜单与 Popover 使用不透明的 `surface-overlay` 背景。尺寸上限使用标准 CSS 视口单位
+  和 Studio 设计令牌，不直接引用 Reka 的 available-size CSS 变量。定位交由 Reka 处理，
+  长内容在自有节点内滚动。
 
 ### 14.7 Dialog
 

@@ -24,6 +24,8 @@ import {
 import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { useStudioKeyboardLayer } from '@/workbench/actions/vue/studio-action-context'
+import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'
+import UiMenuItem from '@/ui/components/UiMenuItem.vue'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
@@ -102,29 +104,41 @@ const saveStatusTitle = computed(
           <UiIconButton :icon="MenuIcon" label="Open project menu" />
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
-          <DropdownMenuContent class="project-workbench__menu" align="start" :side-offset="8">
-            <template v-for="(group, index) in menuGroups" :key="group.label">
-              <DropdownMenuSeparator v-if="index > 0" class="project-workbench__menu-separator" />
-              <DropdownMenuLabel class="project-workbench__menu-label">{{
-                group.label
-              }}</DropdownMenuLabel>
-              <DropdownMenuItem
-                v-for="{ action, icon } in group.items"
-                :key="action.actionId"
-                class="project-workbench__menu-item"
-                :disabled="!action.enabled"
-                :aria-busy="action.busy || undefined"
-                :title="action.title"
-                :aria-description="action.disabledReason ?? undefined"
-                @select="emit('invokeAction', action.actionId, 'menu')"
-              >
-                <UiIcon :icon="icon" :size="20" />
-                <span>{{ action.label }}</span>
-                <span v-if="action.shortcut" class="project-workbench__menu-shortcut">{{
-                  action.shortcut
-                }}</span>
-              </DropdownMenuItem>
-            </template>
+          <DropdownMenuContent
+            as-child
+            prioritize-position
+            align="start"
+            :side-offset="8"
+            :collision-padding="8"
+          >
+            <UiMenuSurface class="project-workbench__menu">
+              <template v-for="(group, index) in menuGroups" :key="group.label">
+                <DropdownMenuSeparator v-if="index > 0" as-child>
+                  <div class="project-workbench__menu-separator" />
+                </DropdownMenuSeparator>
+                <DropdownMenuLabel as-child>
+                  <div class="project-workbench__menu-label">{{ group.label }}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  v-for="{ action, icon } in group.items"
+                  :key="action.actionId"
+                  as-child
+                  :disabled="!action.enabled"
+                  :aria-busy="action.busy || undefined"
+                  :title="action.title"
+                  :aria-description="action.disabledReason ?? undefined"
+                  @select="emit('invokeAction', action.actionId, 'menu')"
+                >
+                  <UiMenuItem class="project-workbench__menu-item">
+                    <template #leading><UiIcon :icon="icon" :size="20" /></template>
+                    {{ action.label }}
+                    <template v-if="action.shortcut" #trailing>
+                      <span class="project-workbench__menu-shortcut">{{ action.shortcut }}</span>
+                    </template>
+                  </UiMenuItem>
+                </DropdownMenuItem>
+              </template>
+            </UiMenuSurface>
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenuRoot>
@@ -277,23 +291,7 @@ const saveStatusTitle = computed(
   background: var(--sd-color-state-danger);
 }
 
-:global(.project-workbench__menu) {
-  z-index: var(--sd-layer-popover);
-  min-inline-size: 14rem;
-  max-block-size: var(--reka-dropdown-menu-content-available-height);
-  overflow-y: auto;
-  padding: var(--sd-space-2);
-  border: 1px solid var(--sd-color-border-strong);
-  border-radius: var(--sd-radius-lg);
-  color: var(--sd-color-text-primary);
-  background: var(--sd-color-surface-overlay);
-  box-shadow: var(--sd-shadow-overlay);
-  outline: none;
-  animation: project-workbench-menu-in var(--sd-motion-duration-fast)
-    var(--sd-motion-easing-standard);
-}
-
-:global(.project-workbench__menu-label) {
+.project-workbench__menu-label {
   padding: var(--sd-space-2) var(--sd-space-3);
   color: var(--sd-color-text-muted);
   font-size: var(--sd-font-size-xs);
@@ -302,46 +300,10 @@ const saveStatusTitle = computed(
   text-transform: uppercase;
 }
 
-:global(.project-workbench__menu-item) {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--sd-space-3);
-  align-items: center;
-  min-block-size: var(--sd-control-height-md);
-  padding-inline: var(--sd-space-3);
-  border-radius: var(--sd-radius-md);
-  color: var(--sd-color-text-secondary);
-  font-size: var(--sd-font-size-sm);
-  outline: none;
-  cursor: pointer;
-}
-
-:global(.project-workbench__menu-shortcut) {
-  color: var(--sd-color-text-muted);
-  font-size: var(--sd-font-size-xs);
-}
-
-:global(.project-workbench__menu-item[data-highlighted]) {
-  color: var(--sd-color-text-primary);
-  background: var(--sd-color-control-ghost-hover);
-}
-
-:global(.project-workbench__menu-item[data-disabled]) {
-  color: var(--sd-color-text-disabled);
-  cursor: not-allowed;
-}
-
-:global(.project-workbench__menu-separator) {
+.project-workbench__menu-separator {
   block-size: 1px;
   margin: var(--sd-space-2);
   background: var(--sd-color-border-subtle);
-}
-
-@keyframes project-workbench-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(calc(var(--sd-space-1) * -1));
-  }
 }
 
 @media (max-width: 71.9375rem) {
@@ -369,12 +331,6 @@ const saveStatusTitle = computed(
 
   .project-workbench__save-status {
     display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :global(.project-workbench__menu) {
-    animation: none;
   }
 }
 </style>

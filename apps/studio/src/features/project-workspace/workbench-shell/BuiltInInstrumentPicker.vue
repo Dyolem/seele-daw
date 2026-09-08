@@ -71,105 +71,110 @@ function choosePreset(preset: BuiltInInstrumentPreset): void {
 
     <PopoverPortal>
       <PopoverContent
-        class="built-in-instrument-picker__content"
+        as-child
+        prioritize-position
         align="start"
         :side-offset="4"
         :collision-padding="12"
       >
-        <header class="built-in-instrument-picker__heading">
-          <div>
-            <strong>Built-in sounds</strong>
-            <span>Preset catalogue</span>
-          </div>
-          <span>439 Presets · 289 playable</span>
-        </header>
+        <div class="built-in-instrument-picker__content">
+          <header class="built-in-instrument-picker__heading">
+            <div>
+              <strong>Built-in sounds</strong>
+              <span>Preset catalogue</span>
+            </div>
+            <span>439 Presets · 289 playable</span>
+          </header>
 
-        <TabsRoot
-          v-model="activeCategoryId"
-          class="built-in-instrument-picker__tabs"
-          orientation="vertical"
-        >
-          <TabsList class="built-in-instrument-picker__families" aria-label="Instrument category">
-            <TabsTrigger
-              v-for="group in BUILT_IN_INSTRUMENT_PRESET_GROUPS"
-              :key="group.categoryId"
-              class="built-in-instrument-picker__family"
-              :data-category-id="group.categoryId"
-              :value="group.categoryId"
-            >
-              <span>{{ group.displayName }}</span>
-              <span>{{ group.presets.length }}</span>
-            </TabsTrigger>
-          </TabsList>
+          <TabsRoot
+            v-model="activeCategoryId"
+            class="built-in-instrument-picker__tabs"
+            orientation="vertical"
+          >
+            <TabsList class="built-in-instrument-picker__families" aria-label="Instrument category">
+              <TabsTrigger
+                v-for="group in BUILT_IN_INSTRUMENT_PRESET_GROUPS"
+                :key="group.categoryId"
+                class="built-in-instrument-picker__family"
+                :data-category-id="group.categoryId"
+                :value="group.categoryId"
+              >
+                <span>{{ group.displayName }}</span>
+                <span>{{ group.presets.length }}</span>
+              </TabsTrigger>
+            </TabsList>
 
-          <div class="built-in-instrument-picker__options-host">
-            <TabsContent
-              v-for="group in BUILT_IN_INSTRUMENT_PRESET_GROUPS"
-              :key="group.categoryId"
-              class="built-in-instrument-picker__options"
-              :value="group.categoryId"
-            >
-              <header>
-                <strong>{{ group.displayName }}</strong>
-                <span>
-                  {{ group.presets.filter((preset) => preset.availability === 'available').length }}
-                  playable · {{ group.presets.length }} total
-                </span>
-              </header>
-              <div class="built-in-instrument-picker__option-list">
-                <button
-                  v-for="preset in group.presets"
-                  :key="preset.sourcePresetId"
-                  type="button"
-                  class="built-in-instrument-picker__option"
-                  :aria-current="
-                    preset.availability === 'available' &&
-                    preset.soundbankId === props.selectedSoundbankId
-                      ? 'true'
-                      : undefined
-                  "
-                  :data-availability="preset.availability"
-                  :data-engine="preset.engine"
-                  :data-soundbank-id="
-                    preset.availability === 'available' ? preset.soundbankId : undefined
-                  "
-                  :data-source-preset-id="preset.sourcePresetId"
-                  @click="choosePreset(preset)"
-                >
-                  <span class="built-in-instrument-picker__check">
-                    <UiIcon
-                      v-if="
-                        preset.availability === 'available' &&
-                        preset.soundbankId === props.selectedSoundbankId
-                      "
-                      :icon="CheckmarkIcon"
-                      :size="16"
-                    />
+            <div class="built-in-instrument-picker__options-host">
+              <TabsContent
+                v-for="group in BUILT_IN_INSTRUMENT_PRESET_GROUPS"
+                :key="group.categoryId"
+                class="built-in-instrument-picker__options"
+                :value="group.categoryId"
+              >
+                <header>
+                  <strong>{{ group.displayName }}</strong>
+                  <span>
+                    {{
+                      group.presets.filter((preset) => preset.availability === 'available').length
+                    }}
+                    playable · {{ group.presets.length }} total
                   </span>
-                  <span class="built-in-instrument-picker__names">
-                    <strong>{{ preset.displayName }}</strong>
-                    <span>{{ preset.subtitle }}</span>
-                  </span>
-                  <span class="built-in-instrument-picker__badges">
-                    <span
-                      v-if="preset.availability === 'runtime-unavailable'"
-                      class="built-in-instrument-picker__engine"
-                    >
-                      {{ preset.engine }}
+                </header>
+                <div class="built-in-instrument-picker__option-list">
+                  <button
+                    v-for="preset in group.presets"
+                    :key="preset.sourcePresetId"
+                    type="button"
+                    class="built-in-instrument-picker__option"
+                    :aria-current="
+                      preset.availability === 'available' &&
+                      preset.soundbankId === props.selectedSoundbankId
+                        ? 'true'
+                        : undefined
+                    "
+                    :data-availability="preset.availability"
+                    :data-engine="preset.engine"
+                    :data-soundbank-id="
+                      preset.availability === 'available' ? preset.soundbankId : undefined
+                    "
+                    :data-source-preset-id="preset.sourcePresetId"
+                    @click="choosePreset(preset)"
+                  >
+                    <span class="built-in-instrument-picker__check">
+                      <UiIcon
+                        v-if="
+                          preset.availability === 'available' &&
+                          preset.soundbankId === props.selectedSoundbankId
+                        "
+                        :icon="CheckmarkIcon"
+                        :size="16"
+                      />
                     </span>
-                    <span
-                      v-if="preset.availability === 'runtime-unavailable'"
-                      class="built-in-instrument-picker__badge"
-                      data-tone="warning"
-                    >
-                      Not supported
+                    <span class="built-in-instrument-picker__names">
+                      <strong>{{ preset.displayName }}</strong>
+                      <span>{{ preset.subtitle }}</span>
                     </span>
-                  </span>
-                </button>
-              </div>
-            </TabsContent>
-          </div>
-        </TabsRoot>
+                    <span class="built-in-instrument-picker__badges">
+                      <span
+                        v-if="preset.availability === 'runtime-unavailable'"
+                        class="built-in-instrument-picker__engine"
+                      >
+                        {{ preset.engine }}
+                      </span>
+                      <span
+                        v-if="preset.availability === 'runtime-unavailable'"
+                        class="built-in-instrument-picker__badge"
+                        data-tone="warning"
+                      >
+                        Not supported
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </TabsContent>
+            </div>
+          </TabsRoot>
+        </div>
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>
@@ -231,10 +236,12 @@ function choosePreset(preset: BuiltInInstrumentPreset): void {
   transform: rotate(180deg);
 }
 
-:global(.built-in-instrument-picker__content) {
+.built-in-instrument-picker__content {
+  display: flex;
+  flex-direction: column;
   z-index: var(--sd-layer-popover);
-  inline-size: min(50rem, calc(100vw - var(--sd-space-6)));
-  max-block-size: min(36rem, var(--reka-popover-content-available-height));
+  inline-size: min(50rem, calc(100dvw - var(--sd-space-6)));
+  max-block-size: min(36rem, calc(100dvh - var(--sd-space-6)));
   overflow: hidden;
   border: 1px solid var(--sd-color-border-strong);
   border-radius: var(--sd-radius-md);
@@ -248,6 +255,7 @@ function choosePreset(preset: BuiltInInstrumentPreset): void {
 
 :global(.built-in-instrument-picker__heading) {
   display: flex;
+  flex: 0 0 auto;
   gap: var(--sd-space-4);
   align-items: center;
   justify-content: space-between;
@@ -274,8 +282,8 @@ function choosePreset(preset: BuiltInInstrumentPreset): void {
 :global(.built-in-instrument-picker__tabs) {
   display: grid;
   grid-template-columns: 12rem minmax(0, 1fr);
-  block-size: min(30rem, calc(var(--reka-popover-content-available-height) - 3.25rem));
-  min-block-size: 22rem;
+  flex: 0 1 30rem;
+  min-block-size: 0;
 }
 
 :global(.built-in-instrument-picker__families) {
@@ -460,10 +468,6 @@ function choosePreset(preset: BuiltInInstrumentPreset): void {
 }
 
 @media (max-width: 42rem) {
-  :global(.built-in-instrument-picker__content) {
-    inline-size: calc(100vw - var(--sd-space-4));
-  }
-
   :global(.built-in-instrument-picker__tabs) {
     grid-template-columns: 9rem minmax(0, 1fr);
   }

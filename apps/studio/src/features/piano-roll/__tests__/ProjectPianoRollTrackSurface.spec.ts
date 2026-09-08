@@ -1,12 +1,18 @@
 import {
+  getPianoRollContextMenuItem,
+  requestPianoRollContextMenu,
+} from '@/features/piano-roll/__tests__/support/piano-roll-context-menu-test-support'
+import {
   createInitialProjectSession,
   parseProjectId,
+  parseMidiChannel,
+  parseMidiControlValue,
   parseTempoEventId,
   parseTick,
   parseTimeSignatureEventId,
   type ProjectSession,
 } from '@seele-daw/project-core'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -220,7 +226,10 @@ function createSurfaceFixture() {
   })
   const projectMidiSustainPedal = createProjectMidiSustainPedalCoordinator({
     activeProject: { state: readyState },
-    createUniqueId: () => 'track-surface-sustain-pedal-event',
+    createUniqueId: createIdentitySource(
+      'track-surface-sustain-pedal-event',
+      'track-surface-later-event',
+    ),
   })
   const midiSustainPedalContext: ProjectMidiSustainPedalVueContext = Object.freeze({
     projectMidiSustainPedal,
@@ -297,6 +306,7 @@ function createSurfaceFixture() {
     playbackState,
     playbackVisualPosition,
     presentation,
+    projectMidiSustainPedal,
     selection,
     session,
     wrapper,
@@ -586,6 +596,146 @@ describe('ProjectPianoRollTrackSurface', () => {
     ).toHaveLength(1)
 
     wrapper.unmount()
+  })
+
+  it('selects an unselected Active Clip event from its context menu and deletes one History step', async () => {
+    const fixture = createSurfaceFixture()
+    const { clip, presentation, session, wrapper } = fixture
+    const event = fixture.projectMidiSustainPedal.placeInClip({
+      baseRevision: session.modelRevision,
+      channel: parseMidiChannel(0),
+      clipId: clip.clipId,
+      clipTick: parseTick(480),
+      value: parseMidiControlValue(127),
+    })
+    const refreshed = createProjectPianoRollTrackPresentation(
+      session.getSnapshot(),
+      presentation.trackId,
+      clip.clipId,
+    )
+    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected Track presentation')
+    await wrapper.setProps({ presentation: refreshed })
+    const marker = wrapper.get(`[data-piano-roll-sustain-pedal-event-id="${event.eventId}"]`)
+    const revision = session.modelRevision
+    await requestPianoRollContextMenu(marker.element)
+    expect(marker.classes()).toContain('piano-roll-sustain-pedal-lane__event--selected')
+    expect(session.modelRevision).toBe(revision)
+    await getPianoRollContextMenuItem('Delete selection — Sustain Pedal events').trigger('click')
+    await flushPromises()
+    expect(session.modelRevision).toBe(revision + 1)
+    expect(
+      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toEqual([])
+    session.undo()
+    expect(
+      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+    ).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('rejects inactive and mismatched Clip occurrences and closes when Active Clip is cleared', async () => {
+    const fixture = createSurfaceFixture()
+    const { clip, presentation, session, wrapper } = fixture
+    const laterClip = createProjectClipCoordinator({
+      activeProject: { state: createReadyState(session) },
+      createUniqueId: createIdentitySource('context-later-clip', 'context-later-source'),
+    }).addEmptyMidiClip({ targetTick: parseTick(7680), trackId: presentation.trackId })
+    const placed = [clip, laterClip].map((target) =>
+      fixture.projectMidiSustainPedal.placeInClip({
+        baseRevision: session.modelRevision,
+        channel: parseMidiChannel(0),
+        clipId: target.clipId,
+        clipTick: parseTick(480),
+        value: parseMidiControlValue(127),
+      }),
+    )
+    const refreshed = createProjectPianoRollTrackPresentation(
+      session.getSnapshot(),
+      presentation.trackId,
+      clip.clipId,
+    )
+    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected Track presentation')
+    await wrapper.setProps({ presentation: refreshed })
+    const active = wrapper.get(`[data-piano-roll-clip-id="${clip.clipId}"]`)
+    const inactive = wrapper.get(`[data-piano-roll-clip-id="${laterClip.clipId}"]`)
+    await requestPianoRollContextMenu(active.element)
+    await getPianoRollContextMenuItem('Clear selection').trigger('click')
+    await requestPianoRollContextMenu(inactive.element)
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    // A linked occurrence can carry an otherwise selectable source event ID.
+    const firstEvent = placed[0]
+    if (firstEvent === undefined) throw new Error('Expected active event')
+    inactive.element.setAttribute('data-piano-roll-sustain-pedal-event-id', firstEvent.eventId)
+    await requestPianoRollContextMenu(inactive.element)
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    await requestPianoRollContextMenu(active.element)
+    const staleDelete = getPianoRollContextMenuItem('Delete selection')
+    const revision = session.modelRevision
+    const withoutActiveClip = createProjectPianoRollTrackPresentation(
+      session.getSnapshot(),
+      presentation.trackId,
+      null,
+    )
+    if (withoutActiveClip?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected Track presentation')
+    await wrapper.setProps({ presentation: withoutActiveClip })
+    await staleDelete.trigger('click')
+    await flushPromises()
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    expect(session.modelRevision).toBe(revision)
+    await requestPianoRollContextMenu(wrapper.get('.piano-roll-sustain-pedal-lane').element)
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    await requestPianoRollContextMenu(wrapper.get('.project-piano-roll-track__canvas-host').element)
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('prevents an old Track menu from retargeting after Clip Focus mounts before Track teardown', async () => {
+    const fixture = createSurfaceFixture()
+    const { clip, presentation, session, wrapper } = fixture
+    fixture.projectMidiSustainPedal.placeInClip({
+      baseRevision: session.modelRevision,
+      channel: parseMidiChannel(0),
+      clipId: clip.clipId,
+      clipTick: parseTick(480),
+      value: parseMidiControlValue(127),
+    })
+    const refreshed = createProjectPianoRollTrackPresentation(
+      session.getSnapshot(),
+      presentation.trackId,
+      clip.clipId,
+    )
+    const clipPresentation = createProjectPianoRollPresentation(session.getSnapshot(), clip.clipId)
+    if (
+      refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY ||
+      clipPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+    )
+      throw new Error('Expected editable scopes')
+    await wrapper.setProps({ presentation: refreshed })
+    const marker = wrapper.get('[data-piano-roll-sustain-pedal-event-id]')
+    await requestPianoRollContextMenu(marker.element)
+    const staleDelete = getPianoRollContextMenuItem('Delete selection')
+    const revision = session.modelRevision
+    const next = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      global: fixture.global,
+      props: {
+        barSpanTick: parseTick(3840),
+        presentation: clipPresentation,
+        session,
+        timeSignatureNumerator: 4,
+      },
+    })
+    await staleDelete.trigger('click')
+    await requestPianoRollContextMenu(marker.element)
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    expect(session.modelRevision).toBe(revision)
+    expect(fixture.keyboard.runtime.pianoRollTarget.current?.value.selectionLabel()).toBe('Notes')
+    wrapper.unmount()
+    expect(fixture.keyboard.runtime.pianoRollTarget.current?.isCurrent()).toBe(true)
+    next.unmount()
   })
 
   it('reports that Track Scope CC64 placement requires an explicit Active Clip', async () => {

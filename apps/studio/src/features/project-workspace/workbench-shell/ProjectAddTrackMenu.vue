@@ -20,6 +20,7 @@ import {
   PROJECT_ADD_TRACK_TYPE,
   type ProjectAddTrackType,
 } from '@/features/project-workspace/workbench-shell/project-add-track-option'
+import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 
@@ -101,72 +102,70 @@ const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
 
     <DropdownMenuPortal>
       <DropdownMenuContent
-        class="project-add-track"
+        as-child
+        prioritize-position
         align="start"
         :side-offset="8"
-        :collision-padding="12"
+        :collision-padding="8"
       >
-        <DropdownMenuLabel class="project-add-track__heading">
-          <strong>Add track</strong>
-          <span>Choose a musical source</span>
-        </DropdownMenuLabel>
+        <UiMenuSurface class="project-add-track">
+          <DropdownMenuLabel as-child>
+            <div class="project-add-track__heading">
+              <strong>Add track</strong>
+              <span>Choose a musical source</span>
+            </div>
+          </DropdownMenuLabel>
 
-        <DropdownMenuItem
-          v-for="option in ADD_TRACK_OPTIONS"
-          :key="option.type"
-          class="project-add-track__option"
-          @select="emit('select', option.type)"
-        >
-          <span
-            class="project-add-track__option-icon"
-            :class="`project-add-track__option-icon--${option.tone}`"
-            aria-hidden="true"
+          <DropdownMenuItem
+            v-for="option in ADD_TRACK_OPTIONS"
+            :key="option.type"
+            as-child
+            @select="emit('select', option.type)"
           >
-            <UiIcon :icon="option.icon" :size="24" />
-          </span>
-          <span class="project-add-track__option-copy">
-            <span class="project-add-track__option-title">
-              <strong>{{ option.label }}</strong>
-              <span v-if="option.unavailable">Soon</span>
-            </span>
-            <span>{{ option.description }}</span>
-          </span>
-        </DropdownMenuItem>
+            <div class="project-add-track__option">
+              <span
+                class="project-add-track__option-icon"
+                :class="`project-add-track__option-icon--${option.tone}`"
+                aria-hidden="true"
+              >
+                <UiIcon :icon="option.icon" :size="24" />
+              </span>
+              <span class="project-add-track__option-copy">
+                <span class="project-add-track__option-title">
+                  <strong>{{ option.label }}</strong>
+                  <span v-if="option.unavailable">Soon</span>
+                </span>
+                <span>{{ option.description }}</span>
+              </span>
+            </div>
+          </DropdownMenuItem>
+        </UiMenuSurface>
       </DropdownMenuContent>
     </DropdownMenuPortal>
   </DropdownMenuRoot>
 </template>
 
 <style scoped>
-:global(.project-add-track) {
-  z-index: var(--sd-layer-popover);
-  inline-size: min(22rem, calc(100vw - var(--sd-space-6)));
-  padding: var(--sd-space-2);
-  border: 1px solid var(--sd-color-border-strong);
-  border-radius: var(--sd-radius-lg);
-  color: var(--sd-color-text-primary);
-  background: var(--sd-color-surface-overlay);
-  box-shadow: var(--sd-shadow-overlay);
-  outline: none;
-  animation: project-add-track-in var(--sd-motion-duration-normal) var(--sd-motion-easing-standard);
+.project-add-track {
+  inline-size: 22rem;
 }
 
-:global(.project-add-track__heading) {
+.project-add-track__heading {
   display: grid;
   gap: var(--sd-space-1);
   padding: var(--sd-space-3) var(--sd-space-3) var(--sd-space-4);
 }
 
-:global(.project-add-track__heading strong) {
+.project-add-track__heading strong {
   font-size: var(--sd-font-size-lg);
 }
 
-:global(.project-add-track__heading span) {
+.project-add-track__heading span {
   color: var(--sd-color-text-muted);
   font-size: var(--sd-font-size-xs);
 }
 
-:global(.project-add-track__option) {
+.project-add-track__option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--sd-space-3);
@@ -178,11 +177,11 @@ const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
   cursor: pointer;
 }
 
-:global(.project-add-track__option[data-highlighted]) {
+.project-add-track__option:is(:hover, :focus) {
   background: var(--sd-color-control-ghost-hover);
 }
 
-:global(.project-add-track__option-icon) {
+.project-add-track__option-icon {
   display: grid;
   inline-size: var(--sd-control-height-md);
   block-size: var(--sd-control-height-md);
@@ -192,28 +191,28 @@ const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
   background: color-mix(in srgb, currentcolor 14%, var(--sd-color-surface-sunken));
 }
 
-:global(.project-add-track__option-icon--red) {
+.project-add-track__option-icon--red {
   color: var(--sd-color-state-record);
 }
 
-:global(.project-add-track__option-icon--green) {
+.project-add-track__option-icon--green {
   color: var(--sd-color-state-success);
 }
 
-:global(.project-add-track__option-icon--gold) {
+.project-add-track__option-icon--gold {
   color: var(--sd-color-state-warning);
 }
 
-:global(.project-add-track__option-icon--violet) {
+.project-add-track__option-icon--violet {
   color: var(--sd-color-border-focus);
 }
 
-:global(.project-add-track__option-icon--cyan),
-:global(.project-add-track__option-icon--blue) {
+.project-add-track__option-icon--cyan,
+.project-add-track__option-icon--blue {
   color: var(--sd-color-state-info);
 }
 
-:global(.project-add-track__option-copy) {
+.project-add-track__option-copy {
   display: grid;
   gap: var(--sd-space-1);
   min-inline-size: 0;
@@ -222,13 +221,13 @@ const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
   line-height: var(--sd-line-height-tight);
 }
 
-:global(.project-add-track__option-title) {
+.project-add-track__option-title {
   display: flex;
   gap: var(--sd-space-2);
   align-items: center;
 }
 
-:global(.project-add-track__option-title strong) {
+.project-add-track__option-title strong {
   overflow: hidden;
   color: var(--sd-color-text-primary);
   font-size: var(--sd-font-size-sm);
@@ -236,24 +235,11 @@ const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
   white-space: nowrap;
 }
 
-:global(.project-add-track__option-title > span) {
+.project-add-track__option-title > span {
   padding: var(--sd-space-0-5) var(--sd-space-2);
   border-radius: var(--sd-radius-pill);
   color: var(--sd-color-text-secondary);
   background: var(--sd-color-control-secondary);
   font-size: var(--sd-font-size-xs);
-}
-
-@keyframes project-add-track-in {
-  from {
-    opacity: 0;
-    transform: translateY(calc(var(--sd-space-1) * -1));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :global(.project-add-track) {
-    animation: none;
-  }
 }
 </style>

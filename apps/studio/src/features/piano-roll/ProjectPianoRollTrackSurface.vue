@@ -45,6 +45,7 @@ import CursorIcon from '~icons/fluent/cursor-20-regular'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import PenIcon from '~icons/fluent/pen-20-regular'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
+import { ContextMenuRoot } from 'reka-ui'
 import {
   computed,
   nextTick,
@@ -59,6 +60,10 @@ import {
 } from 'vue'
 
 import TrackPlayhead from '@/features/piano-roll/playhead/TrackPlayhead.vue'
+import PianoRollContextMenu from '@/features/piano-roll/actions/PianoRollContextMenu.vue'
+import type { PianoRollContextMenuTarget } from '@/features/piano-roll/actions/piano-roll-context-menu-target'
+import type { PianoRollActionTarget } from '@/features/piano-roll/actions/piano-roll-actions'
+import type { StudioActionTargetBinding } from '@/workbench/actions/studio-action-target'
 import PianoRollSustainPedalLane from '@/features/piano-roll/PianoRollSustainPedalLane.vue'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
@@ -683,6 +688,13 @@ function handleFocusIn(): void {
   isSustainPedalTarget.value = sustainPedalLane.value?.isFocused() ?? false
 }
 
+function prepareContextMenu(event: MouseEvent): PianoRollContextMenuTarget | null {
+  if (!boundActionTarget?.isCurrent()) return null
+  const focusElement = sustainPedalLane.value?.prepareContextMenu(event)
+  return focusElement ? { binding: boundActionTarget, focusElement } : null
+}
+
+let boundActionTarget: StudioActionTargetBinding<PianoRollActionTarget> | null = null
 let releaseActionTarget: (() => void) | null = null
 const stopActionTarget = watch(
   [
@@ -690,6 +702,10 @@ const stopActionTarget = watch(
     () => props.presentation.projectId,
     () => props.presentation.trackId,
     () => props.presentation.readModel.activeClipId,
+    () =>
+      props.presentation.readModel.clips.find(
+        ({ clip }) => clip.clipId === props.presentation.readModel.activeClipId,
+      )?.clip.sourceId,
     () => pianoRollPreferences.sustainPedalChannel,
     isSustainPedalTarget,
   ],
@@ -709,6 +725,7 @@ const stopActionTarget = watch(
       cancelInteraction: () =>
         sustainPedalLane.value?.cancelInteraction() ?? STUDIO_ACTION_NOT_APPLIED,
     })
+    boundActionTarget = actionTarget.current
   },
   { immediate: true, flush: 'sync' },
 )
@@ -784,201 +801,210 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section
-    ref="surfaceElement"
-    class="project-piano-roll-track"
-    role="region"
-    :aria-label="`Track Piano Roll for ${props.presentation.name}`"
-    :data-placement-status="placementPreview?.placement.status ?? 'idle'"
-    :data-snap-enabled="pianoRollPreferences.snapEnabled"
-    :data-tool="pianoRollPreferences.activeTool"
-    tabindex="0"
-    @focusin="handleFocusIn"
-  >
-    <header class="project-piano-roll-track__toolbar" aria-label="Piano Roll controls">
-      <div class="project-piano-roll-track__tool-group" role="group" aria-label="Editing tool">
-        <UiIconButton
-          :icon="PenIcon"
-          label="Pencil tool"
-          :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.PENCIL"
-          size="small"
-          @click="activateTool(PIANO_ROLL_TOOL.PENCIL)"
-        />
-        <UiIconButton
-          :icon="CursorIcon"
-          label="Cursor tool"
-          :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.CURSOR"
-          size="small"
-          @click="activateTool(PIANO_ROLL_TOOL.CURSOR)"
-        />
-      </div>
-      <span class="project-piano-roll-track__toolbar-divider" aria-hidden="true"></span>
-      <div class="project-piano-roll-track__snap-control">
-        <UiIconButton
-          :icon="GridIcon"
-          :label="`Snap to ${pianoRollPreferences.gridPreset} grid — ${
-            pianoRollPreferences.snapEnabled ? 'on' : 'off'
-          }`"
-          :pressed="pianoRollPreferences.snapEnabled"
-          size="small"
-          @click="pianoRollPreferences.toggleSnap()"
-        />
-        <span aria-hidden="true">{{ pianoRollPreferences.gridPreset }}</span>
-      </div>
-      <span class="project-piano-roll-track__scope-label">TRACK TIME</span>
-      <UiIconButton
-        class="project-piano-roll-track__follow-control"
-        :disabled="!isCurrentProjectPlaying"
-        :icon="TargetArrowIcon"
-        :label="timelineFollowLabel"
-        :pressed="isTimelineFollowActive"
-        size="small"
-        @click="toggleTimelineFollow"
-      />
-      <label class="project-piano-roll-track__active-clip">
-        <span>Active Clip</span>
-        <select :value="activeClipId ?? ''" @change="handleActiveClipChange">
-          <option value="">None</option>
-          <option
-            v-for="{ clip } in props.presentation.readModel.clips"
-            :key="clip.clipId"
-            :value="clip.clipId"
-          >
-            {{ clip.name
-            }}{{ clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED ? ' (looped)' : '' }}
-          </option>
-        </select>
-      </label>
-      <label class="project-piano-roll-track__channel-control">
-        <span>CC64 Ch</span>
-        <select
-          :value="pianoRollPreferences.sustainPedalChannel"
-          aria-label="Sustain Pedal MIDI Channel"
-          @change="handleSustainPedalChannelChange"
-        >
-          <option v-for="channel in midiChannelOptions" :key="channel" :value="channel">
-            {{ channel + 1 }}
-          </option>
-        </select>
-      </label>
-      <span
-        v-if="previewMessage"
-        class="project-piano-roll-track__preview-message"
-        :data-blocked="
-          placementPreview?.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED
-        "
+  <ContextMenuRoot>
+    <PianoRollContextMenu :prepare-target="prepareContextMenu">
+      <section
+        ref="surfaceElement"
+        class="project-piano-roll-track"
+        role="region"
+        :aria-label="`Track Piano Roll for ${props.presentation.name}`"
+        :data-placement-status="placementPreview?.placement.status ?? 'idle'"
+        :data-snap-enabled="pianoRollPreferences.snapEnabled"
+        :data-tool="pianoRollPreferences.activeTool"
+        tabindex="0"
+        @focusin="handleFocusIn"
       >
-        {{ previewMessage }}
-      </span>
-    </header>
-
-    <div class="project-piano-roll-track__left-stack">
-      <div class="project-piano-roll-track__ruler-corner" aria-hidden="true">PITCH</div>
-      <div class="project-piano-roll-track__keyboard" aria-label="Piano keyboard">
-        <div v-for="key in pianoKeys" :key="key.pitch" class="project-piano-roll-track__key-row">
-          <span :class="{ 'project-piano-roll-track__key--black': key.isBlack }">
-            {{ key.label }}
-          </span>
-        </div>
-      </div>
-      <div class="project-piano-roll-track__lane-label" aria-hidden="true">
-        <strong>CC64</strong>
-        <span>127</span>
-        <span>64</span>
-        <span>0</span>
-      </div>
-    </div>
-
-    <div
-      ref="scrollViewport"
-      class="project-piano-roll-track__scroll-viewport"
-      @keydown.capture="handleTimelineKeydown"
-      @pointerdown.capture="handleTimelinePointerDown"
-      @scroll.passive="handleScroll"
-      @wheel.passive="handleTimelineWheel"
-    >
-      <div class="project-piano-roll-track__timeline-content" :style="timelineContentStyle">
-        <ol class="project-piano-roll-track__ruler" aria-label="Track timeline bars">
-          <li v-for="bar in timelineBars" :key="bar.number" :style="bar.style">
-            {{ bar.number }}
-          </li>
-        </ol>
-        <div
-          ref="canvasHost"
-          class="project-piano-roll-track__canvas-host"
-          @pointerleave="placementPreview = null"
-          @pointermove="handleHover"
-        >
-          <canvas ref="gridCanvas" aria-hidden="true"></canvas>
-          <div ref="noteHost" class="project-piano-roll-track__note-host"></div>
-          <div class="project-piano-roll-track__clip-windows" aria-label="MIDI Clip windows">
-            <button
-              v-for="window in clipWindows"
-              :key="window.clipReadModel.clip.clipId"
-              type="button"
-              :aria-label="`Use ${window.clipReadModel.clip.name} as the Active Clip`"
-              :aria-pressed="activeClipId === window.clipReadModel.clip.clipId"
-              :data-active="activeClipId === window.clipReadModel.clip.clipId"
-              :data-status="window.clipReadModel.clip.status"
-              :style="window.style"
-              @click.stop="activateClip(window.clipReadModel.clip.clipId)"
-            >
-              <span>{{ window.clipReadModel.clip.name }}</span>
-            </button>
+        <header class="project-piano-roll-track__toolbar" aria-label="Piano Roll controls">
+          <div class="project-piano-roll-track__tool-group" role="group" aria-label="Editing tool">
+            <UiIconButton
+              :icon="PenIcon"
+              label="Pencil tool"
+              :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.PENCIL"
+              size="small"
+              @click="activateTool(PIANO_ROLL_TOOL.PENCIL)"
+            />
+            <UiIconButton
+              :icon="CursorIcon"
+              label="Cursor tool"
+              :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.CURSOR"
+              size="small"
+              @click="activateTool(PIANO_ROLL_TOOL.CURSOR)"
+            />
           </div>
-          <div
-            v-if="previewClipStyle"
-            class="project-piano-roll-track__clip-preview"
-            :style="previewClipStyle"
-            aria-hidden="true"
-          ></div>
-          <div
-            v-if="previewNoteStyle"
-            class="project-piano-roll-track__note-preview"
-            :class="{
-              'project-piano-roll-track__note-preview--blocked':
-                placementPreview?.placement.status ===
-                PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED,
-            }"
-            :style="previewNoteStyle"
-            aria-hidden="true"
-          ></div>
-        </div>
-        <PianoRollSustainPedalLane
-          ref="sustainPedalLane"
-          :clip-context="null"
-          :grid="createDisplayGrid()"
-          :label="`Sustain Pedal lane for ${props.presentation.name}`"
-          :pencil-enabled="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.PENCIL"
-          :read-model="sustainPedalLaneReadModel"
-          :snap-enabled="pianoRollPreferences.snapEnabled"
-          :visible-span-tick="props.timelineEndTick"
-          :visible-start-tick="ZERO_TICK"
-          @completed="handleSustainPedalCompleted"
-          @failure="reportSustainPedalFailure"
-          @placement="handleSustainPedalPlacement"
-        />
-        <TrackPlayhead
-          :bar-span-tick="props.barSpanTick"
-          :project-id="props.presentation.projectId"
-          :timeline-end-tick="props.timelineEndTick"
-        />
-      </div>
-    </div>
+          <span class="project-piano-roll-track__toolbar-divider" aria-hidden="true"></span>
+          <div class="project-piano-roll-track__snap-control">
+            <UiIconButton
+              :icon="GridIcon"
+              :label="`Snap to ${pianoRollPreferences.gridPreset} grid — ${
+                pianoRollPreferences.snapEnabled ? 'on' : 'off'
+              }`"
+              :pressed="pianoRollPreferences.snapEnabled"
+              size="small"
+              @click="pianoRollPreferences.toggleSnap()"
+            />
+            <span aria-hidden="true">{{ pianoRollPreferences.gridPreset }}</span>
+          </div>
+          <span class="project-piano-roll-track__scope-label">TRACK TIME</span>
+          <UiIconButton
+            class="project-piano-roll-track__follow-control"
+            :disabled="!isCurrentProjectPlaying"
+            :icon="TargetArrowIcon"
+            :label="timelineFollowLabel"
+            :pressed="isTimelineFollowActive"
+            size="small"
+            @click="toggleTimelineFollow"
+          />
+          <label class="project-piano-roll-track__active-clip">
+            <span>Active Clip</span>
+            <select :value="activeClipId ?? ''" @change="handleActiveClipChange">
+              <option value="">None</option>
+              <option
+                v-for="{ clip } in props.presentation.readModel.clips"
+                :key="clip.clipId"
+                :value="clip.clipId"
+              >
+                {{ clip.name
+                }}{{ clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED ? ' (looped)' : '' }}
+              </option>
+            </select>
+          </label>
+          <label class="project-piano-roll-track__channel-control">
+            <span>CC64 Ch</span>
+            <select
+              :value="pianoRollPreferences.sustainPedalChannel"
+              aria-label="Sustain Pedal MIDI Channel"
+              @change="handleSustainPedalChannelChange"
+            >
+              <option v-for="channel in midiChannelOptions" :key="channel" :value="channel">
+                {{ channel + 1 }}
+              </option>
+            </select>
+          </label>
+          <span
+            v-if="previewMessage"
+            class="project-piano-roll-track__preview-message"
+            :data-blocked="
+              placementPreview?.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED
+            "
+          >
+            {{ previewMessage }}
+          </span>
+        </header>
 
-    <p class="project-piano-roll-track__accessible-status" aria-live="polite">
-      {{ accessibleStatus }}
-    </p>
-    <ul class="project-piano-roll-track__accessible-status">
-      <li
-        v-for="clipReadModel in props.presentation.readModel.clips"
-        :key="clipReadModel.clip.clipId"
-      >
-        {{ clipReadModel.clip.name }}, starts at {{ clipReadModel.clip.startTick }} ticks, ends at
-        {{ clipReadModel.clip.endTick }} ticks, {{ clipReadModel.notes.length }} visible notes
-      </li>
-    </ul>
-  </section>
+        <div class="project-piano-roll-track__left-stack">
+          <div class="project-piano-roll-track__ruler-corner" aria-hidden="true">PITCH</div>
+          <div class="project-piano-roll-track__keyboard" aria-label="Piano keyboard">
+            <div
+              v-for="key in pianoKeys"
+              :key="key.pitch"
+              class="project-piano-roll-track__key-row"
+            >
+              <span :class="{ 'project-piano-roll-track__key--black': key.isBlack }">
+                {{ key.label }}
+              </span>
+            </div>
+          </div>
+          <div class="project-piano-roll-track__lane-label" aria-hidden="true">
+            <strong>CC64</strong>
+            <span>127</span>
+            <span>64</span>
+            <span>0</span>
+          </div>
+        </div>
+
+        <div
+          ref="scrollViewport"
+          class="project-piano-roll-track__scroll-viewport"
+          @keydown.capture="handleTimelineKeydown"
+          @pointerdown.capture="handleTimelinePointerDown"
+          @scroll.passive="handleScroll"
+          @wheel.passive="handleTimelineWheel"
+        >
+          <div class="project-piano-roll-track__timeline-content" :style="timelineContentStyle">
+            <ol class="project-piano-roll-track__ruler" aria-label="Track timeline bars">
+              <li v-for="bar in timelineBars" :key="bar.number" :style="bar.style">
+                {{ bar.number }}
+              </li>
+            </ol>
+            <div
+              ref="canvasHost"
+              class="project-piano-roll-track__canvas-host"
+              @pointerleave="placementPreview = null"
+              @pointermove="handleHover"
+            >
+              <canvas ref="gridCanvas" aria-hidden="true"></canvas>
+              <div ref="noteHost" class="project-piano-roll-track__note-host"></div>
+              <div class="project-piano-roll-track__clip-windows" aria-label="MIDI Clip windows">
+                <button
+                  v-for="window in clipWindows"
+                  :key="window.clipReadModel.clip.clipId"
+                  type="button"
+                  :aria-label="`Use ${window.clipReadModel.clip.name} as the Active Clip`"
+                  :aria-pressed="activeClipId === window.clipReadModel.clip.clipId"
+                  :data-active="activeClipId === window.clipReadModel.clip.clipId"
+                  :data-status="window.clipReadModel.clip.status"
+                  :style="window.style"
+                  @click.stop="activateClip(window.clipReadModel.clip.clipId)"
+                >
+                  <span>{{ window.clipReadModel.clip.name }}</span>
+                </button>
+              </div>
+              <div
+                v-if="previewClipStyle"
+                class="project-piano-roll-track__clip-preview"
+                :style="previewClipStyle"
+                aria-hidden="true"
+              ></div>
+              <div
+                v-if="previewNoteStyle"
+                class="project-piano-roll-track__note-preview"
+                :class="{
+                  'project-piano-roll-track__note-preview--blocked':
+                    placementPreview?.placement.status ===
+                    PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED,
+                }"
+                :style="previewNoteStyle"
+                aria-hidden="true"
+              ></div>
+            </div>
+            <PianoRollSustainPedalLane
+              ref="sustainPedalLane"
+              :clip-context="null"
+              :grid="createDisplayGrid()"
+              :label="`Sustain Pedal lane for ${props.presentation.name}`"
+              :pencil-enabled="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.PENCIL"
+              :read-model="sustainPedalLaneReadModel"
+              :snap-enabled="pianoRollPreferences.snapEnabled"
+              :visible-span-tick="props.timelineEndTick"
+              :visible-start-tick="ZERO_TICK"
+              @completed="handleSustainPedalCompleted"
+              @failure="reportSustainPedalFailure"
+              @placement="handleSustainPedalPlacement"
+            />
+            <TrackPlayhead
+              :bar-span-tick="props.barSpanTick"
+              :project-id="props.presentation.projectId"
+              :timeline-end-tick="props.timelineEndTick"
+            />
+          </div>
+        </div>
+
+        <p class="project-piano-roll-track__accessible-status" aria-live="polite">
+          {{ accessibleStatus }}
+        </p>
+        <ul class="project-piano-roll-track__accessible-status">
+          <li
+            v-for="clipReadModel in props.presentation.readModel.clips"
+            :key="clipReadModel.clip.clipId"
+          >
+            {{ clipReadModel.clip.name }}, starts at {{ clipReadModel.clip.startTick }} ticks, ends
+            at {{ clipReadModel.clip.endTick }} ticks, {{ clipReadModel.notes.length }} visible
+            notes
+          </li>
+        </ul>
+      </section>
+    </PianoRollContextMenu>
+  </ContextMenuRoot>
 </template>
 
 <style scoped>

@@ -72,7 +72,7 @@ interface LaneOccurrence {
   readonly active: boolean
   readonly endTick: Tick
   readonly events: readonly PianoRollSustainPedalLaneEventProjection[]
-  readonly key: string
+  readonly key: ClipId
   readonly segments: readonly PianoRollSustainPedalLaneStepSegment[]
   readonly startTick: Tick
   readonly unsupported: boolean
@@ -89,6 +89,7 @@ interface RenderedLaneSegment {
 interface RenderedLaneEvent {
   readonly active: boolean
   readonly affectsPlayback: boolean
+  readonly clipId: ClipId
   readonly event: PianoRollSustainPedalLaneEventProjection['event']
   readonly key: string
   readonly pedalDown: boolean
@@ -330,6 +331,7 @@ const renderedEvents = computed<readonly RenderedLaneEvent[]>(() => {
             affectsPlayback: isPreview
               ? timelineTick < occurrence.endTick
               : projection.affectsPlayback,
+            clipId: occurrence.key,
             event: projection.event,
             key: `${occurrence.key}:event:${projection.event.id}`,
             pedalDown: isPreview ? isMidiSustainPedalDown(value) : projection.pedalDown,
@@ -486,12 +488,46 @@ function isFocused(): boolean {
   return element?.contains(element.ownerDocument.activeElement) ?? false
 }
 
+function prepareContextMenu(event: MouseEvent): HTMLElement | null {
+  const surface = laneSurface.value
+  if (surface === null || !event.composedPath().includes(surface) || hasCancellableInteraction())
+    return null
+
+  try {
+    const scope = resolveEditingScope()
+    if (scope === null) return null
+    const hit = resolvePianoRollDomSustainPedalEventHit(event, surface)
+    if (hit !== null) {
+      // Linked Clip occurrences can render the same source event ID more than once.
+      const marker = event
+        .composedPath()
+        .find(
+          (node): node is HTMLElement =>
+            node instanceof HTMLElement &&
+            node.getAttribute('data-piano-roll-sustain-pedal-event-id') === hit.sustainPedalEventId,
+        )
+      if (marker?.getAttribute('data-piano-roll-clip-id') !== scope.clipId) return null
+      if (!scope.events.some(({ event }) => event.id === hit.sustainPedalEventId)) return null
+      if (!selectedEventIds.value.includes(hit.sustainPedalEventId)) {
+        setSelectedEventIds([hit.sustainPedalEventId])
+      }
+    }
+    surface.focus({ preventScroll: true })
+    emit('requestFocus')
+    return hasSelection() ? surface : null
+  } catch (cause) {
+    emit('failure', cause)
+    return null
+  }
+}
+
 defineExpose({
   cancelInteraction,
   clearSelection,
   hasCancellableInteraction,
   hasSelection,
   isFocused,
+  prepareContextMenu,
   removeSelectedEvents,
 })
 
@@ -654,6 +690,7 @@ onUnmounted(() => {
         'piano-roll-sustain-pedal-lane__event--terminal': !event.affectsPlayback,
       }"
       :data-piano-roll-sustain-pedal-event-id="event.event.id"
+      :data-piano-roll-clip-id="event.clipId"
       :style="event.style"
       :aria-label="`Sustain Pedal value ${event.value} at tick ${event.timelineTick}${
         event.affectsPlayback ? '' : ', terminal endpoint'

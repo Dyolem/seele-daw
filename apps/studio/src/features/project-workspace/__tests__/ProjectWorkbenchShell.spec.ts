@@ -1,3 +1,4 @@
+import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
   parseClipId,
@@ -19,10 +20,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
-import {
-  presentProjectWorkbenchActions,
-  type ProjectWorkbenchActionControl,
-} from '@/features/project-workspace/actions/project-workbench-action-controls'
+import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
@@ -151,7 +149,7 @@ function mountShell(options: MountShellOptions = {}) {
     actionFixture.runtime.actions,
     actionFixture.runtime.keyboard,
   )
-  const enabled = (control: ProjectWorkbenchActionControl) => ({
+  const enabled = (control: StudioActionControl) => ({
     ...control,
     ...createStudioActionPresentation(control.label),
     title: control.label,

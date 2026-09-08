@@ -1,4 +1,10 @@
 import {
+  getPianoRollContextMenu,
+  getPianoRollContextMenuItem,
+  requestPianoRollContextMenu,
+} from '@/features/piano-roll/__tests__/support/piano-roll-context-menu-test-support'
+import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
+import {
   PROJECT_QUERY_TYPE,
   createInitialProjectSession,
   createMidiNoteRecord,
@@ -17,7 +23,7 @@ import {
   type ProjectQueryResult,
   type ProjectSession,
 } from '@seele-daw/project-core'
-import { config, mount } from '@vue/test-utils'
+import { config, flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { markRaw, nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -277,6 +283,76 @@ function restorePrototypeProperty(
   Object.defineProperty(HTMLElement.prototype, property, descriptor)
 }
 
+const menuFixtureCleanups: Array<() => void> = []
+
+function mountSelectionMenuFixture(identity: string) {
+  installSurfaceEnvironment()
+  const fixture = createInteractiveFixture(identity)
+  const noteIds = [480, 960].map(
+    (tick) =>
+      fixture.projectMidiNotes.addMidiNote({
+        clipId: fixture.presentation.clipId,
+        clipStartTick: parseTick(tick),
+        pitch: parseMidiPitch(60),
+        requestedDurationTick: parsePositiveTick(240),
+      }).noteId,
+  )
+  const eventIds = [480, 960].map(
+    (tick) =>
+      fixture.projectMidiSustainPedal.placeInClip({
+        baseRevision: fixture.session.modelRevision,
+        channel: parseMidiChannel(0),
+        clipId: fixture.presentation.clipId,
+        clipTick: parseTick(tick),
+        value: parseMidiControlValue(64),
+      }).eventId,
+  )
+  const presentation = createProjectPianoRollPresentation(
+    fixture.session.getSnapshot(),
+    fixture.presentation.clipId,
+  )
+  if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+    throw new Error('Expected editable menu fixture')
+  const keyboard = createTestStudioActionRuntime()
+  const invoke = vi.spyOn(keyboard.runtime.actions, 'invoke')
+  const pinia = createPinia()
+  const preferences = usePianoRollPreferencesStore(pinia)
+  preferences.activateTool(PIANO_ROLL_TOOL.CURSOR)
+  const wrapper = mount(ProjectPianoRollSurface, {
+    attachTo: document.body,
+    props: {
+      barSpanTick: parsePositiveTick(3_840),
+      presentation,
+      session: markRaw(fixture.session),
+      timeSignatureNumerator: 4,
+    },
+    global: {
+      plugins: [pinia],
+      provide: {
+        ...keyboard.provide,
+        [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: { projectMidiNotes: fixture.projectMidiNotes },
+        [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: {
+          projectMidiSustainPedal: fixture.projectMidiSustainPedal,
+        },
+      },
+    },
+  })
+  menuFixtureCleanups.push(() => wrapper.unmount())
+  function markers(kind: 'notes' | 'sustain-pedal') {
+    const attribute =
+      kind === 'notes' ? 'data-piano-roll-note-id' : 'data-piano-roll-sustain-pedal-event-id'
+    const ids = kind === 'notes' ? noteIds : eventIds
+    return ids.map((id) => wrapper.get(`[${attribute}="${id}"]`))
+  }
+  function records(kind: 'notes' | 'sustain-pedal') {
+    const snapshot = fixture.session.getSnapshot()
+    return kind === 'notes'
+      ? snapshot.midiNotePartitions.flatMap(({ notes }) => notes)
+      : snapshot.midiSustainPedalEventPartitions.flatMap(({ events }) => events)
+  }
+  return { ...fixture, keyboard, invoke, preferences, wrapper, markers, records }
+}
+
 beforeEach(() => {
   config.global.stubs.PianoRollPlayhead = true
   Reflect.set(
@@ -287,6 +363,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  for (const cleanup of menuFixtureCleanups.splice(0)) cleanup()
   Reflect.deleteProperty(config.global.stubs, 'PianoRollPlayhead')
   Reflect.deleteProperty(config.global.provide, PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol)
   vi.restoreAllMocks()
@@ -300,6 +377,181 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollSurface', () => {
+  it.each(['notes', 'sustain-pedal'] as const)(
+    'retargets repeated context requests within %s and restores that editing surface',
+    async (kind) => {
+      const fixture = mountSelectionMenuFixture(`context-repeat-${kind}`)
+      await nextTick()
+      const [first, second] = fixture.markers(kind)
+      if (first === undefined || second === undefined) throw new Error('Expected two markers')
+      await requestPianoRollContextMenu(first.element)
+      await requestPianoRollContextMenu(second.element)
+      await getPianoRollContextMenu().trigger('keydown', { key: 'Escape' })
+      await flushPromises()
+      const focusSurface = fixture.wrapper.get(
+        kind === 'notes' ? '.project-piano-roll' : '.piano-roll-sustain-pedal-lane',
+      )
+      expect(document.activeElement).toBe(focusSurface.element)
+      expect(fixture.keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(true)
+      expect(fixture.records(kind)).toHaveLength(1)
+    },
+  )
+
+  it('opens for a context request on the keyboard-focused Note region', async () => {
+    const fixture = mountSelectionMenuFixture('context-note-region')
+    await nextTick()
+    const marker = fixture.markers('notes')[0]
+    if (marker === undefined) throw new Error('Expected Note marker')
+    dispatchPointer(marker.element, 'pointerdown')
+    dispatchPointer(marker.element, 'pointerup')
+    const surface = fixture.wrapper.get('.project-piano-roll')
+    await requestPianoRollContextMenu(surface.element)
+    expect(getPianoRollContextMenuItem('Delete selection — Notes').exists()).toBe(true)
+  })
+
+  it('switches an open Note menu to CC64 without deleting the retained Note selection', async () => {
+    const fixture = mountSelectionMenuFixture('context-switch-kind')
+    await nextTick()
+    const note = fixture.markers('notes')[0]
+    const event = fixture.markers('sustain-pedal')[0]
+    if (note === undefined || event === undefined) throw new Error('Expected Note and CC64 markers')
+    await requestPianoRollContextMenu(note.element)
+    await requestPianoRollContextMenu(event.element)
+    await getPianoRollContextMenuItem('Delete selection — Sustain Pedal events').trigger('click')
+    await flushPromises()
+    expect(fixture.records('notes')).toHaveLength(2)
+    expect(note.classes()).toContain('sd-piano-roll-dom-note--selected')
+    expect(fixture.records('sustain-pedal')).toHaveLength(1)
+    expect(document.activeElement).toBe(
+      fixture.wrapper.get('.piano-roll-sustain-pedal-lane').element,
+    )
+  })
+
+  it.each(['notes', 'sustain-pedal'] as const)(
+    'right-clicking unselected %s replaces selection, and Clear only clears that target',
+    async (kind) => {
+      const fixture = mountSelectionMenuFixture(`context-select-${kind}`)
+      await nextTick()
+      const [first, second] = fixture.markers(kind)
+      if (first === undefined || second === undefined)
+        throw new Error('Expected two selection markers')
+      const selectedClass =
+        kind === 'notes'
+          ? 'sd-piano-roll-dom-note--selected'
+          : 'piano-roll-sustain-pedal-lane__event--selected'
+      dispatchPointer(first.element, 'pointerdown')
+      dispatchPointer(first.element, 'pointerup')
+      await nextTick()
+      expect(first.classes()).toContain(selectedClass)
+      const revision = fixture.session.modelRevision
+      // The secondary button must not begin a Pencil/Move gesture before contextmenu.
+      dispatchPointer(second.element, 'pointerdown', { button: 2 })
+      await requestPianoRollContextMenu(second.element)
+      expect(first.classes()).not.toContain(selectedClass)
+      expect(second.classes()).toContain(selectedClass)
+      expect(fixture.session.modelRevision).toBe(revision)
+      await getPianoRollContextMenuItem('Clear selection').trigger('click')
+      await flushPromises()
+      expect(fixture.invoke).toHaveBeenCalledWith(
+        STUDIO_ACTION.PIANO_ROLL_SELECTION_CLEAR,
+        'context-menu',
+      )
+      expect(second.classes()).not.toContain(selectedClass)
+      expect(fixture.session.modelRevision).toBe(revision)
+      expect(fixture.records(kind)).toHaveLength(2)
+      const background = fixture.wrapper.get(
+        kind === 'notes' ? '.project-piano-roll__canvas-host' : '.piano-roll-sustain-pedal-lane',
+      )
+      await requestPianoRollContextMenu(background.element)
+      expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    },
+  )
+
+  it.each(['notes', 'sustain-pedal'] as const)(
+    'preserves multi-selected %s on right-click and deletes the collection in one History step',
+    async (kind) => {
+      const fixture = mountSelectionMenuFixture(`context-remove-${kind}`)
+      await nextTick()
+      const [first, second] = fixture.markers(kind)
+      if (first === undefined || second === undefined)
+        throw new Error('Expected two selection markers')
+      dispatchPointer(first.element, 'pointerdown')
+      dispatchPointer(first.element, 'pointerup')
+      dispatchPointer(second.element, 'pointerdown', { shiftKey: true })
+      dispatchPointer(second.element, 'pointerup', { shiftKey: true })
+      await nextTick()
+      await requestPianoRollContextMenu(first.element)
+      const selectedClass =
+        kind === 'notes'
+          ? 'sd-piano-roll-dom-note--selected'
+          : 'piano-roll-sustain-pedal-lane__event--selected'
+      expect(first.classes()).toContain(selectedClass)
+      expect(second.classes()).toContain(selectedClass)
+      const revision = fixture.session.modelRevision
+      await getPianoRollContextMenuItem('Delete selection').trigger('click')
+      await flushPromises()
+      expect(fixture.invoke).toHaveBeenCalledWith(
+        STUDIO_ACTION.PIANO_ROLL_SELECTION_DELETE,
+        'context-menu',
+      )
+      expect(fixture.session.modelRevision).toBe(revision + 1)
+      expect(fixture.records(kind)).toEqual([])
+      expect(fixture.records(kind === 'notes' ? 'sustain-pedal' : 'notes')).toHaveLength(2)
+      fixture.session.undo()
+      expect(fixture.records(kind)).toHaveLength(2)
+      fixture.session.redo()
+      expect(fixture.records(kind)).toEqual([])
+    },
+  )
+
+  it('retires an open CC64 menu synchronously when the MIDI Channel changes', async () => {
+    const fixture = mountSelectionMenuFixture('context-channel')
+    await nextTick()
+    const marker = fixture.markers('sustain-pedal')[0]
+    if (marker === undefined) throw new Error('Expected CC64 marker')
+    await requestPianoRollContextMenu(marker.element)
+    const staleDelete = getPianoRollContextMenuItem('Delete selection')
+    const revision = fixture.session.modelRevision
+    fixture.preferences.selectSustainPedalChannel(parseMidiChannel(1))
+    await staleDelete.trigger('click')
+    await flushPromises()
+    expect(fixture.session.modelRevision).toBe(revision)
+    expect(fixture.invoke).not.toHaveBeenCalled()
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    expect(fixture.keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
+  })
+
+  it('closes the old menu when the same Clip surface receives another Session and Clip', async () => {
+    const fixture = mountSelectionMenuFixture('context-old-clip')
+    await nextTick()
+    const marker = fixture.markers('notes')[0]
+    if (marker === undefined) throw new Error('Expected Note marker')
+    await requestPianoRollContextMenu(marker.element)
+    const next = createInteractiveFixture('context-new-clip')
+    await fixture.wrapper.setProps({
+      presentation: next.presentation,
+      session: markRaw(next.session),
+    })
+    await flushPromises()
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    expect(fixture.records('notes')).toHaveLength(2)
+    expect(fixture.keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
+  })
+
+  it('does not open a selection menu during an active Note gesture', async () => {
+    const fixture = mountSelectionMenuFixture('context-active-gesture')
+    await nextTick()
+    const marker = fixture.markers('notes')[0]
+    if (marker === undefined) throw new Error('Expected Note marker')
+    dispatchPointer(marker.element, 'pointerdown')
+    const revision = fixture.session.modelRevision
+    await requestPianoRollContextMenu(marker.element)
+    expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
+    expect(fixture.keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
+    dispatchPointer(marker.element, 'pointerup')
+    expect(fixture.session.modelRevision).toBe(revision)
+  })
+
   it('composes Canvas Grid, keyed DOM Notes and the accessible read model', async () => {
     installSurfaceEnvironment()
 

@@ -1,151 +1,98 @@
 # Studio Keyboard Shortcut Architecture
 
-> Status: Implemented; Binding and Keymap refinement awaiting review
+> 状态：WA1 替换已实现并通过审核
 >
-> Date: 2026-07-28
+> Date: 2026-09-08
 >
 > Scope: `apps/studio`
 
-## 1. 目标
+## 1. 边界
 
-Studio 的快捷键系统需要统一解决：
-
-- 跨平台 `Mod` 语义与按键匹配；
-- Action ID、文案、Binding 和 enabled policy；
-- Modal、Focused Editor、Workbench 与 Global 的作用域优先级；
-- 输入控件、IME composing 与浏览器默认行为；
-- Feature 注册、卸载与应用释放；
-- 菜单、帮助面板和未来 Command Palette 可复用的 metadata。
-
-它不拥有 Project History、dirty、Selection 或任何 Project fact。快捷键只找到当前应该执行
-的 Action，业务结果仍由 Active Project、ProjectSession 或 Editor Session 决定。
-
-## 2. 第三方库决定
-
-固定使用 MIT 许可的 `@tanstack/hotkeys@0.8.0` 核心包，不使用 Vue Adapter：
-
-- 核心 `HotkeyManager` 已提供 `Mod`、按键解析、输入过滤、目标监听和显式 unregister；
-- Coordinator 由 Studio Composition Root 创建，不应绑定任意 Vue 组件的 composable 生命周期；
-- 当前库仍为 alpha，API 可能变化；生产代码只有 Browser Adapter 可以运行时导入它，
-  `studio-keyboard-binding.ts` 只导入其 `Hotkey` 类型约束内置配置；
-- `package.json` 使用精确版本，升级必须重新运行输入过滤、跨平台匹配、冲突和 cleanup 测试。
-
-官方依据：
-
-- [TanStack Hotkeys Overview](https://tanstack.com/hotkeys/latest/docs/overview)
-- [HotkeyManager API](https://tanstack.com/hotkeys/latest/docs/reference/classes/HotkeyManager)
-- [npm package](https://www.npmjs.com/package/@tanstack/hotkeys)
-
-## 3. 分层
+Keyboard 是 Action 的一个输入入口。应用级静态目录、当前操作目标、呈现状态与执行结果见
+[Studio Action Architecture](./studio-action-architecture.md)。旧的
+`StudioKeyboardShortcutCoordinator` 和 Feature 动态注册接口已移除。
 
 ```text
 KeyboardEvent
-  -> BrowserTanStackHotkeyRegistry
-     - parsing / Mod / editable filtering / listener cleanup
-  -> StudioKeyboardShortcutCoordinator
-     - Action identity / scope / enabled / handled policy
-  -> Feature Handler
-     - ActiveProjectService / ProjectSession / EditorSession
+  → BrowserTanStackHotkeyRegistry (matching / Mod / editable filtering)
+  → StudioKeyboardInputRouter (input ownership / scopes / keymap)
+  → StudioActionCoordinator (current capability / acceptance / completion)
+  → Current business target (Save / History / Playback / Editor)
 ```
 
-Browser Registry 是第三方兼容层，不知道 Save、Undo、Piano Roll 或 Modal。Coordinator
-不知道 TanStack 类型，也不进入 Pinia；它作为应用级命令能力通过类型化 Vue Context 注入。
+Browser Registry 不知道 Save、Piano Roll 或 Modal。Input Router 不执行 Command、不拥有业务
+busy 状态，也不把键盘焦点变成菜单 Action 的通用 enabled 条件。
 
-Binding 配置链为：
+## 2. 默认键位与平台边界
 
-```text
-compile-time Hotkey literal
-  -> StudioKeyboardBinding
-  -> STUDIO_DEFAULT_KEYMAP
-  -> Composition Root
-  -> Coordinator.bindingsFor(actionId)
-  -> Feature registration
-```
+默认 Binding 集中在 `studio-default-keymap.ts`。`StudioKeyboardBinding` 仍使用共享 Brand，
+内置配置由 `defineStudioKeyboardBinding()` 提供编译期 Hotkey 拼写检查；动态字符串通过
+Browser Adapter 的 Validation 后才成为 Binding。空 Binding 列表表示未分配快捷键，Action
+仍保留在目录中并可由菜单调用。
 
-页面不保存默认按键字面量。Composition Root 当前注入完整默认 Keymap；未来加载用户偏好后，
-可以在同一边界传入合并后的冻结 Keymap，而不修改 Feature。
+Composition Root 提供冻结 Keymap；Router 保存自己的不可变快照并提供平台化显示文案。
+页面不注册按键、不保存默认 Binding 字符串，也不因 Track / Clip 切换重建底层 Listener。
 
-## 4. Action 契约
+`@tanstack/hotkeys@0.8.0` 继续作为已有浏览器叶子 Adapter，未引入其 Vue composable。
+生产运行时导入仅限 `browser-tanstack-hotkey-registry.ts`；Binding 类型文件仅导入 Hotkey
+类型。升级需要重验平台匹配、输入过滤、标准化冲突和释放。
 
-每个注册 Action 必须定义：
+## 3. 输入所有权与冲突
 
-- 稳定 `actionId`；
-- 一个或多个 Binding；
-- label 与 description；
-- Scope；
-- 可选的动态 `isEnabled`；
-- 返回 `boolean` 的同步 `run`。
+优先级为：
 
-`run()` 返回 `true` 表示该 Action 已处理当前按键；异步业务可以在内部启动，但必须同步决定
-是否接受该意图。Coordinator 只在返回 `true` 后调用 `preventDefault()` 和
-`stopPropagation()`。
+1. 打开的 Reka Menu / Modal 接管输入，阻止后台 Action；没有匹配动作也不向后台穿透。
+2. 当前编辑交互（Interaction），例如 Escape 取消拖动。
+3. 聚焦编辑器（Editor），例如清空或删除选择。
+4. Workbench。
+5. Global（当前没有该作用域的 Action）。
 
-Metadata 以冻结快照公开，包含平台格式化后的 Binding，可供菜单和未来帮助面板使用；不公开
-Handler。
+导航确认的 pending 状态由 Composition Root 提供 Modal barrier；Project Menu 打开期间持有
+可嵌套的键盘暂停能力。Reka 继续负责菜单导航、Escape 关闭及焦点恢复。菜单显式选中 Save
+仍可调用同一 Action Handler。
 
-`StudioKeyboardBinding` 使用共享 `Brand<string, 'StudioKeyboardBinding'>` 定义项目自有的
-nominal identity。内置配置必须通过
-`defineStudioKeyboardBinding()` 编写，其泛型受 TanStack `Hotkey` 类型约束，因此拼写错误在
-Type Check 阶段失败；Coordinator、Feature 和 Context 不接受任意 `string`。
+每个物理键位仅注册一次。Browser Adapter 先用同一平台规则标准化 Binding，因此 macOS 上
+`Mod+S` 与 `Meta+S` 会被识别为同一物理组合。相同 Scope 的冲突在任何物理注册前拒绝；
+不同 Scope 可共用键位，例如两个含义独立的 Escape Action。若后续浏览器注册失败，回滚
+已创建的 Listener，不留下部分生效的键位表。
 
-## 5. Scope 与冲突
+分派时只有 `unavailable` 向低优先级 Scope 回退。接受调用或解析失败都会同步阻止浏览器
+默认行为及传播；业务随后成功、未应用或失败，由独立 Completion 表达，不再使用 boolean
+同时代表接管输入与业务成功。
 
-优先级固定为：
+每个按键只读取匹配作用域的上下文，编辑器焦点查询失败不会连带禁用 Workbench Save。
 
-1. Modal / Dialog：300；
-2. focused Piano Roll：200；
-3. Workbench：100；
-4. Global：0。
+## 4. 当前目录与绑定
 
-同一 Binding 可以在不同 Scope 注册。按键发生时从高到低查找 enabled Action；高优先级
-Handler 返回 `false` 时允许较低 Scope 接管。同一 Scope 的同一 Binding 不允许出现两个
-所有者，避免依赖注册顺序。
+| Action ID                       | 默认 Binding               | Scope       | 业务能力                                     |
+| ------------------------------- | -------------------------- | ----------- | -------------------------------------------- |
+| `project.save`                  | `Mod+S`                    | Workbench   | Ready、dirty 且不在 Saving                   |
+| `history.undo`                  | `Mod+Z`                    | Workbench   | Session 可以 Undo                            |
+| `history.redo`                  | `Mod+Shift+Z`、`Control+Y` | Workbench   | Session 可以 Redo                            |
+| `playback.toggle`               | `Space`                    | Workbench   | 当前项目有可播放计划且不在 Loading           |
+| `piano-roll.selection.delete`   | `Delete`、`Backspace`      | Editor      | 当前 Note 或 CC64 选择非空且没有进行中的手势 |
+| `piano-roll.selection.clear`    | `Escape`                   | Editor      | 当前选择非空且没有进行中的手势               |
+| `piano-roll.interaction.cancel` | `Escape`                   | Interaction | 当前编辑目标有进行中的手势                   |
 
-Action ID 在应用中唯一。Feature 注册返回幂等 disposer；最后一个 Action 离开某个 Binding
-后才卸载底层浏览器 Listener。
+`piano-roll.notes.remove` 被语义准确的 `piano-roll.selection.delete` 替代，旧 ID 没有持久化
+消费者。Cancel Interaction 不清空选择，Clear Selection 不兼任取消。Track 音符区域聚焦时，
+不能删除之前选中的 CC64 事件；通过 Tab 聚焦回 Lane 后才恢复该目标的键盘操作。
 
-## 6. 浏览器事件规则
+## 5. 浏览器事件与生命周期
 
-- 第三方 Adapter 强制 `ignoreInputs: true`，包括 `Mod` 和 `Escape`；
-- `isComposing` 或 legacy keyCode 229 不进入 Action；
-- 已被更高层处理的 `defaultPrevented` Event 不再分派；
-- TanStack 的默认 `preventDefault` / `stopPropagation` 被关闭；
-- enabled check 或 Handler failure 不落到更低 Scope，也不逃逸进浏览器事件循环；
-- Composition Root dispose 必须释放 Coordinator；Feature unmount 必须调用自己的 disposer。
+- `Mod` 在 macOS 对应 Command，在 Windows / Linux 对应 Control。
+- Adapter 强制 `ignoreInputs: true`，包括带 Mod 的组合和 Escape。
+- `isComposing`、legacy keyCode 229、已被处理的 `defaultPrevented` Event 不进入 Action。
+- TanStack 默认 `preventDefault` / `stopPropagation` 关闭，由 Router 在接管时决定。
+- 单个 Handler 出错不破坏其他 Action；根级诊断接收器必须接入。
+- Feature 卸载只释放自己的目标；应用释放才卸载整个物理键位表。
+- 目标替换和应用释放结束挂起的 Action 等待，不回滚 Project Commit。
 
-### 6.1 动态用户输入
+## 6. 后续范围
 
-未来 Settings 输入是运行时字符串，不能伪装成编译期 Binding：
+本批没有用户 Keymap 持久化、Settings、Recorder、多键 Sequence 或 Command Palette。已存在
+动态 Binding 验证边界；未来 Settings 必须在字段旁显示无效输入并保留原值，不能把原始
+字符串断言为合法 Binding。损坏持久化覆盖的回退策略留给真正的 V1B 保存/加载切片实现。
 
-1. UI 调用 Coordinator 的 `validateBindingInput()`；
-2. Browser Adapter 返回项目自有的冻结 Validation，包括 errors、warnings 和可选 Binding；
-3. 无效输入在当前字段旁显示，不保存、不替换默认值，也不进入注册流程；
-4. 有效 Binding 才进入用户覆盖 Keymap；
-5. 加载到损坏或已不兼容的持久化覆盖时，回退对应默认 Binding，并在 Settings 中提示。
-
-注册阶段的内置 Keymap 错误属于开发配置错误，应由类型检查或启动失败尽早暴露，不使用 Toast
-掩盖；用户可修正的输入错误则必须在未来 Keymap Settings 面板内提供行内反馈。
-
-## 7. 首批 Action
-
-| Action ID                    | Binding                    | Scope      | 当前 enabled 条件                            |
-| ---------------------------- | -------------------------- | ---------- | -------------------------------------------- |
-| `project.save`               | `Mod+S`                    | Workbench  | Ready、dirty 且不在 Saving                   |
-| `history.undo`               | `Mod+Z`                    | Workbench  | 当前 Session 可以 Undo                       |
-| `history.redo`               | `Mod+Shift+Z`、`Control+Y` | Workbench  | 当前 Session 可以 Redo                       |
-| `piano-roll.selection.clear` | `Escape`                   | Piano Roll | 下一批：Piano Roll focused 且 Selection 非空 |
-
-Piano Roll Action ID 和 Scope 已稳定，但本批不注册一个没有 Editor Session 权威的空 Handler。
-它与可见 Selection 一起在第三阶段 Batch 4 接入。
-
-## 8. 暂不实现
-
-- 用户自定义 Keymap 与持久化；
-- Shortcut Recorder；
-- 多键 Sequence；
-- Shortcut Settings 或 Command Palette；
-- 组件内直接使用 TanStack Vue composable；
-- 用 Pinia 保存注册表、Handler 或浏览器 Listener。
-
-当前已建立默认 Keymap、动态输入验证结果和注入边界，但尚未提供用户可见的 Keymap Settings
-面板或持久化覆盖。
+Workbench 其他菜单和按钮的统一调用在 WA2；右键菜单及其选择语义在 WA3。批次状态见
+[Workbench Action Catalogue V1 phase plan](./workbench-action-catalogue-v1-phase-plan.md)。

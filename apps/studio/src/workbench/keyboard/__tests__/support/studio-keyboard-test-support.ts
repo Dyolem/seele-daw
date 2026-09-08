@@ -1,7 +1,7 @@
 import type {
   StudioKeyboardBindingRegistry,
-  StudioKeyboardShortcutDispose,
-} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+  StudioKeyboardDispose,
+} from '@/workbench/keyboard/studio-keyboard-binding-registry'
 import type {
   StudioKeyboardBinding,
   StudioKeyboardBindingValidation,
@@ -30,10 +30,14 @@ export class TestStudioKeyboardBindingRegistry implements StudioKeyboardBindingR
     return `display:${binding}`
   }
 
+  identity(binding: StudioKeyboardBinding): string {
+    return binding
+  }
+
   register(
     binding: StudioKeyboardBinding,
     listener: (event: KeyboardEvent) => void,
-  ): StudioKeyboardShortcutDispose {
+  ): StudioKeyboardDispose {
     if (this.listeners.has(binding)) {
       throw new Error(`Duplicate test keyboard binding: ${binding}`)
     }

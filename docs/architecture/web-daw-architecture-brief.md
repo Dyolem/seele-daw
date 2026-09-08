@@ -94,7 +94,11 @@ Vue、Canvas、AudioNode、Selection、播放头和波形缓存都不是项目�
 
 UI 组件不直接修改项目。Undo、Autosave、播放同步都以一次 Project Commit 为边界。
 
-Workbench Command 是菜单、按钮和快捷键使用的命令 ID；它的 handler 解析当前 Selection 后，再调用参数完整的 Project Command。
+Studio Action 是菜单、按钮和快捷键使用的用户意图与稳定 ID（旧文中的 Workbench Command）。
+应用装配静态目录，页面绑定当前业务目标；Handler 解析目标后调用既有业务权威，需要写入事实时
+才调用参数完整的 Project Command。键盘输入所有权、Action 接受调用、业务完成是独立边界。
+Save 三入口和既有快捷键已在 WA1 接入，其他菜单／按钮仍待迁移。详见
+[Studio Action Architecture](../../apps/studio/docs/studio-action-architecture.md)。
 
 ## 3. 编辑与播放是项目的两个消费者
 

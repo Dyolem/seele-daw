@@ -871,7 +871,11 @@ type EditorInput =
     }
 ```
 
-快捷键解析根据 focused surface、文本输入焦点和 modal scope 生成 EditorIntent。组件不得自行实现一套删除、复制或拖拽语义。
+快捷键输入根据 focused surface、文本输入焦点和 modal scope 确定输入所有权。当前 Studio
+WA1 的离散操作通过应用级 Action 目录调用当前业务目标；Action 不是 Project Command，也不
+要求保存、导航等工作台操作生成 EditorIntent。Pointer 编辑继续经过既有 Editor Input / Intent
+链路。组件不得自行实现一套平行的删除、复制或拖拽语义。当前实现见
+[Studio Action Architecture](../../apps/studio/docs/studio-action-architecture.md)。
 
 ## 25. Surface、坐标与 Hit Test
 

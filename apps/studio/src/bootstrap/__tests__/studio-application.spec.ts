@@ -15,9 +15,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import { composeStudioApplication } from '@/bootstrap/studio-application'
 import {
-  useStudioKeyboardShortcuts,
-  type StudioKeyboardShortcutVueContext,
-} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+  useStudioActions,
+  type StudioActionVueContext,
+} from '@/workbench/actions/vue/studio-action-context'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import { decodeMidiProgramPlaceholderDeviceState } from '@/workbench/instrument/midi-import-instrument-policy'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -213,11 +213,9 @@ function requireProjectMidiImportContext(
   return context
 }
 
-function requireKeyboardShortcutContext(
-  context: StudioKeyboardShortcutVueContext | null,
-): StudioKeyboardShortcutVueContext {
+function requireActionContext(context: StudioActionVueContext | null): StudioActionVueContext {
   if (context === null) {
-    throw new Error('Expected the Studio Keyboard Shortcut Context')
+    throw new Error('Expected the Studio Action Context')
   }
   return context
 }
@@ -256,7 +254,7 @@ describe('StudioApplication', () => {
     let projectMidiImportContext: ProjectMidiImportVueContext | null = null
     let projectMidiNoteContext: ProjectMidiNoteVueContext | null = null
     let projectTrackContext: ProjectTrackVueContext | null = null
-    let keyboardShortcutContext: StudioKeyboardShortcutVueContext | null = null
+    let actionContext: StudioActionVueContext | null = null
     let projectPlaybackContext: ProjectPlaybackVueContext | null = null
     const rootComponent = defineComponent({
       setup() {
@@ -266,7 +264,7 @@ describe('StudioApplication', () => {
         projectMidiImportContext = useProjectMidiImport()
         projectMidiNoteContext = useProjectMidiNotes()
         projectTrackContext = useProjectTracks()
-        keyboardShortcutContext = useStudioKeyboardShortcuts()
+        actionContext = useStudioActions()
         projectPlaybackContext = useProjectPlayback()
         const projectNavigationDecision = useProjectNavigationDecision()
         const installedRouter = useRouter()
@@ -305,9 +303,7 @@ describe('StudioApplication', () => {
     expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(
       true,
     )
-    expect(
-      requireKeyboardShortcutContext(keyboardShortcutContext).keyboardShortcuts.listShortcuts(),
-    ).toEqual([])
+    expect(requireActionContext(actionContext).actions.catalogue).toHaveLength(7)
     expect(requireProjectPlaybackContext(projectPlaybackContext).state.value.phase).toBe(
       'unavailable',
     )

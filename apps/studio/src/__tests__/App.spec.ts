@@ -14,13 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import App from '@/App.vue'
 import { createStudioRouter } from '@/router'
 import { createProjectWorkspaceLocation, PROJECT_ROUTE_NAME } from '@/router/project-routes'
-import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
-import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
-import {
-  STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
-  type StudioKeyboardShortcutVueContext,
-} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
@@ -162,15 +156,6 @@ function createProjectClipContext(): ProjectClipVueContext {
   })
 }
 
-function createKeyboardShortcutContext(): StudioKeyboardShortcutVueContext {
-  return Object.freeze({
-    keyboardShortcuts: createStudioKeyboardShortcutCoordinator({
-      bindingRegistry: new TestStudioKeyboardBindingRegistry(),
-      keymap: STUDIO_DEFAULT_KEYMAP,
-    }),
-  })
-}
-
 function createProjectPlaybackContext(): ProjectPlaybackVueContext {
   const state = shallowRef<ProjectPlaybackState>(
     Object.freeze({
@@ -244,7 +229,7 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
           }),
         }),
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: createProjectTrackContext(),
-        [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: createKeyboardShortcutContext(),
+        ...createTestStudioActionRuntime().provide,
       },
     },
   })

@@ -3,20 +3,15 @@
 应用外壳、服务装配、命令、上下文、生命周期和 Contribution 注册放在这里。只有 Studio 的
 Composition Root 可以知道并装配全部领域包与浏览器实现。
 
-当前应用级能力还包括 `StudioKeyboardShortcutCoordinator`：
+当前应用级操作能力由两个边界组成：
 
-- Composition Root 创建唯一实例，并通过类型化 Context 提供；
-- Action ID、Scope、enabled 和 handled policy 属于 Studio；
-- `@tanstack/hotkeys@0.8.0` 仅隐藏在 Browser Binding Registry 中；
-- Feature 注册必须返回 disposer，应用释放时 Coordinator 再统一兜底清理；
-- Handler 只调用既有应用能力，不把 ProjectSession、Selection 或 dirty 权威复制进快捷键
-  注册表。
-- Feature 只按 Action ID 从 Coordinator 获取 Binding；默认值集中在
-  `STUDIO_DEFAULT_KEYMAP`，不在组件内散落按键字面量；
-- 动态用户字符串必须先取得 Validation 结果，有效后才能成为 branded
-  `StudioKeyboardBinding`。
+- `StudioActionCoordinator` 拥有静态目录、当前能力解析、调用接受与完成结果；
+- `StudioKeyboardInputRouter` 拥有键位、输入上下文和物理 Listener 生命周期；
+- Composition Root 装配 Feature Action 定义；页面和编辑器只提供临时业务目标；
+- 菜单、按钮和快捷键通过同一个 Action 调用业务权威，当前 Save 纵向切片已完成；
+- Pinia 不保存 Handler、目标能力、pending resolver 或底层业务对象。
 
-完整规则见
+详见 [Studio Action Architecture](../../docs/studio-action-architecture.md) 和
 [Studio Keyboard Shortcut Architecture](../../docs/studio-keyboard-shortcut-architecture.md)。
 
 当前应用级能力还包括 `ProjectPlaybackCoordinator`：

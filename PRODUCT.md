@@ -424,27 +424,32 @@ Track Cursor 的完整 Note 编辑也尚未接入。
 - `Mod+Shift+Z`：当前 Session 可以 Redo 时执行 Redo；
 - `Control+Y`：兼容 Windows 常用 Redo Binding。
 - `Space`：当前计划可播放且没有导航 Modal 时 Play / Pause；Loading 期间不重复触发。
-- `Escape`：Piano Roll 正在拖动 Note 时取消本次 Move；否则在存在 Note Selection 时清空
-  Selection。
-- `Delete` / `Backspace`：Piano Roll 聚焦且存在 Note Selection 时原子删除完整
-  Selection。
+- `Escape`：先取消当前 Note / CC64 手势并保留选择；没有进行中的手势时清空当前选择。
+- `Delete` / `Backspace`：当前聚焦的 Note / CC64 选择非空且没有进行中的手势时，以一个
+  集合 Command 原子删除选择，形成一个 History 步骤。
 
 产品规则：
 
 - `Mod` 在 macOS 对应 Command，在 Windows / Linux 对应 Control；
 - Action 不可用时不执行，也不伪造业务结果；
 - 普通 Input、Textarea、Select、Contenteditable 和 IME composing 默认不触发编辑快捷键；
-- Scope 优先级为 Modal / Dialog → focused Piano Roll → Workbench → Global；
-- 只有 enabled Action 实际处理时才阻止浏览器默认行为；
-- Feature 离开时卸载自己的 Action，应用释放时统一清理剩余 Listener；
-- 快捷键只调用现有 Save / History 权威，不保存 ProjectSession、dirty 或 History 副本。
-- Feature 根据 Action ID 读取集中式默认 Keymap，不在页面组件中散落 Binding 字符串。
+- 打开的 Menu / Modal 接管输入；后台优先级为当前编辑交互 → 聚焦编辑器 → Workbench → Global；
+- 接受调用后立即阻止浏览器默认行为，业务成功、未应用或失败由完成结果独立表达；
+- Action 目录与物理键位在应用装配时建立，页面切换只替换当前目标；旧组件的延迟清理不能
+  释放新目标，应用释放才卸载全部 Listener；
+- 快捷键调用现有 Save / History / Playback / Editor 权威，不保存它们的状态副本；
+- Track 音符区域聚焦时不能删除旧的 CC64 选择；通过键盘聚焦回 Lane 后恢复 CC64 操作。
 
-当前没有用户 Keymap、Shortcut Settings、Sequence 或 Command Palette。
+Workbench Action Catalogue WA1 已实现并通过审核：Save 菜单、Save 按钮和 `Mod+S` 调用同一个
+`project.save` Handler，读取同一份可用、保存中、重试名称和禁用原因；菜单显示平台化快捷键。
+Action 可以没有 Binding，未分配快捷键不影响菜单调用。既有其他快捷键已迁移到同一目录，
+其他 Workbench 菜单／按钮迁移属于 WA2。右键菜单及右键选择语义尚未实现或确认。
 
-用户 Keymap 的输入验证边界已经就绪，但可见设置面板尚未实现。未来无效输入必须在字段旁
-显示错误并保留原 Binding；损坏或不兼容的持久化覆盖应回退默认值，不能让错误延迟到 Feature
-注册时才以应用启动失败暴露。
+当前没有用户 Keymap、Shortcut Settings、Recorder、Sequence 或 Command Palette。动态输入
+验证边界已经就绪，持久化和损坏覆盖的回退策略需随实际 V1B 切片实现。
+
+术语和状态所有权见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)，
+输入策略见 [Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
 
 ### 5.5 `PLAYBACK` 播放与播放中编辑
 

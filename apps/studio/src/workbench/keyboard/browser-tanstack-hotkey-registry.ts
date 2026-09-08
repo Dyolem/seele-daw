@@ -1,6 +1,7 @@
 import {
   formatForDisplay,
   getHotkeyManager,
+  normalizeHotkey,
   validateHotkey,
   type Hotkey,
   type HotkeyManager,
@@ -14,8 +15,8 @@ import type {
 } from '@/workbench/keyboard/studio-keyboard-binding'
 import type {
   StudioKeyboardBindingRegistry,
-  StudioKeyboardShortcutDispose,
-} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
+  StudioKeyboardDispose,
+} from '@/workbench/keyboard/studio-keyboard-binding-registry'
 
 export type StudioKeyboardPlatform = 'linux' | 'mac' | 'windows'
 
@@ -69,15 +70,19 @@ class BrowserTanStackHotkeyRegistry implements StudioKeyboardBindingRegistry {
     })
   }
 
+  identity(binding: StudioKeyboardBinding): string {
+    return normalizeHotkey(binding as Hotkey, this.#platform)
+  }
+
   register(
     binding: StudioKeyboardBinding,
     listener: (event: KeyboardEvent) => void,
-  ): StudioKeyboardShortcutDispose {
+  ): StudioKeyboardDispose {
     const handle = this.#manager.register(binding as Hotkey, (event) => listener(event), {
       conflictBehavior: 'error',
       ignoreInputs: true,
       platform: this.#platform,
-      // The Coordinator prevents only after an enabled Action reports handled.
+      // The input router prevents only after an Action accepts the invocation.
       preventDefault: false,
       stopPropagation: false,
       target: this.#target,

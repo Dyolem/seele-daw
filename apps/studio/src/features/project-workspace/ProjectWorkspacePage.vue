@@ -16,7 +16,7 @@ import {
   AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
   deriveAudibleMidiTimelineRange,
 } from '@seele-daw/playback'
-import { computed, onUnmounted, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onUnmounted, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
@@ -45,15 +45,10 @@ import {
 } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import {
-  ACTIVE_PROJECT_PHASE,
-  ACTIVE_PROJECT_SAVE_STATUS,
-} from '@/workbench/project/active-project-state'
-import {
-  STUDIO_KEYBOARD_ACTION,
-  STUDIO_KEYBOARD_SCOPE,
-} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import { useStudioKeyboardShortcuts } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
+import { STUDIO_ACTION, type StudioActionSource } from '@/workbench/actions/studio-action'
+import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
+import { useProjectWorkbenchActionTarget } from '@/features/project-workspace/actions/project-workbench-action-context'
 import { createProjectClipBarRange } from '@/workbench/project/clip/project-clip-bar-range'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -65,7 +60,6 @@ import {
   reportProjectMidiTrackImportSuccess,
 } from '@/workbench/project/midi-import/project-midi-import-feedback'
 import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
-import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
@@ -100,8 +94,8 @@ const { activeProject, state } = useActiveProject()
 const { projectEntry } = useProjectEntry()
 const { projectMidiImport } = useProjectMidiImport()
 const { projectTempoEvents } = useProjectTempoEvents()
-const projectNavigationDecision = useProjectNavigationDecision()
-const { keyboardShortcuts } = useStudioKeyboardShortcuts()
+const { actions, keyboard } = useStudioActions()
+const workbenchActionTarget = useProjectWorkbenchActionTarget()
 const {
   projectPlayback,
   state: playbackState,
@@ -329,17 +323,8 @@ async function importSelectedMidiFile(): Promise<void> {
   }
 }
 
-async function saveProject(): Promise<void> {
-  try {
-    await activeProject.save()
-  } catch {
-    // ActiveProjectService publishes the failed save state consumed by the Workbench.
-  }
-}
-
-function canSaveProject(): boolean {
-  const ready = readyProject.value
-  return ready !== null && ready.isDirty && ready.saveStatus !== ACTIVE_PROJECT_SAVE_STATUS.SAVING
+function saveProject(source: StudioActionSource): void {
+  actions.invoke(STUDIO_ACTION.PROJECT_SAVE, source)
 }
 
 function undoProject(): boolean {
@@ -494,49 +479,33 @@ function describeSaveFailure(saveFailure: unknown): string | null {
   return saveFailure === null ? null : 'The project could not be saved.'
 }
 
-const disposeKeyboardShortcuts = keyboardShortcuts.register([
-  {
-    actionId: STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE,
-    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PLAYBACK_TOGGLE),
-    description: 'Play or pause the active Project.',
-    isEnabled: () =>
-      playbackCanToggle.value && projectNavigationDecision.pendingDecision.value === null,
-    label: 'Play or pause',
-    run: () => projectPlayback.togglePlayPause(),
-    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
+let releaseActionTarget: (() => void) | null = null
+const stopActionTarget = watch(
+  () => readyProject.value?.session ?? null,
+  (session) => {
+    releaseActionTarget?.()
+    releaseActionTarget = null
+    if (session === null) return
+    releaseActionTarget = workbenchActionTarget.bind({
+      getReadyProject: () => readyProject.value,
+      getPlaybackState: () => playbackState.value,
+      playback: projectPlayback,
+      save: () => activeProject.save(),
+    })
   },
-  {
-    actionId: STUDIO_KEYBOARD_ACTION.PROJECT_SAVE,
-    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PROJECT_SAVE),
-    description: 'Save the active local project.',
-    isEnabled: canSaveProject,
-    label: 'Save project',
-    run: () => {
-      if (!canSaveProject()) return false
-      void saveProject()
-      return true
-    },
-    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
-  },
-  {
-    actionId: STUDIO_KEYBOARD_ACTION.HISTORY_UNDO,
-    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.HISTORY_UNDO),
-    description: 'Undo the latest committed project edit.',
-    isEnabled: () => readyProject.value?.session.canUndo === true,
-    label: 'Undo',
-    run: undoProject,
-    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
-  },
-  {
-    actionId: STUDIO_KEYBOARD_ACTION.HISTORY_REDO,
-    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.HISTORY_REDO),
-    description: 'Redo the latest undone project edit.',
-    isEnabled: () => readyProject.value?.session.canRedo === true,
-    label: 'Redo',
-    run: redoProject,
-    scope: STUDIO_KEYBOARD_SCOPE.WORKBENCH,
-  },
-])
+  { immediate: true, flush: 'sync' },
+)
+const saveAction = computed(() => {
+  // The target's business refs are the reactive source; target slots own only identity.
+  void readyProject.value
+  return actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE)
+})
+const saveShortcut = keyboard.displayBindingsFor(STUDIO_ACTION.PROJECT_SAVE).join(' / ')
+onBeforeUnmount(() => {
+  stopActionTarget()
+  releaseActionTarget?.()
+  releaseActionTarget = null
+})
 
 watch(
   () => {
@@ -626,7 +595,6 @@ onUnmounted(() => {
   if (playbackCanReturnToLastStartPosition.value) {
     projectPlayback.returnToLastStartPosition()
   }
-  disposeKeyboardShortcuts()
   isUnmounted = true
   requestGeneration += 1
   midiImportGeneration += 1
@@ -667,6 +635,8 @@ onUnmounted(() => {
     :project-session="readyProject.session"
     :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
     :save-status="readyProject.saveStatus"
+    :save-action="saveAction"
+    :save-shortcut="saveShortcut"
     :selected-tempo-event-id="selectedTempoEventId"
     :tempo-display-bpm="tempoControlPresentation.displayBpm"
     :tempo-editing-disabled="tempoEditingDisabled"

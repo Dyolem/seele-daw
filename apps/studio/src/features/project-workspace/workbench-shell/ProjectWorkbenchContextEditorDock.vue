@@ -275,6 +275,7 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
           "
           :bar-span-tick="props.barSpanTick"
           :presentation="props.pianoRollTrackPresentation"
+          :session="props.projectSession"
           :timeline-end-tick="props.timelineEndTick"
           :time-signature-numerator="props.timeSignatureNumerator"
         />

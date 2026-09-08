@@ -33,13 +33,7 @@ import {
   type ReadyProjectPianoRollPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
-import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
-import {
-  STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
-  type StudioKeyboardShortcutVueContext,
-} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import type {
   AddMidiNoteInput,
   MoveMidiNotesInput,
@@ -272,18 +266,6 @@ function installPointerCapture(): void {
   })
 }
 
-function createKeyboardFixture() {
-  const bindingRegistry = new TestStudioKeyboardBindingRegistry()
-  const keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
-    bindingRegistry,
-    keymap: STUDIO_DEFAULT_KEYMAP,
-  })
-  const context: StudioKeyboardShortcutVueContext = Object.freeze({
-    keyboardShortcuts,
-  })
-  return { bindingRegistry, context, keyboardShortcuts }
-}
-
 function restorePrototypeProperty(
   property: keyof typeof ORIGINAL_POINTER_CAPTURE_DESCRIPTORS,
 ): void {
@@ -357,7 +339,7 @@ describe('ProjectPianoRollSurface', () => {
       query: query as unknown as ProjectSession['query'],
       subscribe: subscribe as unknown as ProjectSession['subscribe'],
     }
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const addMidiNote = vi.fn<ProjectMidiNoteCoordinator['addMidiNote']>(() => {
       throw new Error('The Cursor test must not add a MIDI Note')
     })
@@ -396,7 +378,7 @@ describe('ProjectPianoRollSurface', () => {
         plugins: [pinia],
         provide: {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -479,10 +461,10 @@ describe('ProjectPianoRollSurface', () => {
     wrapper.unmount()
     expect(unsubscribers).toHaveLength(4)
     expect(unsubscribers.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
-    expect(keyboard.bindingRegistry.listeners.has('Escape')).toBe(false)
+    expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(false)
     expect(addMidiNote).not.toHaveBeenCalled()
     expect(removeMidiNotes).not.toHaveBeenCalled()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('previews and commits a selected Note move as one Project revision', async () => {
@@ -502,7 +484,7 @@ describe('ProjectPianoRollSurface', () => {
         requestedDurationTick: parsePositiveTick(240),
       }).noteId,
     ]
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const preferences = usePianoRollPreferencesStore(pinia)
     preferences.activateTool(PIANO_ROLL_TOOL.CURSOR)
@@ -520,7 +502,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: fixture.projectMidiNotes,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -606,7 +588,7 @@ describe('ProjectPianoRollSurface', () => {
     ])
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('cancels an active Note move with Escape without writing the Project', async () => {
@@ -618,7 +600,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     }).noteId
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
     const wrapper = mount(ProjectPianoRollSurface, {
@@ -635,7 +617,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: fixture.projectMidiNotes,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -673,7 +655,7 @@ describe('ProjectPianoRollSurface', () => {
     ).toMatchObject({ pitch: 60, startTick: 960 })
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('updates the Note move Snap preview when Alt changes during the gesture', async () => {
@@ -685,7 +667,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     }).noteId
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
     const wrapper = mount(ProjectPianoRollSurface, {
@@ -702,7 +684,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: fixture.projectMidiNotes,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -740,7 +722,7 @@ describe('ProjectPianoRollSurface', () => {
     expect(fixture.session.modelRevision).toBe(revisionBeforeMove)
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('cancels an active Note move on Window blur without committing Pointer Up', async () => {
@@ -752,7 +734,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     }).noteId
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
     const wrapper = mount(ProjectPianoRollSurface, {
@@ -769,7 +751,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: fixture.projectMidiNotes,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -803,7 +785,7 @@ describe('ProjectPianoRollSurface', () => {
     expect(wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe('false')
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('previews and commits a Pencil right-edge Resize as one Project revision', async () => {
@@ -815,7 +797,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     }).noteId
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const preferences = usePianoRollPreferencesStore(pinia)
     const wrapper = mount(ProjectPianoRollSurface, {
@@ -832,7 +814,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: fixture.projectMidiNotes,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -893,7 +875,7 @@ describe('ProjectPianoRollSurface', () => {
     ).toMatchObject({ durationTick: 240, startTick: 960 })
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('preserves Project, Selection and Cursor when a left-edge Resize is rejected', async () => {
@@ -905,7 +887,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     }).noteId
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const preferences = usePianoRollPreferencesStore(pinia)
     const toasts = useUiToastStore(pinia)
@@ -935,7 +917,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: rejectedCoordinator,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -994,13 +976,13 @@ describe('ProjectPianoRollSurface', () => {
     })
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('adds one snapped Note with Pencil, selects it and follows Project history', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-pencil')
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
@@ -1016,7 +998,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: fixture.projectMidiNotes,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -1118,13 +1100,13 @@ describe('ProjectPianoRollSurface', () => {
     expect(wrapper.text()).toContain('1 selected')
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('adds one snapped CC64 event in Clip Scope and exposes its raw terminal-aware marker', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-sustain-pedal')
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
       props: {
@@ -1142,7 +1124,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiSustainPedal: fixture.projectMidiSustainPedal,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -1191,7 +1173,7 @@ describe('ProjectPianoRollSurface', () => {
     ).toEqual([])
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('moves, replaces and removes one selected CC64 event through focused Studio actions', async () => {
@@ -1217,7 +1199,7 @@ describe('ProjectPianoRollSurface', () => {
     if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
       throw new Error('Expected editable Sustain Pedal presentation')
     }
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
     const wrapper = mount(ProjectPianoRollSurface, {
@@ -1237,7 +1219,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiSustainPedal: fixture.projectMidiSustainPedal,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -1365,7 +1347,7 @@ describe('ProjectPianoRollSurface', () => {
     })
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('removes a multi-Note selection as one focused keyboard Action and History step', async () => {
@@ -1385,7 +1367,7 @@ describe('ProjectPianoRollSurface', () => {
         requestedDurationTick: parsePositiveTick(240),
       }).noteId,
     ]
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
     const wrapper = mount(ProjectPianoRollSurface, {
@@ -1402,7 +1384,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: fixture.projectMidiNotes,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -1457,9 +1439,9 @@ describe('ProjectPianoRollSurface', () => {
     )
 
     wrapper.unmount()
-    expect(keyboard.bindingRegistry.listeners.has('Backspace')).toBe(false)
-    expect(keyboard.bindingRegistry.listeners.has('Delete')).toBe(false)
-    keyboard.keyboardShortcuts.dispose()
+    expect(keyboard.bindingRegistry.dispatch('Backspace').defaultPrevented).toBe(false)
+    expect(keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
+    keyboard.runtime.dispose()
   })
 
   it('keeps the selection and reports a handled failure when Note removal is rejected', async () => {
@@ -1471,7 +1453,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     })
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const toasts = useUiToastStore(pinia)
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
@@ -1500,7 +1482,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: rejectedCoordinator,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -1526,7 +1508,7 @@ describe('ProjectPianoRollSurface', () => {
     })
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('keeps selection and reports a visible failure when Pencil creation is rejected', async () => {
@@ -1538,7 +1520,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     })
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const toasts = useUiToastStore(pinia)
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
@@ -1568,7 +1550,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: rejectedCoordinator,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -1607,13 +1589,13 @@ describe('ProjectPianoRollSurface', () => {
     ).toHaveLength(1)
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 
   it('distinguishes a committed Note from a later selection failure', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-selection-failure')
-    const keyboard = createKeyboardFixture()
+    const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const toasts = useUiToastStore(pinia)
     const selectionFailureCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
@@ -1646,7 +1628,7 @@ describe('ProjectPianoRollSurface', () => {
           [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
             projectMidiNotes: selectionFailureCoordinator,
           }),
-          [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
+          ...keyboard.provide,
         },
       },
     })
@@ -1676,6 +1658,6 @@ describe('ProjectPianoRollSurface', () => {
     })
 
     wrapper.unmount()
-    keyboard.keyboardShortcuts.dispose()
+    keyboard.runtime.dispose()
   })
 })

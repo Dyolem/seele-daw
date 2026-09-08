@@ -96,7 +96,9 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
 - 使用精确版本，不使用范围版本；
 - 第三方库只负责 Key parsing、跨平台 `Mod`、target、input filtering、注册和 cleanup；
 - Seele DAW 自己拥有 Action ID、Scope priority、enabled policy 和 Handler；
-- 通过 `StudioKeyboardShortcutCoordinator` 包装，不在组件中散布第三方 composable；
+- 通过 Studio 应用级 Action / Keyboard 边界调用，不在组件中散布第三方 composable；
+  当前 WA1 已以静态 Action 目录和目标绑定替代旧 Keyboard Coordinator 动态注册，见
+  [Studio Action Architecture](../../../apps/studio/docs/studio-action-architecture.md)；
 - Scope 优先级为 Modal / Dialog → focused Piano Roll → Workbench → Global；
 - IME composing 和普通可编辑元素默认不触发编辑快捷键；
 - 只有 Action 实际处理时才 `preventDefault`；

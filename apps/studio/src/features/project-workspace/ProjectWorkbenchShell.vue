@@ -22,6 +22,10 @@ import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-sh
 import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
+import type {
+  StudioActionPresentation,
+  StudioActionSource,
+} from '@/workbench/actions/studio-action'
 import type { ActiveProjectSaveStatus } from '@/workbench/project/active-project-state'
 
 interface ProjectWorkbenchShellProps {
@@ -42,6 +46,8 @@ interface ProjectWorkbenchShellProps {
   readonly projectName: string
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly saveFailureMessage?: string | null
+  readonly saveAction: StudioActionPresentation
+  readonly saveShortcut: string
   readonly saveStatus: ActiveProjectSaveStatus
   readonly selectedTempoEventId?: TempoEventId | null
   readonly tempoDisplayBpm: string
@@ -69,7 +75,7 @@ const emit = defineEmits<{
   playbackReturnToLastStartPosition: []
   playbackToggle: []
   redo: []
-  save: []
+  save: [source: StudioActionSource]
   tempoCommit: [input: string]
   tempoEditStart: []
   tempoEventAdd: [bpm: TempoBpm, tick: Tick]
@@ -98,11 +104,13 @@ function openContextEditor(): void {
       :project-name="props.projectName"
       :save-failure-message="props.saveFailureMessage"
       :save-status="props.saveStatus"
+      :save-action="props.saveAction"
+      :save-shortcut="props.saveShortcut"
       @leave-project="emit('leaveProject')"
       @import-midi-as-new-project="emit('importMidiAsNewProject')"
       @import-midi-as-new-tracks="emit('importMidiAsNewTracks')"
       @open-context-editor="openContextEditor"
-      @save="emit('save')"
+      @save="emit('save', $event)"
     />
 
     <ProjectWorkbenchTransport

@@ -11,10 +11,12 @@ import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/ProjectPianoRollTrackSurface.vue'
 import {
   PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
   createProjectPianoRollTrackPresentation,
+  createProjectPianoRollPresentation,
 } from '@/features/piano-roll/project-piano-roll-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import {
@@ -23,16 +25,7 @@ import {
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
 import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
-import {
-  createStudioKeyboardShortcutCoordinator,
-  type StudioKeyboardShortcutCoordinator,
-} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
-import {
-  STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
-  type StudioKeyboardShortcutVueContext,
-} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import {
   PROJECT_MIDI_NOTE_CONTEXT_KEY,
@@ -63,7 +56,6 @@ const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
   ),
   setPointerCapture: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'setPointerCapture'),
 })
-const keyboardCoordinators: StudioKeyboardShortcutCoordinator[] = []
 
 function createFakeCanvasContext(): CanvasRenderingContext2D {
   return {
@@ -188,22 +180,6 @@ function installSurfaceEnvironment(): void {
   installPointerCapture()
 }
 
-function createKeyboardFixture(): {
-  readonly bindingRegistry: TestStudioKeyboardBindingRegistry
-  readonly context: StudioKeyboardShortcutVueContext
-} {
-  const bindingRegistry = new TestStudioKeyboardBindingRegistry()
-  const keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
-    bindingRegistry,
-    keymap: STUDIO_DEFAULT_KEYMAP,
-  })
-  keyboardCoordinators.push(keyboardShortcuts)
-  return Object.freeze({
-    bindingRegistry,
-    context: Object.freeze({ keyboardShortcuts }),
-  })
-}
-
 function createSurfaceFixture() {
   installSurfaceEnvironment()
   const projectId = parseProjectId('track-surface-project')
@@ -289,30 +265,33 @@ function createSurfaceFixture() {
     visualPosition: playbackVisualPosition,
   })
   const pinia = createPinia()
-  const keyboard = createKeyboardFixture()
+  const keyboard = createTestStudioActionRuntime()
   const selection = useProjectWorkbenchSelectionStore(pinia)
   selection.activateProject(projectId)
   selection.selectClip(track.trackId, clip.clipId)
+  const global = {
+    plugins: [pinia],
+    provide: {
+      [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
+      [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: midiSustainPedalContext,
+      [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
+      ...keyboard.provide,
+    },
+  }
   const wrapper = mount(ProjectPianoRollTrackSurface, {
     attachTo: document.body,
     props: {
       barSpanTick: parseTick(3_840),
       presentation,
+      session,
       timelineEndTick: parseTick(576_000),
       timeSignatureNumerator: 4,
     },
-    global: {
-      plugins: [pinia],
-      provide: {
-        [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
-        [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: midiSustainPedalContext,
-        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
-        [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboard.context,
-      },
-    },
+    global,
   })
 
   return {
+    global,
     clip,
     keyboard,
     playbackState,
@@ -325,7 +304,6 @@ function createSurfaceFixture() {
 }
 
 afterEach(() => {
-  for (const keyboardShortcuts of keyboardCoordinators.splice(0)) keyboardShortcuts.dispose()
   vi.restoreAllMocks()
   restorePrototypeProperty('hasPointerCapture')
   restorePrototypeProperty('releasePointerCapture')
@@ -334,6 +312,66 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollTrackSurface', () => {
+  it('keeps one physical keymap while Track and Clip surfaces replace each other before old teardown', async () => {
+    const fixture = createSurfaceFixture()
+    const clipPresentation = createProjectPianoRollPresentation(
+      fixture.session.getSnapshot(),
+      fixture.clip.clipId,
+    )
+    if (clipPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected Clip presentation')
+    const { runtime } = fixture.keyboard
+    let previous = fixture.wrapper
+    for (let iteration = 0; iteration < 4; iteration += 1) {
+      const oldTarget = runtime.pianoRollTarget.current
+      const clip = mount(ProjectPianoRollSurface, {
+        attachTo: document.body,
+        global: fixture.global,
+        props: {
+          barSpanTick: parseTick(3840),
+          presentation: clipPresentation,
+          session: fixture.session,
+          timeSignatureNumerator: 4,
+        },
+      })
+      previous.unmount()
+      expect(oldTarget?.isCurrent()).toBe(false)
+      expect(runtime.pianoRollTarget.current?.isCurrent()).toBe(true)
+      expect(runtime.pianoRollTarget.current?.value.selectionLabel()).toBe('Notes')
+      const track = mount(ProjectPianoRollTrackSurface, {
+        attachTo: document.body,
+        global: fixture.global,
+        props: {
+          barSpanTick: parseTick(3840),
+          presentation: fixture.presentation,
+          session: fixture.session,
+          timelineEndTick: parseTick(576000),
+          timeSignatureNumerator: 4,
+        },
+      })
+      clip.unmount()
+      expect(runtime.pianoRollTarget.current?.isCurrent()).toBe(true)
+      expect(runtime.pianoRollTarget.current?.value.selectionLabel()).toBe('Sustain Pedal events')
+      previous = track
+      await nextTick()
+    }
+    expect(
+      [...fixture.keyboard.bindingRegistry.registrationCountByBinding.values()].every(
+        (count) => count === 1,
+      ),
+    ).toBe(true)
+    expect(fixture.keyboard.bindingRegistry.disposalCountByBinding.size).toBe(0)
+    previous.unmount()
+    expect(runtime.pianoRollTarget.current).toBeNull()
+    runtime.dispose()
+    expect(fixture.keyboard.bindingRegistry.listeners.size).toBe(0)
+    expect(
+      [...fixture.keyboard.bindingRegistry.disposalCountByBinding.values()].every(
+        (count) => count === 1,
+      ),
+    ).toBe(true)
+  })
+
   it('renders global Track time, previews extension and commits one Pencil placement', async () => {
     const { clip, presentation, selection, session, wrapper } = createSurfaceFixture()
     await nextTick()
@@ -530,6 +568,11 @@ describe('ProjectPianoRollTrackSurface', () => {
     await nextTick()
 
     const revisionBeforeRemove = session.modelRevision
+    ;(wrapper.get('.project-piano-roll-track').element as HTMLElement).focus()
+    expect(keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
+    expect(session.modelRevision).toBe(revisionBeforeRemove)
+    // Tab-style focus, without another pointer gesture, reactivates the lane selection.
+    ;(lane.element as HTMLElement).focus()
     const removeEvent = keyboard.bindingRegistry.dispatch('Backspace')
     expect(removeEvent.defaultPrevented).toBe(true)
     expect(session.modelRevision).toBe(revisionBeforeRemove + 1)

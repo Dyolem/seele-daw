@@ -38,6 +38,11 @@ import {
   type Tick,
 } from '@seele-daw/project-core'
 import {
+  STUDIO_ACTION_COMPLETED,
+  STUDIO_ACTION_NOT_APPLIED,
+  type StudioActionCompletion,
+} from '@/workbench/actions/studio-action'
+import {
   computed,
   onMounted,
   onUnmounted,
@@ -436,28 +441,30 @@ function hasCancellableInteraction(): boolean {
   return interactionState.value.pointerId !== null
 }
 
-function clearSelectionOrCancelInteraction(): boolean {
-  if (hasCancellableInteraction()) {
-    if (!(pointerInputAdapter?.cancel() ?? false)) interactionSession.cancel()
-    activeInteractionConfiguration = null
-    emit('completed')
-    return true
-  }
-  if (!hasSelection()) return false
-  setSelectedEventIds([])
+function cancelInteraction(): StudioActionCompletion {
+  if (!hasCancellableInteraction()) return STUDIO_ACTION_NOT_APPLIED
+  if (!(pointerInputAdapter?.cancel() ?? false)) interactionSession.cancel()
+  activeInteractionConfiguration = null
   emit('completed')
-  return true
+  return STUDIO_ACTION_COMPLETED
 }
 
-function removeSelectedEvents(): boolean {
+function clearSelection(): StudioActionCompletion {
+  if (!hasSelection()) return STUDIO_ACTION_NOT_APPLIED
+  setSelectedEventIds([])
+  emit('completed')
+  return STUDIO_ACTION_COMPLETED
+}
+
+function removeSelectedEvents(): StudioActionCompletion {
   let removal: ReturnType<typeof resolvePianoRollSustainPedalRemoval>
   try {
     removal = resolvePianoRollSustainPedalRemoval(resolveEditingScope(), selectedEventIds.value)
   } catch (cause) {
     emit('failure', cause)
-    return hasSelection()
+    return { status: 'failed', cause, reported: true }
   }
-  if (removal === null) return false
+  if (removal === null) return STUDIO_ACTION_NOT_APPLIED
 
   try {
     projectMidiSustainPedal.removeEvents({
@@ -467,16 +474,24 @@ function removeSelectedEvents(): boolean {
     })
     setSelectedEventIds([])
     emit('completed')
+    return STUDIO_ACTION_COMPLETED
   } catch (cause) {
     emit('failure', cause)
+    return { status: 'failed', cause, reported: true }
   }
-  return true
+}
+
+function isFocused(): boolean {
+  const element = laneSurface.value
+  return element?.contains(element.ownerDocument.activeElement) ?? false
 }
 
 defineExpose({
-  clearSelectionOrCancelInteraction,
+  cancelInteraction,
+  clearSelection,
   hasCancellableInteraction,
   hasSelection,
+  isFocused,
   removeSelectedEvents,
 })
 
@@ -596,6 +611,7 @@ onUnmounted(() => {
     :data-interaction-status="interactionState.status"
     role="group"
     tabindex="0"
+    @focusin="emit('requestFocus')"
   >
     <span
       v-if="thresholdStyle"

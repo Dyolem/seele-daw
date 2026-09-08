@@ -1,3 +1,4 @@
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
   parseClipId,
   parseDeviceTypeId,
@@ -11,12 +12,13 @@ import {
   type TrackId,
 } from '@seele-daw/project-core'
 import { parseSoundbankId } from '@seele-daw/playback'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
+import { createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
@@ -160,6 +162,11 @@ function mountShell(options: MountShellOptions = {}) {
       projectSession: createTestSession(parseProjectId('workbench-shell-project-session')),
       saveFailureMessage: options.saveFailureMessage,
       saveStatus: options.saveStatus ?? ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+      saveAction: createStudioActionPresentation(
+        options.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED ? 'Retry save' : 'Save',
+        options.isDirty ? null : 'All changes are saved.',
+      ),
+      saveShortcut: 'display:Mod+S',
       tempoDisplayBpm: '120',
       tempoEditable: true,
       tempoMode: 'single',
@@ -171,6 +178,7 @@ function mountShell(options: MountShellOptions = {}) {
     global: {
       plugins: [pinia],
       provide: {
+        ...createTestStudioActionRuntime().provide,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
@@ -270,7 +278,10 @@ describe('ProjectWorkbenchShell', () => {
       throw new Error('Expected both Project MIDI import menu items')
     }
     importAsProject.click()
-    await nextTick()
+    await flushPromises()
+    expect(wrapper.get('button[aria-label="Open project menu"]').attributes('aria-expanded')).toBe(
+      'false',
+    )
     expect(wrapper.emitted('importMidiAsNewProject')).toHaveLength(1)
 
     await wrapper.get('button[aria-label="Open project menu"]').trigger('click')

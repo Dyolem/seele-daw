@@ -4,7 +4,7 @@ import MenuIcon from '~icons/fluent/line-horizontal-3-20-regular'
 import MidiIcon from '~icons/fluent/midi-20-regular'
 import PanelBottomIcon from '~icons/fluent/panel-bottom-20-regular'
 import SaveIcon from '~icons/fluent/save-20-regular'
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 import {
   DropdownMenuContent,
   DropdownMenuItem,
@@ -15,6 +15,11 @@ import {
   DropdownMenuTrigger,
 } from 'reka-ui'
 
+import type {
+  StudioActionPresentation,
+  StudioActionSource,
+} from '@/workbench/actions/studio-action'
+import { useStudioKeyboardLayer } from '@/workbench/actions/vue/studio-action-context'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
@@ -29,6 +34,8 @@ interface ProjectWorkbenchGlobalBarProps {
   readonly projectId: string
   readonly projectName: string
   readonly saveFailureMessage?: string | null
+  readonly saveAction: StudioActionPresentation
+  readonly saveShortcut: string
   readonly saveStatus: ActiveProjectSaveStatus
 }
 
@@ -41,19 +48,16 @@ const emit = defineEmits<{
   importMidiAsNewTracks: []
   leaveProject: []
   openContextEditor: []
-  save: []
+  save: [source: StudioActionSource]
 }>()
 
-const isSaving = computed(() => props.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.SAVING)
-const canSave = computed(() => props.isDirty && !isSaving.value)
+const isMenuOpen = shallowRef(false)
+useStudioKeyboardLayer(() => isMenuOpen.value)
 const saveStatusLabel = computed(() => {
-  if (isSaving.value) return 'Saving…'
+  if (props.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.SAVING) return 'Saving…'
   if (props.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED) return 'Couldn’t save'
   return props.isDirty ? 'Unsaved changes' : 'Saved'
 })
-const saveActionLabel = computed(() =>
-  props.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED ? 'Retry save' : 'Save',
-)
 const saveStatusTitle = computed(
   () => props.saveFailureMessage ?? `${props.projectName}: ${saveStatusLabel.value}`,
 )
@@ -62,7 +66,7 @@ const saveStatusTitle = computed(
 <template>
   <header class="project-workbench__global-bar">
     <div class="project-workbench__global-start">
-      <DropdownMenuRoot>
+      <DropdownMenuRoot v-model:open="isMenuOpen">
         <DropdownMenuTrigger as-child>
           <UiIconButton :icon="MenuIcon" label="Open project menu" />
         </DropdownMenuTrigger>
@@ -75,11 +79,15 @@ const saveStatusTitle = computed(
             </DropdownMenuItem>
             <DropdownMenuItem
               class="project-workbench__menu-item"
-              :disabled="!canSave"
-              @select="emit('save')"
+              :disabled="!props.saveAction.enabled"
+              @select="emit('save', 'menu')"
+              :title="props.saveAction.disabledReason ?? undefined"
             >
               <UiIcon :icon="SaveIcon" :size="20" />
-              <span>{{ saveActionLabel }}</span>
+              <span>{{ props.saveAction.label }}</span>
+              <span v-if="props.saveShortcut" class="project-workbench__menu-shortcut">{{
+                props.saveShortcut
+              }}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               class="project-workbench__menu-item"
@@ -143,14 +151,15 @@ const saveStatusTitle = computed(
         class="project-workbench__save"
         size="small"
         variant="secondary"
-        :busy="isSaving"
-        :disabled="!canSave"
-        @click="emit('save')"
+        :busy="props.saveAction.busy"
+        :title="props.saveAction.disabledReason ?? (props.saveShortcut || undefined)"
+        :disabled="!props.saveAction.enabled"
+        @click="emit('save', 'toolbar')"
       >
         <template #leading>
           <UiIcon :icon="SaveIcon" :size="16" />
         </template>
-        {{ saveActionLabel }}
+        {{ props.saveAction.label }}
       </UiButton>
     </div>
   </header>
@@ -286,7 +295,7 @@ const saveStatusTitle = computed(
 
 :global(.project-workbench__menu-item) {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--sd-space-3);
   align-items: center;
   min-block-size: var(--sd-control-height-md);
@@ -296,6 +305,11 @@ const saveStatusTitle = computed(
   font-size: var(--sd-font-size-sm);
   outline: none;
   cursor: pointer;
+}
+
+:global(.project-workbench__menu-shortcut) {
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
 }
 
 :global(.project-workbench__menu-item[data-highlighted]) {

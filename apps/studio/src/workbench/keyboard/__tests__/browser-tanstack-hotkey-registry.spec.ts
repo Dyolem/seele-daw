@@ -14,6 +14,31 @@ afterEach(() => {
 })
 
 describe('BrowserTanStackHotkeyRegistry', () => {
+  it.each(['mac', 'windows', 'linux'] as const)(
+    'canonicalizes Mod to the physical modifier on %s',
+    (platform) => {
+      const registry = createBrowserTanStackHotkeyRegistry({ platform, target: document })
+      const binding = defineStudioKeyboardBinding('Mod+S')
+      const physical =
+        platform === 'mac'
+          ? defineStudioKeyboardBinding('Meta+S')
+          : defineStudioKeyboardBinding('Control+S')
+      expect(registry.identity(binding)).toBe(registry.identity(physical))
+      const listener = vi.fn<(event: KeyboardEvent) => void>()
+      const dispose = registry.register(binding, listener)
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          key: 's',
+          ctrlKey: platform !== 'mac',
+          metaKey: platform === 'mac',
+        }),
+      )
+      expect(listener).toHaveBeenCalledOnce()
+      dispose()
+    },
+  )
+
   it('matches cross-platform Mod while leaving handled policy to the Coordinator', () => {
     const registry = createBrowserTanStackHotkeyRegistry({
       platform: 'mac',

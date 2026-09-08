@@ -1,3 +1,4 @@
+import { createDeferredActionResult } from '@/workbench/actions/__tests__/support/deferred-action-test-support'
 import { createStandardMidiFileSourceEnvelope, type MidiFileDocument } from '@seele-daw/midi-file'
 import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
 import {
@@ -25,6 +26,8 @@ import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
+import { STUDIO_ACTION, STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
+import { createStudioKeyboardKeymap } from '@/workbench/keyboard/studio-default-keymap'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { createStudioRouter } from '@/router'
@@ -34,13 +37,7 @@ import {
   PROJECT_ROUTE_QUERY,
 } from '@/router/project-routes'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/studio-keyboard-shortcut-test-support'
-import { createStudioKeyboardShortcutCoordinator } from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
-import {
-  STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
-  type StudioKeyboardShortcutVueContext,
-} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
@@ -229,7 +226,11 @@ function createFixture(
   }
 }
 
-async function mountPage(fixture: PageFixture, projectId: ProjectId) {
+async function mountPage(
+  fixture: PageFixture,
+  projectId: ProjectId,
+  actionOptions: Parameters<typeof createTestStudioActionRuntime>[0] = {},
+) {
   const router = createStudioRouter(createMemoryHistory())
   const pinia = createPinia()
   await router.push(createProjectWorkspaceLocation(projectId))
@@ -260,14 +261,6 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
       activeProject: fixture.activeProjectContext.activeProject,
       createUniqueId: () => `workspace-page-tempo-event-${++tempoEventIdentity}`,
     }),
-  })
-  const keyboardBindingRegistry = new TestStudioKeyboardBindingRegistry()
-  const keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
-    bindingRegistry: keyboardBindingRegistry,
-    keymap: STUDIO_DEFAULT_KEYMAP,
-  })
-  const keyboardShortcutContext: StudioKeyboardShortcutVueContext = Object.freeze({
-    keyboardShortcuts,
   })
   const playbackState = shallowRef(STOPPED_PLAYBACK_STATE)
   const playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
@@ -310,6 +303,11 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
     pendingDecision: shallowReadonly(pendingNavigationDecision),
     resolve: () => false,
   })
+  const actionFixture = createTestStudioActionRuntime({
+    ...actionOptions,
+    isModalActive: () => pendingNavigationDecision.value !== null,
+  })
+  const keyboardBindingRegistry = actionFixture.bindingRegistry
   const wrapper = mount(ProjectWorkspacePage, {
     props: { projectId },
     global: {
@@ -326,13 +324,14 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: projectPlaybackContext,
         [PROJECT_TEMPO_EVENT_CONTEXT_KEY as symbol]: projectTempoEventContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
-        [STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY as symbol]: keyboardShortcutContext,
+        ...actionFixture.provide,
       },
     },
   })
 
   return {
     router,
+    actionFixture,
     keyboardBindingRegistry,
     pendingNavigationDecision,
     projectPlayback,
@@ -344,6 +343,158 @@ async function mountPage(fixture: PageFixture, projectId: ProjectId) {
 }
 
 describe('ProjectWorkspacePage', () => {
+  it.each(['menu', 'toolbar', 'keyboard'] as const)(
+    'shares Save capability, busy state and retry through %s',
+    async (source) => {
+      const projectId = parseProjectId(`save-action-${source}`)
+      const ready = Object.freeze({ ...createReadyState(projectId), isDirty: true })
+      const fixture = createFixture(
+        async () => ({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+        ready,
+      )
+      const pending = createDeferredActionResult<void>()
+      fixture.save.mockImplementationOnce(async () => {
+        fixture.state.value = Object.freeze({
+          ...ready,
+          saveStatus: ACTIVE_PROJECT_SAVE_STATUS.SAVING,
+        })
+        try {
+          await pending.promise
+        } catch (cause) {
+          fixture.state.value = Object.freeze({
+            ...ready,
+            saveStatus: ACTIVE_PROJECT_SAVE_STATUS.FAILED,
+            saveFailure: cause,
+          })
+          throw cause
+        }
+      })
+      const { wrapper, actionFixture, keyboardBindingRegistry } = await mountPage(
+        fixture,
+        projectId,
+      )
+      await flushPromises()
+      const invoke = vi.spyOn(actionFixture.runtime.actions, 'invoke')
+      let inputWasPrevented = false
+      let menuShowsShortcut = false
+      if (source === 'menu') {
+        await wrapper.get('button[aria-label="Open project menu"]').trigger('click')
+        await flushPromises()
+        const saveItem = [
+          ...document.body.querySelectorAll<HTMLElement>('.project-workbench__menu-item'),
+        ].find((item) => item.textContent?.includes('Save'))
+        if (saveItem === undefined) throw new Error('Expected Save menu item')
+        menuShowsShortcut = saveItem.textContent?.includes('display:Mod+S') ?? false
+        // An open Reka menu owns keyboard input, while its explicit Save item remains usable.
+        inputWasPrevented = keyboardBindingRegistry.dispatch('Mod+S').defaultPrevented
+        saveItem.click()
+      } else if (source === 'toolbar') {
+        await wrapper.get('.project-workbench__save').trigger('click')
+      } else {
+        inputWasPrevented = keyboardBindingRegistry.dispatch('Mod+S').defaultPrevented
+      }
+      await flushPromises()
+      expect(inputWasPrevented).toBe(source === 'keyboard')
+      expect(menuShowsShortcut).toBe(source === 'menu')
+      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.PROJECT_SAVE, source)
+      expect(fixture.save).toHaveBeenCalledOnce()
+      expect(actionFixture.runtime.workbenchTarget.current).not.toBeNull()
+      expect(
+        actionFixture.runtime.actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE),
+      ).toMatchObject({ busy: true })
+      expect(wrapper.getComponent(ProjectWorkbenchShell).props('saveAction')).toMatchObject({
+        busy: true,
+        enabled: false,
+        label: 'Saving…',
+      })
+      expect(wrapper.get('.project-workbench__save').attributes('disabled')).toBeDefined()
+      expect(keyboardBindingRegistry.dispatch('Mod+S').defaultPrevented).toBe(false)
+      expect(fixture.save).toHaveBeenCalledOnce()
+
+      pending.reject(new Error('Checkpoint write failed'))
+      await flushPromises()
+      expect(wrapper.get('.project-workbench__save').text()).toContain('Retry save')
+      expect(wrapper.getComponent(ProjectWorkbenchShell).props('saveAction')).toMatchObject({
+        busy: false,
+        enabled: true,
+        label: 'Retry save',
+      })
+      expect(actionFixture.failures).toEqual([])
+      fixture.save.mockImplementationOnce(async () => {
+        fixture.state.value = Object.freeze({ ...ready, isDirty: false })
+      })
+      await wrapper.get('.project-workbench__save').trigger('click')
+      await flushPromises()
+      expect(fixture.save).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('.project-workbench__save-status').text()).toBe('Saved')
+      expect(wrapper.get('.project-workbench__save').attributes('disabled')).toBeDefined()
+      expect(keyboardBindingRegistry.dispatch('Mod+S').defaultPrevented).toBe(false)
+      wrapper.unmount()
+    },
+  )
+
+  it('keeps an unbound Save callable from the menu and settles it when the project target leaves', async () => {
+    const projectId = parseProjectId('save-unbound')
+    const ready = Object.freeze({ ...createReadyState(projectId), isDirty: true })
+    const fixture = createFixture(
+      async () => ({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      ready,
+    )
+    const pending = createDeferredActionResult<void>()
+    fixture.save.mockReturnValueOnce(pending.promise)
+    const { wrapper, actionFixture, keyboardBindingRegistry } = await mountPage(
+      fixture,
+      projectId,
+      {
+        keymap: createStudioKeyboardKeymap({ [STUDIO_ACTION.PROJECT_SAVE]: [] }),
+      },
+    )
+    await flushPromises()
+    expect(keyboardBindingRegistry.listeners.has('Mod+S')).toBe(false)
+    expect(wrapper.getComponent(ProjectWorkbenchShell).props('saveShortcut')).toBe('')
+    const invocation = actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+    if (invocation.status !== 'accepted') throw new Error('Expected unbound Save')
+    fixture.state.value = Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE })
+    await expect(invocation.completion).resolves.toEqual({ status: 'cancelled' })
+    expect(actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu').status).toBe(
+      'unavailable',
+    )
+    pending.resolve()
+    await flushPromises()
+    expect(fixture.save).toHaveBeenCalledOnce()
+    expect(actionFixture.failures).toEqual([])
+    wrapper.unmount()
+  })
+
+  it('keeps Workbench Save usable when an editor focus query fails', async () => {
+    const projectId = parseProjectId('save-editor-failure')
+    const ready = Object.freeze({ ...createReadyState(projectId), isDirty: true })
+    const fixture = createFixture(
+      async () => ({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      ready,
+    )
+    const { wrapper, actionFixture, keyboardBindingRegistry } = await mountPage(fixture, projectId)
+    await flushPromises()
+    actionFixture.runtime.pianoRollTarget.bind({
+      isFocused: () => {
+        throw new Error('Editor focus query failed')
+      },
+      hasSelection: () => true,
+      hasInteraction: () => false,
+      selectionLabel: () => 'Notes',
+      deleteSelection: () => STUDIO_ACTION_NOT_APPLIED,
+      clearSelection: () => STUDIO_ACTION_NOT_APPLIED,
+      cancelInteraction: () => STUDIO_ACTION_NOT_APPLIED,
+    })
+    expect(keyboardBindingRegistry.dispatch('Delete').defaultPrevented).toBe(true)
+    expect(actionFixture.failures).toHaveLength(1)
+    expect(keyboardBindingRegistry.dispatch('Mod+S').defaultPrevented).toBe(true)
+    await flushPromises()
+    expect(fixture.save).toHaveBeenCalledOnce()
+    expect(actionFixture.failures).toHaveLength(1)
+    wrapper.unmount()
+  })
+
   it('resolves a deep-linked Project and renders its Workbench Shell', async () => {
     const projectId = parseProjectId('project-workspace-page-ready')
     const fixture = createFixture(
@@ -874,7 +1025,7 @@ describe('ProjectWorkspacePage', () => {
     expect(fixture.save).toHaveBeenCalledOnce()
 
     wrapper.unmount()
-    expect(keyboardBindingRegistry.listeners.size).toBe(0)
+    expect(keyboardBindingRegistry.dispatch('Mod+S').defaultPrevented).toBe(false)
   })
 
   it('routes Undo and both Redo bindings to current Project History', async () => {
@@ -943,7 +1094,7 @@ describe('ProjectWorkspacePage', () => {
     const handled = keyboardBindingRegistry.dispatch('Space')
 
     expect(handled.defaultPrevented).toBe(true)
-    expect(projectPlayback.togglePlayPause).toHaveBeenCalledOnce()
+    expect(projectPlayback.play).toHaveBeenCalledOnce()
 
     const request: ProjectNavigationDecisionRequest = Object.freeze({
       activeProjectId: projectId,
@@ -956,7 +1107,7 @@ describe('ProjectWorkspacePage', () => {
     const ignored = keyboardBindingRegistry.dispatch('Space')
 
     expect(ignored.defaultPrevented).toBe(false)
-    expect(projectPlayback.togglePlayPause).toHaveBeenCalledOnce()
+    expect(projectPlayback.play).toHaveBeenCalledOnce()
   })
 
   it('keeps empty-plan guidance on the disabled Play control without a launch Toast', async () => {

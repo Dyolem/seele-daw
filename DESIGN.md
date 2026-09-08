@@ -288,37 +288,41 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 
 ### 7.3 命令、菜单和快捷键
 
-菜单项、工具栏按钮、快捷键和右键菜单 SHOULD 调用同一个 Command，而不是各自实现业务逻辑。
+菜单项、工具栏按钮、快捷键和右键菜单 SHOULD 调用同一个 Studio Action。Action 表达用户
+意图；修改 Project facts 时再调用参数完整的 Project Command，保持单次 History 边界。
 
-每个命令至少定义：
+静态目录保存 stable Action ID、label 和 description。动态 Presentation 从业务权威派生：
 
-- stable command id；
-- label；
-- enabled 条件；
+- enabled 与 disabled reason；
+- busy；
 - checked / selected 状态（如适用）；
-- keybinding（如适用）；
-- 执行结果与错误反馈。
+- 当前 label，例如 Save / Saving… / Retry save。
 
-快捷键显示使用当前平台习惯。不可用命令应显示 Disabled 原因或通过上下文避免出现，而不是点击后静默失败。
+Binding 是独立输入配置，Action 可以没有快捷键。平台化 Binding 文案可用于菜单和按钮提示。
+本批 Save 的菜单、按钮和快捷键已统一，其他 Workbench 控件在 WA2 迁移。
 
-快捷键系统遵循：
+键盘和焦点规则：
 
-- Stable Action ID、Scope、enabled policy 和 Handler 由 Seele Studio 拥有；
-- 作用域优先级固定为 Modal / Dialog → focused Piano Roll → Workbench → Global；
-- Feature 必须显式注册并返回 disposer，不在组件中散布第三方快捷键 composable；
-- 普通可编辑元素和 IME composing 默认不触发编辑 Action；
-- 只有当前 Scope 中 enabled Action 真正处理按键时才阻止浏览器默认行为；
-- Action metadata 与 Binding 必须可被菜单、帮助面板和未来 Command Palette 复用；
-- 内置按键集中在强类型默认 Keymap；Feature 只按 Action ID 获取当前 Binding，不散落字符串；
-- 用户输入必须先验证，无效 Binding 在 Settings 字段旁提示且不得进入注册或持久化；
-- 首批 Workbench Binding 为 Save `Mod+S`、Undo `Mod+Z`、Redo `Mod+Shift+Z`，并兼容
-  Windows `Control+Y`；Transport Play / Pause 使用 `Space`；
-- focused Piano Roll 的 `Escape` 清空 Selection，但只有 Editor Session 已接入且该表面
-  获得焦点时才注册。
+- Action 定义与物理 Listener 属于应用生命周期；Feature 只绑定并释放当前业务目标。
+- 目标替换必须使旧能力失效；Track / Clip Surface 不依赖特定卸载顺序避免重复 Action ID。
+- 打开的 Reka Menu / Modal 是输入屏障，负责自己的导航、Escape 和焦点恢复；后台优先级
+  为当前编辑交互 → 聚焦编辑器 → Workbench → Global。
+- 进入菜单造成的 DOM 失焦不会禁用仍然有效的显式菜单 Action；键盘的焦点路由独立判断。
+- 普通可编辑元素和 IME composing 默认不触发编辑 Action。
+- 接受输入与业务完成分开表达；同步或异步失败不能触发较低作用域的另一个动作，也不能
+  回滚已经合法提交的 Project facts。
+- 内置按键集中在强类型默认 Keymap，不在组件中散布字符串或第三方快捷键 composable。
+- Save 使用 `Mod+S`；Undo 使用 `Mod+Z`；Redo 使用 `Mod+Shift+Z` 并兼容 `Control+Y`；
+  Play / Pause 使用 `Space`。
+- Escape 先调用 Cancel Interaction 保留选择，再次按下可调用 Clear Selection；两者是独立
+  意图。Delete Selection 使用一个集合 Command，明确区分当前 Note 与 CC64 目标。
+- Track 音符区域聚焦不会沿用旧 CC64 目标；Tab 聚焦回 Lane 可恢复其选择操作。
 
-当前按键解析与浏览器监听固定通过隔离的 `@tanstack/hotkeys@0.8.0` Adapter 完成；业务
-模块不得直接依赖其 alpha API。架构见
-[Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
+已有 `@tanstack/hotkeys@0.8.0` Browser Adapter 继续隔离平台解析与输入过滤。动态用户 Binding
+需先验证；Settings、Recorder、持久化和右键菜单不属于 WA1。
+
+架构与中英术语见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)；
+输入细则见 [Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
 
 ### 7.4 Transport 首次可听状态
 

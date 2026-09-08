@@ -1,18 +1,11 @@
-export type StudioKeyboardShortcutErrorCode =
-  | 'action-already-registered'
-  | 'coordinator-disposed'
-  | 'invalid-action'
-  | 'invalid-binding'
-  | 'scope-binding-conflict'
+export type StudioKeyboardShortcutErrorCode = 'invalid-binding'
 
 export interface StudioKeyboardShortcutErrorDetails {
-  readonly actionId?: string
   readonly binding?: string
 }
 
 /** Stable application failures raised before a shortcut becomes active. */
 export class StudioKeyboardShortcutError extends Error {
-  readonly actionId: string | null
   readonly binding: string | null
   readonly code: StudioKeyboardShortcutErrorCode
 
@@ -23,7 +16,6 @@ export class StudioKeyboardShortcutError extends Error {
   ) {
     super(message)
     this.name = 'StudioKeyboardShortcutError'
-    this.actionId = details.actionId ?? null
     this.binding = details.binding ?? null
     this.code = code
   }

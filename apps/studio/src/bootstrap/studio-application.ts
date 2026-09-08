@@ -17,12 +17,14 @@ import {
 } from '@/router/project-navigation-guard'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
 import {
-  createStudioKeyboardShortcutCoordinator,
-  type StudioKeyboardBindingRegistry,
-  type StudioKeyboardShortcutCoordinator,
-} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
-import { STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY } from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+  createStudioActionRuntime,
+  type StudioActionRuntime,
+} from '@/bootstrap/studio-action-runtime'
+import { PROJECT_WORKBENCH_ACTION_TARGET_KEY } from '@/features/project-workspace/actions/project-workbench-action-context'
+import { PIANO_ROLL_ACTION_TARGET_KEY } from '@/features/piano-roll/actions/piano-roll-action-context'
+import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
+import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/studio-keyboard-binding-registry'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createStudioMidiImportInstrumentDevice } from '@/workbench/instrument/midi-import-instrument-policy'
 import {
   createBrowserActiveProjectRuntime,
@@ -119,7 +121,7 @@ class StudioApplicationImpl implements StudioApplication {
   readonly #activeProjectBinding: ActiveProjectVueBinding
   readonly #projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding
   readonly #projectNavigationGuardDispose: ProjectNavigationGuardDispose
-  readonly #keyboardShortcuts: StudioKeyboardShortcutCoordinator
+  readonly #actionRuntime: StudioActionRuntime
   #mounted = false
   #disposed = false
   #resourcesReleased = false
@@ -132,7 +134,7 @@ class StudioApplicationImpl implements StudioApplication {
     activeProjectBinding: ActiveProjectVueBinding,
     projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding,
     projectNavigationGuardDispose: ProjectNavigationGuardDispose,
-    keyboardShortcuts: StudioKeyboardShortcutCoordinator,
+    actionRuntime: StudioActionRuntime,
     projectEntry: ProjectEntryCoordinator,
     projectMidiImport: ProjectMidiImportCoordinator,
     projectNavigationConfirmation: ProjectNavigationConfirmationCoordinator,
@@ -144,7 +146,7 @@ class StudioApplicationImpl implements StudioApplication {
     this.#activeProjectBinding = activeProjectBinding
     this.#projectNavigationDecisionBinding = projectNavigationDecisionBinding
     this.#projectNavigationGuardDispose = projectNavigationGuardDispose
-    this.#keyboardShortcuts = keyboardShortcuts
+    this.#actionRuntime = actionRuntime
     this.projectEntry = projectEntry
     this.projectMidiImport = projectMidiImport
     this.projectNavigationConfirmation = projectNavigationConfirmation
@@ -193,7 +195,7 @@ class StudioApplicationImpl implements StudioApplication {
         this.#projectNavigationDecisionBinding.dispose()
       } finally {
         try {
-          this.#keyboardShortcuts.dispose()
+          this.#actionRuntime.dispose()
         } finally {
           try {
             this.#projectPlaybackBinding.dispose()
@@ -226,10 +228,13 @@ export function composeStudioApplication(
   let activeProjectBinding: ActiveProjectVueBinding | null = null
   let projectNavigationDecisionBinding: ProjectNavigationDecisionVueBinding | null = null
   let projectNavigationGuardDispose: ProjectNavigationGuardDispose | null = null
-  let keyboardShortcuts: StudioKeyboardShortcutCoordinator | null = null
+  let actionRuntime: StudioActionRuntime | null = null
   let projectPlayback: ProjectPlaybackCoordinator | null = null
   let projectPlaybackBinding: ProjectPlaybackVueBinding | null = null
   let unownedProjectPlaybackRuntime: ProjectPlaybackRuntimePort | null = null
+
+  const pinia = createPinia()
+  const toasts = useUiToastStore(pinia)
 
   try {
     activeProjectBinding = createActiveProjectVueBinding(projectRuntime.activeProject)
@@ -289,11 +294,18 @@ export function composeStudioApplication(
       projectPlayback,
       composition.projectPlaybackVisualFrame ?? createBrowserProjectPlaybackVisualFrame(),
     )
-    keyboardShortcuts = createStudioKeyboardShortcutCoordinator({
+    actionRuntime = createStudioActionRuntime({
       bindingRegistry:
         composition.keyboardBindingRegistry ??
         createBrowserTanStackHotkeyRegistry({ target: document }),
-      keymap: STUDIO_DEFAULT_KEYMAP,
+      isModalActive: () => projectNavigationDecisionBinding?.context.pendingDecision.value != null,
+      reportFailure: (failure) => {
+        console.error('Studio Action failed', failure)
+        toasts.danger(
+          'Action could not complete',
+          'Please try again. If the problem persists, reload the project.',
+        )
+      },
     })
     projectNavigationGuardDispose = installProjectNavigationGuard(
       composition.router,
@@ -313,15 +325,14 @@ export function composeStudioApplication(
       Object.freeze({ projectMidiSustainPedal }),
     )
     vueApplication.provide(PROJECT_PLAYBACK_CONTEXT_KEY, projectPlaybackBinding.context)
-    vueApplication.provide(
-      STUDIO_KEYBOARD_SHORTCUT_CONTEXT_KEY,
-      Object.freeze({ keyboardShortcuts }),
-    )
+    vueApplication.provide(STUDIO_ACTION_CONTEXT_KEY, actionRuntime)
+    vueApplication.provide(PROJECT_WORKBENCH_ACTION_TARGET_KEY, actionRuntime.workbenchTarget)
+    vueApplication.provide(PIANO_ROLL_ACTION_TARGET_KEY, actionRuntime.pianoRollTarget)
     vueApplication.provide(
       PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
       projectNavigationDecisionBinding.context,
     )
-    vueApplication.use(createPinia())
+    vueApplication.use(pinia)
     // Router installation may start initial navigation, so app-scoped dependencies go first.
     vueApplication.use(composition.router)
 
@@ -333,7 +344,7 @@ export function composeStudioApplication(
       activeProjectBinding,
       projectNavigationDecisionBinding,
       projectNavigationGuardDispose,
-      keyboardShortcuts,
+      actionRuntime,
       projectEntry,
       projectMidiImport,
       projectNavigationConfirmation,
@@ -346,7 +357,7 @@ export function composeStudioApplication(
         projectNavigationDecisionBinding?.dispose()
       } finally {
         try {
-          keyboardShortcuts?.dispose()
+          actionRuntime?.dispose()
         } finally {
           try {
             projectPlaybackBinding?.dispose()

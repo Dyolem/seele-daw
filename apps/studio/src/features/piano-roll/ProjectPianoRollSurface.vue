@@ -42,6 +42,7 @@ import GridIcon from '~icons/fluent/grid-20-regular'
 import PenIcon from '~icons/fluent/pen-20-regular'
 import {
   computed,
+  onBeforeUnmount,
   onMounted,
   onUnmounted,
   shallowRef,
@@ -63,13 +64,11 @@ import {
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
-  STUDIO_KEYBOARD_ACTION,
-  STUDIO_KEYBOARD_SCOPE,
-} from '@/workbench/keyboard/studio-keyboard-shortcut-coordinator'
-import {
-  useStudioKeyboardShortcutRegistration,
-  useStudioKeyboardShortcuts,
-} from '@/workbench/keyboard/vue/studio-keyboard-shortcut-context'
+  STUDIO_ACTION_COMPLETED,
+  STUDIO_ACTION_NOT_APPLIED,
+  type StudioActionCompletion,
+} from '@/workbench/actions/studio-action'
+import { usePianoRollActionTarget } from '@/features/piano-roll/actions/piano-roll-action-context'
 import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 
@@ -80,17 +79,10 @@ interface ProjectPianoRollSurfaceProps {
   readonly timeSignatureNumerator: number
 }
 
-interface SustainPedalLaneHandle {
-  clearSelectionOrCancelInteraction(): boolean
-  hasCancellableInteraction(): boolean
-  hasSelection(): boolean
-  removeSelectedEvents(): boolean
-}
-
 type FocusedPianoRollEditingTarget = 'notes' | 'sustain-pedal'
 
 const props = defineProps<ProjectPianoRollSurfaceProps>()
-const { keyboardShortcuts } = useStudioKeyboardShortcuts()
+const actionTarget = usePianoRollActionTarget()
 const { projectMidiNotes } = useProjectMidiNotes()
 const { projectMidiSustainPedal } = useProjectMidiSustainPedal()
 const pianoRollPreferences = usePianoRollPreferencesStore()
@@ -103,7 +95,8 @@ const canvasHost = useTemplateRef<HTMLElement>('canvasHost')
 const surfaceElement = useTemplateRef<HTMLElement>('surfaceElement')
 const gridCanvas = useTemplateRef<HTMLCanvasElement>('gridCanvas')
 const noteHost = useTemplateRef<HTMLElement>('noteHost')
-const sustainPedalLane = useTemplateRef<SustainPedalLaneHandle>('sustainPedalLane')
+const sustainPedalLane =
+  useTemplateRef<InstanceType<typeof PianoRollSustainPedalLane>>('sustainPedalLane')
 const noteState = shallowRef<PianoRollNoteReadModelState | null>(null)
 const editorState = shallowRef<PianoRollEditorSessionState | null>(null)
 const focusedEditingTarget = shallowRef<FocusedPianoRollEditingTarget>('notes')
@@ -483,16 +476,16 @@ function isPianoRollFocused(): boolean {
   )
 }
 
-function removeSelectedNotes(): boolean {
+function removeSelectedNotes(): StudioActionCompletion {
   const selectedNoteIds = editorState.value?.selectedNoteIds ?? []
-  if (selectedNoteIds.length === 0) return false
-
+  if (selectedNoteIds.length === 0) return STUDIO_ACTION_NOT_APPLIED
   try {
     projectMidiNotes.removeMidiNotes({
       clipId: props.presentation.context.clipId,
       noteIds: selectedNoteIds,
     })
     interactionFailureMessage.value = null
+    return STUDIO_ACTION_COMPLETED
   } catch (cause) {
     const message = describeCause(
       cause,
@@ -500,11 +493,8 @@ function removeSelectedNotes(): boolean {
     )
     interactionFailureMessage.value = message
     toasts.danger('MIDI notes could not be removed', message)
+    return { status: 'failed', cause, reported: true }
   }
-
-  // Once an enabled editor Action claims Delete/Backspace, browser defaults stay suppressed
-  // even when the Project rejects the command.
-  return true
 }
 
 function hasFocusedSelection(): boolean {
@@ -513,25 +503,27 @@ function hasFocusedSelection(): boolean {
     : (editorState.value?.selectedNoteIds.length ?? 0) > 0
 }
 
-function removeFocusedSelection(): boolean {
+function removeFocusedSelection(): StudioActionCompletion {
   return focusedEditingTarget.value === 'sustain-pedal'
-    ? (sustainPedalLane.value?.removeSelectedEvents() ?? false)
+    ? (sustainPedalLane.value?.removeSelectedEvents() ?? STUDIO_ACTION_NOT_APPLIED)
     : removeSelectedNotes()
 }
 
-function clearSelectionOrCancelInteraction(): boolean {
+function clearSelection(): StudioActionCompletion {
   if (focusedEditingTarget.value === 'sustain-pedal') {
-    return sustainPedalLane.value?.clearSelectionOrCancelInteraction() ?? false
+    return sustainPedalLane.value?.clearSelection() ?? STUDIO_ACTION_NOT_APPLIED
   }
-  if (hasCancellablePointerInteraction()) {
-    if (!(pointerInputAdapter?.cancel() ?? false)) {
-      interactionSession.cancel()
-    }
-    interactionFailureMessage.value = null
-    return true
-  }
+  return editorSession?.clearSelection() ? STUDIO_ACTION_COMPLETED : STUDIO_ACTION_NOT_APPLIED
+}
 
-  return editorSession?.clearSelection() ?? false
+function cancelInteraction(): StudioActionCompletion {
+  if (focusedEditingTarget.value === 'sustain-pedal') {
+    return sustainPedalLane.value?.cancelInteraction() ?? STUDIO_ACTION_NOT_APPLIED
+  }
+  if (!hasCancellablePointerInteraction()) return STUDIO_ACTION_NOT_APPLIED
+  if (!(pointerInputAdapter?.cancel() ?? false)) interactionSession.cancel()
+  interactionFailureMessage.value = null
+  return STUDIO_ACTION_COMPLETED
 }
 
 function hasCancellablePointerInteraction(): boolean {
@@ -540,27 +532,9 @@ function hasCancellablePointerInteraction(): boolean {
     : interactionState.value.pointerId !== null
 }
 
-useStudioKeyboardShortcutRegistration(keyboardShortcuts, [
-  {
-    actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE,
-    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PIANO_ROLL_NOTES_REMOVE),
-    description: 'Remove the focused Note or Sustain Pedal event selection.',
-    isEnabled: () => isPianoRollFocused() && hasFocusedSelection(),
-    label: 'Remove selected Piano Roll events',
-    run: removeFocusedSelection,
-    scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
-  },
-  {
-    actionId: STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR,
-    bindings: keyboardShortcuts.bindingsFor(STUDIO_KEYBOARD_ACTION.PIANO_ROLL_SELECTION_CLEAR),
-    description: 'Cancel the active interaction or clear the focused Piano Roll selection.',
-    isEnabled: () =>
-      isPianoRollFocused() && (hasCancellablePointerInteraction() || hasFocusedSelection()),
-    label: 'Clear Piano Roll selection',
-    run: clearSelectionOrCancelInteraction,
-    scope: STUDIO_KEYBOARD_SCOPE.PIANO_ROLL,
-  },
-])
+function handleFocusIn(): void {
+  focusedEditingTarget.value = sustainPedalLane.value?.isFocused() ? 'sustain-pedal' : 'notes'
+}
 
 composeEditorSession()
 
@@ -579,7 +553,38 @@ watch(
     recomposeReadModel()
     composeEditorSession()
   },
+  { flush: 'sync' },
 )
+let releaseActionTarget: (() => void) | null = null
+const stopActionTarget = watch(
+  [
+    () => props.session,
+    () => props.presentation.projectId,
+    () => props.presentation.context.clipId,
+    () => props.presentation.context.sourceId,
+    () => pianoRollPreferences.sustainPedalChannel,
+    focusedEditingTarget,
+  ],
+  () => {
+    releaseActionTarget?.()
+    releaseActionTarget = actionTarget.bind({
+      isFocused: isPianoRollFocused,
+      hasSelection: hasFocusedSelection,
+      hasInteraction: hasCancellablePointerInteraction,
+      selectionLabel: () =>
+        focusedEditingTarget.value === 'sustain-pedal' ? 'Sustain Pedal events' : 'Notes',
+      deleteSelection: removeFocusedSelection,
+      clearSelection,
+      cancelInteraction,
+    })
+  },
+  { immediate: true, flush: 'sync' },
+)
+onBeforeUnmount(() => {
+  stopActionTarget()
+  releaseActionTarget?.()
+  releaseActionTarget = null
+})
 watchEffect(render)
 
 onMounted(() => {
@@ -653,6 +658,7 @@ onUnmounted(() => {
     :data-snap-enabled="pianoRollPreferences.snapEnabled"
     :data-tool="pianoRollPreferences.activeTool"
     tabindex="0"
+    @focusin="handleFocusIn"
   >
     <header class="project-piano-roll__toolbar" aria-label="Piano Roll controls">
       <div class="project-piano-roll__tool-group" role="group" aria-label="Editing tool">

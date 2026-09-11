@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
+import { useTemplateRef, type Component } from 'vue'
 
 import UiIcon from '@/ui/components/UiIcon.vue'
 
@@ -18,10 +18,16 @@ const props = withDefaults(defineProps<UiIconButtonProps>(), {
   pressed: undefined,
   size: 'medium',
 })
+
+const button = useTemplateRef<HTMLButtonElement>('button')
+defineExpose({
+  focus: () => button.value?.focus({ preventScroll: true }),
+})
 </script>
 
 <template>
   <button
+    ref="button"
     class="ui-icon-button"
     :class="`ui-icon-button--${props.size}`"
     type="button"

@@ -1,6 +1,6 @@
 # Workbench Action Catalogue V1 phase plan
 
-> Updated: 2026-09-08
+> Updated: 2026-09-11
 >
 > WA1: implemented and approved
 >
@@ -8,7 +8,7 @@
 >
 > WA3: implemented and approved
 >
-> WA4: authorized
+> WA4: implemented and approved; manual smoke not separately reported
 
 ## Design decision
 
@@ -24,10 +24,11 @@ boolean-only execution results and combined Clear/Cancel intent are replaced in 
 | WA1   | Immutable definitions, dynamic target lifetimes, explicit invocation/completion, input routing, bilingual terms, Save menu/button/shortcut slice, migration of existing keyboard consumers | Implemented; approved |
 | WA2   | Remaining Workbench menus/buttons: Undo/Redo, Play/Pause, Return, Projects, both MIDI imports and opening the MIDI editor; shared presentation and shortcut text                           | Implemented; approved |
 | WA3   | Focused-editor menu consumers and Reka Context Menu; explicit Note/CC64 target and one-command deletion                                                                                    | Implemented; approved |
-| WA4   | Phase-wide regression, failure/release checks, menu and focus review, macOS manual smoke, closure report                                                                                   | Authorized            |
+| WA4   | Phase-wide regression, failure/release checks, menu and focus review, macOS manual smoke, closure report                                                                                   | Implemented; approved |
 
 Each batch stops for review. WA3 was approved on 2026-09-08, with authorization to commit it locally
-and complete the remaining WA4 batch.
+and complete the remaining WA4 batch. WA4 was approved on 2026-09-11, with authorization to commit it
+locally and plan the next phase.
 Implementation and ownership are documented in [Studio Action Architecture](./studio-action-architecture.md).
 
 ## WA1 verification
@@ -144,9 +145,25 @@ Studio Type Check、Production Build 与 dist boundary。既有页面回归的�
 选择和 Clear Selection 均已核对。临时验证数据已通过 Undo 全部撤销，项目恢复 Saved；
 临时视口设置已恢复。
 
-WA3 于 2026-09-08 通过审核并获准本地提交，用户同时授权完成剩余 WA4。全工作区
-`pnpm check` 和 macOS 人工 smoke 在 WA4 执行，本批自动化 DOM 测试和针对性浏览器验证
-不替代阶段人工 smoke。
+WA3 于 2026-09-08 通过审核并获准本地提交，已提交为 `b372145`；用户同时授权完成剩余 WA4。
+本批自动化 DOM 测试和针对性浏览器验证不替代阶段人工 smoke。
+
+## WA4 实现与验证
+
+WA4 的实现和自动验证已完成。基于 WA3 提交 `b372145`，新增 10 项回归，覆盖迟到成功、
+可编辑输入过滤、Cancel 失败不穿透、应用先于视图释放，以及导航确认框的 Cancel／Escape
+焦点恢复。浏览器检查发现并修复了菜单打开确认框后取消时焦点落到 Body 的问题：Projects
+先在菜单关闭阶段恢复按钮焦点，再发起原有导航；原生 MIDI chooser 仍保持同步触发。
+
+2026-09-09 的最终 `pnpm check` 通过 Architecture、Workspace Quality、Format、Oxlint、
+ESLint、全工作区 Type Check、162 个文件／1,476 项测试、Studio Production Build 与 dist
+boundary；Studio 子集为 67 个文件／510 项。构建仅保留既有 large-chunk warning。
+
+Codex 内置浏览器也完成 Save 三入口、History、Playback、可编辑输入、Note／CC64 菜单、
+连续 Scope 切换与未保存导航检查。临时验证使用独立开发 origin，验证后的标签页和专用服务
+已关闭。用户于 2026-09-11 通过 WA4 审核并授权本地提交与下一阶段规划。人工 smoke 未
+单独报告，保留其证据状态，不把自动验证或审核结论写作人工实测通过。详细矩阵见
+[Workbench Action Catalogue V1 收口报告](./workbench-action-catalogue-v1-closure-report.md)。
 
 ## Deferred decisions and limits
 

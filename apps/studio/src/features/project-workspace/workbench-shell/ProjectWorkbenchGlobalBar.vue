@@ -10,7 +10,7 @@ import MenuIcon from '~icons/fluent/line-horizontal-3-20-regular'
 import MidiIcon from '~icons/fluent/midi-20-regular'
 import PanelBottomIcon from '~icons/fluent/panel-bottom-20-regular'
 import SaveIcon from '~icons/fluent/save-20-regular'
-import { computed, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, shallowRef, useTemplateRef } from 'vue'
 import {
   DropdownMenuContent,
   DropdownMenuItem,
@@ -85,7 +85,32 @@ const menuGroups = computed(() => [
 ])
 
 const isMenuOpen = shallowRef(false)
+const menuTrigger = useTemplateRef<InstanceType<typeof UiIconButton>>('menuTrigger')
+let showProjectsAfterMenuClose = false
 useStudioKeyboardLayer(() => isMenuOpen.value)
+
+function invokeMenuAction(actionId: StudioActionId): void {
+  // Navigation may open a confirmation dialog; first return focus to its stable origin.
+  if (actionId === props.actionControls.projects.actionId) {
+    showProjectsAfterMenuClose = true
+    return
+  }
+  // Native file choosers must retain the original user activation.
+  emit('invokeAction', actionId, 'menu')
+}
+
+function handleMenuCloseAutoFocus(event: Event): void {
+  if (!showProjectsAfterMenuClose) return
+  showProjectsAfterMenuClose = false
+  event.preventDefault()
+  menuTrigger.value?.focus()
+  emit('invokeAction', props.actionControls.projects.actionId, 'menu')
+}
+
+onBeforeUnmount(() => {
+  showProjectsAfterMenuClose = false
+})
+
 const saveStatusLabel = computed(() => {
   if (props.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.SAVING) return 'Saving…'
   if (props.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED) return 'Couldn’t save'
@@ -101,7 +126,7 @@ const saveStatusTitle = computed(
     <div class="project-workbench__global-start">
       <DropdownMenuRoot v-model:open="isMenuOpen">
         <DropdownMenuTrigger as-child>
-          <UiIconButton :icon="MenuIcon" label="Open project menu" />
+          <UiIconButton ref="menuTrigger" :icon="MenuIcon" label="Open project menu" />
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
           <DropdownMenuContent
@@ -110,6 +135,7 @@ const saveStatusTitle = computed(
             align="start"
             :side-offset="8"
             :collision-padding="8"
+            @close-auto-focus="handleMenuCloseAutoFocus"
           >
             <UiMenuSurface class="project-workbench__menu">
               <template v-for="(group, index) in menuGroups" :key="group.label">
@@ -127,7 +153,7 @@ const saveStatusTitle = computed(
                   :aria-busy="action.busy || undefined"
                   :title="action.title"
                   :aria-description="action.disabledReason ?? undefined"
-                  @select="emit('invokeAction', action.actionId, 'menu')"
+                  @select="invokeMenuAction(action.actionId)"
                 >
                   <UiMenuItem class="project-workbench__menu-item">
                     <template #leading><UiIcon :icon="icon" :size="20" /></template>

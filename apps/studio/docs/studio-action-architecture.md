@@ -1,8 +1,8 @@
 # Studio Action 架构
 
-> 状态：WA1／WA2／WA3 已实现并通过审核；WA4 已获实施授权
+> 状态：WA1–WA4 已实现并通过审核
 >
-> 日期：2026-09-08
+> 日期：2026-09-11
 
 ## 1. 职责归属与应用装配
 
@@ -103,6 +103,11 @@ Project Menu 新增 History 和 Playback 分组，按钮名称、菜单文案、
 WA2 新增的五个 Action 默认没有 Binding；显式提供合法 Binding 后仍通过同一路径调用。
 参数化的 Tempo、Add Track、音色选择，以及 Clip 双击后的上下文定位保留各自现有业务入口。
 
+从 Project Menu 执行 Projects 时，Workbench UI 先在菜单的 `close-auto-focus` 阶段恢复
+菜单按钮焦点，再调用 Action。这样导航确认框拥有仍然存在的返回目标，Cancel 或 Escape
+关闭后可以回到该按钮。组件卸载会清理尚未派发的导航意图；这段焦点交接不进入 Action
+Coordinator 或导航业务契约，也不延迟需要同步 user activation 的 MIDI 文件选择器。
+
 MIDI 文件选择器必须在原始用户输入的同步调用栈中打开。页面的 `useProjectWorkbenchMidiImport`
 持有原生 input、选择／导入阶段和 pending resolver；两种导入 Action 共用这一阶段状态，
 完成结果覆盖文件选择和后续导入。取消选择或取消替换项目返回 `not-applied`；预期业务失败
@@ -196,3 +201,4 @@ CSS 变量，也不为其建立别名。内容受视口限制并自行滚动；R
 
 键盘策略详见 [Studio 快捷键架构](./studio-keyboard-shortcut-architecture.md)。
 批次范围与进度见 [Workbench Action Catalogue V1 阶段计划](./workbench-action-catalogue-v1-phase-plan.md)。
+完整门禁、浏览器证据与人工验收状态见 [阶段收口报告](./workbench-action-catalogue-v1-closure-report.md)。

@@ -97,9 +97,16 @@ describe('Studio Action invocation', () => {
     expect(failures).toEqual([])
   })
 
-  it.each(['replace target', 'release target', 'dispose application'] as const)(
-    'settles a pending invocation on %s and ignores its later rejection',
-    async (mode) => {
+  it.each([
+    ['replace target', 'success'],
+    ['replace target', 'rejection'],
+    ['release target', 'success'],
+    ['release target', 'rejection'],
+    ['dispose application', 'success'],
+    ['dispose application', 'rejection'],
+  ] as const)(
+    'settles a pending invocation on %s and ignores its later %s',
+    async (mode, outcome) => {
       const { actions, targets, failures } = createActionInvocationFixture()
       const deferred = createDeferredActionResult<StudioActionCompletion>()
       const release = targets.bind({ execute: () => deferred.promise })
@@ -109,8 +116,10 @@ describe('Studio Action invocation', () => {
       else if (mode === 'release target') release()
       else actions.dispose()
       await expect(invocation.completion).resolves.toEqual({ status: 'cancelled' })
-      deferred.reject(new Error('Retired project failed later'))
+      if (outcome === 'success') deferred.resolve(STUDIO_ACTION_COMPLETED)
+      else deferred.reject(new Error('Retired project failed later'))
       await Promise.resolve()
+      await expect(invocation.completion).resolves.toEqual({ status: 'cancelled' })
       expect(failures).toEqual([])
     },
   )

@@ -46,6 +46,47 @@ describe('Studio keyboard input routing', () => {
     expect(bindingRegistry.registrationCountByBinding.get('Escape')).toBe(1)
   })
 
+  it('does not fall through to Clear Selection when Cancel fails after ending the gesture', async () => {
+    const { runtime, bindingRegistry, failures } = createTestStudioActionRuntime()
+    const cause = new Error('Gesture cleanup failed')
+    let interacting = true
+    const clear = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
+    const cancel = vi.fn<() => StudioActionCompletion>(() => {
+      interacting = false
+      throw cause
+    })
+    runtime.pianoRollTarget.bind({
+      isFocused: () => true,
+      hasSelection: () => true,
+      hasInteraction: () => interacting,
+      selectionLabel: () => 'Notes',
+      deleteSelection: () => STUDIO_ACTION_COMPLETED,
+      clearSelection: clear,
+      cancelInteraction: cancel,
+    })
+
+    expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
+    await Promise.resolve()
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(clear).not.toHaveBeenCalled()
+    expect(failures).toEqual([
+      {
+        actionId: STUDIO_ACTION.PIANO_ROLL_INTERACTION_CANCEL,
+        source: 'keyboard',
+        operation: 'execute',
+        cause,
+      },
+    ])
+    expect(runtime.actions.presentationFor(STUDIO_ACTION.PIANO_ROLL_SELECTION_CLEAR).enabled).toBe(
+      true,
+    )
+
+    expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
+    expect(clear).toHaveBeenCalledOnce()
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(bindingRegistry.registrationCountByBinding.get('Escape')).toBe(1)
+  })
+
   it('makes focus and modal ownership keyboard policy while keeping menu invocation available', async () => {
     let modal = false
     let focused = false

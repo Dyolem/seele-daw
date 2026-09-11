@@ -310,6 +310,8 @@ Save、Undo／Redo、Play／Pause，以及 WA2 的 Return、Projects、MIDI Impo
 - 目标替换必须使旧能力失效；Track / Clip Surface 不依赖特定卸载顺序避免重复 Action ID。
 - 打开的 Reka Menu / Modal 是输入屏障，负责自己的导航、Escape 和焦点恢复；后台优先级
   为当前编辑交互 → 聚焦编辑器 → Workbench → Global。
+- Project Menu 发起 Projects 导航前先关闭菜单并恢复按钮焦点；未保存确认框通过 Cancel 或
+  Escape 关闭后回到该按钮。原生 MIDI 文件选择器保留原始输入调用栈中的同步触发。
 - 进入菜单造成的 DOM 失焦不会禁用仍然有效的显式菜单 Action；键盘的焦点路由独立判断。
 - 普通可编辑元素和 IME composing 默认不触发编辑 Action。
 - 接受输入与业务完成分开表达；同步或异步失败不能触发较低作用域的另一个动作，也不能

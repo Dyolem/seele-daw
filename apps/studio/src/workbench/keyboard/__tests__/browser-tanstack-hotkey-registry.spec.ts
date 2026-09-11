@@ -71,38 +71,48 @@ describe('BrowserTanStackHotkeyRegistry', () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
-  it('filters editable targets even for Mod and Escape bindings', () => {
-    const registry = createBrowserTanStackHotkeyRegistry({
-      platform: 'windows',
-      target: document,
-    })
-    const save = vi.fn<(event: KeyboardEvent) => void>()
-    const escape = vi.fn<(event: KeyboardEvent) => void>()
-    const disposeSave = registry.register(defineStudioKeyboardBinding('Mod+S'), save)
-    const disposeEscape = registry.register(defineStudioKeyboardBinding('Escape'), escape)
-    const input = document.createElement('input')
-    document.body.append(input)
-    input.focus()
+  it.each(['input', 'textarea', 'select', 'contenteditable'] as const)(
+    'filters %s targets even for Mod and Escape bindings',
+    (kind) => {
+      const registry = createBrowserTanStackHotkeyRegistry({
+        platform: 'windows',
+        target: document,
+      })
+      const save = vi.fn<(event: KeyboardEvent) => void>()
+      const escape = vi.fn<(event: KeyboardEvent) => void>()
+      const disposeSave = registry.register(defineStudioKeyboardBinding('Mod+S'), save)
+      const disposeEscape = registry.register(defineStudioKeyboardBinding('Escape'), escape)
+      const input = document.createElement(kind === 'contenteditable' ? 'div' : kind)
+      if (kind === 'contenteditable') input.setAttribute('contenteditable', 'true')
+      document.body.append(input)
+      input.focus()
+      const target =
+        kind === 'contenteditable' ? input.appendChild(document.createElement('span')) : input
+      if (kind === 'contenteditable') {
+        // JSDOM lacks the browser's inherited isContentEditable property.
+        Object.defineProperty(target, 'isContentEditable', { value: true })
+      }
 
-    input.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        bubbles: true,
-        ctrlKey: true,
-        key: 's',
-      }),
-    )
-    input.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        bubbles: true,
-        key: 'Escape',
-      }),
-    )
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          ctrlKey: true,
+          key: 's',
+        }),
+      )
+      target.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          key: 'Escape',
+        }),
+      )
 
-    expect(save).not.toHaveBeenCalled()
-    expect(escape).not.toHaveBeenCalled()
-    disposeSave()
-    disposeEscape()
-  })
+      expect(save).not.toHaveBeenCalled()
+      expect(escape).not.toHaveBeenCalled()
+      disposeSave()
+      disposeEscape()
+    },
+  )
 
   it('validates dynamic Settings input before it becomes a Binding', () => {
     const lowerCaseKey = validateStudioKeyboardBinding(' k ')

@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-07，MIDI Semantic Binding MI6D 已审核
+> 最近更新：2026-09-11，Workbench Action Catalogue WA1–WA4 已审核
 >
 > 当前阶段：Studio 已接入 439 项来源 Preset 浏览、289 项采样音色、独立 MIDI Program /
 > Channel 10 路由、初始 CC7 / CC10，以及 MIDI 1.0 模式声明证据与文件级语义绑定反馈；完整目录
@@ -453,6 +453,11 @@ WA3 已实现并通过审核：Clip Focus 的 Note／CC64，以及 Track Scope �
 保留多选；没有可执行动作或命中不可编辑对象时不显示菜单。删除多个对象仍是一个 History
 step，清空选择不改 Project。菜单打开期间接管键盘，Escape 关闭后恢复到原编辑区域；切换
 编辑目标时旧菜单失效并关闭。Track Scope 的完整 Note 选择与编辑流程仍未实现。
+
+从 Project Menu 离开未保存项目时，Save／Discard／Cancel 确认框继续接管输入；Cancel 或
+Escape 取消后，焦点回到 Project Menu 按钮。WA4 已于 2026-09-11 通过用户审核，包含
+1,476 项全工作区测试和内置浏览器检查；人工 smoke 未单独报告，验证记录详见
+[Workbench Action Catalogue V1 收口报告](./apps/studio/docs/workbench-action-catalogue-v1-closure-report.md)。
 
 当前没有用户 Keymap、Shortcut Settings、Recorder、Sequence 或 Command Palette。动态输入
 验证边界已经就绪，持久化和损坏覆盖的回退策略需随实际 V1B 切片实现。

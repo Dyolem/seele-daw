@@ -1078,6 +1078,51 @@ describe('ProjectWorkspacePage', () => {
     wrapper.unmount()
   })
 
+  it('cancels a pending Save and releases input exactly once when the Action runtime closes before its view', async () => {
+    const projectId = parseProjectId('save-runtime-disposal')
+    const ready = Object.freeze({ ...createReadyState(projectId), isDirty: true })
+    const fixture = createFixture(
+      async () => ({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+      ready,
+    )
+    const pending = createDeferredActionResult<void>()
+    fixture.save.mockReturnValueOnce(pending.promise)
+    const { wrapper, actionFixture, keyboardBindingRegistry } = await mountPage(fixture, projectId)
+    await flushPromises()
+    const before = ready.session.getSnapshot()
+    const binding = actionFixture.runtime.workbenchTarget.current
+    const releaseMenu = actionFixture.runtime.keyboard.suspend()
+    const invocation = actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+    if (invocation.status !== 'accepted') throw new Error('Expected pending Save')
+    expect(fixture.save).toHaveBeenCalledOnce()
+
+    actionFixture.runtime.dispose()
+    actionFixture.runtime.dispose()
+    releaseMenu()
+    wrapper.unmount()
+
+    await expect(invocation.completion).resolves.toEqual({ status: 'cancelled' })
+    expect(binding?.isCurrent()).toBe(false)
+    expect(actionFixture.runtime.workbenchTarget.current).toBeNull()
+    expect(actionFixture.runtime.pianoRollTarget.current).toBeNull()
+    expect(keyboardBindingRegistry.listeners.size).toBe(0)
+    expect(keyboardBindingRegistry.disposalCountByBinding.size).toBe(
+      keyboardBindingRegistry.registrationCountByBinding.size,
+    )
+    expect(
+      [...keyboardBindingRegistry.disposalCountByBinding.values()].every((count) => count === 1),
+    ).toBe(true)
+    expect(actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'toolbar').status).toBe(
+      'unavailable',
+    )
+
+    pending.reject(new Error('Save failed after application disposal'))
+    await flushPromises()
+    expect(actionFixture.failures).toEqual([])
+    expect(ready.session.getSnapshot()).toEqual(before)
+    expect(fixture.state.value).toBe(ready)
+  })
+
   it('keeps Workbench Save usable when an editor focus query fails', async () => {
     const projectId = parseProjectId('save-editor-failure')
     const ready = Object.freeze({ ...createReadyState(projectId), isDirty: true })

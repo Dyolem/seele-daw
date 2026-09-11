@@ -1,8 +1,8 @@
 # Studio Keyboard Shortcut Architecture
 
-> 状态：WA1／WA2／WA3 已实现并通过审核；WA4 已获实施授权
+> 状态：WA1–WA4 已实现并通过审核
 >
-> Date: 2026-09-08
+> Date: 2026-09-11
 >
 > Scope: `apps/studio`
 
@@ -52,6 +52,10 @@ Context Menu 打开期间持有可嵌套的键盘暂停能力。Reka 负责菜�
 在 Reka 的关闭焦点钩子中检查原 Binding 是否有效，再恢复到明确的 Note 区域或 CC64 Lane。
 菜单显式选中操作仍可调用同一 Action Handler。Context Menu 的 Escape 只关闭菜单，不会
 穿透到后台清空选择；关闭或卸载后释放键盘暂停能力。
+
+Project Menu 发起 Projects 导航前，先在菜单关闭阶段恢复按钮焦点；随后出现的确认框由
+Modal barrier 接管输入。Cancel 或 Escape 取消导航后回到该按钮，避免尝试恢复已卸载的
+菜单内容。焦点交接属于菜单 UI，MIDI 文件选择器继续在原始输入调用栈中触发。
 
 每个物理键位仅注册一次。Browser Adapter 先用同一平台规则标准化 Binding，因此 macOS 上
 `Mod+S` 与 `Meta+S` 会被识别为同一物理组合。相同 Scope 的冲突在任何物理注册前拒绝；
@@ -103,3 +107,4 @@ Context Menu 打开期间持有可嵌套的键盘暂停能力。Reka 负责菜�
 Workbench 菜单、Transport 和 Arrangement 导入按钮已在 WA2 接入统一调用与 Presentation；
 WA3 已接入 Note／CC64 右键选择菜单，未新增默认 Binding。批次状态见
 [Workbench Action Catalogue V1 phase plan](./workbench-action-catalogue-v1-phase-plan.md)。
+最终回归与人工 smoke 状态见 [阶段收口报告](./workbench-action-catalogue-v1-closure-report.md)。

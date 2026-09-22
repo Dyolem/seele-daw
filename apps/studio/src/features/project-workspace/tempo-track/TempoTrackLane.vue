@@ -8,6 +8,16 @@ import {
 } from '@seele-daw/project-core'
 import { computed, onMounted, onUnmounted, shallowRef, type StyleValue, watch } from 'vue'
 
+import {
+  useStudioEditorSelectionTarget,
+  useStudioInteractionTarget,
+} from '@/workbench/actions/vue/studio-editor-action-context'
+import {
+  STUDIO_ACTION_COMPLETED,
+  STUDIO_ACTION_NOT_APPLIED,
+} from '@/workbench/actions/studio-action'
+import { useTempoEventActions } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+
 import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-control'
 import {
   type TempoTrackEventPreview,
@@ -60,7 +70,6 @@ const emit = defineEmits<{
   bpmChange: [tempoEventId: TempoEventId, bpm: TempoBpm]
   editStart: []
   move: [tempoEventId: TempoEventId, tick: Tick]
-  remove: [tempoEventId: TempoEventId]
   select: [tempoEventId: TempoEventId]
 }>()
 
@@ -211,6 +220,7 @@ function beginPointGesture(tempoEvent: TempoEventRecord, event: PointerEvent): v
   emit('select', targetTempoEvent.id)
   if (props.editingDisabled || plot === null || laneBounds === undefined) return
   const surface = event.currentTarget as HTMLElement
+  surface.focus({ preventScroll: true })
   if (
     !tempoTrackInteraction.beginPreview({
       bpm: targetTempoEvent.bpm,
@@ -320,29 +330,42 @@ function cancelPointGesture(event?: PointerEvent): void {
   event?.preventDefault()
 }
 
-function handlePointKeydown(tempoEvent: TempoEventRecord, event: KeyboardEvent): void {
-  if (event.key === 'Escape' && activeGesture.value !== null) {
+const tempoActions = useTempoEventActions()
+const focusedPoint = shallowRef<{ id: TempoEventId; element: HTMLElement } | null>(null)
+const selectedPoint = computed(() =>
+  props.tempoEvents.find(
+    (event) => event.id === focusedPoint.value?.id && event.id === props.selectedTempoEventId,
+  ),
+)
+const selectionTarget = useStudioEditorSelectionTarget(
+  {
+    isFocused: () => focusedPoint.value?.element === document.activeElement,
+    hasSelection: () => selectedPoint.value !== undefined,
+    selectionLabel: () => 'Tempo Event',
+    deleteDisabledReason: () => {
+      if (props.editingDisabled) return 'Tempo editing is unavailable during playback loading.'
+      return selectedPoint.value?.tick === 0 ? 'The initial Tempo Event cannot be removed.' : null
+    },
+    deleteSelection: () =>
+      selectedPoint.value
+        ? tempoActions.removeTempoEvent(selectedPoint.value.id)
+        : STUDIO_ACTION_NOT_APPLIED,
+  },
+  [() => props.projectId, () => focusedPoint.value?.id, () => props.selectedTempoEventId],
+)
+useStudioInteractionTarget({
+  isActive: () => activeGesture.value !== null,
+  cancel: () => {
+    if (activeGesture.value === null) return STUDIO_ACTION_NOT_APPLIED
     cancelPointGesture()
-    event.preventDefault()
-    return
-  }
-  if (
-    (event.key !== 'Delete' && event.key !== 'Backspace') ||
-    props.editingDisabled ||
-    tempoEvent.id !== props.selectedTempoEventId ||
-    tempoEvent.tick === 0
-  ) {
-    return
-  }
-  emit('remove', tempoEvent.id)
-  event.preventDefault()
-  event.stopPropagation()
-}
+    return STUDIO_ACTION_COMPLETED
+  },
+})
 
-function handleWindowKeydown(event: KeyboardEvent): void {
-  if (event.key !== 'Escape' || activeGesture.value === null) return
-  cancelPointGesture()
-  event.preventDefault()
+function focusPoint(tempoEvent: TempoEventRecord, event: FocusEvent): void {
+  if (!(event.currentTarget instanceof HTMLElement)) return
+  focusedPoint.value = { id: tempoEvent.id, element: event.currentTarget }
+  selectionTarget.activate()
 }
 
 function handleWindowBlur(): void {
@@ -384,12 +407,10 @@ watch(
 )
 
 onMounted(() => {
-  window.addEventListener('keydown', handleWindowKeydown)
   window.addEventListener('blur', handleWindowBlur)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleWindowKeydown)
   window.removeEventListener('blur', handleWindowBlur)
   cancelPointGesture()
 })
@@ -458,7 +479,7 @@ onUnmounted(() => {
         :title="pointLabel(tempoEvent)"
         @click.stop="handlePointClick(tempoEvent, $event)"
         @dblclick.stop
-        @keydown="handlePointKeydown(tempoEvent, $event)"
+        @focus="focusPoint(tempoEvent, $event)"
         @lostpointercapture="cancelPointGesture"
         @pointercancel="cancelPointGesture"
         @pointerdown.stop="beginPointGesture(tempoEvent, $event)"

@@ -1,3 +1,5 @@
+import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
@@ -197,6 +199,9 @@ function mountShell(options: MountShellOptions = {}) {
     global: {
       plugins: [pinia],
       provide: {
+        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: {
+          removeTempoEvent: () => STUDIO_ACTION_COMPLETED,
+        },
         ...actionFixture.provide,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
@@ -231,7 +236,7 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('.project-workbench__save').attributes('disabled')).toBeDefined()
     expect(wrapper.get('button[aria-label="Undo"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('button[aria-label="Redo"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('button[aria-label="Play"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('button[aria-label="Play / pause"]').attributes('disabled')).toBeUndefined()
     expect(
       wrapper.get('button[aria-label="Return to last start position"]').attributes('disabled'),
     ).toBeDefined()
@@ -296,7 +301,7 @@ describe('ProjectWorkbenchShell', () => {
     const menuItems = [
       ...(menu?.querySelectorAll<HTMLElement>('.project-workbench__menu-item') ?? []),
     ]
-    expect(menuItems).toHaveLength(9)
+    expect(menuItems).toHaveLength(10)
     expect(menu?.querySelectorAll('.project-workbench__menu-separator')).toHaveLength(3)
 
     const importAsProject = menuItems.find((item) =>

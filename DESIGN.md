@@ -291,7 +291,7 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 菜单项、工具栏按钮、快捷键和右键菜单 SHOULD 调用同一个 Studio Action。Action 表达用户
 意图；修改 Project facts 时再调用参数完整的 Project Command，保持单次 History 边界。
 
-静态目录保存 stable Action ID、label 和 description。动态 Presentation 从业务权威派生：
+静态目录保存 stable Action ID、label、description、类别与检索词。动态 Presentation 从业务权威派生：
 
 - enabled 与 disabled reason；
 - busy；
@@ -310,7 +310,7 @@ Save、Undo／Redo、Play／Pause，以及 WA2 的 Return、Projects、MIDI Impo
 - 目标替换必须使旧能力失效；Track / Clip Surface 不依赖特定卸载顺序避免重复 Action ID。
 - 打开的 Reka Menu / Modal 是输入屏障，负责自己的导航、Escape 和焦点恢复；后台优先级
   为当前编辑交互 → 聚焦编辑器 → Workbench → Global。
-- Project Menu 发起 Projects 导航前先关闭菜单并恢复按钮焦点；未保存确认框通过 Cancel 或
+- Project Menu 发起 Projects 导航或 Keyboard shortcuts 对话框前先关闭菜单并恢复按钮焦点；未保存确认框通过 Cancel 或
   Escape 关闭后回到该按钮。原生 MIDI 文件选择器保留原始输入调用栈中的同步触发。
 - 进入菜单造成的 DOM 失焦不会禁用仍然有效的显式菜单 Action；键盘的焦点路由独立判断。
 - 普通可编辑元素和 IME composing 默认不触发编辑 Action。
@@ -324,7 +324,14 @@ Save、Undo／Redo、Play／Pause，以及 WA2 的 Return、Projects、MIDI Impo
 - Track 音符区域聚焦不会沿用旧 CC64 目标；Tab 聚焦回 Lane 可恢复其选择操作。
 
 已有 `@tanstack/hotkeys@0.8.0` Browser Adapter 继续隔离平台解析与输入过滤。动态用户 Binding
-需先验证；Settings、Recorder、持久化和右键菜单不属于 WA1。
+需先验证。S1 的只读 Keyboard shortcuts 窗口从统一目录查询已绑定和未绑定 Action，
+提供搜索、筛选、当前／默认键位和作用区域；Widget 与 Pointer Modifier 作为帮助内容单列。
+窗口使用 Dialog 焦点约束，打开时聚焦搜索，关闭后回到原入口；改键与 Recorder 属于 S2–S3。
+
+按钮的原生 Enter / Space，以及 Slider / Splitter 的导航键优先于后台 Action；Arrangement
+Clip 和 Bar 的 Enter 在互斥 Focus Context 中分别执行打开／创建。选区目标由 Focus 激活，
+Mount 不抢占；Cancel 使用独立活动交互能力。Follow 在实际导航或滚动后暂停，不维护物理
+按键列表。Cursor、Pencil 与 Snap 工具栏使用 Action 路径，提示从有效 Keymap 派生。
 
 架构与中英术语见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)；
 输入细则见 [Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。

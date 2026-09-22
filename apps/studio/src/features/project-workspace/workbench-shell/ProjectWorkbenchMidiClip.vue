@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed, type StyleValue } from 'vue'
+import { computed, onBeforeUnmount, useTemplateRef, watch, type StyleValue } from 'vue'
+
+import { useArrangementActionTargets } from '@/features/project-workspace/actions/project-workbench-action-context'
+import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
+import { STUDIO_ACTION, STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 
@@ -27,14 +31,44 @@ const clipStyle = computed<StyleValue>(() => {
   }
 })
 
-function openClip(): void {
-  emit('select')
-  emit('open')
+const element = useTemplateRef<HTMLButtonElement>('element')
+const { actions, keyboard } = useStudioActions()
+const { arrangementClipTarget } = useArrangementActionTargets()
+let releaseTarget: (() => void) | null = null
+function activateTarget(): void {
+  releaseTarget?.()
+  releaseTarget = arrangementClipTarget.bind({
+    isFocused: () => element.value === document.activeElement,
+    execute: () => {
+      emit('select')
+      emit('open')
+      return STUDIO_ACTION_COMPLETED
+    },
+  })
 }
+watch(
+  () => props.clip.id,
+  () => {
+    releaseTarget?.()
+    releaseTarget = null
+    if (element.value === document.activeElement) activateTarget()
+  },
+  { flush: 'sync' },
+)
+onBeforeUnmount(() => releaseTarget?.())
+function openClip(): void {
+  activateTarget()
+  actions.invoke(STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN, 'toolbar')
+}
+const openHint = computed(() => {
+  const bindings = keyboard.displayBindingsFor(STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN).join(' / ')
+  return `Double-click${bindings ? ` or press ${bindings}` : ''} to open.`
+})
 </script>
 
 <template>
   <button
+    ref="element"
     class="project-midi-clip"
     :class="{
       'project-midi-clip--muted': props.clip.muted,
@@ -42,11 +76,11 @@ function openClip(): void {
     }"
     :style="clipStyle"
     type="button"
-    :aria-label="`${props.clip.name} MIDI clip${props.clip.muted ? ', muted' : ''}. Double-click or press Enter to open.`"
+    :aria-label="`${props.clip.name} MIDI clip${props.clip.muted ? ', muted' : ''}. ${openHint}`"
     :aria-pressed="props.selected"
     @click.stop="emit('select')"
     @dblclick.stop="openClip"
-    @keydown.enter.stop.prevent="openClip"
+    @focus="activateTarget"
   >
     <span class="project-midi-clip__accent" aria-hidden="true"></span>
     <strong>{{ props.clip.name }}</strong>

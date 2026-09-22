@@ -1,3 +1,5 @@
+import { STUDIO_EDITOR_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-editor-action-context'
+import { STUDIO_INTERFACE_ACTION_TARGET_KEY } from '@/workbench/actions/vue/studio-interface-action-context'
 import { ToneJsMidiFileDecoder, type MidiFileDecoder } from '@seele-daw/midi-file'
 import { BrowserLocalFileByteReader, type LocalFileByteReader } from '@seele-daw/platform-browser'
 import type { ProjectMidiImportIdFactory } from '@seele-daw/project-midi'
@@ -20,8 +22,11 @@ import {
   createStudioActionRuntime,
   type StudioActionRuntime,
 } from '@/bootstrap/studio-action-runtime'
-import { PROJECT_WORKBENCH_ACTION_TARGET_KEY } from '@/features/project-workspace/actions/project-workbench-action-context'
-import { PIANO_ROLL_ACTION_TARGET_KEY } from '@/features/piano-roll/actions/piano-roll-action-context'
+import {
+  PROJECT_WORKBENCH_ACTION_TARGET_KEY,
+  ARRANGEMENT_ACTION_TARGETS_KEY,
+} from '@/features/project-workspace/actions/project-workbench-action-context'
+import { PIANO_ROLL_TOOL_ACTION_TARGET_KEY } from '@/features/piano-roll/actions/piano-roll-action-context'
 import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
 import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/studio-keyboard-binding-registry'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
@@ -327,7 +332,10 @@ export function composeStudioApplication(
     vueApplication.provide(PROJECT_PLAYBACK_CONTEXT_KEY, projectPlaybackBinding.context)
     vueApplication.provide(STUDIO_ACTION_CONTEXT_KEY, actionRuntime)
     vueApplication.provide(PROJECT_WORKBENCH_ACTION_TARGET_KEY, actionRuntime.workbenchTarget)
-    vueApplication.provide(PIANO_ROLL_ACTION_TARGET_KEY, actionRuntime.pianoRollTarget)
+    vueApplication.provide(PIANO_ROLL_TOOL_ACTION_TARGET_KEY, actionRuntime.pianoRollToolTarget)
+    vueApplication.provide(STUDIO_EDITOR_ACTION_CONTEXT_KEY, actionRuntime)
+    vueApplication.provide(STUDIO_INTERFACE_ACTION_TARGET_KEY, actionRuntime.interfaceTarget)
+    vueApplication.provide(ARRANGEMENT_ACTION_TARGETS_KEY, actionRuntime)
     vueApplication.provide(
       PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
       projectNavigationDecisionBinding.context,

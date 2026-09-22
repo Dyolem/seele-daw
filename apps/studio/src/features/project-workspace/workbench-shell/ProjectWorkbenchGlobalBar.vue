@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import KeyboardIcon from '~icons/fluent/keyboard-20-regular'
 import FolderOpenIcon from '~icons/fluent/folder-open-20-regular'
 import ArrowUndoIcon from '~icons/fluent/arrow-undo-20-regular'
 import ArrowRedoIcon from '~icons/fluent/arrow-redo-20-regular'
@@ -80,19 +81,25 @@ const menuGroups = computed(() => [
   },
   {
     label: 'View',
-    items: [{ action: props.actionControls.openMidiEditor, icon: PanelBottomIcon }],
+    items: [
+      { action: props.actionControls.openMidiEditor, icon: PanelBottomIcon },
+      { action: props.actionControls.keyboardShortcuts, icon: KeyboardIcon },
+    ],
   },
 ])
 
 const isMenuOpen = shallowRef(false)
 const menuTrigger = useTemplateRef<InstanceType<typeof UiIconButton>>('menuTrigger')
-let showProjectsAfterMenuClose = false
+let actionAfterMenuClose: StudioActionId | null = null
 useStudioKeyboardLayer(() => isMenuOpen.value)
 
 function invokeMenuAction(actionId: StudioActionId): void {
-  // Navigation may open a confirmation dialog; first return focus to its stable origin.
-  if (actionId === props.actionControls.projects.actionId) {
-    showProjectsAfterMenuClose = true
+  // Dialog-opening actions first return focus to the stable menu trigger.
+  if (
+    actionId === props.actionControls.projects.actionId ||
+    actionId === props.actionControls.keyboardShortcuts.actionId
+  ) {
+    actionAfterMenuClose = actionId
     return
   }
   // Native file choosers must retain the original user activation.
@@ -100,15 +107,16 @@ function invokeMenuAction(actionId: StudioActionId): void {
 }
 
 function handleMenuCloseAutoFocus(event: Event): void {
-  if (!showProjectsAfterMenuClose) return
-  showProjectsAfterMenuClose = false
+  const actionId = actionAfterMenuClose
+  if (actionId === null) return
+  actionAfterMenuClose = null
   event.preventDefault()
   menuTrigger.value?.focus()
-  emit('invokeAction', props.actionControls.projects.actionId, 'menu')
+  emit('invokeAction', actionId, 'menu')
 }
 
 onBeforeUnmount(() => {
-  showProjectsAfterMenuClose = false
+  actionAfterMenuClose = null
 })
 
 const saveStatusLabel = computed(() => {

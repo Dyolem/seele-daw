@@ -1,8 +1,4 @@
-import {
-  STUDIO_ACTION,
-  type StudioActionId,
-  type StudioActionFailure,
-} from '@/workbench/actions/studio-action'
+import { type StudioActionId, type StudioActionFailure } from '@/workbench/actions/studio-action'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type {
   StudioKeyboardBinding,
@@ -13,29 +9,21 @@ import type {
   StudioKeyboardBindingRegistry,
   StudioKeyboardDispose,
 } from '@/workbench/keyboard/studio-keyboard-binding-registry'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/studio-default-keymap'
-
-export type StudioKeyboardScope = 'global' | 'workbench' | 'editor' | 'interaction'
-
-const SCOPE_PRIORITY = { global: 0, workbench: 1, editor: 2, interaction: 3 } as const
-const ACTION_SCOPES: Readonly<Record<StudioActionId, StudioKeyboardScope>> = {
-  [STUDIO_ACTION.HISTORY_REDO]: 'workbench',
-  [STUDIO_ACTION.HISTORY_UNDO]: 'workbench',
-  [STUDIO_ACTION.PIANO_ROLL_INTERACTION_CANCEL]: 'interaction',
-  [STUDIO_ACTION.PIANO_ROLL_SELECTION_CLEAR]: 'editor',
-  [STUDIO_ACTION.PIANO_ROLL_SELECTION_DELETE]: 'editor',
-  [STUDIO_ACTION.PLAYBACK_TOGGLE]: 'workbench',
-  [STUDIO_ACTION.PLAYBACK_RETURN_TO_START]: 'workbench',
-  [STUDIO_ACTION.PROJECTS_SHOW]: 'workbench',
-  [STUDIO_ACTION.PROJECT_IMPORT_MIDI]: 'workbench',
-  [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS]: 'workbench',
-  [STUDIO_ACTION.MIDI_EDITOR_OPEN]: 'workbench',
-  [STUDIO_ACTION.PROJECT_SAVE]: 'workbench',
-}
+import {
+  createStudioKeyboardKeymap,
+  STUDIO_SHORTCUT_POLICIES,
+} from '@/workbench/keyboard/studio-default-keymap'
+import {
+  STUDIO_KEYBOARD_CONTEXTS,
+  studioKeyboardContextsOverlap,
+  type StudioKeyboardContext,
+} from '@/workbench/keyboard/studio-keyboard-context'
+import { isWidgetOwnedKeyboardInput } from '@/workbench/keyboard/browser-keyboard-ownership'
 
 export interface StudioKeyboardInputRouter {
   bindingsFor(actionId: StudioActionId): readonly StudioKeyboardBinding[]
   displayBindingsFor(actionId: StudioActionId): readonly string[]
+  formatBinding(binding: StudioKeyboardBinding): string
   validateBindingInput(input: string): StudioKeyboardBindingValidation
   suspend(): StudioKeyboardDispose
   dispose(): void
@@ -46,7 +34,7 @@ export interface StudioKeyboardInputRouterOptions {
   readonly bindingRegistry: StudioKeyboardBindingRegistry
   readonly keymap: StudioKeyboardKeymap<StudioActionId>
   readonly isModalActive: () => boolean
-  readonly isScopeActive: (scope: StudioKeyboardScope) => boolean
+  readonly isContextActive: (context: StudioKeyboardContext) => boolean
   readonly reportFailure: (failure: StudioActionFailure) => void
 }
 
@@ -68,8 +56,18 @@ export function createStudioKeyboardInputRouter(
         routes.set(identity, route)
       }
       if (route.actionIds.includes(actionId)) continue
-      if (route.actionIds.some((id) => ACTION_SCOPES[id] === ACTION_SCOPES[actionId])) {
-        throw new Error(`Ambiguous keyboard binding in ${ACTION_SCOPES[actionId]}: ${binding}`)
+      const context = STUDIO_SHORTCUT_POLICIES[actionId].context
+      if (
+        route.actionIds.some((id) => {
+          const other = STUDIO_SHORTCUT_POLICIES[id].context
+          return (
+            STUDIO_KEYBOARD_CONTEXTS[other].priority ===
+              STUDIO_KEYBOARD_CONTEXTS[context].priority &&
+            studioKeyboardContextsOverlap(other, context)
+          )
+        })
+      ) {
+        throw new Error(`Ambiguous keyboard binding in ${context}: ${binding}`)
       }
       route.actionIds.push(actionId)
     }
@@ -105,7 +103,17 @@ export function createStudioKeyboardInputRouter(
     for (const actionId of actionIds) {
       try {
         // Only query the matching scope: a broken editor must not disable Workbench Save.
-        if (!options.isScopeActive(ACTION_SCOPES[actionId])) continue
+        const policy = STUDIO_SHORTCUT_POLICIES[actionId]
+        if (
+          !options.isContextActive(policy.context) ||
+          isWidgetOwnedKeyboardInput(event, policy.context)
+        )
+          continue
+        if (event.repeat && !policy.allowRepeat) {
+          event.preventDefault()
+          event.stopPropagation()
+          return
+        }
         const invocation = options.actions.invoke(actionId, 'keyboard')
         if (invocation.status === 'unavailable') continue
       } catch (cause) {
@@ -121,7 +129,9 @@ export function createStudioKeyboardInputRouter(
   try {
     for (const route of routes.values()) {
       route.actionIds.sort(
-        (a, b) => SCOPE_PRIORITY[ACTION_SCOPES[b]] - SCOPE_PRIORITY[ACTION_SCOPES[a]],
+        (a, b) =>
+          STUDIO_KEYBOARD_CONTEXTS[STUDIO_SHORTCUT_POLICIES[b].context].priority -
+          STUDIO_KEYBOARD_CONTEXTS[STUDIO_SHORTCUT_POLICIES[a].context].priority,
       )
       releases.push(
         options.bindingRegistry.register(route.binding, (event) =>
@@ -139,6 +149,7 @@ export function createStudioKeyboardInputRouter(
       Object.freeze(
         keymap[actionId].map((binding) => options.bindingRegistry.formatForDisplay(binding)),
       ),
+    formatBinding: (binding) => options.bindingRegistry.formatForDisplay(binding),
     validateBindingInput: (input) => options.bindingRegistry.validate(input),
     suspend() {
       const owner = Symbol('keyboard-input-owner')

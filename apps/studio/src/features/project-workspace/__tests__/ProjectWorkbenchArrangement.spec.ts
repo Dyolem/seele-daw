@@ -1,3 +1,6 @@
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
+import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
 import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import {
   createTempoEventRecord,
@@ -59,6 +62,7 @@ const STUDIO_GRAND_INSTRUMENT = Object.freeze({
 })
 
 interface ArrangementFixture {
+  readonly keyboard: ReturnType<typeof createTestStudioActionRuntime>
   readonly addEmptyMidiClip: ReturnType<typeof vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>>
   readonly addInstrumentTrack: ReturnType<
     typeof vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>
@@ -88,6 +92,7 @@ interface MountArrangementOptions {
 }
 
 function mountArrangement(options: MountArrangementOptions = {}): ArrangementFixture {
+  const keyboard = createTestStudioActionRuntime()
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
   const toasts = useUiToastStore(pinia)
@@ -168,6 +173,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     visualPosition: playbackVisualPosition,
   })
   const wrapper = mount(ProjectWorkbenchArrangement, {
+    attachTo: document.body,
     props: {
       barSpanTick: parsePositiveTick(3_840),
       midiImportAction: {
@@ -187,6 +193,10 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     global: {
       plugins: [pinia],
       provide: {
+        ...keyboard.provide,
+        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: {
+          removeTempoEvent: () => STUDIO_ACTION_COMPLETED,
+        },
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: clipContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: context,
@@ -196,6 +206,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   mountedWrappers.push(wrapper)
 
   return {
+    keyboard,
     addEmptyMidiClip,
     addInstrumentTrack,
     beginTimelineLocate,
@@ -379,44 +390,49 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(fixture.beginTimelineLocate).toHaveBeenCalledOnce()
   })
 
-  it('updates only the silent preview while dragging and cancels the gesture safely', async () => {
-    const fixture = mountArrangement()
-    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
-      .element as HTMLElement
-    Object.defineProperty(viewport, 'scrollWidth', { configurable: true, value: 1_600 })
-    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
-      bottom: 600,
-      height: 500,
-      left: 100,
-      right: 500,
-      toJSON: () => ({}),
-      top: 100,
-      width: 400,
-      x: 100,
-      y: 100,
-    })
-    const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface')
+  it.each(['pointercancel', 'Escape'])(
+    'cancels the silent locate preview through %s and ignores a late release',
+    async (cancelInput) => {
+      const fixture = mountArrangement()
+      const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+        .element as HTMLElement
+      Object.defineProperty(viewport, 'scrollWidth', { configurable: true, value: 1_600 })
+      vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+        bottom: 600,
+        height: 500,
+        left: 100,
+        right: 500,
+        toJSON: () => ({}),
+        top: 100,
+        width: 400,
+        x: 100,
+        y: 100,
+      })
+      const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface')
 
-    await dispatchPointerEvent(ruler.element, 'pointerdown', {
-      button: 0,
-      clientX: 100,
-      isPrimary: true,
-      pointerId: 9,
-    })
-    await dispatchPointerEvent(ruler.element, 'pointermove', { clientX: 500, pointerId: 9 })
+      await dispatchPointerEvent(ruler.element, 'pointerdown', {
+        button: 0,
+        clientX: 100,
+        isPrimary: true,
+        pointerId: 9,
+      })
+      await dispatchPointerEvent(ruler.element, 'pointermove', { clientX: 500, pointerId: 9 })
 
-    expect(
-      fixture.wrapper.get('.project-workbench__arrangement-locate-preview').attributes('style'),
-    ).toContain('transform: translate3d(10rem, 0, 0)')
-    expect(fixture.commitTimelineLocate).not.toHaveBeenCalled()
+      expect(
+        fixture.wrapper.get('.project-workbench__arrangement-locate-preview').attributes('style'),
+      ).toContain('transform: translate3d(10rem, 0, 0)')
+      expect(fixture.commitTimelineLocate).not.toHaveBeenCalled()
 
-    await dispatchPointerEvent(ruler.element, 'pointercancel', { pointerId: 9 })
-    expect(fixture.cancelTimelineLocate).toHaveBeenCalledOnce()
-    expect(fixture.commitTimelineLocate).not.toHaveBeenCalled()
-    expect(fixture.wrapper.find('.project-workbench__arrangement-locate-preview').exists()).toBe(
-      false,
-    )
-  })
+      if (cancelInput === 'Escape') fixture.keyboard.bindingRegistry.dispatch('Escape')
+      else await dispatchPointerEvent(ruler.element, 'pointercancel', { pointerId: 9 })
+      await dispatchPointerEvent(ruler.element, 'pointerup', { pointerId: 9, clientX: 500 })
+      expect(fixture.cancelTimelineLocate).toHaveBeenCalledOnce()
+      expect(fixture.commitTimelineLocate).not.toHaveBeenCalled()
+      expect(fixture.wrapper.find('.project-workbench__arrangement-locate-preview').exists()).toBe(
+        false,
+      )
+    },
+  )
 
   it('continuously scrolls a captured locate drag near the Arrangement edge', async () => {
     const frameCallbacks: FrameRequestCallback[] = []
@@ -1191,7 +1207,7 @@ describe('ProjectWorkbenchArrangement', () => {
 
   it('provides a keyboard path for creating a MIDI Clip on the focused bar', async () => {
     const trackId = parseTrackId('track-create-clip-keyboard')
-    const { addEmptyMidiClip, wrapper } = mountArrangement({
+    const { addEmptyMidiClip, wrapper, keyboard } = mountArrangement({
       tracks: Object.freeze([
         Object.freeze({
           color: parseProjectColor('#16B8D4'),
@@ -1204,7 +1220,9 @@ describe('ProjectWorkbenchArrangement', () => {
     })
     const secondBar = wrapper.findAll('.project-workbench__lane-grid button')[1]!
 
-    await secondBar.trigger('keydown', { key: 'Enter' })
+    ;(secondBar.element as HTMLElement).focus()
+    keyboard.bindingRegistry.dispatch('Enter')
+    await nextTick()
 
     expect(addEmptyMidiClip).toHaveBeenCalledExactlyOnceWith({
       targetTick: parseTick(3_840),
@@ -1238,7 +1256,7 @@ describe('ProjectWorkbenchArrangement', () => {
   it('selects and opens an existing Clip without creating another one', async () => {
     const trackId = parseTrackId('track-existing-clip')
     const clipId = parseClipId('clip-existing')
-    const { addEmptyMidiClip, selection, wrapper } = mountArrangement({
+    const { addEmptyMidiClip, selection, wrapper, keyboard } = mountArrangement({
       clips: Object.freeze([
         Object.freeze({
           color: null,
@@ -1271,7 +1289,9 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(wrapper.emitted('openMidiClip')).toHaveLength(1)
     expect(clip.attributes('aria-pressed')).toBe('true')
 
-    await clip.trigger('keydown', { key: 'Enter' })
+    ;(clip.element as HTMLElement).focus()
+    keyboard.bindingRegistry.dispatch('Enter')
+    await nextTick()
 
     expect(addEmptyMidiClip).not.toHaveBeenCalled()
     expect(wrapper.emitted('openMidiClip')).toHaveLength(2)

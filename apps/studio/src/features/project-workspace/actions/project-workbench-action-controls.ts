@@ -24,6 +24,7 @@ export function presentProjectWorkbenchActions(
     importMidiProject: present(STUDIO_ACTION.PROJECT_IMPORT_MIDI),
     importMidiTracks: present(STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS),
     openMidiEditor: present(STUDIO_ACTION.MIDI_EDITOR_OPEN),
+    keyboardShortcuts: present(STUDIO_ACTION.SHORTCUTS_SHOW),
   })
 }
 

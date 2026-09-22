@@ -1,3 +1,4 @@
+import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
 import type { ProjectWorkbenchMidiEditor } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import {
   STUDIO_ACTION,
@@ -39,12 +40,14 @@ export function createProjectWorkbenchActions(
   targets: StudioActionTargetSlot<ProjectWorkbenchActionTarget>,
 ): readonly StudioActionDefinition[] {
   function define(
-    descriptor: StudioActionDescriptor,
+    actionId: StudioActionDescriptor['actionId'],
     resolve: (
       target: ProjectWorkbenchActionTarget,
       ready: ReadyActiveProjectState,
+      defaultLabel: string,
     ) => Pick<StudioActionResolution, 'presentation' | 'execute'>,
   ): StudioActionDefinition {
+    const descriptor = describeStudioAction(actionId)
     return Object.freeze({
       ...descriptor,
       resolve() {
@@ -52,7 +55,7 @@ export function createProjectWorkbenchActions(
         const ready = binding?.value.getReadyProject() ?? null
         if (binding === null || ready === null) return null
         return {
-          ...resolve(binding.value, ready),
+          ...resolve(binding.value, ready, descriptor.label),
           isCurrent: () =>
             binding.isCurrent() && binding.value.getReadyProject()?.session === ready.session,
           onInvalidated: binding.onInvalidated,
@@ -64,9 +67,9 @@ export function createProjectWorkbenchActions(
   function defineMidiImport(
     actionId: StudioActionDescriptor['actionId'],
     destination: 'new-project' | 'new-tracks',
-    label: string,
   ): StudioActionDefinition {
-    return define({ actionId, label, description: label }, (target) => {
+    const { label } = describeStudioAction(actionId)
+    return define(actionId, (target) => {
       const phase = target.getMidiImportPhase()
       const busy = phase !== 'idle'
       let reason: string | null = null
@@ -100,157 +103,100 @@ export function createProjectWorkbenchActions(
   }
 
   return Object.freeze([
-    define(
-      {
-        actionId: STUDIO_ACTION.PROJECT_SAVE,
-        label: 'Save',
-        description: 'Save the current project.',
-      },
-      (target, ready) => {
-        const busy = ready.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.SAVING
-        let label = 'Save'
-        if (busy) label = 'Saving…'
-        else if (ready.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED) label = 'Retry save'
-        let reason: string | null = null
-        if (busy) reason = 'The project is being saved.'
-        else if (!ready.isDirty) reason = 'All changes are saved.'
-        return {
-          presentation: createStudioActionPresentation(label, reason, { busy }),
-          async execute() {
-            try {
-              await target.save()
-              return STUDIO_ACTION_COMPLETED
-            } catch (cause) {
-              return {
-                status: 'failed',
-                cause,
-                reported: target.getReadyProject()?.saveFailure === cause,
-              }
-            }
-          },
-        }
-      },
-    ),
-    define(
-      {
-        actionId: STUDIO_ACTION.HISTORY_UNDO,
-        label: 'Undo',
-        description: 'Undo the last project edit.',
-      },
-      (_target, ready) => ({
-        presentation: createStudioActionPresentation(
-          'Undo',
-          ready.session.canUndo ? null : 'There is nothing to undo.',
-        ),
-        execute: () =>
-          ready.session.undo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
-      }),
-    ),
-    define(
-      {
-        actionId: STUDIO_ACTION.HISTORY_REDO,
-        label: 'Redo',
-        description: 'Redo the last undone project edit.',
-      },
-      (_target, ready) => ({
-        presentation: createStudioActionPresentation(
-          'Redo',
-          ready.session.canRedo ? null : 'There is nothing to redo.',
-        ),
-        execute: () =>
-          ready.session.redo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
-      }),
-    ),
-    define(
-      {
-        actionId: STUDIO_ACTION.PLAYBACK_TOGGLE,
-        label: 'Play',
-        description: 'Play or pause the current project.',
-      },
-      (target, ready) => {
-        const state = target.getPlaybackState()
-        const busy = state.phase === PROJECT_PLAYBACK_PHASE.LOADING
-        const playing = state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
-        const playable =
-          state.projectId === ready.projectId &&
-          (state.planStatus === 'playable' || state.planStatus === 'partial')
-        let label = playing ? 'Pause' : 'Play'
-        if (busy) label = 'Loading…'
-        let reason: string | null = null
-        if (busy) reason = 'Playback is loading.'
-        else if (!playable) reason = state.feedback?.message ?? 'No playable audio is available.'
-        return {
-          presentation: createStudioActionPresentation(label, reason, { busy, checked: playing }),
-          async execute() {
-            const applied = playing ? target.playback.pause() : await target.playback.play()
-            return playbackCompletion(target, applied)
-          },
-        }
-      },
-    ),
-    define(
-      {
-        actionId: STUDIO_ACTION.PLAYBACK_RETURN_TO_START,
-        label: 'Return to last start position',
-        description: 'Stop playback and return to the last start position.',
-      },
-      (target) => ({
-        presentation: createStudioActionPresentation(
-          'Return to last start position',
-          target.canReturnToLastStartPosition() ? null : 'Already at the last start position.',
-        ),
-        execute: () => playbackCompletion(target, target.playback.returnToLastStartPosition()),
-      }),
-    ),
-    define(
-      {
-        actionId: STUDIO_ACTION.PROJECTS_SHOW,
-        label: 'Projects',
-        description: 'Return to the project list through the existing navigation guard.',
-      },
-      (target) => {
-        const busy = target.isShowingProjects()
-        return {
-          presentation: createStudioActionPresentation(
-            'Projects',
-            busy ? 'Project navigation is awaiting completion.' : null,
-            { busy },
-          ),
-          execute: () => target.showProjects(),
-        }
-      },
-    ),
-    defineMidiImport(
-      STUDIO_ACTION.PROJECT_IMPORT_MIDI,
-      'new-project',
-      'Import MIDI as new project…',
-    ),
-    defineMidiImport(
-      STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
-      'new-tracks',
-      'Import MIDI as new tracks…',
-    ),
-    define(
-      {
-        actionId: STUDIO_ACTION.MIDI_EDITOR_OPEN,
-        label: 'Open MIDI editor',
-        description: 'Open or restore the MIDI editor without changing the current selection.',
-      },
-      (target) => {
-        const editor = target.getMidiEditor()
-        return {
-          presentation: createStudioActionPresentation(
-            'Open MIDI editor',
-            editor === null ? 'The MIDI editor workspace is unavailable.' : null,
-            { checked: editor?.isOpen() ?? false },
-          ),
-          execute() {
-            if (editor === null) return STUDIO_ACTION_NOT_APPLIED
-            editor.open()
+    define(STUDIO_ACTION.PROJECT_SAVE, (target, ready, defaultLabel) => {
+      const busy = ready.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.SAVING
+      let label = defaultLabel
+      if (busy) label = 'Saving…'
+      else if (ready.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED) label = 'Retry save'
+      let reason: string | null = null
+      if (busy) reason = 'The project is being saved.'
+      else if (!ready.isDirty) reason = 'All changes are saved.'
+      return {
+        presentation: createStudioActionPresentation(label, reason, { busy }),
+        async execute() {
+          try {
+            await target.save()
             return STUDIO_ACTION_COMPLETED
-          },
-        }
-      },
-    ),
+          } catch (cause) {
+            return {
+              status: 'failed',
+              cause,
+              reported: target.getReadyProject()?.saveFailure === cause,
+            }
+          }
+        },
+      }
+    }),
+    define(STUDIO_ACTION.HISTORY_UNDO, (_target, ready, label) => ({
+      presentation: createStudioActionPresentation(
+        label,
+        ready.session.canUndo ? null : 'There is nothing to undo.',
+      ),
+      execute: () =>
+        ready.session.undo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
+    })),
+    define(STUDIO_ACTION.HISTORY_REDO, (_target, ready, label) => ({
+      presentation: createStudioActionPresentation(
+        label,
+        ready.session.canRedo ? null : 'There is nothing to redo.',
+      ),
+      execute: () =>
+        ready.session.redo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
+    })),
+    define(STUDIO_ACTION.PLAYBACK_TOGGLE, (target, ready) => {
+      const state = target.getPlaybackState()
+      const busy = state.phase === PROJECT_PLAYBACK_PHASE.LOADING
+      const playing = state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
+      const playable =
+        state.projectId === ready.projectId &&
+        (state.planStatus === 'playable' || state.planStatus === 'partial')
+      let label = playing ? 'Pause' : 'Play'
+      if (busy) label = 'Loading…'
+      let reason: string | null = null
+      if (busy) reason = 'Playback is loading.'
+      else if (!playable) reason = state.feedback?.message ?? 'No playable audio is available.'
+      return {
+        presentation: createStudioActionPresentation(label, reason, { busy, checked: playing }),
+        async execute() {
+          const applied = playing ? target.playback.pause() : await target.playback.play()
+          return playbackCompletion(target, applied)
+        },
+      }
+    }),
+    define(STUDIO_ACTION.PLAYBACK_RETURN_TO_START, (target, _ready, label) => ({
+      presentation: createStudioActionPresentation(
+        label,
+        target.canReturnToLastStartPosition() ? null : 'Already at the last start position.',
+      ),
+      execute: () => playbackCompletion(target, target.playback.returnToLastStartPosition()),
+    })),
+    define(STUDIO_ACTION.PROJECTS_SHOW, (target, _ready, label) => {
+      const busy = target.isShowingProjects()
+      return {
+        presentation: createStudioActionPresentation(
+          label,
+          busy ? 'Project navigation is awaiting completion.' : null,
+          { busy },
+        ),
+        execute: () => target.showProjects(),
+      }
+    }),
+    defineMidiImport(STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'new-project'),
+    defineMidiImport(STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'new-tracks'),
+    define(STUDIO_ACTION.MIDI_EDITOR_OPEN, (target, _ready, label) => {
+      const editor = target.getMidiEditor()
+      return {
+        presentation: createStudioActionPresentation(
+          label,
+          editor === null ? 'The MIDI editor workspace is unavailable.' : null,
+          { checked: editor?.isOpen() ?? false },
+        ),
+        execute() {
+          if (editor === null) return STUDIO_ACTION_NOT_APPLIED
+          editor.open()
+          return STUDIO_ACTION_COMPLETED
+        },
+      }
+    }),
   ])
 }

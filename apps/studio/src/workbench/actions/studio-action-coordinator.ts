@@ -44,8 +44,14 @@ export function createStudioActionCoordinator(
     definitions.set(definition.actionId, Object.freeze({ ...definition }))
   }
   const catalogue = Object.freeze(
-    [...definitions.values()].map(({ actionId, description, label }) =>
-      Object.freeze({ actionId, description, label }),
+    [...definitions.values()].map(({ actionId, description, label, category, keywords }) =>
+      Object.freeze({
+        actionId,
+        description,
+        label,
+        category,
+        keywords: Object.freeze([...keywords]),
+      }),
     ),
   )
   const pending = new Set<() => void>()

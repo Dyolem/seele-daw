@@ -44,6 +44,10 @@ const modelStoreWriteAccessConsumers = new Set([
   'packages/project-core/src/model/model-store.ts',
   'packages/project-core/src/mutation/mutation-applier.ts',
 ])
+const studioHotkeyAdapterFiles = new Set([
+  'apps/studio/src/workbench/keyboard/browser-tanstack-hotkey-registry.ts',
+  'apps/studio/src/workbench/keyboard/studio-keyboard-binding.ts',
+])
 const projectCoreCommandsDirectory = path.join(root, 'packages', 'project-core', 'src', 'commands')
 const errors = []
 
@@ -158,6 +162,15 @@ for (const file of await collectFiles(root)) {
   }
 
   for (const specifier of importsFrom(source)) {
+    if (
+      /^@tanstack\/(?:hotkeys|vue-hotkeys|react-hotkeys)(?:\/|$)/u.test(specifier) &&
+      !relativeFile.includes('/__tests__/') &&
+      !studioHotkeyAdapterFiles.has(relativeFile)
+    ) {
+      errors.push(
+        `${relativeFile}: TanStack Hotkeys 只能由 Studio Keyboard Adapter 导入；组件应调用 Action`,
+      )
+    }
     if (withoutSourceExtension(specifier).endsWith('/model-store-write-access')) {
       if (!modelStoreWriteAccessConsumers.has(relativeFile)) {
         errors.push(

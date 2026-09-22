@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import {
+  STUDIO_ACTION,
+  STUDIO_ACTION_COMPLETED,
+  STUDIO_ACTION_NOT_APPLIED,
+  type StudioActionCompletion,
+  type StudioActionId,
+  type StudioActionSource,
+} from '@/workbench/actions/studio-action'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import {
   parseTick,
@@ -9,6 +16,9 @@ import {
   type Tick,
   type TrackId,
 } from '@seele-daw/project-core'
+import { useArrangementActionTargets } from '@/features/project-workspace/actions/project-workbench-action-context'
+import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
+import { useStudioInteractionTarget } from '@/workbench/actions/vue/studio-editor-action-context'
 import GridIcon from '~icons/fluent/grid-20-regular'
 import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MidiIcon from '~icons/fluent/midi-20-regular'
@@ -16,7 +26,15 @@ import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
-import { computed, nextTick, onUnmounted, shallowRef, type StyleValue, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onUnmounted,
+  shallowRef,
+  type StyleValue,
+  watch,
+} from 'vue'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
@@ -67,17 +85,6 @@ const WHEEL_DELTA_MODE_PAGE = 2
 const WHEEL_LINE_BLOCK_SIZE_PX = 16
 const MAXIMUM_LOCATE_EDGE_SCROLL_FRAME_DURATION_SECOND = 0.05
 const EMPTY_CLIPS: readonly ProjectMidiClipPresentation[] = Object.freeze([])
-const TIMELINE_INTERACTION_KEYS = new Set([
-  ' ',
-  'ArrowLeft',
-  'ArrowRight',
-  'End',
-  'Enter',
-  'Home',
-  'PageDown',
-  'PageUp',
-])
-
 interface TimelineBarPresentation {
   readonly number: number
   readonly startTick: Tick
@@ -138,11 +145,54 @@ const isTimelineFollowSuspended = shallowRef(false)
 const locatePreviewTick = shallowRef<Tick | null>(null)
 const tempoTrackInteraction = provideTempoTrackInteraction()
 let observedArrangementScrollLeft = 0
-let activeTimelineLocateGesture: ActiveTimelineLocateGesture | null = null
+const activeTimelineLocateGesture = shallowRef<ActiveTimelineLocateGesture | null>(null)
 let locateEdgeScrollFrameHandle: number | null = null
 let locateEdgeScrollPreviousTimestamp: number | null = null
 let locatePointerClientX = 0
 let pendingPlaybackStartFollowSuspension: boolean | null = null
+
+const { actions, keyboard } = useStudioActions()
+const { arrangementBarTarget } = useArrangementActionTargets()
+let releaseBarTarget: (() => void) | null = null
+function bindBarTarget(track: ProjectTrackPresentation, tick: Tick, event: Event): void {
+  const element = event.currentTarget
+  if (!(element instanceof HTMLElement)) return
+  releaseBarTarget?.()
+  releaseBarTarget = arrangementBarTarget.bind({
+    isFocused: () => element === document.activeElement && element.isConnected,
+    execute: () => {
+      const currentTrack = props.tracks.find(({ id }) => id === track.id)
+      return currentTrack && tick < props.timelineEndTick
+        ? createEmptyMidiClip(currentTrack, tick)
+        : STUDIO_ACTION_NOT_APPLIED
+    },
+  })
+}
+function createClipFromBar(track: ProjectTrackPresentation, tick: Tick, event: MouseEvent): void {
+  bindBarTarget(track, tick, event)
+  actions.invoke(STUDIO_ACTION.ARRANGEMENT_CLIP_CREATE, 'toolbar')
+}
+watch(
+  () => props.projectId,
+  () => {
+    releaseBarTarget?.()
+    releaseBarTarget = null
+  },
+  { flush: 'sync' },
+)
+onBeforeUnmount(() => releaseBarTarget?.())
+useStudioInteractionTarget({
+  isActive: () => activeTimelineLocateGesture.value !== null,
+  cancel: () => {
+    if (activeTimelineLocateGesture.value === null) return STUDIO_ACTION_NOT_APPLIED
+    cancelTimelineLocate()
+    return STUDIO_ACTION_COMPLETED
+  },
+})
+const createClipHint = computed(() => {
+  const bindings = keyboard.displayBindingsFor(STUDIO_ACTION.ARRANGEMENT_CLIP_CREATE).join(' / ')
+  return `Double-click${bindings ? ` or press ${bindings}` : ''} to create a MIDI clip`
+})
 
 const isCurrentProjectPlaying = computed(
   () =>
@@ -300,6 +350,7 @@ function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
 }
 
 function selectTrack(track: ProjectTrackPresentation): void {
+  suspendTimelineFollow()
   workbenchSelection.selectTrack(track.id)
 }
 
@@ -307,14 +358,19 @@ function clipsForTrack(trackId: TrackId): readonly ProjectMidiClipPresentation[]
   return visibleClipsByTrack.value.get(trackId) ?? EMPTY_CLIPS
 }
 
-function createEmptyMidiClip(track: ProjectTrackPresentation, targetTick: Tick): void {
+function createEmptyMidiClip(
+  track: ProjectTrackPresentation,
+  targetTick: Tick,
+): StudioActionCompletion {
   try {
     const result = projectClips.addEmptyMidiClip({
       targetTick,
       trackId: track.id,
     })
     workbenchSelection.selectClip(result.trackId, result.clipId)
+    suspendTimelineFollow()
     emit('openMidiClip')
+    return STUDIO_ACTION_COMPLETED
   } catch (cause) {
     toasts.danger(
       'MIDI clip could not be added',
@@ -322,10 +378,12 @@ function createEmptyMidiClip(track: ProjectTrackPresentation, targetTick: Tick):
         ? cause.message
         : 'The Project rejected the Clip command. Please try again.',
     )
+    return { status: 'failed', cause, reported: true }
   }
 }
 
 function selectClip(clip: ProjectMidiClipPresentation): void {
+  suspendTimelineFollow()
   workbenchSelection.selectClip(clip.trackId, clip.id)
 }
 
@@ -494,7 +552,7 @@ function stopTimelineLocateEdgeScroll(): void {
 function requestTimelineLocateEdgeScroll(): void {
   const viewport = arrangementViewportElement.value
   if (
-    activeTimelineLocateGesture === null ||
+    activeTimelineLocateGesture.value === null ||
     viewport === null ||
     edgeScrollVelocity(locatePointerClientX, viewport) === 0
   ) {
@@ -506,7 +564,7 @@ function requestTimelineLocateEdgeScroll(): void {
   locateEdgeScrollFrameHandle = window.requestAnimationFrame((timestamp) => {
     locateEdgeScrollFrameHandle = null
     const activeViewport = arrangementViewportElement.value
-    if (activeTimelineLocateGesture === null || activeViewport === null) {
+    if (activeTimelineLocateGesture.value === null || activeViewport === null) {
       locateEdgeScrollPreviousTimestamp = null
       return
     }
@@ -537,8 +595,8 @@ function requestTimelineLocateEdgeScroll(): void {
 function releaseTimelineLocateGesture(
   gesture: ActiveTimelineLocateGesture,
 ): ActiveTimelineLocateGesture | null {
-  if (activeTimelineLocateGesture !== gesture) return null
-  activeTimelineLocateGesture = null
+  if (activeTimelineLocateGesture.value !== gesture) return null
+  activeTimelineLocateGesture.value = null
   locatePreviewTick.value = null
   stopTimelineLocateEdgeScroll()
   if (
@@ -551,7 +609,11 @@ function releaseTimelineLocateGesture(
 }
 
 function beginTimelineLocate(event: PointerEvent): void {
-  if (activeTimelineLocateGesture !== null || event.isPrimary === false || event.button !== 0) {
+  if (
+    activeTimelineLocateGesture.value !== null ||
+    event.isPrimary === false ||
+    event.button !== 0
+  ) {
     return
   }
 
@@ -564,7 +626,7 @@ function beginTimelineLocate(event: PointerEvent): void {
     surface,
     wasTimelineFollowSuspended: isTimelineFollowSuspended.value,
   })
-  activeTimelineLocateGesture = gesture
+  activeTimelineLocateGesture.value = gesture
   locatePointerClientX = event.clientX
   locatePreviewTick.value = locateTickAtClientX(event.clientX)
   if (session.startedWhilePlaying) isTimelineFollowSuspended.value = true
@@ -574,7 +636,7 @@ function beginTimelineLocate(event: PointerEvent): void {
 }
 
 function updateTimelineLocate(event: PointerEvent): void {
-  const gesture = activeTimelineLocateGesture
+  const gesture = activeTimelineLocateGesture.value
   if (gesture === null || gesture.pointerId !== event.pointerId) return
 
   locatePointerClientX = event.clientX
@@ -584,7 +646,7 @@ function updateTimelineLocate(event: PointerEvent): void {
 }
 
 function commitTimelineLocate(event: PointerEvent): void {
-  const gesture = activeTimelineLocateGesture
+  const gesture = activeTimelineLocateGesture.value
   if (gesture === null || gesture.pointerId !== event.pointerId) return
 
   const targetTick = locateTickAtClientX(event.clientX)
@@ -602,7 +664,7 @@ function commitTimelineLocate(event: PointerEvent): void {
 }
 
 function cancelTimelineLocate(event?: PointerEvent): void {
-  const gesture = activeTimelineLocateGesture
+  const gesture = activeTimelineLocateGesture.value
   if (gesture === null || (event !== undefined && gesture.pointerId !== event.pointerId)) return
 
   if (releaseTimelineLocateGesture(gesture) === null) return
@@ -624,21 +686,6 @@ function handleTimelineLocateCaptureLoss(event: PointerEvent): void {
 
 function handleTimelinePointerDown(event: PointerEvent): void {
   if (!isFollowControlTarget(event.target) && !isTimelineLocateTarget(event.target)) {
-    suspendTimelineFollow()
-  }
-}
-
-function handleTimelineKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && activeTimelineLocateGesture !== null) {
-    cancelTimelineLocate()
-    event.preventDefault()
-    return
-  }
-  if (
-    !isFollowControlTarget(event.target) &&
-    !isTimelineLocateTarget(event.target) &&
-    TIMELINE_INTERACTION_KEYS.has(event.key)
-  ) {
     suspendTimelineFollow()
   }
 }
@@ -853,7 +900,6 @@ onUnmounted(() => {
       class="project-workbench__arrangement-scroll-viewport"
       aria-label="Timeline"
       tabindex="0"
-      @keydown.capture="handleTimelineKeydown"
       @pointerdown.capture="handleTimelinePointerDown"
       @scroll.passive="handleArrangementScroll"
       @wheel.passive="handleArrangementWheel"
@@ -932,7 +978,6 @@ onUnmounted(() => {
             @bpm-change="(tempoEventId, bpm) => emit('tempoEventBpmChange', tempoEventId, bpm)"
             @edit-start="emit('tempoEditStart')"
             @move="(tempoEventId, tick) => emit('tempoEventMove', tempoEventId, tick)"
-            @remove="emit('tempoEventRemove', $event)"
             @select="emit('tempoEventSelect', $event)"
           />
         </div>
@@ -980,11 +1025,11 @@ onUnmounted(() => {
                 :key="bar.number"
                 :style="bar.style"
                 type="button"
-                :aria-label="`Bar ${bar.number} on ${track.name}. Double-click or press Enter to add a MIDI clip.`"
+                :aria-label="`Bar ${bar.number} on ${track.name}. ${createClipHint}.`"
                 :aria-pressed="workbenchSelection.selectedTrackId === track.id"
                 @click="selectTrack(track)"
-                @dblclick="createEmptyMidiClip(track, bar.startTick)"
-                @keydown.enter.prevent="createEmptyMidiClip(track, bar.startTick)"
+                @dblclick="createClipFromBar(track, bar.startTick, $event)"
+                @focus="bindBarTarget(track, bar.startTick, $event)"
               ></button>
             </div>
             <span class="project-workbench__lane-accent" aria-hidden="true"></span>

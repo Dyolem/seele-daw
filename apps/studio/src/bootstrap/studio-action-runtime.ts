@@ -1,11 +1,24 @@
 import {
-  createPianoRollActions,
-  type PianoRollActionTarget,
-} from '@/features/piano-roll/actions/piano-roll-actions'
+  createStudioEditorActions,
+  type StudioEditorSelectionTarget,
+  type StudioInteractionTarget,
+} from '@/workbench/actions/studio-editor-actions'
 import {
   createProjectWorkbenchActions,
   type ProjectWorkbenchActionTarget,
 } from '@/features/project-workspace/actions/project-workbench-actions'
+import {
+  createArrangementKeyboardActions,
+  type ArrangementKeyboardTarget,
+} from '@/features/project-workspace/actions/arrangement-keyboard-actions'
+import {
+  createPianoRollToolActions,
+  type PianoRollToolActionTarget,
+} from '@/features/piano-roll/actions/piano-roll-tool-actions'
+import {
+  createStudioInterfaceActions,
+  type StudioInterfaceActionTarget,
+} from '@/workbench/actions/studio-interface-actions'
 import type { StudioActionFailure, StudioActionId } from '@/workbench/actions/studio-action'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import { createStudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
@@ -21,17 +34,37 @@ export interface StudioActionRuntimeOptions {
   readonly reportFailure: (failure: StudioActionFailure) => void
 }
 
-/** One application catalogue and one physical keymap outlive all mounted editing surfaces. */
+/** The catalogue outlives views; selection focus and active interaction have separate owners. */
 export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
   const workbenchTarget = createStudioActionTargetSlot<ProjectWorkbenchActionTarget>()
-  const pianoRollTarget = createStudioActionTargetSlot<PianoRollActionTarget>()
+  const selectionTarget = createStudioActionTargetSlot<StudioEditorSelectionTarget>()
+  const interactionTarget = createStudioActionTargetSlot<StudioInteractionTarget>()
+  const arrangementClipTarget = createStudioActionTargetSlot<ArrangementKeyboardTarget>()
+  const arrangementBarTarget = createStudioActionTargetSlot<ArrangementKeyboardTarget>()
+  const pianoRollToolTarget = createStudioActionTargetSlot<PianoRollToolActionTarget>()
+  const interfaceTarget = createStudioActionTargetSlot<StudioInterfaceActionTarget>()
+  const targets = {
+    workbenchTarget,
+    selectionTarget,
+    interactionTarget,
+    arrangementClipTarget,
+    arrangementBarTarget,
+    pianoRollToolTarget,
+    interfaceTarget,
+  }
   const actions = createStudioActionCoordinator({
     definitions: [
       ...createProjectWorkbenchActions(workbenchTarget),
-      ...createPianoRollActions(pianoRollTarget),
+      ...createStudioEditorActions(selectionTarget, interactionTarget),
+      ...createArrangementKeyboardActions(arrangementClipTarget, arrangementBarTarget),
+      ...createPianoRollToolActions(pianoRollToolTarget),
+      ...createStudioInterfaceActions(interfaceTarget),
     ],
     reportFailure: options.reportFailure,
   })
+  function disposeTargets(): void {
+    for (const target of Object.values(targets)) target.dispose()
+  }
   try {
     const keyboard = createStudioKeyboardInputRouter({
       actions,
@@ -39,33 +72,47 @@ export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
       keymap: options.keymap ?? STUDIO_DEFAULT_KEYMAP,
       reportFailure: options.reportFailure,
       isModalActive: options.isModalActive,
-      isScopeActive(scope) {
-        if (scope === 'global') return true
-        if (scope === 'workbench') return workbenchTarget.current?.value.getReadyProject() != null
-        const editor = pianoRollTarget.current?.value
-        if (!(editor?.isFocused() ?? false)) return false
-        return scope === 'editor' || (editor?.hasInteraction() ?? false)
+      isContextActive(context) {
+        switch (context) {
+          case 'global':
+            return true
+          case 'workbench':
+            return workbenchTarget.current?.value.getReadyProject() != null
+          case 'editor-selection':
+            return selectionTarget.current?.value.isFocused() ?? false
+          case 'interaction':
+            return interactionTarget.current?.value.isActive() ?? false
+          case 'piano-roll':
+            return pianoRollToolTarget.current?.value.isFocused() ?? false
+          case 'arrangement-clip':
+            return arrangementClipTarget.current?.value.isFocused() ?? false
+          case 'arrangement-bar':
+            return arrangementBarTarget.current?.value.isFocused() ?? false
+        }
       },
     })
     return {
       actions,
       keyboard,
-      workbenchTarget,
-      pianoRollTarget,
+      ...targets,
       dispose() {
         try {
           keyboard.dispose()
         } finally {
-          actions.dispose()
-          pianoRollTarget.dispose()
-          workbenchTarget.dispose()
+          try {
+            actions.dispose()
+          } finally {
+            disposeTargets()
+          }
         }
       },
     }
   } catch (cause) {
-    actions.dispose()
-    pianoRollTarget.dispose()
-    workbenchTarget.dispose()
+    try {
+      actions.dispose()
+    } finally {
+      disposeTargets()
+    }
     throw cause
   }
 }

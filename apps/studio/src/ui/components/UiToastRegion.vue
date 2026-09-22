@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTemplateRef } from 'vue'
 import DismissIcon from '~icons/fluent/dismiss-20-regular'
 import {
   ToastClose,
@@ -15,10 +16,14 @@ import type { UiToastMessage } from '@/ui/components/ui-toast'
 
 const props = defineProps<{
   readonly message: UiToastMessage | null
+  readonly shortcut?: string
 }>()
 const emit = defineEmits<{
   dismiss: [messageId: number]
 }>()
+
+const viewport = useTemplateRef<HTMLOListElement>('viewport')
+defineExpose({ focus: () => viewport.value?.focus({ preventScroll: true }) })
 
 function handleOpenChange(isOpen: boolean): void {
   const message = props.message
@@ -49,7 +54,13 @@ function handleOpenChange(isOpen: boolean): void {
           <UiIconButton :icon="DismissIcon" label="Dismiss notification" size="small" />
         </ToastClose>
       </ToastRoot>
-      <ToastViewport class="ui-toast-viewport" :hotkey="['F8']" label="Notifications ({hotkey})" />
+      <ToastViewport
+        as-child
+        :hotkey="[]"
+        :label="props.shortcut ? `Notifications (${props.shortcut})` : 'Notifications'"
+      >
+        <ol ref="viewport" class="ui-toast-viewport" />
+      </ToastViewport>
     </ToastPortal>
   </ToastProvider>
 </template>

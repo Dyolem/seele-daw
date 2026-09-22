@@ -453,7 +453,7 @@ describe('ProjectPianoRollSurface', () => {
       await getPianoRollContextMenuItem('Clear selection').trigger('click')
       await flushPromises()
       expect(fixture.invoke).toHaveBeenCalledWith(
-        STUDIO_ACTION.PIANO_ROLL_SELECTION_CLEAR,
+        STUDIO_ACTION.EDITOR_SELECTION_CLEAR,
         'context-menu',
       )
       expect(second.classes()).not.toContain(selectedClass)
@@ -491,7 +491,7 @@ describe('ProjectPianoRollSurface', () => {
       await getPianoRollContextMenuItem('Delete selection').trigger('click')
       await flushPromises()
       expect(fixture.invoke).toHaveBeenCalledWith(
-        STUDIO_ACTION.PIANO_ROLL_SELECTION_DELETE,
+        STUDIO_ACTION.EDITOR_SELECTION_DELETE,
         'context-menu',
       )
       expect(fixture.session.modelRevision).toBe(revision + 1)

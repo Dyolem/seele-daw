@@ -1,3 +1,4 @@
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { parseProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
@@ -136,6 +137,7 @@ async function mountPage(fixture: PageFixture, initialLocation = '/') {
     global: {
       plugins: [pinia, router],
       provide: {
+        ...createTestStudioActionRuntime().provide,
         [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
         [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: fixture.projectMidiImportContext,
       },

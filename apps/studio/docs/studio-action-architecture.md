@@ -1,6 +1,6 @@
 # Studio Action 架构
 
-> 状态：WA1–WA4 已实现并通过审核
+> 状态：WA1–WA4 已审核；Input Foundation S1 已于 2026-09-22 通过用户审核
 >
 > 日期：2026-09-11
 
@@ -24,7 +24,7 @@ Keyboard → Browser Registry → Input Router
                       修改事实时调用 Project Command
 ```
 
-`bootstrap/studio-action-runtime.ts` 装配各功能的 Action 定义、两个目标槽位和键盘路由器。
+`bootstrap/studio-action-runtime.ts` 装配各功能的 Action 定义、按所有权拆分的目标槽位和键盘路由器。
 `studio-application.ts` 负责释放这些资源，并将非预期错误接入现有 Toast 通道和控制台诊断。
 各视图通过带类型约束的 Vue context 注入能力。Handler、等待完成的 resolver、目标绑定、
 History、dirty 状态和播放资源均不进入 Pinia。
@@ -34,7 +34,7 @@ History、dirty 状态和播放资源均不进入 Pinia。
 
 ## 2. 接口契约
 
-- 对外公开的 Catalogue 不可变，只包含稳定 ID、名称和说明，不包含 Handler 或绑定。
+- 对外公开的 Catalogue 不可变，只包含稳定 ID、名称、说明、类别与检索词，不包含 Handler 或绑定。
 - 各功能的 Action 定义负责解析当前目标，并从业务状态的权威持有方派生 `enabled`、`busy`、
   可选的 `checked`、名称和禁用原因。Presentation 是可随时释放的派生视图。
 - Keyboard、Menu、Toolbar 和 Context Menu 都是调用来源，共用同一个 Handler。
@@ -43,8 +43,9 @@ History、dirty 状态和播放资源均不进入 Pinia。
   仍然有效的当前编辑目标的显式 Action 调用。
 - 允许 Action 没有按键绑定。移除快捷键不会从 Catalogue 中移除 Action，也不会禁用菜单调用。
 
-本批次只使用 Workbench 和 Piano Roll 两个目标槽位，不引入通用的参数化 Action 总线、
-上下文表达式语言或应用级故障恢复平台。
+Workbench、选区、活动交互、Piano Roll Tool、Arrangement Clip／Bar 和界面操作分别提供
+当前能力；这些有限槽位不解释任意参数或用户 Context 表达式。未引入通用参数化 Action
+总线或应用级故障恢复平台。
 
 ## 3. 接受调用、完成结果与失败处理
 
@@ -121,17 +122,26 @@ MIDI 文件选择器必须在原始用户输入的同步调用栈中打开。页
 Dock 的 `checked` 直接读取 Workspace 当前状态；Shell 不再通过事件维护第二份开关状态。
 页面通过当前 Shell 的临时端口找到 Workspace，Action 定义仍属于应用生命周期。
 
-### 4.2 Piano Roll（WA1／WA3）
+### 4.2 编辑区域（WA1／WA3 与 Input Foundation S1）
 
-Piano Roll 区分三个独立意图：
+S1 把尚未持久化的 Piano Roll 专属选择／取消 ID 泛化为三个独立意图：
 
-- `piano-roll.selection.delete` 使用现有集合 Command 删除当前选中的 Note 或 CC64 事件，
-  一次调用只产生一个 Command 和一个 History step。它替换了语义不准确的内部 ID
-  `piano-roll.notes.remove`，因为旧 Action 实际上也会删除 CC64 事件。没有持久化 Keymap
-  或 Project 协议使用该旧 ID。
-- `piano-roll.selection.clear` 只清空选择，在手势进行期间禁用。
-- `piano-roll.interaction.cancel` 只取消手势，保留选择。Escape 优先路由到此 Action，
-  然后才是 Clear Selection；再次按 Escape 时可以清空选择。
+- `editor.selection.delete` 删除聚焦区域的 Note／CC64 选择，或聚焦且选中的可删除 Tempo
+  Event。每次事实删除仍经既有业务 Coordinator 形成一个 Command / History step。
+- `editor.selection.clear` 只清空支持此能力的编辑器选择；Tempo 不声明该能力。
+- `interaction.cancel` 取消当前活动 Note／CC64／Tempo 手势或 Timeline Locate，不清空
+  选择。键盘不要求交互持有焦点；下一次 Escape 才可能执行 Clear Selection。
+
+选区能力由 `useStudioEditorSelectionTarget()` 在 Focus 时激活，Mount 不抢占。身份变更
+使旧 Binding 和菜单失效；旧组件卸载只释放自己的 Binding。活动交互使用另一 Slot，
+在 Begin / End 的活动状态变化时绑定和释放，不跟随选区 Focus。两个 Slot 不保存选区、
+Preview 或 Project facts 的副本。Tempo 删除由 Page 提供窄能力，保留 Playback 准备、
+Command 结果、失败反馈和选择清理；Lane 不通过无返回值的 Emit 冒充业务完成。
+
+Cursor、Pencil、Snap、Arrangement Clip 打开／创建，以及通知焦点和快捷键查询均已进入
+Catalogue；具体能力仍属于各 Feature。静态 metadata 集中在 `studio-action-catalogue.ts`，
+默认 Binding / Context / Repeat 集中在 `studio-default-keymap.ts`，新增 ID 必须补齐两份
+穷尽配置。Settings 在 Feature 未挂载时仍能查询完整目录。
 
 Track Scope 尚无完整的 Note 选择与编辑流程。焦点进入其 Note 区域后，不能删除先前的 CC64
 选择；通过键盘聚焦 CC64 lane 时，会重新激活对应的选择目标。Track／Clip 替换时，

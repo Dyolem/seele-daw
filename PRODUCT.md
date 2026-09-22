@@ -424,9 +424,12 @@ Track Cursor 的完整 Note 编辑也尚未接入。
 - `Mod+Shift+Z`：当前 Session 可以 Redo 时执行 Redo；
 - `Control+Y`：兼容 Windows 常用 Redo Binding。
 - `Space`：当前计划可播放且没有导航 Modal 时 Play / Pause；Loading 期间不重复触发。
-- `Escape`：先取消当前 Note / CC64 手势并保留选择；没有进行中的手势时清空当前选择。
-- `Delete` / `Backspace`：当前聚焦的 Note / CC64 选择非空且没有进行中的手势时，以一个
-  集合 Command 原子删除选择，形成一个 History 步骤。
+- `Escape`：先取消活动的 Note / CC64 / Tempo 手势或 Timeline Locate；取消不清空选择。
+  没有活动交互时，清空聚焦的 Note / CC64 选择。
+- `Delete` / `Backspace`：删除聚焦编辑区域中选中的 Note / CC64，或聚焦且选中的后续
+  Tempo Event；初始 Tempo Event 不可删除。事实删除形成一个 Command / History 步骤。
+- `Enter`：聚焦 Arrangement Clip 时打开它；聚焦 Track Bar 时创建并打开 MIDI Clip。
+- `F8`：把焦点移入通知区域；打开的 Menu / Modal 仍然优先接管输入。
 
 产品规则：
 
@@ -439,6 +442,10 @@ Track Cursor 的完整 Note 编辑也尚未接入。
   释放新目标，应用释放才卸载全部 Listener；
 - 快捷键调用现有 Save / History / Playback / Editor 权威，不保存它们的状态副本；
 - Track 音符区域聚焦时不能删除旧的 CC64 选择；通过键盘聚焦回 Lane 后恢复 CC64 操作。
+- Mount 不抢占选区目标；实际 Focus 激活选择能力。活动手势拥有独立的 Cancel 能力，
+  即使焦点已经移动，也能取消；仅仅聚焦 Tempo point 不会自动选择它。
+- 按钮自身的 Enter / Space、Slider / Splitter 的导航键以及字段的提交 / 取消协议优先。
+  Undo / Redo 允许长按重复，其余 Action 默认只在首次按下时调用。
 
 Workbench Action Catalogue WA1 已实现并通过审核：Save 菜单、Save 按钮和 `Mod+S` 调用同一个
 `project.save` Handler，读取同一份可用、保存中、重试名称和禁用原因；菜单显示平台化快捷键。
@@ -459,8 +466,16 @@ Escape 取消后，焦点回到 Project Menu 按钮。WA4 已于 2026-09-11 通�
 1,476 项全工作区测试和内置浏览器检查；人工 smoke 未单独报告，验证记录详见
 [Workbench Action Catalogue V1 收口报告](./apps/studio/docs/workbench-action-catalogue-v1-closure-report.md)。
 
-当前没有用户 Keymap、Shortcut Settings、Recorder、Sequence 或 Command Palette。动态输入
-验证边界已经就绪，持久化和损坏覆盖的回退策略需随实际 V1B 切片实现。
+Editor Input Foundation S1 已于 2026-09-22 通过用户审核：项目入口的 Keyboard shortcuts 按钮与
+Project Menu → View → Keyboard shortcuts 打开只读查询窗口。目录包含 19 个 Action，
+其中 10 个有默认键位，9 个未分配；支持中英文检索、已分配／未分配筛选，显示当前键位、
+默认键位、作用区域和重复政策，并单列 Widget / Modifier 帮助。Cursor、Pencil、Snap
+也已进入目录并与工具栏共用 Action，默认不分配按键。
+
+默认 Keymap、Context、Repeat 政策集中维护，菜单与按钮从有效 Keymap 派生提示。Follow
+暂停由实际导航和滚动触发，不再依赖硬编码按键集合。尚未提供用户修改、持久化、Recorder、
+Sequence 或 Command Palette；S2–S3 与后续独立手势架构见
+[Editor Input Foundation V1 计划](./apps/studio/docs/editor-input-foundation-v1-phase-plan.md)。
 
 术语和状态所有权见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)，
 输入策略见 [Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。

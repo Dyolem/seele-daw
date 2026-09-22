@@ -1,9 +1,16 @@
 export const STUDIO_ACTION = {
   HISTORY_REDO: 'history.redo',
   HISTORY_UNDO: 'history.undo',
-  PIANO_ROLL_INTERACTION_CANCEL: 'piano-roll.interaction.cancel',
-  PIANO_ROLL_SELECTION_CLEAR: 'piano-roll.selection.clear',
-  PIANO_ROLL_SELECTION_DELETE: 'piano-roll.selection.delete',
+  INTERACTION_CANCEL: 'interaction.cancel',
+  EDITOR_SELECTION_CLEAR: 'editor.selection.clear',
+  EDITOR_SELECTION_DELETE: 'editor.selection.delete',
+  ARRANGEMENT_CLIP_OPEN: 'arrangement.clip.open',
+  ARRANGEMENT_CLIP_CREATE: 'arrangement.clip.create',
+  PIANO_ROLL_TOOL_CURSOR: 'piano-roll.tool.cursor',
+  PIANO_ROLL_TOOL_PENCIL: 'piano-roll.tool.pencil',
+  PIANO_ROLL_SNAP_TOGGLE: 'piano-roll.snap.toggle',
+  NOTIFICATIONS_FOCUS: 'notifications.focus',
+  SHORTCUTS_SHOW: 'shortcuts.show',
   PLAYBACK_TOGGLE: 'playback.toggle',
   PLAYBACK_RETURN_TO_START: 'playback.return-to-last-start-position',
   PROJECTS_SHOW: 'projects.show',
@@ -16,10 +23,20 @@ export const STUDIO_ACTION = {
 export type StudioActionId = (typeof STUDIO_ACTION)[keyof typeof STUDIO_ACTION]
 export type StudioActionSource = 'keyboard' | 'menu' | 'toolbar' | 'context-menu'
 
+export type StudioActionCategory =
+  | 'project'
+  | 'history'
+  | 'playback'
+  | 'editor'
+  | 'arrangement'
+  | 'interface'
+
 export interface StudioActionDescriptor {
   readonly actionId: StudioActionId
   readonly description: string
   readonly label: string
+  readonly category: StudioActionCategory
+  readonly keywords: readonly string[]
 }
 
 /** A disposable projection of business capability, independent of keyboard focus. */

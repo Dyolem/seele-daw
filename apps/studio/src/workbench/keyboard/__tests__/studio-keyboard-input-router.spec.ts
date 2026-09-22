@@ -25,16 +25,15 @@ describe('Studio keyboard input routing', () => {
       interacting = false
       return STUDIO_ACTION_COMPLETED
     })
-    runtime.pianoRollTarget.bind({
+    runtime.selectionTarget.bind({
       isFocused: () => true,
       hasSelection: () => selected,
-      hasInteraction: () => interacting,
       selectionLabel: () => 'Notes',
       deleteSelection: () => STUDIO_ACTION_COMPLETED,
       clearSelection: clear,
-      cancelInteraction: cancel,
     })
-    expect(runtime.actions.invoke(STUDIO_ACTION.PIANO_ROLL_SELECTION_CLEAR, 'menu').status).toBe(
+    runtime.interactionTarget.bind({ isActive: () => interacting, cancel })
+    expect(runtime.actions.invoke(STUDIO_ACTION.EDITOR_SELECTION_CLEAR, 'menu').status).toBe(
       'unavailable',
     )
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
@@ -55,15 +54,14 @@ describe('Studio keyboard input routing', () => {
       interacting = false
       throw cause
     })
-    runtime.pianoRollTarget.bind({
+    runtime.selectionTarget.bind({
       isFocused: () => true,
       hasSelection: () => true,
-      hasInteraction: () => interacting,
       selectionLabel: () => 'Notes',
       deleteSelection: () => STUDIO_ACTION_COMPLETED,
       clearSelection: clear,
-      cancelInteraction: cancel,
     })
+    runtime.interactionTarget.bind({ isActive: () => interacting, cancel })
 
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
     await Promise.resolve()
@@ -71,15 +69,13 @@ describe('Studio keyboard input routing', () => {
     expect(clear).not.toHaveBeenCalled()
     expect(failures).toEqual([
       {
-        actionId: STUDIO_ACTION.PIANO_ROLL_INTERACTION_CANCEL,
+        actionId: STUDIO_ACTION.INTERACTION_CANCEL,
         source: 'keyboard',
         operation: 'execute',
         cause,
       },
     ])
-    expect(runtime.actions.presentationFor(STUDIO_ACTION.PIANO_ROLL_SELECTION_CLEAR).enabled).toBe(
-      true,
-    )
+    expect(runtime.actions.presentationFor(STUDIO_ACTION.EDITOR_SELECTION_CLEAR).enabled).toBe(true)
 
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
     expect(clear).toHaveBeenCalledOnce()
@@ -94,17 +90,15 @@ describe('Studio keyboard input routing', () => {
       isModalActive: () => modal,
     })
     const remove = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
-    runtime.pianoRollTarget.bind({
+    runtime.selectionTarget.bind({
       isFocused: () => focused,
       hasSelection: () => true,
-      hasInteraction: () => false,
       selectionLabel: () => 'Notes',
       deleteSelection: remove,
       clearSelection: () => STUDIO_ACTION_COMPLETED,
-      cancelInteraction: () => STUDIO_ACTION_COMPLETED,
     })
     expect(bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
-    const menu = runtime.actions.invoke(STUDIO_ACTION.PIANO_ROLL_SELECTION_DELETE, 'menu')
+    const menu = runtime.actions.invoke(STUDIO_ACTION.EDITOR_SELECTION_DELETE, 'menu')
     if (menu.status !== 'accepted') throw new Error('Expected explicit menu target')
     await menu.completion
     expect(remove).toHaveBeenCalledOnce()
@@ -127,14 +121,12 @@ describe('Studio keyboard input routing', () => {
     const remove = vi.fn<() => StudioActionCompletion>(() => {
       throw cause
     })
-    runtime.pianoRollTarget.bind({
+    runtime.selectionTarget.bind({
       isFocused: () => true,
       hasSelection: () => true,
-      hasInteraction: () => false,
       selectionLabel: () => 'Notes',
       deleteSelection: remove,
       clearSelection: () => STUDIO_ACTION_COMPLETED,
-      cancelInteraction: () => STUDIO_ACTION_COMPLETED,
     })
     expect(bindingRegistry.dispatch('Delete', { isComposing: true }).defaultPrevented).toBe(false)
     expect(bindingRegistry.dispatch('Delete', { keyCode: 229 }).defaultPrevented).toBe(false)
@@ -148,7 +140,7 @@ describe('Studio keyboard input routing', () => {
     expect(failures).toHaveLength(1)
     expect(failures[0]).toMatchObject({
       cause,
-      actionId: STUDIO_ACTION.PIANO_ROLL_SELECTION_DELETE,
+      actionId: STUDIO_ACTION.EDITOR_SELECTION_DELETE,
       operation: 'execute',
     })
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)

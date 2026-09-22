@@ -1,3 +1,4 @@
+import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
 import { onTestFinished } from 'vitest'
 
 import {
@@ -20,7 +21,7 @@ export function createActionInvocationFixture() {
   const targets = createStudioActionTargetSlot<TestActionTarget>()
   const failures: StudioActionFailure[] = []
   const definition: StudioActionDefinition = {
-    actionId: STUDIO_ACTION.PROJECT_SAVE,
+    ...describeStudioAction(STUDIO_ACTION.PROJECT_SAVE),
     label: 'Save',
     description: 'Save the project.',
     resolve() {

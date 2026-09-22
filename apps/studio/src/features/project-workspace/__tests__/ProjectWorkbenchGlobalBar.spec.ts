@@ -7,6 +7,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import UiAlertDialog from '@/ui/components/UiAlertDialog.vue'
+import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
 import {
   STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
@@ -20,6 +21,79 @@ import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browse
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 
 describe('Project menu keyboard ownership', () => {
+  it('opens the shortcut directory through the real Action after returning focus to the menu trigger', async () => {
+    const open = shallowRef(false)
+    const cancelInteraction = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
+    const runtime = createStudioActionRuntime({
+      bindingRegistry: createBrowserTanStackHotkeyRegistry({ platform: 'mac', target: document }),
+      isModalActive: () => false,
+      reportFailure: vi.fn<(failure: StudioActionFailure) => void>(),
+    })
+    runtime.interfaceTarget.bind({
+      showShortcuts: () => {
+        open.value = true
+      },
+      focusNotifications: () => {},
+    })
+    runtime.interactionTarget.bind({ isActive: () => true, cancel: cancelInteraction })
+    const wrapper = mount(
+      {
+        render: () =>
+          h('div', [
+            h(ProjectWorkbenchGlobalBar, {
+              actionControls: presentProjectWorkbenchActions(runtime.actions, runtime.keyboard),
+              isDirty: false,
+              projectId: 'shortcuts-menu-focus',
+              projectName: 'Shortcuts',
+              saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+              onInvokeAction: (id: StudioActionId, source: StudioActionSource) =>
+                runtime.actions.invoke(id, source),
+            }),
+            h(StudioKeyboardShortcutsDialog, {
+              open: open.value,
+              'onUpdate:open': (value: boolean) => {
+                open.value = value
+              },
+            }),
+          ]),
+      },
+      {
+        attachTo: document.body,
+        global: { provide: { [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime } },
+      },
+    )
+    onTestFinished(() => {
+      wrapper.unmount()
+      runtime.dispose()
+      HotkeyManager.resetInstance()
+      document.body.replaceChildren()
+    })
+    const trigger = wrapper.get<HTMLButtonElement>('button[aria-label="Open project menu"]')
+    trigger.element.focus()
+    await trigger.trigger('click')
+    await flushPromises()
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((element) =>
+      element.textContent?.includes('Keyboard shortcuts'),
+    )
+    if (!item) throw new Error('Expected the keyboard shortcuts menu item')
+    item.click()
+    await flushPromises()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Search keyboard shortcuts')
+    const close = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Close keyboard shortcuts"]',
+    )
+    if (!close) throw new Error('Expected the shortcuts close button')
+    close.focus()
+    close.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }),
+    )
+    await flushPromises()
+    expect(open.value).toBe(false)
+    expect(document.activeElement).toBe(trigger.element)
+    expect(cancelInteraction).not.toHaveBeenCalled()
+  })
+
   it.each(['Cancel', 'Escape'] as const)(
     'hands focus to the navigation dialog and returns to the menu trigger on %s',
     async (dismissal) => {
@@ -122,14 +196,12 @@ describe('Project menu keyboard ownership', () => {
     const editor = document.createElement('div')
     editor.tabIndex = 0
     document.body.append(editor)
-    runtime.pianoRollTarget.bind({
+    runtime.selectionTarget.bind({
       isFocused: () => document.activeElement === editor,
       hasSelection: () => true,
-      hasInteraction: () => false,
       selectionLabel: () => 'Notes',
       clearSelection,
       deleteSelection: () => STUDIO_ACTION_COMPLETED,
-      cancelInteraction: () => STUDIO_ACTION_COMPLETED,
     })
     const wrapper = mount(ProjectWorkbenchGlobalBar, {
       attachTo: document.body,

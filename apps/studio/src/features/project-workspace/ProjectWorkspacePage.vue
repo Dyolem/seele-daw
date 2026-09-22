@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { provide } from 'vue'
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
 import {
   PROJECT_PPQ,
   ZERO_TICK,
@@ -388,14 +390,18 @@ function commitTempoEventInput(tempoEventId: TempoEventId, input: string): void 
   replaceTempoEventBpm(tempoEventId, parsed.bpm)
 }
 
-function removeTempoEvent(tempoEventId: TempoEventId): void {
+provide(TEMPO_EVENT_ACTION_CONTEXT_KEY, { removeTempoEvent })
+
+function removeTempoEvent(tempoEventId: TempoEventId): StudioActionCompletion {
   const failureTitle = 'Tempo Event could not be removed'
-  if (!prepareTempoEventCommand(failureTitle)) return
+  if (!prepareTempoEventCommand(failureTitle)) return STUDIO_ACTION_NOT_APPLIED
   try {
     projectTempoEvents.removeTempoEvent(tempoEventId)
     if (selectedTempoEventId.value === tempoEventId) selectedTempoEventId.value = null
+    return STUDIO_ACTION_COMPLETED
   } catch (cause) {
     toasts.danger(failureTitle, describeTempoEditFailure(cause))
+    return { status: 'failed', cause, reported: true }
   }
 }
 

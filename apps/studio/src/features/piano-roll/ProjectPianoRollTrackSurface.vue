@@ -49,7 +49,6 @@ import { ContextMenuRoot } from 'reka-ui'
 import {
   computed,
   nextTick,
-  onBeforeUnmount,
   onMounted,
   onUnmounted,
   shallowRef,
@@ -62,15 +61,12 @@ import {
 import TrackPlayhead from '@/features/piano-roll/playhead/TrackPlayhead.vue'
 import PianoRollContextMenu from '@/features/piano-roll/actions/PianoRollContextMenu.vue'
 import type { PianoRollContextMenuTarget } from '@/features/piano-roll/actions/piano-roll-context-menu-target'
-import type { PianoRollActionTarget } from '@/features/piano-roll/actions/piano-roll-actions'
-import type { StudioActionTargetBinding } from '@/workbench/actions/studio-action-target'
 import PianoRollSustainPedalLane from '@/features/piano-roll/PianoRollSustainPedalLane.vue'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/project-piano-roll-note-renderer'
 import {
   PIANO_ROLL_TOOL,
   usePianoRollPreferencesStore,
-  type PianoRollTool,
 } from '@/features/piano-roll/piano-roll-preferences-store'
 import {
   resolvePagedFollowScrollLeft,
@@ -80,8 +76,12 @@ import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspa
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import { STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
-import { usePianoRollActionTarget } from '@/features/piano-roll/actions/piano-roll-action-context'
+import { STUDIO_ACTION, STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
+import { usePianoRollToolActions } from '@/features/piano-roll/actions/use-piano-roll-tool-actions'
+import {
+  useStudioEditorSelectionTarget,
+  useStudioInteractionTarget,
+} from '@/workbench/actions/vue/studio-editor-action-context'
 import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import { ProjectMidiSustainPedalError } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-error'
 import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
@@ -102,7 +102,6 @@ interface TrackPlacementPreview {
 }
 
 const props = defineProps<ProjectPianoRollTrackSurfaceProps>()
-const actionTarget = usePianoRollActionTarget()
 const { projectMidiNotes } = useProjectMidiNotes()
 const { projectMidiSustainPedal } = useProjectMidiSustainPedal()
 const { state: playbackState, visualPosition: playbackVisualPosition } = useProjectPlayback()
@@ -130,17 +129,6 @@ const isTimelineFollowSuspended = shallowRef(false)
 let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
 let resizeObserver: ResizeObserver | null = null
 let observedScrollLeft = 0
-
-const TIMELINE_INTERACTION_KEYS = new Set([
-  ' ',
-  'ArrowLeft',
-  'ArrowRight',
-  'End',
-  'Enter',
-  'Home',
-  'PageDown',
-  'PageUp',
-])
 
 const isCurrentProjectPlaying = computed(
   () =>
@@ -344,9 +332,13 @@ function createDisplayGrid() {
   })
 }
 
-function activateTool(tool: PianoRollTool): void {
-  pianoRollPreferences.activateTool(tool)
-}
+const { controls: toolControls, invoke: invokeTool } = usePianoRollToolActions({
+  isFocused: () => surfaceElement.value?.contains(document.activeElement) ?? false,
+  getTool: () => pianoRollPreferences.activeTool,
+  activateTool: pianoRollPreferences.activateTool,
+  isSnapEnabled: () => pianoRollPreferences.snapEnabled,
+  toggleSnap: pianoRollPreferences.toggleSnap,
+})
 
 function handleSustainPedalChannelChange(event: Event): void {
   pianoRollPreferences.selectSustainPedalChannel(
@@ -550,6 +542,7 @@ function activateClip(clipId: ClipId): void {
   if (!props.presentation.readModel.clips.some(({ clip }) => clip.clipId === clipId)) {
     return
   }
+  suspendTimelineFollow()
   workbenchSelection.selectClip(props.presentation.trackId, clipId)
 }
 
@@ -665,12 +658,6 @@ function handleTimelinePointerDown(event: PointerEvent): void {
   if (!isFollowControlTarget(event.target)) suspendTimelineFollow()
 }
 
-function handleTimelineKeydown(event: KeyboardEvent): void {
-  if (!isFollowControlTarget(event.target) && TIMELINE_INTERACTION_KEYS.has(event.key)) {
-    suspendTimelineFollow()
-  }
-}
-
 function handleTimelineWheel(event: WheelEvent): void {
   if (event.deltaX !== 0 || (event.shiftKey && event.deltaY !== 0)) suspendTimelineFollow()
 }
@@ -686,17 +673,27 @@ function handleScroll(event: Event): void {
 
 function handleFocusIn(): void {
   isSustainPedalTarget.value = sustainPedalLane.value?.isFocused() ?? false
+  selectionTarget.activate()
 }
 
 function prepareContextMenu(event: MouseEvent): PianoRollContextMenuTarget | null {
-  if (!boundActionTarget?.isCurrent()) return null
   const focusElement = sustainPedalLane.value?.prepareContextMenu(event)
-  return focusElement ? { binding: boundActionTarget, focusElement } : null
+  if (!focusElement) return null
+  selectionTarget.activate()
+  const binding = selectionTarget.binding
+  return binding ? { binding, focusElement } : null
 }
 
-let boundActionTarget: StudioActionTargetBinding<PianoRollActionTarget> | null = null
-let releaseActionTarget: (() => void) | null = null
-const stopActionTarget = watch(
+const selectionTarget = useStudioEditorSelectionTarget(
+  {
+    isFocused: () => sustainPedalLane.value?.isFocused() ?? false,
+    hasSelection: () =>
+      isSustainPedalTarget.value && (sustainPedalLane.value?.hasSelection() ?? false),
+    selectionLabel: () => 'Sustain Pedal events',
+    deleteSelection: () =>
+      sustainPedalLane.value?.removeSelectedEvents() ?? STUDIO_ACTION_NOT_APPLIED,
+    clearSelection: () => sustainPedalLane.value?.clearSelection() ?? STUDIO_ACTION_NOT_APPLIED,
+  },
   [
     () => props.session,
     () => props.presentation.projectId,
@@ -709,30 +706,10 @@ const stopActionTarget = watch(
     () => pianoRollPreferences.sustainPedalChannel,
     isSustainPedalTarget,
   ],
-  () => {
-    releaseActionTarget?.()
-    releaseActionTarget = actionTarget.bind({
-      isFocused: () => sustainPedalLane.value?.isFocused() ?? false,
-      hasSelection: () =>
-        isSustainPedalTarget.value && (sustainPedalLane.value?.hasSelection() ?? false),
-      hasInteraction: () =>
-        isSustainPedalTarget.value &&
-        (sustainPedalLane.value?.hasCancellableInteraction() ?? false),
-      selectionLabel: () => 'Sustain Pedal events',
-      deleteSelection: () =>
-        sustainPedalLane.value?.removeSelectedEvents() ?? STUDIO_ACTION_NOT_APPLIED,
-      clearSelection: () => sustainPedalLane.value?.clearSelection() ?? STUDIO_ACTION_NOT_APPLIED,
-      cancelInteraction: () =>
-        sustainPedalLane.value?.cancelInteraction() ?? STUDIO_ACTION_NOT_APPLIED,
-    })
-    boundActionTarget = actionTarget.current
-  },
-  { immediate: true, flush: 'sync' },
 )
-onBeforeUnmount(() => {
-  stopActionTarget()
-  releaseActionTarget?.()
-  releaseActionTarget = null
+useStudioInteractionTarget({
+  isActive: () => sustainPedalLane.value?.hasCancellableInteraction() ?? false,
+  cancel: () => sustainPedalLane.value?.cancelInteraction() ?? STUDIO_ACTION_NOT_APPLIED,
 })
 
 watchEffect(render)
@@ -818,29 +795,32 @@ onUnmounted(() => {
           <div class="project-piano-roll-track__tool-group" role="group" aria-label="Editing tool">
             <UiIconButton
               :icon="PenIcon"
-              label="Pencil tool"
+              :label="toolControls.pencil.label"
+              :title="toolControls.pencil.title"
               :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.PENCIL"
               size="small"
-              @click="activateTool(PIANO_ROLL_TOOL.PENCIL)"
+              @click="invokeTool(STUDIO_ACTION.PIANO_ROLL_TOOL_PENCIL)"
             />
             <UiIconButton
               :icon="CursorIcon"
-              label="Cursor tool"
+              :label="toolControls.cursor.label"
+              :title="toolControls.cursor.title"
               :pressed="pianoRollPreferences.activeTool === PIANO_ROLL_TOOL.CURSOR"
               size="small"
-              @click="activateTool(PIANO_ROLL_TOOL.CURSOR)"
+              @click="invokeTool(STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR)"
             />
           </div>
           <span class="project-piano-roll-track__toolbar-divider" aria-hidden="true"></span>
           <div class="project-piano-roll-track__snap-control">
             <UiIconButton
               :icon="GridIcon"
+              :title="toolControls.snap.title"
               :label="`Snap to ${pianoRollPreferences.gridPreset} grid — ${
                 pianoRollPreferences.snapEnabled ? 'on' : 'off'
               }`"
               :pressed="pianoRollPreferences.snapEnabled"
               size="small"
-              @click="pianoRollPreferences.toggleSnap()"
+              @click="invokeTool(STUDIO_ACTION.PIANO_ROLL_SNAP_TOGGLE)"
             />
             <span aria-hidden="true">{{ pianoRollPreferences.gridPreset }}</span>
           </div>
@@ -915,7 +895,6 @@ onUnmounted(() => {
         <div
           ref="scrollViewport"
           class="project-piano-roll-track__scroll-viewport"
-          @keydown.capture="handleTimelineKeydown"
           @pointerdown.capture="handleTimelinePointerDown"
           @scroll.passive="handleScroll"
           @wheel.passive="handleTimelineWheel"

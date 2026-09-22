@@ -332,8 +332,9 @@ describe('ProjectPianoRollTrackSurface', () => {
       throw new Error('Expected Clip presentation')
     const { runtime } = fixture.keyboard
     let previous = fixture.wrapper
+    ;(previous.get('.project-piano-roll-track').element as HTMLElement).focus()
     for (let iteration = 0; iteration < 4; iteration += 1) {
-      const oldTarget = runtime.pianoRollTarget.current
+      const oldTarget = runtime.selectionTarget.current
       const clip = mount(ProjectPianoRollSurface, {
         attachTo: document.body,
         global: fixture.global,
@@ -344,10 +345,12 @@ describe('ProjectPianoRollTrackSurface', () => {
           timeSignatureNumerator: 4,
         },
       })
+      expect(runtime.selectionTarget.current).toBe(oldTarget)
+      ;(clip.get('.project-piano-roll').element as HTMLElement).focus()
       previous.unmount()
       expect(oldTarget?.isCurrent()).toBe(false)
-      expect(runtime.pianoRollTarget.current?.isCurrent()).toBe(true)
-      expect(runtime.pianoRollTarget.current?.value.selectionLabel()).toBe('Notes')
+      expect(runtime.selectionTarget.current?.isCurrent()).toBe(true)
+      expect(runtime.selectionTarget.current?.value.selectionLabel()).toBe('Notes')
       const track = mount(ProjectPianoRollTrackSurface, {
         attachTo: document.body,
         global: fixture.global,
@@ -359,9 +362,10 @@ describe('ProjectPianoRollTrackSurface', () => {
           timeSignatureNumerator: 4,
         },
       })
+      ;(track.get('.project-piano-roll-track').element as HTMLElement).focus()
       clip.unmount()
-      expect(runtime.pianoRollTarget.current?.isCurrent()).toBe(true)
-      expect(runtime.pianoRollTarget.current?.value.selectionLabel()).toBe('Sustain Pedal events')
+      expect(runtime.selectionTarget.current?.isCurrent()).toBe(true)
+      expect(runtime.selectionTarget.current?.value.selectionLabel()).toBe('Sustain Pedal events')
       previous = track
       await nextTick()
     }
@@ -372,7 +376,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     ).toBe(true)
     expect(fixture.keyboard.bindingRegistry.disposalCountByBinding.size).toBe(0)
     previous.unmount()
-    expect(runtime.pianoRollTarget.current).toBeNull()
+    expect(runtime.selectionTarget.current).toBeNull()
     runtime.dispose()
     expect(fixture.keyboard.bindingRegistry.listeners.size).toBe(0)
     expect(
@@ -489,6 +493,8 @@ describe('ProjectPianoRollTrackSurface', () => {
     expect(followControl.attributes('aria-pressed')).toBe('true')
 
     await scrollViewport.trigger('keydown', { key: 'ArrowRight' })
+    expect(followControl.attributes('aria-pressed')).toBe('true')
+    await wrapper.get('.project-piano-roll-track__clip-windows button').trigger('click')
     expect(followControl.attributes('aria-pressed')).toBe('false')
 
     playbackVisualPosition.value = Object.freeze({
@@ -728,13 +734,15 @@ describe('ProjectPianoRollTrackSurface', () => {
         timeSignatureNumerator: 4,
       },
     })
+    // Mount alone preserves focus ownership; explicit focus replaces and invalidates the old menu.
+    ;(next.get('.project-piano-roll').element as HTMLElement).focus()
     await staleDelete.trigger('click')
-    await requestPianoRollContextMenu(marker.element)
+    await flushPromises()
     expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
     expect(session.modelRevision).toBe(revision)
-    expect(fixture.keyboard.runtime.pianoRollTarget.current?.value.selectionLabel()).toBe('Notes')
+    expect(fixture.keyboard.runtime.selectionTarget.current?.value.selectionLabel()).toBe('Notes')
     wrapper.unmount()
-    expect(fixture.keyboard.runtime.pianoRollTarget.current?.isCurrent()).toBe(true)
+    expect(fixture.keyboard.runtime.selectionTarget.current?.isCurrent()).toBe(true)
     next.unmount()
   })
 

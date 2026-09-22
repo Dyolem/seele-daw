@@ -1104,7 +1104,7 @@ describe('ProjectWorkspacePage', () => {
     await expect(invocation.completion).resolves.toEqual({ status: 'cancelled' })
     expect(binding?.isCurrent()).toBe(false)
     expect(actionFixture.runtime.workbenchTarget.current).toBeNull()
-    expect(actionFixture.runtime.pianoRollTarget.current).toBeNull()
+    expect(actionFixture.runtime.selectionTarget.current).toBeNull()
     expect(keyboardBindingRegistry.listeners.size).toBe(0)
     expect(keyboardBindingRegistry.disposalCountByBinding.size).toBe(
       keyboardBindingRegistry.registrationCountByBinding.size,
@@ -1132,16 +1132,14 @@ describe('ProjectWorkspacePage', () => {
     )
     const { wrapper, actionFixture, keyboardBindingRegistry } = await mountPage(fixture, projectId)
     await flushPromises()
-    actionFixture.runtime.pianoRollTarget.bind({
+    actionFixture.runtime.selectionTarget.bind({
       isFocused: () => {
         throw new Error('Editor focus query failed')
       },
       hasSelection: () => true,
-      hasInteraction: () => false,
       selectionLabel: () => 'Notes',
       deleteSelection: () => STUDIO_ACTION_NOT_APPLIED,
       clearSelection: () => STUDIO_ACTION_NOT_APPLIED,
-      cancelInteraction: () => STUDIO_ACTION_NOT_APPLIED,
     })
     expect(keyboardBindingRegistry.dispatch('Delete').defaultPrevented).toBe(true)
     expect(actionFixture.failures).toHaveLength(1)

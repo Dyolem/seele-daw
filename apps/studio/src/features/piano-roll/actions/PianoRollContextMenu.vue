@@ -28,7 +28,7 @@ let releaseTarget: (() => void) | null = null
 
 const menuActions = computed(() => {
   if (!target.value?.binding.isCurrent()) return []
-  return [STUDIO_ACTION.PIANO_ROLL_SELECTION_DELETE, STUDIO_ACTION.PIANO_ROLL_SELECTION_CLEAR].map(
+  return [STUDIO_ACTION.EDITOR_SELECTION_DELETE, STUDIO_ACTION.EDITOR_SELECTION_CLEAR].map(
     (actionId) => presentStudioAction(actions, keyboard, actionId),
   )
 })

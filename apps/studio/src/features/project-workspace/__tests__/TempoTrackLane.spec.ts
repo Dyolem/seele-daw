@@ -1,4 +1,13 @@
 import {
+  type TempoEventActionContext,
+  TEMPO_EVENT_ACTION_CONTEXT_KEY,
+} from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
+import {
+  type StudioActionCompletion,
+  STUDIO_ACTION_COMPLETED,
+} from '@/workbench/actions/studio-action'
+import {
   createTempoEventRecord,
   parsePositiveTick,
   parseTempoBpm,
@@ -36,8 +45,11 @@ function mountLane(
     readonly tempoEvents?: readonly TempoEventRecord[]
   } = {},
 ) {
+  const keyboard = createTestStudioActionRuntime()
+  const remove = vi.fn<TempoEventActionContext['removeTempoEvent']>(() => STUDIO_ACTION_COMPLETED)
   const interaction = createTempoTrackInteractionController()
   const wrapper = mount(TempoTrackLane, {
+    attachTo: document.body,
     props: {
       barSpanTick: parsePositiveTick(3_840),
       editingDisabled: input.editingDisabled ?? false,
@@ -48,6 +60,8 @@ function mountLane(
     },
     global: {
       provide: {
+        ...keyboard.provide,
+        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: { removeTempoEvent: remove },
         [TEMPO_TRACK_INTERACTION_KEY as symbol]: interaction,
       },
     },
@@ -65,7 +79,7 @@ function mountLane(
     x: 100,
     y: 50,
   })
-  return { interaction, plot, wrapper }
+  return { interaction, plot, wrapper, keyboard, remove }
 }
 
 async function dispatchPointer(
@@ -100,6 +114,28 @@ afterEach(() => {
 })
 
 describe('TempoTrackLane', () => {
+  it('uses focused Tempo selection instead of a previous Note target and never treats focus as selection', async () => {
+    const { keyboard, remove, wrapper } = mountLane({ selectedTempoEventId: LATER_EVENT.id })
+    const removeNotes = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
+    keyboard.runtime.selectionTarget.bind({
+      isFocused: () => true,
+      hasSelection: () => true,
+      selectionLabel: () => 'Notes',
+      deleteSelection: removeNotes,
+    })
+    const laterPoint = wrapper.findAll('.tempo-track-lane__point')[1]!.element as HTMLElement
+    laterPoint.focus()
+    expect(keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(true)
+    expect(remove).toHaveBeenCalledExactlyOnceWith(LATER_EVENT.id)
+    expect(removeNotes).not.toHaveBeenCalled()
+    await wrapper.setProps({ selectedTempoEventId: INITIAL_EVENT.id })
+    expect(keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
+    expect(remove).toHaveBeenCalledOnce()
+    expect(removeNotes).not.toHaveBeenCalled()
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(false)
+  })
+
   it('renders a continuous selected Step contour with center-anchored Tempo points', () => {
     const { wrapper } = mountLane({ selectedTempoEventId: LATER_EVENT.id })
     const points = wrapper.findAll('.tempo-track-lane__point')
@@ -264,7 +300,7 @@ describe('TempoTrackLane', () => {
   })
 
   it('cancels an active preview from the global Escape path without committing', async () => {
-    const { interaction, wrapper } = mountLane()
+    const { interaction, wrapper, keyboard } = mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -277,7 +313,7 @@ describe('TempoTrackLane', () => {
       clientY: 112,
       pointerId: 81,
     })
-    window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+    keyboard.bindingRegistry.dispatch('Escape')
     await Promise.resolve()
 
     expect(wrapper.emitted('move')).toBeUndefined()
@@ -306,15 +342,16 @@ describe('TempoTrackLane', () => {
       clientY: 91,
       pointerId: 9,
     })
-    await initialPoint.trigger('keydown', { key: 'Delete' })
+    initialFixture.keyboard.bindingRegistry.dispatch('Delete')
     expect(initialFixture.wrapper.emitted('move')).toBeUndefined()
-    expect(initialFixture.wrapper.emitted('remove')).toBeUndefined()
+    expect(initialFixture.remove).not.toHaveBeenCalled()
 
     const laterFixture = mountLane({ selectedTempoEventId: LATER_EVENT.id })
-    await laterFixture.wrapper
-      .findAll('.tempo-track-lane__point')[1]!
-      .trigger('keydown', { key: 'Backspace' })
-    expect(laterFixture.wrapper.emitted('remove')).toEqual([[LATER_EVENT.id]])
+    const laterPoint = laterFixture.wrapper.findAll('.tempo-track-lane__point')[1]!
+      .element as HTMLElement
+    laterPoint.focus()
+    laterFixture.keyboard.bindingRegistry.dispatch('Backspace')
+    expect(laterFixture.remove).toHaveBeenCalledExactlyOnceWith(LATER_EVENT.id)
   })
 
   it('keeps selection available but suppresses mutations while editing is disabled', async () => {

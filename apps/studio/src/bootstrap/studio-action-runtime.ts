@@ -22,6 +22,12 @@ import {
 import type { StudioActionFailure, StudioActionId } from '@/workbench/actions/studio-action'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import { createStudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
+import { createStudioUserKeymap } from '@/workbench/keyboard/studio-user-keymap'
+import { createStudioKeyboardVueBinding } from '@/workbench/keyboard/vue/studio-keyboard-vue-binding'
+import {
+  createBrowserUserKeymapStorage,
+  type StudioUserKeymapStorage,
+} from '@/workbench/keyboard/browser-user-keymap-storage'
 import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
 import type { StudioKeyboardKeymap } from '@/workbench/keyboard/studio-keyboard-binding'
 import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/studio-keyboard-binding-registry'
@@ -29,6 +35,7 @@ import { createStudioKeyboardInputRouter } from '@/workbench/keyboard/studio-key
 
 export interface StudioActionRuntimeOptions {
   readonly bindingRegistry: StudioKeyboardBindingRegistry
+  readonly userKeymapStorage?: StudioUserKeymapStorage
   readonly isModalActive: () => boolean
   readonly keymap?: StudioKeyboardKeymap<StudioActionId>
   readonly reportFailure: (failure: StudioActionFailure) => void
@@ -65,8 +72,9 @@ export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
   function disposeTargets(): void {
     for (const target of Object.values(targets)) target.dispose()
   }
+  let keyboard: ReturnType<typeof createStudioKeyboardInputRouter> | null = null
   try {
-    const keyboard = createStudioKeyboardInputRouter({
+    keyboard = createStudioKeyboardInputRouter({
       actions,
       bindingRegistry: options.bindingRegistry,
       keymap: options.keymap ?? STUDIO_DEFAULT_KEYMAP,
@@ -91,13 +99,25 @@ export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
         }
       },
     })
+    const ownedKeyboard = keyboard
+    const userKeymap = createStudioUserKeymap({
+      catalogue: actions.catalogue,
+      registry: options.bindingRegistry,
+      router: keyboard,
+      storage: options.userKeymapStorage ?? createBrowserUserKeymapStorage(),
+    })
+    const keyboardBinding = createStudioKeyboardVueBinding(keyboard, userKeymap)
     return {
       actions,
-      keyboard,
+      keyboard: keyboardBinding.keyboard,
+      userKeymap,
+      keymapState: keyboardBinding.keymapState,
       ...targets,
       dispose() {
         try {
-          keyboard.dispose()
+          keyboardBinding.dispose()
+          userKeymap.dispose()
+          ownedKeyboard.dispose()
         } finally {
           try {
             actions.dispose()
@@ -108,6 +128,7 @@ export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
       },
     }
   } catch (cause) {
+    keyboard?.dispose()
     try {
       actions.dispose()
     } finally {

@@ -1,8 +1,8 @@
 # Studio Action 架构
 
-> 状态：WA1–WA4 已审核；Input Foundation S1 已于 2026-09-22 通过用户审核
+> 状态：WA1–WA4 已审核；Input Foundation S1 已审核提交；S2 已于 2026-09-22 通过用户审核
 >
-> 日期：2026-09-11
+> 日期：2026-09-22
 
 ## 1. 职责归属与应用装配
 
@@ -24,7 +24,9 @@ Keyboard → Browser Registry → Input Router
                       修改事实时调用 Project Command
 ```
 
-`bootstrap/studio-action-runtime.ts` 装配各功能的 Action 定义、按所有权拆分的目标槽位和键盘路由器。
+`bootstrap/studio-action-runtime.ts` 装配各功能的 Action 定义、按所有权拆分的目标槽位、
+键盘路由器、User Keymap 和 Vue Binding。用户覆盖由独立本地记录保存，菜单、按钮和 Settings
+读取成功提交后的同一响应式键位快照；设置草稿和保存失败不会改变业务 Action 或 Project。
 `studio-application.ts` 负责释放这些资源，并将非预期错误接入现有 Toast 通道和控制台诊断。
 各视图通过带类型约束的 Vue context 注入能力。Handler、等待完成的 resolver、目标绑定、
 History、dirty 状态和播放资源均不进入 Pinia。

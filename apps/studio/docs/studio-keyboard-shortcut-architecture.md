@@ -1,8 +1,8 @@
 # Studio Keyboard Input 架构
 
-> 状态：WA1–WA4 已审核；Input Foundation S1 已于 2026-09-22 通过用户审核
+> 状态：WA1–WA4 已审核；Input Foundation S1 已审核提交；S2 已于 2026-09-22 通过用户审核
 >
-> 日期：2026-09-11
+> 日期：2026-09-22
 >
 > 范围：`apps/studio`
 
@@ -34,11 +34,14 @@ TanStack Adapter 不知道业务 Action、Selection 或 Modal。Router 不执行
 `queryStudioShortcuts()` 从 Catalogue、政策和 Router 的有效 Keymap 派生只读查询结果。
 未挂载或当前不可执行的 Action 仍然可查，不通过扫描组件或另建手工列表取得操作目录。
 Project Entry 的 Keyboard shortcuts 按钮和 Project Menu → View → Keyboard shortcuts
-打开同一个 Dialog，支持搜索、已分配／未分配筛选、当前／默认键位、作用区域和 Repeat 提示。
+打开同一个 Dialog，支持功能／键位／作用区域搜索、已分配／未分配／已修改筛选、当前／
+默认键位和 Repeat 提示。
 Widget / Pointer Modifier 作为独立帮助内容，不伪装成可重绑定的 Action。
 
-S1 的有效 Keymap 仍是创建时的冻结快照；菜单、Tooltip 和查询窗口均从该 Router 读取。
-用户编辑、持久化、响应式替换和 Recorder 由 S2–S3 实现，当前界面不提供修改能力。
+S2 由 `StudioUserKeymap` 协调用户覆盖记录、整表验证和 Router 替换；Vue Binding 订阅成功
+提交的冻结快照。菜单、Tooltip 和 Settings 读取同一响应式 `StudioKeyboardInput`，组件不能
+直接替换物理注册。编辑草稿仅由 Settings 的 `StudioShortcutEditor` 持有，成功保存前不影响
+当前键位。Recorder 与更完整的冲突处理交互仍属于 S3。
 
 `StudioKeyboardBinding` 使用 Brand，内置配置由 `defineStudioKeyboardBinding()` 检查
 Hotkey 拼写；动态输入在 Browser Adapter 验证后才成为 Binding。`@tanstack/hotkeys@0.8.0`
@@ -120,3 +123,55 @@ S1 回归包含目录完整性、互斥 Enter、真实 DOM 控件按键、Repeat
 Settings / Toast 和菜单焦点。实施计划与验证记录见
 [Editor Input Foundation V1](./editor-input-foundation-v1-phase-plan.md)；WA 历史验证保留在
 [Workbench Action Catalogue 收口报告](./workbench-action-catalogue-v1-closure-report.md)。
+
+## 6. 用户覆盖记录与恢复
+
+`BrowserUserKeymapStorage` 只读写 `seele.studio.user-keymap`，记录格式为：
+
+```json
+{
+  "version": 1,
+  "overrides": {
+    "project.save": ["Mod+K"],
+    "piano-roll.tool.pencil": [],
+    "notifications.focus": ["F9", "F10"]
+  }
+}
+```
+
+- 缺少 Action 条目表示跟随默认；空数组表示主动解除全部绑定；恢复单项删除该覆盖。
+  主动保存与默认相同的键位仍是用户覆盖，以便与未来默认政策变更区分。
+- 持久化输入保留 portable `Mod`，当前平台仅负责显示和匹配，不把记录改写成 Meta / Control。
+- Action ID 已成为持久化协议。未知 ID 连同原始值保留，不注册，也不会因普通编辑或
+  “恢复全部默认”被删除；已知非法记录保留到用户修复或恢复对应 Action。
+- 加载先检查 JSON、版本和顶层 schema，再逐项验证 Binding，最后按规范化键位检查整个
+  Context 路由。非法条目或同层重叠冲突覆盖回退默认；回退后再次验证，直到不再产生连锁
+  冲突。有效且无冲突的覆盖仍可使用。相同 Action 的重复物理键位同样拒绝。
+- 未识别键名等 TanStack Validation warning 在编辑草稿中显示；warning 不等于非法格式。
+  错误和真实冲突阻止保存。S2 不自建另一份第三方键名字典。
+- 加载不写回存储。损坏、未知版本或读取失败不会阻止启动；设置解释默认值已生效，普通编辑
+  暂停，只有用户明确确认重置才替换不可读记录。写入再次失败则保留原记录和提示。
+- 加载注册失败时保留默认、原记录及诊断；可修改相关 Action 或恢复默认后重试。
+- 设置修改重新验证整份候选记录；不让一个新操作静默禁用原来正常的其他覆盖。旧的非法条目
+  可以继续保留；修复解除冲突后，原先因冲突停用且现已有效的覆盖可以一并恢复。
+- 记录在当前浏览器本地保存；当前标签页立即生效，重新打开应用加载保存值。没有跨标签页
+  同步，不进入 Project File、Project IndexedDB、dirty、History 或 Playback。
+
+## 7. 运行时替换事务
+
+`StudioKeyboardInputRouter.replaceKeymap()` 与 `StudioUserKeymap` 的同步事务顺序：
+
+1. 从默认和候选覆盖生成完整冻结 Keymap，验证格式、重复物理键位和 Context 冲突。
+2. 暂停分派；复用规范化身份相同的注册，为新增键位准备 Listener。
+3. 成功保存用户覆盖后，发布 Router 的新路由和 User Keymap 快照；Vue Binding 同步接收。
+4. 释放不再使用的旧注册，结束暂停。已打开的 Menu / Dialog 暂停令牌继续有效。
+
+准备或持久化失败时撤回新增注册，不发布快照；原路由、UI 提示、存储内容都保持原值。
+注册 callback 按物理身份查询已发布路由，而不是闭包保存旧 Action 列表，因此键位交换和
+同平台别名替换可以复用原 Listener。成功提交后的旧注册清理异常只记录诊断，不伪报保存
+回退；已移除路由不再派发 Action。订阅者异常隔离，不能把已经保存的结果解释为失败。
+
+Composition Root 创建并释放 Storage、User Keymap、Vue Binding 和 Router；Vue 只持有
+可丢弃投影及本地草稿。S2 回归包括加载／刷新语义、未知 ID、非法／冲突连锁回退、单项／
+全部恢复、注册／存储失败、事务输入暂停、实际 TanStack Mod 匹配和交换路由，以及真实
+Reka Dialog、菜单／按钮提示更新与焦点恢复。

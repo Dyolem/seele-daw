@@ -13,17 +13,22 @@ import {
 } from '@/features/project-workspace/actions/project-workbench-action-context'
 import type { StudioActionFailure } from '@/workbench/actions/studio-action'
 import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
-import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
+import {
+  TestStudioKeyboardBindingRegistry,
+  createTestUserKeymapStorage,
+} from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
 
 export function createTestStudioActionRuntime(
   options: Omit<Partial<StudioActionRuntimeOptions>, 'bindingRegistry' | 'reportFailure'> = {},
 ) {
   const bindingRegistry = new TestStudioKeyboardBindingRegistry()
   const failures: StudioActionFailure[] = []
+  const storage = createTestUserKeymapStorage()
   const runtime = createStudioActionRuntime({
     bindingRegistry,
     isModalActive: () => false,
     ...options,
+    userKeymapStorage: options.userKeymapStorage ?? storage,
     reportFailure: (failure) => {
       failures.push(failure)
     },
@@ -31,6 +36,7 @@ export function createTestStudioActionRuntime(
   onTestFinished(() => runtime.dispose())
   return {
     bindingRegistry,
+    storage,
     runtime,
     failures,
     provide: {

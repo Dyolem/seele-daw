@@ -19,8 +19,51 @@ import {
 import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
+import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 
 describe('Project menu keyboard ownership', () => {
+  it('updates menu shortcuts and the Save button hint from the same committed user keymap', async () => {
+    const { runtime, provide } = createTestStudioActionRuntime()
+    const wrapper = mount(
+      {
+        render: () =>
+          h(ProjectWorkbenchGlobalBar, {
+            actionControls: presentProjectWorkbenchActions(runtime.actions, runtime.keyboard),
+            isDirty: false,
+            projectId: 'keymap-hints',
+            projectName: 'Shortcuts',
+            saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+          }),
+      },
+      { attachTo: document.body, global: { provide } },
+    )
+    onTestFinished(() => {
+      wrapper.unmount()
+      document.body.replaceChildren()
+    })
+    expect(wrapper.get('.project-workbench__save').attributes('title')).toContain('display:Mod+S')
+    expect(runtime.userKeymap.setBindings(STUDIO_ACTION.PROJECT_SAVE, ['Mod+K'])).toEqual({
+      status: 'saved',
+    })
+    await flushPromises()
+    expect(wrapper.get('.project-workbench__save').attributes('title')).toContain('display:Mod+K')
+    expect(wrapper.get('.project-workbench__save').attributes('title')).not.toContain(
+      'display:Mod+S',
+    )
+    await wrapper.get('[aria-label="Open project menu"]').trigger('click')
+    await flushPromises()
+    const saveItem = [...document.querySelectorAll('[role="menuitem"]')].find((element) =>
+      element.getAttribute('title')?.startsWith('Save ('),
+    )
+    expect(saveItem?.textContent).toContain('display:Mod+K')
+    expect(runtime.userKeymap.restoreAction(STUDIO_ACTION.PROJECT_SAVE)).toEqual({
+      status: 'saved',
+    })
+    await flushPromises()
+    expect(saveItem?.textContent).toContain('display:Mod+S')
+    expect(wrapper.get('.project-workbench__save').attributes('title')).toContain('display:Mod+S')
+  })
+
   it('opens the shortcut directory through the real Action after returning focus to the menu trigger', async () => {
     const open = shallowRef(false)
     const cancelInteraction = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)

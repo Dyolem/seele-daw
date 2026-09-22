@@ -324,9 +324,16 @@ Save、Undo／Redo、Play／Pause，以及 WA2 的 Return、Projects、MIDI Impo
 - Track 音符区域聚焦不会沿用旧 CC64 目标；Tab 聚焦回 Lane 可恢复其选择操作。
 
 已有 `@tanstack/hotkeys@0.8.0` Browser Adapter 继续隔离平台解析与输入过滤。动态用户 Binding
-需先验证。S1 的只读 Keyboard shortcuts 窗口从统一目录查询已绑定和未绑定 Action，
-提供搜索、筛选、当前／默认键位和作用区域；Widget 与 Pointer Modifier 作为帮助内容单列。
-窗口使用 Dialog 焦点约束，打开时聚焦搜索，关闭后回到原入口；改键与 Recorder 属于 S2–S3。
+需先验证。Keyboard shortcuts 窗口从统一目录查询已绑定和未绑定 Action，提供功能／键位／
+作用区域搜索、已修改筛选、当前／默认键位；Widget 与 Pointer Modifier 作为帮助内容单列。
+S2 提供每个 Action 的键名编辑草稿、添加／移除、保存／取消、恢复单项与恢复全部。用 `Mod`
+表达跨平台主修饰键，当前文案按平台显示。空列表说明保存后会解除绑定；恢复默认说明回到
+默认政策。真实冲突、存储和注册失败在草稿旁反馈，失败后保留草稿和当前键位。
+
+窗口使用 Dialog 焦点约束，打开时聚焦搜索，关闭后回到原入口；编辑时聚焦首个键位，
+Escape 先取消编辑草稿，再次按下关闭窗口。保存／取消后回到对应 Edit 按钮；筛选使该行
+消失时回到搜索。全部恢复需要窗口内确认；损坏记录必须明确说明重置会替换原记录。
+非法覆盖显示未应用和默认回退，可逐项修复。Recorder 与冲突解除交互属于 S3。
 
 按钮的原生 Enter / Space，以及 Slider / Splitter 的导航键优先于后台 Action；Arrangement
 Clip 和 Bar 的 Enter 在互斥 Focus Context 中分别执行打开／创建。选区目标由 Focus 激活，
@@ -1244,7 +1251,7 @@ Canvas 功能至少检查：
 - Track Color 是固定 Palette ID，还是允许任意色值；
 - 首批内置主题除 Piano Black 外的数量和视觉方向；
 - Browser / Library 与 Mixer 的最终工作区模式；
-- 用户 Keymap、Shortcut Settings 与平台冲突定制策略。
+- Shortcut Recorder 与更完整的平台冲突解除交互（User Keymap / Settings 基础操作已在 S2 实施）。
 
 每项应在对应纵向产品切片开始前，结合可操作原型单独确认。
 

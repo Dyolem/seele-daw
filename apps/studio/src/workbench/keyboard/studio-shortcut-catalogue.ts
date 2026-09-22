@@ -1,8 +1,8 @@
-import type { StudioActionCategory } from '@/workbench/actions/studio-action'
+import type { StudioActionCategory, StudioActionId } from '@/workbench/actions/studio-action'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/studio-default-keymap'
 import { STUDIO_KEYBOARD_CONTEXTS } from '@/workbench/keyboard/studio-keyboard-context'
-import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/studio-keyboard-input-router'
+import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
 
 export const STUDIO_ACTION_CATEGORIES = Object.freeze({
   project: 'Project',
@@ -16,9 +16,10 @@ export const STUDIO_ACTION_CATEGORIES = Object.freeze({
 /** This projection does not depend on whether a feature is mounted or currently executable. */
 export function queryStudioShortcuts(
   actions: StudioActionCoordinator,
-  keyboard: StudioKeyboardInputRouter,
+  keyboard: StudioKeyboardInput,
   query = '',
-  assignment: 'all' | 'assigned' | 'unassigned' = 'all',
+  assignment: 'all' | 'assigned' | 'unassigned' | 'modified' = 'all',
+  modifiedActionIds: readonly StudioActionId[] = [],
 ) {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean)
   return Object.freeze(
@@ -27,6 +28,7 @@ export function queryStudioShortcuts(
         const policy = STUDIO_SHORTCUT_POLICIES[descriptor.actionId]
         return Object.freeze({
           ...descriptor,
+          modified: modifiedActionIds.includes(descriptor.actionId),
           categoryLabel: STUDIO_ACTION_CATEGORIES[descriptor.category],
           contextLabel: STUDIO_KEYBOARD_CONTEXTS[policy.context].label,
           currentBindings: keyboard.displayBindingsFor(descriptor.actionId),
@@ -35,6 +37,7 @@ export function queryStudioShortcuts(
         })
       })
       .filter((row) => {
+        if (assignment === 'modified' && !row.modified) return false
         if (assignment === 'assigned' && row.currentBindings.length === 0) return false
         if (assignment === 'unassigned' && row.currentBindings.length !== 0) return false
         const text = [
@@ -45,6 +48,9 @@ export function queryStudioShortcuts(
           row.contextLabel,
           ...row.keywords,
           ...row.currentBindings,
+          ...row.defaultBindings,
+          ...keyboard.bindingsFor(row.actionId),
+          ...STUDIO_SHORTCUT_POLICIES[row.actionId].defaultBindings,
         ]
           .join(' ')
           .toLocaleLowerCase()

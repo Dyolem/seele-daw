@@ -13,19 +13,25 @@ import {
   createStudioKeyboardKeymap,
   STUDIO_SHORTCUT_POLICIES,
 } from '@/workbench/keyboard/studio-default-keymap'
-import {
-  STUDIO_KEYBOARD_CONTEXTS,
-  studioKeyboardContextsOverlap,
-  type StudioKeyboardContext,
-} from '@/workbench/keyboard/studio-keyboard-context'
+import { type StudioKeyboardContext } from '@/workbench/keyboard/studio-keyboard-context'
+import { analyzeStudioKeyboardRoutes } from '@/workbench/keyboard/studio-keyboard-routes'
 import { isWidgetOwnedKeyboardInput } from '@/workbench/keyboard/browser-keyboard-ownership'
 
-export interface StudioKeyboardInputRouter {
+export interface StudioKeyboardInput {
+  readonly keymap: StudioKeyboardKeymap<StudioActionId>
   bindingsFor(actionId: StudioActionId): readonly StudioKeyboardBinding[]
   displayBindingsFor(actionId: StudioActionId): readonly string[]
   formatBinding(binding: StudioKeyboardBinding): string
   validateBindingInput(input: string): StudioKeyboardBindingValidation
   suspend(): StudioKeyboardDispose
+}
+
+export interface StudioKeyboardInputRouter extends StudioKeyboardInput {
+  replaceKeymap(
+    keymap: StudioKeyboardKeymap<StudioActionId>,
+    persist: () => void,
+    publish?: () => void,
+  ): void
   dispose(): void
 }
 
@@ -42,34 +48,72 @@ export interface StudioKeyboardInputRouterOptions {
 export function createStudioKeyboardInputRouter(
   options: StudioKeyboardInputRouterOptions,
 ): StudioKeyboardInputRouter {
-  const keymap = createStudioKeyboardKeymap(options.keymap)
-  const routes = new Map<string, { binding: StudioKeyboardBinding; actionIds: StudioActionId[] }>()
-  const releases: StudioKeyboardDispose[] = []
+  let keymap = createStudioKeyboardKeymap(options.keymap)
+  let routes = analyzeStudioKeyboardRoutes(
+    options.actions.catalogue,
+    keymap,
+    options.bindingRegistry,
+  ).routes
+  const registrations = new Map<string, StudioKeyboardDispose>()
   const suspended = new Set<symbol>()
+  let replacing = false
   let disposed = false
-  for (const { actionId } of options.actions.catalogue) {
-    for (const binding of keymap[actionId]) {
-      const identity = options.bindingRegistry.identity(binding)
-      let route = routes.get(identity)
-      if (route === undefined) {
-        route = { binding, actionIds: [] }
-        routes.set(identity, route)
-      }
-      if (route.actionIds.includes(actionId)) continue
-      const context = STUDIO_SHORTCUT_POLICIES[actionId].context
-      if (
-        route.actionIds.some((id) => {
-          const other = STUDIO_SHORTCUT_POLICIES[id].context
-          return (
-            STUDIO_KEYBOARD_CONTEXTS[other].priority ===
-              STUDIO_KEYBOARD_CONTEXTS[context].priority &&
-            studioKeyboardContextsOverlap(other, context)
+
+  function releaseRegistration(release: StudioKeyboardDispose): void {
+    try {
+      release()
+    } catch (cause) {
+      // A cleanup failure cannot undo a persisted map; removed routes no longer dispatch.
+      console.error('Studio keyboard registration cleanup failed', cause)
+    }
+  }
+
+  function replaceKeymap(
+    candidate: StudioKeyboardKeymap<StudioActionId>,
+    persist: () => void,
+    publish: () => void = () => {},
+  ): void {
+    if (disposed) throw new Error('The keyboard router has been disposed.')
+    if (replacing) throw new Error('A keymap replacement is already in progress.')
+    const nextKeymap = createStudioKeyboardKeymap(candidate)
+    const next = analyzeStudioKeyboardRoutes(
+      options.actions.catalogue,
+      nextKeymap,
+      options.bindingRegistry,
+    )
+    if (next.conflicts.length)
+      throw new Error('Ambiguous keyboard binding in overlapping contexts.')
+    const prepared = new Map<string, StudioKeyboardDispose>()
+    replacing = true
+    try {
+      try {
+        for (const [identity, route] of next.routes) {
+          if (registrations.has(identity)) continue
+          // Callbacks resolve the published route by identity; swaps reuse physical registrations.
+          prepared.set(
+            identity,
+            options.bindingRegistry.register(route.binding, (event) =>
+              dispatch(routes.get(identity)?.actionIds ?? [], event),
+            ),
           )
-        })
-      ) {
-        throw new Error(`Ambiguous keyboard binding in ${context}: ${binding}`)
+        }
+        persist()
+      } catch (cause) {
+        for (const release of [...prepared.values()].reverse()) releaseRegistration(release)
+        throw cause
       }
-      route.actionIds.push(actionId)
+      keymap = nextKeymap
+      routes = next.routes
+      for (const [identity, release] of prepared) registrations.set(identity, release)
+      // Publication cannot reject a committed record; the owner isolates subscriber failures.
+      publish()
+      for (const [identity, release] of registrations) {
+        if (routes.has(identity)) continue
+        registrations.delete(identity)
+        releaseRegistration(release)
+      }
+    } finally {
+      replacing = false
     }
   }
 
@@ -87,6 +131,7 @@ export function createStudioKeyboardInputRouter(
   function dispatch(actionIds: readonly StudioActionId[], event: KeyboardEvent): void {
     if (
       disposed ||
+      replacing ||
       suspended.size > 0 ||
       event.defaultPrevented ||
       event.isComposing ||
@@ -126,24 +171,12 @@ export function createStudioKeyboardInputRouter(
     }
   }
 
-  try {
-    for (const route of routes.values()) {
-      route.actionIds.sort(
-        (a, b) =>
-          STUDIO_KEYBOARD_CONTEXTS[STUDIO_SHORTCUT_POLICIES[b].context].priority -
-          STUDIO_KEYBOARD_CONTEXTS[STUDIO_SHORTCUT_POLICIES[a].context].priority,
-      )
-      releases.push(
-        options.bindingRegistry.register(route.binding, (event) =>
-          dispatch(route.actionIds, event),
-        ),
-      )
-    }
-  } catch (cause) {
-    for (const release of releases.reverse()) release()
-    throw cause
-  }
+  replaceKeymap(keymap, () => {})
   return {
+    get keymap() {
+      return keymap
+    },
+    replaceKeymap,
     bindingsFor: (actionId) => keymap[actionId],
     displayBindingsFor: (actionId) =>
       Object.freeze(
@@ -162,8 +195,8 @@ export function createStudioKeyboardInputRouter(
       if (disposed) return
       disposed = true
       suspended.clear()
-      for (const release of releases.reverse()) release()
-      releases.length = 0
+      for (const release of [...registrations.values()].reverse()) releaseRegistration(release)
+      registrations.clear()
     },
   }
 }

@@ -1,6 +1,6 @@
 import type { StudioActionId, StudioActionPresentation } from '@/workbench/actions/studio-action'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/studio-keyboard-input-router'
+import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
 
 export interface StudioActionControl extends StudioActionPresentation {
   readonly actionId: StudioActionId
@@ -11,7 +11,7 @@ export interface StudioActionControl extends StudioActionPresentation {
 /** Menus and buttons share business presentation and platform-formatted hints. */
 export function presentStudioAction(
   actions: StudioActionCoordinator,
-  keyboard: StudioKeyboardInputRouter,
+  keyboard: StudioKeyboardInput,
   actionId: StudioActionId,
 ): StudioActionControl {
   const presentation = actions.presentationFor(actionId)

@@ -4,11 +4,11 @@ import {
   type StudioActionControl,
 } from '@/workbench/actions/studio-action-control'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/studio-keyboard-input-router'
+import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
 
 export function presentProjectWorkbenchActions(
   actions: StudioActionCoordinator,
-  keyboard: StudioKeyboardInputRouter,
+  keyboard: StudioKeyboardInput,
 ) {
   function present(actionId: StudioActionId): StudioActionControl {
     return presentStudioAction(actions, keyboard, actionId)

@@ -1,3 +1,4 @@
+import { validateStudioKeyboardBinding } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
 import type {
   StudioKeyboardBindingRegistry,
   StudioKeyboardDispose,
@@ -57,14 +58,19 @@ export class TestStudioKeyboardBindingRegistry implements StudioKeyboardBindingR
   }
 
   validate(input: string): StudioKeyboardBindingValidation {
-    const normalized = input.trim()
-    const valid = normalized.length > 0
-    return Object.freeze({
-      binding: valid ? (normalized as StudioKeyboardBinding) : null,
-      errors: Object.freeze(valid ? [] : ['Binding cannot be empty']),
-      input,
-      valid,
-      warnings: Object.freeze([]),
-    })
+    return validateStudioKeyboardBinding(input)
+  }
+}
+
+export function createTestUserKeymapStorage(initial: string | null = null) {
+  let record = initial
+  const writes: string[] = []
+  return {
+    writes,
+    read: () => record,
+    write(serialized: string): void {
+      record = serialized
+      writes.push(serialized)
+    },
   }
 }

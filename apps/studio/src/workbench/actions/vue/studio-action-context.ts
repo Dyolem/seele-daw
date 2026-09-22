@@ -1,11 +1,18 @@
-import { inject, onBeforeUnmount, watch, type InjectionKey } from 'vue'
+import { inject, onBeforeUnmount, watch, type InjectionKey, type ComputedRef } from 'vue'
 
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/studio-keyboard-input-router'
+import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
+
+import type {
+  StudioUserKeymap,
+  StudioUserKeymapState,
+} from '@/workbench/keyboard/studio-user-keymap'
 
 export interface StudioActionVueContext {
+  readonly userKeymap: StudioUserKeymap
+  readonly keymapState: ComputedRef<StudioUserKeymapState>
   readonly actions: StudioActionCoordinator
-  readonly keyboard: StudioKeyboardInputRouter
+  readonly keyboard: StudioKeyboardInput
 }
 
 export const STUDIO_ACTION_CONTEXT_KEY: InjectionKey<StudioActionVueContext> =

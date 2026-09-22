@@ -121,7 +121,7 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 | `MIDI-CLIP-CREATE`     | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                                                                                          |
 | `CONTEXT-EDITOR-DOCK`  | 上下文编辑器 Dock         | **局部可用** | 可调整布局并在 Track 全局时间轴与所选 Clip Focus Piano Roll 之间切换。                                                                                                            |
 | `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                                                                                   |
-| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | Workbench Save / Undo / Redo / Play-Pause 与 Piano Roll Escape / Delete / Backspace 已接入。                                                                                      |
+| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | 19 个 Action 集中查询；S2 自定义键位、独立本地保存与运行时替换已通过审核；Recorder 留待 S3。                                                                                      |
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                                   |
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                                         |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。           |
@@ -417,7 +417,7 @@ Track Cursor 的完整 Note 编辑也尚未接入。
 
 **局部可用**
 
-当前 Workbench 支持：
+内置默认键位如下；S2 支持用户修改：
 
 - `Mod+S`：当前项目 dirty 且不在保存中时执行 Save；
 - `Mod+Z`：当前 Session 可以 Undo 时执行 Undo；
@@ -439,7 +439,7 @@ Track Cursor 的完整 Note 编辑也尚未接入。
 - 打开的 Menu / Modal 接管输入；后台优先级为当前编辑交互 → 聚焦编辑器 → Workbench → Global；
 - 接受调用后立即阻止浏览器默认行为，业务成功、未应用或失败由完成结果独立表达；
 - Action 目录与物理键位在应用装配时建立，页面切换只替换当前目标；旧组件的延迟清理不能
-  释放新目标，应用释放才卸载全部 Listener；
+  释放新目标；User Keymap 替换只更新差异注册，应用释放时卸载全部 Listener；
 - 快捷键调用现有 Save / History / Playback / Editor 权威，不保存它们的状态副本；
 - Track 音符区域聚焦时不能删除旧的 CC64 选择；通过键盘聚焦回 Lane 后恢复 CC64 操作。
 - Mount 不抢占选区目标；实际 Focus 激活选择能力。活动手势拥有独立的 Cancel 能力，
@@ -467,14 +467,22 @@ Escape 取消后，焦点回到 Project Menu 按钮。WA4 已于 2026-09-11 通�
 [Workbench Action Catalogue V1 收口报告](./apps/studio/docs/workbench-action-catalogue-v1-closure-report.md)。
 
 Editor Input Foundation S1 已于 2026-09-22 通过用户审核：项目入口的 Keyboard shortcuts 按钮与
-Project Menu → View → Keyboard shortcuts 打开只读查询窗口。目录包含 19 个 Action，
+Project Menu → View → Keyboard shortcuts 提供统一设置入口。目录包含 19 个 Action，
 其中 10 个有默认键位，9 个未分配；支持中英文检索、已分配／未分配筛选，显示当前键位、
 默认键位、作用区域和重复政策，并单列 Widget / Modifier 帮助。Cursor、Pencil、Snap
 也已进入目录并与工具栏共用 Action，默认不分配按键。
 
 默认 Keymap、Context、Repeat 政策集中维护，菜单与按钮从有效 Keymap 派生提示。Follow
-暂停由实际导航和滚动触发，不再依赖硬编码按键集合。尚未提供用户修改、持久化、Recorder、
-Sequence 或 Command Palette；S2–S3 与后续独立手势架构见
+暂停由实际导航和滚动触发，不再依赖硬编码按键集合。
+
+S2 已于 2026-09-22 通过用户审核：Keyboard shortcuts 支持手动输入键位、添加／移除绑定、单项恢复和
+全部恢复，并提供 Modified 筛选。设置保存在当前浏览器独立的版本化记录中；缺少覆盖跟随
+默认，空数组表示主动解除，恢复默认删除覆盖。菜单与按钮提示随成功保存立即更新，旧键
+失效，重新打开保留配置。注册或保存失败保留旧路由和提示；非法／冲突记录退回默认，未知
+Action 保留但不执行。损坏或未知版本的整份记录不会阻止启动，也不会自动重写，可在设置中
+明确确认重置。改键不影响 Project dirty、History 或播放事实。
+
+尚未提供 Recorder、Sequence 或 Command Palette；S3 与后续独立手势架构见
 [Editor Input Foundation V1 计划](./apps/studio/docs/editor-input-foundation-v1-phase-plan.md)。
 
 术语和状态所有权见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)，

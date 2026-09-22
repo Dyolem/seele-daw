@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import {
   DialogRoot,
   DialogPortal,
@@ -10,6 +10,9 @@ import {
   DialogClose,
 } from 'reka-ui'
 import DismissIcon from '~icons/fluent/dismiss-20-regular'
+import UiButton from '@/ui/components/UiButton.vue'
+import StudioShortcutEditor from '@/features/keyboard-shortcuts/StudioShortcutEditor.vue'
+import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import {
   useStudioActions,
@@ -21,16 +24,88 @@ import {
 } from '@/workbench/keyboard/studio-shortcut-catalogue'
 
 const open = defineModel<boolean>('open', { required: true })
-const { actions, keyboard } = useStudioActions()
+const { actions, keyboard, userKeymap, keymapState } = useStudioActions()
 const search = shallowRef('')
-const assignment = shallowRef<'all' | 'assigned' | 'unassigned'>('all')
+const assignment = shallowRef<'all' | 'assigned' | 'unassigned' | 'modified'>('all')
 const searchField = useTemplateRef<HTMLInputElement>('searchField')
-const rows = computed(() => queryStudioShortcuts(actions, keyboard, search.value, assignment.value))
+const rows = computed(() =>
+  queryStudioShortcuts(
+    actions,
+    keyboard,
+    search.value,
+    assignment.value,
+    keymapState.value.modifiedActionIds,
+  ),
+)
+const editing = shallowRef<StudioActionDescriptor | null>(null)
+const confirmReset = shallowRef(false)
+const feedback = shallowRef('')
+const resetError = shallowRef('')
+let editReturnTarget: HTMLElement | null = null
+let resetReturnTarget: HTMLElement | null = null
 let returnFocusTarget: HTMLElement | null = null
+function rejectedMessage(actionId: StudioActionId): string | undefined {
+  return keymapState.value.rejectedOverrides.find((issue) => issue.actionId === actionId)?.message
+}
+function editAction(action: StudioActionDescriptor, event: MouseEvent): void {
+  editReturnTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  editing.value = action
+  confirmReset.value = false
+  feedback.value = ''
+  resetError.value = ''
+}
+async function closeEditor(message = ''): Promise<void> {
+  editing.value = null
+  feedback.value = message
+  await nextTick()
+  if (editReturnTarget?.isConnected) editReturnTarget.focus({ preventScroll: true })
+  else searchField.value?.focus({ preventScroll: true })
+  editReturnTarget = null
+}
+function handleEscape(event: KeyboardEvent): void {
+  if (editing.value) {
+    event.preventDefault()
+    void closeEditor()
+  } else if (confirmReset.value) {
+    event.preventDefault()
+    cancelRestoreAll()
+  }
+}
+function requestRestoreAll(event: MouseEvent): void {
+  resetReturnTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  confirmReset.value = true
+  editing.value = null
+  resetError.value = ''
+  feedback.value = ''
+}
+function cancelRestoreAll(): void {
+  confirmReset.value = false
+  resetError.value = ''
+  if (resetReturnTarget?.isConnected) resetReturnTarget.focus({ preventScroll: true })
+  else searchField.value?.focus({ preventScroll: true })
+  resetReturnTarget = null
+}
+function restoreAll(): void {
+  const result = userKeymap.restoreAll()
+  if (result.status === 'rejected') resetError.value = result.message
+  else {
+    confirmReset.value = false
+    editing.value = null
+    resetError.value = ''
+    feedback.value = 'All actions now follow the default shortcuts.'
+    searchField.value?.focus({ preventScroll: true })
+  }
+}
 useStudioKeyboardLayer(() => open.value)
 watch(
   open,
   (value) => {
+    editing.value = null
+    confirmReset.value = false
+    feedback.value = ''
+    resetError.value = ''
+    editReturnTarget = null
+    resetReturnTarget = null
     if (value) {
       returnFocusTarget =
         document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -59,12 +134,14 @@ function restoreFocus(event: Event): void {
         class="studio-shortcuts"
         @open-auto-focus="focusSearch"
         @close-auto-focus="restoreFocus"
+        @escape-key-down="handleEscape"
       >
         <header class="studio-shortcuts__header">
           <div>
             <DialogTitle class="studio-shortcuts__title">Keyboard shortcuts</DialogTitle>
             <DialogDescription class="studio-shortcuts__description"
-              >Browse actions, assigned keys, and where they work.</DialogDescription
+              >Customize actions, assigned keys, and where they work. Saved in this
+              browser.</DialogDescription
             >
           </div>
           <DialogClose as-child
@@ -83,13 +160,49 @@ function restoreFocus(event: Event): void {
             <option value="all">All actions</option>
             <option value="assigned">Assigned</option>
             <option value="unassigned">Unassigned</option>
+            <option value="modified">Modified</option>
           </select>
           <span role="status">{{ rows.length }} / {{ actions.catalogue.length }} actions</span>
         </div>
         <div class="studio-shortcuts__body">
+          <div class="studio-shortcuts__settings">
+            <UiButton size="small" @click="requestRestoreAll">{{
+              keymapState.canEdit ? 'Restore all defaults' : 'Reset saved record'
+            }}</UiButton>
+            <span v-if="feedback" role="status">{{ feedback }}</span>
+          </div>
+          <p v-if="keymapState.problem" role="alert">{{ keymapState.problem.message }}</p>
+          <p v-if="keymapState.rejectedOverrides.length" role="alert">
+            {{ keymapState.rejectedOverrides.length }} saved action overrides are not applied. Edit
+            those actions or restore their defaults.
+          </p>
+          <p v-if="keymapState.unknownActionIds.length" class="studio-shortcuts__notice">
+            {{ keymapState.unknownActionIds.length }} saved actions from another version are
+            preserved but are not active.
+          </p>
+          <div v-if="confirmReset" class="studio-shortcuts__reset">
+            <p>
+              {{
+                keymapState.canEdit
+                  ? 'Restore every action to its default shortcuts? Saved actions from another version will be kept.'
+                  : 'Replace the unreadable or unsupported saved record with default shortcuts? This cannot be undone.'
+              }}
+            </p>
+            <UiButton size="small" @click="restoreAll">Confirm restore</UiButton>
+            <UiButton size="small" variant="ghost" @click="cancelRestoreAll"
+              >Cancel restore</UiButton
+            >
+            <p v-if="resetError" role="alert">{{ resetError }}</p>
+          </div>
+          <StudioShortcutEditor
+            v-if="editing"
+            :key="editing.actionId"
+            :action="editing"
+            @close="closeEditor"
+          />
           <table v-if="rows.length" class="studio-shortcuts__table">
             <caption class="studio-shortcuts__caption">
-              Current shortcuts · default keymap · read-only
+              Current shortcuts · default bindings · local changes
             </caption>
             <thead>
               <tr>
@@ -97,6 +210,7 @@ function restoreFocus(event: Event): void {
                 <th scope="col">Current</th>
                 <th scope="col">Default</th>
                 <th scope="col">Where it works</th>
+                <th scope="col">Customize</th>
               </tr>
             </thead>
             <tbody>
@@ -104,7 +218,12 @@ function restoreFocus(event: Event): void {
                 <th scope="row">
                   <strong>{{ row.label }}</strong
                   ><span>{{ row.description }}</span
-                  ><small>{{ row.categoryLabel }}</small>
+                  ><small
+                    >{{ row.categoryLabel }} · {{ row.modified ? 'Modified' : 'Default' }}</small
+                  >
+                  <small v-if="rejectedMessage(row.actionId)"
+                    >{{ rejectedMessage(row.actionId) }} Using defaults.</small
+                  >
                 </th>
                 <td>
                   <kbd v-for="binding in row.currentBindings" :key="binding">{{ binding }}</kbd
@@ -120,6 +239,15 @@ function restoreFocus(event: Event): void {
                 </td>
                 <td>
                   {{ row.contextLabel }}<small v-if="row.allowRepeat">Repeats while held</small>
+                </td>
+                <td>
+                  <UiButton
+                    size="small"
+                    :aria-label="`Edit ${row.label} shortcuts`"
+                    :disabled="!keymapState.canEdit"
+                    @click="editAction(row, $event)"
+                    >Edit</UiButton
+                  >
                 </td>
               </tr>
             </tbody>
@@ -220,6 +348,34 @@ function restoreFocus(event: Event): void {
   color: var(--sd-color-text-secondary);
   font-size: var(--sd-font-size-xs);
 }
+.studio-shortcuts__settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sd-space-3);
+  margin-block-end: var(--sd-space-3);
+  font-size: var(--sd-font-size-sm);
+}
+.studio-shortcuts__notice,
+.studio-shortcuts__body > [role='alert'] {
+  font-size: var(--sd-font-size-sm);
+  color: var(--sd-color-text-secondary);
+}
+.studio-shortcuts__reset {
+  padding: var(--sd-space-3);
+  margin-block-end: var(--sd-space-3);
+  border: 1px solid var(--sd-color-border-strong);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-color-surface-sunken);
+  font-size: var(--sd-font-size-sm);
+}
+.studio-shortcuts__reset p {
+  margin-block-start: 0;
+}
+.studio-shortcuts__reset [role='alert'] {
+  color: var(--sd-color-state-danger);
+  margin-block: var(--sd-space-3) 0;
+}
 .studio-shortcuts__body {
   min-block-size: 0;
   overflow: auto;
@@ -306,6 +462,34 @@ function restoreFocus(event: Event): void {
   }
   .studio-shortcuts__header,
   .studio-shortcuts__filters,
+  .studio-shortcuts__settings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sd-space-3);
+    margin-block-end: var(--sd-space-3);
+    font-size: var(--sd-font-size-sm);
+  }
+  .studio-shortcuts__notice,
+  .studio-shortcuts__body > [role='alert'] {
+    font-size: var(--sd-font-size-sm);
+    color: var(--sd-color-text-secondary);
+  }
+  .studio-shortcuts__reset {
+    padding: var(--sd-space-3);
+    margin-block-end: var(--sd-space-3);
+    border: 1px solid var(--sd-color-border-strong);
+    border-radius: var(--sd-radius-md);
+    background: var(--sd-color-surface-sunken);
+    font-size: var(--sd-font-size-sm);
+  }
+  .studio-shortcuts__reset p {
+    margin-block-start: 0;
+  }
+  .studio-shortcuts__reset [role='alert'] {
+    color: var(--sd-color-state-danger);
+    margin-block: var(--sd-space-3) 0;
+  }
   .studio-shortcuts__body {
     padding-inline: var(--sd-space-4);
   }

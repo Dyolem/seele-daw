@@ -17,6 +17,10 @@ import {
   installProjectNavigationGuard,
   type ProjectNavigationGuardDispose,
 } from '@/router/project-navigation-guard'
+import {
+  createBrowserUserKeymapStorage,
+  type StudioUserKeymapStorage,
+} from '@/workbench/keyboard/browser-user-keymap-storage'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
 import {
   createStudioActionRuntime,
@@ -99,6 +103,7 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
   readonly createProjectEntityId?: () => string
   readonly createProjectMidiImportId?: ProjectMidiImportIdFactory
   readonly createRandomValue?: () => number
+  readonly userKeymapStorage?: StudioUserKeymapStorage
   readonly keyboardBindingRegistry?: StudioKeyboardBindingRegistry
   readonly midiFileDecoder?: MidiFileDecoder
   readonly midiFileReader?: LocalFileByteReader
@@ -300,6 +305,7 @@ export function composeStudioApplication(
       composition.projectPlaybackVisualFrame ?? createBrowserProjectPlaybackVisualFrame(),
     )
     actionRuntime = createStudioActionRuntime({
+      userKeymapStorage: composition.userKeymapStorage ?? createBrowserUserKeymapStorage(),
       bindingRegistry:
         composition.keyboardBindingRegistry ??
         createBrowserTanStackHotkeyRegistry({ target: document }),

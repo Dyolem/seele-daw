@@ -3,10 +3,12 @@
 应用外壳、服务装配、命令、上下文、生命周期和 Contribution 注册放在这里。只有 Studio 的
 Composition Root 可以知道并装配全部领域包与浏览器实现。
 
-当前应用级操作能力由两个边界组成：
+当前应用级操作能力按以下职责组成：
 
 - `StudioActionCoordinator` 拥有静态目录、当前能力解析、调用接受与完成结果；
 - `StudioKeyboardInputRouter` 拥有键位、输入上下文和物理 Listener 生命周期；
+- `StudioUserKeymap` 拥有本地用户覆盖记录，协调验证、保存与 Router 替换；Vue Binding 只订阅
+  已提交快照，菜单、按钮和设置共享当前键位；
 - Composition Root 装配 Feature Action 定义；页面和编辑器只提供临时业务目标；
 - 菜单、按钮和快捷键通过同一个 Action 调用业务权威，Save 与 WA2 Workbench 入口已接入；
 - 文件选择器与导航等待由页面持有；Dock 能力直接读取 Workspace，均不成为应用状态副本；

@@ -121,7 +121,7 @@ Runtime 引用，不改变 PCM、Envelope 或尾音长度，也不 dispose 仍�
 | `MIDI-CLIP-CREATE`     | 创建空 MIDI Clip          | **用户可用** | 双击目标小节创建，支持 Clip 视觉、选择、打开与失败反馈。                                                                                                                          |
 | `CONTEXT-EDITOR-DOCK`  | 上下文编辑器 Dock         | **局部可用** | 可调整布局并在 Track 全局时间轴与所选 Clip Focus Piano Roll 之间切换。                                                                                                            |
 | `UI-FOUNDATION`        | Piano Black UI 基础       | **用户可用** | 设计令牌、按钮、图标按钮、菜单、Dialog、Toast。                                                                                                                                   |
-| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | 19 个 Action 集中查询；S2 自定义键位、独立本地保存与运行时替换已通过审核；Recorder 留待 S3。                                                                                      |
+| `KEYBOARD-SHORTCUTS`   | Scoped Keyboard Shortcuts | **局部可用** | 19 个 Action 集中查询；S2 自定义键位、独立本地保存与运行时替换已通过审核；S3 录制、特殊键选择与冲突重新分配已通过审核。                                                           |
 | `MIDI-NOTE-CORE`       | MIDI Note 增删移动与缩放  | **用户可用** | Add、多 Note Move / Remove 与单 Note Resize 已接入 Piano Roll。                                                                                                                   |
 | `MIDI-CC64`            | Sustain Pedal 控制        | **局部可用** | 导入、二值播放及 Track / Clip Focus Lane 的 Pencil Add、Cursor Selection / Move / Replace Value、Delete 已接入；half-pedal 发声尚未实现。                                         |
 | `PLAYBACK`             | 播放与 Transport 执行     | **局部可用** | 本地开发环境可 Play / Pause / Return，并播放含 Note Track 内导入的二值 CC64；底层 Note / CC64 / Track 变化选择性生效。Loop、完整 Seek / Scrub、Record、Meter 尚未实现。           |
@@ -482,7 +482,13 @@ S2 已于 2026-09-22 通过用户审核：Keyboard shortcuts 支持手动输入�
 Action 保留但不执行。损坏或未知版本的整份记录不会阻止启动，也不会自动重写，可在设置中
 明确确认重置。改键不影响 Project dirty、History 或播放事实。
 
-尚未提供 Recorder、Sequence 或 Command Palette；S3 与后续独立手势架构见
+S3 已于 2026-09-23 通过用户审核：每个键位可录制或直接选择 Escape / Delete / Backspace。录制只修改草稿；
+Escape 取消录制，无修饰键的 Delete / Backspace 清空当前草稿行，失焦或关闭窗口会结束录制。
+Settings 区分互斥区域共用、明确的优先级和真实冲突；真实冲突必须改键或确认重新分配，
+一次保存只移除其他 Action 的冲突键，保留其余绑定。Tab / Shift+Tab 留给焦点导航；常见
+浏览器／系统键位给出提示，无法保证页面会收到对应输入。
+
+尚未提供 Sequence 或 Command Palette；后续独立手势架构按 G1–G4 实施，见
 [Editor Input Foundation V1 计划](./apps/studio/docs/editor-input-foundation-v1-phase-plan.md)。
 
 术语和状态所有权见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)，

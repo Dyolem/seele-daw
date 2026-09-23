@@ -1,6 +1,6 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：计划已获批准；S1 已于 2026-09-22 通过用户审核；S2 已于 2026-09-22 通过用户审核；S3 / G1–G4 尚未实施
+> 状态：计划已获批准；S1 / S2 已于 2026-09-22 通过用户审核并提交；S3 已于 2026-09-23 通过用户审核；G1–G4 尚未实施
 >
 > 日期：2026-09-11
 >
@@ -317,4 +317,26 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
   Studio 为 71 个文件 / 543 项测试。构建保留已有大 chunk 提示；没有新增 E2E。
 - 文档本地链接 44 项通过，`git diff --check` 通过。应用已提供 Codex 内置浏览器预览入口；
   当前会话没有可操作的浏览器自动化接口，未把 DOM / Reka 集成测试当作视觉或人工 smoke。
-- S2 已通过用户审核，按授权提交；后续按计划实施 S3，再进入 G1–G4。
+- S2 已通过用户审核，按授权提交为 `0351061`；后续按计划实施 S3，再进入 G1–G4。
+
+## 11. S3 实施记录（2026-09-23，已审核）
+
+- 接入已安装的 TanStack `HotkeyRecorder`，由窄 Browser Adapter 管理单次录制、输入暂停
+  与完整清理。Settings 只接收草稿；Escape 取消录制，Delete / Backspace 清空当前行，
+  Special key 与手动输入允许真正绑定这些控制键。
+- 完成、失焦、Window blur、页面隐藏、卸载与应用释放都会清理 Recorder；IME、Repeat、
+  Dead Key、AltGraph 和已消费事件不进入草稿，旧 cancel 不影响新会话，Modal 屏障独立保留。
+- 路由分析统一产出互斥共用、优先级和同层冲突。Settings 解释 Action 与 Context，显式确认
+  后原子重新分配冲突键，保留其他绑定及未知记录；陈旧确认、损坏关联项和保存失败均有反馈。
+- 拒绝纯 Modifier 与 Tab / Shift+Tab，常见浏览器／系统键位提供非阻断提醒。没有升级依赖、
+  引入用户 `when` 表达式或复制第三方键名字典；业务 Action 与 Project Facts 不受录制影响。
+- Codex 内置浏览器实际验证：录制 `Mod+K` 并保存／刷新保留，Escape 只取消录制，
+  Delete 特殊键选择，Backspace 只移除草稿，冲突提示及重新分配，确认焦点与分层 Escape，
+  Cancel / Clear 优先级说明，Clip / Bar 互斥共用，以及菜单／Save 提示同步。发现并修复了
+  重新分配确认未接收焦点的问题；验证后已恢复原默认键位，没有操作个人 Chrome。
+- Windows / Linux 的 Mod 映射、别名冲突和重新分配由自动测试覆盖；真实浏览器验证在
+  macOS 的内置 Chromium 中完成。用户人工 smoke 未单独报告；未新增 E2E。
+- 完整 `pnpm check` 通过：架构、workspace 命令一致性、格式、Oxlint、ESLint、全工作区
+  Type Check、167 个测试文件 / 1,544 项测试、Production Build 与 soundbank dist boundary。
+  Studio 为 72 个文件 / 578 项测试，新增 35 项行为回归；构建保留已有大 chunk 提示。
+- S3 已通过用户审核，按授权提交；后续进入 G1 的中立交互协议与 Note 纵向迁移。

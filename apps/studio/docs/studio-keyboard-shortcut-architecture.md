@@ -1,8 +1,8 @@
 # Studio Keyboard Input 架构
 
-> 状态：WA1–WA4 已审核；Input Foundation S1 已审核提交；S2 已于 2026-09-22 通过用户审核
+> 状态：WA1–WA4 已审核；Input Foundation S1 / S2 已审核提交；S3 已于 2026-09-23 通过用户审核
 >
-> 日期：2026-09-22
+> 日期：2026-09-23
 >
 > 范围：`apps/studio`
 
@@ -41,22 +41,24 @@ Widget / Pointer Modifier 作为独立帮助内容，不伪装成可重绑定的
 S2 由 `StudioUserKeymap` 协调用户覆盖记录、整表验证和 Router 替换；Vue Binding 订阅成功
 提交的冻结快照。菜单、Tooltip 和 Settings 读取同一响应式 `StudioKeyboardInput`，组件不能
 直接替换物理注册。编辑草稿仅由 Settings 的 `StudioShortcutEditor` 持有，成功保存前不影响
-当前键位。Recorder 与更完整的冲突处理交互仍属于 S3。
+当前键位。S3 增加 Recorder、特殊键选择和冲突重新分配，沿用同一草稿与保存事务。
 
 `StudioKeyboardBinding` 使用 Brand，内置配置由 `defineStudioKeyboardBinding()` 检查
 Hotkey 拼写；动态输入在 Browser Adapter 验证后才成为 Binding。`@tanstack/hotkeys@0.8.0`
-运行时依赖仅进入 `browser-tanstack-hotkey-registry.ts`，Binding 文件只导入类型；架构检查
+运行时依赖仅进入 `browser-tanstack-hotkey-registry.ts` 与
+`browser-tanstack-hotkey-recorder.ts`，Binding 文件只导入类型；架构检查
 禁止组件直接导入该库或其框架适配包。升级需重验匹配、输入过滤、规范化冲突和释放。
 
 ## 3. 输入归属与焦点
 
 输入优先顺序为：
 
-1. 打开的 Menu / Dialog：无匹配动作仍是屏障，自己负责导航、Escape 和焦点恢复。
-2. 当前控件保留键：Editable / IME、按钮 Enter / Space、Slider / Splitter 导航键等。
-3. 活动 Interaction：独立持有 Cancel 能力，不要求原视图仍获得焦点。
-4. Focused Surface：Editor Selection、Piano Roll Tool、Arrangement Clip 或 Bar。
-5. Workbench，然后是 Global。
+1. 正在录制且仍聚焦的局部区域：只生成 Settings 草稿，Escape 只取消录制。
+2. 打开的 Menu / Dialog：无匹配动作仍是屏障，自己负责导航、Escape 和焦点恢复。
+3. 当前控件保留键：Editable / IME、按钮 Enter / Space、Slider / Splitter 导航键等。
+4. 活动 Interaction：独立持有 Cancel 能力，不要求原视图仍获得焦点。
+5. Focused Surface：Editor Selection、Piano Roll Tool、Arrangement Clip 或 Bar。
+6. Workbench，然后是 Global。
 
 选区目标通过 Focus 激活；Mount 不抢占其他区域的选择。菜单可以使用仍有效的明确目标，
 不因为进入菜单时的 DOM 失焦自动禁用。目标身份变化、另一编辑区域获得焦点或卸载会使旧
@@ -148,7 +150,8 @@ Settings / Toast 和菜单焦点。实施计划与验证记录见
   Context 路由。非法条目或同层重叠冲突覆盖回退默认；回退后再次验证，直到不再产生连锁
   冲突。有效且无冲突的覆盖仍可使用。相同 Action 的重复物理键位同样拒绝。
 - 未识别键名等 TanStack Validation warning 在编辑草稿中显示；warning 不等于非法格式。
-  错误和真实冲突阻止保存。S2 不自建另一份第三方键名字典。
+  错误和真实冲突阻止保存，不自建另一份第三方键名字典。S3 额外拒绝纯 Modifier 和
+  保留给焦点导航的 Tab / Shift+Tab；常见浏览器／系统组合只作提示，见第 8 节。
 - 加载不写回存储。损坏、未知版本或读取失败不会阻止启动；设置解释默认值已生效，普通编辑
   暂停，只有用户明确确认重置才替换不可读记录。写入再次失败则保留原记录和提示。
 - 加载注册失败时保留默认、原记录及诊断；可修改相关 Action 或恢复默认后重试。
@@ -175,3 +178,50 @@ Composition Root 创建并释放 Storage、User Keymap、Vue Binding 和 Router�
 可丢弃投影及本地草稿。S2 回归包括加载／刷新语义、未知 ID、非法／冲突连锁回退、单项／
 全部恢复、注册／存储失败、事务输入暂停、实际 TanStack Mod 匹配和交换路由，以及真实
 Reka Dialog、菜单／按钮提示更新与焦点恢复。
+
+## 8. Recorder 与特殊键
+
+Composition Root 创建唯一 `StudioShortcutRecorder`，通过 Vue Context 提供录制能力，释放时
+先停止 Recorder 再释放 Router。Settings 按钮是本次录制的焦点所有者；Adapter 暂停后台
+Action 路由，调用 TanStack 的公开 `HotkeyRecorder`，完成后将结果交回本地草稿。它不执行
+Action，不保存用户设置，也不接触 Project。
+
+- 正常录制输出 portable `Mod`，经过与手动输入相同的 Validation 后写入当前草稿行。
+- Escape 只取消录制；无修饰键的 Delete / Backspace 只移除当前草稿行。用户需要绑定这些
+  按键时，可以手动输入或使用 Special key 选择；带修饰键的 Delete 仍可正常录制。
+- IME、legacy 229、Dead / Process / Unidentified、AltGraph、Repeat 和已消费事件不会生成
+  Binding。库自身没有完整处理这些条件，因此过滤放在窄 Browser Adapter 中。
+- 完成、取消、焦点离开、Window blur、页面隐藏、组件卸载或应用释放时，清理录制监听与
+  本次暂停令牌。旧 cancel 不能结束新录制；Dialog 自己的暂停令牌不受录制结束影响。
+- 录制启动失败同样清理资源并保留草稿。保存按钮在录制期间禁用；结果仍需显式保存才生效。
+
+上述 Escape / Delete 和 portable Mod 行为依据已安装的 `0.8.0` 源码与
+[TanStack 录制指南](https://tanstack.com/hotkeys/latest/docs/framework/vue/guides/hotkey-recording)。
+对常见浏览器／系统组合提供非阻断提示；列表是有限提醒，不是平台保留键的完整数据库。
+浏览器未交付的事件无法被页面录制或覆盖，用户仍可手动输入。浏览器组合参考
+[Chrome keyboard shortcuts](https://support.google.com/chrome/answer/157179?hl=en)。
+
+## 9. 冲突预览与重新分配
+
+`analyzeStudioKeyboardRoutes()` 是运行时验证、加载验证和草稿说明的共同规则，按当前平台的
+物理键位身份比较 Action 对，返回三类关系：
+
+| 关系        | 解释与处理                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------- |
+| `exclusive` | 聚焦区域互斥，允许共用；例如 Arrangement Clip / Bar 的 Enter。                                       |
+| `priority`  | Context 可能重叠，但优先级明确；例如 Cancel 优先于 Clear。只有上层不可用才尝试下层，执行失败不回退。 |
+| `conflict`  | Context 可能重叠且同优先级，普通保存被阻止；用户需要改键或显式重新分配。                             |
+
+`StudioUserKeymap.inspectBindings()` 只读分析候选覆盖，包含尚未因冲突隔离的原始请求，因此
+能解释冲突对象，而不是拿默认回退后的路由误判为无冲突。UI 列出 Action 名称、键位和作用
+区域；合理共用不会被删除。
+
+选择 Reassign 后先展示将受影响的 Action 和键位，焦点进入确认按钮。最终保存只从同层
+冲突 Action 移除对应物理键位，保留其余绑定、未知记录和兼容的共用关系。整批改动复用
+第 7 节的一次保存事务，注册或存储失败时全部保持原值。其他 Action 的损坏记录必须先由
+用户修复，不能为移除一个键而丢弃整份记录。
+
+确认保留当时的 User Keymap 快照；配置已变化时拒绝旧确认，要求重新检查。编辑草稿会
+撤销当前确认；Escape 依次退出重新分配确认、编辑草稿、Settings Dialog。录制中的 Escape
+在这一层级之前被 Recorder 接管。macOS / Windows / Linux 的 Mod 与别名冲突由自动测试
+验证，真实浏览器 smoke 范围单独记在阶段计划中。

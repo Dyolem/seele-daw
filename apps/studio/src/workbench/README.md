@@ -9,6 +9,8 @@ Composition Root 可以知道并装配全部领域包与浏览器实现。
 - `StudioKeyboardInputRouter` 拥有键位、输入上下文和物理 Listener 生命周期；
 - `StudioUserKeymap` 拥有本地用户覆盖记录，协调验证、保存与 Router 替换；Vue Binding 只订阅
   已提交快照，菜单、按钮和设置共享当前键位；
+- `StudioShortcutRecorder` 封装 TanStack 录制与输入暂停生命周期，只向 Settings 返回草稿；
+  冲突说明与重新分配使用 User Keymap 的统一 Context 分析和原子保存；
 - Composition Root 装配 Feature Action 定义；页面和编辑器只提供临时业务目标；
 - 菜单、按钮和快捷键通过同一个 Action 调用业务权威，Save 与 WA2 Workbench 入口已接入；
 - 文件选择器与导航等待由页面持有；Dock 能力直接读取 Workspace，均不成为应用状态副本；

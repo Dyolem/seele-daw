@@ -333,7 +333,15 @@ S2 提供每个 Action 的键名编辑草稿、添加／移除、保存／取消
 窗口使用 Dialog 焦点约束，打开时聚焦搜索，关闭后回到原入口；编辑时聚焦首个键位，
 Escape 先取消编辑草稿，再次按下关闭窗口。保存／取消后回到对应 Edit 按钮；筛选使该行
 消失时回到搜索。全部恢复需要窗口内确认；损坏记录必须明确说明重置会替换原记录。
-非法覆盖显示未应用和默认回退，可逐项修复。Recorder 与冲突解除交互属于 S3。
+非法覆盖显示未应用和默认回退，可逐项修复。
+
+S3 每行增加 Record 和 Special key。录制期间说明 Escape 取消、无修饰键的 Delete /
+Backspace 移除当前草稿行、移开焦点取消；结果仍需保存。Escape / Delete / Backspace 也可
+直接选择或手动输入，避免录制控制键无法成为绑定。录制成功后回到对应键名字段。
+草稿实时解释互斥共用、优先级或真实冲突；真实冲突禁用普通保存，Reassign 展示受影响的
+Action 和键位后再确认。确认区接收焦点，Escape 只退出该确认并返回 Reassign 按钮，随后
+才是取消草稿、关闭窗口；录制期间的 Escape 先取消录制。浏览器／系统组合提示是非阻断
+提醒；纯 Modifier、Tab / Shift+Tab 不能保存为业务快捷键。
 
 按钮的原生 Enter / Space，以及 Slider / Splitter 的导航键优先于后台 Action；Arrangement
 Clip 和 Bar 的 Enter 在互斥 Focus Context 中分别执行打开／创建。选区目标由 Focus 激活，
@@ -1251,7 +1259,6 @@ Canvas 功能至少检查：
 - Track Color 是固定 Palette ID，还是允许任意色值；
 - 首批内置主题除 Piano Black 外的数量和视觉方向；
 - Browser / Library 与 Mixer 的最终工作区模式；
-- Shortcut Recorder 与更完整的平台冲突解除交互（User Keymap / Settings 基础操作已在 S2 实施）。
 
 每项应在对应纵向产品切片开始前，结合可操作原型单独确认。
 

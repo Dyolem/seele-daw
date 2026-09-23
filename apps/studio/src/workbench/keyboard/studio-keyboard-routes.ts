@@ -10,9 +10,11 @@ import {
   studioKeyboardContextsOverlap,
 } from '@/workbench/keyboard/studio-keyboard-context'
 
-export interface StudioKeyboardConflict {
+export interface StudioKeyboardRelation {
+  readonly kind: 'conflict' | 'exclusive' | 'priority'
+  readonly priorityActionId: StudioActionId | null
   readonly binding: StudioKeyboardBinding
-  readonly actionIds: readonly StudioActionId[]
+  readonly actionIds: readonly [StudioActionId, StudioActionId]
 }
 
 export function analyzeStudioKeyboardRoutes(
@@ -21,7 +23,7 @@ export function analyzeStudioKeyboardRoutes(
   registry: StudioKeyboardBindingRegistry,
 ) {
   const routes = new Map<string, { binding: StudioKeyboardBinding; actionIds: StudioActionId[] }>()
-  const conflicts: StudioKeyboardConflict[] = []
+  const relations: StudioKeyboardRelation[] = []
   for (const { actionId } of catalogue) {
     for (const binding of keymap[actionId]) {
       const identity = registry.identity(binding)
@@ -34,12 +36,21 @@ export function analyzeStudioKeyboardRoutes(
       const context = STUDIO_SHORTCUT_POLICIES[actionId].context
       for (const otherId of route.actionIds) {
         const other = STUDIO_SHORTCUT_POLICIES[otherId].context
-        if (
-          STUDIO_KEYBOARD_CONTEXTS[other].priority === STUDIO_KEYBOARD_CONTEXTS[context].priority &&
-          studioKeyboardContextsOverlap(other, context)
-        ) {
-          conflicts.push(Object.freeze({ binding, actionIds: Object.freeze([otherId, actionId]) }))
-        }
+        const difference =
+          STUDIO_KEYBOARD_CONTEXTS[context].priority - STUDIO_KEYBOARD_CONTEXTS[other].priority
+        let kind: StudioKeyboardRelation['kind'] = 'exclusive'
+        if (studioKeyboardContextsOverlap(other, context))
+          kind = difference === 0 ? 'conflict' : 'priority'
+        let priorityActionId: StudioActionId | null = null
+        if (kind === 'priority') priorityActionId = difference > 0 ? actionId : otherId
+        relations.push(
+          Object.freeze({
+            kind,
+            priorityActionId,
+            binding,
+            actionIds: Object.freeze([otherId, actionId] as const),
+          }),
+        )
       }
       route.actionIds.push(actionId)
     }
@@ -51,5 +62,9 @@ export function analyzeStudioKeyboardRoutes(
         STUDIO_KEYBOARD_CONTEXTS[STUDIO_SHORTCUT_POLICIES[a].context].priority,
     )
   }
-  return { routes, conflicts: Object.freeze(conflicts) }
+  return {
+    routes,
+    relations: Object.freeze(relations),
+    conflicts: Object.freeze(relations.filter((relation) => relation.kind === 'conflict')),
+  }
 }

@@ -14,6 +14,28 @@ afterEach(() => {
 })
 
 describe('BrowserTanStackHotkeyRegistry', () => {
+  it.each(['Tab', 'Shift+Tab', 'Control', 'Mod+Shift'])(
+    'rejects the reserved focus key or modifier-only binding %s',
+    (input) => {
+      expect(validateStudioKeyboardBinding(input).valid).toBe(false)
+      expect(validateStudioKeyboardBinding(input).binding).toBeNull()
+    },
+  )
+
+  it.each(['mac', 'windows', 'linux'] as const)(
+    'warns about canonical browser keys on %s without rejecting normal bindings',
+    (platform) => {
+      const physical = platform === 'mac' ? 'Meta+L' : 'Control+L'
+      const registry = createBrowserTanStackHotkeyRegistry({ target: document, platform })
+      expect(registry.validate(physical)).toMatchObject({
+        valid: true,
+        warnings: [expect.stringContaining('may not reach Studio')],
+      })
+      expect(registry.validate('Mod+K')).toMatchObject({ valid: true, warnings: [] })
+      expect(registry.validate('Shift+Delete').valid).toBe(true)
+    },
+  )
+
   it.each(['mac', 'windows', 'linux'] as const)(
     'canonicalizes Mod to the physical modifier on %s',
     (platform) => {

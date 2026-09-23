@@ -41,6 +41,122 @@ function buttonWithText(dialog: DOMWrapper<Element>, label: string) {
 }
 
 describe('Keyboard shortcuts dialog', () => {
+  it('records into a draft, cancels recording before closing the editor, and clears only a draft binding', async () => {
+    const { dialog, runtime, storage, bindingRegistry } = await openSettings()
+    const invoke = vi.spyOn(runtime.actions, 'invoke')
+    await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
+    await dialog.get('[aria-label="Record key combination 1"]').trigger('click')
+    await dialog
+      .get('[aria-label="Stop recording key combination 1"]')
+      .trigger('keydown', { key: 'F9' })
+    expect(dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]').element.value).toBe(
+      'F9',
+    )
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
+    expect(storage.writes).toEqual([])
+    expect(invoke).not.toHaveBeenCalled()
+    await dialog.get('[aria-label="Record key combination 1"]').trigger('click')
+    await dialog
+      .get('[aria-label="Stop recording key combination 1"]')
+      .trigger('keydown', { key: 'Escape' })
+    expect(dialog.find('form').exists()).toBe(true)
+    expect(dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]').element.value).toBe(
+      'F9',
+    )
+    expect(dialog.text()).toContain('Recording cancelled')
+    await dialog.get('[aria-label="Record key combination 1"]').trigger('click')
+    await dialog
+      .get('[aria-label="Stop recording key combination 1"]')
+      .trigger('keydown', { key: 'Backspace' })
+    expect(dialog.find('[aria-label="Key combination 1"]').exists()).toBe(false)
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
+    expect(storage.writes).toEqual([])
+    await buttonWithText(dialog, 'Add key combination').trigger('click')
+    await dialog.get('[aria-label="Record key combination 1"]').trigger('click')
+    await dialog.get('[aria-label="Close keyboard shortcuts"]').trigger('click')
+    await flushPromises()
+    bindingRegistry.dispatch('F8')
+    expect(invoke).toHaveBeenCalledOnce()
+  })
+
+  it.each(['Escape', 'Delete', 'Backspace'])(
+    'lets users explicitly bind %s without recording it as a cancel or clear instruction',
+    async (key) => {
+      const { dialog, runtime } = await openSettings()
+      await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
+      await dialog.get('[aria-label="Choose special key for combination 1"]').setValue(key)
+      expect(dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]').element.value).toBe(
+        key,
+      )
+      expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
+      await dialog.get('form').trigger('submit')
+      expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([key])
+    },
+  )
+
+  it('reviews exactly which keys will move, returns focus on cancellation, and saves all affected actions together', async () => {
+    const { dialog, runtime, storage } = await openSettings()
+    await dialog.get('[aria-label="Edit Save shortcuts"]').trigger('click')
+    await dialog.get('[aria-label="Key combination 1"]').setValue('Mod+Shift+Z')
+    expect(dialog.get('[aria-label="Shortcut relationships"]').text()).toContain(
+      'conflicts with Redo',
+    )
+    expect(buttonWithText(dialog, 'Save shortcuts').attributes('disabled')).toBeDefined()
+    await buttonWithText(dialog, 'Reassign conflicting keys…').trigger('click')
+    const confirm = buttonWithText(dialog, 'Reassign and save')
+    expect(document.activeElement).toBe(confirm.element)
+    expect(storage.writes).toEqual([])
+    await confirm.trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(dialog.find('[aria-label="Confirm shortcut reassignment"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(
+      buttonWithText(dialog, 'Reassign conflicting keys…').element,
+    )
+    expect(dialog.find('form').exists()).toBe(true)
+    await buttonWithText(dialog, 'Reassign conflicting keys…').trigger('click')
+    await buttonWithText(dialog, 'Reassign and save').trigger('click')
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['Mod+Shift+Z'])
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.HISTORY_REDO)).toEqual(['Control+Y'])
+    expect(storage.writes).toHaveLength(1)
+    expect(dialog.find('form').exists()).toBe(false)
+  })
+
+  it('keeps the reviewed draft on reassignment failure and cancels the review when the user edits a key', async () => {
+    const storage = createTestUserKeymapStorage()
+    const { dialog, runtime } = await openSettings(storage)
+    await dialog.get('[aria-label="Edit Save shortcuts"]').trigger('click')
+    await dialog.get('[aria-label="Key combination 1"]').setValue('Mod+Z')
+    await buttonWithText(dialog, 'Reassign conflicting keys…').trigger('click')
+    vi.spyOn(storage, 'write').mockImplementation(() => {
+      throw new Error('Storage denied')
+    })
+    await buttonWithText(dialog, 'Reassign and save').trigger('click')
+    expect(dialog.get('[role="alert"]').text()).toContain('previous shortcuts are still active')
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['Mod+S'])
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.HISTORY_UNDO)).toEqual(['Mod+Z'])
+    await dialog.get('[aria-label="Key combination 1"]').setValue('F9')
+    expect(dialog.find('[aria-label="Confirm shortcut reassignment"]').exists()).toBe(false)
+    expect(dialog.find('[aria-label="Shortcut relationships"]').exists()).toBe(false)
+  })
+
+  it('explains compatible sharing and priority without offering a destructive reassignment', async () => {
+    const { dialog } = await openSettings()
+    await dialog.get('[aria-label="Edit Open MIDI clip shortcuts"]').trigger('click')
+    expect(dialog.get('[aria-label="Shortcut relationships"]').text()).toContain(
+      'separate focused regions',
+    )
+    expect(buttonWithText(dialog, 'Save shortcuts').attributes('disabled')).toBeUndefined()
+    expect(dialog.text()).not.toContain('Reassign conflicting keys…')
+    await buttonWithText(dialog, 'Cancel').trigger('click')
+    await dialog.get('[aria-label="Edit Clear selection shortcuts"]').trigger('click')
+    expect(dialog.get('[aria-label="Shortcut relationships"]').text()).toContain(
+      'priority to Cancel interaction',
+    )
+    expect(dialog.text()).not.toContain('Reassign conflicting keys…')
+    await dialog.get('[aria-label="Key combination 1"]').setValue('Mod+L')
+    expect(dialog.text()).toContain('commonly used by the browser or operating system')
+  })
+
   it('adds, changes and removes shortcuts, filters modifications, restores defaults and preserves them on reopening', async () => {
     const storage = createTestUserKeymapStorage()
     const { dialog, runtime, bindingRegistry, wrapper } = await openSettings(storage)

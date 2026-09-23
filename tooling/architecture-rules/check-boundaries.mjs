@@ -46,6 +46,7 @@ const modelStoreWriteAccessConsumers = new Set([
 ])
 const studioHotkeyAdapterFiles = new Set([
   'apps/studio/src/workbench/keyboard/browser-tanstack-hotkey-registry.ts',
+  'apps/studio/src/workbench/keyboard/browser-tanstack-hotkey-recorder.ts',
   'apps/studio/src/workbench/keyboard/studio-keyboard-binding.ts',
 ])
 const projectCoreCommandsDirectory = path.join(root, 'packages', 'project-core', 'src', 'commands')

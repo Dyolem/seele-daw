@@ -61,35 +61,35 @@ export function createStudioUserKeymap(options: {
   let disposed = false
   let updating = false
 
+  function parseBindings(inputs: unknown) {
+    if (!isBindingList(inputs))
+      return { bindings: [], error: 'Saved bindings must be a list of key combinations.' }
+    const bindings: StudioKeyboardBinding[] = []
+    const identities = new Set<string>()
+    for (const input of inputs) {
+      const validation = options.registry.validate(input)
+      if (validation.binding === null)
+        return { bindings, error: validation.errors.join(' ') || 'Enter a valid key combination.' }
+      const identity = options.registry.identity(validation.binding)
+      if (identities.has(identity))
+        return { bindings, error: 'This action has the same key combination more than once.' }
+      identities.add(identity)
+      bindings.push(validation.binding)
+    }
+    return { bindings, error: null }
+  }
+
   function evaluate(candidate: Record<string, unknown>) {
     const overrides: StudioKeyboardKeymapOverrides = {}
     const rejected = new Map<StudioActionId, string>()
     for (const { actionId } of options.catalogue) {
       if (!Object.hasOwn(candidate, actionId)) continue
-      const inputs = candidate[actionId]
-      if (!isBindingList(inputs)) {
-        rejected.set(actionId, 'Saved bindings must be a list of key combinations.')
-        continue
-      }
-      const bindings: StudioKeyboardBinding[] = []
-      const identities = new Set<string>()
-      for (const input of inputs) {
-        const validation = options.registry.validate(input)
-        if (validation.binding === null) {
-          rejected.set(actionId, validation.errors.join(' ') || 'Enter a valid key combination.')
-          break
-        }
-        const identity = options.registry.identity(validation.binding)
-        if (identities.has(identity)) {
-          rejected.set(actionId, 'This action has the same key combination more than once.')
-          break
-        }
-        identities.add(identity)
-        bindings.push(validation.binding)
-      }
-      if (!rejected.has(actionId)) overrides[actionId] = Object.freeze(bindings)
+      const parsed = parseBindings(candidate[actionId])
+      if (parsed.error !== null) rejected.set(actionId, parsed.error)
+      else overrides[actionId] = Object.freeze(parsed.bindings)
     }
     let keymap = createStudioKeyboardKeymap({ ...defaults, ...overrides })
+    const requestedKeymap = keymap
     // Removing one conflicting override restores its default, which may reveal another conflict.
     for (;;) {
       const { conflicts } = analyzeStudioKeyboardRoutes(options.catalogue, keymap, options.registry)
@@ -114,6 +114,7 @@ export function createStudioUserKeymap(options: {
     }
     return {
       keymap,
+      requestedKeymap,
       rejectedOverrides: Object.freeze(
         [...rejected].map(([actionId, message]) => Object.freeze({ actionId, message })),
       ),
@@ -270,7 +271,67 @@ export function createStudioUserKeymap(options: {
     }
   }
 
+  function inspectBindings(actionId: StudioActionId, inputs: readonly string[]) {
+    const parsed = parseBindings(inputs)
+    const candidate = evaluate({ ...entries, [actionId]: inputs })
+    const relations = analyzeStudioKeyboardRoutes(
+      options.catalogue,
+      candidate.requestedKeymap,
+      options.registry,
+    ).relations.filter((relation) => relation.actionIds.includes(actionId))
+    const conflicts = relations.filter((relation) => relation.kind === 'conflict')
+    // Never overwrite an unrelated damaged record while removing one conflicting key.
+    const damagedPeer = conflicts
+      .flatMap((relation) => relation.actionIds)
+      .find(
+        (id) =>
+          id !== actionId &&
+          Object.hasOwn(entries, id) &&
+          parseBindings(entries[id]).error !== null,
+      )
+    return Object.freeze({
+      error: parsed.error,
+      relations: Object.freeze(relations),
+      conflicts: Object.freeze(conflicts),
+      reassignBlockedReason: damagedPeer
+        ? `Repair the saved bindings for ${options.catalogue.find((action) => action.actionId === damagedPeer)?.label} before reassigning this shortcut.`
+        : null,
+    })
+  }
+
   return {
+    inspectBindings,
+    reassignBindings(
+      actionId: StudioActionId,
+      inputs: readonly string[],
+      expectedState: StudioUserKeymapState,
+    ): StudioUserKeymapResult {
+      if (expectedState !== state)
+        return {
+          status: 'rejected',
+          code: 'validation',
+          message:
+            'Shortcuts changed while you were reviewing conflicts. Review them again before reassigning.',
+        }
+      const inspection = inspectBindings(actionId, inputs)
+      const message = inspection.error ?? inspection.reassignBlockedReason
+      if (message) return { status: 'rejected', code: 'validation', message }
+      const candidateEntries = { ...entries, [actionId]: inputs.map((input) => input.trim()) }
+      const requested = evaluate(candidateEntries).requestedKeymap
+      const editedIds = new Set<StudioActionId>([actionId])
+      for (const conflict of inspection.conflicts) {
+        const identity = options.registry.identity(conflict.binding)
+        for (const peer of conflict.actionIds) {
+          if (peer === actionId) continue
+          const bindings = parseBindings(candidateEntries[peer] ?? requested[peer]).bindings
+          candidateEntries[peer] = bindings.filter(
+            (binding) => options.registry.identity(binding) !== identity,
+          )
+          editedIds.add(peer)
+        }
+      }
+      return save(candidateEntries, [...editedIds])
+    },
     get state() {
       return state
     },

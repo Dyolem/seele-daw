@@ -28,6 +28,51 @@ function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): 
 }
 
 describe('Studio DOM keyboard ownership', () => {
+  it.each(['mac', 'windows', 'linux'] as const)(
+    'reassigns canonical physical conflicts on %s, preserving unrelated aliases',
+    (platform) => {
+      const runtime = createStudioActionRuntime({
+        bindingRegistry: createBrowserTanStackHotkeyRegistry({ target: document, platform }),
+        userKeymapStorage: createTestUserKeymapStorage(),
+        isModalActive: () => false,
+        reportFailure: () => {},
+      })
+      onTestFinished(() => runtime.dispose())
+      const physical = platform === 'mac' ? 'Meta+Shift+Z' : 'Control+Shift+Z'
+      const review = runtime.userKeymap.inspectBindings(STUDIO_ACTION.PROJECT_SAVE, [physical])
+      expect(review.conflicts).toHaveLength(1)
+      expect(
+        runtime.userKeymap.reassignBindings(
+          STUDIO_ACTION.PROJECT_SAVE,
+          [physical],
+          runtime.userKeymap.state,
+        ),
+      ).toEqual({ status: 'saved' })
+      expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.HISTORY_REDO)).toEqual(['Control+Y'])
+    },
+  )
+
+  it('keeps widget arrows and input keys owned by controls after a user rebinds a matching Action', () => {
+    const runtime = createStudioActionRuntime({
+      bindingRegistry: createBrowserTanStackHotkeyRegistry({ target: document }),
+      userKeymapStorage: createTestUserKeymapStorage(),
+      isModalActive: () => false,
+      reportFailure: () => {},
+    })
+    onTestFinished(() => runtime.dispose())
+    const focus = vi.fn<() => void>()
+    runtime.interfaceTarget.bind({ focusNotifications: focus, showShortcuts: () => {} })
+    expect(
+      runtime.userKeymap.setBindings(STUDIO_ACTION.NOTIFICATIONS_FOCUS, ['ArrowRight']),
+    ).toEqual({ status: 'saved' })
+    const slider = document.body.appendChild(document.createElement('div'))
+    slider.setAttribute('role', 'slider')
+    expect(press(slider, 'ArrowRight').defaultPrevented).toBe(false)
+    expect(focus).not.toHaveBeenCalled()
+    expect(press(document.body, 'ArrowRight').defaultPrevented).toBe(true)
+    expect(focus).toHaveBeenCalledOnce()
+  })
+
   it('rebinds live input with portable Mod and rejects canonical platform collisions', () => {
     const storage = createTestUserKeymapStorage()
     const runtime = createStudioActionRuntime({

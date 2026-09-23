@@ -1,5 +1,8 @@
 import {
   formatForDisplay,
+  detectPlatform,
+  hasNonModifierKey,
+  parseHotkey,
   getHotkeyManager,
   normalizeHotkey,
   validateHotkey,
@@ -27,17 +30,50 @@ export interface CreateBrowserTanStackHotkeyRegistryInput {
 }
 
 /** Validates dynamic Settings input without exposing TanStack result types to UI. */
-export function validateStudioKeyboardBinding(input: string): StudioKeyboardBindingValidation {
+export function validateStudioKeyboardBinding(
+  input: string,
+  platform: StudioKeyboardPlatform = detectPlatform(),
+): StudioKeyboardBindingValidation {
   const normalizedInput = input.trim()
   const validation = validateHotkey(normalizedInput)
-  const valid = validation.valid && normalizedInput.length > 0
+  const errors = [...validation.errors]
+  const warnings = [...validation.warnings]
+  if (validation.valid) {
+    if (!hasNonModifierKey(normalizedInput, platform))
+      errors.push('Choose a key together with the modifier, such as Mod+K.')
+    const parsed = parseHotkey(normalizedInput, platform)
+    if (parsed.key === 'Tab' && !parsed.ctrl && !parsed.alt && !parsed.meta)
+      errors.push('Tab and Shift+Tab are reserved for moving focus between controls.')
+    const identity = normalizeHotkey(normalizedInput, platform)
+    // Advisory only: browser/OS shortcuts differ, and some key events never reach the page.
+    const browserKeys = [
+      'Mod+L',
+      'Mod+N',
+      'Mod+T',
+      'Mod+W',
+      'Mod+R',
+      'Mod+Shift+N',
+      'Mod+Shift+T',
+      'Mod+Shift+W',
+      'Mod+Shift+R',
+      'Control+Tab',
+      'Control+Shift+Tab',
+    ]
+    if (platform === 'mac') browserKeys.push('Mod+Q', 'Mod+Space')
+    else browserKeys.push('Alt+F4', 'F5', 'F11')
+    if (browserKeys.some((key) => normalizeHotkey(key, platform) === identity))
+      warnings.push(
+        'This combination is commonly used by the browser or operating system and may not reach Studio. Consider another shortcut.',
+      )
+  }
+  const valid = errors.length === 0 && normalizedInput.length > 0
 
   return Object.freeze({
     binding: valid ? (normalizedInput as StudioKeyboardBinding) : null,
-    errors: Object.freeze([...validation.errors]),
+    errors: Object.freeze(errors),
     input,
     valid,
-    warnings: Object.freeze([...validation.warnings]),
+    warnings: Object.freeze(warnings),
   })
 }
 
@@ -91,7 +127,7 @@ class BrowserTanStackHotkeyRegistry implements StudioKeyboardBindingRegistry {
   }
 
   validate(input: string): StudioKeyboardBindingValidation {
-    return validateStudioKeyboardBinding(input)
+    return validateStudioKeyboardBinding(input, this.#platform)
   }
 }
 

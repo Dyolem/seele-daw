@@ -8,7 +8,10 @@ import type {
   StudioUserKeymapState,
 } from '@/workbench/keyboard/studio-user-keymap'
 
+import type { StudioShortcutRecorder } from '@/workbench/keyboard/browser-tanstack-hotkey-recorder'
+
 export interface StudioActionVueContext {
+  readonly shortcutRecorder: StudioShortcutRecorder
   readonly userKeymap: StudioUserKeymap
   readonly keymapState: ComputedRef<StudioUserKeymapState>
   readonly actions: StudioActionCoordinator

@@ -22,6 +22,7 @@ import {
 import type { StudioActionFailure, StudioActionId } from '@/workbench/actions/studio-action'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import { createStudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
+import { createBrowserStudioShortcutRecorder } from '@/workbench/keyboard/browser-tanstack-hotkey-recorder'
 import { createStudioUserKeymap } from '@/workbench/keyboard/studio-user-keymap'
 import { createStudioKeyboardVueBinding } from '@/workbench/keyboard/vue/studio-keyboard-vue-binding'
 import {
@@ -107,7 +108,9 @@ export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
       storage: options.userKeymapStorage ?? createBrowserUserKeymapStorage(),
     })
     const keyboardBinding = createStudioKeyboardVueBinding(keyboard, userKeymap)
+    const shortcutRecorder = createBrowserStudioShortcutRecorder(keyboardBinding.keyboard)
     return {
+      shortcutRecorder,
       actions,
       keyboard: keyboardBinding.keyboard,
       userKeymap,
@@ -115,6 +118,7 @@ export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
       ...targets,
       dispose() {
         try {
+          shortcutRecorder.dispose()
           keyboardBinding.dispose()
           userKeymap.dispose()
           ownedKeyboard.dispose()

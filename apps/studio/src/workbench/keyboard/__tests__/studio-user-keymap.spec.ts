@@ -20,6 +20,100 @@ const record = (overrides: Record<string, unknown>): string =>
   JSON.stringify({ version: 1, overrides })
 
 describe('Studio user keymap', () => {
+  it('distinguishes mutually exclusive contexts, explicit priorities and real overlap conflicts', () => {
+    const { runtime, storage } = createTestStudioActionRuntime()
+    const shared = runtime.userKeymap.inspectBindings(STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN, [
+      'Enter',
+    ])
+    expect(shared.conflicts).toEqual([])
+    expect(shared.relations).toEqual([
+      expect.objectContaining({
+        kind: 'exclusive',
+        actionIds: expect.arrayContaining([STUDIO_ACTION.ARRANGEMENT_CLIP_CREATE]),
+      }),
+    ])
+    const priority = runtime.userKeymap.inspectBindings(STUDIO_ACTION.EDITOR_SELECTION_CLEAR, [
+      'Escape',
+    ])
+    expect(priority.conflicts).toEqual([])
+    expect(priority.relations).toEqual([
+      expect.objectContaining({
+        kind: 'priority',
+        priorityActionId: STUDIO_ACTION.INTERACTION_CANCEL,
+      }),
+    ])
+    const conflict = runtime.userKeymap.inspectBindings(STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR, [
+      'Delete',
+    ])
+    expect(conflict.conflicts).toEqual([
+      expect.objectContaining({
+        kind: 'conflict',
+        actionIds: expect.arrayContaining([STUDIO_ACTION.EDITOR_SELECTION_DELETE]),
+      }),
+    ])
+    expect(storage.writes).toEqual([])
+  })
+
+  it('reassigns only conflicting keys in one transaction while preserving other bindings and compatible priorities', () => {
+    const { runtime, storage } = createTestStudioActionRuntime()
+    const cursor = STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR
+    const remove = STUDIO_ACTION.EDITOR_SELECTION_DELETE
+    const state = runtime.userKeymap.state
+    expect(runtime.userKeymap.reassignBindings(cursor, ['Delete', 'Escape'], state)).toEqual({
+      status: 'saved',
+    })
+    expect(runtime.keyboard.bindingsFor(cursor)).toEqual(['Delete', 'Escape'])
+    expect(runtime.keyboard.bindingsFor(remove)).toEqual(['Backspace'])
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.EDITOR_SELECTION_CLEAR)).toEqual([])
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.INTERACTION_CANCEL)).toEqual(['Escape'])
+    expect(storage.writes).toHaveLength(1)
+    const saved = JSON.parse(storage.read() ?? '')
+    expect(saved.overrides[remove]).toEqual(['Backspace'])
+    expect(saved.overrides[STUDIO_ACTION.EDITOR_SELECTION_CLEAR]).toEqual([])
+    expect(saved.overrides[STUDIO_ACTION.INTERACTION_CANCEL]).toBeUndefined()
+  })
+
+  it('rejects a stale reassignment review and rolls back every affected action on storage failure', () => {
+    const { runtime, storage } = createTestStudioActionRuntime()
+    const stale = runtime.userKeymap.state
+    runtime.userKeymap.setBindings(notifications, ['F9'])
+    expect(runtime.userKeymap.reassignBindings(save, ['Mod+Z'], stale)).toMatchObject({
+      status: 'rejected',
+      message: expect.stringContaining('changed'),
+    })
+    const current = runtime.userKeymap.state
+    vi.spyOn(storage, 'write').mockImplementation(() => {
+      throw new Error('Denied')
+    })
+    expect(runtime.userKeymap.reassignBindings(save, ['Mod+Z'], current)).toMatchObject({
+      status: 'rejected',
+      code: 'storage',
+    })
+    expect(runtime.userKeymap.state).toBe(current)
+    expect(runtime.keyboard.bindingsFor(save)).toEqual(['Mod+S'])
+    expect(runtime.keyboard.bindingsFor(undo)).toEqual(['Mod+Z'])
+    expect(storage.writes).toHaveLength(1)
+  })
+
+  it('does not discard a malformed peer record just to remove one conflicting default key', () => {
+    const storage = createTestUserKeymapStorage(
+      record({ [undo]: 42, 'future.action': { retained: true } }),
+    )
+    const { runtime } = createTestStudioActionRuntime({ userKeymapStorage: storage })
+    expect(runtime.userKeymap.inspectBindings(save, ['Mod+Z']).reassignBlockedReason).toContain(
+      'Repair',
+    )
+    expect(
+      runtime.userKeymap.reassignBindings(save, ['Mod+Z'], runtime.userKeymap.state),
+    ).toMatchObject({ status: 'rejected', code: 'validation' })
+    expect(storage.writes).toEqual([])
+    expect(runtime.userKeymap.restoreAction(undo)).toEqual({ status: 'saved' })
+    expect(runtime.userKeymap.reassignBindings(save, ['Mod+Z'], runtime.userKeymap.state)).toEqual({
+      status: 'saved',
+    })
+    expect(JSON.parse(storage.read() ?? '').overrides['future.action']).toEqual({ retained: true })
+  })
+
   it('saves differences, keeps portable Mod, reloads, and distinguishes unbinding from following defaults', () => {
     const storage = createTestUserKeymapStorage()
     const { runtime, bindingRegistry } = createTestStudioActionRuntime({

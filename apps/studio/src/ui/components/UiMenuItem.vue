@@ -1,7 +1,12 @@
 <template>
   <div class="ui-menu-item">
     <span v-if="$slots.leading" class="ui-menu-item__leading"><slot name="leading" /></span>
-    <span class="ui-menu-item__label"><slot /></span>
+    <span class="ui-menu-item__body">
+      <span class="ui-menu-item__label"><slot /></span>
+      <small v-if="$slots.description" class="ui-menu-item__description"
+        ><slot name="description"
+      /></small>
+    </span>
     <span v-if="$slots.trailing" class="ui-menu-item__trailing"><slot name="trailing" /></span>
   </div>
 </template>
@@ -14,7 +19,7 @@
   min-block-size: var(--sd-control-height-md);
   padding-inline: var(--sd-space-3);
   border-radius: var(--sd-radius-md);
-  color: var(--sd-color-text-secondary);
+  color: var(--sd-color-text-primary);
   font-size: var(--sd-font-size-sm);
   outline: none;
   cursor: pointer;
@@ -29,22 +34,35 @@
   color: var(--sd-color-text-disabled);
   cursor: not-allowed;
 }
+.ui-menu-item[aria-disabled='true'] .ui-menu-item__trailing {
+  color: var(--sd-color-text-disabled);
+}
 
 .ui-menu-item__leading {
   display: inline-flex;
   flex: 0 0 auto;
 }
 
-.ui-menu-item__label {
+.ui-menu-item__body {
   flex: 1;
   min-inline-size: 0;
   overflow-wrap: anywhere;
 }
+.ui-menu-item__label {
+  display: block;
+}
 
 .ui-menu-item__trailing {
   flex: 0 0 auto;
-  color: var(--sd-color-text-muted);
+  color: var(--sd-color-text-secondary);
   font-size: var(--sd-font-size-xs);
   white-space: nowrap;
+}
+.ui-menu-item__description {
+  display: block;
+  margin-block: var(--sd-space-1);
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+  line-height: var(--sd-line-height-default);
 }
 </style>

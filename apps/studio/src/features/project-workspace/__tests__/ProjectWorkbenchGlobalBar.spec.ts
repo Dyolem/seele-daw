@@ -200,7 +200,7 @@ describe('Project menu keyboard ownership', () => {
       await trigger.trigger('click')
       await flushPromises()
       const projects = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-        (item) => item.textContent?.trim() === 'Projects',
+        (item) => item.getAttribute('aria-label') === 'Projects',
       )
       if (projects === undefined) throw new Error('Expected the Projects menu item')
       projects.focus()

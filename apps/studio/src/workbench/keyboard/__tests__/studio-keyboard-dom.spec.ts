@@ -28,6 +28,20 @@ function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): 
 }
 
 describe('Studio DOM keyboard ownership', () => {
+  it('opens settings with the default Option+K even when macOS produces an alternate character', () => {
+    const runtime = createStudioActionRuntime({
+      bindingRegistry: createBrowserTanStackHotkeyRegistry({ target: document, platform: 'mac' }),
+      userKeymapStorage: createTestUserKeymapStorage(),
+      isModalActive: () => false,
+      reportFailure: () => {},
+    })
+    onTestFinished(() => runtime.dispose())
+    const show = vi.fn<() => void>()
+    runtime.interfaceTarget.bind({ focusNotifications: () => {}, showShortcuts: show })
+    expect(press(document.body, '˚', { code: 'KeyK', altKey: true }).defaultPrevented).toBe(true)
+    expect(show).toHaveBeenCalledOnce()
+  })
+
   it.each(['mac', 'windows', 'linux'] as const)(
     'reassigns canonical physical conflicts on %s, preserving unrelated aliases',
     (platform) => {

@@ -10,6 +10,10 @@ import {
   watch,
 } from 'vue'
 import UiButton from '@/ui/components/UiButton.vue'
+import UiSelect from '@/ui/components/UiSelect.vue'
+import UiIcon from '@/ui/components/UiIcon.vue'
+import KeyboardIcon from '~icons/fluent/keyboard-20-regular'
+import ArrowResetIcon from '~icons/fluent/arrow-reset-20-regular'
 import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
 import type {
   StudioUserKeymapResult,
@@ -24,6 +28,29 @@ const props = defineProps<{ action: StudioActionDescriptor }>()
 const emit = defineEmits<{ close: [message?: string] }>()
 const { actions, keyboard, userKeymap, keymapState, shortcutRecorder } = useStudioActions()
 const draft = ref([...userKeymap.bindingsForEditing(props.action.actionId)])
+const initialBindings = [...draft.value]
+const restoreRequested = shallowRef(false)
+const specialKeys = [
+  { value: 'Escape', label: 'Escape' },
+  { value: 'Delete', label: 'Delete' },
+  { value: 'Backspace', label: 'Backspace' },
+] as const
+const defaultBindings = STUDIO_SHORTCUT_POLICIES[props.action.actionId].defaultBindings
+const isModified = computed(() =>
+  keymapState.value.modifiedActionIds.includes(props.action.actionId),
+)
+const hasChanges = computed(() =>
+  restoreRequested.value
+    ? isModified.value
+    : draft.value.length !== initialBindings.length ||
+      draft.value.some((binding, index) => binding.trim() !== initialBindings[index]?.trim()),
+)
+const canRestore = computed(
+  () =>
+    isModified.value ||
+    draft.value.length !== defaultBindings.length ||
+    draft.value.some((binding, index) => binding.trim() !== defaultBindings[index]),
+)
 const error = shallowRef('')
 const recordingIndex = shallowRef<number | null>(null)
 const recordingFeedback = shallowRef('')
@@ -41,6 +68,8 @@ watch(
   draft,
   () => {
     confirmation.value = null
+    restoreRequested.value = false
+    recordingFeedback.value = ''
   },
   { deep: true, flush: 'sync' },
 )
@@ -97,6 +126,7 @@ function recordBinding(index: number, event: MouseEvent): void {
     cancelRecording?.()
     return
   }
+  if (recordingIndex.value !== null) return
   const owner = event.currentTarget
   if (!(owner instanceof HTMLElement)) return
   cancelRecording?.()
@@ -120,18 +150,16 @@ function recordBinding(index: number, event: MouseEvent): void {
     else recordingFeedback.value = 'Recording cancelled. Your draft is unchanged.'
   })
 }
-function chooseSpecialKey(index: number, event: Event): void {
-  const field = event.target
-  if (!(field instanceof HTMLSelectElement) || !field.value) return
-  draft.value[index] = field.value
-  field.value = ''
+function chooseSpecialKey(index: number, key: string): void {
+  if (recordingIndex.value !== null) return
+  draft.value[index] = key
   error.value = ''
   recordingFeedback.value = 'Special key added to the draft. Save to apply.'
 }
 const form = useTemplateRef<HTMLFormElement>('form')
-const warnings = computed(() => [
-  ...new Set(draft.value.flatMap((input) => keyboard.validateBindingInput(input).warnings)),
-])
+const warnings = computed(() =>
+  draft.value.map((input) => keyboard.validateBindingInput(input).warnings),
+)
 
 function focusBinding(index: number): void {
   form.value?.querySelectorAll<HTMLInputElement>('input')[index]?.focus()
@@ -141,6 +169,7 @@ onMounted(() => {
   else form.value?.querySelector<HTMLButtonElement>('[data-add-binding]')?.focus()
 })
 async function addBinding(): Promise<void> {
+  if (recordingIndex.value !== null) return
   draft.value.push('')
   error.value = ''
   await nextTick()
@@ -158,17 +187,20 @@ function finish(result: StudioUserKeymapResult, message: string): void {
   else emit('close', message)
 }
 function save(): void {
-  if (recordingIndex.value !== null) return
+  if (recordingIndex.value !== null || !hasChanges.value) return
   finish(
-    userKeymap.setBindings(props.action.actionId, draft.value),
+    restoreRequested.value
+      ? userKeymap.restoreAction(props.action.actionId)
+      : userKeymap.setBindings(props.action.actionId, draft.value),
     `${props.action.label} shortcuts saved.`,
   )
 }
 function restore(): void {
-  finish(
-    userKeymap.restoreAction(props.action.actionId),
-    `${props.action.label} now follows the default shortcuts.`,
-  )
+  if (recordingIndex.value !== null) return
+  draft.value = [...defaultBindings]
+  restoreRequested.value = true
+  error.value = ''
+  recordingFeedback.value = 'Defaults loaded into the draft. Save to apply.'
 }
 </script>
 
@@ -176,62 +208,81 @@ function restore(): void {
   <form
     ref="form"
     class="shortcut-editor"
+    :class="{ 'shortcut-editor--recording': recordingIndex !== null }"
     :aria-label="`Edit ${action.label} shortcuts`"
     @submit.prevent="save"
     @keydown.esc="handleEscape"
   >
-    <h3>{{ action.label }}</h3>
-    <p>
-      Record a key combination or type one, such as <kbd>Mod+K</kbd>, <kbd>Shift+F9</kbd>, or
-      <kbd>Delete</kbd>. Mod means Command on Mac and Control on Windows / Linux. Special keys can
-      be chosen directly.
-    </p>
-    <div v-for="(_, index) in draft" :key="index" class="shortcut-editor__binding">
-      <label :for="`shortcut-binding-${index}`">Key {{ index + 1 }}</label>
-      <input
-        :id="`shortcut-binding-${index}`"
-        v-model="draft[index]"
-        :aria-label="`Key combination ${index + 1}`"
-        autocomplete="off"
-        :spellcheck="false"
-        placeholder="e.g. Mod+K"
-        @input="error = ''"
-      />
-      <UiButton
-        size="small"
-        :aria-label="`${recordingIndex === index ? 'Stop recording' : 'Record'} key combination ${index + 1}`"
-        :aria-pressed="recordingIndex === index"
-        @click="recordBinding(index, $event)"
-        >{{ recordingIndex === index ? 'Stop recording' : 'Record' }}</UiButton
-      >
-      <select
-        :aria-label="`Choose special key for combination ${index + 1}`"
-        @change="chooseSpecialKey(index, $event)"
-      >
-        <option value="">Special key…</option>
-        <option value="Escape">Escape</option>
-        <option value="Delete">Delete</option>
-        <option value="Backspace">Backspace</option>
-      </select>
-      <UiButton
-        size="small"
-        :aria-label="`Remove key combination ${index + 1}`"
-        @click="removeBinding(index)"
-        >Remove</UiButton
-      >
+    <header class="shortcut-editor__header">
+      <span class="shortcut-editor__eyebrow">Edit shortcuts</span>
+      <h3>{{ action.label }}</h3>
+      <p>{{ action.description }}</p>
+    </header>
+    <div v-if="recordingIndex !== null" role="status" class="shortcut-editor__recording">
+      <UiIcon :icon="KeyboardIcon" :size="20" />
+      <div>
+        <strong>Listening for a key combination…</strong>
+        <p>
+          Press the keys for Key {{ recordingIndex + 1 }} now. Escape cancels recording; Delete /
+          Backspace removes this draft key.
+        </p>
+      </div>
     </div>
-    <p v-if="recordingIndex !== null" role="status" class="shortcut-editor__recording">
-      Press a key combination. Escape cancels recording; Delete / Backspace removes this draft key.
-      Moving focus away cancels recording.
+    <p v-else class="shortcut-editor__hint">
+      Record or type a combination. Mod means Command on Mac and Control on Windows / Linux. Changes
+      stay in this draft until you save.
     </p>
-    <p v-else-if="recordingFeedback" role="status">{{ recordingFeedback }}</p>
-    <p class="shortcut-editor__hint">
-      Tab navigation is reserved for controls. Browser or system shortcuts may not reach Studio;
-      type the combination if it cannot be recorded.
-    </p>
+    <div
+      v-for="(_, index) in draft"
+      :key="index"
+      class="shortcut-editor__binding"
+      :class="{ 'shortcut-editor__binding--recording': recordingIndex === index }"
+    >
+      <label :for="`shortcut-binding-${index}`">Key {{ index + 1 }}</label>
+      <div class="shortcut-editor__key-controls">
+        <input
+          :id="`shortcut-binding-${index}`"
+          v-model="draft[index]"
+          :aria-label="`Key combination ${index + 1}`"
+          autocomplete="off"
+          :spellcheck="false"
+          placeholder="e.g. Mod+K"
+          :disabled="recordingIndex !== null"
+          @input="error = ''"
+        />
+        <UiButton
+          size="small"
+          :aria-label="`${recordingIndex === index ? 'Stop recording' : 'Record'} key combination ${index + 1}`"
+          :aria-pressed="recordingIndex === index"
+          :disabled="recordingIndex !== null && recordingIndex !== index"
+          @click="recordBinding(index, $event)"
+          >{{ recordingIndex === index ? 'Stop recording' : 'Record' }}</UiButton
+        >
+        <UiSelect
+          :model-value="''"
+          :options="specialKeys"
+          placeholder="Special key…"
+          :aria-label="`Choose special key for combination ${index + 1}`"
+          :disabled="recordingIndex !== null"
+          @update:model-value="chooseSpecialKey(index, $event)"
+        />
+        <UiButton
+          size="small"
+          :aria-label="`Remove key combination ${index + 1}`"
+          :disabled="recordingIndex !== null"
+          @click="removeBinding(index)"
+          >Remove</UiButton
+        >
+      </div>
+      <ul v-if="warnings[index]?.length" class="shortcut-editor__warnings" role="status">
+        <li v-for="warning in warnings[index]" :key="warning">{{ warning }}</li>
+      </ul>
+    </div>
     <p v-if="!draft.length">Unassigned. Saving this will remove all shortcuts for this action.</p>
-    <UiButton size="small" data-add-binding @click="addBinding">Add key combination</UiButton>
-    <p v-for="warning in warnings" :key="warning" class="shortcut-editor__warning">{{ warning }}</p>
+    <UiButton size="small" data-add-binding :disabled="recordingIndex !== null" @click="addBinding"
+      >Add key combination</UiButton
+    >
+    <p v-if="recordingIndex === null && recordingFeedback" role="status">{{ recordingFeedback }}</p>
     <p v-if="inspection.error && !error" role="alert" class="shortcut-editor__error">
       {{ inspection.error }}
     </p>
@@ -288,29 +339,51 @@ function restore(): void {
       <UiButton size="small" @click="cancelReassignment">Keep existing shortcuts</UiButton>
     </div>
     <p v-if="error" role="alert" class="shortcut-editor__error">{{ error }}</p>
-    <div class="shortcut-editor__actions">
-      <UiButton
-        size="small"
-        variant="primary"
-        type="submit"
-        :disabled="recordingIndex !== null || !!inspection.error || !!inspection.conflicts.length"
-        >Save shortcuts</UiButton
-      >
-      <UiButton
-        v-if="
-          !confirmation &&
-          !inspection.error &&
-          inspection.conflicts.length &&
-          !inspection.reassignBlockedReason
-        "
-        size="small"
-        data-request-reassignment
-        @click="requestReassignment"
-        >Reassign conflicting keys…</UiButton
-      >
-      <UiButton size="small" @click="emit('close')">Cancel</UiButton>
-      <UiButton size="small" variant="ghost" @click="restore">Restore default</UiButton>
-    </div>
+    <footer class="shortcut-editor__footer">
+      <div class="shortcut-editor__defaults">
+        <UiButton
+          size="small"
+          :disabled="recordingIndex !== null || !canRestore || restoreRequested"
+          @click="restore"
+        >
+          <template #leading><UiIcon :icon="ArrowResetIcon" :size="16" /></template>
+          Restore defaults
+        </UiButton>
+        <span>{{
+          restoreRequested ? 'Defaults are in the draft.' : 'Load defaults into this draft.'
+        }}</span>
+      </div>
+      <div class="shortcut-editor__actions">
+        <UiButton size="small" :disabled="recordingIndex !== null" @click="emit('close')"
+          >Cancel editing</UiButton
+        >
+        <UiButton
+          size="small"
+          variant="primary"
+          type="submit"
+          :disabled="
+            recordingIndex !== null ||
+            !hasChanges ||
+            !!inspection.error ||
+            !!inspection.conflicts.length
+          "
+          >Save shortcuts</UiButton
+        >
+        <UiButton
+          v-if="
+            !confirmation &&
+            !inspection.error &&
+            inspection.conflicts.length &&
+            !inspection.reassignBlockedReason
+          "
+          size="small"
+          :disabled="recordingIndex !== null"
+          data-request-reassignment
+          @click="requestReassignment"
+          >Reassign conflicting keys…</UiButton
+        >
+      </div>
+    </footer>
   </form>
 </template>
 
@@ -323,6 +396,18 @@ function restore(): void {
   background: var(--sd-color-surface-sunken);
   font-size: var(--sd-font-size-sm);
 }
+.shortcut-editor--recording {
+  border-color: var(--sd-color-state-info);
+}
+.shortcut-editor__header {
+  margin-block-end: var(--sd-space-4);
+}
+.shortcut-editor__eyebrow {
+  display: block;
+  margin-block-end: var(--sd-space-2);
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+}
 .shortcut-editor h3 {
   margin: 0;
   font-size: var(--sd-font-size-md);
@@ -331,7 +416,7 @@ function restore(): void {
   color: var(--sd-color-text-secondary);
   line-height: var(--sd-line-height-default);
 }
-.shortcut-editor__binding,
+.shortcut-editor__key-controls,
 .shortcut-editor__actions {
   display: flex;
   flex-wrap: wrap;
@@ -339,8 +424,21 @@ function restore(): void {
   align-items: center;
   margin-block: var(--sd-space-3);
 }
-.shortcut-editor__binding input,
-.shortcut-editor__binding select {
+.shortcut-editor__binding {
+  margin-block: var(--sd-space-3);
+  padding: var(--sd-space-3);
+  border: 1px solid var(--sd-color-border-subtle);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-color-surface-panel);
+}
+.shortcut-editor__binding > label {
+  font-weight: 650;
+}
+.shortcut-editor__binding--recording {
+  border-color: var(--sd-color-state-info);
+}
+.shortcut-editor__binding input {
+  flex: 1;
   min-inline-size: 8rem;
   min-block-size: var(--sd-control-height-md);
   padding-inline: var(--sd-space-3);
@@ -350,11 +448,11 @@ function restore(): void {
   color: var(--sd-color-text-primary);
   font: inherit;
 }
-.shortcut-editor__binding input {
-  flex: 1;
+.shortcut-editor__binding input:disabled {
+  color: var(--sd-color-text-disabled);
+  cursor: not-allowed;
 }
-.shortcut-editor__binding input:focus-visible,
-.shortcut-editor__binding select:focus-visible {
+.shortcut-editor__binding input:focus-visible {
   outline: 2px solid var(--sd-color-border-focus);
   outline-offset: 2px;
 }
@@ -371,8 +469,41 @@ function restore(): void {
   border-radius: var(--sd-radius-md);
   background: var(--sd-color-surface-overlay);
 }
-.shortcut-editor .shortcut-editor__recording {
+.shortcut-editor__recording {
+  display: flex;
+  gap: var(--sd-space-3);
+  align-items: center;
+  padding: var(--sd-space-4);
+  border: 1px solid var(--sd-color-state-info);
+  border-radius: var(--sd-radius-md);
+  background: color-mix(in srgb, var(--sd-color-state-info) 12%, var(--sd-color-surface-panel));
   color: var(--sd-color-text-primary);
+}
+.shortcut-editor__recording p {
+  margin-block: var(--sd-space-2) 0;
+}
+.shortcut-editor__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sd-space-5);
+  border-block-start: 1px solid var(--sd-color-border-strong);
+  margin-block-start: var(--sd-space-5);
+  padding-block-start: var(--sd-space-4);
+}
+.shortcut-editor__defaults {
+  display: grid;
+  justify-items: start;
+  gap: var(--sd-space-2);
+}
+.shortcut-editor__defaults span {
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+}
+.shortcut-editor__actions {
+  margin-block: 0;
+  margin-inline-start: auto;
 }
 .shortcut-editor__hint {
   font-size: var(--sd-font-size-xs);
@@ -380,7 +511,12 @@ function restore(): void {
 .shortcut-editor .shortcut-editor__error {
   color: var(--sd-color-state-danger);
 }
-.shortcut-editor .shortcut-editor__warning {
+.shortcut-editor__warnings {
+  padding: var(--sd-space-3) var(--sd-space-5);
+  border: 1px solid var(--sd-color-state-warning);
+  border-radius: var(--sd-radius-sm);
+  background: color-mix(in srgb, var(--sd-color-state-warning) 8%, var(--sd-color-surface-panel));
   color: var(--sd-color-state-warning);
+  line-height: var(--sd-line-height-default);
 }
 </style>

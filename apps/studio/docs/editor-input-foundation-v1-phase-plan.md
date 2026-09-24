@@ -1,6 +1,6 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：计划已获批准；S1 / S2 已于 2026-09-22 通过用户审核并提交；S3 已于 2026-09-23 通过用户审核；G1–G4 尚未实施
+> 状态：计划已获批准；S1–S3 已审核提交；快捷键体验修订已通过用户审核；G1–G4 尚未实施
 >
 > 日期：2026-09-11
 >
@@ -117,7 +117,7 @@ Clip Enter 打开和 Bar Enter 创建是带具体目标的编辑操作，分别�
 Dock 的 `midi-editor.open` 混同。F8 接入通知区域的 Focus Action，Reka 自带的重复触发入口
 通过其公开配置停用，并由自定义 UI 暴露 Focus 能力。
 
-现有 Cursor / Pencil 切换与 Snap 开关也加入可绑定 Action，首版保留未分配键位，用户可以
+现有 Cursor / Pencil 切换与 Snap 开关也加入可绑定 Action，首版曾保留未分配键位，用户可以
 自行设置。单一 Grid Preset 和带任意数值的字段仍是控件操作，不预建参数化 Action 系统。
 
 ### 5.3 用户设置与保存
@@ -339,4 +339,28 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
 - 完整 `pnpm check` 通过：架构、workspace 命令一致性、格式、Oxlint、ESLint、全工作区
   Type Check、167 个测试文件 / 1,544 项测试、Production Build 与 soundbank dist boundary。
   Studio 为 72 个文件 / 578 项测试，新增 35 项行为回归；构建保留已有大 chunk 提示。
-- S3 已通过用户审核，按授权提交；后续进入 G1 的中立交互协议与 Note 纵向迁移。
+- S3 已通过用户审核，按授权提交为 `9622f76`；根据用户体验反馈，先实施下方快捷键修订，
+  再进入 G1 的中立交互协议与 Note 纵向迁移。
+
+## 12. 快捷键体验修订（2026-09-23，已审核）
+
+- 两个原生 Select 改为自有 UiSelect；Reka 只负责行为和定位，UiMenuSurface 与设计令牌
+  负责菜单背景、间距及状态，不引用 Reka 专属 CSS 变量。
+- 编辑详情与目录分离，新增、录制、恢复和保存分层；录制有独立高亮状态，期间禁用其他
+  草稿操作，Stop recording 与 Cancel editing 含义分开。Restore 只改草稿，保存后应用。
+  未变化的 Save 和已是默认的 Restore 禁用；后续编辑会清除过期录制反馈。
+- Source 显示 Default / User；用户覆盖失效时明确显示实际回退来源。根据 Cubase / Logic
+  的工具与入口习惯补齐 9 个默认键位，19 个 Action 均可通过默认键调用；既有显式覆盖保留。
+  完整表和来源见 [Keyboard 架构](./studio-keyboard-shortcut-architecture.md#4-当前默认绑定)。
+- 占键提示按平台说明具体用途，包含 Inspect Element、Developer Tools、浏览器反馈等；
+  不把静态提醒误称为系统可用性检测。Sequence 暂缓，Source 立即接入，理由见架构第 10 节。
+- Project 菜单继续读取统一 Action 与有效 Keymap，提高可用项对比度并显示禁用原因。
+  Tempo 修改后 Undo 可用，菜单 Undo 后 Redo 可用；没有在这一路径复现业务状态分歧。
+- Codex 内置浏览器已验证自定义菜单背景与焦点、特殊键选择、Alt+K 入口、录制高亮与禁用、
+  Escape 分层、具体占键提示、录制后保存和 Source 更新、恢复后取消及保存、菜单键位与
+  Undo / Redo 更新。验证后恢复 Save 默认键位与原 Tempo；没有操作个人 Chrome。
+- 完整 `pnpm check` 通过：架构、workspace 命令一致性、格式、Oxlint、ESLint、全工作区
+  Type Check、167 个测试文件 / 1,548 项测试、Production Build 与 soundbank dist boundary。
+  Studio 为 72 个文件 / 582 项测试；涵盖录制禁用、草稿恢复、有效来源及 macOS Option+K
+  字符转换回归。文档本地链接 37 项通过，`git diff --check` 通过；没有新增 E2E。
+  构建保留已有大 chunk 提示；本批已通过用户审核，由本次提交交付。

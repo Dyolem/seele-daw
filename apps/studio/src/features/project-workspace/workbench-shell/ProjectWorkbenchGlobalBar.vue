@@ -158,6 +158,7 @@ const saveStatusTitle = computed(
                   :key="action.actionId"
                   as-child
                   :disabled="!action.enabled"
+                  :aria-label="action.label"
                   :aria-busy="action.busy || undefined"
                   :title="action.title"
                   :aria-description="action.disabledReason ?? undefined"
@@ -166,6 +167,9 @@ const saveStatusTitle = computed(
                   <UiMenuItem class="project-workbench__menu-item">
                     <template #leading><UiIcon :icon="icon" :size="20" /></template>
                     {{ action.label }}
+                    <template v-if="!action.enabled && action.disabledReason" #description>
+                      {{ action.disabledReason }}
+                    </template>
                     <template v-if="action.shortcut" #trailing>
                       <span class="project-workbench__menu-shortcut">{{ action.shortcut }}</span>
                     </template>

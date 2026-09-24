@@ -406,6 +406,7 @@ describe('ProjectWorkspacePage', () => {
       await flushPromises()
       const undoRevision = session.modelRevision
       const undoItem = await openProjectMenuItem(wrapper, 'Undo')
+      expect(undoItem.getAttribute('aria-disabled')).not.toBe('true')
       expect(undoItem.querySelector('.project-workbench__menu-shortcut')?.textContent).toBe(
         'display:Mod+Z',
       )
@@ -428,7 +429,9 @@ describe('ProjectWorkspacePage', () => {
       const redoRevision = session.modelRevision
       const undo = await openProjectMenuItem(wrapper, 'Undo')
       expect(undo.getAttribute('aria-disabled')).toBe('true')
+      expect(undo.textContent).toContain('There is nothing to undo.')
       const redo = await openProjectMenuItem(wrapper, 'Redo')
+      expect(redo.getAttribute('aria-disabled')).not.toBe('true')
       expect(redo.title).toBe(wrapper.get('button[aria-label="Redo"]').attributes('title'))
       if (source === 'menu') redo.click()
       else {
@@ -680,7 +683,10 @@ describe('ProjectWorkspacePage', () => {
         invoke,
         selection,
       } = await mountPage(fixture, projectId, {
-        keymap: createStudioKeyboardKeymap({ [actionId]: [defineStudioKeyboardBinding('Mod+I')] }),
+        keymap: createStudioKeyboardKeymap({
+          [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS]: [],
+          [actionId]: [defineStudioKeyboardBinding('Mod+I')],
+        }),
       })
       const pending = createDeferredActionResult<void>()
       const importedTrackId = parseTrackId(`imported-track-${source}`)

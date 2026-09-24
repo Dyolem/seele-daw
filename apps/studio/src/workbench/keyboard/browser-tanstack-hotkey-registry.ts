@@ -29,6 +29,60 @@ export interface CreateBrowserTanStackHotkeyRegistryInput {
   readonly target: Document
 }
 
+// Advisory matches describe known browser/OS assignments, not guaranteed event delivery.
+const BROWSER_SHORTCUTS: Readonly<Record<string, string>> = Object.freeze({
+  'Mod+Shift+C': 'open Developer Tools / Inspect Element',
+  'Mod+L': 'focus the address bar',
+  'Mod+K': 'search from the address bar',
+  'Mod+N': 'open a new window',
+  'Mod+T': 'open a new tab',
+  'Mod+W': 'close the current tab',
+  'Mod+R': 'reload the page',
+  'Mod+O': 'open a file',
+  'Mod+P': 'print the page',
+  'Mod+Shift+N': 'open a private window',
+  'Mod+Shift+T': 'reopen a closed tab',
+  'Mod+Shift+W': 'close the current window',
+  'Mod+Shift+R': 'reload without cached content',
+  'Mod+Shift+M': 'open browser profile options',
+  'Control+Tab': 'switch to the next tab',
+  'Control+Shift+Tab': 'switch to the previous tab',
+  ...Object.fromEntries(
+    Array.from({ length: 9 }, (_, i) => [`Mod+${i + 1}`, 'switch browser tabs']),
+  ),
+})
+const PLATFORM_SHORTCUTS = Object.freeze({
+  mac: {
+    'Mod+Alt+I': 'open Developer Tools',
+    'Mod+Alt+J': 'open the developer console',
+    'Mod+Alt+C': 'open Developer Tools / Inspect Element',
+    'Mod+Alt+B': 'open the bookmark manager',
+    'Mod+Alt+Shift+I': 'open browser feedback',
+    'Mod+Shift+I': 'compose an email with a link to this page',
+    'Mod+Shift+J': 'open downloads',
+    'Mod+Alt+M': 'minimize all application windows',
+    'Mod+,': 'open browser settings',
+    'Mod+Q': 'quit the application',
+    'Mod+Space': 'open Spotlight',
+    'Mod+Tab': 'switch applications',
+    'Control+Space': 'switch input sources',
+  },
+  other: {
+    'Mod+Shift+I': 'open Developer Tools',
+    'Mod+Shift+J': 'open the developer console',
+    'Mod+Shift+O': 'open the bookmark manager',
+    'Alt+Shift+I': 'open browser feedback',
+    F12: 'open Developer Tools',
+    F1: 'open browser help',
+    F5: 'reload the page',
+    F11: 'toggle browser fullscreen',
+    'Control+F5': 'reload without cached content',
+    'Alt+F4': 'close the current window',
+    'Alt+Tab': 'switch applications',
+    'Alt+Space': 'open the system window menu',
+  },
+})
+
 /** Validates dynamic Settings input without exposing TanStack result types to UI. */
 export function validateStudioKeyboardBinding(
   input: string,
@@ -45,25 +99,16 @@ export function validateStudioKeyboardBinding(
     if (parsed.key === 'Tab' && !parsed.ctrl && !parsed.alt && !parsed.meta)
       errors.push('Tab and Shift+Tab are reserved for moving focus between controls.')
     const identity = normalizeHotkey(normalizedInput, platform)
-    // Advisory only: browser/OS shortcuts differ, and some key events never reach the page.
-    const browserKeys = [
-      'Mod+L',
-      'Mod+N',
-      'Mod+T',
-      'Mod+W',
-      'Mod+R',
-      'Mod+Shift+N',
-      'Mod+Shift+T',
-      'Mod+Shift+W',
-      'Mod+Shift+R',
-      'Control+Tab',
-      'Control+Shift+Tab',
-    ]
-    if (platform === 'mac') browserKeys.push('Mod+Q', 'Mod+Space')
-    else browserKeys.push('Alt+F4', 'F5', 'F11')
-    if (browserKeys.some((key) => normalizeHotkey(key, platform) === identity))
+    const knownShortcuts = {
+      ...BROWSER_SHORTCUTS,
+      ...(platform === 'mac' ? PLATFORM_SHORTCUTS.mac : PLATFORM_SHORTCUTS.other),
+    }
+    const known = Object.entries(knownShortcuts).find(
+      ([key]) => normalizeHotkey(key, platform) === identity,
+    )
+    if (known)
       warnings.push(
-        'This combination is commonly used by the browser or operating system and may not reach Studio. Consider another shortcut.',
+        `${formatForDisplay(normalizedInput, { platform })} is commonly used by Chrome / Chromium or the operating system to ${known[1]}. It may be handled before Studio receives it. Choose another combination for reliable access.`,
       )
   }
   const valid = errors.length === 0 && normalizedInput.length > 0

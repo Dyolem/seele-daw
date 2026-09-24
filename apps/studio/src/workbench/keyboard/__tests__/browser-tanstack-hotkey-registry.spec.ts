@@ -7,6 +7,7 @@ import {
   validateStudioKeyboardBinding,
 } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/studio-keyboard-binding'
+import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
 
 afterEach(() => {
   HotkeyManager.resetInstance()
@@ -29,10 +30,22 @@ describe('BrowserTanStackHotkeyRegistry', () => {
       const registry = createBrowserTanStackHotkeyRegistry({ target: document, platform })
       expect(registry.validate(physical)).toMatchObject({
         valid: true,
-        warnings: [expect.stringContaining('may not reach Studio')],
+        warnings: [expect.stringContaining('focus the address bar')],
       })
-      expect(registry.validate('Mod+K')).toMatchObject({ valid: true, warnings: [] })
+      expect(registry.validate('Mod+Shift+C')).toMatchObject({
+        valid: true,
+        warnings: [expect.stringContaining('Developer Tools / Inspect Element')],
+      })
+      expect(
+        registry.validate(platform === 'mac' ? 'Mod+Alt+Shift+I' : 'Alt+Shift+I'),
+      ).toMatchObject({
+        valid: true,
+        warnings: [expect.stringContaining('open browser feedback')],
+      })
       expect(registry.validate('Shift+Delete').valid).toBe(true)
+      for (const binding of Object.values(STUDIO_DEFAULT_KEYMAP).flat()) {
+        expect(registry.validate(binding)).toMatchObject({ valid: true, warnings: [] })
+      }
     },
   )
 

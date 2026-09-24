@@ -135,6 +135,10 @@ const props = withDefaults(defineProps<UiButtonProps>(), {
   cursor: not-allowed;
   opacity: 0.72;
 }
+.ui-button--primary:disabled {
+  background: var(--sd-color-control-secondary);
+  border-color: var(--sd-color-border-default);
+}
 
 .ui-button__progress {
   inline-size: var(--sd-space-3);

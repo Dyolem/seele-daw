@@ -325,10 +325,17 @@ Save、Undo／Redo、Play／Pause，以及 WA2 的 Return、Projects、MIDI Impo
 
 已有 `@tanstack/hotkeys@0.8.0` Browser Adapter 继续隔离平台解析与输入过滤。动态用户 Binding
 需先验证。Keyboard shortcuts 窗口从统一目录查询已绑定和未绑定 Action，提供功能／键位／
-作用区域搜索、已修改筛选、当前／默认键位；Widget 与 Pointer Modifier 作为帮助内容单列。
+作用区域搜索、用户覆盖筛选、当前／默认键位与 Source；Widget 与 Pointer Modifier 作为帮助内容单列。
 S2 提供每个 Action 的键名编辑草稿、添加／移除、保存／取消、恢复单项与恢复全部。用 `Mod`
 表达跨平台主修饰键，当前文案按平台显示。空列表说明保存后会解除绑定；恢复默认说明回到
-默认政策。真实冲突、存储和注册失败在草稿旁反馈，失败后保留草稿和当前键位。
+默认政策。Source 显示有效键位来自 Default 或 User；非法覆盖回退时显示 Default 并注明用户
+覆盖未应用。真实冲突、存储和注册失败在草稿旁反馈，失败后保留草稿和当前键位。
+
+进入编辑详情后隐藏目录和筛选；输入行、Add key combination 与页脚分层。Restore defaults
+使用有边框和图标的按钮，位于页脚左侧；它只加载默认草稿，Save 后才应用。Cancel editing
+与 Save 位于右侧，取消不保存恢复结果。未变化时 Save 禁用，已跟随默认时 Restore 禁用；
+禁用的主按钮使用低强调样式。两个下拉框均使用 UiSelect / UiMenuSurface，箭头右侧保留
+16px 间距；Reka 只管理交互、ARIA 与定位，不以其专属 CSS 变量作为视觉样式依赖。
 
 窗口使用 Dialog 焦点约束，打开时聚焦搜索，关闭后回到原入口；编辑时聚焦首个键位，
 Escape 先取消编辑草稿，再次按下关闭窗口。保存／取消后回到对应 Edit 按钮；筛选使该行
@@ -336,12 +343,16 @@ Escape 先取消编辑草稿，再次按下关闭窗口。保存／取消后回�
 非法覆盖显示未应用和默认回退，可逐项修复。
 
 S3 每行增加 Record 和 Special key。录制期间说明 Escape 取消、无修饰键的 Delete /
-Backspace 移除当前草稿行、移开焦点取消；结果仍需保存。Escape / Delete / Backspace 也可
+Backspace 移除当前草稿行、移开焦点取消；高亮 Listening 状态和当前行同时出现。期间禁用
+输入、Special key、Remove、Add、Restore、Cancel editing 和 Save，仅 Stop recording、Escape
+或关闭窗口可结束录制；结果仍需保存。Escape / Delete / Backspace 也可
 直接选择或手动输入，避免录制控制键无法成为绑定。录制成功后回到对应键名字段。
 草稿实时解释互斥共用、优先级或真实冲突；真实冲突禁用普通保存，Reassign 展示受影响的
 Action 和键位后再确认。确认区接收焦点，Escape 只退出该确认并返回 Reassign 按钮，随后
 才是取消草稿、关闭窗口；录制期间的 Escape 先取消录制。浏览器／系统组合提示是非阻断
-提醒；纯 Modifier、Tab / Shift+Tab 不能保存为业务快捷键。
+提醒，逐项说明 Developer Tools、切换标签页等用途；没有提示不意味着可以保证生效。
+纯 Modifier、Tab / Shift+Tab 不能保存为业务快捷键。菜单中可执行项使用正文亮度，禁用项
+显示业务原因；快捷键分配不改变 Action 的可用性。
 
 按钮的原生 Enter / Space，以及 Slider / Splitter 的导航键优先于后台 Action；Arrangement
 Clip 和 Bar 的 Enter 在互斥 Focus Context 中分别执行打开／创建。选区目标由 Focus 激活，

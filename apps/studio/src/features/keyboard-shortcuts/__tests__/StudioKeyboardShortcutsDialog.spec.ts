@@ -40,7 +40,86 @@ function buttonWithText(dialog: DOMWrapper<Element>, label: string) {
   return button
 }
 
+async function chooseOption(dialog: DOMWrapper<Element>, label: string, option: string) {
+  const trigger = dialog.get(`[role="combobox"][aria-label="${label}"]`)
+  await trigger.trigger('keydown', { key: 'ArrowDown' })
+  await flushPromises()
+  const item = [...document.querySelectorAll('[role="option"]')].find(
+    (item) => item.textContent?.trim() === option,
+  )
+  if (!item) throw new Error(`Expected option: ${option}`)
+  await new DOMWrapper(item).trigger('keydown', { key: 'Enter' })
+  await flushPromises()
+}
+
 describe('Keyboard shortcuts dialog', () => {
+  it('isolates recording from editing and makes unchanged saves and restores inactive', async () => {
+    const { dialog, storage } = await openSettings()
+    await dialog.get('[aria-label="Edit Save shortcuts"]').trigger('click')
+    expect(dialog.get('table').isVisible()).toBe(false)
+    expect(buttonWithText(dialog, 'Save shortcuts').attributes('disabled')).toBeDefined()
+    expect(buttonWithText(dialog, 'Restore defaults').attributes('disabled')).toBeDefined()
+    await buttonWithText(dialog, 'Record').trigger('click')
+    expect(dialog.get('[role="status"].shortcut-editor__recording').text()).toContain(
+      'Listening for a key combination',
+    )
+    for (const label of [
+      'Add key combination',
+      'Cancel editing',
+      'Save shortcuts',
+      'Restore defaults',
+    ]) {
+      expect(buttonWithText(dialog, label).attributes('disabled')).toBeDefined()
+    }
+    expect(dialog.get('[aria-label="Key combination 1"]').attributes('disabled')).toBeDefined()
+    expect(
+      dialog.get('[aria-label="Choose special key for combination 1"]').attributes('disabled'),
+    ).toBeDefined()
+    await buttonWithText(dialog, 'Add key combination').trigger('click')
+    expect(dialog.findAll('.shortcut-editor__binding')).toHaveLength(1)
+    expect(dialog.find('.shortcut-editor__recording').exists()).toBe(true)
+    await buttonWithText(dialog, 'Stop recording').trigger('click')
+    expect(dialog.find('.shortcut-editor__recording').exists()).toBe(false)
+    expect(dialog.find('form').exists()).toBe(true)
+    expect(storage.writes).toEqual([])
+    await dialog.get('[aria-label="Key combination 1"]').setValue('Mod+Shift+C')
+    expect(dialog.text()).not.toContain('Your draft is unchanged')
+    await buttonWithText(dialog, 'Cancel editing').trigger('click')
+    expect(dialog.get('table').isVisible()).toBe(true)
+  })
+
+  it('restores only the draft, permits cancellation, and shows the effective binding source', async () => {
+    const storage = createTestUserKeymapStorage(
+      JSON.stringify({ version: 1, overrides: { 'project.save': ['F9'] } }),
+    )
+    const { dialog, runtime } = await openSettings(storage)
+    const source = () => dialog.get('tbody tr .studio-shortcuts__source').text()
+    expect(source()).toBe('User')
+    await dialog.get('[aria-label="Edit Save shortcuts"]').trigger('click')
+    await buttonWithText(dialog, 'Restore defaults').trigger('click')
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['F9'])
+    expect(storage.writes).toEqual([])
+    await buttonWithText(dialog, 'Cancel editing').trigger('click')
+    expect(source()).toBe('User')
+    await dialog.get('[aria-label="Edit Save shortcuts"]').trigger('click')
+    await buttonWithText(dialog, 'Restore defaults').trigger('click')
+    await buttonWithText(dialog, 'Save shortcuts').trigger('click')
+    expect(source()).toBe('Default')
+    expect(runtime.keymapState.value.modifiedActionIds).not.toContain(STUDIO_ACTION.PROJECT_SAVE)
+    expect(storage.writes).toHaveLength(1)
+  })
+
+  it('shows default as the effective source when a saved user override is rejected', async () => {
+    const storage = createTestUserKeymapStorage(
+      JSON.stringify({ version: 1, overrides: { 'project.save': 42 } }),
+    )
+    const { dialog } = await openSettings(storage)
+    expect(dialog.get('tbody tr .studio-shortcuts__source').text()).toContain('Default')
+    expect(dialog.get('tbody tr .studio-shortcuts__source').text()).toContain(
+      'User override not applied',
+    )
+  })
+
   it('records into a draft, cancels recording before closing the editor, and clears only a draft binding', async () => {
     const { dialog, runtime, storage, bindingRegistry } = await openSettings()
     const invoke = vi.spyOn(runtime.actions, 'invoke')
@@ -84,7 +163,7 @@ describe('Keyboard shortcuts dialog', () => {
     async (key) => {
       const { dialog, runtime } = await openSettings()
       await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
-      await dialog.get('[aria-label="Choose special key for combination 1"]').setValue(key)
+      await chooseOption(dialog, 'Choose special key for combination 1', key)
       expect(dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]').element.value).toBe(
         key,
       )
@@ -145,16 +224,16 @@ describe('Keyboard shortcuts dialog', () => {
     expect(dialog.get('[aria-label="Shortcut relationships"]').text()).toContain(
       'separate focused regions',
     )
-    expect(buttonWithText(dialog, 'Save shortcuts').attributes('disabled')).toBeUndefined()
+    expect(buttonWithText(dialog, 'Save shortcuts').attributes('disabled')).toBeDefined()
     expect(dialog.text()).not.toContain('Reassign conflicting keys…')
-    await buttonWithText(dialog, 'Cancel').trigger('click')
+    await buttonWithText(dialog, 'Cancel editing').trigger('click')
     await dialog.get('[aria-label="Edit Clear selection shortcuts"]').trigger('click')
     expect(dialog.get('[aria-label="Shortcut relationships"]').text()).toContain(
       'priority to Cancel interaction',
     )
     expect(dialog.text()).not.toContain('Reassign conflicting keys…')
     await dialog.get('[aria-label="Key combination 1"]').setValue('Mod+L')
-    expect(dialog.text()).toContain('commonly used by the browser or operating system')
+    expect(dialog.text()).toContain('focus the address bar')
   })
 
   it('adds, changes and removes shortcuts, filters modifications, restores defaults and preserves them on reopening', async () => {
@@ -176,7 +255,7 @@ describe('Keyboard shortcuts dialog', () => {
     expect(document.activeElement?.getAttribute('aria-label')).toBe(
       'Edit Focus notifications shortcuts',
     )
-    await dialog.get('select').setValue('modified')
+    await chooseOption(dialog, 'Filter shortcut assignment', 'User overrides')
     expect(dialog.findAll('tbody tr')).toHaveLength(1)
     expect(dialog.get('tbody tr').text()).toContain('display:F9')
     await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
@@ -187,7 +266,9 @@ describe('Keyboard shortcuts dialog', () => {
     expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([])
     expect(dialog.get('tbody tr').text()).toContain('Unassigned')
     await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
-    await buttonWithText(dialog, 'Restore default').trigger('click')
+    await buttonWithText(dialog, 'Restore defaults').trigger('click')
+    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([])
+    await buttonWithText(dialog, 'Save shortcuts').trigger('click')
     expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
     expect(dialog.findAll('tbody tr')).toHaveLength(0)
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Search keyboard shortcuts')
@@ -301,8 +382,8 @@ describe('Keyboard shortcuts dialog', () => {
     expect(dialog.findAll('tbody tr')).toHaveLength(1)
     expect(dialog.text()).toContain('Pencil tool')
     await search.setValue('')
-    await dialog.get('select').setValue('unassigned')
-    expect(dialog.findAll('tbody tr')).toHaveLength(9)
+    await chooseOption(dialog, 'Filter shortcut assignment', 'Unassigned')
+    expect(dialog.findAll('tbody tr')).toHaveLength(0)
     await search.trigger('keydown', { key: 'Escape' })
     await flushPromises()
     expect(document.querySelector('[role="dialog"]')).toBeNull()

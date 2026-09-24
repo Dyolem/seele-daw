@@ -453,7 +453,7 @@ WA2 已实现并通过审核：Undo／Redo、Play／Pause、Return、Projects、
 Open MIDI Editor 的菜单和按钮已接入统一 Action。菜单新增 History／Playback 分组；
 Arrangement 导入按钮也使用同一份状态。导入期间阻止重复选择文件，取消选择可立即重试；
 Return 在播放加载期间仍可停止并返回起点，返回项目列表继续经过既有导航确认。
-Action 可以没有 Binding；WA2 新增五个 Action 默认不分配快捷键。
+Action 可以没有 Binding；WA2 新增操作的默认键位已在后续快捷键体验修订中补齐。
 
 WA3 已实现并通过审核：Clip Focus 的 Note／CC64，以及 Track Scope 中 Active Clip 的 CC64
 现在提供右键 Delete Selection／Clear Selection。右键未选中对象时先单选，右键多选成员时
@@ -468,15 +468,14 @@ Escape 取消后，焦点回到 Project Menu 按钮。WA4 已于 2026-09-11 通�
 
 Editor Input Foundation S1 已于 2026-09-22 通过用户审核：项目入口的 Keyboard shortcuts 按钮与
 Project Menu → View → Keyboard shortcuts 提供统一设置入口。目录包含 19 个 Action，
-其中 10 个有默认键位，9 个未分配；支持中英文检索、已分配／未分配筛选，显示当前键位、
-默认键位、作用区域和重复政策，并单列 Widget / Modifier 帮助。Cursor、Pencil、Snap
-也已进入目录并与工具栏共用 Action，默认不分配按键。
+支持中英文检索、已分配／未分配筛选，显示当前键位、默认键位、作用区域和重复政策，
+并单列 Widget / Modifier 帮助。Cursor、Pencil、Snap 也已进入目录并与工具栏共用 Action。
 
 默认 Keymap、Context、Repeat 政策集中维护，菜单与按钮从有效 Keymap 派生提示。Follow
 暂停由实际导航和滚动触发，不再依赖硬编码按键集合。
 
 S2 已于 2026-09-22 通过用户审核：Keyboard shortcuts 支持手动输入键位、添加／移除绑定、单项恢复和
-全部恢复，并提供 Modified 筛选。设置保存在当前浏览器独立的版本化记录中；缺少覆盖跟随
+全部恢复，并提供用户覆盖筛选。设置保存在当前浏览器独立的版本化记录中；缺少覆盖跟随
 默认，空数组表示主动解除，恢复默认删除覆盖。菜单与按钮提示随成功保存立即更新，旧键
 失效，重新打开保留配置。注册或保存失败保留旧路由和提示；非法／冲突记录退回默认，未知
 Action 保留但不执行。损坏或未知版本的整份记录不会阻止启动，也不会自动重写，可在设置中
@@ -487,6 +486,17 @@ Escape 取消录制，无修饰键的 Delete / Backspace 清空当前草稿行�
 Settings 区分互斥区域共用、明确的优先级和真实冲突；真实冲突必须改键或确认重新分配，
 一次保存只移除其他 Action 的冲突键，保留其余绑定。Tab / Shift+Tab 留给焦点导航；常见
 浏览器／系统键位给出提示，无法保证页面会收到对应输入。
+
+S3 后的体验修订已通过用户审核：19 个 Action 均有默认键位，新增 `1` / `8` 工具选择、`J`
+Snap、`P` 打开 MIDI Editor、`Alt+K` 打开快捷键设置、`Home` 返回最后启动位置、`Mod+I`
+导入新轨道、`Mod+Alt+O` 返回 Projects，以及 `Mod+Alt+Shift+M` 从 MIDI 建立新项目。
+既有用户覆盖不会被改写；完整映射与 DAW 参考见快捷键架构文档。
+
+设置中的下拉框统一自定义样式，Source 列区分有效的 Default / User 来源。编辑详情与目录
+分离；录制有独立高亮状态，期间禁用会打断录制的编辑操作，Stop recording 与 Cancel editing
+含义分开。Restore defaults 只更新草稿，Save 后应用，Cancel 可以丢弃恢复。占键提示说明
+具体浏览器／系统用途，没有提示不代表保证可用。Project 菜单继续共用 Action 状态与当前
+快捷键，并显示禁用原因；Undo / Redo 仍需当前 Session 存在相应 History。
 
 尚未提供 Sequence 或 Command Palette；后续独立手势架构按 G1–G4 实施，见
 [Editor Input Foundation V1 计划](./apps/studio/docs/editor-input-foundation-v1-phase-plan.md)。

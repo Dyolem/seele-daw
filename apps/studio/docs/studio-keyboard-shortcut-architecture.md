@@ -1,6 +1,6 @@
 # Studio Keyboard Input 架构
 
-> 状态：WA1–WA4 已审核；Input Foundation S1 / S2 已审核提交；S3 已于 2026-09-23 通过用户审核
+> 状态：WA1–WA4、Input Foundation S1–S3 已审核提交；快捷键体验修订已通过用户审核
 >
 > 日期：2026-09-23
 >
@@ -35,7 +35,9 @@ TanStack Adapter 不知道业务 Action、Selection 或 Modal。Router 不执行
 未挂载或当前不可执行的 Action 仍然可查，不通过扫描组件或另建手工列表取得操作目录。
 Project Entry 的 Keyboard shortcuts 按钮和 Project Menu → View → Keyboard shortcuts
 打开同一个 Dialog，支持功能／键位／作用区域搜索、已分配／未分配／已修改筛选、当前／
-默认键位和 Repeat 提示。
+默认键位、Source 和 Repeat 提示。Source 表示有效键位来自 `Default` 或 `User`；主动解除
+绑定或显式保存与默认相同的键位仍属于 `User`。非法覆盖退回默认时，显示 `Default`，同时
+保留 `User override not applied` 诊断；没有插件来源时不增加空的 Extension / Workspace 分类。
 Widget / Pointer Modifier 作为独立帮助内容，不伪装成可重绑定的 Action。
 
 S2 由 `StudioUserKeymap` 协调用户覆盖记录、整表验证和 Router 替换；Vue Binding 订阅成功
@@ -85,30 +87,48 @@ Project Menu 在打开导航确认或 Keyboard shortcuts Dialog 前，先关闭�
 
 以下为产品规则说明；运行时权威是 `STUDIO_SHORTCUT_POLICIES`，UI 不从本文读取。
 
-| Action ID                                            | 默认 Binding               | Context / 能力                                                         |
-| ---------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------- |
-| `project.save`                                       | `Mod+S`                    | Ready、dirty 且不在 Saving 的 Workbench                                |
-| `history.undo`                                       | `Mod+Z`                    | Workbench 可以 Undo；允许 Repeat                                       |
-| `history.redo`                                       | `Mod+Shift+Z`、`Control+Y` | Workbench 可以 Redo；允许 Repeat                                       |
-| `playback.toggle`                                    | `Space`                    | 当前项目可播放且不在 Loading                                           |
-| `playback.return-to-last-start-position`             | 未分配                     | Playback 允许 Return                                                   |
-| `projects.show`                                      | 未分配                     | Ready Workbench，没有等待中的返回导航                                  |
-| `project.import-midi` / `project.import-midi-tracks` | 未分配                     | Ready Workbench，文件选择／导入能力可用                                |
-| `midi-editor.open`                                   | 未分配                     | 当前 Workspace 的 Dock 能力可用                                        |
-| `editor.selection.delete`                            | `Backspace`、`Delete`      | 聚焦 Note／CC64 的非空选择，或聚焦且选中的后续 Tempo Event；无活动手势 |
-| `editor.selection.clear`                             | `Escape`                   | 聚焦区域有选择且支持 Clear；无活动手势                                 |
-| `interaction.cancel`                                 | `Escape`                   | 活动 Note／CC64／Tempo／Locate 交互                                    |
-| `arrangement.clip.open`                              | `Enter`                    | 聚焦的 Arrangement MIDI Clip                                           |
-| `arrangement.clip.create`                            | `Enter`                    | 聚焦的 Arrangement Track Bar                                           |
-| `piano-roll.tool.cursor` / `piano-roll.tool.pencil`  | 未分配                     | 聚焦的 Piano Roll                                                      |
-| `piano-roll.snap.toggle`                             | 未分配                     | 聚焦的 Piano Roll                                                      |
-| `notifications.focus`                                | `F8`                       | Global                                                                 |
-| `shortcuts.show`                                     | 未分配                     | Global                                                                 |
+| Action ID                                           | 默认 Binding               | Context / 能力                                                         |
+| --------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------- |
+| `project.save`                                      | `Mod+S`                    | Ready、dirty 且不在 Saving 的 Workbench                                |
+| `history.undo`                                      | `Mod+Z`                    | Workbench 可以 Undo；允许 Repeat                                       |
+| `history.redo`                                      | `Mod+Shift+Z`、`Control+Y` | Workbench 可以 Redo；允许 Repeat                                       |
+| `playback.toggle`                                   | `Space`                    | 当前项目可播放且不在 Loading                                           |
+| `playback.return-to-last-start-position`            | `Home`                     | Playback 允许 Return                                                   |
+| `projects.show`                                     | `Mod+Alt+O`                | Ready Workbench，没有等待中的返回导航                                  |
+| `project.import-midi`                               | `Mod+Alt+Shift+M`          | Ready Workbench，作为新项目导入 MIDI 的能力可用                        |
+| `project.import-midi-tracks`                        | `Mod+I`                    | Ready Workbench，作为新轨道导入 MIDI 的能力可用                        |
+| `midi-editor.open`                                  | `P`                        | 当前 Workspace 的 Dock 能力可用                                        |
+| `editor.selection.delete`                           | `Backspace`、`Delete`      | 聚焦 Note／CC64 的非空选择，或聚焦且选中的后续 Tempo Event；无活动手势 |
+| `editor.selection.clear`                            | `Escape`                   | 聚焦区域有选择且支持 Clear；无活动手势                                 |
+| `interaction.cancel`                                | `Escape`                   | 活动 Note／CC64／Tempo／Locate 交互                                    |
+| `arrangement.clip.open`                             | `Enter`                    | 聚焦的 Arrangement MIDI Clip                                           |
+| `arrangement.clip.create`                           | `Enter`                    | 聚焦的 Arrangement Track Bar                                           |
+| `piano-roll.tool.cursor` / `piano-roll.tool.pencil` | `1` / `8`                  | 聚焦的 Piano Roll                                                      |
+| `piano-roll.snap.toggle`                            | `J`                        | 聚焦的 Piano Roll                                                      |
+| `notifications.focus`                               | `F8`                       | Global                                                                 |
+| `shortcuts.show`                                    | `Alt+K`                    | Global                                                                 |
 
-共 19 个 Action，10 个有默认键位，9 个未分配。除 Undo / Redo 外，长按不会重复调用。
+共 19 个 Action，均有默认键位。用户仍可解除任意绑定；除 Undo / Redo 外，长按不会重复调用。
 S1 在首份用户 Keymap 持久化之前，把旧 `piano-roll.selection.*` 和
 `piano-roll.interaction.cancel` 泛化；没有持久化消费者需要兼容旧 ID。Track Note 区域
 仍无完整 Note Selection，不能用其焦点删除旧 CC64 选择；Tempo 初始事件仍不可删除。
+
+默认政策参考主流 DAW 的现有习惯，同时适配浏览器：
+
+- `1` / `8` 沿用 [Cubase 的 Object Selection / Draw 工具键](https://www.steinberg.help/r/cubase-ai/15.0/en/cubase_nuendo/topics/key_commands/key_commands_tool_category_c.html)，
+  `J` 沿用 [Cubase 的 Snap 开关](https://www.steinberg.help/r/cubase-ai/15.0/en/cubase_nuendo/topics/key_commands/key_commands_edit_category_c.html)。
+- `P` 和 `Mod+I` 参考 [Logic Pro 的 Piano Roll 与 Import 入口](https://support.apple.com/en-mo/guide/logicpro/lgcp02bf31b6/12.3/mac/15.6)，
+  `Alt+K` 参考其 [Key Commands 入口](https://support.apple.com/en-asia/guide/logicpro/lgcp32e85cd9/10.7/mac/11.0)。
+  Seele 的 `P` 只打开／恢复已有 Dock，不把当前 Action 改成关闭切换。
+- `Home` 采用返回播放位置的易记语义；Seele 仍返回最后启动位置，不改变为项目零点。
+  这是产品自己的映射，不宣称与其他 DAW 的 Home 行为完全一致。
+- `Mod+Alt+O` 和 `Mod+Alt+Shift+M` 是 Seele 的 Projects / MIDI 新项目入口。
+  避开 Chrome 的 `Mod+O` 打开文件、`Mod+Shift+M` 切换用户，以及 macOS 的
+  `Mod+Alt+I` Developer Tools、`Mod+Alt+Shift+I` 浏览器反馈。
+
+新增默认值只影响跟随默认的条目，不重写已有用户记录；原来的显式覆盖和主动解除仍保留，
+加载时继续通过既有冲突验证。Project 菜单读取相同有效键位；Undo / Redo 是否可执行取决于
+当前 Project History，禁用时显示原因，不能仅因分配了快捷键就强制启用。
 
 ## 5. 失败与释放
 
@@ -193,13 +213,27 @@ Action，不保存用户设置，也不接触 Project。
   Binding。库自身没有完整处理这些条件，因此过滤放在窄 Browser Adapter 中。
 - 完成、取消、焦点离开、Window blur、页面隐藏、组件卸载或应用释放时，清理录制监听与
   本次暂停令牌。旧 cancel 不能结束新录制；Dialog 自己的暂停令牌不受录制结束影响。
-- 录制启动失败同样清理资源并保留草稿。保存按钮在录制期间禁用；结果仍需显式保存才生效。
+- 录制启动失败同样清理资源并保留草稿；结果仍需显式保存才生效。
+
+编辑使用独立详情区，暂时隐藏目录与筛选。每行只放键位输入、Record、Special key 与 Remove；
+Add 位于行列表下方。页脚将 Restore 与 Cancel editing / Save shortcuts 分组，Restore 先加载
+默认值到草稿，保存后才删除用户覆盖；取消可丢弃恢复操作。未改动时禁用 Save，已是默认时
+禁用 Restore。录制时显示高亮的 Listening 状态与当前 Key 编号；输入、Special key、Remove、
+Add、Restore、Cancel editing 和 Save 全部禁用，只保留 Stop recording、Escape 与关闭窗口。
+
+筛选与特殊键选择统一使用 Studio 的 `UiSelect`。Reka Select 负责键盘、焦点与定位，
+`UiMenuSurface` 和自有样式负责背景、间距、边框及状态；不读取 Reka 专属 CSS 变量。
 
 上述 Escape / Delete 和 portable Mod 行为依据已安装的 `0.8.0` 源码与
 [TanStack 录制指南](https://tanstack.com/hotkeys/latest/docs/framework/vue/guides/hotkey-recording)。
-对常见浏览器／系统组合提供非阻断提示；列表是有限提醒，不是平台保留键的完整数据库。
-浏览器未交付的事件无法被页面录制或覆盖，用户仍可手动输入。浏览器组合参考
-[Chrome keyboard shortcuts](https://support.google.com/chrome/answer/157179?hl=en)。
+对常见浏览器／系统组合按平台提供具体的非阻断提示，例如 `Mod+Shift+C` 会说明可能唤起
+Developer Tools / Inspect Element。依据是 [Chrome 快捷键表](https://support.google.com/chrome/answer/157179?hl=en)
+和 [DevTools 快捷键表](https://developer.chrome.com/docs/devtools/shortcuts)。列表是有限提醒，
+没有提示不代表保证有效；系统改键、扩展和其他浏览器仍可能截获输入。手动输入只解决
+无法录制的问题，不能令被截获的组合变得可用。
+
+网页没有通用接口提前枚举所有被占用的组合。[Keyboard Lock](https://developer.chrome.com/docs/capabilities/web-apis/keyboard-lock)
+也受操作系统限制，并要求 JavaScript 发起的全屏；本阶段不为录制切换全屏或尝试抢占系统键。
 
 ## 9. 冲突预览与重新分配
 
@@ -225,3 +259,13 @@ Action，不保存用户设置，也不接触 Project。
 撤销当前确认；Escape 依次退出重新分配确认、编辑草稿、Settings Dialog。录制中的 Escape
 在这一层级之前被 Recorder 接管。macOS / Windows / Linux 的 Mod 与别名冲突由自动测试
 验证，真实浏览器 smoke 范围单独记在阶段计划中。
+
+## 10. Sequence 的产品决定
+
+[VS Code 的 Chord 与 Source](https://code.visualstudio.com/docs/configure/keybindings) 分别解决
+组合空间不足与配置来源追踪。Source 已有真实需求，本批接入 `Default` / `User`。19 个 Action
+目前没有组合空间不足的问题，本批暂不实现 `Mod+K` 后再按 `Mod+S` 的 Sequence。
+
+将来出现足够多的分组动作时，Sequence 应作为独立批次定义：首键提示与等待时间、Escape／
+失焦取消、错误后续键、单键与前缀冲突、Context 变化和可访问反馈。不能仅把超时 Listener
+叠加到当前 Router；也不提前改变 version 1 单组合存储协议。

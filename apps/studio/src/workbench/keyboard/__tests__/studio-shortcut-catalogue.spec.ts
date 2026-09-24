@@ -20,9 +20,9 @@ describe('Shortcut catalogue', () => {
       rows.every((row) => row.label && row.description && row.categoryLabel && row.contextLabel),
     ).toBe(true)
     expect(rows.every((row) => Object.isFrozen(row.keywords))).toBe(true)
-    expect(queryStudioShortcuts(runtime.actions, runtime.keyboard, '', 'assigned')).toHaveLength(10)
+    expect(queryStudioShortcuts(runtime.actions, runtime.keyboard, '', 'assigned')).toHaveLength(19)
     expect(queryStudioShortcuts(runtime.actions, runtime.keyboard, '', 'unassigned')).toHaveLength(
-      9,
+      0,
     )
   })
 

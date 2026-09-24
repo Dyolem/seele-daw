@@ -11,6 +11,7 @@ import {
 } from 'reka-ui'
 import DismissIcon from '~icons/fluent/dismiss-20-regular'
 import UiButton from '@/ui/components/UiButton.vue'
+import UiSelect from '@/ui/components/UiSelect.vue'
 import StudioShortcutEditor from '@/features/keyboard-shortcuts/StudioShortcutEditor.vue'
 import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
@@ -27,6 +28,12 @@ const open = defineModel<boolean>('open', { required: true })
 const { actions, keyboard, userKeymap, keymapState } = useStudioActions()
 const search = shallowRef('')
 const assignment = shallowRef<'all' | 'assigned' | 'unassigned' | 'modified'>('all')
+const assignmentOptions = [
+  { value: 'all', label: 'All actions' },
+  { value: 'assigned', label: 'Assigned' },
+  { value: 'unassigned', label: 'Unassigned' },
+  { value: 'modified', label: 'User overrides' },
+] as const
 const searchField = useTemplateRef<HTMLInputElement>('searchField')
 const rows = computed(() =>
   queryStudioShortcuts(
@@ -148,7 +155,7 @@ function restoreFocus(event: Event): void {
             ><UiIconButton :icon="DismissIcon" label="Close keyboard shortcuts"
           /></DialogClose>
         </header>
-        <div class="studio-shortcuts__filters">
+        <div v-show="!editing" class="studio-shortcuts__filters">
           <input
             ref="searchField"
             v-model="search"
@@ -156,16 +163,15 @@ function restoreFocus(event: Event): void {
             aria-label="Search keyboard shortcuts"
             placeholder="Search actions, keys, or editor…"
           />
-          <select v-model="assignment" aria-label="Filter shortcut assignment">
-            <option value="all">All actions</option>
-            <option value="assigned">Assigned</option>
-            <option value="unassigned">Unassigned</option>
-            <option value="modified">Modified</option>
-          </select>
+          <UiSelect
+            v-model="assignment"
+            :options="assignmentOptions"
+            aria-label="Filter shortcut assignment"
+          />
           <span role="status">{{ rows.length }} / {{ actions.catalogue.length }} actions</span>
         </div>
         <div class="studio-shortcuts__body">
-          <div class="studio-shortcuts__settings">
+          <div v-show="!editing" class="studio-shortcuts__settings">
             <UiButton size="small" @click="requestRestoreAll">{{
               keymapState.canEdit ? 'Restore all defaults' : 'Reset saved record'
             }}</UiButton>
@@ -200,7 +206,7 @@ function restoreFocus(event: Event): void {
             :action="editing"
             @close="closeEditor"
           />
-          <table v-if="rows.length" class="studio-shortcuts__table">
+          <table v-if="rows.length" v-show="!editing" class="studio-shortcuts__table">
             <caption class="studio-shortcuts__caption">
               Current shortcuts · default bindings · local changes
             </caption>
@@ -209,6 +215,7 @@ function restoreFocus(event: Event): void {
                 <th scope="col">Action</th>
                 <th scope="col">Current</th>
                 <th scope="col">Default</th>
+                <th scope="col">Source</th>
                 <th scope="col">Where it works</th>
                 <th scope="col">Customize</th>
               </tr>
@@ -218,9 +225,7 @@ function restoreFocus(event: Event): void {
                 <th scope="row">
                   <strong>{{ row.label }}</strong
                   ><span>{{ row.description }}</span
-                  ><small
-                    >{{ row.categoryLabel }} · {{ row.modified ? 'Modified' : 'Default' }}</small
-                  >
+                  ><small>{{ row.categoryLabel }}</small>
                   <small v-if="rejectedMessage(row.actionId)"
                     >{{ rejectedMessage(row.actionId) }} Using defaults.</small
                   >
@@ -237,6 +242,10 @@ function restoreFocus(event: Event): void {
                     >Unassigned</span
                   >
                 </td>
+                <td class="studio-shortcuts__source">
+                  {{ row.modified && !rejectedMessage(row.actionId) ? 'User' : 'Default' }}
+                  <small v-if="rejectedMessage(row.actionId)">User override not applied</small>
+                </td>
                 <td>
                   {{ row.contextLabel }}<small v-if="row.allowRepeat">Repeats while held</small>
                 </td>
@@ -252,10 +261,10 @@ function restoreFocus(event: Event): void {
               </tr>
             </tbody>
           </table>
-          <p v-else class="studio-shortcuts__empty">
+          <p v-else-if="!editing" class="studio-shortcuts__empty">
             No matching actions. Try a different search or filter.
           </p>
-          <details class="studio-shortcuts__help">
+          <details v-show="!editing" class="studio-shortcuts__help">
             <summary>Controls and gesture modifiers</summary>
             <p>
               These keys follow the focused control or pointer gesture. They are separate from
@@ -324,8 +333,9 @@ function restoreFocus(event: Event): void {
   gap: var(--sd-space-3);
   padding: 0 var(--sd-space-6) var(--sd-space-4);
 }
-.studio-shortcuts__filters input,
-.studio-shortcuts__filters select {
+.studio-shortcuts__filters input {
+  flex: 1;
+  min-inline-size: 12rem;
   min-block-size: var(--sd-control-height-md);
   border: 1px solid var(--sd-color-border-default);
   border-radius: var(--sd-radius-md);
@@ -334,10 +344,6 @@ function restoreFocus(event: Event): void {
   padding: var(--sd-space-2) var(--sd-space-3);
   font: inherit;
   font-size: var(--sd-font-size-sm);
-}
-.studio-shortcuts__filters input {
-  flex: 1;
-  min-inline-size: 12rem;
 }
 .studio-shortcuts__filters :focus-visible,
 .studio-shortcuts__help summary:focus-visible {
@@ -462,34 +468,6 @@ function restoreFocus(event: Event): void {
   }
   .studio-shortcuts__header,
   .studio-shortcuts__filters,
-  .studio-shortcuts__settings {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sd-space-3);
-    margin-block-end: var(--sd-space-3);
-    font-size: var(--sd-font-size-sm);
-  }
-  .studio-shortcuts__notice,
-  .studio-shortcuts__body > [role='alert'] {
-    font-size: var(--sd-font-size-sm);
-    color: var(--sd-color-text-secondary);
-  }
-  .studio-shortcuts__reset {
-    padding: var(--sd-space-3);
-    margin-block-end: var(--sd-space-3);
-    border: 1px solid var(--sd-color-border-strong);
-    border-radius: var(--sd-radius-md);
-    background: var(--sd-color-surface-sunken);
-    font-size: var(--sd-font-size-sm);
-  }
-  .studio-shortcuts__reset p {
-    margin-block-start: 0;
-  }
-  .studio-shortcuts__reset [role='alert'] {
-    color: var(--sd-color-state-danger);
-    margin-block: var(--sd-space-3) 0;
-  }
   .studio-shortcuts__body {
     padding-inline: var(--sd-space-4);
   }

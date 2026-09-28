@@ -1,7 +1,7 @@
 import type {
   StudioKeyboardBinding,
   StudioKeyboardBindingValidation,
-} from '@/workbench/keyboard/studio-keyboard-binding'
+} from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 
 export type StudioKeyboardDispose = () => void
 

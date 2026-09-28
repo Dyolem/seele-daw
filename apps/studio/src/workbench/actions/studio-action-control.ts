@@ -1,6 +1,6 @@
 import type { StudioActionId, StudioActionPresentation } from '@/workbench/actions/studio-action'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
+import type { StudioKeyboardInput } from '@/workbench/keyboard'
 
 export interface StudioActionControl extends StudioActionPresentation {
   readonly actionId: StudioActionId

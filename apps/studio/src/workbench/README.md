@@ -18,6 +18,8 @@ Composition Root 可以知道并装配全部领域包与浏览器实现。
 
 详见 [Studio Action Architecture](../../docs/studio-action-architecture.md) 和
 [Studio Keyboard Shortcut Architecture](../../docs/studio-keyboard-shortcut-architecture.md)。
+Keyboard 的目录职责、公开入口与两条阅读主线见 [Keyboard 模块导读](./keyboard/README.md)；
+功能组件从 `@/workbench/keyboard` 引用，bootstrap 从 `@/workbench/keyboard/setup` 装配。
 
 当前应用级能力还包括 `ProjectPlaybackCoordinator`：
 

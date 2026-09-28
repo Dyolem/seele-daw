@@ -1,0 +1,11 @@
+/** Composition-only entry. Importing this module does not create instances or register input. */
+export type { StudioKeyboardKeymap } from './contracts/studio-keyboard-binding'
+export type { StudioKeyboardBindingRegistry } from './contracts/studio-keyboard-binding-registry'
+export type { StudioUserKeymapStorage } from './contracts/studio-user-keymap-storage'
+export { STUDIO_DEFAULT_KEYMAP } from './keymap/studio-default-keymap'
+export { createStudioKeyboardInputRouter } from './runtime/studio-keyboard-input-router'
+export { createStudioUserKeymap } from './runtime/studio-user-keymap'
+export { createBrowserTanStackHotkeyRegistry } from './browser/browser-tanstack-hotkey-registry'
+export { createBrowserStudioShortcutRecorder } from './browser/browser-tanstack-hotkey-recorder'
+export { createBrowserUserKeymapStorage } from './browser/browser-user-keymap-storage'
+export { createStudioKeyboardVueBinding } from './vue/studio-keyboard-vue-binding'

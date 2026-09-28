@@ -17,7 +17,7 @@ import {
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
 import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
-import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
+import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 

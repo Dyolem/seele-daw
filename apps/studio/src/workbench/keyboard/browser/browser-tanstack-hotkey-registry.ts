@@ -10,16 +10,16 @@ import {
   type HotkeyManager,
 } from '@tanstack/hotkeys'
 
-import { StudioKeyboardShortcutError } from '@/workbench/keyboard/studio-keyboard-shortcut-error'
+import { StudioKeyboardShortcutError } from '@/workbench/keyboard/browser/studio-keyboard-shortcut-error'
 
 import type {
   StudioKeyboardBinding,
   StudioKeyboardBindingValidation,
-} from '@/workbench/keyboard/studio-keyboard-binding'
+} from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import type {
   StudioKeyboardBindingRegistry,
   StudioKeyboardDispose,
-} from '@/workbench/keyboard/studio-keyboard-binding-registry'
+} from '@/workbench/keyboard/contracts/studio-keyboard-binding-registry'
 
 export type StudioKeyboardPlatform = 'linux' | 'mac' | 'windows'
 

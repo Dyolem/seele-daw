@@ -1,4 +1,4 @@
-import type { StudioKeyboardContext } from '@/workbench/keyboard/studio-keyboard-context'
+import type { StudioKeyboardContext } from '@/workbench/keyboard/keymap/studio-keyboard-context'
 
 /** Native activation and composite-widget navigation take precedence over application shortcuts. */
 export function isWidgetOwnedKeyboardInput(

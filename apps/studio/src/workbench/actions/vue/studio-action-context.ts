@@ -1,14 +1,12 @@
 import { inject, onBeforeUnmount, watch, type InjectionKey, type ComputedRef } from 'vue'
 
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
-
 import type {
+  StudioKeyboardInput,
   StudioUserKeymap,
   StudioUserKeymapState,
-} from '@/workbench/keyboard/studio-user-keymap'
-
-import type { StudioShortcutRecorder } from '@/workbench/keyboard/browser-tanstack-hotkey-recorder'
+  StudioShortcutRecorder,
+} from '@/workbench/keyboard'
 
 export interface StudioActionVueContext {
   readonly shortcutRecorder: StudioShortcutRecorder

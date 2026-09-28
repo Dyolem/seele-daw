@@ -20,8 +20,9 @@ import {
 import {
   createBrowserUserKeymapStorage,
   type StudioUserKeymapStorage,
-} from '@/workbench/keyboard/browser-user-keymap-storage'
-import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
+  createBrowserTanStackHotkeyRegistry,
+  type StudioKeyboardBindingRegistry,
+} from '@/workbench/keyboard/setup'
 import {
   createStudioActionRuntime,
   type StudioActionRuntime,
@@ -32,7 +33,6 @@ import {
 } from '@/features/project-workspace/actions/project-workbench-action-context'
 import { PIANO_ROLL_TOOL_ACTION_TARGET_KEY } from '@/features/piano-roll/actions/piano-roll-action-context'
 import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
-import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/studio-keyboard-binding-registry'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createStudioMidiImportInstrumentDevice } from '@/workbench/instrument/midi-import-instrument-policy'
 import {

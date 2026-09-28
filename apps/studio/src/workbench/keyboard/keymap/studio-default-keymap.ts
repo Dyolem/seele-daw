@@ -2,9 +2,9 @@ import {
   defineStudioKeyboardBinding,
   type StudioKeyboardBinding,
   type StudioKeyboardKeymap,
-} from '@/workbench/keyboard/studio-keyboard-binding'
+} from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import { STUDIO_ACTION, type StudioActionId } from '@/workbench/actions/studio-action'
-import type { StudioKeyboardContext } from '@/workbench/keyboard/studio-keyboard-context'
+import type { StudioKeyboardContext } from '@/workbench/keyboard/keymap/studio-keyboard-context'
 
 export interface StudioShortcutPolicy {
   readonly context: StudioKeyboardContext

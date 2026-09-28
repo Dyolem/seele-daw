@@ -8,11 +8,54 @@ import {
   type StudioActionCompletion,
   type StudioActionFailure,
 } from '@/workbench/actions/studio-action'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/studio-default-keymap'
-import { defineStudioKeyboardBinding } from '@/workbench/keyboard/studio-keyboard-binding'
+import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
 
 describe('Studio keyboard input routing', () => {
+  it('keeps forwarded callbacks bound to their owner across keymap replacement', () => {
+    const first = createTestStudioActionRuntime()
+    const second = createTestStudioActionRuntime()
+    const firstFocus = vi.fn<() => void>()
+    const secondFocus = vi.fn<() => void>()
+    first.runtime.interfaceTarget.bind({ focusNotifications: firstFocus, showShortcuts: () => {} })
+    second.runtime.interfaceTarget.bind({
+      focusNotifications: secondFocus,
+      showShortcuts: () => {},
+    })
+    vi.spyOn(first.bindingRegistry, 'formatForDisplay').mockImplementation(
+      (binding) => `first:${binding}`,
+    )
+
+    const { formatBinding, validateBindingInput, displayBindingsFor, suspend } =
+      first.runtime.keyboard
+    expect([defineStudioKeyboardBinding('F9')].map(formatBinding)).toEqual(['first:F9'])
+    expect(validateBindingInput('F9').binding).toBe('F9')
+    const release = suspend()
+    expect(first.runtime.userKeymap.setBindings(STUDIO_ACTION.NOTIFICATIONS_FOCUS, ['F9'])).toEqual(
+      {
+        status: 'saved',
+      },
+    )
+    expect(displayBindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['first:F9'])
+    expect(second.runtime.keyboard.displayBindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([
+      'display:F8',
+    ])
+    expect(first.bindingRegistry.dispatch('F9').defaultPrevented).toBe(false)
+    expect(second.bindingRegistry.dispatch('F8').defaultPrevented).toBe(true)
+    expect(firstFocus).not.toHaveBeenCalled()
+    expect(secondFocus).toHaveBeenCalledOnce()
+
+    release()
+    release()
+    expect(first.bindingRegistry.dispatch('F9').defaultPrevented).toBe(true)
+    expect(firstFocus).toHaveBeenCalledOnce()
+    first.runtime.dispose()
+    expect(first.bindingRegistry.listeners.size).toBe(0)
+    expect(second.bindingRegistry.dispatch('F8').defaultPrevented).toBe(true)
+    expect(secondFocus).toHaveBeenCalledTimes(2)
+  })
+
   it('cancels a gesture before clearing selection, without coupling the two Actions', () => {
     const { runtime, bindingRegistry } = createTestStudioActionRuntime()
     let interacting = true

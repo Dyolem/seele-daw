@@ -5,9 +5,9 @@ import {
   createBrowserTanStackHotkeyRegistry,
   parseStudioKeyboardBinding,
   validateStudioKeyboardBinding,
-} from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
-import { defineStudioKeyboardBinding } from '@/workbench/keyboard/studio-keyboard-binding'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
+} from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
+import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
+import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/keymap/studio-default-keymap'
 
 afterEach(() => {
   HotkeyManager.resetInstance()

@@ -4,8 +4,8 @@ import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import {
   createBrowserTanStackHotkeyRegistry,
   type StudioKeyboardPlatform,
-} from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
-import type { StudioShortcutRecordingResult } from '@/workbench/keyboard/browser-tanstack-hotkey-recorder'
+} from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
+import type { StudioShortcutRecordingResult } from '@/workbench/keyboard/contracts/studio-shortcut-recorder'
 import { createTestUserKeymapStorage } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
 
 afterEach(() => {

@@ -1,12 +1,12 @@
-import { validateStudioKeyboardBinding } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
+import { validateStudioKeyboardBinding } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import type {
   StudioKeyboardBindingRegistry,
   StudioKeyboardDispose,
-} from '@/workbench/keyboard/studio-keyboard-binding-registry'
+} from '@/workbench/keyboard/contracts/studio-keyboard-binding-registry'
 import type {
   StudioKeyboardBinding,
   StudioKeyboardBindingValidation,
-} from '@/workbench/keyboard/studio-keyboard-binding'
+} from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 
 export class TestStudioKeyboardBindingRegistry implements StudioKeyboardBindingRegistry {
   readonly listeners = new Map<string, (event: KeyboardEvent) => void>()

@@ -1,8 +1,8 @@
 # Studio Keyboard Input 架构
 
-> 状态：WA1–WA4、Input Foundation S1–S3 已审核提交；快捷键体验修订已通过用户审核
+> 状态：WA1–WA4、Input Foundation S1–S3 与快捷键体验修订已审核提交；模块组织重构已通过用户审核
 >
-> 日期：2026-09-23
+> 日期：2026-09-28
 >
 > 范围：`apps/studio`
 
@@ -24,6 +24,32 @@ KeyboardEvent
 TanStack Adapter 不知道业务 Action、Selection 或 Modal。Router 不执行 Command、不保存
 业务状态，也不把焦点判断变成所有菜单调用的 enabled 条件。Composition Root 创建并释放
 目录、目标槽位和唯一物理键位表；视图切换只改变目标，不重复注册 Listener。
+
+### 1.1 模块入口与目录
+
+`keyboard/index.ts` 是功能消费者的唯一生产入口，明确导出输入、编辑和录制契约，以及实际
+需要的政策与目录查询；不导出构造函数、Router 替换、存储实现或资源销毁。`keyboard/setup.ts`
+仅供 Studio bootstrap 导入已有构造函数和注入 Port；Composition Root 继续实际创建与释放实例。
+
+内部按 `contracts/`、`keymap/`、`runtime/`、`browser/` 和 `vue/` 组织；内部文件直接互引，
+不反向经过公开入口。共享 Storage、Recorder 和 User Keymap 契约独立于实现文件，公开能力
+不再由实现的 `ReturnType` 决定。Router 和 User Keymap 的生命周期接口只在装配与适配中使用。
+
+架构检查限制外部深层引用、入口通配导出、内部反向引用以及分层依赖；测试仍可访问内部
+实现。具体文件地图、依赖矩阵和按键／改键两条阅读主线见
+[Keyboard 模块导读](../src/workbench/keyboard/README.md)。本批保持 Action ID、默认键位、
+存储 version 1、输入归属与录制语义不变。
+
+### 1.2 有状态实例的实现
+
+Input Router 与 User Keymap 使用模块内的 class 实现，分别拥有注册／暂停／替换状态和
+用户记录／快照／订阅／保存状态；这些状态及内部算法通过 `#` 私有成员组织。公开能力仍
+按现有接口暴露，并通过箭头函数字段保持实例绑定，支持 Vue 转发及单独传递回调。
+
+已有创建入口继续返回接口类型：Router 在首次注册成功后返回，部分注册失败仍完整回滚；
+User Keymap 在建立初始快照后返回，保留加载回退和版本化存储语义。class 不进入 Vue 深代理，
+资源生命周期仍由 Composition Root 管理。默认政策与纯计算保留函数形式，单次暂停、订阅
+和保存过程保留各自的局部闭包。
 
 ## 2. 可查询目录与默认政策
 

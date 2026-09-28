@@ -15,13 +15,13 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import KeyboardIcon from '~icons/fluent/keyboard-20-regular'
 import ArrowResetIcon from '~icons/fluent/arrow-reset-20-regular'
 import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
-import type {
-  StudioUserKeymapResult,
-  StudioUserKeymapState,
-} from '@/workbench/keyboard/studio-user-keymap'
-import type { StudioKeyboardRelation } from '@/workbench/keyboard/studio-keyboard-routes'
-import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/studio-default-keymap'
-import { STUDIO_KEYBOARD_CONTEXTS } from '@/workbench/keyboard/studio-keyboard-context'
+import {
+  type StudioUserKeymapResult,
+  type StudioUserKeymapState,
+  type StudioKeyboardRelation,
+  STUDIO_SHORTCUT_POLICIES,
+  STUDIO_KEYBOARD_CONTEXTS,
+} from '@/workbench/keyboard'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 
 const props = defineProps<{ action: StudioActionDescriptor }>()

@@ -4,6 +4,7 @@ import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
 import { presentStudioAction } from '@/workbench/actions/studio-action-control'
+import type { StudioUserKeymapState } from '@/workbench/keyboard'
 import {
   createTestUserKeymapStorage,
   TestStudioKeyboardBindingRegistry,
@@ -11,7 +12,7 @@ import {
 import {
   createBrowserUserKeymapStorage,
   STUDIO_USER_KEYMAP_STORAGE_KEY,
-} from '@/workbench/keyboard/browser-user-keymap-storage'
+} from '@/workbench/keyboard/browser/browser-user-keymap-storage'
 
 const notifications = STUDIO_ACTION.NOTIFICATIONS_FOCUS
 const save = STUDIO_ACTION.PROJECT_SAVE
@@ -20,6 +21,52 @@ const record = (overrides: Record<string, unknown>): string =>
   JSON.stringify({ version: 1, overrides })
 
 describe('Studio user keymap', () => {
+  it('keeps detached editing and subscription capabilities isolated between instances', () => {
+    const first = createTestStudioActionRuntime()
+    const second = createTestStudioActionRuntime()
+    const {
+      bindingsForEditing,
+      inspectBindings,
+      setBindings,
+      restoreAction,
+      restoreAll,
+      subscribe,
+      dispose,
+    } = first.runtime.userKeymap
+    const firstPublished = vi.fn<(state: StudioUserKeymapState) => void>()
+    const secondPublished = vi.fn<(state: StudioUserKeymapState) => void>()
+    const unsubscribe = subscribe(firstPublished)
+    second.runtime.userKeymap.subscribe(secondPublished)
+
+    expect(inspectBindings(notifications, ['F9']).error).toBeNull()
+    expect(setBindings(notifications, ['F9'])).toEqual({ status: 'saved' })
+    expect(bindingsForEditing(notifications)).toEqual(['F9'])
+    expect(firstPublished).toHaveBeenCalledExactlyOnceWith(first.runtime.userKeymap.state)
+    expect(secondPublished).not.toHaveBeenCalled()
+    expect(second.storage.read()).toBeNull()
+    expect(second.runtime.userKeymap.bindingsForEditing(notifications)).toEqual(['F8'])
+
+    unsubscribe()
+    unsubscribe()
+    expect(restoreAction(notifications)).toEqual({ status: 'saved' })
+    expect(bindingsForEditing(notifications)).toEqual(['F8'])
+    expect(firstPublished).toHaveBeenCalledOnce()
+    subscribe(firstPublished)
+    dispose()
+    dispose()
+    expect(restoreAll()).toMatchObject({ status: 'rejected', code: 'unavailable' })
+    expect(setBindings(notifications, ['F10'])).toMatchObject({
+      status: 'rejected',
+      code: 'unavailable',
+    })
+    expect(first.storage.writes).toHaveLength(2)
+    expect(second.runtime.userKeymap.setBindings(notifications, ['F10'])).toEqual({
+      status: 'saved',
+    })
+    expect(secondPublished).toHaveBeenCalledExactlyOnceWith(second.runtime.userKeymap.state)
+    expect(firstPublished).toHaveBeenCalledOnce()
+  })
+
   it('distinguishes mutually exclusive contexts, explicit priorities and real overlap conflicts', () => {
     const { runtime, storage } = createTestStudioActionRuntime()
     const shared = runtime.userKeymap.inspectBindings(STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN, [

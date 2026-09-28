@@ -1,14 +1,12 @@
 import { computed, shallowRef } from 'vue'
-import type {
-  StudioKeyboardInput,
-  StudioKeyboardInputRouter,
-} from '@/workbench/keyboard/studio-keyboard-input-router'
-import type { StudioUserKeymap } from '@/workbench/keyboard/studio-user-keymap'
+import type { StudioKeyboardInput } from '@/workbench/keyboard/contracts/studio-keyboard-input'
+import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/runtime/studio-keyboard-input-router'
+import type { StudioUserKeymapRuntime } from '@/workbench/keyboard/runtime/studio-user-keymap'
 
 /** Vue observes the committed snapshot; components cannot replace physical registrations. */
 export function createStudioKeyboardVueBinding(
   router: StudioKeyboardInputRouter,
-  userKeymap: StudioUserKeymap,
+  userKeymap: StudioUserKeymapRuntime,
 ) {
   const state = shallowRef(userKeymap.state)
   const unsubscribe = userKeymap.subscribe((snapshot) => {

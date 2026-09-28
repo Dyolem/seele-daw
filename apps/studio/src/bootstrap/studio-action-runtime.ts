@@ -22,17 +22,17 @@ import {
 import type { StudioActionFailure, StudioActionId } from '@/workbench/actions/studio-action'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import { createStudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
-import { createBrowserStudioShortcutRecorder } from '@/workbench/keyboard/browser-tanstack-hotkey-recorder'
-import { createStudioUserKeymap } from '@/workbench/keyboard/studio-user-keymap'
-import { createStudioKeyboardVueBinding } from '@/workbench/keyboard/vue/studio-keyboard-vue-binding'
 import {
+  createBrowserStudioShortcutRecorder,
+  createStudioUserKeymap,
+  createStudioKeyboardVueBinding,
   createBrowserUserKeymapStorage,
   type StudioUserKeymapStorage,
-} from '@/workbench/keyboard/browser-user-keymap-storage'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/studio-default-keymap'
-import type { StudioKeyboardKeymap } from '@/workbench/keyboard/studio-keyboard-binding'
-import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/studio-keyboard-binding-registry'
-import { createStudioKeyboardInputRouter } from '@/workbench/keyboard/studio-keyboard-input-router'
+  STUDIO_DEFAULT_KEYMAP,
+  type StudioKeyboardKeymap,
+  type StudioKeyboardBindingRegistry,
+  createStudioKeyboardInputRouter,
+} from '@/workbench/keyboard/setup'
 
 export interface StudioActionRuntimeOptions {
   readonly bindingRegistry: StudioKeyboardBindingRegistry

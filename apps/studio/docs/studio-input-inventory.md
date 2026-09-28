@@ -21,8 +21,8 @@ Tempo / Locate Cancel、Clip / Bar Enter、Toast F8，以及 Cursor / Pencil / S
 
 ## 1. S1 前已进入 Action Catalogue 的快捷键
 
-默认键位权威是 [studio-default-keymap.ts](../src/workbench/keyboard/studio-default-keymap.ts)，
-执行和 Scope 分派见 [Input Router](../src/workbench/keyboard/studio-keyboard-input-router.ts)。
+默认键位权威是 [studio-default-keymap.ts](../src/workbench/keyboard/keymap/studio-default-keymap.ts)，
+执行和 Scope 分派见 [Input Router](../src/workbench/keyboard/runtime/studio-keyboard-input-router.ts)。
 `Mod` 在 macOS 表示 Command，在 Windows / Linux 表示 Control。
 
 | 功能                  | 当前 Action ID                  | 默认键位                   | 当前作用域               |

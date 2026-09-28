@@ -11,7 +11,7 @@ import {
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/studio-default-keymap'
+import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
 
 describe('Studio Action invocation', () => {
   it('exposes the immutable catalogue without mounting any target or supplying a key binding', () => {

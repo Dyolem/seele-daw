@@ -7,7 +7,7 @@ import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/sup
 import { DOMWrapper } from '@vue/test-utils'
 import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
 import { createTestUserKeymapStorage } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
-import type { StudioUserKeymapStorage } from '@/workbench/keyboard/browser-user-keymap-storage'
+import type { StudioUserKeymapStorage } from '@/workbench/keyboard/contracts/studio-user-keymap-storage'
 
 const cleanups: Array<() => void> = []
 afterEach(() => {

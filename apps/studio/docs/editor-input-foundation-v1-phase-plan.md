@@ -1,6 +1,6 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：计划已获批准；S1–S3 已审核提交；快捷键体验修订已通过用户审核；G1–G4 尚未实施
+> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已通过用户审核；G1–G4 尚未实施
 >
 > 日期：2026-09-11
 >
@@ -363,4 +363,26 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
   Type Check、167 个测试文件 / 1,548 项测试、Production Build 与 soundbank dist boundary。
   Studio 为 72 个文件 / 582 项测试；涵盖录制禁用、草稿恢复、有效来源及 macOS Option+K
   字符转换回归。文档本地链接 37 项通过，`git diff --check` 通过；没有新增 E2E。
-  构建保留已有大 chunk 提示；本批已通过用户审核，由本次提交交付。
+  构建保留已有大 chunk 提示；本批已通过用户审核，提交为 `42ceb06`。
+
+## 13. Keyboard 模块组织重构（2026-09-24，2026-09-28 已审核）
+
+- 用户批准在 G1 前完成独立的组织重构；现有文件按 contracts、keymap、runtime、browser
+  与 vue 分组，保留原有职责明确的文件名，不添加旧路径转发层。
+- 功能消费者统一从 `keyboard/index.ts` 引用；bootstrap 统一从 `keyboard/setup.ts` 装配。
+  两个入口均明确导出，实际实例创建、资源释放和业务目标连接仍在 Composition Root。
+- Storage、输入能力、Recorder、User Keymap 及冲突关系使用明确契约；组件侧类型不暴露
+  Router.replaceKeymap、用户配置订阅／销毁或 Recorder.dispose。
+- 架构检查约束模块入口和内部依赖，测试允许访问内部实现。新增边界规则回归接入
+  `lint:architecture`，验证入口、深层引用、反向依赖、测试支持隔离和明确导出。
+- 新增 [模块导读](../src/workbench/keyboard/README.md)，列出文件地图、依赖矩阵与两条阅读
+  主线；同步原有源码链接。默认键位、版本化存储、Action ID 与交互行为保持不变。
+- 用户进一步批准将 Input Router 与 User Keymap 改为模块内的 class，以私有字段、公开能力
+  和私有方法表达状态所有权及生命周期；创建入口与消费者接口保持一致。公开函数保留实例
+  绑定，单次暂停、订阅和事务继续使用局部闭包；纯计算模块保留普通函数。
+- 新增两项行为回归，验证单独传递的键盘／配置能力、多实例隔离，以及取消订阅、暂停释放
+  和销毁的归属。原有初始化回滚、事务顺序、加载回退及录制集成继续由既有回归覆盖。
+- class 调整后的 `pnpm check` 通过：包含 6 项架构规则回归、Lint、Format Check、Type Check、
+  167 个测试文件 / 1,550 项测试、Production Build 与 soundbank dist boundary；Studio 为
+  72 个文件 / 584 项测试。5 份文档的 56 项本地链接与 `git diff --check` 通过。
+- 构建保留已有大 chunk 提示；不新增 E2E。本批于 2026-09-28 通过用户审核，由本次提交交付。

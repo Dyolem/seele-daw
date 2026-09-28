@@ -1,10 +1,6 @@
-/** A separate preference record; never part of Project persistence or History. */
-export const STUDIO_USER_KEYMAP_STORAGE_KEY = 'seele.studio.user-keymap'
+import type { StudioUserKeymapStorage } from '@/workbench/keyboard/contracts/studio-user-keymap-storage'
 
-export interface StudioUserKeymapStorage {
-  read(): string | null
-  write(record: string): void
-}
+export const STUDIO_USER_KEYMAP_STORAGE_KEY = 'seele.studio.user-keymap'
 
 export function createBrowserUserKeymapStorage(
   getStorage: () => Pick<Storage, 'getItem' | 'setItem'> = () => window.localStorage,

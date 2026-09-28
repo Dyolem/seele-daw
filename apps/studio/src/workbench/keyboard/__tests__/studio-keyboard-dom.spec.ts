@@ -11,9 +11,9 @@ import {
   type StudioActionFailure,
 } from '@/workbench/actions/studio-action'
 import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
-import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
-import { createStudioKeyboardInputRouter } from '@/workbench/keyboard/studio-keyboard-input-router'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/studio-default-keymap'
+import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
+import { createStudioKeyboardInputRouter } from '@/workbench/keyboard/runtime/studio-keyboard-input-router'
+import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
 import { createTestUserKeymapStorage } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
 
 afterEach(() => {

@@ -4,9 +4,9 @@ import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
 import {
   STUDIO_SHORTCUT_POLICIES,
   createStudioKeyboardKeymap,
-} from '@/workbench/keyboard/studio-default-keymap'
-import { defineStudioKeyboardBinding } from '@/workbench/keyboard/studio-keyboard-binding'
-import { queryStudioShortcuts } from '@/workbench/keyboard/studio-shortcut-catalogue'
+} from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
+import { queryStudioShortcuts } from '@/workbench/keyboard/keymap/studio-shortcut-catalogue'
 
 describe('Shortcut catalogue', () => {
   it('lists every Action and its explicit default policy without mounting a feature', () => {

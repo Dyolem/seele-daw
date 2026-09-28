@@ -22,8 +22,8 @@ import {
   type StudioActionFailure,
 } from '@/workbench/actions/studio-action'
 import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
-import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser-tanstack-hotkey-registry'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/studio-default-keymap'
+import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
+import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
 
 const cleanups: Array<() => void> = []
 

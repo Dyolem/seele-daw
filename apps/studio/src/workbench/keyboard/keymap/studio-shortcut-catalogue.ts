@@ -1,8 +1,8 @@
 import type { StudioActionCategory, StudioActionId } from '@/workbench/actions/studio-action'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/studio-default-keymap'
-import { STUDIO_KEYBOARD_CONTEXTS } from '@/workbench/keyboard/studio-keyboard-context'
-import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
+import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { STUDIO_KEYBOARD_CONTEXTS } from '@/workbench/keyboard/keymap/studio-keyboard-context'
+import type { StudioKeyboardInput } from '@/workbench/keyboard/contracts/studio-keyboard-input'
 
 export const STUDIO_ACTION_CATEGORIES = Object.freeze({
   project: 'Project',

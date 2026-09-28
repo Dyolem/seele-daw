@@ -1,14 +1,18 @@
 import { HotkeyRecorder } from '@tanstack/hotkeys'
-import type { StudioKeyboardBinding } from '@/workbench/keyboard/studio-keyboard-binding'
-import type { StudioKeyboardInput } from '@/workbench/keyboard/studio-keyboard-input-router'
+import type { StudioKeyboardInput } from '@/workbench/keyboard/contracts/studio-keyboard-input'
+import type {
+  StudioShortcutRecorder,
+  StudioShortcutRecordingResult,
+} from '@/workbench/keyboard/contracts/studio-shortcut-recorder'
 
-export type StudioShortcutRecordingResult =
-  | { readonly status: 'recorded'; readonly binding: StudioKeyboardBinding }
-  | { readonly status: 'cleared' | 'cancelled' }
-  | { readonly status: 'failed'; readonly message: string }
+interface BrowserStudioShortcutRecorder extends StudioShortcutRecorder {
+  dispose(): void
+}
 
 /** One focused recording session; TanStack owns chord capture, Studio owns its input lifetime. */
-export function createBrowserStudioShortcutRecorder(keyboard: StudioKeyboardInput) {
+export function createBrowserStudioShortcutRecorder(
+  keyboard: StudioKeyboardInput,
+): BrowserStudioShortcutRecorder {
   let cancelCurrent: (() => void) | null = null
   let disposed = false
 
@@ -100,5 +104,3 @@ export function createBrowserStudioShortcutRecorder(keyboard: StudioKeyboardInpu
     },
   }
 }
-
-export type StudioShortcutRecorder = ReturnType<typeof createBrowserStudioShortcutRecorder>

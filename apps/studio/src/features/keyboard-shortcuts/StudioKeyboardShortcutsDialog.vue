@@ -19,10 +19,7 @@ import {
   useStudioActions,
   useStudioKeyboardLayer,
 } from '@/workbench/actions/vue/studio-action-context'
-import {
-  queryStudioShortcuts,
-  STUDIO_KEYBOARD_CONTROL_HELP,
-} from '@/workbench/keyboard/studio-shortcut-catalogue'
+import { queryStudioShortcuts, STUDIO_KEYBOARD_CONTROL_HELP } from '@/workbench/keyboard'
 
 const open = defineModel<boolean>('open', { required: true })
 const { actions, keyboard, userKeymap, keymapState } = useStudioActions()

@@ -1,21 +1,15 @@
 import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
-import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/studio-default-keymap'
+import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/keymap/studio-default-keymap'
 import type {
   StudioKeyboardBinding,
   StudioKeyboardKeymap,
-} from '@/workbench/keyboard/studio-keyboard-binding'
-import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/studio-keyboard-binding-registry'
+} from '@/workbench/keyboard/contracts/studio-keyboard-binding'
+import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/contracts/studio-keyboard-binding-registry'
+import type { StudioKeyboardRelation } from '@/workbench/keyboard/contracts/studio-keyboard-relation'
 import {
   STUDIO_KEYBOARD_CONTEXTS,
   studioKeyboardContextsOverlap,
-} from '@/workbench/keyboard/studio-keyboard-context'
-
-export interface StudioKeyboardRelation {
-  readonly kind: 'conflict' | 'exclusive' | 'priority'
-  readonly priorityActionId: StudioActionId | null
-  readonly binding: StudioKeyboardBinding
-  readonly actionIds: readonly [StudioActionId, StudioActionId]
-}
+} from '@/workbench/keyboard/keymap/studio-keyboard-context'
 
 export function analyzeStudioKeyboardRoutes(
   catalogue: readonly StudioActionDescriptor[],

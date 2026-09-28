@@ -1,6 +1,10 @@
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import {
+  studioKeyboardFileViolation,
+  studioKeyboardImportViolation,
+} from './studio-keyboard-boundaries.mjs'
 
 const root = process.cwd()
 const packageRoot = path.join(root, 'packages')
@@ -45,9 +49,9 @@ const modelStoreWriteAccessConsumers = new Set([
   'packages/project-core/src/mutation/mutation-applier.ts',
 ])
 const studioHotkeyAdapterFiles = new Set([
-  'apps/studio/src/workbench/keyboard/browser-tanstack-hotkey-registry.ts',
-  'apps/studio/src/workbench/keyboard/browser-tanstack-hotkey-recorder.ts',
-  'apps/studio/src/workbench/keyboard/studio-keyboard-binding.ts',
+  'apps/studio/src/workbench/keyboard/browser/browser-tanstack-hotkey-registry.ts',
+  'apps/studio/src/workbench/keyboard/browser/browser-tanstack-hotkey-recorder.ts',
+  'apps/studio/src/workbench/keyboard/contracts/studio-keyboard-binding.ts',
 ])
 const projectCoreCommandsDirectory = path.join(root, 'packages', 'project-core', 'src', 'commands')
 const errors = []
@@ -155,6 +159,8 @@ for (const file of await collectFiles(root)) {
 
   const source = await readFile(file, 'utf8')
   const relativeFile = path.relative(root, file).split(path.sep).join('/')
+  const keyboardFileViolation = studioKeyboardFileViolation(root, file, source)
+  if (keyboardFileViolation) errors.push(`${relativeFile}: ${keyboardFileViolation}`)
 
   if (path.dirname(file) === projectCoreCommandsDirectory) {
     errors.push(
@@ -163,6 +169,12 @@ for (const file of await collectFiles(root)) {
   }
 
   for (const specifier of importsFrom(source)) {
+    let localTarget = workspaceAliasTarget(specifier, workspaceDirectory)
+    if (specifier.startsWith('.')) localTarget = path.resolve(path.dirname(file), specifier)
+    else if (path.isAbsolute(specifier)) localTarget = specifier
+    const keyboardImportViolation = studioKeyboardImportViolation(root, file, localTarget)
+    if (keyboardImportViolation) errors.push(`${relativeFile}: ${keyboardImportViolation}`)
+
     if (
       /^@tanstack\/(?:hotkeys|vue-hotkeys|react-hotkeys)(?:\/|$)/u.test(specifier) &&
       !relativeFile.includes('/__tests__/') &&

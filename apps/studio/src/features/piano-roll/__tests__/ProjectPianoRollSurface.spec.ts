@@ -291,6 +291,8 @@ function mountSelectionMenuFixture(identity: string) {
   const noteIds = [480, 960].map(
     (tick) =>
       fixture.projectMidiNotes.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
         clipStartTick: parseTick(tick),
         pitch: parseMidiPitch(60),
@@ -588,6 +590,7 @@ describe('ProjectPianoRollSurface', () => {
       return unsubscribe
     })
     const session = {
+      modelRevision: 0 as ModelRevision,
       query: query as unknown as ProjectSession['query'],
       subscribe: subscribe as unknown as ProjectSession['subscribe'],
     }
@@ -711,7 +714,7 @@ describe('ProjectPianoRollSurface', () => {
     expect(wrapper.text()).toContain('0 selected')
 
     wrapper.unmount()
-    expect(unsubscribers).toHaveLength(4)
+    expect(unsubscribers).toHaveLength(10)
     expect(unsubscribers.every((unsubscribe) => unsubscribe.mock.calls.length === 1)).toBe(true)
     expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(false)
     expect(addMidiNote).not.toHaveBeenCalled()
@@ -719,17 +722,107 @@ describe('ProjectPianoRollSurface', () => {
     keyboard.runtime.dispose()
   })
 
+  it.each(['external-commit', 'viewport-size', 'surface-offset', 'session-switch'] as const)(
+    'releases a Note capture and ignores its late End after %s',
+    async (reason) => {
+      const fixture = mountSelectionMenuFixture(`note-invalidation-${reason}`)
+      await nextTick()
+      const note = fixture.markers('notes')[0]!
+      const host = fixture.wrapper.get<HTMLElement>('.project-piano-roll__canvas-host')
+      dispatchPointer(note.element, 'pointerdown', { clientX: 200, clientY: 120 })
+      dispatchPointer(host.element, 'pointermove', { clientX: 260, clientY: 110 })
+      await nextTick()
+      expect(host.element.hasPointerCapture(1)).toBe(true)
+      expect(fixture.wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe(
+        'true',
+      )
+
+      switch (reason) {
+        case 'external-commit':
+          fixture.session.undo()
+          break
+        case 'viewport-size':
+          vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1_024)
+          window.dispatchEvent(new Event('resize'))
+          break
+        case 'surface-offset':
+          vi.spyOn(host.element, 'getBoundingClientRect').mockReturnValue(
+            new DOMRect(20, 0, 960, 250),
+          )
+          window.dispatchEvent(new Event('scroll'))
+          break
+        case 'session-switch': {
+          const replacement = createInteractiveFixture(`note-invalidation-${reason}`)
+          await fixture.wrapper.setProps({
+            session: markRaw(replacement.session),
+            presentation: replacement.presentation,
+          })
+          break
+        }
+      }
+      await flushPromises()
+      const snapshot = fixture.session.getSnapshot()
+      expect(host.element.hasPointerCapture(1)).toBe(false)
+      dispatchPointer(host.element, 'pointerup', { clientX: 260, clientY: 110 })
+      await nextTick()
+      expect(fixture.session.getSnapshot()).toEqual(snapshot)
+      expect(fixture.wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe(
+        'false',
+      )
+      fixture.keyboard.runtime.dispose()
+    },
+  )
+
+  it('captures the new Surface mapping when Begin retires an earlier commit handoff', async () => {
+    const fixture = mountSelectionMenuFixture('note-new-begin-before-handoff')
+    await nextTick()
+    const note = fixture.markers('notes')[0]!
+    const host = fixture.wrapper.get<HTMLElement>('.project-piano-roll__canvas-host')
+    dispatchPointer(note.element, 'pointerdown', { clientX: 200, clientY: 120 })
+    dispatchPointer(host.element, 'pointerup', { clientX: 260, clientY: 110 })
+    const revisionAfterCommit = fixture.session.modelRevision
+    // The first command is committed, but its authoritative projection has not been published.
+    dispatchPointer(note.element, 'pointerdown', { clientX: 260, clientY: 110 })
+    expect(host.element.hasPointerCapture(1)).toBe(true)
+    vi.spyOn(host.element, 'getBoundingClientRect').mockReturnValue(new DOMRect(20, 0, 960, 250))
+    window.dispatchEvent(new Event('scroll'))
+    expect(host.element.hasPointerCapture(1)).toBe(false)
+    dispatchPointer(host.element, 'pointerup', { clientX: 320, clientY: 100 })
+    await flushPromises()
+    expect(fixture.session.modelRevision).toBe(revisionAfterCommit)
+    fixture.keyboard.runtime.dispose()
+  })
+
+  it('cancels a Pencil press if the Project changes before publication reaches the Surface', async () => {
+    const fixture = mountSelectionMenuFixture('pencil-stale-before-publication')
+    fixture.preferences.activateTool(PIANO_ROLL_TOOL.PENCIL)
+    await nextTick()
+    const host = fixture.wrapper.get<HTMLElement>('.project-piano-roll__canvas-host')
+    dispatchPointer(host.element, 'pointerdown', { clientX: 100, clientY: 120 })
+    fixture.session.undo()
+    const snapshot = fixture.session.getSnapshot()
+    dispatchPointer(host.element, 'pointerup', { clientX: 100, clientY: 120 })
+    await flushPromises()
+    expect(fixture.session.getSnapshot()).toEqual(snapshot)
+    expect(host.element.hasPointerCapture(1)).toBe(false)
+    fixture.keyboard.runtime.dispose()
+  })
+
   it('previews and commits a selected Note move as one Project revision', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move')
     const noteIds = [
       fixture.projectMidiNotes.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
         clipStartTick: parseTick(960),
         pitch: parseMidiPitch(60),
         requestedDurationTick: parsePositiveTick(240),
       }).noteId,
       fixture.projectMidiNotes.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
         clipStartTick: parseTick(1_200),
         pitch: parseMidiPitch(64),
@@ -847,6 +940,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move-cancel')
     const noteId = fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(960),
       pitch: parseMidiPitch(60),
@@ -914,6 +1009,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move-live-alt')
     const noteId = fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(960),
       pitch: parseMidiPitch(60),
@@ -981,6 +1078,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move-window-blur')
     const noteId = fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(960),
       pitch: parseMidiPitch(60),
@@ -1044,6 +1143,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-resize-pencil')
     const noteId = fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(960),
       pitch: parseMidiPitch(60),
@@ -1134,6 +1235,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-resize-failure')
     const noteId = fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(960),
       pitch: parseMidiPitch(60),
@@ -1432,6 +1535,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-sustain-pedal-edit')
     const noteId = fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(480),
       pitch: parseMidiPitch(60),
@@ -1607,12 +1712,16 @@ describe('ProjectPianoRollSurface', () => {
     const fixture = createInteractiveFixture('surface-remove')
     const noteIds = [
       fixture.projectMidiNotes.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
         clipStartTick: parseTick(960),
         pitch: parseMidiPitch(60),
         requestedDurationTick: parsePositiveTick(240),
       }).noteId,
       fixture.projectMidiNotes.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
         clipStartTick: parseTick(1_200),
         pitch: parseMidiPitch(64),
@@ -1700,6 +1809,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-remove-failure')
     fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(960),
       pitch: parseMidiPitch(60),
@@ -1767,6 +1878,8 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-failure')
     fixture.projectMidiNotes.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
       clipStartTick: parseTick(960),
       pitch: parseMidiPitch(60),

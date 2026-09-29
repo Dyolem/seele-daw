@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  PIANO_ROLL_INTERACTION_STATUS,
   PIANO_ROLL_INTERACTION_TOOL,
   PIANO_ROLL_POINTER_INPUT_PHASE,
   createPianoRollInteractionSession,
@@ -83,7 +82,7 @@ import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-ped
 interface ProjectPianoRollSurfaceProps {
   readonly barSpanTick: Tick
   readonly presentation: ReadyProjectPianoRollPresentation
-  readonly session: Pick<ProjectSession, 'query' | 'subscribe'>
+  readonly session: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly timeSignatureNumerator: number
 }
 
@@ -119,10 +118,11 @@ let unsubscribeEditorSession: (() => void) | null = null
 let readModel: PianoRollNoteReadModel | null = null
 let unsubscribeReadModel: (() => void) | null = null
 let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
+let captureBounds: Readonly<{ left: number; top: number }> | null = null
 let resizeObserver: ResizeObserver | null = null
 const handleInteractionIntent = createProjectPianoRollIntentHandler({
   getAuthorityRevision: () => noteState.value?.modelRevision ?? null,
-  getClipId: () => props.presentation.context.clipId,
+  getSession: () => props.session,
   getEditorSession: () => editorSession,
   interactionSession,
   projectMidiNotes,
@@ -134,7 +134,12 @@ const handleInteractionIntent = createProjectPianoRollIntentHandler({
 })
 const unsubscribeInteractionSession = interactionSession.subscribe({
   onStateChange: (state) => {
+    const wasCapturing = interactionState.value.pointerId !== null
     interactionState.value = state
+    if (state.pointerId === null) {
+      captureBounds = null
+      if (wasCapturing) pointerInputAdapter?.cancel()
+    }
   },
 })
 const movePreview = computed(() => interactionState.value.movePreview)
@@ -315,6 +320,8 @@ function handlePointerInput(input: PianoRollPointerInput): void {
   if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
     focusedEditingTarget.value = 'notes'
     surfaceElement.value?.focus({ preventScroll: true })
+  } else if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL && !hasStablePointerMapping()) {
+    return
   }
 
   const outcome = interactionSession.handlePointerInput(
@@ -333,19 +340,21 @@ function handlePointerInput(input: PianoRollPointerInput): void {
   )
 
   if (outcome.failure !== null) {
-    if (interactionState.value.status === PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE) {
-      interactionSession.skipMoveCommit()
-    } else if (
-      interactionState.value.status === PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE
-    ) {
-      interactionSession.skipResizeCommit()
-    }
+    pointerInputAdapter?.cancel()
     const message = describeFailure(outcome.failure)
     interactionFailureMessage.value = message
     if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.END) {
       toasts.danger('Piano Roll interaction could not complete', message)
     }
     return
+  }
+
+  if (
+    input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN &&
+    interactionState.value.pointerId === input.pointerId
+  ) {
+    // Begin may first retire a previous commit handoff, which clears the old mapping.
+    captureBounds = canvasHost.value?.getBoundingClientRect() ?? null
   }
 
   if (outcome.intent !== null) handleInteractionIntent(outcome.intent)
@@ -384,6 +393,7 @@ function render(): void {
     )
     renderFailureMessage.value = null
   } catch (cause) {
+    interactionSession.cancel()
     renderFailureMessage.value = describeFailure(cause)
   }
 }
@@ -411,6 +421,15 @@ function composeEditorSession(): void {
         interactionFailureMessage.value = describeFailure(failure.cause)
       },
       onStateChange: (state) => {
+        // Selection changes from another action invalidate the captured Note operation.
+        if (
+          interactionState.value.pointerId !== null &&
+          (editorState.value?.selectedNoteIds.length !== state.selectedNoteIds.length ||
+            state.selectedNoteIds.some(
+              (noteId) => !editorState.value?.selectedNoteIds.includes(noteId),
+            ))
+        )
+          interactionSession.cancel()
         editorState.value = state
         interactionFailureMessage.value = null
       },
@@ -431,7 +450,10 @@ function disposeReadModel(): void {
 
 function createOrResizeReadModel(): void {
   const host = canvasHost.value
-  if (host === null || host.clientWidth <= 0 || host.clientHeight <= 0) return
+  if (host === null || host.clientWidth <= 0 || host.clientHeight <= 0) {
+    interactionSession.notifyViewport(null)
+    return
+  }
 
   try {
     const viewport = createInitialPianoRollViewport(props.presentation.context, {
@@ -441,6 +463,7 @@ function createOrResizeReadModel(): void {
       widthCssPixel: host.clientWidth,
     })
 
+    interactionSession.notifyViewport(viewport)
     if (readModel !== null) {
       readModel.setViewport(viewport)
       readModelFailureMessage.value = null
@@ -455,6 +478,7 @@ function createOrResizeReadModel(): void {
     noteState.value = readModel.state
     unsubscribeReadModel = readModel.subscribe({
       onError: (failure) => {
+        interactionSession.cancel()
         readModelFailureMessage.value = describeFailure(failure.cause)
       },
       onStateChange: (state) => {
@@ -475,7 +499,20 @@ function recomposeReadModel(): void {
 }
 
 function handleWindowResize(): void {
+  hasStablePointerMapping()
   createOrResizeReadModel()
+}
+
+function hasStablePointerMapping(): boolean {
+  if (captureBounds === null) return true
+  const bounds = canvasHost.value?.getBoundingClientRect()
+  if (bounds?.left === captureBounds.left && bounds.top === captureBounds.top) return true
+  interactionSession.cancel()
+  return false
+}
+
+function handleSurfaceScroll(): void {
+  hasStablePointerMapping()
 }
 
 function isPianoRollFocused(): boolean {
@@ -634,6 +671,8 @@ onMounted(() => {
   const surface = surfaceElement.value
   if (grid === null || notes === null || host === null || surface === null) return
 
+  window.addEventListener('scroll', handleSurfaceScroll, true)
+
   try {
     gridRenderer.value = createPianoRollGridCanvasRenderer({
       canvas: grid,
@@ -644,6 +683,7 @@ onMounted(() => {
     pointerInputAdapter = createPianoRollPointerInputAdapter({
       observer: {
         onError: (failure) => {
+          interactionSession.cancel()
           interactionFailureMessage.value = describeFailure(failure.cause)
         },
         onInput: handlePointerInput,
@@ -674,6 +714,7 @@ onUnmounted(() => {
   resizeObserver?.disconnect()
   resizeObserver = null
   window.removeEventListener('resize', handleWindowResize)
+  window.removeEventListener('scroll', handleSurfaceScroll, true)
   pointerInputAdapter?.dispose()
   pointerInputAdapter = null
   unsubscribeInteractionSession()

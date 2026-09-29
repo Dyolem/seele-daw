@@ -4,7 +4,7 @@ import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_INTERACTION_TOOL,
   type PianoRollInteractionTool,
-} from '#internal/common/piano-roll/state-machine/piano-roll-interaction-session'
+} from '#internal/common/piano-roll/interaction/piano-roll-interaction'
 import type { PianoRollSustainPedalEditingScope } from '#internal/common/piano-roll/sustain-pedal-lane/sustain-pedal-editing-scope'
 import {
   PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS,

@@ -25,6 +25,8 @@ const NO_MODIFIERS = Object.freeze({
   shift: false,
 })
 
+const TEST_CAPTURE_ID = Symbol('test-capture')
+
 function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({
     xCssPixel: 240,
@@ -41,6 +43,7 @@ function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): Pia
     originModifiers: NO_MODIFIERS,
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
+    captureId: TEST_CAPTURE_ID,
     pointerId: 1,
     pointerType: 'mouse',
     position: originPosition,
@@ -81,6 +84,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     if (gesture === null) throw new Error('Expected Note resize gesture')
 
     const preview = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -130,6 +134,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     if (gesture === null) throw new Error('Expected Note resize gesture')
 
     const preview = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -172,6 +177,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     if (gesture === null) throw new Error('Expected Note resize gesture')
 
     const snapped = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -184,6 +190,7 @@ describe('Piano Roll Note Resize Interaction', () => {
       viewport: fixture.viewport,
     })
     const unsnapped = resolvePianoRollNoteResizePreview({
+      bypassSnap: true,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -234,6 +241,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     }
 
     const collapsedStart = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture: startGesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -245,6 +253,7 @@ describe('Piano Roll Note Resize Interaction', () => {
       viewport: fixture.viewport,
     })
     const collapsedEnd = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture: endGesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -293,6 +302,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     }
 
     const sourceStart = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture: startGesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -305,6 +315,7 @@ describe('Piano Roll Note Resize Interaction', () => {
       viewport: fixture.viewport,
     })
     const sourceEnd = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture: endGesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -344,6 +355,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     if (gesture === null) throw new Error('Expected Note resize gesture')
 
     const preview = resolvePianoRollNoteResizePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -390,6 +402,7 @@ describe('Piano Roll Note Resize Interaction', () => {
 
     expect(() =>
       resolvePianoRollNoteResizePreview({
+        bypassSnap: false,
         gesture,
         grid: fixture.grid,
         pointerInput: createPointerInput({

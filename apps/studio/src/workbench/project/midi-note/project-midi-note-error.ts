@@ -3,6 +3,7 @@ import type { ClipId, MidiSourceId, Tick, TrackId } from '@seele-daw/project-cor
 export type ProjectMidiNoteErrorCode =
   | 'active-project-not-ready'
   | 'note-start-outside-clip'
+  | 'note-edit-target-stale'
   | 'target-clip-not-found'
   | 'target-clip-source-invalid'
   | 'target-clip-looped'

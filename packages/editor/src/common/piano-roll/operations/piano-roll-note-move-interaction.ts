@@ -65,6 +65,7 @@ export interface ResolvePianoRollNoteMovePreviewInput {
   readonly gesture: PianoRollNoteMoveGesture
   readonly grid: TimelineGrid
   readonly pointerInput: PianoRollPointerInput
+  readonly bypassSnap: boolean
   readonly snapEnabled: boolean
   readonly viewport: PianoRollViewport
 }
@@ -149,7 +150,7 @@ function resolveTickDelta(
   }
 
   let candidateDelta: number
-  if (!input.snapEnabled || input.pointerInput.modifiers.alt) {
+  if (!input.snapEnabled || input.bypassSnap) {
     candidateDelta = Math.round(rawDelta)
   } else {
     const anchorClipStartTick = anchor.startTick - input.gesture.context.sourceStartTick
@@ -253,7 +254,7 @@ export function resolvePianoRollNoteMovePreview(
   const anchorTargetSourceTick = anchor.startTick + deltaTick
   const snapGuideTick =
     input.snapEnabled &&
-    !input.pointerInput.modifiers.alt &&
+    !input.bypassSnap &&
     anchorTargetSourceTick >= input.gesture.context.sourceStartTick &&
     anchorTargetSourceTick <= input.gesture.context.sourceEndTick
       ? parseTick(anchorTargetSourceTick - input.gesture.context.sourceStartTick)

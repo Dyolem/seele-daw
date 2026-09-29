@@ -1,35 +1,22 @@
+import type { NoteId } from '@seele-daw/project-core'
 import type { PianoRollEditorSession } from '#internal/common/piano-roll/piano-roll-editor-session'
-import {
-  PIANO_ROLL_POINTER_INPUT_PHASE,
-  type PianoRollPointerInput,
-} from '#internal/common/piano-roll/piano-roll-input'
 
 export type PianoRollSelectionTarget = Pick<
   PianoRollEditorSession,
   'clearSelection' | 'selectOnly' | 'toggleSelection'
 >
 
-function requestsSelectionToggle(input: PianoRollPointerInput): boolean {
-  return input.originModifiers.control || input.originModifiers.meta || input.originModifiers.shift
+export interface PianoRollSelectionChange {
+  readonly noteId: NoteId | null
+  readonly toggleSelection: boolean
 }
 
-/**
- * Applies a completed click gesture to the Clip-scoped selection authority.
- *
- * Drag gestures and incomplete Pointer lifecycles are intentionally ignored so
- * future tools can claim them without undoing an eager Pointer Down selection.
- */
+/** Applies the semantic result of a completed click to the Clip-scoped selection authority. */
 export function applyPianoRollSelectInteraction(
   target: PianoRollSelectionTarget,
-  input: PianoRollPointerInput,
+  input: PianoRollSelectionChange,
 ): boolean {
-  if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.END || input.hasExceededDragThreshold) {
-    return false
-  }
-
-  if (input.hit === null) return target.clearSelection()
-  if (requestsSelectionToggle(input)) {
-    return target.toggleSelection(input.hit.noteId)
-  }
-  return target.selectOnly(input.hit.noteId)
+  if (input.noteId === null) return target.clearSelection()
+  if (input.toggleSelection) return target.toggleSelection(input.noteId)
+  return target.selectOnly(input.noteId)
 }

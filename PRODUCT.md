@@ -871,8 +871,8 @@ Surface，切换只改变 Studio 应用偏好。两个模式都显示来自共�
   Semitone Delta 和 Selection 合法边界交集。
 - 冻结的 Cursor / Pencil 单 Note Resize Gesture、左右 Edge 几何、Grid Coordinate
   Absolute Snap、Source 边界 Clamp 与 Clip-clipped Preview；
-- Surface-scoped Pointer Interaction Session，统一 Click、Add、Move、Resize 的 pressing、
-  Preview、cancel、单次 Intent 与权威 revision 交接；XState 只作为内部实现。
+- 中立 Interaction Session 与 Note Operation 组合，统一 Click、Add、Move、Resize 的
+  Preview、cancel、独立交互身份、一次完成领取与可选权威 revision 交接。
 
 单 Note Resize 同时接受 Cursor 与 Pencil 的明确左右 Edge Hit。左 Edge 固定原始 End，右
 Edge 固定原始 Start；Snap 开启时使用冻结 Grid 的最近绝对坐标，动态 `Alt` 临时绕过 Snap。
@@ -912,9 +912,9 @@ Threshold 的 Cursor Edge Click 仍解析 Selection，Pencil Edge Click 不写 P
   Selection；
 - Cursor 拖动已选 Note 时移动完整 Selection；拖动未选 Note 时只移动该 Note，并在成功
   后把它设为唯一 Selection；
-- Pointer Down 冻结 Project revision、Note Facts、Selection、Viewport、Grid、Snap
-  Preference、Hit 与 origin Modifier；手势期间 Project revision 改变时，Pointer Up 的
-  stale intent 整体拒绝；
+- Pointer Down 冻结 Session 对象身份、Clip / Source、Project revision、Note Facts、
+  Selection、Viewport、Grid、Snap Preference、Hit 与 origin Modifier；Add / Move / Resize
+  均在实际提交入口验证冻结目标与版本，外部修改取消手势，异步通知到达前的 End 也无效；
 - Pointer Move 只更新冻结 Preview；Snap 开启时显示 Anchor Guide，Pointer Up 的非零
   Delta 最多执行一个 `MoveNotesCommand`；
 - Snap 开启时，Note 无论原本是否对齐，都以拖动后的绝对目标时间解析当前 Grid
@@ -932,7 +932,12 @@ Threshold 的 Cursor Edge Click 仍解析 Selection，Pencil Edge Click 不写 P
   Selection，已选中目标保留现有 Selection，Pencil 保持激活；
 - Resize No-change 不提交；拒绝时清理 Preview、保留 Project / Selection / Tool 并显示
   Toast；成功 Commit 后等待权威 Read Model revision 再清理最终 Preview；
-- Clip 切换创建新的 Editor Session，不继承前一个 Clip 的 Selection。
+- Clip 切换创建新的 Editor Session，不继承前一个 Clip 的 Selection；
+- Note Surface 映射改变、消费者或投影失败会关闭未提交交互并释放捕获；迟到 End、重复结果
+  和旧提交回告不能影响新手势。该映射政策不限制 Timeline Locate 的 Edge Scroll。
+
+G1 的边界与迁移记录见 [Editor Interaction V1 决策](./packages/editor/docs/editor-interaction-architecture-v1.md)。
+Tempo、CC64、Track Pencil 与 Locate 的完整语义迁移仍按后续批次实施。
 
 Selection 只保存稳定 `NoteId`，属于当前 Clip Editor lifetime；它不进入 Pinia、Project
 History、Snapshot、Checkpoint 或 IndexedDB。Note 移出当前可见 Viewport 时仍保持选中；

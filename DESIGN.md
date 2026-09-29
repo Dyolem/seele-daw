@@ -410,6 +410,12 @@ Mount 不抢占；Cancel 使用独立活动交互能力。Follow 在实际导航
 
 如果提交前 Project 已发生不兼容变化，交互应取消或重新验证，不能把过期预览强行写回。
 
+当前 Note 实现以 Begin 的 Session、Clip 和 revision 作为提交前置条件；交互身份独立于
+浏览器可复用的 Pointer ID。旧 End / Cancel / Commit 回告不能影响后续手势。Note 映射改变
+会取消未提交操作；仅等值投影刷新不取消。Locate 的滚动连续性由其自身 Mapping 政策负责。
+公共生命周期与领域 Operation 的分工见
+[Editor Interaction V1 决策](./packages/editor/docs/editor-interaction-architecture-v1.md)。
+
 ### 7.6 时间线、滚动与缩放
 
 - 鼠标滚轮默认纵向滚动当前表面。

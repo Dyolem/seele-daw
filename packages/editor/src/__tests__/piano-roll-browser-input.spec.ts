@@ -560,24 +560,78 @@ describe('Piano Roll Pointer Input Adapter', () => {
     fixture.renderer.dispose()
   })
 
-  it('isolates Observer failures from the browser event loop', () => {
+  it.each([PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN, PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE])(
+    'closes capture when the %s consumer throws and ignores a late Pointer Up',
+    (phase) => {
+      const fixture = createDomNoteFixture()
+      const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
+      const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>((input) => {
+        if (input.phase === phase) throw new Error('Input consumer failed')
+      })
+      const adapter = createPianoRollPointerInputAdapter({
+        observer: { onError, onInput },
+        surface: fixture.surface,
+      })
+      dispatchPointer(fixture.note, 'pointerdown')
+      dispatchPointer(fixture.surface, 'pointermove', { clientX: 260 })
+      dispatchPointer(fixture.surface, 'pointerup', { clientX: 260 })
+      expect(fixture.capture.capturedPointerIds.size).toBe(0)
+      expect(onInput.mock.calls.map(([input]) => input.phase)).not.toContain(
+        PIANO_ROLL_POINTER_INPUT_PHASE.END,
+      )
+      expect(onInput).toHaveBeenLastCalledWith(
+        expect.objectContaining({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL }),
+      )
+      expect(onError).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ operation: 'observer-delivery' }),
+      )
+      adapter.dispose()
+      fixture.renderer.dispose()
+    },
+  )
+
+  it('assigns a fresh capture identity when the browser reuses a Pointer ID', () => {
     const fixture = createDomNoteFixture()
-    const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
+    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
     const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError,
-        onInput: () => {
-          throw new Error('Input Observer failed')
-        },
-      },
+      observer: { onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(), onInput },
       surface: fixture.surface,
     })
+    dispatchPointer(fixture.note, 'pointerdown')
+    dispatchPointer(fixture.surface, 'pointerup')
+    dispatchPointer(fixture.note, 'pointerdown')
+    dispatchPointer(fixture.surface, 'pointerup')
+    const inputs = onInput.mock.calls.map(([input]) => input)
+    expect(inputs[0]?.captureId).toBe(inputs[1]?.captureId)
+    expect(inputs[2]?.captureId).toBe(inputs[3]?.captureId)
+    expect(inputs[0]?.captureId).not.toBe(inputs[2]?.captureId)
+    expect(inputs[0]?.pointerId).toBe(inputs[2]?.pointerId)
+    adapter.dispose()
+    fixture.renderer.dispose()
+  })
 
-    expect(() => dispatchPointer(fixture.note, 'pointerdown')).not.toThrow()
+  it('cancels and releases capture when coordinate mapping fails', () => {
+    const fixture = createDomNoteFixture()
+    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
+    const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
+    const adapter = createPianoRollPointerInputAdapter({
+      observer: { onError, onInput },
+      surface: fixture.surface,
+    })
+    dispatchPointer(fixture.note, 'pointerdown')
+    vi.spyOn(fixture.surface, 'getBoundingClientRect').mockImplementationOnce(() => {
+      throw new Error('Mapping failed')
+    })
+    dispatchPointer(fixture.surface, 'pointermove')
+    dispatchPointer(fixture.surface, 'pointerup')
+    expect(fixture.capture.capturedPointerIds.size).toBe(0)
+    expect(onInput.mock.calls.map(([input]) => input.phase)).toEqual([
+      PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
+      PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL,
+    ])
     expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({ operation: 'observer-delivery' }),
+      expect.objectContaining({ operation: 'coordinate-mapping' }),
     )
-
     adapter.dispose()
     fixture.renderer.dispose()
   })

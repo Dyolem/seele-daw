@@ -19,7 +19,6 @@
     "test:run": "vitest run --environment node"
   },
   "dependencies": {
-    "@seele-daw/project-core": "workspace:*",
-    "xstate": "5.32.5"
+    "@seele-daw/project-core": "workspace:*"
   }
 }

@@ -141,6 +141,8 @@ describe('ProjectMidiNoteCoordinator', () => {
       createUniqueId: () => 'note-midi-note-defaults',
     })
     const result = coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(120),
       requestedDurationTick: parsePositiveTick(240),
@@ -285,6 +287,8 @@ describe('ProjectMidiNoteCoordinator', () => {
     })
 
     coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(900),
       requestedDurationTick: parsePositiveTick(240),
@@ -308,12 +312,16 @@ describe('ProjectMidiNoteCoordinator', () => {
     })
     const noteIds = [
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(120),
         requestedDurationTick: parsePositiveTick(240),
         pitch: parseMidiPitch(60),
       }).noteId,
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(480),
         requestedDurationTick: parsePositiveTick(240),
@@ -322,6 +330,7 @@ describe('ProjectMidiNoteCoordinator', () => {
     ]
     const revisionBeforeMove = fixture.session.modelRevision
     const result = coordinator.moveMidiNotes({
+      expectedSession: fixture.session,
       baseRevision: revisionBeforeMove,
       clipId: fixture.clipId,
       deltaPitch: parseMidiPitchDelta(2),
@@ -368,6 +377,8 @@ describe('ProjectMidiNoteCoordinator', () => {
       ),
     })
     const noteId = coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(120),
       requestedDurationTick: parsePositiveTick(240),
@@ -376,6 +387,8 @@ describe('ProjectMidiNoteCoordinator', () => {
     const gestureRevision = fixture.session.modelRevision
 
     coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(480),
       requestedDurationTick: parsePositiveTick(240),
@@ -385,6 +398,7 @@ describe('ProjectMidiNoteCoordinator', () => {
 
     expect(() =>
       coordinator.moveMidiNotes({
+        expectedSession: fixture.session,
         baseRevision: gestureRevision,
         clipId: fixture.clipId,
         deltaPitch: parseMidiPitchDelta(1),
@@ -417,12 +431,16 @@ describe('ProjectMidiNoteCoordinator', () => {
     })
     const noteIds = [
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(120),
         requestedDurationTick: parsePositiveTick(240),
         pitch: parseMidiPitch(60),
       }).noteId,
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(480),
         requestedDurationTick: parsePositiveTick(240),
@@ -433,6 +451,7 @@ describe('ProjectMidiNoteCoordinator', () => {
 
     expect(
       coordinator.moveMidiNotes({
+        expectedSession: fixture.session,
         baseRevision: revisionBeforeMove,
         clipId: fixture.clipId,
         deltaPitch: parseMidiPitchDelta(0),
@@ -444,6 +463,7 @@ describe('ProjectMidiNoteCoordinator', () => {
 
     expect(() =>
       coordinator.moveMidiNotes({
+        expectedSession: fixture.session,
         baseRevision: revisionBeforeMove,
         clipId: fixture.clipId,
         deltaPitch: parseMidiPitchDelta(0),
@@ -470,6 +490,8 @@ describe('ProjectMidiNoteCoordinator', () => {
       createUniqueId: () => 'note-midi-note-resize',
     })
     const noteId = coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(120),
       requestedDurationTick: parsePositiveTick(240),
@@ -478,6 +500,7 @@ describe('ProjectMidiNoteCoordinator', () => {
     const revisionBeforeResize = fixture.session.modelRevision
 
     const result = coordinator.resizeMidiNote({
+      expectedSession: fixture.session,
       baseRevision: revisionBeforeResize,
       clipId: fixture.clipId,
       durationTick: parsePositiveTick(360),
@@ -534,6 +557,8 @@ describe('ProjectMidiNoteCoordinator', () => {
       ),
     })
     const noteId = coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(120),
       requestedDurationTick: parsePositiveTick(240),
@@ -543,6 +568,7 @@ describe('ProjectMidiNoteCoordinator', () => {
 
     expect(
       coordinator.resizeMidiNote({
+        expectedSession: fixture.session,
         baseRevision: gestureRevision,
         clipId: fixture.clipId,
         durationTick: parsePositiveTick(240),
@@ -553,6 +579,8 @@ describe('ProjectMidiNoteCoordinator', () => {
     expect(fixture.session.modelRevision).toBe(gestureRevision)
 
     coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(480),
       requestedDurationTick: parsePositiveTick(240),
@@ -562,6 +590,7 @@ describe('ProjectMidiNoteCoordinator', () => {
 
     expect(() =>
       coordinator.resizeMidiNote({
+        expectedSession: fixture.session,
         baseRevision: gestureRevision,
         clipId: fixture.clipId,
         durationTick: parsePositiveTick(480),
@@ -594,12 +623,16 @@ describe('ProjectMidiNoteCoordinator', () => {
     })
     const noteIds = [
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(120),
         requestedDurationTick: parsePositiveTick(240),
         pitch: parseMidiPitch(60),
       }).noteId,
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(480),
         requestedDurationTick: parsePositiveTick(240),
@@ -650,6 +683,8 @@ describe('ProjectMidiNoteCoordinator', () => {
       createUniqueId: () => 'note-midi-note-remove-many-existing',
     })
     const existingNoteId = coordinator.addMidiNote({
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
       clipId: fixture.clipId,
       clipStartTick: parseTick(120),
       requestedDurationTick: parsePositiveTick(240),
@@ -673,7 +708,7 @@ describe('ProjectMidiNoteCoordinator', () => {
     expect(noteRecords(fixture.session).map(({ id }) => id)).toEqual([existingNoteId])
   })
 
-  it('uses the live Session revision for consecutive overlapping Notes', () => {
+  it('requires a fresh captured revision for each consecutive overlapping Note', () => {
     const fixture = createMidiClipFixture('revision')
     const coordinator = createProjectMidiNoteCoordinator({
       activeProject: { state: fixture.readyState },
@@ -689,8 +724,16 @@ describe('ProjectMidiNoteCoordinator', () => {
       pitch: parseMidiPitch(64),
     }
 
-    coordinator.addMidiNote(input)
-    coordinator.addMidiNote(input)
+    coordinator.addMidiNote({
+      ...input,
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
+    })
+    coordinator.addMidiNote({
+      ...input,
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
+    })
 
     expect(fixture.readyState.modelRevision).toBe(0)
     expect(noteRecords(fixture.session).map(({ id }) => id)).toEqual([
@@ -712,6 +755,8 @@ describe('ProjectMidiNoteCoordinator', () => {
 
     expect(() =>
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(960),
         requestedDurationTick: parsePositiveTick(240),
@@ -738,7 +783,10 @@ describe('ProjectMidiNoteCoordinator', () => {
       activeProject: idleActiveProject,
       createUniqueId: () => 'unused-midi-note-idle',
     })
+    const session = createSession('missing-clip')
     const input = {
+      expectedSession: session,
+      baseRevision: session.modelRevision,
       clipId: parseClipId('missing-midi-note-clip'),
       clipStartTick: parseTick(0),
       requestedDurationTick: parsePositiveTick(240),
@@ -752,7 +800,6 @@ describe('ProjectMidiNoteCoordinator', () => {
       }),
     )
 
-    const session = createSession('missing-clip')
     const readyCoordinator = createProjectMidiNoteCoordinator({
       activeProject: { state: createReadyState(session) },
       createUniqueId: () => 'unused-midi-note-missing-clip',
@@ -779,6 +826,8 @@ describe('ProjectMidiNoteCoordinator', () => {
       createUniqueId: () => 'unused-midi-note-missing-source',
     })
     const input = {
+      expectedSession: missingSourceFixture.session,
+      baseRevision: missingSourceFixture.session.modelRevision,
       clipId: missingSourceFixture.clipId,
       clipStartTick: parseTick(0),
       requestedDurationTick: parsePositiveTick(240),
@@ -808,6 +857,8 @@ describe('ProjectMidiNoteCoordinator', () => {
     expect(() =>
       missingPartitionCoordinator.addMidiNote({
         ...input,
+        expectedSession: missingPartitionFixture.session,
+        baseRevision: missingPartitionFixture.session.modelRevision,
         clipId: missingPartitionFixture.clipId,
       }),
     ).toThrowError(
@@ -831,6 +882,8 @@ describe('ProjectMidiNoteCoordinator', () => {
 
     expect(() =>
       coordinator.addMidiNote({
+        expectedSession: fixture.session,
+        baseRevision: fixture.session.modelRevision,
         clipId: fixture.clipId,
         clipStartTick: parseTick(0),
         requestedDurationTick: parsePositiveTick(240),
@@ -843,5 +896,69 @@ describe('ProjectMidiNoteCoordinator', () => {
       }),
     )
     expect(identityCalls).toBe(0)
+  })
+  it('rejects Pencil placement against a stale captured revision', () => {
+    const fixture = createMidiClipFixture('pencil-stale')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: fixture.readyState },
+      createUniqueId: createIdentitySource('stale-pencil-1', 'stale-pencil-2'),
+    })
+    const input = {
+      expectedSession: fixture.session,
+      baseRevision: fixture.session.modelRevision,
+      clipId: fixture.clipId,
+      clipStartTick: parseTick(120),
+      requestedDurationTick: parsePositiveTick(240),
+      pitch: parseMidiPitch(60),
+    }
+    coordinator.addMidiNote(input)
+    const beforeRejectedPlacement = fixture.session.getSnapshot()
+    expect(() => coordinator.addMidiNote(input)).toThrowError(
+      expect.objectContaining({ code: 'base-revision-mismatch' }),
+    )
+    expect(fixture.session.getSnapshot()).toEqual(beforeRejectedPlacement)
+  })
+
+  it('rejects a replaced Session even when Project, Clip IDs and revision are equal', () => {
+    const previous = createMidiClipFixture('same-target')
+    const current = createMidiClipFixture('same-target')
+    const execute = vi.spyOn(current.session, 'execute')
+    const createUniqueId = vi.fn<() => string>(() => 'unused-stale-note')
+    const coordinator = createProjectMidiNoteCoordinator({
+      activeProject: { state: current.readyState },
+      createUniqueId,
+    })
+    const target = {
+      expectedSession: previous.session,
+      baseRevision: previous.session.modelRevision,
+      clipId: previous.clipId,
+    }
+    expect(() =>
+      coordinator.addMidiNote({
+        ...target,
+        clipStartTick: parseTick(120),
+        requestedDurationTick: parsePositiveTick(240),
+        pitch: parseMidiPitch(60),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'note-edit-target-stale' }))
+    expect(() =>
+      coordinator.moveMidiNotes({
+        ...target,
+        deltaTick: parseTickDelta(120),
+        deltaPitch: parseMidiPitchDelta(1),
+        noteIds: [parseNoteId('old-note')],
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'note-edit-target-stale' }))
+    expect(() =>
+      coordinator.resizeMidiNote({
+        ...target,
+        noteId: parseNoteId('old-note'),
+        durationTick: parsePositiveTick(480),
+        sourceStartTick: parseTick(120),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'note-edit-target-stale' }))
+    expect(execute).not.toHaveBeenCalled()
+    expect(createUniqueId).not.toHaveBeenCalled()
+    expect(noteRecords(current.session)).toEqual([])
   })
 })

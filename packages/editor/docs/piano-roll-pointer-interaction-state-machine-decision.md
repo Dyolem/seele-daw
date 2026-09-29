@@ -1,6 +1,6 @@
 # Piano Roll Pointer Interaction 状态机决策
 
-> Status: Accepted
+> 状态：已被 [Editor Interaction V1 决策](./editor-interaction-architecture-v1.md) 替代。以下保留为历史记录。
 >
 > Date: 2026-08-10
 

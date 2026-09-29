@@ -36,6 +36,8 @@ const NO_MODIFIERS = Object.freeze({
   shift: false,
 })
 
+const TEST_CAPTURE_ID = Symbol('test-capture')
+
 function createPointerInput(
   eventId: MidiSustainPedalEventId | null,
   overrides: Partial<PianoRollPointerInput<PianoRollSustainPedalLaneHit>> = {},
@@ -49,6 +51,7 @@ function createPointerInput(
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
     pointerId: 7,
+    captureId: TEST_CAPTURE_ID,
     pointerType: 'mouse',
     position: originPosition,
     ...overrides,

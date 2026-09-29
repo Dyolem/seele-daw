@@ -13,3 +13,5 @@ export type {
 } from './timeline-grid'
 export { TimelineGridError } from './timeline-grid-error'
 export type { TimelineGridErrorCode } from './timeline-grid-error'
+
+export type { InteractionId } from './interaction/interaction-session'

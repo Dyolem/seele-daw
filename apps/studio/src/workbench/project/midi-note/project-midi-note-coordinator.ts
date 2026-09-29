@@ -54,8 +54,14 @@ export interface ProjectMidiNoteCoordinatorDependencies {
   readonly createUniqueId: () => string
 }
 
-export interface AddMidiNoteInput {
+interface CapturedMidiNoteTarget {
+  readonly baseRevision: ModelRevision
   readonly clipId: ClipId
+  /** Identity of the Project Session captured when the interaction began. */
+  readonly expectedSession: Pick<ProjectSession, 'query'>
+}
+
+export interface AddMidiNoteInput extends CapturedMidiNoteTarget {
   /** Already resolved Clip-local start; Pointer and Snap policy stay outside this use case. */
   readonly clipStartTick: Tick
   /** Desired duration, shortened only when the Clip has less positive time remaining. */
@@ -78,9 +84,7 @@ export interface RemovedMidiNotesResult {
   readonly noteIds: readonly NoteId[]
 }
 
-export interface MoveMidiNotesInput {
-  readonly baseRevision: ModelRevision
-  readonly clipId: ClipId
+export interface MoveMidiNotesInput extends CapturedMidiNoteTarget {
   readonly deltaPitch: MidiPitchDelta
   readonly deltaTick: TickDelta
   readonly noteIds: readonly NoteId[]
@@ -93,9 +97,7 @@ export interface MovedMidiNotesResult {
   readonly noteIds: readonly NoteId[]
 }
 
-export interface ResizeMidiNoteInput {
-  readonly baseRevision: ModelRevision
-  readonly clipId: ClipId
+export interface ResizeMidiNoteInput extends CapturedMidiNoteTarget {
   readonly durationTick: Tick
   readonly noteId: NoteId
   /** Final MidiSource-local start resolved by the Editor interaction. */
@@ -166,6 +168,7 @@ interface EditableMidiNoteTarget {
 function requireEditableMidiNoteTarget(
   dependencies: ProjectMidiNoteCoordinatorDependencies,
   clipId: ClipId,
+  expectedSession?: Pick<ProjectSession, 'query'>,
 ): EditableMidiNoteTarget {
   const activeState = dependencies.activeProject.state
   if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
@@ -177,6 +180,13 @@ function requireEditableMidiNoteTarget(
   }
 
   const session = activeState.session
+  if (expectedSession !== undefined && expectedSession !== session) {
+    throw new ProjectMidiNoteError(
+      'note-edit-target-stale',
+      'The Project changed before the MIDI Note edit could complete. Try the gesture again.',
+      { clipId },
+    )
+  }
   const snapshot = session.getSnapshot()
   const clip = snapshot.clips.find((candidate) => candidate.id === clipId)
   if (clip === undefined) {
@@ -221,7 +231,11 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   addMidiNote(input: AddMidiNoteInput): AddedMidiNoteResult {
-    const { context, session } = requireEditableMidiNoteTarget(this.#dependencies, input.clipId)
+    const { context, session } = requireEditableMidiNoteTarget(
+      this.#dependencies,
+      input.clipId,
+      input.expectedSession,
+    )
     const clipStartTick = parseTick(input.clipStartTick)
     if (clipStartTick >= context.clipSpanTick) {
       throw new ProjectMidiNoteError(
@@ -244,7 +258,7 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
     const noteId = parseNoteId(this.#dependencies.createUniqueId())
     const result = session.execute(
       createAddNoteCommand({
-        baseRevision: session.modelRevision,
+        baseRevision: input.baseRevision,
         sourceId: context.sourceId,
         noteId,
         startTick: sourceStartTick,
@@ -418,7 +432,11 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   moveMidiNotes(input: MoveMidiNotesInput): MovedMidiNotesResult | null {
-    const { context, session } = requireEditableMidiNoteTarget(this.#dependencies, input.clipId)
+    const { context, session } = requireEditableMidiNoteTarget(
+      this.#dependencies,
+      input.clipId,
+      input.expectedSession,
+    )
     const command = createMoveNotesCommand({
       baseRevision: input.baseRevision,
       sourceId: context.sourceId,
@@ -439,7 +457,11 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
   }
 
   resizeMidiNote(input: ResizeMidiNoteInput): ResizedMidiNoteResult | null {
-    const { context, session } = requireEditableMidiNoteTarget(this.#dependencies, input.clipId)
+    const { context, session } = requireEditableMidiNoteTarget(
+      this.#dependencies,
+      input.clipId,
+      input.expectedSession,
+    )
     const command = createResizeNoteCommand({
       baseRevision: input.baseRevision,
       sourceId: context.sourceId,

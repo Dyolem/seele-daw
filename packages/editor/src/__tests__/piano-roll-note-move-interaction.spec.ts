@@ -12,6 +12,8 @@ import {
 } from '#internal/index'
 import { createPianoRollProjectFixture } from '#internal/__tests__/support/piano-roll-project-fixture'
 
+const TEST_CAPTURE_ID = Symbol('test-capture')
+
 function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({
     xCssPixel: 240,
@@ -38,6 +40,7 @@ function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): Pia
     }),
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
+    captureId: TEST_CAPTURE_ID,
     pointerId: 1,
     pointerType: 'mouse',
     position: originPosition,
@@ -79,6 +82,7 @@ describe('Piano Roll Note Move Interaction', () => {
     if (gesture === null) throw new Error('Expected Note move gesture')
 
     const preview = resolvePianoRollNoteMovePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -137,6 +141,7 @@ describe('Piano Roll Note Move Interaction', () => {
     if (gesture === null) throw new Error('Expected Note move gesture')
 
     const preview = resolvePianoRollNoteMovePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -174,6 +179,7 @@ describe('Piano Roll Note Move Interaction', () => {
     if (gesture === null) throw new Error('Expected Note move gesture')
 
     const preview = resolvePianoRollNoteMovePreview({
+      bypassSnap: false,
       gesture,
       grid: createPianoRollGrid({
         barSpanTick: parsePositiveTick(960),
@@ -210,6 +216,7 @@ describe('Piano Roll Note Move Interaction', () => {
     if (gesture === null) throw new Error('Expected Note move gesture')
 
     const preview = resolvePianoRollNoteMovePreview({
+      bypassSnap: true,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -234,6 +241,7 @@ describe('Piano Roll Note Move Interaction', () => {
     })
 
     const snappedPreview = resolvePianoRollNoteMovePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -262,6 +270,7 @@ describe('Piano Roll Note Move Interaction', () => {
     if (gesture === null) throw new Error('Expected Note move gesture')
 
     const preview = resolvePianoRollNoteMovePreview({
+      bypassSnap: false,
       gesture,
       grid: fixture.grid,
       pointerInput: createPointerInput({
@@ -291,6 +300,7 @@ describe('Piano Roll Note Move Interaction', () => {
 
     expect(
       resolvePianoRollNoteMovePreview({
+        bypassSnap: false,
         gesture,
         grid: fixture.grid,
         pointerInput: createPointerInput({

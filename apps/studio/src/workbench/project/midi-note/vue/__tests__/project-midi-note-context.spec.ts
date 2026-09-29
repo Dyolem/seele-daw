@@ -7,6 +7,7 @@ import {
   parseTick,
   parseTickDelta,
   type ModelRevision,
+  type ProjectSession,
 } from '@seele-daw/project-core'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
@@ -21,6 +22,11 @@ import { ProjectMidiNoteVueError } from '@/workbench/project/midi-note/vue/proje
 
 describe('ProjectMidiNoteVueContext', () => {
   it('resolves the provided Coordinator and fails clearly without composition', () => {
+    const expectedSession: Pick<ProjectSession, 'query'> = {
+      query: () => {
+        throw new Error('Unexpected query')
+      },
+    }
     const addMidiNote = vi.fn<ProjectMidiNoteCoordinator['addMidiNote']>()
     const moveMidiNotes = vi.fn<ProjectMidiNoteCoordinator['moveMidiNotes']>()
     const placeMidiNoteOnTrack = vi.fn<ProjectMidiNoteCoordinator['placeMidiNoteOnTrack']>()
@@ -53,6 +59,8 @@ describe('ProjectMidiNoteVueContext', () => {
 
     providedApp.runWithContext(() =>
       useProjectMidiNotes().projectMidiNotes.addMidiNote({
+        expectedSession,
+        baseRevision: 0 as ModelRevision,
         clipId: parseClipId('context-midi-note-clip'),
         clipStartTick: parseTick(0),
         requestedDurationTick: parsePositiveTick(240),
@@ -63,6 +71,7 @@ describe('ProjectMidiNoteVueContext', () => {
 
     providedApp.runWithContext(() =>
       useProjectMidiNotes().projectMidiNotes.moveMidiNotes({
+        expectedSession,
         baseRevision: 0 as ModelRevision,
         clipId: parseClipId('context-midi-note-clip'),
         deltaPitch: parseMidiPitchDelta(1),
@@ -82,6 +91,7 @@ describe('ProjectMidiNoteVueContext', () => {
 
     providedApp.runWithContext(() =>
       useProjectMidiNotes().projectMidiNotes.resizeMidiNote({
+        expectedSession,
         baseRevision: 0 as ModelRevision,
         clipId: parseClipId('context-midi-note-clip'),
         durationTick: parsePositiveTick(480),

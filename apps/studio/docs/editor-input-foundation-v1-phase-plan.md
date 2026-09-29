@@ -1,10 +1,10 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已通过用户审核；G1–G4 尚未实施
+> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已实现待审核，G2–G4 尚未实施
 >
 > 日期：2026-09-11
 >
-> 代码基线：`b28049f`，Workbench Action Catalogue WA1–WA4 已审核并提交
+> 当前代码基线：`5179bee`（Keyboard 模块组织与 class 调整）；原始规划基线为 `b28049f`
 
 ## 1. 重新确定优先级
 
@@ -386,3 +386,27 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
   167 个测试文件 / 1,550 项测试、Production Build 与 soundbank dist boundary；Studio 为
   72 个文件 / 584 项测试。5 份文档的 56 项本地链接与 `git diff --check` 通过。
 - 构建保留已有大 chunk 提示；不新增 E2E。本批于 2026-09-28 通过用户审核，由本次提交交付。
+
+## 14. G1 中立协议与 Note 迁移（2026-09-29）
+
+- 在 `packages/editor` 建立 `common/interaction` 与 `browser/interaction`，共享捕获、
+  Modifier、一次交互身份、Operation、失败关闭和可选 Commit Handoff。核心直接使用 class，
+  没有 Note / Pitch 分支，也不要求 Project、DOM 或 Vue。
+- Note Click / Add / Move / Resize 已迁移，删除旧 Note-specific XState machine 和失去消费者
+  的 `xstate` 依赖。具体选择依据、Tempo / Locate 转换表和阅读顺序见
+  [Editor Interaction V1 决策](../../../packages/editor/docs/editor-interaction-architecture-v1.md)。
+- Begin 冻结的 Session、Clip、revision 贯穿 Coordinator；Pencil 不再于 End 读取当前目标或
+  最新版本。每次 capture / interaction 独立，完成只领取一次，旧输入与回告无效。
+- 外部 Project 修改、Selection / Scope / Session 切换、Note 映射改变与输入 / 投影失败关闭
+  未提交手势；End 同步验证 revision，覆盖 Project 异步通知前的窗口。保留动态 Alt、origin
+  Selection Toggle、No-op 不发命令、一次 History 和提交后 Selection 失败不回滚事实。
+- CC64 / Track 仅复用已抽出的 Browser Adapter；Tempo、Locate 和其余语义迁移仍未实施。
+- 完整 `pnpm check` 通过：8 项架构规则回归、Lint、Format Check、Type Check、168 个
+  Vitest 文件 / 1,578 项测试，以及 Studio 构建和本地音源资源边界检查。Editor 为 17 文件 /
+  160 项，Studio 为 72 文件 / 592 项；构建仍有既有的大 chunk 提示。
+- Codex 内置浏览器使用独立本地项目验证 Pencil 新增、Cursor 同时移动 Tick / Pitch、右边缘
+  Resize，以及两种编辑各自的一次 Undo。取消、失焦、目标切换、旧输入 / 回告、异步通知窗口
+  与失败清理由自动化用例覆盖；没有新增 E2E。
+- 补充验证新 Begin 在前次 handoff 未完成时仍记录自己的 Surface 映射；位置变化后释放
+  capture，迟到 End 不提交。
+- 当前代码未提交，等待本批审核。

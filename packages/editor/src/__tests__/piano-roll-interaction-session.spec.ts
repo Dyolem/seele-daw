@@ -30,6 +30,8 @@ const NO_MODIFIERS = Object.freeze({
   shift: false,
 })
 
+const TEST_CAPTURE_ID = Symbol('test-capture')
+
 function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({
     xCssPixel: 240,
@@ -46,6 +48,7 @@ function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): Pia
     originModifiers: NO_MODIFIERS,
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
+    captureId: TEST_CAPTURE_ID,
     pointerId: 1,
     pointerType: 'mouse',
     position: originPosition,
@@ -104,14 +107,17 @@ describe('Piano Roll Interaction Session', () => {
     })
     const outcome = session.handlePointerInput(end)
 
-    expect(outcome).toEqual({
+    expect(outcome).toMatchObject({
       failure: null,
       intent: {
-        pointerInput: end,
+        selection: { noteId: end.hit?.noteId, toggleSelection: false },
         type: PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION,
       },
     })
-    expect(session.state).toEqual({
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMPLETING)
+    session.finish(outcome.intent!.interactionId)
+    expect(session.state).toMatchObject({
+      interactionId: null,
       activeGesture: null,
       movePreview: null,
       pointerId: null,
@@ -168,8 +174,10 @@ describe('Piano Roll Interaction Session', () => {
     })
     expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE)
 
-    const commitRevision = fixture.session.modelRevision
-    session.resolveMoveCommit({
+    const commitRevision = (fixture.session.modelRevision + 1) as ModelRevision
+    expect(session.claimCompletion(outcome.intent!.interactionId)).toBe(true)
+    session.resolveCommit({
+      interactionId: outcome.intent!.interactionId,
       authorityRevision: (commitRevision - 1) as ModelRevision,
       commitRevision,
     })
@@ -182,7 +190,8 @@ describe('Piano Roll Interaction Session', () => {
     })
 
     session.notifyAuthorityRevision(commitRevision)
-    expect(session.state).toEqual({
+    expect(session.state).toMatchObject({
+      interactionId: null,
       activeGesture: null,
       movePreview: null,
       pointerId: null,
@@ -248,14 +257,17 @@ describe('Piano Roll Interaction Session', () => {
       })
       expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
 
-      session.resolveMoveCommit({
+      session.resolveCommit({
+        interactionId: Symbol('stale-interaction'),
         authorityRevision: fixture.session.modelRevision,
         commitRevision: fixture.session.modelRevision,
       })
       expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
 
-      const commitRevision = fixture.session.modelRevision
-      session.resolveResizeCommit({
+      const commitRevision = (fixture.session.modelRevision + 1) as ModelRevision
+      expect(session.claimCompletion(outcome.intent!.interactionId)).toBe(true)
+      session.resolveCommit({
+        interactionId: outcome.intent!.interactionId,
         authorityRevision: (commitRevision - 1) as ModelRevision,
         commitRevision,
       })
@@ -268,7 +280,7 @@ describe('Piano Roll Interaction Session', () => {
       })
 
       session.notifyAuthorityRevision(commitRevision)
-      expect(session.state).toEqual({
+      expect(session.state).toMatchObject({
         activeGesture: null,
         movePreview: null,
         pointerId: null,
@@ -297,13 +309,16 @@ describe('Piano Roll Interaction Session', () => {
       ...begin,
       phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
     })
-    expect(session.handlePointerInput(end)).toEqual({
+    const outcome = session.handlePointerInput(end)
+    expect(outcome).toMatchObject({
       failure: null,
       intent: {
-        pointerInput: end,
+        selection: { noteId: end.hit?.noteId, toggleSelection: false },
         type: PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION,
       },
     })
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMPLETING)
+    session.finish(outcome.intent!.interactionId)
     expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
 
     session.dispose()
@@ -353,7 +368,8 @@ describe('Piano Roll Interaction Session', () => {
     expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE)
 
     expect(session.cancel()).toBe(true)
-    expect(session.state).toEqual({
+    expect(session.state).toMatchObject({
+      interactionId: null,
       activeGesture: null,
       movePreview: null,
       pointerId: null,
@@ -392,8 +408,9 @@ describe('Piano Roll Interaction Session', () => {
     )
     expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
 
-    session.skipResizeCommit()
-    expect(session.state).toEqual({
+    session.finish(session.state.interactionId!)
+    expect(session.state).toMatchObject({
+      interactionId: null,
       activeGesture: null,
       movePreview: null,
       pointerId: null,
@@ -417,7 +434,7 @@ describe('Piano Roll Interaction Session', () => {
       }),
     )
 
-    expect(outcome).toEqual({
+    expect(outcome).toMatchObject({
       failure: null,
       intent: {
         placement: {
@@ -428,6 +445,8 @@ describe('Piano Roll Interaction Session', () => {
         type: PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE,
       },
     })
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMPLETING)
+    session.finish(outcome.intent!.interactionId)
     expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
 
     session.dispose()
@@ -469,9 +488,270 @@ describe('Piano Roll Interaction Session', () => {
       }),
     )
 
-    expect(outcome).toEqual({ failure: null, intent: null })
+    expect(outcome).toMatchObject({ failure: null, intent: null })
     expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
 
     session.dispose()
   })
+  it('freezes the Begin tool, grid, selection, hit and anchor throughout Note Move', () => {
+    const fixture = createFixture()
+    const session = createPianoRollInteractionSession()
+    const selectedNoteIds = [...fixture.configuration.selectedNoteIds]
+    const configuration = {
+      ...fixture.configuration,
+      grid: { ...fixture.configuration.grid },
+      selectedNoteIds,
+    }
+    const originPosition = { xCssPixel: 240, yCssPixel: 64 }
+    const begin = { ...createPointerInput(), originPosition }
+    session.handlePointerInput(begin, configuration)
+    const interactionId = session.state.interactionId
+    selectedNoteIds.length = 0
+    configuration.tool = PIANO_ROLL_INTERACTION_TOOL.PENCIL
+    configuration.snapEnabled = false
+    configuration.grid.subdivisionSpanTick = parsePositiveTick(120)
+    originPosition.xCssPixel = 800
+    const outcome = session.handlePointerInput(
+      createPointerInput({
+        hit: null,
+        hasExceededDragThreshold: true,
+        phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
+        position: { xCssPixel: 370, yCssPixel: 40 },
+      }),
+    )
+    expect(outcome.intent).toMatchObject({
+      interactionId,
+      target: {
+        session: fixture.session,
+        context: fixture.context,
+        baseRevision: fixture.session.modelRevision,
+      },
+      type: PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES,
+      preview: {
+        deltaTick: 240,
+        deltaPitch: 2,
+        movedNoteIds: fixture.configuration.selectedNoteIds,
+      },
+    })
+    session.dispose()
+  })
+
+  it('recomputes bypassSnap from current modifiers without moving the Pointer', () => {
+    const fixture = createFixture()
+    const session = createPianoRollInteractionSession()
+    session.handlePointerInput(createPointerInput(), fixture.configuration)
+    const input = createPointerInput({
+      hasExceededDragThreshold: true,
+      phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+      position: { xCssPixel: 370, yCssPixel: 64 },
+    })
+    session.handlePointerInput(input)
+    expect(session.state.movePreview?.deltaTick).toBe(240)
+    session.handlePointerInput({ ...input, modifiers: { ...NO_MODIFIERS, alt: true } })
+    expect(session.state.movePreview?.deltaTick).toBe(260)
+    session.handlePointerInput(input)
+    expect(session.state.movePreview?.deltaTick).toBe(240)
+    session.dispose()
+  })
+
+  it('ignores a late End and Cancel when the browser reuses the physical Pointer ID', () => {
+    const fixture = createFixture()
+    const session = createPianoRollInteractionSession()
+    const previous = createPointerInput()
+    session.handlePointerInput(previous, fixture.configuration)
+    session.cancel()
+    const current = { ...previous, captureId: Symbol('next-capture') }
+    session.handlePointerInput(current, fixture.configuration)
+    const interactionId = session.state.interactionId
+    for (const phase of [
+      PIANO_ROLL_POINTER_INPUT_PHASE.END,
+      PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL,
+    ]) {
+      expect(session.handlePointerInput({ ...previous, phase }).intent).toBeNull()
+      expect(session.state.interactionId).toBe(interactionId)
+    }
+    expect(
+      session.handlePointerInput({ ...current, phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }).intent,
+    ).not.toBeNull()
+    session.dispose()
+  })
+
+  it('does not let an old commit reply clear a newer completion', () => {
+    const fixture = createFixture()
+    const session = createPianoRollInteractionSession()
+    const end = createPointerInput({
+      phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
+      hasExceededDragThreshold: true,
+      position: { xCssPixel: 370, yCssPixel: 40 },
+    })
+    session.handlePointerInput(createPointerInput(), fixture.configuration)
+    const first = session.handlePointerInput(end).intent!
+    expect(session.claimCompletion(first.interactionId)).toBe(true)
+    const commitRevision = (fixture.session.modelRevision + 1) as ModelRevision
+    session.resolveCommit({
+      interactionId: first.interactionId,
+      authorityRevision: fixture.session.modelRevision,
+      commitRevision,
+    })
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.AWAITING_AUTHORITY)
+    session.handlePointerInput(
+      createPointerInput({ captureId: Symbol('new-capture') }),
+      fixture.configuration,
+    )
+    const currentId = session.state.interactionId
+    session.resolveCommit({
+      interactionId: first.interactionId,
+      authorityRevision: commitRevision,
+      commitRevision,
+    })
+    session.finish(first.interactionId)
+    expect(session.claimCompletion(first.interactionId)).toBe(false)
+    expect(session.state).toMatchObject({
+      interactionId: currentId,
+      status: PIANO_ROLL_INTERACTION_STATUS.PRESSING,
+    })
+    session.dispose()
+  })
+
+  it('accepts the authoritative projection arriving before its matching commit reply', () => {
+    const fixture = createFixture()
+    const session = createPianoRollInteractionSession()
+    session.handlePointerInput(createPointerInput(), fixture.configuration)
+    const intent = session.handlePointerInput(
+      createPointerInput({
+        phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
+        hasExceededDragThreshold: true,
+        position: { xCssPixel: 370, yCssPixel: 40 },
+      }),
+    ).intent!
+    session.claimCompletion(intent.interactionId)
+    const commitRevision = (fixture.session.modelRevision + 1) as ModelRevision
+    session.notifyAuthorityRevision(commitRevision)
+    expect(session.state.movePreview).not.toBeNull()
+    session.resolveCommit({
+      interactionId: intent.interactionId,
+      authorityRevision: fixture.session.modelRevision,
+      commitRevision,
+    })
+    expect(session.state).toMatchObject({
+      interactionId: null,
+      movePreview: null,
+      status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+    })
+    session.dispose()
+  })
+
+  it.each([false, true])(
+    'invalidates unclaimed input on an external Project commit (completed: %s)',
+    async (completed) => {
+      const fixture = createFixture()
+      const session = createPianoRollInteractionSession()
+      session.handlePointerInput(createPointerInput(), fixture.configuration)
+      const interactionId = session.state.interactionId!
+      const end = createPointerInput({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.END })
+      if (completed) session.handlePointerInput(end)
+      fixture.session.undo()
+      // Project publication is queued: the synchronous revision guard must already reject End.
+      expect(session.handlePointerInput(end).intent).toBeNull()
+      expect(session.claimCompletion(interactionId)).toBe(false)
+      await Promise.resolve()
+      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+      expect(session.claimCompletion(interactionId)).toBe(false)
+      expect(session.handlePointerInput(end).intent).toBeNull()
+      session.dispose()
+    },
+  )
+
+  it('cancels Note mapping changes while allowing an equivalent viewport projection', () => {
+    const fixture = createFixture()
+    const session = createPianoRollInteractionSession()
+    session.handlePointerInput(createPointerInput(), fixture.configuration)
+    const viewport = fixture.configuration.viewport!
+    session.notifyViewport({ ...viewport })
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.PRESSING)
+    session.notifyViewport({ ...viewport, widthCssPixel: viewport.widthCssPixel + 1 })
+    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+    expect(
+      session.handlePointerInput(createPointerInput({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }))
+        .intent,
+    ).toBeNull()
+    session.dispose()
+  })
+
+  it.each([PIANO_ROLL_HIT_ZONE.BODY, PIANO_ROLL_HIT_ZONE.RESIZE_END])(
+    'emits no command intent when a %s drag returns to its origin',
+    (zone) => {
+      const fixture = createFixture()
+      const session = createPianoRollInteractionSession()
+      const begin = createPointerInput({ hit: { zone, noteId: parseNoteId('editor-note-inside') } })
+      session.handlePointerInput(begin, fixture.configuration)
+      session.handlePointerInput({
+        ...begin,
+        phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
+        hasExceededDragThreshold: true,
+        position: { xCssPixel: 370, yCssPixel: 40 },
+      })
+      const outcome = session.handlePointerInput({
+        ...begin,
+        phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
+        hasExceededDragThreshold: true,
+      })
+      expect(outcome).toEqual({ failure: null, intent: null })
+      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+      session.dispose()
+    },
+  )
+
+  it('closes input and clears healthy projections when an observer fails', () => {
+    const fixture = createFixture()
+    const session = createPianoRollInteractionSession()
+    const failure = new Error('Broken preview consumer')
+    const onStateChange = vi.fn<(state: PianoRollInteractionState) => void>()
+    session.subscribe({ onStateChange })
+    session.subscribe({
+      onStateChange: () => {
+        throw failure
+      },
+    })
+    expect(session.handlePointerInput(createPointerInput(), fixture.configuration)).toEqual({
+      failure,
+      intent: null,
+    })
+    expect(onStateChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ interactionId: null, status: PIANO_ROLL_INTERACTION_STATUS.IDLE }),
+    )
+    expect(
+      session.handlePointerInput(createPointerInput({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }))
+        .intent,
+    ).toBeNull()
+    session.dispose()
+  })
+  it.each(['control', 'meta', 'shift'] as const)(
+    'resolves toggleSelection from Begin %s after its key is released',
+    (modifier) => {
+      const fixture = createFixture()
+      const session = createPianoRollInteractionSession()
+      const begin = createPointerInput({ originModifiers: { ...NO_MODIFIERS, [modifier]: true } })
+      session.handlePointerInput(begin, fixture.configuration)
+      const outcome = session.handlePointerInput(
+        createPointerInput({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }),
+      )
+      expect(outcome.intent).toMatchObject({
+        type: PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION,
+        selection: { noteId: begin.hit!.noteId, toggleSelection: true },
+      })
+      session.dispose()
+    },
+  )
+
+  it.each([PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE, PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL])(
+    'does not produce a Selection result from %s',
+    (phase) => {
+      const fixture = createFixture()
+      const session = createPianoRollInteractionSession()
+      session.handlePointerInput(createPointerInput(), fixture.configuration)
+      expect(session.handlePointerInput(createPointerInput({ phase })).intent).toBeNull()
+      session.dispose()
+    },
+  )
 })

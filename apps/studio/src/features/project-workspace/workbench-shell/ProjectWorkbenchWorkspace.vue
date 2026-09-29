@@ -39,7 +39,7 @@ const props = withDefaults(
     readonly pianoRollPresentation: ProjectPianoRollPresentation | null
     readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
     readonly projectId: string
-    readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
+    readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
     readonly selectedTempoEventId?: TempoEventId | null
     readonly tempoEditingDisabled?: boolean
     readonly tempoEvents?: readonly TempoEventRecord[]

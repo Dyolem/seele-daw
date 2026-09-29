@@ -57,6 +57,8 @@ function createFixture() {
   return { context, grid, viewport }
 }
 
+const TEST_CAPTURE_ID = Symbol('test-capture')
+
 function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): PianoRollPointerInput {
   const originPosition = Object.freeze({ xCssPixel: 130, yCssPixel: 8 })
 
@@ -77,6 +79,7 @@ function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): Pia
     }),
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
+    captureId: TEST_CAPTURE_ID,
     pointerId: 1,
     pointerType: 'mouse',
     position: originPosition,

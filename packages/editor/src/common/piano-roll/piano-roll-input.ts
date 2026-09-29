@@ -13,44 +13,13 @@ export interface PianoRollHit {
   readonly zone: PianoRollHitZone
 }
 
-export const PIANO_ROLL_POINTER_INPUT_PHASE = {
-  BEGIN: 'begin',
-  CANCEL: 'cancel',
-  END: 'end',
-  UPDATE: 'update',
-} as const
-
-export type PianoRollPointerInputPhase =
-  (typeof PIANO_ROLL_POINTER_INPUT_PHASE)[keyof typeof PIANO_ROLL_POINTER_INPUT_PHASE]
-
-export type PianoRollPointerType = 'mouse' | 'pen' | 'touch' | 'unknown'
-
-export interface PianoRollCssPoint {
-  readonly xCssPixel: number
-  readonly yCssPixel: number
-}
-
-export interface PianoRollInputModifiers {
-  readonly alt: boolean
-  readonly control: boolean
-  readonly meta: boolean
-  readonly shift: boolean
-}
-
-/**
- * Framework-neutral facts for one captured primary-pointer gesture.
- *
- * Hit, origin modifiers, and origin position are fixed at Pointer Down.
- * Current modifiers and position may change while the Pointer is captured.
- */
-export interface PianoRollPointerInput<Hit extends object = PianoRollHit> {
-  readonly hasExceededDragThreshold: boolean
-  readonly hit: Readonly<Hit> | null
-  readonly modifiers: PianoRollInputModifiers
-  readonly originModifiers: PianoRollInputModifiers
-  readonly originPosition: PianoRollCssPoint
-  readonly phase: PianoRollPointerInputPhase
-  readonly pointerId: number
-  readonly pointerType: PianoRollPointerType
-  readonly position: PianoRollCssPoint
-}
+// Piano Roll specializes the shared captured-input contract with its own Hit semantics.
+export { EDITOR_POINTER_INPUT_PHASE as PIANO_ROLL_POINTER_INPUT_PHASE } from '#internal/common/interaction/editor-pointer-input'
+export type {
+  EditorCssPoint as PianoRollCssPoint,
+  EditorInputModifiers as PianoRollInputModifiers,
+  EditorPointerInputPhase as PianoRollPointerInputPhase,
+  EditorPointerType as PianoRollPointerType,
+} from '#internal/common/interaction/editor-pointer-input'
+import type { EditorPointerInput } from '#internal/common/interaction/editor-pointer-input'
+export type PianoRollPointerInput<Hit extends object = PianoRollHit> = EditorPointerInput<Hit>

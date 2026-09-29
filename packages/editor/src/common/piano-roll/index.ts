@@ -28,14 +28,16 @@ export type {
 } from './piano-roll-input'
 
 export { applyPianoRollSelectInteraction } from './operations/piano-roll-select-interaction'
-export type { PianoRollSelectionTarget } from './operations/piano-roll-select-interaction'
+export type {
+  PianoRollSelectionTarget,
+  PianoRollSelectionChange,
+} from './operations/piano-roll-select-interaction'
 
 export {
   PIANO_ROLL_INTERACTION_INTENT,
   PIANO_ROLL_INTERACTION_STATUS,
   PIANO_ROLL_INTERACTION_TOOL,
-  createPianoRollInteractionSession,
-} from './state-machine/piano-roll-interaction-session'
+} from './interaction/piano-roll-interaction'
 export type {
   PianoRollAddNoteIntent,
   PianoRollInteractionConfiguration,
@@ -49,9 +51,9 @@ export type {
   PianoRollMoveNotesIntent,
   PianoRollResizeNoteIntent,
   PianoRollResolveSelectionIntent,
-  ResolvePianoRollMoveCommitInput,
-  ResolvePianoRollResizeCommitInput,
-} from './state-machine/piano-roll-interaction-session'
+  PianoRollInteractionTarget,
+  ResolvePianoRollCommitInput,
+} from './interaction/piano-roll-interaction'
 
 export { PianoRollError } from './piano-roll-error'
 export type { PianoRollErrorCode } from './piano-roll-error'
@@ -125,3 +127,5 @@ export type {
 export * from './track/index'
 export * from './sustain-pedal-lane/index'
 export * from './value-lane/index'
+
+export { createPianoRollInteractionSession } from './interaction/piano-roll-interaction-session'

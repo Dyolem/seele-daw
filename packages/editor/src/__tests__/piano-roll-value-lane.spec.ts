@@ -28,6 +28,8 @@ function createViewport() {
   })
 }
 
+const TEST_CAPTURE_ID = Symbol('test-capture')
+
 function createPointerInput(
   overrides: Partial<PianoRollPointerInput<PianoRollSustainPedalLaneHit>> = {},
 ): PianoRollPointerInput<PianoRollSustainPedalLaneHit> {
@@ -39,6 +41,7 @@ function createPointerInput(
     originModifiers: Object.freeze({ alt: false, control: false, meta: false, shift: false }),
     originPosition,
     phase: PIANO_ROLL_POINTER_INPUT_PHASE.END,
+    captureId: TEST_CAPTURE_ID,
     pointerId: 1,
     pointerType: 'mouse',
     position: originPosition,

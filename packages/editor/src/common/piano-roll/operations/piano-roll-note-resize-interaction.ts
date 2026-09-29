@@ -64,6 +64,7 @@ export interface ResolvePianoRollNoteResizePreviewInput {
   readonly gesture: PianoRollNoteResizeGesture
   readonly grid: TimelineGrid
   readonly pointerInput: PianoRollPointerInput
+  readonly bypassSnap: boolean
   readonly snapEnabled: boolean
   readonly viewport: PianoRollViewport
 }
@@ -138,7 +139,7 @@ function resolveTargetEdgeTick(input: ResolvePianoRollNoteResizePreviewInput): T
   const rawTargetSourceTick = resolveRawTargetEdgeTick(input)
   let candidateTargetTick: number
 
-  if (!input.snapEnabled || input.pointerInput.modifiers.alt) {
+  if (!input.snapEnabled || input.bypassSnap) {
     candidateTargetTick = Math.round(rawTargetSourceTick)
   } else {
     const rawTargetClipTick = rawTargetSourceTick - input.gesture.context.sourceStartTick
@@ -215,7 +216,7 @@ export function resolvePianoRollNoteResizePreview(
     input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START ? sourceStartTick : sourceEndTick
   const snapGuideTick =
     input.snapEnabled &&
-    !pointerInput.modifiers.alt &&
+    !input.bypassSnap &&
     draggedEdgeTick >= input.gesture.context.sourceStartTick &&
     draggedEdgeTick <= input.gesture.context.sourceEndTick
       ? parseTick(draggedEdgeTick - input.gesture.context.sourceStartTick)

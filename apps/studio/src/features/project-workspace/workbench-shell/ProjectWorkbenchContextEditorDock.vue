@@ -43,7 +43,7 @@ interface ProjectWorkbenchContextEditorDockProps {
   readonly isMaximized: boolean
   readonly pianoRollPresentation: ProjectPianoRollPresentation | null
   readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
-  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
+  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly selectedClip: ProjectMidiClipPresentation | null
   readonly selectedTrack: ProjectTrackPresentation | null
   readonly timeSignatureNumerator: number

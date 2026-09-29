@@ -6,6 +6,11 @@ import {
   studioKeyboardImportViolation,
 } from './studio-keyboard-boundaries.mjs'
 
+import {
+  editorInteractionFileViolation,
+  editorInteractionImportViolation,
+} from './editor-interaction-boundaries.mjs'
+
 const root = process.cwd()
 const packageRoot = path.join(root, 'packages')
 const packageNames = [
@@ -159,6 +164,8 @@ for (const file of await collectFiles(root)) {
 
   const source = await readFile(file, 'utf8')
   const relativeFile = path.relative(root, file).split(path.sep).join('/')
+  const interactionFileViolation = editorInteractionFileViolation(root, file, source)
+  if (interactionFileViolation) errors.push(`${relativeFile}: ${interactionFileViolation}`)
   const keyboardFileViolation = studioKeyboardFileViolation(root, file, source)
   if (keyboardFileViolation) errors.push(`${relativeFile}: ${keyboardFileViolation}`)
 
@@ -169,9 +176,18 @@ for (const file of await collectFiles(root)) {
   }
 
   for (const specifier of importsFrom(source)) {
-    let localTarget = workspaceAliasTarget(specifier, workspaceDirectory)
+    let localTarget =
+      workspaceAliasTarget(specifier, workspaceDirectory) ??
+      workspacePrivateImportTarget(specifier, workspaceDirectory)
     if (specifier.startsWith('.')) localTarget = path.resolve(path.dirname(file), specifier)
     else if (path.isAbsolute(specifier)) localTarget = specifier
+    const interactionImportViolation = editorInteractionImportViolation(
+      root,
+      file,
+      localTarget,
+      specifier,
+    )
+    if (interactionImportViolation) errors.push(`${relativeFile}: ${interactionImportViolation}`)
     const keyboardImportViolation = studioKeyboardImportViolation(root, file, localTarget)
     if (keyboardImportViolation) errors.push(`${relativeFile}: ${keyboardImportViolation}`)
 

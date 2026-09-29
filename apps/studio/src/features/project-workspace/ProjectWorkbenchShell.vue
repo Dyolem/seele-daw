@@ -37,7 +37,7 @@ interface ProjectWorkbenchShellProps {
   readonly playbackTime: string
   readonly projectId: string
   readonly projectName: string
-  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
+  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly saveFailureMessage?: string | null
   readonly saveStatus: ActiveProjectSaveStatus
   readonly selectedTempoEventId?: TempoEventId | null

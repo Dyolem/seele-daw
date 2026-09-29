@@ -5,8 +5,8 @@
 > 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model，以及从
 > immutable Snapshot 派生的 Track 全局 Clip / Note Read Model；
 > Clip-scoped Note Selection Session、Timeline Grid Snap 与 Pencil Note Placement；
-> Cursor Move 与 Cursor / Pencil 单 Note Resize Gesture、Preview 和 Interaction Session
-> 分支已经就绪；
+> Cursor Move 与 Cursor / Pencil 单 Note Resize Gesture、Preview 已迁移到中立 Interaction
+> Session 与独立 Note Operation，提交使用冻结目标和单次交互身份；
 > `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
 > Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；`common` / `browser`
 > 还已完成显式 Channel 的 CC64 Value Lane、Pencil Placement、Event Selection、主导轴 Move /
@@ -20,10 +20,10 @@
 ```text
 DOM / Pointer / Keyboard / MIDI
 -> EditorInput
--> EditorIntent
--> Tool Interaction State Machine
--> Preview
--> ProjectCommand
+-> Surface / Tool Operation
+-> InteractionSession / Preview
+-> Identity-bound completion
+-> Studio ProjectCommand
 -> project-core atomic commit
 ```
 
@@ -53,24 +53,25 @@ DOM / Pointer / Keyboard / MIDI
 
 本包不能拥有或复制一份可写 ProjectModel。删除实体、Undo/Redo 和项目切换后，Selection 必须按稳定 ID 清理或恢复；Preview 不进入 History、Autosave 或 Playback compiler。
 
-## 建议的内部模块
+## 当前交互模块
 
 ```text
 src/
 ├── common/
-│   ├── piano-roll/   已实现的 Note / CC64 Clip / Track 投影、Viewport 与交互解析
-│   ├── input/        EditorInput 与 EditorIntent
-│   ├── session/      Selection、focus、clipboard
-│   ├── surfaces/     Surface 契约与领域坐标
-│   ├── tools/        交互状态机、约束与取消语义
-│   ├── snap/         吸附候选和策略
-│   └── read-models/  面向编辑器的查询适配
+│   ├── interaction/               输入契约、Session、Modifier、可选 Commit Handoff
+│   └── piano-roll/
+│       ├── interaction/           Note 契约、Operation 与 Session 组合
+│       ├── operations/            Note 选择、放置、移动、缩放的领域运算
+│       └── sustain-pedal-lane/    CC64 投影及现有语义 Session（G3 迁移）
 ├── browser/
-│   └── piano-roll/   Canvas Grid、Note Adapter、DOM Hit 与 Pointer Input
-└── index.ts          唯一公开入口
+│   ├── interaction/               中立 Pointer Capture 与 Key State Adapter
+│   └── piano-roll/                Grid / Note Renderer、领域 Hit 与 Adapter 组合
+└── index.ts                        唯一公开入口
 ```
 
-目录按真实功能逐步建立，不能把 `common` 变成无归属工具集合。
+中立 Session 使用 class 拥有生命周期，领域规则通过 Operation 组合接入。Note、Tempo 与
+Locate 的协议对照、状态实现理由和迁移边界见
+[Editor Interaction V1 决策](./docs/editor-interaction-architecture-v1.md)。
 
 ## 关键交互规则
 
@@ -161,11 +162,11 @@ Active Project、ID、默认 Note Facts 与提交。
 - DOM Event composed path 到稳定 `NoteId` / body zone 的小型 Hit Adapter；
 - Surface-local CSS Pixel 坐标、固定的 Down origin Hit 与修饰键；
 - 单 primary Pointer、Pointer Capture 与默认 4 CSS Pixel Drag Threshold；
-- Up、Cancel、lost capture、dispose 与失败隔离的完整生命周期。
+- 每次捕获独立的 `captureId`；Up、Cancel、lost capture、blur、dispose 和消费者失败均关闭输入。
 
 Browser Input 不读取 ProjectSession，也不直接修改 Selection。默认入口维持 Note DOM Hit；
 需要其他语义 Hit 的 Surface 必须显式提供 Resolver，并复用同一 Pointer Capture、阈值、取消与
-失败隔离生命周期。它只把浏览器事实交给 Select Interaction 或 Pencil Placement；Keyboard、
+失败隔离生命周期。它把浏览器事实交给 Surface 的 Operation / Session；Keyboard、
 Tool Preference 与 Project Command 由 Studio 组合。
 
 ## 已实现：CC64 Sustain Pedal Lane Editor Foundation

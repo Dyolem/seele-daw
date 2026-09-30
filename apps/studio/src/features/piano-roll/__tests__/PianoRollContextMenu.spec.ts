@@ -1,9 +1,9 @@
+import { STUDIO_ACTION_CONTEXT_KEY } from '@/symbols'
 import { HotkeyManager } from '@tanstack/hotkeys'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ContextMenuRoot } from 'reka-ui'
 import { defineComponent, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-
 import {
   createStudioActionRuntime,
   type StudioActionRuntime,
@@ -21,7 +21,6 @@ import {
   type StudioActionCompletion,
   type StudioActionFailure,
 } from '@/workbench/actions/studio-action'
-import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
 

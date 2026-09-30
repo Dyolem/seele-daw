@@ -1,10 +1,10 @@
+import { PROJECT_ENTRY_CONTEXT_KEY, PROJECT_MIDI_IMPORT_CONTEXT_KEY } from '@/symbols'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { parseProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
-
 import ProjectEntryPage from '@/features/project-entry/ProjectEntryPage.vue'
 import { PROJECT_ROUTE_NAME, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
@@ -15,18 +15,12 @@ import {
   type ProjectEntryCoordinator,
   type ProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import {
-  PROJECT_ENTRY_CONTEXT_KEY,
-  type ProjectEntryVueContext,
-} from '@/workbench/project/entry/vue/project-entry-context'
+import { type ProjectEntryVueContext } from '@/workbench/project/entry/vue/project-entry-context'
 import type {
   ProjectMidiImportCoordinator,
   ProjectMidiImportResult,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
-import {
-  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
-  type ProjectMidiImportVueContext,
-} from '@/workbench/project/midi-import/vue/project-midi-import-context'
+import { type ProjectMidiImportVueContext } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
   NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,

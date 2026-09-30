@@ -4,30 +4,16 @@ import {
   type PianoRollAddNoteIntent,
   type PianoRollEditorSession,
   type PianoRollInteractionIntent,
-  type PianoRollInteractionSession,
   type PianoRollMoveNotesIntent,
   type PianoRollResizeNoteIntent,
   type PianoRollResolveSelectionIntent,
 } from '@seele-daw/editor'
-import type { ModelRevision, NoteId, ProjectSession } from '@seele-daw/project-core'
+import type { ModelRevision, NoteId } from '@seele-daw/project-core'
 
-import type { ProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
-
-export interface ProjectPianoRollIntentHandlerDependencies {
-  readonly getAuthorityRevision: () => ModelRevision | null
-  readonly getSession: () => Pick<ProjectSession, 'query'>
-  readonly getEditorSession: () => PianoRollEditorSession | null
-  readonly interactionSession: Pick<
-    PianoRollInteractionSession,
-    'claimCompletion' | 'resolveCommit' | 'finish'
-  >
-  readonly projectMidiNotes: ProjectMidiNoteCoordinator
-  readonly reportDanger: (title: string, description: string) => void
-  readonly reportWarning: (title: string, description: string) => void
-  readonly setFailureMessage: (message: string | null) => void
-}
-
-export type ProjectPianoRollIntentHandler = (intent: PianoRollInteractionIntent) => void
+import type {
+  ProjectPianoRollIntentHandler,
+  ProjectPianoRollIntentHandlerDependencies,
+} from '@/features/piano-roll/types/piano-roll-intent'
 
 function describeCause(cause: unknown, fallback: string): string {
   if (cause instanceof Error && cause.message.trim().length > 0) {

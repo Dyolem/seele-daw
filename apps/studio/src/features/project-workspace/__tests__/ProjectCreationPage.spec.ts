@@ -1,9 +1,9 @@
+import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/symbols'
 import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { shallowReadonly, shallowRef } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
-
 import ProjectCreationPage from '@/features/project-workspace/ProjectCreationPage.vue'
 import { createStudioRouter } from '@/router'
 import { PROJECT_ROUTE_NAME } from '@/router/project-routes'
@@ -12,10 +12,7 @@ import {
   ACTIVE_PROJECT_PHASE,
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import {
-  ACTIVE_PROJECT_CONTEXT_KEY,
-  type ActiveProjectVueContext,
-} from '@/workbench/project/vue/active-project-context'
+import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-context'
 
 interface Deferred<T> {
   readonly promise: Promise<T>

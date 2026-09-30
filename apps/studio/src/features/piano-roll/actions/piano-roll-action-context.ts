@@ -1,11 +1,7 @@
-import { inject, type InjectionKey } from 'vue'
-
-import type { PianoRollToolActionTarget } from '@/features/piano-roll/actions/piano-roll-tool-actions'
+import { PIANO_ROLL_TOOL_ACTION_TARGET_KEY } from '@/symbols'
+import { inject } from 'vue'
+import type { PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
 import type { StudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
-
-export const PIANO_ROLL_TOOL_ACTION_TARGET_KEY: InjectionKey<
-  StudioActionTargetSlot<PianoRollToolActionTarget>
-> = Symbol('PianoRollToolActionTarget')
 
 export function usePianoRollToolActionTarget(): StudioActionTargetSlot<PianoRollToolActionTarget> {
   const target = inject(PIANO_ROLL_TOOL_ACTION_TARGET_KEY, null)

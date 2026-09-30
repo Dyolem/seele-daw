@@ -1,6 +1,6 @@
+import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/symbols'
 import { createApp, isProxy, isReadonly, isShallow } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
@@ -13,10 +13,7 @@ import type {
   ProjectPlaybackVisualFramePort,
   ProjectPlaybackVisualPosition,
 } from '@/workbench/project/playback/project-playback-visual-position'
-import {
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  useProjectPlayback,
-} from '@/workbench/project/playback/vue/project-playback-context'
+import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 import { createProjectPlaybackVueBinding } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 
 const INITIAL_STATE = Object.freeze<ProjectPlaybackState>({

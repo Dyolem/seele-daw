@@ -12,7 +12,7 @@ import { shallowRef } from 'vue'
 import type {
   ProjectPianoRollPresentation,
   ProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
+} from '@/features/piano-roll/types/piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import type { ProjectTempoControlMode } from '@/features/project-workspace/tempo/tempo-control'

@@ -1,4 +1,9 @@
-import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+import {
+  PROJECT_CLIP_CONTEXT_KEY,
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  PROJECT_TRACK_CONTEXT_KEY,
+  TEMPO_EVENT_ACTION_CONTEXT_KEY,
+} from '@/symbols'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
 import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
@@ -23,17 +28,13 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef, type ShallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { PROJECT_TRACK_INSTRUMENT_STATUS } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import {
-  PROJECT_CLIP_CONTEXT_KEY,
-  type ProjectClipVueContext,
-} from '@/workbench/project/clip/vue/project-clip-context'
+import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
 import type {
   ProjectPlaybackCoordinator,
   ProjectPlaybackLocateSession,
@@ -43,15 +44,9 @@ import {
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import {
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  type ProjectPlaybackVueContext,
-} from '@/workbench/project/playback/vue/project-playback-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import {
-  PROJECT_TRACK_CONTEXT_KEY,
-  type ProjectTrackVueContext,
-} from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
 
 const mountedWrappers: VueWrapper[] = []
 const STUDIO_GRAND_INSTRUMENT = Object.freeze({

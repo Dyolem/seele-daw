@@ -1,5 +1,10 @@
+import {
+  PROJECT_CLIP_CONTEXT_KEY,
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  PROJECT_TRACK_CONTEXT_KEY,
+  TEMPO_EVENT_ACTION_CONTEXT_KEY,
+} from '@/symbols'
 import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
-import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
@@ -19,7 +24,6 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
@@ -40,25 +44,16 @@ import {
 } from '@/workbench/project/active-project-state'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import {
-  PROJECT_CLIP_CONTEXT_KEY,
-  type ProjectClipVueContext,
-} from '@/workbench/project/clip/vue/project-clip-context'
+import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import {
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  type ProjectPlaybackVueContext,
-} from '@/workbench/project/playback/vue/project-playback-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import {
-  PROJECT_TRACK_CONTEXT_KEY,
-  type ProjectTrackVueContext,
-} from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
 
 interface MountShellOptions {
   readonly clips?: readonly ProjectMidiClipPresentation[]

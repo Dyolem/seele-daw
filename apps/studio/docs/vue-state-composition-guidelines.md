@@ -73,6 +73,11 @@ Store 或 Context。
 | Navigation Decision | pending binding + resolver        | 一次性异步决策 Port                          |
 | Project Playback    | Coordinator + shallow Vue Binding | 外部音频资源、Transport 命令与可丢弃状态投影 |
 
+所有 Studio `InjectionKey` 统一在 [Symbol 注册文件](../src/symbols.ts) 声明。Provider、Context
+hook 和测试从同一位置导入；注册文件通过 `import type` 引用契约，不加载任何服务或组件的
+运行时实现。稳定的 Context Key 与每次创建的 Keyboard Owner 身份分开登记，详见
+[工程准则](../../../CODE_GUIDELINES.md#symbol-注册与身份)。
+
 Context 可以携带 `shallowRef`，但如果该对象开始拥有大量 UI 状态、派生值、协调动作、
 重置规则和多个跨分支消费者，它已经成为手写 Store，应重新评估 Pinia。
 

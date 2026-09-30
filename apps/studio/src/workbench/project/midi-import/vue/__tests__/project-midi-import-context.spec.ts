@@ -1,9 +1,8 @@
+import { PROJECT_MIDI_IMPORT_CONTEXT_KEY } from '@/symbols'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectMidiImportCoordinator } from '@/workbench/project/midi-import/project-midi-import-coordinator'
 import {
-  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
   useProjectMidiImport,
   type ProjectMidiImportVueContext,
 } from '@/workbench/project/midi-import/vue/project-midi-import-context'

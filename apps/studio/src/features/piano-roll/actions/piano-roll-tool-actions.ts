@@ -1,7 +1,5 @@
-import {
-  PIANO_ROLL_TOOL,
-  type PianoRollTool,
-} from '@/features/piano-roll/piano-roll-preferences-store'
+import type { PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
+import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import {
   STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
@@ -10,14 +8,6 @@ import {
 } from '@/workbench/actions/studio-action'
 import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
 import type { StudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
-
-export interface PianoRollToolActionTarget {
-  isFocused(): boolean
-  getTool(): PianoRollTool
-  activateTool(tool: PianoRollTool): void
-  isSnapEnabled(): boolean
-  toggleSnap(): void
-}
 
 export function createPianoRollToolActions(
   targets: StudioActionTargetSlot<PianoRollToolActionTarget>,

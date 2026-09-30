@@ -1,3 +1,9 @@
+import { installPianoRollResizeObserver } from '@/features/piano-roll/__tests__/support/piano-roll-resize-observer-test-support'
+import {
+  PROJECT_MIDI_NOTE_CONTEXT_KEY,
+  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+} from '@/symbols'
 import {
   getPianoRollContextMenuItem,
   requestPianoRollContextMenu,
@@ -16,14 +22,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
-import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
-import ProjectPianoRollTrackSurface from '@/features/piano-roll/ProjectPianoRollTrackSurface.vue'
+import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
+import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue'
+import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import {
-  PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
   createProjectPianoRollTrackPresentation,
   createProjectPianoRollPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
+} from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import {
   ACTIVE_PROJECT_PHASE,
@@ -33,25 +38,16 @@ import {
 import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
-import {
-  PROJECT_MIDI_NOTE_CONTEXT_KEY,
-  type ProjectMidiNoteVueContext,
-} from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { type ProjectMidiNoteVueContext } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import { createProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
-import {
-  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
-  type ProjectMidiSustainPedalVueContext,
-} from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
+import { type ProjectMidiSustainPedalVueContext } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import {
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  type ProjectPlaybackVueContext,
-} from '@/workbench/project/playback/vue/project-playback-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
 import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 
 const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
@@ -315,6 +311,7 @@ function createSurfaceFixture() {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   restorePrototypeProperty('hasPointerCapture')
   restorePrototypeProperty('releasePointerCapture')
   restorePrototypeProperty('setPointerCapture')
@@ -322,6 +319,47 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollTrackSurface', () => {
+  it('rolls back renderers and input when viewport observation fails during mount', async () => {
+    const probe = installPianoRollResizeObserver('.project-piano-roll-track__canvas-host')
+    const { session, wrapper } = createSurfaceFixture()
+    await nextTick()
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    const observer = probe.forElement(host)
+    expect(wrapper.text()).toContain('Viewport observation failed')
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.project-piano-roll-track__note-host').element.childElementCount).toBe(0)
+
+    const revision = session.modelRevision
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+    observer.deliver()
+    await nextTick()
+    expect(session.modelRevision).toBe(revision)
+    expect(wrapper.text()).toContain('Viewport observation failed')
+    expect(wrapper.get('.project-piano-roll-track__note-host').element.childElementCount).toBe(0)
+    wrapper.unmount()
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels a captured placement when the Track viewport changes size', async () => {
+    const probe = installPianoRollResizeObserver()
+    const { session, wrapper } = createSurfaceFixture()
+    await nextTick()
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    const observer = probe.forElement(host)
+    const revision = session.modelRevision
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+    expect(host.hasPointerCapture(1)).toBe(true)
+    Object.defineProperty(host, 'clientWidth', { configurable: true, value: 6_000 })
+    observer.deliver()
+    expect(host.hasPointerCapture(1)).toBe(false)
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+    expect(session.modelRevision).toBe(revision)
+    wrapper.unmount()
+    observer.deliver()
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps one physical keymap while Track and Clip surfaces replace each other before old teardown', async () => {
     const fixture = createSurfaceFixture()
     const clipPresentation = createProjectPianoRollPresentation(
@@ -395,10 +433,9 @@ describe('ProjectPianoRollTrackSurface', () => {
       wrapper.find('.project-piano-roll-track__timeline-content').attributes('style'),
     ).toContain('750rem')
     expect(wrapper.findAll('.project-piano-roll-track__clip-windows button')).toHaveLength(1)
-    expect(
-      (wrapper.find('.project-piano-roll-track__active-clip select').element as HTMLSelectElement)
-        .value,
-    ).toBe(clip.clipId)
+    expect(wrapper.get('[role="combobox"][aria-label="Active Clip"]').text()).toBe(
+      presentation.readModel.clips[0]?.clip.name,
+    )
 
     const host = wrapper.find('.project-piano-roll-track__canvas-host')
     dispatchPointer(host.element, 'pointermove', { clientX: 85, clientY: 125 })

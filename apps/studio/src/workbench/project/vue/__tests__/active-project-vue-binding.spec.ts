@@ -1,14 +1,11 @@
+import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/symbols'
 import { createApp, isProxy, isReadonly, isShallow } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import {
   createActiveProjectService,
   type ActiveProjectService,
 } from '@/workbench/project/active-project-service'
-import {
-  ACTIVE_PROJECT_CONTEXT_KEY,
-  useActiveProject,
-} from '@/workbench/project/vue/active-project-context'
+import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 import { createActiveProjectVueBinding } from '@/workbench/project/vue/active-project-vue-binding'
 import { ActiveProjectVueError } from '@/workbench/project/vue/active-project-vue-error'
 import {

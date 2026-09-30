@@ -1,4 +1,5 @@
-import { inject, onBeforeUnmount, watch, type InjectionKey, type WatchSource } from 'vue'
+import { STUDIO_EDITOR_ACTION_CONTEXT_KEY } from '@/symbols'
+import { inject, onBeforeUnmount, watch, type WatchSource } from 'vue'
 import type {
   StudioEditorSelectionTarget,
   StudioInteractionTarget,
@@ -12,10 +13,6 @@ export interface StudioEditorActionContext {
   readonly selectionTarget: StudioActionTargetSlot<StudioEditorSelectionTarget>
   readonly interactionTarget: StudioActionTargetSlot<StudioInteractionTarget>
 }
-
-export const STUDIO_EDITOR_ACTION_CONTEXT_KEY: InjectionKey<StudioEditorActionContext> = Symbol(
-  'StudioEditorActionContext',
-)
 
 export function useStudioEditorActionTargets(): StudioEditorActionContext {
   const targets = inject(STUDIO_EDITOR_ACTION_CONTEXT_KEY, null)

@@ -1,4 +1,14 @@
 import {
+  ACTIVE_PROJECT_CONTEXT_KEY,
+  PROJECT_CLIP_CONTEXT_KEY,
+  PROJECT_ENTRY_CONTEXT_KEY,
+  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
+  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
+  PROJECT_TRACK_CONTEXT_KEY,
+} from '@/symbols'
+import {
   parseClipId,
   parseProjectId,
   parseTrackId,
@@ -10,7 +20,6 @@ import { createPinia } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
 import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
-
 import App from '@/App.vue'
 import { createStudioRouter } from '@/router'
 import { createProjectWorkspaceLocation, PROJECT_ROUTE_NAME } from '@/router/project-routes'
@@ -23,49 +32,27 @@ import {
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import {
-  PROJECT_CLIP_CONTEXT_KEY,
-  type ProjectClipVueContext,
-} from '@/workbench/project/clip/vue/project-clip-context'
+import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   PROJECT_ENTRY_SELECTION_REASON,
   type ProjectEntryCoordinator,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import {
-  PROJECT_ENTRY_CONTEXT_KEY,
-  type ProjectEntryVueContext,
-} from '@/workbench/project/entry/vue/project-entry-context'
+import { type ProjectEntryVueContext } from '@/workbench/project/entry/vue/project-entry-context'
 import type { ProjectMidiImportCoordinator } from '@/workbench/project/midi-import/project-midi-import-coordinator'
-import {
-  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
-  type ProjectMidiImportVueContext,
-} from '@/workbench/project/midi-import/vue/project-midi-import-context'
-import {
-  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
-  type ProjectNavigationDecisionVueContext,
-} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import { type ProjectMidiImportVueContext } from '@/workbench/project/midi-import/vue/project-midi-import-context'
+import { type ProjectNavigationDecisionVueContext } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import {
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  type ProjectPlaybackVueContext,
-} from '@/workbench/project/playback/vue/project-playback-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import {
-  PROJECT_TRACK_CONTEXT_KEY,
-  type ProjectTrackVueContext,
-} from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
 import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
-import { PROJECT_TEMPO_EVENT_CONTEXT_KEY } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
-import {
-  ACTIVE_PROJECT_CONTEXT_KEY,
-  type ActiveProjectVueContext,
-} from '@/workbench/project/vue/active-project-context'
+import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-context'
 
 function createActiveProjectContext(state: ActiveProjectState): ActiveProjectVueContext {
   const stateRef = shallowRef(state)

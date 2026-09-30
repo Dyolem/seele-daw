@@ -1,3 +1,4 @@
+import { createPointerCaptureId } from '#internal/common/interaction/interaction-symbols'
 import { EditorPointerInputError } from './editor-pointer-input-error'
 import {
   EDITOR_POINTER_INPUT_PHASE,
@@ -222,7 +223,7 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
       hit,
       originModifiers,
       originPosition: position,
-      captureId: Symbol('pointer-capture'),
+      captureId: createPointerCaptureId(),
       pointerId: event.pointerId,
       pointerType: normalizePointerType(event.pointerType),
       hasExceededDragThreshold: false,

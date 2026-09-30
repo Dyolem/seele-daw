@@ -1,14 +1,11 @@
-import { inject, type InjectionKey } from 'vue'
-
+import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/symbols'
+import { inject } from 'vue'
 import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
 import { ProjectMidiSustainPedalVueError } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-vue-error'
 
 export interface ProjectMidiSustainPedalVueContext {
   readonly projectMidiSustainPedal: ProjectMidiSustainPedalCoordinator
 }
-
-export const PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY: InjectionKey<ProjectMidiSustainPedalVueContext> =
-  Symbol('ProjectMidiSustainPedalVueContext')
 
 /** Resolves the CC64 command capability owned by the current Studio application. */
 export function useProjectMidiSustainPedal(): ProjectMidiSustainPedalVueContext {

@@ -1,5 +1,5 @@
-import { inject, type InjectionKey, type ShallowRef } from 'vue'
-
+import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/symbols'
+import { inject, type ShallowRef } from 'vue'
 import type {
   ProjectNavigationDecision,
   ProjectNavigationDecisionRequest,
@@ -14,9 +14,6 @@ export interface ProjectNavigationDecisionVueContext {
   readonly pendingDecision: Readonly<ShallowRef<PendingProjectNavigationDecision | null>>
   resolve(pending: PendingProjectNavigationDecision, decision: ProjectNavigationDecision): boolean
 }
-
-export const PROJECT_NAVIGATION_DECISION_CONTEXT_KEY: InjectionKey<ProjectNavigationDecisionVueContext> =
-  Symbol('ProjectNavigationDecisionVueContext')
 
 /** Resolves the one-shot Project navigation decision channel for the current component tree. */
 export function useProjectNavigationDecision(): ProjectNavigationDecisionVueContext {

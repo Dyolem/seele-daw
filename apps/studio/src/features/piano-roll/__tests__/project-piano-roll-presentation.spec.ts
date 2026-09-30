@@ -9,11 +9,11 @@ import {
 } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
+import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import {
-  PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
   createProjectPianoRollPresentation,
   createProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
+} from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,

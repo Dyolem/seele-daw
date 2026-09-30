@@ -21,14 +21,15 @@ const value = defineModel<Value>({ required: true })
 defineProps<{
   readonly options: readonly { readonly value: Value; readonly label: string }[]
   readonly disabled?: boolean
+  readonly size?: 'small' | 'medium'
   readonly placeholder?: string
 }>()
 </script>
 
 <template>
   <SelectRoot v-model="value" :disabled="disabled">
-    <SelectTrigger v-bind="$attrs" class="ui-select__trigger">
-      <SelectValue :placeholder="placeholder" />
+    <SelectTrigger v-bind="$attrs" class="ui-select__trigger" :data-size="size ?? 'medium'">
+      <SelectValue class="ui-select__value" :placeholder="placeholder" />
       <SelectIcon class="ui-select__chevron"
         ><UiIcon :icon="ChevronDownIcon" :size="16"
       /></SelectIcon>
@@ -77,6 +78,12 @@ defineProps<{
   font-size: var(--sd-font-size-sm);
   cursor: pointer;
 }
+.ui-select__trigger[data-size='small'] {
+  min-block-size: var(--sd-control-height-sm);
+  padding-inline-start: var(--sd-space-2);
+  border-radius: var(--sd-radius-sm);
+  font-size: var(--sd-font-size-xs);
+}
 .ui-select__trigger:hover:not(:disabled) {
   border-color: var(--sd-color-border-strong);
   background: var(--sd-color-control-secondary-hover);
@@ -92,6 +99,12 @@ defineProps<{
 .ui-select__chevron {
   display: inline-flex;
   flex: 0 0 auto;
+}
+.ui-select__value {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ui-select__content {
   z-index: var(--sd-layer-modal);

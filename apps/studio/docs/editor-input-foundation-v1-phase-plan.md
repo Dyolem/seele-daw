@@ -1,6 +1,6 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已实现待审核，G2–G4 尚未实施
+> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已审核提交；Symbol 与 Piano Roll 组织优化（含 O1–O3）已审核通过，G2–G4 尚未实施
 >
 > 日期：2026-09-11
 >
@@ -409,4 +409,43 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
   与失败清理由自动化用例覆盖；没有新增 E2E。
 - 补充验证新 Begin 在前次 handoff 未完成时仍记录自己的 Surface 映射；位置变化后释放
   capture，迟到 End 不提交。
-- 当前代码未提交，等待本批审核。
+- G1 已通过用户审核，按授权提交为 `2b2d8c6`。
+
+## 15. G1 审核后的代码组织优化（2026-09-29）
+
+- 用户要求先提交 G1，再独立完成 Symbol 注册、Piano Roll 目录与共享类型整理、Clip Focus
+  Surface 的 hook 拆分；不改变 G2–G4 的实施范围。
+- Studio 的 18 个 InjectionKey 与 Keyboard Owner 工厂集中在 `src/symbols.ts`。Editor 的
+  Interaction / Pointer Capture 和 Project Core 的 History Identity / Mutation Sentinel 各在
+  所属 package 内部注册。稳定键复用，瞬态身份每次创建；不使用 `Symbol.for`、全局 token
+  缓存或新的公共工具 package。注册表只允许 type import，架构检查约束创建入口与依赖方向。
+- Piano Roll 按 `components / hooks / types / interaction / presentation / state` 整理，保留
+  `actions / playhead / __tests__` 的既有职责。共享 Presentation、Preferences、Intent、Action
+  Target、CC64 Placement / Handle、Surface 与 Theme 类型进入 `types/`，消费者直接导入契约。
+- Clip Focus Surface 按 Note Model、Note Interaction、Note Rendering、Editing Actions、Clip
+  Sustain Pedal 拆成五个 hook。组件显式协调同步目标失效与资源生命周期；Editor classes
+  继续拥有手势状态机和提交交接。两种 Surface 共用 Theme 与固定 Pitch Layout。
+- [Feature README](../src/features/piano-roll/README.md) 给出职责地图、阅读顺序和清理约束。
+- Clip Focus Surface 脚本从 728 行缩减为 168 行；模板与样式保持一致，Grid 改为共享 computed
+  投影。五个 hook 各为 74–193 行，避免把整个脚本搬成单个大 hook。
+- 完整 `pnpm check` 通过：10 项架构规则回归、Lint、Format Check、Type Check、168 个
+  Vitest 文件 / 1,578 项测试，以及 Production Build 和本地音源资源边界检查。此前单独验证
+  Piano Roll 的 8 个文件 / 59 项测试；构建保留既有大 chunk 提示。
+- 本批为代码组织调整，没有新增 E2E，也未引入新的交互机制；与 O1–O3 一并通过用户审核。
+
+## 16. Studio 组织规范与 O1–O3（2026-09-29）
+
+- 已审定规则写入根 `CODE_GUIDELINES.md`，根 `.AGENT` 引用规范。适用于 Studio 各 feature 的
+  增量开发；本次实施范围限于 Piano Roll。
+- Clip Focus、Track Surface、CC64 Lane 分别进入具名组件子目录，私有 hooks 与局部共享类型
+  就近放置；feature 共享契约、Actions、Preferences 和展示政策继续由原 owner 提供。
+- Track 拆为 Layout、Rendering、Placement、Follow、Actions、Sustain Pedal 六个 hooks，
+  CC64 拆为 Viewport、Selection、Interaction、Projection、Actions 五个 hooks。提取 Track
+  Toolbar 及两种 Surface 共用的 Tool Controls，保持一次 Tool Action Target 注册。
+- 修复部分初始化失败时的资源回收，Viewport 变更取消捕获，排队回调不能在释放后重建资源。
+  Track / CC64 的中立语义协议迁移仍属于 G3；本批没有提前实施 G2–G4。
+- Active Clip 与 Channel 采用现有 UiSelect 的 small 规格。具体结构、入口、外部依赖和清理
+  顺序见 [Piano Roll README](../src/features/piano-roll/README.md)。
+- 验证：完整 `pnpm check` 通过（168 个 Vitest 文件 / 1,583 tests，14 项 Node 架构规则）；
+  内置浏览器确认工具栏、Channel / Active Clip 菜单和 Scope 切换，临时数据已撤销。
+  构建保留既有大 chunk 提示。本批已通过用户审核，按授权提交。

@@ -1,9 +1,8 @@
+import { PROJECT_CLIP_CONTEXT_KEY } from '@/symbols'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
 import {
-  PROJECT_CLIP_CONTEXT_KEY,
   useProjectClips,
   type ProjectClipVueContext,
 } from '@/workbench/project/clip/vue/project-clip-context'

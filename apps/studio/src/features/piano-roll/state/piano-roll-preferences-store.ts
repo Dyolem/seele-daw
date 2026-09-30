@@ -1,33 +1,20 @@
 import {
+  PIANO_ROLL_TOOL,
+  PIANO_ROLL_EDITING_SCOPE,
+  PIANO_ROLL_GRID_PRESET,
+  type PianoRollTool,
+  type PianoRollEditingScope,
+  type PianoRollGridPreset,
+} from '@/features/piano-roll/types/piano-roll-preferences'
+import {
   PROJECT_PPQ,
   parseMidiChannel,
   parsePositiveTick,
   type MidiChannel,
   type Tick,
 } from '@seele-daw/project-core'
-import type { ValueOf } from '@seele-daw/type-utils'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
-
-export const PIANO_ROLL_TOOL = {
-  CURSOR: 'cursor',
-  PENCIL: 'pencil',
-} as const
-
-export type PianoRollTool = ValueOf<typeof PIANO_ROLL_TOOL>
-
-export const PIANO_ROLL_EDITING_SCOPE = {
-  CLIP: 'clip',
-  TRACK: 'track',
-} as const
-
-export type PianoRollEditingScope = ValueOf<typeof PIANO_ROLL_EDITING_SCOPE>
-
-export const PIANO_ROLL_GRID_PRESET = {
-  SIXTEENTH: '1/16',
-} as const
-
-export type PianoRollGridPreset = ValueOf<typeof PIANO_ROLL_GRID_PRESET>
 
 const GRID_PRESET_SUBDIVISION_SPAN_TICK = Object.freeze({
   [PIANO_ROLL_GRID_PRESET.SIXTEENTH]: parsePositiveTick(PROJECT_PPQ / 4),

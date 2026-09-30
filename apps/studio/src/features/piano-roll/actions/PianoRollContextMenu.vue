@@ -10,7 +10,7 @@ import {
 
 import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'
 import UiMenuItem from '@/ui/components/UiMenuItem.vue'
-import type { PianoRollContextMenuTarget } from '@/features/piano-roll/actions/piano-roll-context-menu-target'
+import type { PianoRollContextMenuTarget } from '@/features/piano-roll/types/piano-roll-context-menu-target'
 import { STUDIO_ACTION, type StudioActionId } from '@/workbench/actions/studio-action'
 import { presentStudioAction } from '@/workbench/actions/studio-action-control'
 import {

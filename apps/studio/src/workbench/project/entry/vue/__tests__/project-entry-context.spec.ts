@@ -1,9 +1,8 @@
+import { PROJECT_ENTRY_CONTEXT_KEY } from '@/symbols'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectEntryCoordinator } from '@/workbench/project/entry/project-entry-coordinator'
 import {
-  PROJECT_ENTRY_CONTEXT_KEY,
   useProjectEntry,
   type ProjectEntryVueContext,
 } from '@/workbench/project/entry/vue/project-entry-context'

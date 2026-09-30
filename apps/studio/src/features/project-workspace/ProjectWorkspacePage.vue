@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/symbols'
 import { provide } from 'vue'
-import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
 import {
   PROJECT_PPQ,
   ZERO_TICK,
@@ -20,11 +20,10 @@ import {
 } from '@seele-daw/playback'
 import { computed, onBeforeUnmount, onUnmounted, shallowRef, watch } from 'vue'
 import { isNavigationFailure, useRouter } from 'vue-router'
-
 import {
   createProjectPianoRollPresentation,
   createProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
+} from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { useProjectWorkbenchMidiImport } from '@/features/project-workspace/actions/use-project-workbench-midi-import'

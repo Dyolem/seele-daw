@@ -1,34 +1,15 @@
 import {
   PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT,
   resolvePianoRollSustainPedalSelection,
-  type PianoRollSustainPedalEditingScope,
-  type PianoRollSustainPedalInteractionIntent,
-  type PianoRollSustainPedalInteractionSession,
   type PianoRollSustainPedalMoveEventsIntent,
   type PianoRollSustainPedalReplaceValueIntent,
   type PianoRollSustainPedalResolveSelectionIntent,
 } from '@seele-daw/editor'
-import type { MidiSustainPedalEventId, ModelRevision } from '@seele-daw/project-core'
 
-import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
-
-export interface ProjectPianoRollSustainPedalIntentHandlerDependencies {
-  readonly getAuthorityRevision: () => ModelRevision
-  readonly getInteractionScope: () => PianoRollSustainPedalEditingScope | null
-  readonly getSelectedEventIds: () => readonly MidiSustainPedalEventId[]
-  readonly interactionSession: Pick<
-    PianoRollSustainPedalInteractionSession,
-    'resolveTransformCommit' | 'skipTransformCommit'
-  >
-  readonly projectMidiSustainPedal: ProjectMidiSustainPedalCoordinator
-  readonly reportFailure: (cause: unknown) => void
-  readonly reportSuccess: () => void
-  readonly setSelectedEventIds: (eventIds: readonly MidiSustainPedalEventId[]) => void
-}
-
-export type ProjectPianoRollSustainPedalIntentHandler = (
-  intent: PianoRollSustainPedalInteractionIntent,
-) => void
+import type {
+  ProjectPianoRollSustainPedalIntentHandler,
+  ProjectPianoRollSustainPedalIntentHandlerDependencies,
+} from '@/features/piano-roll/types/piano-roll-intent'
 
 function handleSelectionIntent(
   dependencies: ProjectPianoRollSustainPedalIntentHandlerDependencies,

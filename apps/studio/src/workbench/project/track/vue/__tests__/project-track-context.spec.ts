@@ -1,9 +1,8 @@
+import { PROJECT_TRACK_CONTEXT_KEY } from '@/symbols'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import {
-  PROJECT_TRACK_CONTEXT_KEY,
   useProjectTracks,
   type ProjectTrackVueContext,
 } from '@/workbench/project/track/vue/project-track-context'

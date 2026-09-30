@@ -10,10 +10,8 @@ import {
   type MutationPlan,
 } from '#internal/mutation/mutation-plan'
 import type { ProjectMutation } from '#internal/mutation/project-mutation'
-import {
-  createProjectContentStateId,
-  type ProjectContentStateId,
-} from '#internal/session/project-content-state-id'
+import type { ProjectContentStateId } from '#internal/session/project-content-state-id'
+import { createProjectContentStateId } from '#internal/project-symbols'
 
 interface HistoryEntry {
   readonly commandType: ProjectCommandType

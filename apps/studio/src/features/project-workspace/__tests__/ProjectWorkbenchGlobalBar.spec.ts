@@ -1,9 +1,9 @@
+import { STUDIO_ACTION_CONTEXT_KEY } from '@/symbols'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { HotkeyManager } from '@tanstack/hotkeys'
 import { flushPromises, mount } from '@vue/test-utils'
 import { h, shallowRef } from 'vue'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-
 import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import UiAlertDialog from '@/ui/components/UiAlertDialog.vue'
@@ -16,7 +16,6 @@ import {
   type StudioActionFailure,
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
-import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'

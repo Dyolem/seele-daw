@@ -4,7 +4,7 @@
 >
 > Scope: `apps/`、`packages/` 与 `tooling/` 中所有人工维护的生产代码、测试和工程文档
 >
-> Last updated: 2026-08-17
+> Last updated: 2026-09-29
 
 本文档规定 Seele DAW 在代码清晰度、复用、抽象、配置、状态所有权和测试方面的共同工程
 准则。它不重复格式化器、ESLint、TypeScript 或专项架构文档已经能够明确决定的细节。
@@ -100,6 +100,65 @@
 
 文件变长只是检查信号，不是拆分理由。组件或模块应按产品责任、状态所有权和变化原因拆分，
 不能为了行数制造只做透传的碎片。
+
+### 4.3 Studio 各层职责
+
+`apps/studio/src` 按以下边界组织。所有 feature 的新增代码和相应模块的修改遵循同一规则，
+既有模块随业务改动逐步调整，不为目录外观一致进行全仓机械迁移。
+
+| 位置         | 职责及边界                                                           |
+| ------------ | -------------------------------------------------------------------- |
+| `bootstrap/` | 组合应用级服务，注入能力，定义创建失败回滚和最终释放顺序             |
+| `workbench/` | Studio 应用用例、Action / Keyboard、Project 与 Playback 的应用层协调 |
+| `features/`  | 可见功能、局部编辑目标、视图投影、Vue 组合与 UI 会话状态             |
+| `ui/`        | 不依赖具体 feature 的基础控件、设计令牌和通知展示                    |
+| `symbols.ts` | 稳定 InjectionKey 与唯一身份工厂，遵循本文 Symbol 注册约束           |
+
+- 业务操作沿统一 Action、Coordinator 与 Project Command 路径执行；目录整理不得改变
+  ProjectSession、History、Playback 或 Editor Session 的权威归属。
+- Feature 可以组合其他 feature 明确提供的组件与契约，MUST NOT 导入对方私有 hooks、
+  DOM refs 或内部状态对象。既存共享依赖必须在 README 中列明 owner，调整其归属时单独
+  评估公共边界，不能通过搬目录悄悄更换状态权威。
+- `ui/` 不反向依赖业务 feature；`workbench/` 的运行时服务不依赖功能组件。
+  编译期类型引用与运行时依赖分别检查，不得借助 barrel 隐藏运行时循环。
+
+### 4.4 Studio Feature 内部组织
+
+先按功能归属，再按局部职责拆分。文件默认放在实际消费者的最小共同范围：
+
+| 消费范围                      | 默认位置                                                |
+| ----------------------------- | ------------------------------------------------------- |
+| 单个文件内部                  | 当前文件内的私有类型、函数                              |
+| 一个组件子模块内部            | `components/<submodule>/`，共置组件与私有实现           |
+| 同一子模块的多个文件共享类型  | 该子模块的 `types/`                                     |
+| 同一 feature 的多个子模块共享 | feature 层的具名职责目录，共享契约进入该层 `types/`     |
+| 多个 feature 共用             | 按语义评估既有 `workbench/`、`ui/` 或明确的公共能力边界 |
+
+- Feature 根层可保留少量清晰的页面或功能入口。复杂 UI 子模块使用
+  `components/<submodule>/` 聚合，一个主组件与密切相关的文件共置；hooks 较多时使用
+  局部 `hooks/`。MUST NOT 按 DOM 每层嵌套目录或为每个按钮建立目录。
+- 多文件共享类型按概念放入最小共同范围的 `types/`，单文件私有类型留在原文件。
+  不把所有类型堆入一个 `types.ts`，不从 `.vue` 实例类型反向推导公共能力。
+- `types/` 可以共置契约需要的有限 discriminator 常量，但 MUST NOT 创建服务、执行订阅
+  或加载运行时实现。类型依赖使用 `import type`。
+- `state/` 只保存本 feature 拥有的轻量 UI Store；手势对象、Read Model、Renderer 不进入
+  Store。`presentation/` 放投影、展示政策与主题读取；`interaction/` 放 Intent 提交适配。
+  仅属于一个子模块的实现放在该子模块内。
+- `actions/` 放 Action 定义与能力绑定，不另建快捷键系统，不绕过统一 Action 调用。
+- 跨子模块共享的契约、Preferences、展示政策与 Action 留在 feature 层；相似代码不自动
+  构成共享理由，也不得因此创建无 owner 的全局 `utils`。
+- 小 feature MAY 保持简单结构，不复制完整目录模板、不预建空目录。出现不同消费者、
+  生命周期或独立变化原因时，再建立对应子模块。
+
+### 4.5 Studio 引用与阅读入口
+
+- Studio 内跨目录导入使用 `@/`，相邻文件可用 `./`；跨 package 仍遵循 package root 边界。
+- 子模块通过 Props / Emits、明确的 Handle 或共享契约协作，不相互导入私有 hooks。
+- 不强制为每个目录创建 `index.ts`。确有公共能力边界时，入口 MUST 显式列出导出，
+  不用 `export *` 汇总私有实现。既有 Keyboard 的 `index / setup / contracts` 边界继续遵循
+  专项规则，不机械套用 feature 目录。
+- 成熟 feature 的 README SHOULD 列出公开入口、职责地图、推荐阅读顺序、外部依赖及
+  资源清理顺序；移动职责时同步更新。
 
 ## 5. 代码复用
 
@@ -197,6 +256,18 @@ Interface、Port、Adapter、Factory、Coordinator 或 Strategy 至少应解决�
 配置对象 SHOULD 使用准确类型、`satisfies`、readonly 或冻结快照，使新增 Action 或字段时由
 类型检查暴露遗漏。
 
+#### Symbol 注册与身份
+
+- 生产 `Symbol()` 必须集中在所属 owner 的注册文件：Studio 的 `apps/studio/src/symbols.ts`、
+  Editor 的 `packages/editor/src/common/interaction/interaction-symbols.ts`、Project Core 的
+  `packages/project-core/src/project-symbols.ts`。新增 owner 时同步登记架构检查。
+- 稳定的 InjectionKey / Sentinel 导出单个常量；Interaction、Pointer Capture、Keyboard
+  Owner、History Content State 通过命名工厂每次创建新 Symbol。不能因统一注册而共享不同
+  生命周期的身份，也不保存已生成 token 的全局表。
+- 注册文件只允许 `import type`，不能加载消费者的运行时实现；生产代码不使用 `Symbol.for`。
+  测试 fixture 可以直接创建独立 Symbol，标准 `Symbol.iterator` 等协议不受此限制。
+- 注册表属于各自运行时边界，不进入纯类型的 `type-utils`，不扩大 package public API。
+
 ### 7.2 可以保持局部
 
 - 数组首项 `0`、单步增量 `1` 等语义显然的语言操作；
@@ -239,6 +310,8 @@ Interface、Port、Adapter、Factory、Coordinator 或 Strategy 至少应解决�
 
 ## 9. Vue 与 Studio 状态
 
+### 9.1 状态与依赖归属
+
 选择 Local Ref、Props / Emits、Typed Context 或 Pinia 前，必须先确定权威和生命周期。完整
 规则见 [Studio Vue 状态与依赖组合准则](./apps/studio/docs/vue-state-composition-guidelines.md)。
 
@@ -248,11 +321,30 @@ Interface、Port、Adapter、Factory、Coordinator 或 Strategy 至少应解决�
   Pinia 或 Vue 深代理。
 - 纯派生数据优先 `computed`，不要用 `watch` 把一个响应值手动同步到另一个响应值。
 - `watch` / `watchEffect` 适用于命令式副作用、订阅、Renderer 调用和资源重建；必须明确
-  cleanup、触发源和竞态策略。
+  cleanup、触发源、flush 时机和竞态策略。目标变化时，必须明确取消、重建、Selection
+  协调和旧回调失效分别由谁负责。
 - Composition Root 创建并释放应用级 Service、Coordinator、Binding 和浏览器资源。
 - Vue 组件不直接拥有 Project Command 之外的领域写能力。
 - 组件应按产品责任拆分。除样式外，单个组件的 template 与逻辑接近 800 行时必须重新评估，
   但不得为了数字合规制造无语义的透传组件。
+
+### 9.2 组件、Hook、Class 与纯函数
+
+| 形式              | 应拥有的职责                                             | 应避免的问题                                     |
+| ----------------- | -------------------------------------------------------- | ------------------------------------------------ |
+| Vue 组件          | 模板、局部 DOM refs、Props / Emits、无障碍语义与组合顺序 | 内嵌完整输入协议、提交事务和大量几何计算         |
+| Hook / Composable | Vue 响应式适配、订阅、监听和局部资源组合                 | 将整个组件脚本搬入一个巨大 `useSurface()`        |
+| Class             | 独立会话、状态转换、资源身份与明确生命周期               | 为无状态计算建立空壳 class，或复制 Editor 状态机 |
+| 普通函数          | 投影、几何、解析和不可变输入到输出的转换                 | 只为统一名称而加 `use` 前缀或读取全局组件状态    |
+
+- 每个 hook SHOULD 能用一句话说明职责。参数只传所需 refs、getter 或能力，不传包含整个
+  feature 状态与 setter 的大 Context；只读观察值和修改能力分开暴露。
+- Hook 与 Class 都不得成为第二份 Project、Playback 或 Editor 权威。Class 负责独立状态与
+  生命周期，Hook 负责 Vue 适配，纯计算保持普通函数；不为统一形式强制使用某一种。
+- 子组件按完整视觉区域提取，区域样式随 owner 移动，布局协调样式留在父组件。
+  SHOULD NOT 用大量 `:deep()` 控制子组件内部，也不得为缩短文件把内聚样式移入无关全局文件。
+- 基础按钮、菜单、下拉框遵循 Studio `ui/` 的组件政策，子组件不另建控件皮肤或 Action
+  路由。拆分共享控件时，原 owner 继续拥有 Action Target，不重复注册。
 
 ## 10. Project、Editor 与浏览器边界
 
@@ -270,6 +362,10 @@ Interface、Port、Adapter、Factory、Coordinator 或 Strategy 至少应解决�
 - 注册 Listener、Subscription、Observer、Timer 或外部资源的 API MUST 返回 disposer，或由
   明确 owner 提供统一 `dispose()`。
 - disposer SHOULD 幂等；部分创建失败时必须回滚已经创建的资源。
+- Studio Hook 的独立订阅可以绑定 Vue scope 清理。多个资源有依赖顺序时，组件或具名组合
+  入口 MUST 显式安排 `mount / dispose`，不能依赖多个 `onMounted` 的偶然注册顺序。
+  组合入口的 `dispose` 必须幂等，初始化失败按创建顺序逆序回收；释放后的排队任务必须失效，
+  不得继续操作旧 DOM 或旧会话。
 - 异步请求必须定义重复请求、过期结果、取消、释放和错误传播语义。
 - Promise resolver 不得放入 Pinia，也不得在组件卸载或应用释放后悬挂。
 - latest-request-wins、队列、拒绝并发或合并请求必须由用例明确选择，不能依赖偶然时序。
@@ -283,6 +379,9 @@ Interface、Port、Adapter、Factory、Coordinator 或 Strategy 至少应解决�
 - 少量重复如果能让测试意图更直接，可以保留。共享 helper 只抽取稳定且无关的机械细节。
 - 测试 support、fixture、fake 和 fault injection 只放在 `__tests__/support` 或
   `__tests__/fixtures`，不得进入生产目录或 package root。
+- Studio 组件与 feature 的既有行为测试保留在 feature 的 `__tests__/`；独立子模块的新测试
+  MAY 放局部 `__tests__/`。优先沿用行为测试验证组织重构，只为缺失的边界或失败路径新增
+  用例，不为搬目录机械迁移测试，也不编写镜像 Hook 内部方法的测试。
 - 生产模块不得为了测试暴露额外写入口。
 - 时间、随机身份、浏览器资源和调度器在需要确定性时通过已有 Port 注入。
 
@@ -305,6 +404,33 @@ Project Core 的具体目录约定见
   进入以产品职责命名的功能目录。新增命令不得重新在 commands 根层创建平铺文件，该边界由
   架构检查执行。
 - ID、Command type、Action ID 与 protocol field 一旦持久化或跨边界，就视为稳定契约。
+
+Studio 的人工维护代码采用以下约定：
+
+| 对象                   | 约定                           | 示例                                     |
+| ---------------------- | ------------------------------ | ---------------------------------------- |
+| 普通目录               | kebab-case                     | `track-surface/`、`sustain-pedal/`       |
+| Vue 组件文件与组件标识 | PascalCase，多词且有业务辨识度 | `ProjectPianoRollTrackSurface.vue`       |
+| 普通 TS 文件           | kebab-case，表达概念与职责     | `track-placement.ts`                     |
+| Composable 文件 / 函数 | `use-xxx.ts` / `useXxx`        | `use-track-follow.ts` / `useTrackFollow` |
+| TS 类型与 Class        | PascalCase                     | `TrackPlacementPreview`                  |
+| 普通函数与变量         | camelCase                      | `resolvePlacement`、`activeClipId`       |
+| 稳定枚举式常量、注册键 | UPPER_SNAKE_CASE               | `PIANO_ROLL_TOOL`                        |
+| 普通 TS 测试           | 对应文件名 + `.spec.ts`        | `track-placement.spec.ts`                |
+| Vue 组件测试           | 保留对应组件名 + `.spec.ts`    | `ProjectPianoRollTrackSurface.spec.ts`   |
+
+`README.md`、`index.ts`、框架入口和生成文件遵循其用途；Vue 组件测试是普通 TS 文件采用
+kebab-case 的明确例外。上述约定是本项目选择，不是前端行业统一标准；Vue 的 `useXxx`
+约定针对函数，并不要求文件名也采用 camelCase。
+
+- 跨 feature 的公开组件、类型和能力保留领域限定词，例如 `PianoRollSustainPedalLaneHandle`。
+- 组件私有文件 MAY 省略外围 `studio / project / piano-roll` 前缀，保留局部领域与角色。
+  例如 `components/track-surface/hooks/use-track-follow.ts`，不机械堆叠为
+  `use-project-piano-roll-track-surface-timeline-follow.ts`。
+- 名称应在文件搜索、编辑器标签和 import 中仍可辨认，不要求全仓唯一；也不统一缩成
+  `types.ts / state.ts / helpers.ts / use-interaction.ts` 等缺乏业务范围的名称。
+- 必要的职责迁移可同步精简私有文件名，公开 Vue 组件名保持业务辨识度；不因此发起存量文件
+  的纯风格全量重命名。
 
 ### 13.2 注释
 
@@ -369,6 +495,13 @@ Project Core 的具体目录约定见
   — TypeScript 类型断言、命名、控制流与可读性；
 - [Vue Style Guide](https://vuejs.org/style-guide/)
   — Vue 组件的错误预防和一致性建议；
+- [Vue：SFC 文件命名](https://vuejs.org/style-guide/rules-strongly-recommended.html#single-file-component-filename-casing)
+  与[紧密关联的子组件命名](https://vuejs.org/style-guide/rules-strongly-recommended.html#tightly-coupled-component-names)
+  — 一致的大小写和有意义的组件前缀；
+- [Vue：Composable 命名](https://vuejs.org/guide/reusability/composables.html#naming)
+  — `useXxx` 函数命名约定；
+- [Angular：Coding Style Guide](https://angular.dev/style-guide)
+  — kebab-case 文件命名的生态参考，不作为 Vue 的强制规则；
 - [Google Testing Blog: Tests Too DRY? Make Them DAMP!](https://testing.googleblog.com/2019/12/testing-on-toilet-tests-too-dry-make.html)
   — 测试可读性与复用的取舍；
 - [typescript-eslint: no-magic-numbers](https://typescript-eslint.io/rules/no-magic-numbers/)

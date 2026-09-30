@@ -1,5 +1,21 @@
-import { STUDIO_EDITOR_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-editor-action-context'
-import { STUDIO_INTERFACE_ACTION_TARGET_KEY } from '@/workbench/actions/vue/studio-interface-action-context'
+import {
+  ACTIVE_PROJECT_CONTEXT_KEY,
+  ARRANGEMENT_ACTION_TARGETS_KEY,
+  PIANO_ROLL_TOOL_ACTION_TARGET_KEY,
+  PROJECT_CLIP_CONTEXT_KEY,
+  PROJECT_ENTRY_CONTEXT_KEY,
+  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
+  PROJECT_MIDI_NOTE_CONTEXT_KEY,
+  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
+  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
+  PROJECT_TRACK_CONTEXT_KEY,
+  PROJECT_WORKBENCH_ACTION_TARGET_KEY,
+  STUDIO_ACTION_CONTEXT_KEY,
+  STUDIO_EDITOR_ACTION_CONTEXT_KEY,
+  STUDIO_INTERFACE_ACTION_TARGET_KEY,
+} from '@/symbols'
 import { ToneJsMidiFileDecoder, type MidiFileDecoder } from '@seele-daw/midi-file'
 import { BrowserLocalFileByteReader, type LocalFileByteReader } from '@seele-daw/platform-browser'
 import type { ProjectMidiImportIdFactory } from '@seele-daw/project-midi'
@@ -11,7 +27,6 @@ import {
   type App as VueApplication,
 } from 'vue'
 import type { Router } from 'vue-router'
-
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import {
   installProjectNavigationGuard,
@@ -27,12 +42,6 @@ import {
   createStudioActionRuntime,
   type StudioActionRuntime,
 } from '@/bootstrap/studio-action-runtime'
-import {
-  PROJECT_WORKBENCH_ACTION_TARGET_KEY,
-  ARRANGEMENT_ACTION_TARGETS_KEY,
-} from '@/features/project-workspace/actions/project-workbench-action-context'
-import { PIANO_ROLL_TOOL_ACTION_TARGET_KEY } from '@/features/piano-roll/actions/piano-roll-action-context'
-import { STUDIO_ACTION_CONTEXT_KEY } from '@/workbench/actions/vue/studio-action-context'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createStudioMidiImportInstrumentDevice } from '@/workbench/instrument/midi-import-instrument-policy'
 import {
@@ -40,26 +49,20 @@ import {
   type BrowserActiveProjectRuntime,
 } from '@/workbench/project/browser-active-project-runtime'
 import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { PROJECT_CLIP_CONTEXT_KEY } from '@/workbench/project/clip/vue/project-clip-context'
 import {
   createProjectEntryCoordinator,
   type ProjectEntryCoordinator,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import { PROJECT_ENTRY_CONTEXT_KEY } from '@/workbench/project/entry/vue/project-entry-context'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
-import { PROJECT_MIDI_NOTE_CONTEXT_KEY } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import { createProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
-import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import {
   createProjectMidiImportCoordinator,
   type ProjectMidiImportCoordinator,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
-import { PROJECT_MIDI_IMPORT_CONTEXT_KEY } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   createProjectNavigationConfirmationCoordinator,
   type ProjectNavigationConfirmationCoordinator,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import {
   createProjectNavigationDecisionVueBinding,
   type ProjectNavigationDecisionVueBinding,
@@ -77,16 +80,12 @@ import {
   type ProjectPlaybackTimerPort,
 } from '@/workbench/project/playback/project-playback-coordinator'
 import type { ProjectPlaybackVisualFramePort } from '@/workbench/project/playback/project-playback-visual-position'
-import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/workbench/project/playback/vue/project-playback-context'
 import {
   createProjectPlaybackVueBinding,
   type ProjectPlaybackVueBinding,
 } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import { PROJECT_TRACK_CONTEXT_KEY } from '@/workbench/project/track/vue/project-track-context'
 import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
-import { PROJECT_TEMPO_EVENT_CONTEXT_KEY } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
-import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/workbench/project/vue/active-project-context'
 import {
   createActiveProjectVueBinding,
   type ActiveProjectVueBinding,

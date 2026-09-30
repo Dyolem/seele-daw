@@ -11,10 +11,8 @@ import {
   createArrangementKeyboardActions,
   type ArrangementKeyboardTarget,
 } from '@/features/project-workspace/actions/arrangement-keyboard-actions'
-import {
-  createPianoRollToolActions,
-  type PianoRollToolActionTarget,
-} from '@/features/piano-roll/actions/piano-roll-tool-actions'
+import { type PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
+import { createPianoRollToolActions } from '@/features/piano-roll/actions/piano-roll-tool-actions'
 import {
   createStudioInterfaceActions,
   type StudioInterfaceActionTarget,

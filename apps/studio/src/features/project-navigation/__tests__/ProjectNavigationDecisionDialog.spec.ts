@@ -1,8 +1,8 @@
+import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/symbols'
 import { parseProjectId, type ProjectContentStateId, type ProjectId } from '@seele-daw/project-core'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
-
 import ProjectNavigationDecisionDialog from '@/features/project-navigation/ProjectNavigationDecisionDialog.vue'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import {
@@ -11,7 +11,6 @@ import {
   type ProjectNavigationDecisionRequest,
   type ProjectNavigationIntent,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import {
   createProjectNavigationDecisionVueBinding,
   type ProjectNavigationDecisionVueBinding,

@@ -1,3 +1,5 @@
+import { installPianoRollResizeObserver } from '@/features/piano-roll/__tests__/support/piano-roll-resize-observer-test-support'
+import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/symbols'
 import {
   createPianoRollGrid,
   type PianoRollClipContext,
@@ -19,10 +21,8 @@ import {
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-import PianoRollSustainPedalLane from '@/features/piano-roll/PianoRollSustainPedalLane.vue'
+import PianoRollSustainPedalLane from '@/features/piano-roll/components/sustain-pedal/PianoRollSustainPedalLane.vue'
 import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
-import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 
 const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
   hasPointerCapture: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hasPointerCapture'),
@@ -145,6 +145,34 @@ function createUnavailableCoordinator(): ProjectMidiSustainPedalCoordinator {
   })
 }
 
+function mountLane() {
+  const wrapper = mount(PianoRollSustainPedalLane, {
+    props: {
+      clipContext: createClipContext(),
+      grid: createPianoRollGrid({
+        barSpanTick: parsePositiveTick(960),
+        beatSpanTick: parsePositiveTick(240),
+        originTick: ZERO_TICK,
+        subdivisionSpanTick: parsePositiveTick(240),
+      }),
+      label: 'Sustain Pedal lane',
+      pencilEnabled: true,
+      readModel: createReadModel(),
+      snapEnabled: true,
+      visibleSpanTick: parsePositiveTick(960),
+      visibleStartTick: ZERO_TICK,
+    },
+    global: {
+      provide: {
+        [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
+          projectMidiSustainPedal: createUnavailableCoordinator(),
+        }),
+      },
+    },
+  })
+  return wrapper
+}
+
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(960)
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(128)
@@ -153,37 +181,57 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   restorePrototypeProperty('hasPointerCapture')
   restorePrototypeProperty('releasePointerCapture')
   restorePrototypeProperty('setPointerCapture')
 })
 
 describe('PianoRollSustainPedalLane', () => {
+  it('releases input and the session immediately when viewport observation fails', async () => {
+    const probe = installPianoRollResizeObserver('.piano-roll-sustain-pedal-lane')
+    const wrapper = mountLane()
+    await nextTick()
+    const surface = wrapper.get('[role="group"]').element
+    const observer = probe.forElement(surface)
+    expect(wrapper.emitted('failure')).toEqual([
+      [expect.objectContaining({ message: 'Viewport observation failed' })],
+    ])
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+    dispatchPointer(surface, 'pointerdown', 250, 64)
+    dispatchPointer(surface, 'pointerup', 250, 64)
+    observer.deliver()
+    await nextTick()
+    expect(wrapper.emitted('placement')).toBeUndefined()
+    expect(wrapper.emitted('requestFocus')).toBeUndefined()
+    expect(wrapper.emitted('failure')).toHaveLength(1)
+    wrapper.unmount()
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels capture after geometry changes and ignores callbacks after unmount', async () => {
+    const probe = installPianoRollResizeObserver()
+    const wrapper = mountLane()
+    await nextTick()
+    const surface = wrapper.get('[role="group"]').element
+    const observer = probe.forElement(surface)
+    dispatchPointer(surface, 'pointerdown', 250, 64)
+    expect(surface.hasPointerCapture(1)).toBe(true)
+    Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 480 })
+    observer.deliver()
+    expect(surface.hasPointerCapture(1)).toBe(false)
+    dispatchPointer(surface, 'pointerup', 250, 64)
+    expect(wrapper.emitted('placement')).toBeUndefined()
+    wrapper.unmount()
+    observer.deliver()
+    dispatchPointer(surface, 'pointerdown', 250, 64)
+    dispatchPointer(surface, 'pointerup', 250, 64)
+    expect(wrapper.emitted('placement')).toBeUndefined()
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+  })
+
   it('renders raw CC64 state and resolves one blank Pencil click through Snap', async () => {
-    const wrapper = mount(PianoRollSustainPedalLane, {
-      props: {
-        clipContext: createClipContext(),
-        grid: createPianoRollGrid({
-          barSpanTick: parsePositiveTick(960),
-          beatSpanTick: parsePositiveTick(240),
-          originTick: ZERO_TICK,
-          subdivisionSpanTick: parsePositiveTick(240),
-        }),
-        label: 'Sustain Pedal lane',
-        pencilEnabled: true,
-        readModel: createReadModel(),
-        snapEnabled: true,
-        visibleSpanTick: parsePositiveTick(960),
-        visibleStartTick: ZERO_TICK,
-      },
-      global: {
-        provide: {
-          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiSustainPedal: createUnavailableCoordinator(),
-          }),
-        },
-      },
-    })
+    const wrapper = mountLane()
     await nextTick()
     const surface = wrapper.get('[role="group"]')
 
@@ -209,33 +257,11 @@ describe('PianoRollSustainPedalLane', () => {
         },
       ],
     ])
+    wrapper.unmount()
   })
 
   it('does not turn an existing event marker into a second placement', async () => {
-    const wrapper = mount(PianoRollSustainPedalLane, {
-      props: {
-        clipContext: createClipContext(),
-        grid: createPianoRollGrid({
-          barSpanTick: parsePositiveTick(960),
-          beatSpanTick: parsePositiveTick(240),
-          originTick: ZERO_TICK,
-          subdivisionSpanTick: parsePositiveTick(240),
-        }),
-        label: 'Sustain Pedal lane',
-        pencilEnabled: true,
-        readModel: createReadModel(),
-        snapEnabled: true,
-        visibleSpanTick: parsePositiveTick(960),
-        visibleStartTick: ZERO_TICK,
-      },
-      global: {
-        provide: {
-          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiSustainPedal: createUnavailableCoordinator(),
-          }),
-        },
-      },
-    })
+    const wrapper = mountLane()
     await nextTick()
     const marker = wrapper.get(
       '[data-piano-roll-sustain-pedal-event-id="sustain-pedal-lane-event"]',
@@ -245,5 +271,6 @@ describe('PianoRollSustainPedalLane', () => {
     dispatchPointer(marker.element, 'pointerup', 960, 128)
 
     expect(wrapper.emitted('placement')).toBeUndefined()
+    wrapper.unmount()
   })
 })

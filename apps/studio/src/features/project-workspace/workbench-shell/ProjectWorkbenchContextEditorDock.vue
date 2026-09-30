@@ -10,17 +10,15 @@ import OptionsIcon from '~icons/fluent/options-20-regular'
 import MinimizeIcon from '~icons/fluent/subtract-16-regular'
 import { computed } from 'vue'
 
-import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
-import ProjectPianoRollTrackSurface from '@/features/piano-roll/ProjectPianoRollTrackSurface.vue'
+import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
+import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue'
 import {
   PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
   type ProjectPianoRollPresentation,
   type ProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
-import {
-  PIANO_ROLL_EDITING_SCOPE,
-  usePianoRollPreferencesStore,
-} from '@/features/piano-roll/piano-roll-preferences-store'
+} from '@/features/piano-roll/types/piano-roll-presentation'
+import { PIANO_ROLL_EDITING_SCOPE } from '@/features/piano-roll/types/piano-roll-preferences'
+import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import {
   PROJECT_TRACK_INSTRUMENT_STATUS,

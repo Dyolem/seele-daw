@@ -1,7 +1,5 @@
-import {
-  type TempoEventActionContext,
-  TEMPO_EVENT_ACTION_CONTEXT_KEY,
-} from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY, TEMPO_TRACK_INTERACTION_KEY } from '@/symbols'
+import { type TempoEventActionContext } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
   type StudioActionCompletion,
@@ -17,11 +15,7 @@ import {
 } from '@seele-daw/project-core'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
-import {
-  createTempoTrackInteractionController,
-  TEMPO_TRACK_INTERACTION_KEY,
-} from '@/features/project-workspace/tempo-track/interaction'
+import { createTempoTrackInteractionController } from '@/features/project-workspace/tempo-track/interaction'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
 
 const mountedWrappers: VueWrapper[] = []

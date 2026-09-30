@@ -1,3 +1,4 @@
+import { PROJECT_TRACK_CONTEXT_KEY } from '@/symbols'
 import {
   parseClipId,
   parseDeviceTypeId,
@@ -11,11 +12,8 @@ import { parseSoundbankId } from '@seele-daw/playback'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-
-import {
-  PIANO_ROLL_EDITING_SCOPE,
-  usePianoRollPreferencesStore,
-} from '@/features/piano-roll/piano-roll-preferences-store'
+import { PIANO_ROLL_EDITING_SCOPE } from '@/features/piano-roll/types/piano-roll-preferences'
+import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import {
   PROJECT_TRACK_INSTRUMENT_STATUS,
@@ -30,10 +28,7 @@ import {
 } from '@/workbench/instrument/built-in-instrument-catalogue'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import {
-  PROJECT_TRACK_CONTEXT_KEY,
-  type ProjectTrackVueContext,
-} from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
 
 const mountedWrappers: VueWrapper[] = []
 const TRACK_ID = parseTrackId('track-instrument-inspector')

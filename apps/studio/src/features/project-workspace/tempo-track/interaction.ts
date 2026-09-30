@@ -1,5 +1,6 @@
+import { TEMPO_TRACK_INTERACTION_KEY } from '@/symbols'
 import type { TempoBpm, TempoEventId, Tick } from '@seele-daw/project-core'
-import { inject, provide, shallowRef, type InjectionKey, type ShallowRef } from 'vue'
+import { inject, provide, shallowRef, type ShallowRef } from 'vue'
 
 export type TempoTrackPreviewOwner = 'bpm-editor' | 'lane-drag' | 'position-editor'
 
@@ -20,10 +21,6 @@ export interface TempoTrackInteractionController {
   ): TempoTrackEventPreview | null
   updatePreview(preview: TempoTrackEventPreview): boolean
 }
-
-export const TEMPO_TRACK_INTERACTION_KEY: InjectionKey<TempoTrackInteractionController> = Symbol(
-  'TempoTrackInteractionController',
-)
 
 /**
  * Coordinates one feature-scoped Tempo interaction without turning its preview into a Project fact.

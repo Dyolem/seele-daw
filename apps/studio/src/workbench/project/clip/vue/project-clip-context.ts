@@ -1,14 +1,11 @@
-import { inject, type InjectionKey } from 'vue'
-
+import { PROJECT_CLIP_CONTEXT_KEY } from '@/symbols'
+import { inject } from 'vue'
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
 import { ProjectClipVueError } from '@/workbench/project/clip/vue/project-clip-vue-error'
 
 export interface ProjectClipVueContext {
   readonly projectClips: ProjectClipCoordinator
 }
-
-export const PROJECT_CLIP_CONTEXT_KEY: InjectionKey<ProjectClipVueContext> =
-  Symbol('ProjectClipVueContext')
 
 /** Resolves the Clip command capability owned by the current Studio application. */
 export function useProjectClips(): ProjectClipVueContext {

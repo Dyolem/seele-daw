@@ -1,6 +1,6 @@
 # Editor Interaction V1：中立生命周期与 Note Operation
 
-> 状态：G1 已实现，待审核；Tempo 与 Timeline Locate 仅完成协议对照，分别在 G2、G3 迁移。
+> 状态：G1 已审核提交（`2b2d8c6`）；Tempo 与 Timeline Locate 仅完成协议对照，分别在 G2、G3 迁移。
 >
 > 日期：2026-09-29
 >
@@ -44,8 +44,16 @@ CC64 的语义 Session 和 Track Pencil 的完成逻辑仍属于 G3，不能据�
 handoff 和订阅所有权。Browser 工厂创建并拥有监听资源。新增内部模块仅供包内真实消费者
 使用，没有为了测试扩大 package root。
 
+Studio 的 Clip Focus Surface 已按 Model、Interaction、Rendering、Editing Actions 和 CC64
+组合拆成 hooks；组件保留资源创建、目标失效和卸载顺序，详见
+[Feature 阅读说明](../../../apps/studio/src/features/piano-roll/README.md)。这些 hooks 观察并
+组合 Editor classes，不替代 Common 生命周期权威。
+
 ## 身份、冻结与一次执行
 
+- Editor 的 Symbol 创建入口集中在 `common/interaction/interaction-symbols.ts`，工厂每次
+  返回独立身份，不使用 `Symbol.for` 或保留 token 的全局注册表。入口不从 package root
+  导出，Common / Browser 消费相同的内部身份政策。
 - 浏览器 `pointerId` 可以复用；每次 Down 额外生成 `captureId`，贯穿 Begin / Update / End /
   Cancel。旧 capture 的输入不能操作新的手势。
 - Session 为每次 Begin 生成独立 `InteractionId`。完成结果、领取、回告和清理均携带该身份；

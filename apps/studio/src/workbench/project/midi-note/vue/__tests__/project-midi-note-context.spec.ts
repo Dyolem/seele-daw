@@ -1,3 +1,4 @@
+import { PROJECT_MIDI_NOTE_CONTEXT_KEY } from '@/symbols'
 import {
   parseClipId,
   parseMidiPitch,
@@ -11,10 +12,8 @@ import {
 } from '@seele-daw/project-core'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import {
-  PROJECT_MIDI_NOTE_CONTEXT_KEY,
   useProjectMidiNotes,
   type ProjectMidiNoteVueContext,
 } from '@/workbench/project/midi-note/vue/project-midi-note-context'

@@ -1,3 +1,5 @@
+import { installPianoRollResizeObserver } from '@/features/piano-roll/__tests__/support/piano-roll-resize-observer-test-support'
+import { PROJECT_MIDI_NOTE_CONTEXT_KEY, PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/symbols'
 import {
   getPianoRollContextMenu,
   getPianoRollContextMenuItem,
@@ -23,21 +25,18 @@ import {
   type ProjectQueryResult,
   type ProjectSession,
 } from '@seele-daw/project-core'
-import { config, flushPromises, mount } from '@vue/test-utils'
+import { config, DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { markRaw, nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-import ProjectPianoRollSurface from '@/features/piano-roll/ProjectPianoRollSurface.vue'
-import {
-  PIANO_ROLL_TOOL,
-  usePianoRollPreferencesStore,
-} from '@/features/piano-roll/piano-roll-preferences-store'
+import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
+import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
+import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import {
   PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
-  createProjectPianoRollPresentation,
   type ReadyProjectPianoRollPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
+} from '@/features/piano-roll/types/piano-roll-presentation'
+import { createProjectPianoRollPresentation } from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import type {
@@ -49,18 +48,12 @@ import type {
   ResizeMidiNoteInput,
 } from '@/workbench/project/midi-note/project-midi-note-coordinator'
 import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
-import {
-  PROJECT_MIDI_NOTE_CONTEXT_KEY,
-  type ProjectMidiNoteVueContext,
-} from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { type ProjectMidiNoteVueContext } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import {
   createProjectMidiSustainPedalCoordinator,
   type ProjectMidiSustainPedalCoordinator,
 } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
-import {
-  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
-  type ProjectMidiSustainPedalVueContext,
-} from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
+import { type ProjectMidiSustainPedalVueContext } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
@@ -369,6 +362,7 @@ afterEach(() => {
   Reflect.deleteProperty(config.global.stubs, 'PianoRollPlayhead')
   Reflect.deleteProperty(config.global.provide, PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol)
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   restorePrototypeProperty('hasPointerCapture')
   restorePrototypeProperty('releasePointerCapture')
   restorePrototypeProperty('setPointerCapture')
@@ -379,6 +373,28 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollSurface', () => {
+  it('rolls back Clip input, projections and renderers when viewport observation fails', async () => {
+    const probe = installPianoRollResizeObserver('.project-piano-roll__canvas-host')
+    const { session, preferences, wrapper } = mountSelectionMenuFixture('clip-viewport-failure')
+    await nextTick()
+    const host = wrapper.get('.project-piano-roll__canvas-host').element
+    const observer = probe.forElement(host)
+    expect(wrapper.text()).toContain('Viewport observation failed')
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.project-piano-roll__note-host').element.childElementCount).toBe(0)
+    const revision = session.modelRevision
+    preferences.activateTool(PIANO_ROLL_TOOL.PENCIL)
+    dispatchPointer(host, 'pointerdown', { clientX: 240, clientY: 125 })
+    dispatchPointer(host, 'pointerup', { clientX: 240, clientY: 125 })
+    observer.deliver()
+    await nextTick()
+    expect(session.modelRevision).toBe(revision)
+    expect(wrapper.get('.project-piano-roll__note-host').element.childElementCount).toBe(0)
+    wrapper.unmount()
+    observer.deliver()
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+  })
+
   it.each(['notes', 'sustain-pedal'] as const)(
     'retargets repeated context requests within %s and restores that editing surface',
     async (kind) => {
@@ -1485,11 +1501,19 @@ describe('ProjectPianoRollSurface', () => {
     })
     await nextTick()
 
-    const channelSelector = wrapper.get('select[aria-label="Sustain Pedal MIDI Channel"]')
-    expect(channelSelector.findAll('option').map((option) => option.text())).toEqual(
+    const channelSelector = wrapper.get(
+      '[role="combobox"][aria-label="Sustain Pedal MIDI Channel"]',
+    )
+    await channelSelector.trigger('keydown', { key: 'ArrowDown' })
+    await flushPromises()
+    const options = [...document.querySelectorAll('[role="option"]')]
+    expect(options.map((option) => option.textContent)).toEqual(
       Array.from({ length: 16 }, (_, index) => String(index + 1)),
     )
-    await channelSelector.setValue('2')
+    const channelThree = options.find((option) => option.textContent === '3')
+    if (channelThree === undefined) throw new Error('Expected MIDI channel 3 option')
+    await new DOMWrapper(channelThree).trigger('keydown', { key: 'Enter' })
+    await flushPromises()
     const lane = wrapper.get('.piano-roll-sustain-pedal-lane')
     dispatchPointer(lane.element, 'pointerdown', { clientX: 240, clientY: 125, pointerId: 71 })
     dispatchPointer(lane.element, 'pointerup', { clientX: 240, clientY: 125, pointerId: 71 })

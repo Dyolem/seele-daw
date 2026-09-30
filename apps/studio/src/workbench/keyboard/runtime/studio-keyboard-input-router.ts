@@ -1,3 +1,4 @@
+import { createKeyboardInputOwner } from '@/symbols'
 import { type StudioActionId, type StudioActionFailure } from '@/workbench/actions/studio-action'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type {
@@ -123,7 +124,7 @@ class StudioKeyboardInputRouterImpl implements StudioKeyboardInputRouter {
   }
 
   readonly suspend = (): StudioKeyboardDispose => {
-    const owner = Symbol('keyboard-input-owner')
+    const owner = createKeyboardInputOwner()
     if (!this.#disposed) this.#suspended.add(owner)
     return () => {
       this.#suspended.delete(owner)

@@ -1,3 +1,13 @@
+import {
+  ACTIVE_PROJECT_CONTEXT_KEY,
+  PROJECT_CLIP_CONTEXT_KEY,
+  PROJECT_ENTRY_CONTEXT_KEY,
+  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
+  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
+  PROJECT_PLAYBACK_CONTEXT_KEY,
+  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
+  PROJECT_TRACK_CONTEXT_KEY,
+} from '@/symbols'
 import { createDeferredActionResult } from '@/workbench/actions/__tests__/support/deferred-action-test-support'
 import { createStandardMidiFileSourceEnvelope, type MidiFileDocument } from '@seele-daw/midi-file'
 import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
@@ -26,7 +36,6 @@ import { nextTick, shallowReadonly, shallowRef, type ShallowRef } from 'vue'
 import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
-
 import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
 import { STUDIO_ACTION, STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
 import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
@@ -52,10 +61,7 @@ import {
   createProjectClipCoordinator,
   type ProjectClipCoordinator,
 } from '@/workbench/project/clip/project-clip-coordinator'
-import {
-  PROJECT_CLIP_CONTEXT_KEY,
-  type ProjectClipVueContext,
-} from '@/workbench/project/clip/vue/project-clip-context'
+import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
 import {
   PROJECT_ENTRY_FAILURE_OPERATION,
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -63,19 +69,13 @@ import {
   type ProjectEntryCoordinator,
   type ProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import {
-  PROJECT_ENTRY_CONTEXT_KEY,
-  type ProjectEntryVueContext,
-} from '@/workbench/project/entry/vue/project-entry-context'
+import { type ProjectEntryVueContext } from '@/workbench/project/entry/vue/project-entry-context'
 import type {
   ProjectMidiImportCoordinator,
   ProjectMidiImportResult,
   ProjectMidiTrackImportResult,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
-import {
-  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
-  type ProjectMidiImportVueContext,
-} from '@/workbench/project/midi-import/vue/project-midi-import-context'
+import { type ProjectMidiImportVueContext } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
   NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
@@ -85,7 +85,6 @@ import {
   type ProjectNavigationDecisionRequest,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
 import {
-  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
   type PendingProjectNavigationDecision,
   type ProjectNavigationDecisionVueContext,
 } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
@@ -95,25 +94,13 @@ import {
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import {
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  type ProjectPlaybackVueContext,
-} from '@/workbench/project/playback/vue/project-playback-context'
-import {
-  ACTIVE_PROJECT_CONTEXT_KEY,
-  type ActiveProjectVueContext,
-} from '@/workbench/project/vue/active-project-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
+import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-context'
 import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
-import {
-  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
-  type ProjectTempoEventVueContext,
-} from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
+import { type ProjectTempoEventVueContext } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import {
-  PROJECT_TRACK_CONTEXT_KEY,
-  type ProjectTrackVueContext,
-} from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
 
 interface PageFixture {
   readonly activeProjectContext: ActiveProjectVueContext

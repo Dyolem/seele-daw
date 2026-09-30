@@ -3,6 +3,7 @@
  * Local storage preconditions are checked per mutation; cross-entity invariants are
  * checked once after the final projected state exists. The base reader is never mutated.
  */
+import { PROJECTED_DELETED as DELETED } from '#internal/project-symbols'
 import type { MasterChannelRecord } from '#internal/model/channel'
 import type { DeviceDescriptor } from '#internal/model/device'
 import type {
@@ -33,8 +34,6 @@ import {
 } from './mutation-precondition-error'
 import { PROJECT_MUTATION_TYPE, type ProjectMutationType } from './mutation-type'
 import type { ProjectMutation } from './project-mutation'
-
-const DELETED = Symbol('projected-deleted')
 
 type EntryPosition = 'append' | 'base'
 

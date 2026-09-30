@@ -3,16 +3,18 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  PIANO_ROLL_GRID_PRESET,
+  PIANO_ROLL_EDITING_SCOPE,
+  PIANO_ROLL_TOOL,
+} from '@/features/piano-roll/types/piano-roll-preferences'
+import {
   PIANO_ROLL_DEFAULT_GRID_PRESET,
   PIANO_ROLL_DEFAULT_EDITING_SCOPE,
   PIANO_ROLL_DEFAULT_SNAP_ENABLED,
   PIANO_ROLL_DEFAULT_SUSTAIN_PEDAL_CHANNEL,
   PIANO_ROLL_DEFAULT_TOOL,
-  PIANO_ROLL_GRID_PRESET,
-  PIANO_ROLL_EDITING_SCOPE,
-  PIANO_ROLL_TOOL,
   usePianoRollPreferencesStore,
-} from '@/features/piano-roll/piano-roll-preferences-store'
+} from '@/features/piano-roll/state/piano-roll-preferences-store'
 
 beforeEach(() => {
   setActivePinia(createPinia())

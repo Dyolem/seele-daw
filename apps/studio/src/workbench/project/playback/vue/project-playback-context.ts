@@ -1,5 +1,5 @@
-import { inject, type InjectionKey, type ShallowRef } from 'vue'
-
+import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/symbols'
+import { inject, type ShallowRef } from 'vue'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import { ProjectPlaybackError } from '@/workbench/project/playback/project-playback-error'
 import type { ProjectPlaybackState } from '@/workbench/project/playback/project-playback-state'
@@ -10,10 +10,6 @@ export interface ProjectPlaybackVueContext {
   readonly state: Readonly<ShallowRef<ProjectPlaybackState>>
   readonly visualPosition: Readonly<ShallowRef<ProjectPlaybackVisualPosition>>
 }
-
-export const PROJECT_PLAYBACK_CONTEXT_KEY: InjectionKey<ProjectPlaybackVueContext> = Symbol(
-  'ProjectPlaybackVueContext',
-)
 
 /** Resolves the application-owned Project Playback capability and shallow state projection. */
 export function useProjectPlayback(): ProjectPlaybackVueContext {

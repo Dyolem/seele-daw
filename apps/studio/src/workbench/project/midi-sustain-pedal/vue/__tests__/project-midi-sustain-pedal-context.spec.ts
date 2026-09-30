@@ -1,3 +1,4 @@
+import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/symbols'
 import {
   parseClipId,
   parseMidiChannel,
@@ -7,10 +8,8 @@ import {
 } from '@seele-daw/project-core'
 import { createApp } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
 import {
-  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
   useProjectMidiSustainPedal,
   type ProjectMidiSustainPedalVueContext,
 } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'

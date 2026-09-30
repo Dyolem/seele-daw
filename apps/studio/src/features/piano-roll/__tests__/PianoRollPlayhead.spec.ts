@@ -1,3 +1,4 @@
+import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/symbols'
 import { createInitialPianoRollViewport, createPianoRollClipContext } from '@seele-daw/editor'
 import {
   createMidiClipRecord,
@@ -14,19 +15,15 @@ import {
 import { mount } from '@vue/test-utils'
 import { nextTick, shallowRef } from 'vue'
 import { describe, expect, it } from 'vitest'
-
 import PianoRollPlayhead from '@/features/piano-roll/playhead/PianoRollPlayhead.vue'
-import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/project-piano-roll-presentation'
+import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import {
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  type ProjectPlaybackVueContext,
-} from '@/workbench/project/playback/vue/project-playback-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
 
 const PROJECT_ID = parseProjectId('piano-roll-playhead-project')
 const OTHER_PROJECT_ID = parseProjectId('piano-roll-playhead-other-project')

@@ -3,7 +3,7 @@ import type { PianoRollViewport } from '@seele-daw/editor'
 import { computed, type StyleValue } from 'vue'
 
 import { projectPianoRollPlayheadCssPixel } from '@/features/piano-roll/playhead/playhead-projection'
-import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/project-piano-roll-presentation'
+import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 
 const props = defineProps<{

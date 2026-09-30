@@ -13,7 +13,7 @@ import type { StudioActionControl } from '@/workbench/actions/studio-action-cont
 import type {
   ProjectPianoRollPresentation,
   ProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/project-piano-roll-presentation'
+} from '@/features/piano-roll/types/piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'

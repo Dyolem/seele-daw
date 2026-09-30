@@ -1,6 +1,8 @@
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import { symbolFileViolation } from './symbol-boundaries.mjs'
+import { pianoRollImportViolation } from './piano-roll-boundaries.mjs'
 import {
   studioKeyboardFileViolation,
   studioKeyboardImportViolation,
@@ -164,6 +166,8 @@ for (const file of await collectFiles(root)) {
 
   const source = await readFile(file, 'utf8')
   const relativeFile = path.relative(root, file).split(path.sep).join('/')
+  const symbolViolation = symbolFileViolation(root, file, source)
+  if (symbolViolation) errors.push(`${relativeFile}: ${symbolViolation}`)
   const interactionFileViolation = editorInteractionFileViolation(root, file, source)
   if (interactionFileViolation) errors.push(`${relativeFile}: ${interactionFileViolation}`)
   const keyboardFileViolation = studioKeyboardFileViolation(root, file, source)
@@ -188,6 +192,8 @@ for (const file of await collectFiles(root)) {
       specifier,
     )
     if (interactionImportViolation) errors.push(`${relativeFile}: ${interactionImportViolation}`)
+    const pianoRollViolation = pianoRollImportViolation(root, file, localTarget)
+    if (pianoRollViolation) errors.push(`${relativeFile}: ${pianoRollViolation}`)
     const keyboardImportViolation = studioKeyboardImportViolation(root, file, localTarget)
     if (keyboardImportViolation) errors.push(`${relativeFile}: ${keyboardImportViolation}`)
 

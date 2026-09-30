@@ -1,11 +1,10 @@
+import { PROJECT_TEMPO_EVENT_CONTEXT_KEY } from '@/symbols'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-
 import type { ProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
 import { ProjectTempoEventError } from '@/workbench/project/tempo-event/project-tempo-event-error'
 import {
-  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
   useProjectTempoEvents,
   type ProjectTempoEventVueContext,
 } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'

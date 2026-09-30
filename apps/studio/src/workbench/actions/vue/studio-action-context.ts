@@ -1,5 +1,5 @@
-import { inject, onBeforeUnmount, watch, type InjectionKey, type ComputedRef } from 'vue'
-
+import { STUDIO_ACTION_CONTEXT_KEY } from '@/symbols'
+import { inject, onBeforeUnmount, watch, type ComputedRef } from 'vue'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type {
   StudioKeyboardInput,
@@ -15,9 +15,6 @@ export interface StudioActionVueContext {
   readonly actions: StudioActionCoordinator
   readonly keyboard: StudioKeyboardInput
 }
-
-export const STUDIO_ACTION_CONTEXT_KEY: InjectionKey<StudioActionVueContext> =
-  Symbol('StudioActionVueContext')
 
 export function useStudioActions(): StudioActionVueContext {
   const context = inject(STUDIO_ACTION_CONTEXT_KEY, null)

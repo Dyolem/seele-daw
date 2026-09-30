@@ -1,17 +1,14 @@
+import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/symbols'
 import { parseProjectId, type ProjectContentStateId } from '@seele-daw/project-core'
 import { createApp, isProxy, isReadonly, isShallow } from 'vue'
 import { describe, expect, it } from 'vitest'
-
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import {
   PROJECT_NAVIGATION_DECISION,
   PROJECT_NAVIGATION_INTENT_KIND,
   type ProjectNavigationDecisionRequest,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import {
-  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
-  useProjectNavigationDecision,
-} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import { createProjectNavigationDecisionVueBinding } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
 import { ProjectNavigationDecisionVueError } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-error'
 

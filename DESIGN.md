@@ -902,6 +902,8 @@ Mute、Solo、Record Arm、Snap 和 Tool 都是持续状态，不应只在按下
   `as-child` 提供原生内容节点，并拥有背景、边框、间距、滚动和视口尺寸约束。
 - `UiMenuSurface` 统一命令菜单的浮层外观，`UiMenuItem` 提供文字、前置图标与尾部提示的
   排列；Add Track 等复杂菜单项和音色选择器保留各自的内容布局。
+- Piano Roll 的 Active Clip 与 CC64 Channel 下拉框使用 `UiSelect` 的 small 规格，保留
+  与其他下拉框一致的箭头右侧间距；Pencil / Cursor / Snap 两种 Scope 共用同一控件视图。
 - 菜单与 Popover 使用不透明的 `surface-overlay` 背景。尺寸上限使用标准 CSS 视口单位
   和 Studio 设计令牌，不直接引用 Reka 的 available-size CSS 变量。定位交由 Reka 处理，
   长内容在自有节点内滚动。

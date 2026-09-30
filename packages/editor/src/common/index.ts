@@ -14,4 +14,8 @@ export type {
 export { TimelineGridError } from './timeline-grid-error'
 export type { TimelineGridErrorCode } from './timeline-grid-error'
 
-export type { InteractionId } from './interaction/interaction-session'
+export { InteractionSession } from './interaction/interaction-session'
+export type { InteractionId, InteractionOperation } from './interaction/interaction-session'
+export { InteractionCommitHandoff } from './interaction/interaction-commit-handoff'
+export { EDITOR_POINTER_INPUT_PHASE } from './interaction/editor-pointer-input'
+export type { EditorPointerInput } from './interaction/editor-pointer-input'

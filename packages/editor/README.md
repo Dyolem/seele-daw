@@ -69,7 +69,10 @@ src/
 └── index.ts                        唯一公开入口
 ```
 
-中立 Session 使用 class 拥有生命周期，领域规则通过 Operation 组合接入。Note、Tempo 与
+中立 Session 使用 class 拥有生命周期，领域规则通过 Operation 组合接入。G2 的
+[Studio Tempo Track](../../apps/studio/src/features/project-workspace/tempo-track/README.md) 从
+package root 复用 Session、CommitHandoff 与 Browser Pointer Adapter，领域规则保留在
+Studio；这是 Note 之外的实际消费者。Note、Tempo 与
 Locate 的协议对照、状态实现理由和迁移边界见
 [Editor Interaction V1 决策](./docs/editor-interaction-architecture-v1.md)。
 

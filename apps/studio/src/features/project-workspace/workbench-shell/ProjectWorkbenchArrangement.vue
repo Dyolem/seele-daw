@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import type {
+  ProjectTempoEventPositionDraft,
+  ProjectTempoEventNavigationDirection,
+} from '@/features/project-workspace/tempo-track/types/tempo-track'
 import {
   STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
@@ -41,13 +45,11 @@ import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
-import { provideTempoTrackInteraction } from '@/features/project-workspace/tempo-track/interaction'
+import { provideTempoTrackPreview } from '@/features/project-workspace/tempo-track/tempo-track-preview'
 import {
   createProjectTempoEventLocationPresentation,
   orderProjectTempoEvents,
   parseProjectTempoEventPositionInput,
-  type ProjectTempoEventPositionDraft,
-  type ProjectTempoEventNavigationDirection,
 } from '@/features/project-workspace/tempo-track/tempo-track'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
@@ -122,7 +124,6 @@ const emit = defineEmits<{
   openMidiClip: []
   tempoEditStart: []
   tempoEventAdd: [bpm: TempoBpm, tick: Tick]
-  tempoEventBpmChange: [tempoEventId: TempoEventId, bpm: TempoBpm]
   tempoEventBpmCommit: [tempoEventId: TempoEventId, input: string]
   tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
   tempoEventRemove: [tempoEventId: TempoEventId]
@@ -143,7 +144,7 @@ const trackViewportElement = shallowRef<HTMLElement | null>(null)
 const trackFollowerElement = shallowRef<HTMLElement | null>(null)
 const isTimelineFollowSuspended = shallowRef(false)
 const locatePreviewTick = shallowRef<Tick | null>(null)
-const tempoTrackInteraction = provideTempoTrackInteraction()
+const tempoPreview = provideTempoTrackPreview()
 let observedArrangementScrollLeft = 0
 const activeTimelineLocateGesture = shallowRef<ActiveTimelineLocateGesture | null>(null)
 let locateEdgeScrollFrameHandle: number | null = null
@@ -220,7 +221,7 @@ const rulerPositionTick = computed(() =>
   ),
 )
 const presentedTempoEvents = computed(() => {
-  const preview = tempoTrackInteraction.preview.value
+  const preview = tempoPreview.preview.value
   if (preview === null) return props.tempoEvents
 
   return Object.freeze(
@@ -235,7 +236,7 @@ const selectedTempoEvent = computed(
   () => presentedTempoEvents.value.find(({ id }) => id === props.selectedTempoEventId) ?? null,
 )
 const tempoPreviewHasPositionConflict = computed(() => {
-  const preview = tempoTrackInteraction.preview.value
+  const preview = tempoPreview.preview.value
   return (
     preview !== null &&
     props.tempoEvents.some(({ id, tick }) => id !== preview.tempoEventId && tick === preview.tick)
@@ -813,12 +814,12 @@ watch(
 
 watch(
   () => props.projectId,
-  () => tempoTrackInteraction.cancelPreview(),
+  () => tempoPreview.cancelPreview(),
 )
 
 onUnmounted(() => {
   cancelTimelineLocate()
-  tempoTrackInteraction.cancelPreview()
+  tempoPreview.cancelPreview()
 })
 </script>
 
@@ -975,9 +976,7 @@ onUnmounted(() => {
             :tempo-events="props.tempoEvents"
             :timeline-end-tick="props.timelineEndTick"
             @add="({ bpm, tick }) => emit('tempoEventAdd', bpm, tick)"
-            @bpm-change="(tempoEventId, bpm) => emit('tempoEventBpmChange', tempoEventId, bpm)"
             @edit-start="emit('tempoEditStart')"
-            @move="(tempoEventId, tick) => emit('tempoEventMove', tempoEventId, tick)"
             @select="emit('tempoEventSelect', $event)"
           />
         </div>

@@ -2,6 +2,7 @@ export type ProjectTempoEventErrorCode =
   | 'active-project-not-ready'
   | 'missing-context'
   | 'tempo-event-add-produced-no-change'
+  | 'tempo-event-edit-target-stale'
 
 export interface ProjectTempoEventErrorDetails {
   readonly phase?: string

@@ -15,6 +15,7 @@ import {
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'
 import { ProjectTempoEventError } from '@/workbench/project/tempo-event/project-tempo-event-error'
+import type { ProjectTempoEventEditTarget } from './types/tempo-event-edit'
 
 export interface ProjectTempoEventCoordinatorDependencies {
   readonly activeProject: Pick<ActiveProjectService, 'state'>
@@ -32,11 +33,13 @@ export interface AddedProjectTempoEventResult {
 }
 
 export interface MoveProjectTempoEventInput {
+  readonly target?: ProjectTempoEventEditTarget
   readonly tempoEventId: TempoEventId
   readonly tick: Tick
 }
 
 export interface ReplaceProjectTempoEventBpmInput {
+  readonly target?: ProjectTempoEventEditTarget
   readonly bpm: TempoBpm
   readonly tempoEventId: TempoEventId
 }
@@ -78,10 +81,10 @@ class ProjectTempoEventCoordinatorImpl implements ProjectTempoEventCoordinator {
   }
 
   moveTempoEvent(input: MoveProjectTempoEventInput): ProjectCommandExecutionResult {
-    const session = this.#readySession('move')
+    const session = this.#readySession('move', input.target)
     return session.execute(
       createMoveTempoEventCommand({
-        baseRevision: session.modelRevision,
+        baseRevision: input.target?.baseRevision ?? session.modelRevision,
         tempoEventId: input.tempoEventId,
         tick: input.tick,
       }),
@@ -99,23 +102,29 @@ class ProjectTempoEventCoordinatorImpl implements ProjectTempoEventCoordinator {
   }
 
   replaceTempoEventBpm(input: ReplaceProjectTempoEventBpmInput): ProjectCommandExecutionResult {
-    const session = this.#readySession('replace BPM for')
+    const session = this.#readySession('replace BPM for', input.target)
     return session.execute(
       createReplaceTempoEventBpmCommand({
-        baseRevision: session.modelRevision,
+        baseRevision: input.target?.baseRevision ?? session.modelRevision,
         bpm: input.bpm,
         tempoEventId: input.tempoEventId,
       }),
     )
   }
 
-  #readySession(intent: string) {
+  #readySession(intent: string, target?: ProjectTempoEventEditTarget) {
     const activeState = this.#dependencies.activeProject.state
     if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
       throw new ProjectTempoEventError(
         'active-project-not-ready',
         `Cannot ${intent} a Tempo Event while the Active Project is ${activeState.phase}`,
         { phase: activeState.phase },
+      )
+    }
+    if (target !== undefined && target.expectedSession !== activeState.session) {
+      throw new ProjectTempoEventError(
+        'tempo-event-edit-target-stale',
+        'The Project changed before the Tempo edit could complete. Try the gesture again.',
       )
     }
     return activeState.session

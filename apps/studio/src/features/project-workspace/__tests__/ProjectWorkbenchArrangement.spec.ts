@@ -1,11 +1,15 @@
 import {
+  createTempoTrackTestActions,
+  installTempoPointerCapture,
+} from './support/tempo-track-test-support'
+import { createReplaceTempoEventBpmCommand } from '@seele-daw/project-core'
+import {
   PROJECT_CLIP_CONTEXT_KEY,
   PROJECT_PLAYBACK_CONTEXT_KEY,
   PROJECT_TRACK_CONTEXT_KEY,
   TEMPO_EVENT_ACTION_CONTEXT_KEY,
 } from '@/symbols'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
 import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import {
   createTempoEventRecord,
@@ -57,6 +61,7 @@ const STUDIO_GRAND_INSTRUMENT = Object.freeze({
 })
 
 interface ArrangementFixture {
+  readonly tempoActions: ReturnType<typeof createTempoTrackTestActions>
   readonly keyboard: ReturnType<typeof createTestStudioActionRuntime>
   readonly addEmptyMidiClip: ReturnType<typeof vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>>
   readonly addInstrumentTrack: ReturnType<
@@ -87,6 +92,18 @@ interface MountArrangementOptions {
 }
 
 function mountArrangement(options: MountArrangementOptions = {}): ArrangementFixture {
+  const tempoActions = createTempoTrackTestActions(options.tempoEvents ?? [])
+  tempoActions.commitDrag.mockImplementation(() => {
+    const current = tempoActions.session.value
+    const initial = current.getSnapshot().tempoEvents[0]!
+    return current.execute(
+      createReplaceTempoEventBpmCommand({
+        baseRevision: current.modelRevision,
+        tempoEventId: initial.id,
+        bpm: initial.bpm,
+      }),
+    )
+  })
   const keyboard = createTestStudioActionRuntime()
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
@@ -189,9 +206,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       plugins: [pinia],
       provide: {
         ...keyboard.provide,
-        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: {
-          removeTempoEvent: () => STUDIO_ACTION_COMPLETED,
-        },
+        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: tempoActions.context,
         [PROJECT_CLIP_CONTEXT_KEY as symbol]: clipContext,
         [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
         [PROJECT_TRACK_CONTEXT_KEY as symbol]: context,
@@ -201,6 +216,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   mountedWrappers.push(wrapper)
 
   return {
+    tempoActions,
     keyboard,
     addEmptyMidiClip,
     addInstrumentTrack,
@@ -760,6 +776,7 @@ describe('ProjectWorkbenchArrangement', () => {
       x: 100,
       y: 50,
     })
+    installTempoPointerCapture(plot)
     const point = fixture.wrapper.findAll('.tempo-track-lane__point')[1]!
     const bpm = fixture.wrapper.get<HTMLInputElement>(
       'input[aria-label="Selected Tempo Event BPM"]',
@@ -786,7 +803,7 @@ describe('ProjectWorkbenchArrangement', () => {
     })
     await nextTick()
 
-    expect(fixture.wrapper.emitted('tempoEventMove')).toBeUndefined()
+    expect(fixture.tempoActions.commitDrag).not.toHaveBeenCalled()
     expect(bar.element.value).toBe('1')
     expect(beat.element.value).toBe('3')
     expect(offset.element.value).toBe('0')
@@ -797,7 +814,11 @@ describe('ProjectWorkbenchArrangement', () => {
       clientY: 121,
       pointerId: 71,
     })
-    expect(fixture.wrapper.emitted('tempoEventMove')).toEqual([[selected.id, parseTick(1_920)]])
+    expect(fixture.tempoActions.commitDrag.mock.calls[0]?.[0]).toMatchObject({
+      axis: 'tick',
+      tempoEventId: selected.id,
+      tick: 1_920,
+    })
     expect(beat.element.value).toBe('2')
 
     await dispatchPointerEvent(point.element, 'pointerdown', {
@@ -812,7 +833,7 @@ describe('ProjectWorkbenchArrangement', () => {
     })
     await nextTick()
 
-    expect(fixture.wrapper.emitted('tempoEventBpmChange')).toBeUndefined()
+    expect(fixture.tempoActions.commitDrag).toHaveBeenCalledOnce()
     expect(bpm.element.value).toBe('140')
 
     await dispatchPointerEvent(point.element, 'pointerup', {
@@ -820,9 +841,11 @@ describe('ProjectWorkbenchArrangement', () => {
       clientY: 100,
       pointerId: 72,
     })
-    expect(fixture.wrapper.emitted('tempoEventBpmChange')).toEqual([
-      [selected.id, parseTempoBpm(140)],
-    ])
+    expect(fixture.tempoActions.commitDrag.mock.calls[1]?.[0]).toMatchObject({
+      axis: 'bpm',
+      tempoEventId: selected.id,
+      bpm: 140,
+    })
 
     await dispatchPointerEvent(point.element, 'pointerdown', {
       clientX: 350,
@@ -846,7 +869,7 @@ describe('ProjectWorkbenchArrangement', () => {
       clientY: 121,
       pointerId: 73,
     })
-    expect(fixture.wrapper.emitted('tempoEventMove')).toHaveLength(1)
+    expect(fixture.tempoActions.commitDrag).toHaveBeenCalledTimes(2)
     expect(fixture.wrapper.get('.tempo-track-control__time').text()).toContain('00:00.500')
   })
 

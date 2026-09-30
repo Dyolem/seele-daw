@@ -63,6 +63,8 @@ import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-pla
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 import { useProjectTempoEvents } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
+import { ProjectTempoEventError } from '@/workbench/project/tempo-event/project-tempo-event-error'
+import type { TempoTrackDragIntent } from '@/features/project-workspace/tempo-track/types/tempo-track-drag'
 import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 
 const props = defineProps<{
@@ -389,7 +391,42 @@ function commitTempoEventInput(tempoEventId: TempoEventId, input: string): void 
   replaceTempoEventBpm(tempoEventId, parsed.bpm)
 }
 
-provide(TEMPO_EVENT_ACTION_CONTEXT_KEY, { removeTempoEvent })
+provide(TEMPO_EVENT_ACTION_CONTEXT_KEY, {
+  get session() {
+    const ready = readyProject.value
+    const current = activeProject.state
+    return current.phase === ACTIVE_PROJECT_PHASE.READY && current.session === ready?.session
+      ? current.session
+      : null
+  },
+  get projectedRevision() {
+    return projectSnapshot.value?.modelRevision ?? null
+  },
+  commitDrag: commitTempoDrag,
+  removeTempoEvent,
+})
+
+function commitTempoDrag(intent: TempoTrackDragIntent) {
+  if (readyProject.value?.session !== intent.target.expectedSession) {
+    throw new ProjectTempoEventError(
+      'tempo-event-edit-target-stale',
+      'The Tempo editing target changed. Try the gesture again.',
+    )
+  }
+  if (!ensureTempoPlaybackIsInactive()) throw new Error('Playback could not be paused safely.')
+  // The coordinator validates the captured Session again after playback preparation.
+  return intent.axis === 'tick'
+    ? projectTempoEvents.moveTempoEvent({
+        target: intent.target,
+        tempoEventId: intent.tempoEventId,
+        tick: intent.tick,
+      })
+    : projectTempoEvents.replaceTempoEventBpm({
+        target: intent.target,
+        tempoEventId: intent.tempoEventId,
+        bpm: intent.bpm,
+      })
+}
 
 function removeTempoEvent(tempoEventId: TempoEventId): StudioActionCompletion {
   const failureTitle = 'Tempo Event could not be removed'
@@ -582,7 +619,6 @@ onUnmounted(() => {
     @tempo-commit="commitTempoInput"
     @tempo-edit-start="beginTempoEdit"
     @tempo-event-add="addTempoEvent"
-    @tempo-event-bpm-change="replaceTempoEventBpm"
     @tempo-event-bpm-commit="commitTempoEventInput"
     @tempo-event-move="moveTempoEvent"
     @tempo-event-remove="removeTempoEvent"

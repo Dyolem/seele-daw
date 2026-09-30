@@ -1,5 +1,17 @@
-import { TEMPO_EVENT_ACTION_CONTEXT_KEY, TEMPO_TRACK_INTERACTION_KEY } from '@/symbols'
-import { type TempoEventActionContext } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+import { nextTick } from 'vue'
+import { useUiToastStore } from '@/ui/stores/ui-toast-store'
+import { createReplaceTempoEventBpmCommand } from '@seele-daw/project-core'
+import {
+  createTempoTrackTestSession,
+  dispatchTempoPointer,
+  installTempoResizeObserver,
+} from './support/tempo-track-test-support'
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY, TEMPO_TRACK_PREVIEW_KEY } from '@/symbols'
+import { createPinia } from 'pinia'
+import {
+  createTempoTrackTestActions,
+  installTempoPointerCapture,
+} from './support/tempo-track-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
   type StudioActionCompletion,
@@ -15,7 +27,7 @@ import {
 } from '@seele-daw/project-core'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createTempoTrackInteractionController } from '@/features/project-workspace/tempo-track/interaction'
+import { createTempoTrackPreviewController } from '@/features/project-workspace/tempo-track/tempo-track-preview'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
 
 const mountedWrappers: VueWrapper[] = []
@@ -40,8 +52,18 @@ function mountLane(
   } = {},
 ) {
   const keyboard = createTestStudioActionRuntime()
-  const remove = vi.fn<TempoEventActionContext['removeTempoEvent']>(() => STUDIO_ACTION_COMPLETED)
-  const interaction = createTempoTrackInteractionController()
+  const actions = createTempoTrackTestActions(
+    input.tempoEvents ?? [INITIAL_EVENT, LATER_EVENT],
+    input.projectId,
+  )
+  const { remove, commitDrag, session, projectedRevision } = actions
+  const controller = createTempoTrackPreviewController()
+  const interaction = {
+    ...controller,
+    publishPreview: vi.fn<typeof controller.publishPreview>(controller.publishPreview),
+  }
+  const pinia = createPinia()
+  const toasts = useUiToastStore(pinia)
   const wrapper = mount(TempoTrackLane, {
     attachTo: document.body,
     props: {
@@ -53,10 +75,11 @@ function mountLane(
       timelineEndTick: parseTick(3_840),
     },
     global: {
+      plugins: [pinia],
       provide: {
         ...keyboard.provide,
-        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: { removeTempoEvent: remove },
-        [TEMPO_TRACK_INTERACTION_KEY as symbol]: interaction,
+        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: actions.context,
+        [TEMPO_TRACK_PREVIEW_KEY as symbol]: interaction,
       },
     },
   })
@@ -73,7 +96,25 @@ function mountLane(
     x: 100,
     y: 50,
   })
-  return { interaction, plot, wrapper, keyboard, remove }
+  const capture = installTempoPointerCapture(plot)
+  async function syncProjection() {
+    const update = wrapper.setProps({ tempoEvents: session.value.getSnapshot().tempoEvents })
+    projectedRevision.value = session.value.modelRevision
+    await update
+  }
+  return {
+    interaction,
+    plot,
+    wrapper,
+    keyboard,
+    remove,
+    commitDrag,
+    session,
+    projectedRevision,
+    capture,
+    syncProjection,
+    toasts,
+  }
 }
 
 async function dispatchPointer(
@@ -105,9 +146,181 @@ async function dispatchPointer(
 afterEach(() => {
   for (const wrapper of mountedWrappers.splice(0)) wrapper.unmount()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('TempoTrackLane', () => {
+  it('keeps a newer preview when an old interaction attempts to publish or clear it', () => {
+    const projection = createTempoTrackPreviewController()
+    const old = Symbol('old')
+    const current = Symbol('current')
+    const original = { tempoEventId: LATER_EVENT.id, tick: LATER_EVENT.tick, bpm: LATER_EVENT.bpm }
+    projection.publishPreview(old, original)
+    projection.cancelPreview(old)
+    projection.publishPreview(current, { ...original, tick: parseTick(1_920) })
+    expect(projection.cancelPreview(old)).toBe(false)
+    expect(projection.publishPreview(old, original)).toBe(false)
+    expect(projection.preview.value?.tick).toBe(1_920)
+  })
+
+  it('reports delayed handoff display failures as post-commit warnings and clears the preview', async () => {
+    const { plot, wrapper, interaction, session, syncProjection, toasts } = mountLane()
+    dispatchTempoPointer(wrapper.findAll('.tempo-track-lane__point')[1]!.element, 'pointerdown')
+    dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+    const revision = session.value.modelRevision
+    vi.spyOn(interaction, 'cancelPreview').mockImplementationOnce(() => {
+      throw new Error('Delayed projection failed')
+    })
+    await syncProjection()
+    expect(session.value.modelRevision).toBe(revision)
+    expect(session.value.getSnapshot().tempoEvents[1]?.tick).toBe(1_920)
+    expect(interaction.preview.value).toBeNull()
+    expect(toasts.message?.title).toBe('Tempo edit was committed but could not be displayed')
+  })
+
+  it.each(['pointercancel', 'lostpointercapture', 'blur'])(
+    'releases capture and ignores late End after %s',
+    async (reason) => {
+      const { plot, wrapper, interaction, capture, commitDrag } = mountLane()
+      const point = wrapper.findAll('.tempo-track-lane__point')[1]!.element
+      dispatchTempoPointer(point, 'pointerdown')
+      dispatchTempoPointer(plot, 'pointermove', { x: 600 })
+      expect(capture.captures.has(7)).toBe(true)
+      if (reason === 'blur') window.dispatchEvent(new Event('blur'))
+      else {
+        if (reason === 'lostpointercapture') capture.captures.delete(7)
+        dispatchTempoPointer(plot, reason)
+      }
+      dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+      await nextTick()
+      expect(interaction.preview.value).toBeNull()
+      expect(commitDrag).not.toHaveBeenCalled()
+      expect(capture.captures.size).toBe(0)
+    },
+  )
+
+  it('cancels on external facts before commit notification reaches Vue', () => {
+    const { plot, wrapper, interaction, capture, commitDrag, session } = mountLane()
+    const point = wrapper.findAll('.tempo-track-lane__point')[1]!.element
+    dispatchTempoPointer(point, 'pointerdown')
+    dispatchTempoPointer(plot, 'pointermove', { x: 600 })
+    session.value.execute(
+      createReplaceTempoEventBpmCommand({
+        baseRevision: session.value.modelRevision,
+        tempoEventId: INITIAL_EVENT.id,
+        bpm: parseTempoBpm(140),
+      }),
+    )
+    dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+    expect(commitDrag).not.toHaveBeenCalled()
+    expect(capture.captures.size).toBe(0)
+    expect(interaction.preview.value).toBeNull()
+  })
+
+  it('cancels when Session identity changes even if Project IDs and revisions match', () => {
+    const { plot, wrapper, interaction, capture, commitDrag, session } = mountLane()
+    dispatchTempoPointer(wrapper.findAll('.tempo-track-lane__point')[1]!.element, 'pointerdown')
+    dispatchTempoPointer(plot, 'pointermove', { x: 600 })
+    const replacement = createTempoTrackTestSession([INITIAL_EVENT, LATER_EVENT])
+    expect(replacement.modelRevision).toBe(session.value.modelRevision)
+    session.value = replacement
+    dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+    expect(commitDrag).not.toHaveBeenCalled()
+    expect(capture.captures.size).toBe(0)
+    expect(interaction.preview.value).toBeNull()
+  })
+
+  it('keeps equal mapping changes but cancels when scrolling moves the Lane', () => {
+    const { plot, wrapper, interaction, capture, commitDrag } = mountLane()
+    dispatchTempoPointer(wrapper.findAll('.tempo-track-lane__point')[1]!.element, 'pointerdown')
+    dispatchTempoPointer(plot, 'pointermove', { x: 600 })
+    window.dispatchEvent(new Event('scroll'))
+    expect(interaction.preview.value?.tick).toBe(1_920)
+    const bounds = plot.getBoundingClientRect()
+    vi.mocked(plot.getBoundingClientRect).mockReturnValue({ ...bounds, left: 80 })
+    window.dispatchEvent(new Event('scroll'))
+    dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+    expect(interaction.preview.value).toBeNull()
+    expect(capture.captures.size).toBe(0)
+    expect(commitDrag).not.toHaveBeenCalled()
+  })
+
+  it.each(['timeline', 'loading', 'selection'] as const)(
+    'invalidates the frozen target on %s changes',
+    async (change) => {
+      const { plot, wrapper, interaction, capture, commitDrag } = mountLane()
+      dispatchTempoPointer(wrapper.findAll('.tempo-track-lane__point')[1]!.element, 'pointerdown')
+      dispatchTempoPointer(plot, 'pointermove', { x: 600 })
+      if (change === 'timeline') await wrapper.setProps({ timelineEndTick: parseTick(7_680) })
+      else if (change === 'loading') await wrapper.setProps({ editingDisabled: true })
+      else await wrapper.setProps({ selectedTempoEventId: INITIAL_EVENT.id })
+      dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+      expect(interaction.preview.value).toBeNull()
+      expect(capture.captures.size).toBe(0)
+      expect(commitDrag).not.toHaveBeenCalled()
+    },
+  )
+
+  it('releases resized and unmounted captures and ignores queued observer callbacks', () => {
+    const observers = installTempoResizeObserver()
+    const { plot, wrapper, interaction, capture, commitDrag } = mountLane()
+    const point = wrapper.findAll('.tempo-track-lane__point')[1]!.element
+    dispatchTempoPointer(point, 'pointerdown')
+    const bounds = plot.getBoundingClientRect()
+    vi.mocked(plot.getBoundingClientRect).mockReturnValue({ ...bounds, height: 200 })
+    observers[0]!.deliver()
+    expect(interaction.preview.value).toBeNull()
+    expect(capture.captures.size).toBe(0)
+    dispatchTempoPointer(point, 'pointerdown')
+    wrapper.unmount()
+    mountedWrappers.splice(mountedWrappers.indexOf(wrapper), 1)
+    expect(observers[0]!.disconnect).toHaveBeenCalledOnce()
+    vi.mocked(plot.getBoundingClientRect).mockImplementation(() => {
+      throw new Error('Released element accessed')
+    })
+    expect(() => observers[0]!.deliver()).not.toThrow()
+    dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+    expect(commitDrag).not.toHaveBeenCalled()
+    expect(capture.captures.size).toBe(0)
+  })
+
+  it('cleans up when observation fails partway through mount', () => {
+    const observers = installTempoResizeObserver(true)
+    const addListener = vi.spyOn(window, 'addEventListener')
+    const removeListener = vi.spyOn(window, 'removeEventListener')
+    expect(() => mountLane()).toThrow('Tempo viewport observation failed')
+    expect(observers[0]!.disconnect).toHaveBeenCalledOnce()
+    const ownedListeners = addListener.mock.calls.filter(([event]) =>
+      ['scroll', 'resize', 'blur', 'keydown', 'keyup'].includes(event),
+    )
+    for (const [event, handler] of ownedListeners) {
+      expect(
+        removeListener.mock.calls.some(
+          ([removedEvent, removedHandler]) => removedEvent === event && removedHandler === handler,
+        ),
+      ).toBe(true)
+    }
+  })
+
+  it('reports post-commit preview failures without claiming that the committed facts were rejected', () => {
+    const { plot, wrapper, interaction, commitDrag, session, toasts } = mountLane()
+    const apply = commitDrag.getMockImplementation()!
+    commitDrag.mockImplementation((intent) => {
+      const result = apply(intent)
+      interaction.publishPreview.mockImplementationOnce(() => {
+        throw new Error('Projection failed')
+      })
+      return result
+    })
+    const revision = session.value.modelRevision
+    dispatchTempoPointer(wrapper.findAll('.tempo-track-lane__point')[1]!.element, 'pointerdown')
+    dispatchTempoPointer(plot, 'pointerup', { x: 600 })
+    expect(session.value.modelRevision).toBe(revision + 1)
+    expect(session.value.getSnapshot().tempoEvents[1]?.tick).toBe(1_920)
+    expect(interaction.preview.value).toBeNull()
+    expect(toasts.message?.title).toBe('Tempo edit was committed but could not be displayed')
+  })
+
   it('uses focused Tempo selection instead of a previous Note target and never treats focus as selection', async () => {
     const { keyboard, remove, wrapper } = mountLane({ selectedTempoEventId: LATER_EVENT.id })
     const removeNotes = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
@@ -230,8 +443,8 @@ describe('TempoTrackLane', () => {
     expect(wrapper.emitted('add')).toBeUndefined()
   })
 
-  it('locks horizontal drag, previews silently, and emits one Move on release', async () => {
-    const { interaction, wrapper } = mountLane()
+  it('locks horizontal drag, commits once and keeps the preview until facts are projected', async () => {
+    const { interaction, wrapper, commitDrag, session, syncProjection } = mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -247,10 +460,9 @@ describe('TempoTrackLane', () => {
 
     expect(wrapper.emitted('select')).toEqual([[LATER_EVENT.id]])
     expect(wrapper.emitted('editStart')).toHaveLength(1)
-    expect(wrapper.emitted('move')).toBeUndefined()
+    expect(commitDrag).not.toHaveBeenCalled()
     expect(interaction.preview.value).toEqual({
       bpm: LATER_EVENT.bpm,
-      owner: 'lane-drag',
       tempoEventId: LATER_EVENT.id,
       tick: parseTick(1_920),
     })
@@ -263,13 +475,20 @@ describe('TempoTrackLane', () => {
       clientY: 112,
       pointerId: 7,
     })
-    expect(wrapper.emitted('move')).toEqual([[LATER_EVENT.id, parseTick(1_920)]])
-    expect(wrapper.emitted('bpmChange')).toBeUndefined()
+    expect(commitDrag).toHaveBeenCalledOnce()
+    expect(commitDrag.mock.calls[0]?.[0]).toMatchObject({
+      axis: 'tick',
+      tempoEventId: LATER_EVENT.id,
+      tick: 1_920,
+      target: { expectedSession: session.value },
+    })
+    expect(interaction.preview.value?.tick).toBe(1_920)
+    await syncProjection()
     expect(interaction.preview.value).toBeNull()
   })
 
-  it('locks vertical drag and emits one BPM replacement on release', async () => {
-    const { wrapper } = mountLane()
+  it('locks vertical drag and commits one BPM replacement on release', async () => {
+    const { wrapper, commitDrag } = mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -282,19 +501,23 @@ describe('TempoTrackLane', () => {
       clientY: 100,
       pointerId: 8,
     })
-    expect(wrapper.emitted('bpmChange')).toBeUndefined()
+    expect(commitDrag).not.toHaveBeenCalled()
 
     await dispatchPointer(point.element, 'pointerup', {
       clientX: 352,
       clientY: 100,
       pointerId: 8,
     })
-    expect(wrapper.emitted('bpmChange')).toEqual([[LATER_EVENT.id, parseTempoBpm(120)]])
-    expect(wrapper.emitted('move')).toBeUndefined()
+    expect(commitDrag).toHaveBeenCalledOnce()
+    expect(commitDrag.mock.calls[0]?.[0]).toMatchObject({
+      axis: 'bpm',
+      tempoEventId: LATER_EVENT.id,
+      bpm: 120,
+    })
   })
 
   it('cancels an active preview from the global Escape path without committing', async () => {
-    const { interaction, wrapper, keyboard } = mountLane()
+    const { interaction, wrapper, keyboard, commitDrag } = mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -310,8 +533,7 @@ describe('TempoTrackLane', () => {
     keyboard.bindingRegistry.dispatch('Escape')
     await Promise.resolve()
 
-    expect(wrapper.emitted('move')).toBeUndefined()
-    expect(wrapper.emitted('bpmChange')).toBeUndefined()
+    expect(commitDrag).not.toHaveBeenCalled()
     expect(interaction.preview.value).toBeNull()
     expect(wrapper.findAll('.tempo-track-lane__point')[1]?.attributes('style')).toContain(
       'translate3d(calc(1.25rem - 50%), -50%, 0)',
@@ -337,7 +559,7 @@ describe('TempoTrackLane', () => {
       pointerId: 9,
     })
     initialFixture.keyboard.bindingRegistry.dispatch('Delete')
-    expect(initialFixture.wrapper.emitted('move')).toBeUndefined()
+    expect(initialFixture.commitDrag).not.toHaveBeenCalled()
     expect(initialFixture.remove).not.toHaveBeenCalled()
 
     const laterFixture = mountLane({ selectedTempoEventId: LATER_EVENT.id })

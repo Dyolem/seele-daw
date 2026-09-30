@@ -58,7 +58,6 @@ const emit = defineEmits<{
   invokeAction: [actionId: StudioActionId, source: StudioActionSource]
   tempoEditStart: []
   tempoEventAdd: [bpm: TempoBpm, tick: Tick]
-  tempoEventBpmChange: [tempoEventId: TempoEventId, bpm: TempoBpm]
   tempoEventBpmCommit: [tempoEventId: TempoEventId, input: string]
   tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
   tempoEventRemove: [tempoEventId: TempoEventId]
@@ -267,9 +266,6 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
       @open-midi-clip="openContextEditor"
       @tempo-edit-start="emit('tempoEditStart')"
       @tempo-event-add="(bpm, tick) => emit('tempoEventAdd', bpm, tick)"
-      @tempo-event-bpm-change="
-        (tempoEventId, bpm) => emit('tempoEventBpmChange', tempoEventId, bpm)
-      "
       @tempo-event-bpm-commit="
         (tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)
       "

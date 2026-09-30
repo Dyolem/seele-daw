@@ -1,8 +1,8 @@
-# Editor Interaction V1：中立生命周期与 Note Operation
+# Editor Interaction V1：中立生命周期与领域 Operation
 
-> 状态：G1 已审核提交（`2b2d8c6`）；Tempo 与 Timeline Locate 仅完成协议对照，分别在 G2、G3 迁移。
+> 状态：G1 已审核提交（`2b2d8c6`）；G2 Tempo 已审核通过，Timeline Locate 留在 G3 迁移。
 >
-> 日期：2026-09-29
+> 日期：2026-09-30
 >
 > 替代：[Piano Roll Pointer Interaction 状态机决策](./piano-roll-pointer-interaction-state-machine-decision.md)
 
@@ -41,8 +41,9 @@ CC64 的语义 Session 和 Track Pencil 的完成逻辑仍属于 G3，不能据�
 
 公共内核直接用 class 构造，不新增 Interface → Implementation → Factory 链。Note 保留既有
 `createPianoRollInteractionSession` 公开门面以收敛 package root 的变更；它组合内部 host、
-handoff 和订阅所有权。Browser 工厂创建并拥有监听资源。新增内部模块仅供包内真实消费者
-使用，没有为了测试扩大 package root。
+handoff 和订阅所有权。Browser 工厂创建并拥有监听资源。G2 通过 package root 显式公开已有
+`InteractionSession`、`InteractionCommitHandoff` 和中立 Pointer Adapter 及其必要契约，
+供 Studio Tempo 的真实生产消费者使用；Symbol 创建工厂仍留在内部。
 
 Studio 的 Clip Focus Surface 已按 Model、Interaction、Rendering、Editing Actions 和 CC64
 组合拆成 hooks；组件保留资源创建、目标失效和卸载顺序，详见
@@ -73,15 +74,15 @@ Preview 永远是可丢弃投影，不写 Project、Autosave、History 或 Playb
 
 ## Note、Tempo、Locate 转换对照
 
-| 阶段 / 事件            | Note（G1 已接入）                                      | Tempo（G2 设计约束）                                       | Timeline Locate（G3 设计约束）                                          |
-| ---------------------- | ------------------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Begin                  | 冻结 Clip、Note、选择、revision、Tool、Grid、映射      | 冻结 TempoEvent、Session、revision、原 Tick / BPM、Snap    | 保存 Playback Locate session、原播放 / Follow 状态和抓取锚点            |
-| 阈值以内               | pressing，End 解释为 Selection / Add                   | 点击选择事件；尚未决定编辑轴                               | 可立即定位预览，无需制造“拖动后才能定位”的限制                          |
-| Update                 | Move / Resize 纯 Preview，Alt 更新 `bypassSnap`        | 冻结主导轴；Tick 或 BPM Operation；tick 0 水平移动继续受限 | 重新映射当前坐标，更新定位 Preview；Edge Scroll 可在 Pointer 不动时更新 |
-| End                    | 无变化直接结束，否则领取一次语义结果                   | 仅变更的一轴产生一个 Command                               | 完成已有 Playback Locate session，不写 Project                          |
-| Commit / authority     | 接受先到或后到的权威 revision，交接最终 Preview        | 使用同一可选 handoff，不能用当前 revision 掩盖冲突         | 不需要 revision / Commit handoff                                        |
-| Cancel / target change | 释放 capture、清除 Preview，未提交结果作废             | 清除轴状态和 Preview，迟到 End 无效                        | 停止 Edge Scroll，取消 Playback Locate 并按其规则恢复播放 / Follow      |
-| Mapping change         | 当前 Note Surface 不支持连续滚动重映射，映射改变则取消 | 在 G2 明确其冻结映射与失效政策                             | 显式接受滚动偏移更新，保留原锚点；未知映射重建才取消                    |
+| 阶段 / 事件            | Note（G1 已接入）                                      | Tempo（G2 已接入）                                                | Timeline Locate（G3 设计约束）                                          |
+| ---------------------- | ------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Begin                  | 冻结 Clip、Note、选择、revision、Tool、Grid、映射      | 冻结 TempoEvent、Session、revision、原 Tick / BPM、整数 Tick 映射 | 保存 Playback Locate session、原播放 / Follow 状态和抓取锚点            |
+| 阈值以内               | pressing，End 解释为 Selection / Add                   | 点击选择事件；尚未决定编辑轴                                      | 可立即定位预览，无需制造“拖动后才能定位”的限制                          |
+| Update                 | Move / Resize 纯 Preview，Alt 更新 `bypassSnap`        | 冻结主导轴；Tick 或 BPM Operation；tick 0 水平移动继续受限        | 重新映射当前坐标，更新定位 Preview；Edge Scroll 可在 Pointer 不动时更新 |
+| End                    | 无变化直接结束，否则领取一次语义结果                   | 仅变更的一轴产生一个 Command                                      | 完成已有 Playback Locate session，不写 Project                          |
+| Commit / authority     | 接受先到或后到的权威 revision，交接最终 Preview        | 使用同一可选 handoff，不能用当前 revision 掩盖冲突                | 不需要 revision / Commit handoff                                        |
+| Cancel / target change | 释放 capture、清除 Preview，未提交结果作废             | 清除轴状态和 Preview，迟到 End 无效                               | 停止 Edge Scroll，取消 Playback Locate 并按其规则恢复播放 / Follow      |
+| Mapping change         | 当前 Note Surface 不支持连续滚动重映射，映射改变则取消 | 冻结 Lane 位置 / 尺寸与时间 / BPM Scale；映射变化取消             | 显式接受滚动偏移更新，保留原锚点；未知映射重建才取消                    |
 
 对照依据为当前 Tempo Lane 的 `tick / bpm / blocked-tick` 轴解析与 Arrangement 的 Locate /
 Edge Scroll 实现。G1 没有为了这些将来消费者加入无实际调用的 Mapping 接口或 Playback
@@ -89,8 +90,8 @@ Edge Scroll 实现。G1 没有为了这些将来消费者加入无实际调用�
 
 ## 失效、异常与资源清理
 
-Note 订阅 Project Commit，外部提交会取消活动或尚未领取的结果。Project 当前通过 microtask
-发布通知，因此 Update / End 和提交领取还同步检查 `session.modelRevision`，不能只等通知。
+Note 与 Tempo 订阅 Project Commit，外部提交会取消活动或尚未领取的结果。Project 当前通过
+microtask 发布通知，因此 Update / End 和提交领取还同步检查 `session.modelRevision`，不能只等通知。
 领取自己的执行结果后允许提交的同步或异步通知到达，不把它误判为外部编辑。
 
 权威投影先到时 handoff 记录已观察 revision；回告先到时保留最终 Preview，直到投影追上。
@@ -102,10 +103,35 @@ Cancel；Note observer 失败时清除内部状态，也向健康 observer 发�
 失败不得留下仍可产生 End 的输入。
 
 Note Surface 还处理 Selection 改变、Viewport 尺寸 /范围改变、Surface 位置改变和投影失败。
-等值 Viewport 和不改变该 Surface 映射的滚动不会取消。该政策只属于 Note，不能推广为
+等值 Viewport 和不改变该 Surface 映射的滚动不会取消。映射政策由各自 Surface 决定，不能推广为
 “所有 Editor 遇到 scroll / resize 都取消”；Locate Edge Scroll 必须在 G3 保留。
 
+## G2：Tempo 的实际跨域消费者
+
+Studio 的 [Tempo Track](../../../apps/studio/src/features/project-workspace/tempo-track/README.md)
+直接组合相同公共 host、handoff 和 Browser Adapter。`TempoTrackDragOperation` 只计算单轴
+Preview / Result；`TempoTrackDragSession` 拥有冻结的 Project 目标和 Commit 订阅；Vue Hook
+负责 DOM 映射、统一 Cancel 及 Page 能力调用。Editor 中立层没有加入 Tempo 专属分支。
+
+- 保留原有 4 CSS px 主导轴容差（横纵相等时选择 BPM），首事件水平拖动锁为
+  `blocked-tick`，不能拖到一半再切到 BPM；首事件纵向 BPM 编辑和禁止删除的约束不变。
+- Tempo 现有产品不做音乐网格吸附，Begin 冻结的是整数 Tick 映射。BPM 拖回起点时保留
+  导入的原始精度，不能因两位小数编辑精度制造一个无意的 Command。
+- Studio Page 通过既有 Typed Context 增加窄的 `commitDrag` 能力，返回真实 Command 结果；
+  已移除 Lane → Arrangement → Workspace → Shell 的无回告拖动 Emit 链。数值输入、
+  新增和删除继续使用既有业务路径，不建通用参数化 Action Bus。
+- Coordinator 的拖动输入同时携带 `expectedSession` 与 `baseRevision`，在播放准备之后
+  再验证 Session 身份；Command 验证原 revision。即时数值操作仍可显式省略拖动目标。
+- 共享 Preview 改为仅按 InteractionId 发布 / 清除的展示对象，移除没有真实消费者的
+  `bpm-editor / position-editor` 模式及第二套 begin / finish 生命周期。
+- Tempo Hook 在 Vue 的 post flush 确认对应事实已投影后交接 Preview。Scroll、Resize
+  与每次 Update / End 都检查 Lane 映射；相等映射保留，实际映射变化取消。此政策不作用于
+  G3 的 Locate Edge Scroll。
+
 ## 验证边界
+
+G2 另覆盖 Tempo 两种交接顺序、旧捕获 / 回告、映射失效、初始化失败、播放准备期间的
+外部 Commit、Session 替换、碰撞拒绝、一次 Undo 及提交后的显示失败。
 
 自动测试覆盖公共 host 的一次执行、空结果、失败关闭、重入和释放；Note 的冻结、动态
 Modifier、旧 capture / 回告、两种 handoff 顺序、外部修改前后的通知窗口、映射失效和
@@ -113,4 +139,6 @@ observer 失败；Browser 的捕获、取消、失焦、坐标失败和释放；
 目标替换、Pencil 版本校验与提交后的 Selection 失败。架构规则限制中立层只能依赖自身，
 Browser 可单向依赖 Common，Common 禁止 DOM 对象与事件。
 
-完整门禁与手工验证结果记录在 [阶段计划](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#14-g1-中立协议与-note-迁移2026-09-29)。
+完整门禁与手工验证结果记录在阶段计划的
+[G1](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#14-g1-中立协议与-note-迁移2026-09-29)
+与 [G2](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#17-g2tempo-跨域验证2026-09-30) 记录。

@@ -1,6 +1,6 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已审核提交；Symbol 与 Piano Roll 组织优化（含 O1–O3）已审核通过，G2–G4 尚未实施
+> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已审核提交；Symbol 与 Piano Roll 组织优化（含 O1–O3）已审核提交（`c614b9c`）；G2 已审核通过，G3–G4 尚未实施
 >
 > 日期：2026-09-11
 >
@@ -449,3 +449,24 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
 - 验证：完整 `pnpm check` 通过（168 个 Vitest 文件 / 1,583 tests，14 项 Node 架构规则）；
   内置浏览器确认工具栏、Channel / Active Clip 菜单和 Scope 切换，临时数据已撤销。
   构建保留既有大 chunk 提示。本批已通过用户审核，按授权提交。
+
+## 17. G2：Tempo 跨域验证（2026-09-30）
+
+- 已审核的 Symbol / Piano Roll 组织调整先独立提交为 `c614b9c`，G2 保持为后续独立批次。
+- Lane 复用公共 Pointer Adapter、InteractionSession 与 CommitHandoff。Tempo 专属
+  Operation / Session 留在 Studio，Vue Hook 只适配映射监测、Action Cancel 与 Page 提交。
+  阅读入口、职责地图和清理顺序见 [Tempo Track README](../src/features/project-workspace/tempo-track/README.md)。
+- Begin 冻结 Session、TempoEvent、base revision、原值与映射。保留 4 CSS px 主导轴规则、
+  tick 0 水平移动 / 删除限制及整数 Tick 编辑，不增加音乐网格 Snap。
+- Update、End、领取同步检查 revision，覆盖 Commit microtask 尚未通知的窗口；实际
+  Coordinator 在播放准备后校验 Session 身份，并将原 revision 交给 Command。
+- 共享 Preview 仅负责展示并使用 InteractionId 区分 owner，完成协议不再由 Vue 另行维护。
+  End 使用最后坐标，拖回原值不产生 History；BPM 返回原点保留导入精度。一次修改可一次 Undo。
+- 提交后保留 Preview 至事实投影的 post flush。映射、Session、选择变化或编辑禁用会取消；
+  旧输入 / 回告、Pointer Cancel、lost capture、失焦、释放和部分初始化失败均有清理。
+- 内置浏览器验证时间 / BPM 各自拖动和一次撤销；临时 Tempo 点已撤销，原项目恢复 Saved。
+  Console 无 warning / error；临时 viewport 已恢复、标签已关闭。没有使用个人 Chrome。
+- 完整 `pnpm check` 通过：169 个 Vitest 文件 / 1,621 项测试（本批新增 38 项），14 项
+  Node 架构规则回归，以及格式、Lint、类型、Production Build 与音源资源边界检查。
+  构建仅保留既有的大 chunk 提示。更新文档后的本地链接、格式与 `git diff --check` 通过。
+- 本批不实施 G3 / G4，不新增 E2E。代码已通过用户审核，按授权提交。

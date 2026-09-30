@@ -11,7 +11,7 @@ import type {
   ProjectTempoEventLocationPresentation,
   ProjectTempoEventNavigationDirection,
   ProjectTempoEventPositionDraft,
-} from '@/features/project-workspace/tempo-track/tempo-track'
+} from '@/features/project-workspace/tempo-track/types/tempo-track'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
 const props = defineProps<{

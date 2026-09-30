@@ -55,6 +55,64 @@ function createDependencies(
 }
 
 describe('ProjectTempoEventCoordinator', () => {
+  it.each(['move', 'bpm'] as const)(
+    'rejects %s gestures targeting a replaced Session with equal IDs and revisions',
+    (axis) => {
+      const original = createSession('replaced')
+      const replacement = createSession('replaced')
+      const first = createProjectTempoEventCoordinator(createDependencies(original))
+      const second = createProjectTempoEventCoordinator(createDependencies(replacement))
+      const event = first.addTempoEvent({ bpm: parseTempoBpm(100), tick: parseTick(960) })
+      second.addTempoEvent({ bpm: parseTempoBpm(100), tick: parseTick(960) })
+      const target = { expectedSession: original, baseRevision: original.modelRevision }
+      expect(original.modelRevision).toBe(replacement.modelRevision)
+      const before = replacement.getSnapshot()
+      expect(() =>
+        axis === 'move'
+          ? second.moveTempoEvent({
+              target,
+              tempoEventId: event.tempoEventId,
+              tick: parseTick(1_920),
+            })
+          : second.replaceTempoEventBpm({
+              target,
+              tempoEventId: event.tempoEventId,
+              bpm: parseTempoBpm(140),
+            }),
+      ).toThrow(expect.objectContaining({ code: 'tempo-event-edit-target-stale' }))
+      expect(replacement.getSnapshot()).toEqual(before)
+    },
+  )
+
+  it.each(['move', 'bpm'] as const)(
+    'preserves the original %s revision at the execution boundary',
+    (axis) => {
+      const session = createSession('revision')
+      const coordinator = createProjectTempoEventCoordinator(createDependencies(session))
+      const added = coordinator.addTempoEvent({ bpm: parseTempoBpm(100), tick: parseTick(960) })
+      const target = { expectedSession: session, baseRevision: session.modelRevision }
+      coordinator.replaceTempoEventBpm({
+        tempoEventId: session.getSnapshot().tempoEvents[0]!.id,
+        bpm: parseTempoBpm(130),
+      })
+      const before = session.getSnapshot()
+      expect(() =>
+        axis === 'move'
+          ? coordinator.moveTempoEvent({
+              target,
+              tempoEventId: added.tempoEventId,
+              tick: parseTick(1_920),
+            })
+          : coordinator.replaceTempoEventBpm({
+              target,
+              tempoEventId: added.tempoEventId,
+              bpm: parseTempoBpm(100),
+            }),
+      ).toThrow(expect.objectContaining({ code: 'base-revision-mismatch' }))
+      expect(session.getSnapshot()).toEqual(before)
+    },
+  )
+
   it('owns identity creation and coordinates the complete Tempo Event lifecycle', () => {
     const session = createSession('lifecycle')
     const coordinator = createProjectTempoEventCoordinator(createDependencies(session))

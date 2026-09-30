@@ -195,6 +195,8 @@ function mountShell(options: MountShellOptions = {}) {
       plugins: [pinia],
       provide: {
         [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: {
+          session: null,
+          projectedRevision: null,
           removeTempoEvent: () => STUDIO_ACTION_COMPLETED,
         },
         ...actionFixture.provide,

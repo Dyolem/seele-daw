@@ -2,8 +2,8 @@ import type { InjectionKey } from 'vue'
 import type { PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
 import type { ArrangementActionTargets } from '@/features/project-workspace/actions/project-workbench-action-context'
 import type { ProjectWorkbenchActionTarget } from '@/features/project-workspace/actions/project-workbench-actions'
-import type { TempoTrackInteractionController } from '@/features/project-workspace/tempo-track/interaction'
-import type { TempoEventActionContext } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+import type { TempoTrackPreviewController } from '@/features/project-workspace/tempo-track/types/tempo-track-preview'
+import type { TempoEventActionContext } from '@/features/project-workspace/tempo-track/types/tempo-event-actions'
 import type { StudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
 import type { StudioInterfaceActionTarget } from '@/workbench/actions/studio-interface-actions'
 import type { StudioActionVueContext } from '@/workbench/actions/vue/studio-action-context'
@@ -86,8 +86,8 @@ export const TEMPO_EVENT_ACTION_CONTEXT_KEY: InjectionKey<TempoEventActionContex
   'seele/studio/TempoEventActionContext',
 )
 
-export const TEMPO_TRACK_INTERACTION_KEY: InjectionKey<TempoTrackInteractionController> = Symbol(
-  'seele/studio/TempoTrackInteractionController',
+export const TEMPO_TRACK_PREVIEW_KEY: InjectionKey<TempoTrackPreviewController> = Symbol(
+  'seele/studio/TempoTrackPreviewController',
 )
 
 /** Each keyboard claim must have an independent lifetime, including nested suspensions. */

@@ -1,3 +1,10 @@
+import { EDITOR_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL } from '@seele-daw/editor'
+import type {
+  ProjectTempoTrackScale,
+  ProjectTempoEventLocationPresentation,
+  ProjectTempoEventPositionDraft,
+  ProjectTempoTrackDragAxis,
+} from './types/tempo-track'
 import {
   TEMPO_BPM_MAX,
   TEMPO_BPM_MIN,
@@ -20,28 +27,7 @@ import {
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM = 40
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MAXIMUM_BPM = 240
 export const PROJECT_TEMPO_TRACK_VISIBLE_SCALE_PADDING_BPM = 20
-export const PROJECT_TEMPO_TRACK_DRAG_THRESHOLD_PX = 4
 export const PROJECT_TEMPO_TRACK_POINT_HIT_RADIUS_PX = 14
-
-export interface ProjectTempoTrackScale {
-  readonly maximumBpm: number
-  readonly minimumBpm: number
-}
-
-export interface ProjectTempoEventLocationPresentation {
-  readonly barNumber: number
-  readonly beatNumber: number
-  readonly maximumOffsetWithinBeat: number
-  readonly offsetWithinBeat: number
-  readonly projectTime: string
-  readonly title: string
-}
-
-export interface ProjectTempoEventPositionDraft {
-  readonly bar: string
-  readonly beat: string
-  readonly offset: string
-}
 
 export type ProjectTempoEventPositionInputResult =
   | {
@@ -63,8 +49,6 @@ type ProjectTempoEventPositionComponentResult =
       readonly message: string
     }
 
-export type ProjectTempoEventNavigationDirection = 'next' | 'previous'
-
 interface CreateProjectTempoEventLocationPresentationInput {
   readonly barSpanTick: Tick
   readonly projectTimeUnavailable?: boolean
@@ -84,8 +68,6 @@ export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_SCALE = Object.freeze<ProjectTe
   maximumBpm: PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MAXIMUM_BPM,
   minimumBpm: PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM,
 })
-
-export type ProjectTempoTrackDragAxis = 'blocked-tick' | 'bpm' | 'tick'
 
 export interface ResolveProjectTempoTrackTickInput {
   readonly clientX: number
@@ -390,7 +372,7 @@ export function resolveProjectTempoTrackDragAxis(
   deltaY: number,
   canMoveTick: boolean,
 ): ProjectTempoTrackDragAxis | null {
-  if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < PROJECT_TEMPO_TRACK_DRAG_THRESHOLD_PX) {
+  if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < EDITOR_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL) {
     return null
   }
   if (Math.abs(deltaX) > Math.abs(deltaY)) return canMoveTick ? 'tick' : 'blocked-tick'

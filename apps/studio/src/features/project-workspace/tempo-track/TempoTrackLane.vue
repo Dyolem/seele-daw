@@ -1,60 +1,34 @@
 <script setup lang="ts">
+import { useTempoTrackDrag } from '@/features/project-workspace/tempo-track/hooks/use-tempo-track-drag'
+import type { ProjectTempoTrackScale } from '@/features/project-workspace/tempo-track/types/tempo-track'
 import {
-  parseTick,
   type TempoBpm,
   type TempoEventId,
   type TempoEventRecord,
   type Tick,
 } from '@seele-daw/project-core'
-import { computed, onMounted, onUnmounted, shallowRef, type StyleValue, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, shallowRef, type StyleValue, watch } from 'vue'
 
-import {
-  useStudioEditorSelectionTarget,
-  useStudioInteractionTarget,
-} from '@/workbench/actions/vue/studio-editor-action-context'
-import {
-  STUDIO_ACTION_COMPLETED,
-  STUDIO_ACTION_NOT_APPLIED,
-} from '@/workbench/actions/studio-action'
+import { useStudioEditorSelectionTarget } from '@/workbench/actions/vue/studio-editor-action-context'
+import { STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
 import { useTempoEventActions } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
 
 import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-control'
-import {
-  type TempoTrackEventPreview,
-  useTempoTrackInteraction,
-} from '@/features/project-workspace/tempo-track/interaction'
+import { useTempoTrackPreview } from '@/features/project-workspace/tempo-track/tempo-track-preview'
 import {
   createInitialProjectTempoTrackScale,
   expandProjectTempoTrackScale,
   orderProjectTempoEvents,
   projectTempoTrackBpmPositionRatio,
-  resolveDraggedProjectTempoBpm,
   resolveNearestProjectTempoTrackEvent,
   resolveProjectTempoTrackBpm,
-  resolveProjectTempoTrackDragAxis,
   resolveProjectTempoTrackTick,
-  type ProjectTempoTrackDragAxis,
-  type ProjectTempoTrackScale,
 } from '@/features/project-workspace/tempo-track/tempo-track'
 import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
 
 interface TempoTrackAddIntent {
   readonly bpm: TempoBpm
   readonly tick: Tick
-}
-
-interface ActiveTempoPointGesture {
-  readonly axis: ProjectTempoTrackDragAxis | null
-  readonly grabOffsetTick: number
-  readonly laneBounds: DOMRect
-  readonly pointerId: number
-  readonly scale: ProjectTempoTrackScale
-  readonly startBpm: TempoBpm
-  readonly startClientX: number
-  readonly startClientY: number
-  readonly startTick: Tick
-  readonly surface: HTMLElement
-  readonly tempoEventId: TempoEventId
 }
 
 const props = defineProps<{
@@ -67,22 +41,17 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   add: [intent: TempoTrackAddIntent]
-  bpmChange: [tempoEventId: TempoEventId, bpm: TempoBpm]
   editStart: []
-  move: [tempoEventId: TempoEventId, tick: Tick]
   select: [tempoEventId: TempoEventId]
 }>()
 
 const plotElement = shallowRef<HTMLElement | null>(null)
-// A captured gesture mutates only this preview. Axis lock happens once, and Pointer Up emits one
-// semantic intent for the Page-owned command coordinator; cancellation discards the preview.
-const activeGesture = shallowRef<ActiveTempoPointGesture | null>(null)
-const tempoTrackInteraction = useTempoTrackInteraction()
+const tempoPreview = useTempoTrackPreview()
 const tempoScale = shallowRef<ProjectTempoTrackScale>(
   createInitialProjectTempoTrackScale(props.tempoEvents),
 )
 const renderedEvents = computed(() => {
-  const preview = tempoTrackInteraction.preview.value
+  const preview = tempoPreview.preview.value
   return orderProjectTempoEvents(
     preview === null
       ? props.tempoEvents
@@ -209,126 +178,29 @@ function addTempoEvent(event: MouseEvent): void {
   event.preventDefault()
 }
 
-function beginPointGesture(tempoEvent: TempoEventRecord, event: PointerEvent): void {
-  if (activeGesture.value !== null || event.isPrimary === false || event.button !== 0) return
-  const plot = plotElement.value
-  const laneBounds = plot?.getBoundingClientRect()
-  const targetTempoEvent =
-    laneBounds === undefined
-      ? tempoEvent
-      : (tempoEventAtClientPosition(event.clientX, event.clientY, laneBounds) ?? tempoEvent)
-  emit('select', targetTempoEvent.id)
-  if (props.editingDisabled || plot === null || laneBounds === undefined) return
-  const surface = event.currentTarget as HTMLElement
-  surface.focus({ preventScroll: true })
-  if (
-    !tempoTrackInteraction.beginPreview({
-      bpm: targetTempoEvent.bpm,
-      owner: 'lane-drag',
-      tempoEventId: targetTempoEvent.id,
-      tick: targetTempoEvent.tick,
-    })
-  ) {
-    return
-  }
-  activeGesture.value = {
-    axis: null,
-    grabOffsetTick: tickAtClientX(event.clientX, laneBounds) - targetTempoEvent.tick,
-    laneBounds,
-    pointerId: event.pointerId,
-    scale: tempoScale.value,
-    startBpm: targetTempoEvent.bpm,
-    startClientX: event.clientX,
-    startClientY: event.clientY,
-    startTick: targetTempoEvent.tick,
-    surface,
-    tempoEventId: targetTempoEvent.id,
-  }
-  surface.setPointerCapture?.(event.pointerId)
-  event.preventDefault()
-}
-
 function handlePointClick(tempoEvent: TempoEventRecord, event: MouseEvent): void {
-  // Pointer selection happens on Pointer Down so dense overlaps can use geometric hit testing.
-  // A keyboard-synthesized click has detail 0 and still needs the point's direct selection path.
+  // Pointer selection uses geometric hit testing; keyboard clicks select the focused point.
   if (event.detail === 0) emit('select', tempoEvent.id)
 }
 
-function updatePointGesture(event: PointerEvent): void {
-  const gesture = activeGesture.value
-  if (gesture === null || gesture.pointerId !== event.pointerId) return
-  let axis = gesture.axis
-  if (axis === null) {
-    axis = resolveProjectTempoTrackDragAxis(
-      event.clientX - gesture.startClientX,
-      event.clientY - gesture.startClientY,
-      gesture.startTick !== 0,
-    )
-    if (axis === null) return
-    activeGesture.value = { ...gesture, axis }
-    if (axis !== 'blocked-tick') emit('editStart')
-  }
-
-  if (axis === 'tick') {
-    const targetTick = tickAtClientX(event.clientX, gesture.laneBounds) - gesture.grabOffsetTick
-    tempoTrackInteraction.updatePreview({
-      bpm: gesture.startBpm,
-      owner: 'lane-drag',
-      tempoEventId: gesture.tempoEventId,
-      tick: parseTick(Math.min(props.timelineEndTick, Math.max(0, targetTick))),
-    })
-  } else if (axis === 'bpm') {
-    tempoTrackInteraction.updatePreview({
-      bpm: resolveDraggedProjectTempoBpm({
-        currentClientY: event.clientY,
-        laneHeight: gesture.laneBounds.height,
-        scale: gesture.scale,
-        startBpm: gesture.startBpm,
-        startClientY: gesture.startClientY,
-      }),
-      owner: 'lane-drag',
-      tempoEventId: gesture.tempoEventId,
-      tick: gesture.startTick,
-    })
-  }
-  event.preventDefault()
-}
-
-function releasePointGesture(pointerId: number): {
-  readonly gesture: ActiveTempoPointGesture
-  readonly preview: TempoTrackEventPreview
-} | null {
-  const gesture = activeGesture.value
-  if (gesture === null || gesture.pointerId !== pointerId) return null
-  const preview = tempoTrackInteraction.finishPreview('lane-drag', gesture.tempoEventId)
-  activeGesture.value = null
-  if (gesture.surface.hasPointerCapture?.(pointerId))
-    gesture.surface.releasePointerCapture(pointerId)
-  if (preview === null) return null
-  return { gesture, preview }
-}
-
-function commitPointGesture(event: PointerEvent): void {
-  const released = releasePointGesture(event.pointerId)
-  if (released === null) return
-  const { gesture, preview } = released
-  if (gesture.axis === 'tick' && preview.tick !== gesture.startTick) {
-    emit('move', gesture.tempoEventId, preview.tick)
-  } else if (gesture.axis === 'bpm' && preview.bpm !== gesture.startBpm) {
-    emit('bpmChange', gesture.tempoEventId, preview.bpm)
-  }
-  event.preventDefault()
-}
-
-function cancelPointGesture(event?: PointerEvent): void {
-  const gesture = activeGesture.value
-  if (gesture === null || (event !== undefined && gesture.pointerId !== event.pointerId)) return
-  activeGesture.value = null
-  tempoTrackInteraction.cancelPreview('lane-drag', gesture.tempoEventId)
-  if (gesture.surface.hasPointerCapture?.(gesture.pointerId))
-    gesture.surface.releasePointerCapture(gesture.pointerId)
-  event?.preventDefault()
-}
+const drag = useTempoTrackDrag({
+  props,
+  plotElement,
+  tempoScale,
+  projection: tempoPreview,
+  hitTest: (event, bounds) => {
+    const nearest = tempoEventAtClientPosition(event.clientX, event.clientY, bounds)
+    if (nearest !== null) return nearest
+    const point =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>('.tempo-track-lane__point')
+        : null
+    return props.tempoEvents.find(({ id }) => id === point?.dataset.tempoEventId) ?? null
+  },
+  select: (id) => emit('select', id),
+  editStart: () => emit('editStart'),
+})
+const dragState = drag.state
 
 const tempoActions = useTempoEventActions()
 const focusedPoint = shallowRef<{ id: TempoEventId; element: HTMLElement } | null>(null)
@@ -353,67 +225,25 @@ const selectionTarget = useStudioEditorSelectionTarget(
   },
   [() => props.projectId, () => focusedPoint.value?.id, () => props.selectedTempoEventId],
 )
-useStudioInteractionTarget({
-  isActive: () => activeGesture.value !== null,
-  cancel: () => {
-    if (activeGesture.value === null) return STUDIO_ACTION_NOT_APPLIED
-    cancelPointGesture()
-    return STUDIO_ACTION_COMPLETED
-  },
-})
-
 function focusPoint(tempoEvent: TempoEventRecord, event: FocusEvent): void {
   if (!(event.currentTarget instanceof HTMLElement)) return
   focusedPoint.value = { id: tempoEvent.id, element: event.currentTarget }
   selectionTarget.activate()
 }
 
-function handleWindowBlur(): void {
-  cancelPointGesture()
-}
-
 watch(
   [() => props.projectId, () => props.tempoEvents],
-  ([projectId, tempoEvents], [previousProjectId, previousTempoEvents]) => {
-    if (
-      activeGesture.value !== null &&
-      (projectId !== previousProjectId || tempoEvents !== previousTempoEvents)
-    ) {
-      cancelPointGesture()
-    }
-    if (projectId !== previousProjectId) {
-      tempoScale.value = createInitialProjectTempoTrackScale(tempoEvents)
-      return
-    }
-
-    tempoScale.value = expandProjectTempoTrackScale(tempoScale.value, tempoEvents)
+  ([projectId, events], [previousProjectId]) => {
+    tempoScale.value =
+      projectId === previousProjectId
+        ? expandProjectTempoTrackScale(tempoScale.value, events)
+        : createInitialProjectTempoTrackScale(events)
   },
+  { flush: 'sync' },
 )
 
-watch(
-  () => props.selectedTempoEventId,
-  (selectedTempoEventId) => {
-    if (activeGesture.value !== null && activeGesture.value.tempoEventId !== selectedTempoEventId) {
-      cancelPointGesture()
-    }
-  },
-)
-
-watch(
-  () => props.tempoEvents.some(({ id }) => id === activeGesture.value?.tempoEventId),
-  (stillExists) => {
-    if (!stillExists) cancelPointGesture()
-  },
-)
-
-onMounted(() => {
-  window.addEventListener('blur', handleWindowBlur)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('blur', handleWindowBlur)
-  cancelPointGesture()
-})
+onMounted(drag.mount)
+onBeforeUnmount(drag.dispose)
 </script>
 
 <template>
@@ -466,9 +296,10 @@ onUnmounted(() => {
       <button
         v-for="tempoEvent in renderedEvents"
         :key="tempoEvent.id"
+        :data-tempo-event-id="tempoEvent.id"
         class="tempo-track-lane__point"
         :class="{
-          'tempo-track-lane__point--active': activeGesture?.tempoEventId === tempoEvent.id,
+          'tempo-track-lane__point--active': dragState.preview?.tempoEventId === tempoEvent.id,
           'tempo-track-lane__point--initial': tempoEvent.tick === 0,
           'tempo-track-lane__point--selected': props.selectedTempoEventId === tempoEvent.id,
         }"
@@ -480,11 +311,6 @@ onUnmounted(() => {
         @click.stop="handlePointClick(tempoEvent, $event)"
         @dblclick.stop
         @focus="focusPoint(tempoEvent, $event)"
-        @lostpointercapture="cancelPointGesture"
-        @pointercancel="cancelPointGesture"
-        @pointerdown.stop="beginPointGesture(tempoEvent, $event)"
-        @pointermove.stop="updatePointGesture"
-        @pointerup.stop="commitPointGesture"
       ></button>
     </div>
   </section>

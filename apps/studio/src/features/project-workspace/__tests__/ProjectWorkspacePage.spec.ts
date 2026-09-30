@@ -1,4 +1,9 @@
 import {
+  createTempoTrackTestSession,
+  dispatchTempoPointer,
+  installTempoPointerCapture,
+} from './support/tempo-track-test-support'
+import {
   ACTIVE_PROJECT_CONTEXT_KEY,
   PROJECT_CLIP_CONTEXT_KEY,
   PROJECT_ENTRY_CONTEXT_KEY,
@@ -334,6 +339,43 @@ async function mountPage(
     selection: useProjectWorkbenchSelectionStore(pinia),
     wrapper,
   }
+}
+
+async function mountTempoDragPage() {
+  const projectId = parseProjectId('tempo-drag-page')
+  const initial = {
+    id: parseTempoEventId('drag-initial'),
+    tick: parseTick(0),
+    bpm: parseTempoBpm(120),
+  }
+  const later = {
+    id: parseTempoEventId('drag-later'),
+    tick: parseTick(960),
+    bpm: parseTempoBpm(100),
+  }
+  const session = createTempoTrackTestSession([initial, later], projectId)
+  const fixture = createFixture(
+    async () => ({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
+    createReadyState(projectId, session),
+  )
+  const page = await mountPage(fixture, projectId)
+  await flushPromises()
+  const plot = page.wrapper.get('.tempo-track-lane__plot').element as HTMLElement
+  const width = Number(page.wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick'))
+  vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
+    left: 100,
+    top: 50,
+    width,
+    height: 100,
+    right: 100 + width,
+    bottom: 150,
+    x: 100,
+    y: 50,
+    toJSON: () => ({}),
+  })
+  const capture = installTempoPointerCapture(plot)
+  const point = page.wrapper.findAll('.tempo-track-lane__point')[1]!.element
+  return { ...page, projectId, session, fixture, plot, point, capture, initial, later }
 }
 
 async function openProjectMenuItem(wrapper: VueWrapper, label: string): Promise<HTMLElement> {
@@ -1297,6 +1339,94 @@ describe('ProjectWorkspacePage', () => {
     })
     await nextTick()
     expect(input.element.value).toBe('90.25')
+  })
+
+  it.each(['tick', 'bpm'] as const)(
+    'commits one %s drag through the Page and Coordinator, pauses playback and supports one Undo',
+    async (axis) => {
+      const {
+        session,
+        fixture,
+        plot,
+        point,
+        projectId,
+        projectPlayback,
+        playbackState,
+        wrapper,
+        later,
+      } = await mountTempoDragPage()
+      const revision = session.modelRevision
+      playbackState.value = {
+        ...STOPPED_PLAYBACK_STATE,
+        projectId,
+        phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+      }
+      vi.mocked(projectPlayback.pause).mockImplementation(() => {
+        playbackState.value = { ...playbackState.value, phase: PROJECT_PLAYBACK_PHASE.PAUSED }
+        return true
+      })
+      const end = axis === 'tick' ? { x: 2_020, y: 120 } : { x: 1_060, y: 110 }
+      dispatchTempoPointer(point, 'pointerdown', { x: 1_060, y: 120 })
+      dispatchTempoPointer(plot, 'pointermove', end)
+      await nextTick()
+      expect(projectPlayback.pause).toHaveBeenCalledOnce()
+      expect(session.modelRevision).toBe(revision)
+      dispatchTempoPointer(plot, 'pointerup', end)
+      dispatchTempoPointer(plot, 'pointerup', end)
+      expect(session.modelRevision).toBe(revision + 1)
+      expect(session.getSnapshot().tempoEvents[1]).toMatchObject(
+        axis === 'tick' ? { tick: 1_920, bpm: 100 } : { tick: 960, bpm: 120 },
+      )
+      fixture.state.value = createReadyState(projectId, session)
+      await nextTick()
+      expect(wrapper.findAll('.tempo-track-lane__point')[1]?.classes()).not.toContain(
+        'tempo-track-lane__point--active',
+      )
+      session.undo()
+      expect(session.getSnapshot().tempoEvents[1]).toEqual(later)
+    },
+  )
+
+  it('reports a dragged Tick collision without changing facts or History', async () => {
+    const { session, plot, point, capture, wrapper } = await mountTempoDragPage()
+    const before = session.getSnapshot()
+    dispatchTempoPointer(point, 'pointerdown', { x: 1_060, y: 120 })
+    dispatchTempoPointer(plot, 'pointerup', { x: 100, y: 120 })
+    await nextTick()
+    expect(session.getSnapshot()).toEqual(before)
+    expect(capture.captures.size).toBe(0)
+    expect(useUiToastStore().message?.title).toBe('Tempo edit could not complete')
+    expect(wrapper.findAll('.tempo-track-lane__point')[1]?.classes()).not.toContain(
+      'tempo-track-lane__point--active',
+    )
+  })
+
+  it('does not replace the captured revision when playback preparation commits another change', async () => {
+    const { session, plot, point, initial, projectId, projectPlayback, playbackState, later } =
+      await mountTempoDragPage()
+    const revision = session.modelRevision
+    dispatchTempoPointer(point, 'pointerdown', { x: 1_060, y: 120 })
+    dispatchTempoPointer(plot, 'pointermove', { x: 2_020, y: 120 })
+    playbackState.value = {
+      ...STOPPED_PLAYBACK_STATE,
+      projectId,
+      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
+    }
+    vi.mocked(projectPlayback.pause).mockImplementation(() => {
+      session.execute(
+        createReplaceTempoEventBpmCommand({
+          baseRevision: session.modelRevision,
+          tempoEventId: initial.id,
+          bpm: parseTempoBpm(130),
+        }),
+      )
+      playbackState.value = { ...playbackState.value, phase: PROJECT_PLAYBACK_PHASE.PAUSED }
+      return true
+    })
+    dispatchTempoPointer(plot, 'pointerup', { x: 2_020, y: 120 })
+    expect(session.modelRevision).toBe(revision + 1)
+    expect(session.getSnapshot().tempoEvents[1]).toEqual(later)
+    expect(useUiToastStore().message?.title).toBe('Tempo edit could not complete')
   })
 
   it('coordinates Tempo Track add, move, numeric BPM edit, selection, and removal', async () => {

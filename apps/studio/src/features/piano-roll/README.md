@@ -103,6 +103,11 @@ Note、CC64 与 Track Pencil 均组合 Editor 的公共 InteractionSession，事
 领取同步检查 Begin revision，Command 边界再次验证 Session 对象身份；同 ID / revision 的替换
 Session 不能接收旧交互。旧 capture、回告与订阅不能取消或提交新的手势。
 
+统一 Interaction Action Target 在新 Surface 开始时取消旧手势；连续 Preview 更新保持原
+Binding。runtime 提前释放与组件卸载都会取消活动交互；正常完成先退订失效通知再解绑，
+保留合法 Commit 的投影交接。Scope 切换、Dock 最小化 / 关闭通过卸载 Surface 清理；Channel
+和 Active Clip 变化由各自 Hook 同步取消，迟到 End 不写入旧或新 Session。
+
 CC64 保留首次越阈值后的单轴锁定，Tick 移动完整选择，Value 只改锚点。拖回原始值不增加
 History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设置；开始点击后，Hover 不再
 覆盖冻结预览。成功放置返回的 Clip 直接更新 Selection，避免新 Clip 尚未进入界面投影时

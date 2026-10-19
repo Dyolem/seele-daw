@@ -28,13 +28,14 @@ import {
   type Tick,
 } from '@seele-daw/project-core'
 import { parseSoundbankId } from '@seele-daw/playback'
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { nextTick, shallowRef, type ShallowRef } from 'vue'
+import { h, nextTick, shallowRef, type ShallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { PROJECT_TRACK_INSTRUMENT_STATUS } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
+import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
@@ -1367,7 +1368,137 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(fixture.cancelTimelineLocate).toHaveBeenCalledTimes(2)
   })
 
-  it.each(['blur', 'project', 'scale', 'geometry'] as const)(
+  it.each([false, true])(
+    'transfers ownership between Locate and Tempo even when Playback cancellation fails: %s',
+    async (failCancel) => {
+      const initial = createTempoEventRecord({
+        bpm: parseTempoBpm(120),
+        id: parseTempoEventId('handoff-initial'),
+        tick: parseTick(0),
+      })
+      const later = createTempoEventRecord({
+        bpm: parseTempoBpm(100),
+        id: parseTempoEventId('handoff-later'),
+        tick: parseTick(960),
+      })
+      const frames: FrameRequestCallback[] = []
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+        frames.push(callback)
+        return frames.length
+      })
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const fixture = mountArrangement({
+        tempoEvents: [initial, later],
+        selectedTempoEventId: later.id,
+      })
+      const { wrapper, keyboard, cancelTimelineLocate, commitTimelineLocate, tempoActions } =
+        fixture
+      const viewport = wrapper.get('.project-workbench__arrangement-scroll-viewport')
+        .element as HTMLElement
+      Object.defineProperties(viewport, {
+        clientWidth: { configurable: true, value: 400 },
+        scrollWidth: { configurable: true, value: 1600 },
+      })
+      vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+        left: 100,
+        right: 500,
+        width: 400,
+      } as DOMRect)
+      const plot = wrapper.get('.tempo-track-lane__plot').element as HTMLElement
+      vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
+        left: 100,
+        top: 50,
+        width: 1000,
+        height: 100,
+      } as DOMRect)
+      installTempoPointerCapture(plot)
+      const point = wrapper.findAll('.tempo-track-lane__point')[1]!.element
+      const ruler = wrapper.get('.project-workbench__ruler-locate-surface').element as HTMLElement
+      await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 490, pointerId: 10 })
+      const oldFrame = frames[0]
+      if (oldFrame === undefined) throw new Error('Expected Locate edge-scroll frame')
+      if (failCancel)
+        cancelTimelineLocate.mockImplementationOnce(() => {
+          throw new Error('Playback cancel failed')
+        })
+      await dispatchPointerEvent(point, 'pointerdown', {
+        clientX: 350,
+        clientY: 120,
+        pointerId: 71,
+      })
+      const tempoTarget = keyboard.runtime.interactionTarget.current
+      await dispatchPointerEvent(plot, 'pointermove', { clientX: 600, clientY: 120, pointerId: 71 })
+      expect(cancelTimelineLocate).toHaveBeenCalledOnce()
+      expect(ruler.hasPointerCapture(10)).toBe(false)
+      expect(plot.hasPointerCapture(71)).toBe(true)
+      oldFrame(16)
+      await dispatchPointerEvent(ruler, 'pointerup', { clientX: 490, pointerId: 10 })
+      expect(viewport.scrollLeft).toBe(0)
+      expect(commitTimelineLocate).not.toHaveBeenCalled()
+      expect(tempoTarget?.isCurrent()).toBe(true)
+
+      await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 300, pointerId: 11 })
+      expect(plot.hasPointerCapture(71)).toBe(false)
+      await dispatchPointerEvent(plot, 'pointerup', { clientX: 600, clientY: 120, pointerId: 71 })
+      expect(tempoActions.commitDrag).not.toHaveBeenCalled()
+      const selectionCount = wrapper.emitted('selectTempoEvent')?.length ?? 0
+      expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
+      expect(ruler.hasPointerCapture(11)).toBe(false)
+      expect(cancelTimelineLocate).toHaveBeenCalledTimes(2)
+      expect(wrapper.emitted('selectTempoEvent')?.length ?? 0).toBe(selectionCount)
+      expect(error).toHaveBeenCalledTimes(failCancel ? 1 : 0)
+    },
+  )
+
+  it.each(['menu', 'dialog'] as const)(
+    'keeps an active Locate behind the %s keyboard barrier until it closes',
+    async (layer) => {
+      const { wrapper, keyboard, cancelTimelineLocate, commitTimelineLocate } = mountArrangement()
+      const ruler = wrapper.get('.project-workbench__ruler-locate-surface').element as HTMLElement
+      await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 100, pointerId: 19 })
+      if (layer === 'menu') await openAddTrackMenu(wrapper)
+      else {
+        const open = shallowRef(true)
+        const dialog = mount(
+          {
+            render: () =>
+              h(StudioKeyboardShortcutsDialog, {
+                open: open.value,
+                'onUpdate:open': (value: boolean) => {
+                  open.value = value
+                },
+              }),
+          },
+          { attachTo: document.body, global: { provide: keyboard.provide } },
+        )
+        mountedWrappers.push(dialog)
+      }
+      await flushPromises()
+      expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(false)
+      expect(ruler.hasPointerCapture(19)).toBe(true)
+      expect(cancelTimelineLocate).not.toHaveBeenCalled()
+      const content = document.querySelector(`[role="${layer}"]`)
+      if (content === null) throw new Error(`Expected open ${layer}`)
+      content.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Escape',
+        }),
+      )
+      await flushPromises()
+      expect(document.querySelector(`[role="${layer}"]`)).toBeNull()
+      expect(cancelTimelineLocate).not.toHaveBeenCalled()
+      expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
+      expect(ruler.hasPointerCapture(19)).toBe(false)
+      expect(cancelTimelineLocate).toHaveBeenCalledOnce()
+      await dispatchPointerEvent(ruler, 'pointerup', { clientX: 100, pointerId: 19 })
+      expect(commitTimelineLocate).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['blur', 'project', 'scale', 'geometry', 'runtime'] as const)(
     'cancels Locate on %s without applying a late release',
     async (reason) => {
       const fixture = mountArrangement()
@@ -1376,6 +1507,7 @@ describe('ProjectWorkbenchArrangement', () => {
       if (reason === 'blur') window.dispatchEvent(new Event('blur'))
       if (reason === 'project') await fixture.wrapper.setProps({ projectId: 'replacement-project' })
       if (reason === 'scale') await fixture.wrapper.setProps({ timelineEndTick: parseTick(10000) })
+      if (reason === 'runtime') fixture.keyboard.runtime.dispose()
       if (reason === 'geometry') {
         const viewport = fixture.wrapper.get(
           '.project-workbench__arrangement-scroll-viewport',

@@ -1,8 +1,8 @@
 # Editor Interaction V1：中立生命周期与领域 Operation
 
-> 状态：G1 已审核提交（`2b2d8c6`）；G2 已提交（`c83d906`）；G3 CC64、Track Pencil 与 Timeline Locate 已审核通过（2026-10-19）。
+> 状态：G1 已审核提交（`2b2d8c6`）；G2 已提交（`c83d906`）；G3 已审核提交（`f65bd17`）；G4 已审核通过，浏览器验证待补。
 >
-> 日期：2026-09-30
+> 日期：2026-10-19
 >
 > 替代：[Piano Roll Pointer Interaction 状态机决策](./piano-roll-pointer-interaction-state-machine-decision.md)
 
@@ -106,6 +106,29 @@ Note Surface 还处理 Selection 改变、Viewport 尺寸 /范围改变、Surfac
 等值 Viewport 和不改变该 Surface 映射的滚动不会取消。映射政策由各自 Surface 决定，不能推广为
 “所有 Editor 遇到 scroll / resize 都取消”；Locate 接受连续的滚动偏移变化，仍会取消尺寸 / 范围的映射重建。
 
+## Studio 输入所有权与跨 Surface 交接
+
+每个 Surface 的领域 Session 拥有自己的交互状态；Studio 的单一 Interaction Action Target
+只路由当前 Cancel 能力，不保存 Preview 或另一份手势状态。Selection Target 独立按 Focus
+激活，聚焦另一个控件不等于开始新手势。
+
+- `useStudioInteractionTarget` 在 inactive → active 时绑定，在 active → inactive 时释放。
+  连续 Pointer / Modifier / Preview 更新维持同一 Binding，不反复撤销并重新绑定。
+- 新 Surface 开始交互时，Slot 先使旧 Binding 失效，再发布新 Binding。旧 owner 的失效订阅
+  主动取消手势，释放 Capture、Preview 及领域资源；旧 Pointer End、动画帧或延迟卸载不能
+  影响新 owner。取消回调抛错会被隔离并报告，不能阻止交接或 runtime 释放。
+- 正常完成先退订 Binding 失效，再释放路由，避免把正常 End 或 Commit Handoff 当作取消。
+  runtime 先释放时仍会通知活动 owner；组件卸载也会停止观察、解绑并取消活动交互。
+- Scope、Active Clip、CC64 Channel、Project / Session 变化由对应 Surface 同步取消；Dock
+  切换 Scope、最小化或关闭会卸载原 Surface，不能在旧 DOM 的迟到 End 中提交。
+- Project 菜单、Add track 菜单、Context Menu 与快捷键 Dialog 使用既有 Keyboard Layer
+  暂停后台 Action。当前层的 Escape 仅关闭该层；屏障释放后的下一次 Escape 才取消手势，
+  后续才可能清空选择。导航 Modal 由应用的 `isModalActive` 屏障覆盖。
+
+Browser Adapter 构造过程中任一步 Listener 注册失败，必须立即移除已注册 Listener，保留
+其他 owner 的监听。构造失败不能把资源留给不存在的调用方；随后可以在同一 Surface 重试。
+通常释放和重复释放继续使用同一幂等 `dispose`。
+
 ## G2：Tempo 的实际跨域消费者
 
 Studio 的 [Tempo Track](../../../apps/studio/src/features/project-workspace/tempo-track/README.md)
@@ -153,6 +176,25 @@ Preview / Result；`TempoTrackDragSession` 拥有冻结的 Project 目标和 Com
   通过同一解释函数消费，Keyboard Settings 从同一规则生成只读帮助。Pencil 仍消费 Snap
   Preference，未新增 Alt 绕过或 Modifier 自定义能力。
 
+## 新编辑对象的接入步骤
+
+1. 在实际 Feature 定义 Hit、坐标映射与失效政策，明确哪些输入在 Begin 冻结、哪些可持续
+   更新。Clip Move / Trim / Stretch 的 Track、Source Offset、Loop 规则仍由 Clip 领域决定。
+2. 用纯 Operation 计算 Preview 与完成结果，组合 `InteractionSession` 表达一次交互。仅在
+   确有事实投影交接时组合 `InteractionCommitHandoff`；视图操作不伪造 Project revision。
+3. 领域 Session 固定目标身份与原 revision，拥有必要的失效订阅；Update、End 和领取结果时
+   同步验证，拒绝通知尚未送达的旧版本。通过交互身份隔离完成领取、回告和清理。
+4. Hook 组合公共 Pointer Adapter、当前映射及 `useStudioInteractionTarget`；明确 mount、
+   部分失败回滚与幂等 dispose。组件安排资源依赖顺序，不再声明一套 Pointer / Escape 监听。
+5. Studio Handler 领取一次结果，经现有业务 Coordinator 执行原子 Command，把真实结果
+   回告给本次 Session；等待对应事实投影后移除 Preview。取消和零变化不产生 History。
+6. 用行为测试验证冻结、切换、旧输入、失败、释放、菜单屏障与一次 Undo；手工验证真实
+   浏览器的 Capture、Focus、拖动及滚动。接口须有实际消费者，不先建 Clip 占位协议。
+
+Dock Splitter、Ruler 的 Slider 键盘导航、Follow 暂停捕获、Hover 与 Context Menu 目标清理
+保留各自职责。G4 审计确认没有迁移后继续运行的旧编辑生命周期；这些监听不是重复的事实编辑
+路径，不为统一形式强制迁入 InteractionSession。
+
 ## 验证边界
 
 G2 另覆盖 Tempo 两种交接顺序、旧捕获 / 回告、映射失效、初始化失败、播放准备期间的
@@ -168,7 +210,14 @@ G3 新增 CC64 / Track 配置冻结、同 revision 的 Session 替换、提交�
 旧 capture / 回告 / observer、Locate 连续重映射、取消后的动画回调、失焦、Scope / 映射改变
 以及 Pointer / Playback 失败清理回归。
 
+G4 增加跨 Track / Clip Focus / CC64 / Tempo / Locate 的 ownership 交接、连续 Preview 下的
+Cancel 路由、Dock Scope / 最小化 / 关闭、Channel / Active Clip / Session 替换、runtime
+提前释放、Playback 取消失败与旧帧隔离，以及公共 Adapter 部分注册失败后的重试。
+真实 Reka Menu / Dialog 与活动 Locate 的组合验证键盘屏障；TanStack DOM 测试验证 Add track
+菜单也屏蔽用户自定义的 Cancel 组合，关闭后恢复输入。
+
 完整门禁与手工验证结果记录在阶段计划的
 [G1](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#14-g1-中立协议与-note-迁移2026-09-29)
 、[G2](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#17-g2tempo-跨域验证2026-09-30)
-与 [G3](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#18-g3其余消费者迁移2026-09-30) 记录。
+、[G3](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#18-g3其余消费者迁移2026-09-30)
+与 [G4](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19) 记录。

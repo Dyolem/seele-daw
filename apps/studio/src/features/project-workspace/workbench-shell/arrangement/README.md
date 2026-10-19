@@ -27,3 +27,11 @@ facts、History 或 dirty，也不引入 Commit Handoff。
 取消或释放先关闭语义 Session 与 Playback，再清空 Preview、停止动画帧并释放 Capture；卸载
 关闭 watchers、ResizeObserver、Window 监听与 Adapter。帧回调同时核验句柄和 InteractionId，
 延迟 Follow 回调核验生命周期代次，旧回调不能影响新操作。
+
+统一 Interaction Action Target 失效会主动取消 Locate；Tempo 等其他 Surface 开始时先结束
+旧 Locate，Playback cancel 抛错也不能留下 Capture 或 Edge Scroll。runtime 提前释放与
+组件卸载均清理本次 owner，旧清理不能影响后续手势。
+
+Add track 菜单与快捷键 Dialog 打开时暂停后台 Action；当前层的 Escape 只关闭该层，关闭
+后的下一次 Escape 才取消活动 Locate。单纯打开菜单不完成定位；取消后的迟到 End 不调用
+Playback commit。

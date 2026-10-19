@@ -133,12 +133,14 @@ S1 把尚未持久化的 Piano Roll 专属选择／取消 ID 泛化为三个独�
 - `editor.selection.delete` 删除聚焦区域的 Note／CC64 选择，或聚焦且选中的可删除 Tempo
   Event。每次事实删除仍经既有业务 Coordinator 形成一个 Command / History step。
 - `editor.selection.clear` 只清空支持此能力的编辑器选择；Tempo 不声明该能力。
-- `interaction.cancel` 取消当前活动 Note／CC64／Tempo 手势或 Timeline Locate，不清空
+- `interaction.cancel` 取消当前活动 Note／CC64／Track Pencil／Tempo 手势或 Timeline Locate，不清空
   选择。键盘不要求交互持有焦点；下一次 Escape 才可能执行 Clear Selection。
 
 选区能力由 `useStudioEditorSelectionTarget()` 在 Focus 时激活，Mount 不抢占。身份变更
 使旧 Binding 和菜单失效；旧组件卸载只释放自己的 Binding。活动交互使用另一 Slot，
-在 Begin / End 的活动状态变化时绑定和释放，不跟随选区 Focus。两个 Slot 不保存选区、
+在 Begin / End 的活动状态变化时绑定和释放，不跟随选区 Focus。替换 Binding 或释放 runtime
+会通知旧 owner 主动取消手势；正常完成先退订失效回调再解绑，连续 Preview 更新维持同一
+Binding。旧 owner 的延迟释放不能取消新 owner，取消异常不妨碍交接。两个 Slot 不保存选区、
 Preview 或 Project facts 的副本。Tempo 删除由 Page 提供窄能力，保留 Playback 准备、
 Command 结果、失败反馈和选择清理；Lane 不通过无返回值的 Emit 冒充业务完成。
 

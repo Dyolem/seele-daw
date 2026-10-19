@@ -639,6 +639,44 @@ describe('Piano Roll Pointer Input Adapter', () => {
   })
 })
 
+describe('Editor Pointer resource ownership', () => {
+  it.each(['pointermove', 'keyup'])(
+    'rolls back a partially registered adapter when %s registration fails',
+    (failedType) => {
+      const { surface, capture, renderer } = createDomNoteFixture()
+      const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
+      const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
+      const unrelated = vi.fn<EventListener>()
+      surface.addEventListener('pointerdown', unrelated)
+      const target: EventTarget = failedType === 'keyup' ? window : surface
+      const add = target.addEventListener.bind(target)
+      const registration = vi.spyOn(target, 'addEventListener')
+      registration.mockImplementation((type, listener, options) => {
+        if (type === failedType) throw new Error('Listener registration failed')
+        add(type, listener, options)
+      })
+      expect(() =>
+        createPianoRollPointerInputAdapter({ surface, observer: { onInput, onError } }),
+      ).toThrow('Listener registration failed')
+      registration.mockRestore()
+
+      dispatchPointer(surface, 'pointerdown')
+      dispatchPointer(surface, 'pointerup')
+      window.dispatchEvent(new Event('blur'))
+      expect(onInput).not.toHaveBeenCalled()
+      expect(capture.capturedPointerIds.size).toBe(0)
+      expect(unrelated).toHaveBeenCalledOnce()
+
+      const retry = createPianoRollPointerInputAdapter({ surface, observer: { onInput, onError } })
+      dispatchPointer(surface, 'pointerdown')
+      dispatchPointer(surface, 'pointerup')
+      expect(onInput.mock.calls.map(([input]) => input.phase)).toEqual(['begin', 'end'])
+      retry.dispose()
+      renderer.dispose()
+    },
+  )
+})
+
 describe('Editor Pointer coordinate space', () => {
   it('keeps client coordinates across scroll and modifier updates', () => {
     const surface = document.createElement('div')

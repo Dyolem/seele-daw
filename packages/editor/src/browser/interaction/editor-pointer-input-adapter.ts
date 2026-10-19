@@ -147,14 +147,20 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     this.#positionSpace = input.positionSpace ?? 'surface'
     this.#window = input.surface.ownerDocument.defaultView
 
-    input.surface.addEventListener('pointerdown', this.#handlePointerDown)
-    input.surface.addEventListener('pointermove', this.#handlePointerMove)
-    input.surface.addEventListener('pointerup', this.#handlePointerUp)
-    input.surface.addEventListener('pointercancel', this.#handlePointerCancel)
-    input.surface.addEventListener('lostpointercapture', this.#handleLostPointerCapture)
-    this.#window?.addEventListener('blur', this.#handleWindowBlur)
-    this.#window?.addEventListener('keydown', this.#handleModifierChange)
-    this.#window?.addEventListener('keyup', this.#handleModifierChange)
+    try {
+      input.surface.addEventListener('pointerdown', this.#handlePointerDown)
+      input.surface.addEventListener('pointermove', this.#handlePointerMove)
+      input.surface.addEventListener('pointerup', this.#handlePointerUp)
+      input.surface.addEventListener('pointercancel', this.#handlePointerCancel)
+      input.surface.addEventListener('lostpointercapture', this.#handleLostPointerCapture)
+      this.#window?.addEventListener('blur', this.#handleWindowBlur)
+      this.#window?.addEventListener('keydown', this.#handleModifierChange)
+      this.#window?.addEventListener('keyup', this.#handleModifierChange)
+    } catch (cause) {
+      // Construction has no owner yet; roll back listeners before propagating the failure.
+      this.dispose()
+      throw cause
+    }
   }
 
   cancel(): boolean {

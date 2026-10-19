@@ -1,10 +1,10 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已审核提交；Symbol 与 Piano Roll 组织优化（含 O1–O3）已审核提交（`c614b9c`）；G2 已审核提交（`c83d906`）；G3 已审核通过；G4 尚未实施
+> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已审核提交；Symbol 与 Piano Roll 组织优化（含 O1–O3）已审核提交（`c614b9c`）；G2 已审核提交（`c83d906`）；G3 已审核提交（`f65bd17`）；G4 已审核通过，浏览器验证待补
 >
-> 日期：2026-09-11
+> 创建日期：2026-09-11；最近更新：2026-10-19
 >
-> 当前代码基线：`5179bee`（Keyboard 模块组织与 class 调整）；原始规划基线为 `b28049f`
+> 当前代码基线：`f65bd17`（G3）；原始规划基线为 `b28049f`
 
 ## 1. 重新确定优先级
 
@@ -497,5 +497,34 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
 - 完整 `pnpm check` 通过：171 个 Vitest 文件 / 1,653 项测试（本批新增 32 项）、14 项 Node
   架构规则回归，以及格式、Lint、类型、Production Build 与音源资源边界检查。构建保留既有
   大 chunk 提示。更新文档后的本地链接、格式与 `git diff --check` 通过。
-- 本批于 2026-10-19 通过用户审核，按授权提交。未实施 G4 或新的 Clip / Velocity 产品能力，
+- 本批于 2026-10-19 通过用户审核，按授权提交为 `f65bd17`。未实施 G4 或新的 Clip / Velocity 产品能力，
   未新增 E2E。
+
+## 19. G4：交互收口（2026-10-19）
+
+- 审计 Note、CC64、Track Pencil、Tempo 与 Locate 的生产路径，已全部使用公共 Pointer
+  Adapter / InteractionSession，未发现仍运行的旧生命周期。保留 Dock Splitter、Follow
+  暂停、Hover、菜单目标清理与控件键盘协议的独立职责；现行入口见
+  [输入清单](./studio-input-inventory.md#5-g4-现行输入路径审计)。
+- 修复 Interaction Action Target 被替换或 runtime 先释放时只解绑、不取消旧手势的缺口。
+  旧 Binding 失效同步取消 owner；正常完成先退订再解绑，连续 Preview 更新维持相同 Binding。
+  取消异常不阻断新 owner 发布或最终释放，旧卸载 / End 不能影响新手势。
+- 公共 Pointer Adapter 构造中的 Listener 注册失败会回滚已注册资源，不移除其他 owner 的
+  Listener；重试创建不会产生重复输入，dispose 保持幂等。
+- Add track 菜单补齐现有 Keyboard Layer。真实 Reka 菜单 / 快捷键 Dialog 与活动 Locate
+  的组合验证当前层先处理 Escape；真实 TanStack DOM 测试验证菜单屏蔽自定义 Cancel 键位，
+  关闭后恢复输入，不依赖默认 Escape 恰好被控件拦截。
+- 回归覆盖 Track → Clip Focus、Track Note → CC64、Tempo ↔ Locate；真实 Dock 的 Scope /
+  最小化 / 关闭；CC64 Channel / Active Clip / Session 切换；runtime 先于 Surface 释放；
+  Playback cancel 抛错、旧 Edge Scroll 帧与迟到 End。取消不写 Project，新 owner 可以完成
+  一次编辑并一次 Undo。
+- 更新 Editor 架构、新编辑对象接入步骤、Action 所有权、模块 README、PRODUCT 和 DESIGN，
+  清除仍把 Tempo / CC64 / Track / Locate 写作未迁移的当前状态描述。
+- 完整 `pnpm check` 通过：171 个 Vitest 文件 / 1,671 项测试（本批新增 18 项），14 项 Node
+  架构规则回归，以及格式、Lint、类型、Production Build 与音源资源边界检查。构建保留既有
+  大 chunk 提示。修改文档的本地链接 / 锚点、格式和 `git diff --check` 通过。
+- 真实浏览器验证尚未执行：本会话没有可操作 Codex 内置浏览器的工具，
+  未使用个人 Chrome 替代。需要补验实际拖动、取消、Scope / Dock 切换、菜单屏障、Locate
+  Edge Scroll 与 Playback 恢复；组件 / DOM 自动化结果不能代替这一项。
+- 本批于 2026-10-19 通过用户审核，按授权提交；浏览器验证仍待补。不实施新的
+  Clip / Velocity / WAV 能力，不新增 E2E。

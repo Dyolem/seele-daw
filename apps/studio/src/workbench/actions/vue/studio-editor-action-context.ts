@@ -61,17 +61,33 @@ export function useStudioEditorSelectionTarget(
 export function useStudioInteractionTarget(target: StudioInteractionTarget): void {
   const { interactionTarget } = useStudioEditorActionTargets()
   let release: (() => void) | null = null
+  function cancelActive(): void {
+    try {
+      if (target.isActive()) target.cancel()
+    } catch (cause) {
+      // A failed consumer must not prevent another Surface or the runtime from releasing ownership.
+      console.error('Studio interaction cleanup failed', cause)
+    }
+  }
   const stop = watch(
     target.isActive,
     (active) => {
+      // Ownership follows active transitions, not each reactive Preview update.
       release?.()
       release = null
-      if (active) release = interactionTarget.bind(target)
+      if (!active) return
+      const unbind = interactionTarget.bind(target)
+      const unsubscribe = interactionTarget.current?.onInvalidated(cancelActive)
+      release = () => {
+        unsubscribe?.()
+        unbind()
+      }
     },
     { flush: 'sync', immediate: true },
   )
   onBeforeUnmount(() => {
     stop()
     release?.()
+    cancelActive()
   })
 }

@@ -37,10 +37,10 @@ blocked-tick`，等量偏移选择 BPM。tick 0 首事件不能水平移动或�
   旧 capture、重复 End、旧回告和旧 Preview 清理不能影响新交互。
 - 拖动冻结的 Lane `left / top / width / height`、时间范围、Bar 映射或 BPM Scale 变化时
   取消；等值 Resize、没有改变 Lane 映射的 Scroll 保留手势。这里不实现 Edge Scroll，
-  Timeline Locate 在 G3 使用自己的重映射政策。
-- 目标、Session、选择切换、编辑禁用、Escape、Pointer Cancel、lost capture、Window blur
-  或卸载会结束未提交交互。提交失败不修改 Project；提交后的显示失败报告 Warning，
-  不声称合法 Commit 被回滚。
+  Timeline Locate 使用自己的重映射政策。
+- 目标、Session、选择切换、编辑禁用、Escape、Pointer Cancel、lost capture、Window blur、
+  其他 Surface 接管、runtime 释放或卸载会结束未提交交互。提交失败不修改 Project；提交后的
+  显示失败报告 Warning，不声称合法 Commit 被回滚。
 
 ## 资源与外部 owner
 
@@ -57,6 +57,10 @@ blocked-tick`，等量偏移选择 BPM。tick 0 首事件不能水平移动或�
 组件在 `onBeforeUnmount` 调用幂等 `dispose`：先停止 Vue 观察与映射监听，再断开
 ResizeObserver、释放 Pointer Adapter，最后清理 Session 与其 Commit 订阅。已排队的
 回调在释放后直接退出。`types/` 不反向导入上述运行时实现。
+
+Interaction Action Target 只在活动状态转换时绑定 / 释放，Preview 更新不重绑；Slot 替换会
+取消旧 owner，正常结束退订失效通知后释放路由。Tempo 与 Locate 互相接管的组合测试覆盖
+迟到 End、旧动画帧和 Playback 取消异常，新 owner 继续持有 Capture 与 Escape 能力。
 
 行为验证保留在 feature 的 [**tests**](../__tests__)：Session 协议、Lane 资源、Arrangement
 共享展示、Page 单步 History 与实际 Coordinator 前置条件分别验证；没有新增 E2E。

@@ -3,7 +3,7 @@
 > Status: Normative Draft  
 > Scope: Seele Studio editor and workbench  
 > Default theme: Piano Black  
-> Last updated: 2026-08-21
+> Last updated: 2026-10-19
 
 本文档定义 Seele Studio 编辑器的产品界面、交互模型与视觉语言。它是产品设计、前端实现、Canvas 渲染、主题开发和设计评审共同遵循的基线。
 
@@ -393,7 +393,7 @@ Mount 不抢占；Cancel 使用独立活动交互能力。Follow 在实际导航
 - 单击对象：替换选择，并设置 Primary。
 - 修饰键单击：切换对象是否在 Selection set 中。
 - 拖动空白区域：框选；开始拖动对象则是移动，不同时开始框选。
-- Escape：先取消当前瞬时交互，再关闭非模态浮层，最后才清除选择。
+- Escape：Menu / Modal 先接管；没有输入屏障时取消当前瞬时交互，后续才清除选择。
 
 ### 7.5 拖动与编辑事务
 
@@ -410,9 +410,18 @@ Mount 不抢占；Cancel 使用独立活动交互能力。Follow 在实际导航
 
 如果提交前 Project 已发生不兼容变化，交互应取消或重新验证，不能把过期预览强行写回。
 
-当前 Note 实现以 Begin 的 Session、Clip 和 revision 作为提交前置条件；交互身份独立于
-浏览器可复用的 Pointer ID。旧 End / Cancel / Commit 回告不能影响后续手势。Note 映射改变
-会取消未提交操作；仅等值投影刷新不取消。Locate 的滚动连续性由其自身 Mapping 政策负责。
+当前 Note、CC64、Track Pencil 与 Tempo 均以 Begin 的 Session、领域目标和 revision 作为
+提交前置条件；交互身份独立于浏览器可复用的 Pointer ID。旧 End / Cancel / Commit 回告
+不能影响后续手势。事实编辑映射改变会取消未提交操作；仅等值投影刷新不取消。Locate
+复用公共生命周期并保留自身的 Playback 会话、Edge Scroll 和连续滚动 Mapping 政策。
+
+同一 Studio 的新编辑 Surface 开始时，MUST 先取消旧 owner 的未提交交互并释放 Capture；
+连续 Preview 更新不得释放或替换仍活动的 Cancel 路由。Scope、Active Clip、CC64 Channel、
+Project / Session 切换与 Dock 最小化 / 关闭 MUST 清理相关未提交操作；旧视图卸载不能取消
+新视图。正常完成解除路由不应打断已经提交事实的 Preview 交接。
+
+Menu / Modal 的输入屏障包含用户自定义的快捷键，不只依靠控件恰好处理默认 Escape。
+当前层关闭后才恢复后台 Action；单次 Escape 不同时关闭菜单、取消手势和清空选择。
 公共生命周期与领域 Operation 的分工见
 [Editor Interaction V1 决策](./packages/editor/docs/editor-interaction-architecture-v1.md)。
 

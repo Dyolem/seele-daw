@@ -6,6 +6,7 @@ import { h, shallowRef } from 'vue'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
+import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import UiAlertDialog from '@/ui/components/UiAlertDialog.vue'
 import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
 import {
@@ -19,8 +20,65 @@ import {
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
+import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 
-describe('Project menu keyboard ownership', () => {
+describe('Workbench menu keyboard ownership', () => {
+  it('blocks a customized Cancel shortcut while Add track is open and resumes it after close', async () => {
+    const cancel = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
+    const runtime = createStudioActionRuntime({
+      bindingRegistry: createBrowserTanStackHotkeyRegistry({ platform: 'mac', target: document }),
+      keymap: createStudioKeyboardKeymap({
+        [STUDIO_ACTION.INTERACTION_CANCEL]: [defineStudioKeyboardBinding('Alt+X')],
+      }),
+      isModalActive: () => false,
+      reportFailure: vi.fn<(failure: StudioActionFailure) => void>(),
+    })
+    runtime.interactionTarget.bind({ isActive: () => true, cancel })
+    const wrapper = mount(ProjectAddTrackMenu, {
+      attachTo: document.body,
+      global: { provide: { [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime } },
+    })
+    onTestFinished(() => {
+      wrapper.unmount()
+      runtime.dispose()
+      HotkeyManager.resetInstance()
+      document.body.replaceChildren()
+    })
+    const trigger = wrapper.get<HTMLButtonElement>('.project-add-track__trigger')
+    await trigger.trigger('click')
+    await flushPromises()
+    const menu = document.querySelector('[role="menu"]')
+    if (menu === null) throw new Error('Expected Add track menu')
+    menu.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'x',
+        altKey: true,
+      }),
+    )
+    expect(cancel).not.toHaveBeenCalled()
+    menu.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Escape',
+      }),
+    )
+    await flushPromises()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
+    trigger.element.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'x',
+        altKey: true,
+      }),
+    )
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
   it('updates menu shortcuts and the Save button hint from the same committed user keymap', async () => {
     const { runtime, provide } = createTestStudioActionRuntime()
     const wrapper = mount(

@@ -62,18 +62,18 @@ src/
 │   └── piano-roll/
 │       ├── interaction/           Note 契约、Operation 与 Session 组合
 │       ├── operations/            Note 选择、放置、移动、缩放的领域运算
-│       └── sustain-pedal-lane/    CC64 投影及现有语义 Session（G3 迁移）
+│       └── sustain-pedal-lane/    CC64 投影、契约、Operation 与 Session 组合
 ├── browser/
 │   ├── interaction/               中立 Pointer Capture 与 Key State Adapter
 │   └── piano-roll/                Grid / Note Renderer、领域 Hit 与 Adapter 组合
 └── index.ts                        唯一公开入口
 ```
 
-中立 Session 使用 class 拥有生命周期，领域规则通过 Operation 组合接入。G2 的
+中立 Session 使用 class 拥有生命周期，领域规则通过 Operation 组合接入。
 [Studio Tempo Track](../../apps/studio/src/features/project-workspace/tempo-track/README.md) 从
 package root 复用 Session、CommitHandoff 与 Browser Pointer Adapter，领域规则保留在
-Studio；这是 Note 之外的实际消费者。Note、Tempo 与
-Locate 的协议对照、状态实现理由和迁移边界见
+Studio。CC64、Track Pencil 与 Timeline Locate 也已接入同一内核；Locate 继续由 Playback
+管理定位，不组合事实编辑 Handoff。协议对照、输入所有权、资源清理与新对象接入步骤见
 [Editor Interaction V1 决策](./docs/editor-interaction-architecture-v1.md)。
 
 ## 关键交互规则
@@ -122,8 +122,8 @@ Locate 的协议对照、状态实现理由和迁移边界见
   Clip Viewport 继续在其上附加 `clipId` 和 Clip 边界验证。
 
 该能力是纯 Snapshot Read Model，不订阅 ProjectSession、不拥有 Selection，也不写 Project Fact。
-Studio 已用它组合默认 Track-time Surface 与原子 Pencil 放置；可见 Scope 切换、Track Cursor 的
-完整 Note 编辑和双模式 Playhead / Follow 仍由后续纵向批次完成。
+Studio 已用它组合默认 Track-time Surface 与原子 Pencil 放置，并接入可见 Scope 切换及双模式
+Playhead / Track Follow；Track Cursor 的完整 Note 编辑尚未实现。
 
 ## 已实现：Piano Roll Editor Session
 
@@ -166,6 +166,7 @@ Active Project、ID、默认 Note Facts 与提交。
 - Surface-local CSS Pixel 坐标、固定的 Down origin Hit 与修饰键；
 - 单 primary Pointer、Pointer Capture 与默认 4 CSS Pixel Drag Threshold；
 - 每次捕获独立的 `captureId`；Up、Cancel、lost capture、blur、dispose 和消费者失败均关闭输入。
+- Listener 部分注册失败时回滚自身资源，同一 Surface 可以重新创建 Adapter；dispose 幂等。
 
 Browser Input 不读取 ProjectSession，也不直接修改 Selection。默认入口维持 Note DOM Hit；
 需要其他语义 Hit 的 Surface 必须显式提供 Resolver，并复用同一 Pointer Capture、阈值、取消与
@@ -239,13 +240,16 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 5. **已完成**：多 Note Remove、Cursor Move 与 Cursor / Pencil 单 Note Resize 已接入
    Studio，完整边界见
    [Piano Roll Note Editing 第五阶段计划](./docs/piano-roll-note-editing-phase-plan.md)。
-6. **进行中**：同一 Project 模型的 Track 全局 / Clip Focus 双 Scope；共享 Track Read Model、
-   原子 Clip / Note 放置与默认 Track Surface 已完成，可见模式切换与双模式 Playhead / Follow
-   尚待后续批次。
+6. **局部完成**：同一 Project 模型的 Track 全局 / Clip Focus 双 Scope；共享 Track Read Model、
+   原子 Clip / Note 放置、可见模式切换与双模式 Playhead / Track Follow 已完成；Track Cursor
+   的完整 Note 编辑尚未实现。
 7. **已完成**：CC64 Sustain Pedal Lane 的 Editor Snapshot 投影、Value Lane 坐标、类型化
    Browser Hit、Pencil Placement、Event Selection、主导轴 Transform 与 Studio 可见写入闭环。
-8. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
-9. 扩展 Arrangement、Audio Clip、Automation 等 Surface。
+8. **已实施，G4 已审核通过**：公共 InteractionSession、领域 Operation、可选 Handoff 和
+   Pointer Adapter；Note、CC64、Tempo、Track Pencil 与 Timeline Locate 均有真实消费者。
+   G4 自动化与浏览器验证状态见 [阶段计划](../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19)。
+9. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
+10. 扩展 Arrangement Clip、Audio Clip、Automation 等编辑能力。
 
 ## 测试与验收
 

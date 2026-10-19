@@ -4,7 +4,7 @@
 >
 > 首次基线：2026-07-27，功能代码截至 `ea1f7f5`
 >
-> 最近更新：2026-09-11，Workbench Action Catalogue WA1–WA4 已审核
+> 最近更新：2026-10-19，Input Foundation G1–G3 已审核提交；G4 已审核通过，浏览器验证待补
 >
 > 当前阶段：Studio 已接入 439 项来源 Preset 浏览、289 项采样音色、独立 MIDI Program /
 > Channel 10 路由、初始 CC7 / CC10，以及 MIDI 1.0 模式声明证据与文件级语义绑定反馈；完整目录
@@ -316,11 +316,13 @@ Arrangement 的 Tempo Track 遵循以下规则：
   完整的安全整数并落在当前拍号网格与 Timeline 范围内；错误提示使用界面可见的 Bar、Beat、Offset
   术语，同位置输入不形成命令。合法输入复用既有 Move Tempo Event Command，因此仍只有一个
   History 步骤并继续遵守同 Tick 冲突规则；Project Tick `0` 初始事件的位置字段只读；
-- Tempo 点拖拽使用 Arrangement 生命周期内的 feature-scoped 交互控制器；轨道轮廓与左侧 BPM、
+- Tempo 点拖拽由 Lane 的领域 Session 组合公共 InteractionSession 与 Commit Handoff；
+  Arrangement 提供仅按 InteractionId 发布 / 清理的共享 Preview，轨道轮廓与左侧 BPM、
   BAR、BEAT、OFFSET、TIME 读取同一份瞬时预览并实时同步。预览不是 Project Fact，不进入 Pinia、
-  Project File 或 History；Pointer Up 仍只交接一次既有命令，Escape、Pointer Cancel、项目切换或
-  权威 Tempo Event 集合改变会丢弃预览。只有未来出现 Arrangement 组件树之外的真实消费者时，才把
-  这份瞬时 UI 状态迁移为独立 Pinia Store，且 Pinia 仍不得镜像 Project Fact 或执行 Core Command；
+  Project File 或 History；Pointer Up 仍只交接一次既有命令，Escape、Pointer Cancel、项目切换、
+  外部 Project 修改、其他编辑 Surface 接管或目标映射改变会丢弃未提交预览。Begin 冻结 Session
+  身份与 revision，执行时再次校验；不能把旧拖动提交到替换后的 Project。当前共享 Preview
+  由 Arrangement 组件树持有，不镜像 Project Fact 或执行 Core Command；
 - 左侧控制区提供上一枚 / 下一枚 Tempo Event 导航，以及把所选事件居中带回当前 Arrangement
   视口的显式定位按钮。两种导航都只改变页面级选择与横向滚动，不移动 Playhead、不写入 Project、
   History 或文件；播放中执行时暂停 Timeline Follow，避免自动翻页立刻覆盖用户定位；
@@ -424,7 +426,7 @@ Track Cursor 的完整 Note 编辑也尚未接入。
 - `Mod+Shift+Z`：当前 Session 可以 Redo 时执行 Redo；
 - `Control+Y`：兼容 Windows 常用 Redo Binding。
 - `Space`：当前计划可播放且没有导航 Modal 时 Play / Pause；Loading 期间不重复触发。
-- `Escape`：先取消活动的 Note / CC64 / Tempo 手势或 Timeline Locate；取消不清空选择。
+- `Escape`：先取消活动的 Note / CC64 / Track Pencil / Tempo 手势或 Timeline Locate；取消不清空选择。
   没有活动交互时，清空聚焦的 Note / CC64 选择。
 - `Delete` / `Backspace`：删除聚焦编辑区域中选中的 Note / CC64，或聚焦且选中的后续
   Tempo Event；初始 Tempo Event 不可删除。事实删除形成一个 Command / History 步骤。
@@ -444,6 +446,11 @@ Track Cursor 的完整 Note 编辑也尚未接入。
 - Track 音符区域聚焦时不能删除旧的 CC64 选择；通过键盘聚焦回 Lane 后恢复 CC64 操作。
 - Mount 不抢占选区目标；实际 Focus 激活选择能力。活动手势拥有独立的 Cancel 能力，
   即使焦点已经移动，也能取消；仅仅聚焦 Tempo point 不会自动选择它。
+- 另一个编辑 Surface 开始交互时取消旧手势，旧 Pointer End、旧动画帧和延迟卸载不能影响
+  新手势。Scope、Active Clip、CC64 Channel、Project / Session 切换，以及 Dock 最小化或
+  关闭均清理对应未提交操作，不产生 History。正常完成仍保留一次 Command 与权威投影交接。
+- Project / Add track / Piano Roll 菜单与快捷键 Dialog 打开时屏蔽后台 Action，包括用户改绑
+  的 Cancel；Escape 先关闭当前层，关闭后的下一次 Escape 才路由到活动交互。
 - 按钮自身的 Enter / Space、Slider / Splitter 的导航键以及字段的提交 / 取消协议优先。
   Undo / Redo 允许长按重复，其余 Action 默认只在首次按下时调用。
 
@@ -498,7 +505,7 @@ Snap、`P` 打开 MIDI Editor、`Alt+K` 打开快捷键设置、`Home` 返回最
 具体浏览器／系统用途，没有提示不代表保证可用。Project 菜单继续共用 Action 状态与当前
 快捷键，并显示禁用原因；Undo / Redo 仍需当前 Session 存在相应 History。
 
-尚未提供 Sequence 或 Command Palette；后续独立手势架构按 G1–G4 实施，见
+尚未提供 Sequence 或 Command Palette；独立手势架构的迁移与 G4 收口验证见
 [Editor Input Foundation V1 计划](./apps/studio/docs/editor-input-foundation-v1-phase-plan.md)。
 
 术语和状态所有权见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)，
@@ -871,8 +878,8 @@ Surface，切换只改变 Studio 应用偏好。两个模式都显示来自共�
   Semitone Delta 和 Selection 合法边界交集。
 - 冻结的 Cursor / Pencil 单 Note Resize Gesture、左右 Edge 几何、Grid Coordinate
   Absolute Snap、Source 边界 Clamp 与 Clip-clipped Preview；
-- 中立 Interaction Session 与 Note Operation 组合，统一 Click、Add、Move、Resize 的
-  Preview、cancel、独立交互身份、一次完成领取与可选权威 revision 交接。
+- 中立 Interaction Session 与领域 Operation 组合，Note、CC64、Track Pencil、Tempo 和
+  Locate 复用一次交互身份、Preview、cancel 与完成领取；事实编辑组合可选权威 revision 交接。
 
 单 Note Resize 同时接受 Cursor 与 Pencil 的明确左右 Edge Hit。左 Edge 固定原始 End，右
 Edge 固定原始 Start；Snap 开启时使用冻结 Grid 的最近绝对坐标，动态 `Alt` 临时绕过 Snap。
@@ -936,8 +943,9 @@ Threshold 的 Cursor Edge Click 仍解析 Selection，Pencil Edge Click 不写 P
 - Note Surface 映射改变、消费者或投影失败会关闭未提交交互并释放捕获；迟到 End、重复结果
   和旧提交回告不能影响新手势。该映射政策不限制 Timeline Locate 的 Edge Scroll。
 
-G1 的边界与迁移记录见 [Editor Interaction V1 决策](./packages/editor/docs/editor-interaction-architecture-v1.md)。
-Tempo、CC64、Track Pencil 与 Locate 的完整语义迁移仍按后续批次实施。
+完整边界与新对象接入步骤见 [Editor Interaction V1 决策](./packages/editor/docs/editor-interaction-architecture-v1.md)。
+Tempo、CC64、Track Pencil 与 Locate 已完成语义迁移；Locate 保留 Playback 定位会话与
+Edge Scroll，取消恢复原播放位置及 Follow 状态，不写 Project 或 History。
 
 Selection 只保存稳定 `NoteId`，属于当前 Clip Editor lifetime；它不进入 Pinia、Project
 History、Snapshot、Checkpoint 或 IndexedDB。Note 移出当前可见 Viewport 时仍保持选中；
@@ -1220,6 +1228,7 @@ File 导入是独立交换格式入口，不替代 Project File。
 | 2026-09-04 | `MIDI-IMPORT`                                              | MI6B 建立 SMF / PPQ / MIDI 1.0 Source Envelope，并明确区分 Profile 声明尚未检查；只贯穿中立 Document、导入摘要与 Studio 结果，不升级 Project File。              | `40ce3f3`                                  |
 | 2026-09-07 | `MIDI-IMPORT`                                              | MI6C 精确检查五类 MIDI 1.0 Mode Declaration、重组 SysEx 分片并计数未分类消息；当前不建立 Semantic Binding，也不改变导入路由或发声。                              | `32a8f36`                                  |
 | 2026-09-07 | `MIDI-IMPORT`                                              | MI6D 从 Mode Evidence 派生版本化、文件级 Bound / Unbound / Unresolved / Conflicted 结果并接入 Studio 反馈；不改变 Instrument 路由或 Project Fact。               | 已审核                                     |
+| 2026-10-19 | `EDITOR`、`PIANO-ROLL`、`TEMPO-TRACK`、`TIMELINE`          | G1–G3 完成公共交互生命周期迁移；G4 补齐跨 Surface 取消、初始化失败回滚和 Add track 菜单屏障，并通过完整自动化门禁；真实浏览器验收待补。                          | G3 `f65bd17`；G4 已审核通过                |
 
 ## 13. 阶段收口与当前验证基线
 

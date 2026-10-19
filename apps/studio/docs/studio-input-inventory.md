@@ -3,20 +3,20 @@
 S1 已将下表中的业务快捷键迁入统一 Action / Keyboard 路径：Tempo Delete、Note / CC64 /
 Tempo / Locate Cancel、Clip / Bar Enter、Toast F8，以及 Cursor / Pencil / Snap。当前可查询
 目录有 19 个 Action；默认绑定与作用区域见 [快捷键架构](./studio-keyboard-shortcut-architecture.md)。
-以下详细表保留规划时的输入来源审计，用于后续 S2–S3 / G1–G4 对照，不表示局部业务监听仍在运行。
+第 1–2 节保留 S1 前的历史输入来源，不能用于判断当前能力；第 3–5 节记录 G4 审计的现行路径。
 
-> 状态：保留 S1 前的盘点基线；S1 业务快捷键迁移已于 2026-09-22 通过用户审核
+> 状态：S1–S3、G1–G3 已审核提交；G4 输入路径审计已完成，实施已审核通过
 >
-> 日期：2026-09-11
+> 更新日期：2026-10-19
 >
-> 基线：`b28049f`
+> 历史盘点基线：`b28049f`；G4 实施基线：`f65bd17`
 
 本文提供当前快捷键与交互的查找入口，配套
 [Editor Input Foundation V1 计划](./editor-input-foundation-v1-phase-plan.md)。盘点范围为
 `apps/studio/src`、`packages/editor/src` 的生产输入代码，另核验已安装 TanStack 的公开实现。
 浏览器 / 操作系统快捷键与第三方控件全部内部监听不计作 Studio 自有 Action。
 
-这是迁移前清单。S1 后产品内列表应从 Catalogue 和有效 Keymap 自动生成，本文不成为另一份
+S1 后产品内列表从 Catalogue 和有效 Keymap 自动生成，本文不成为另一份
 人工维护的运行时键位权威。
 
 ## 1. S1 前已进入 Action Catalogue 的快捷键
@@ -100,4 +100,29 @@ Pencil 已支持 Alt 临时绕过吸附。
 | Dock Splitter           | [Workspace](../src/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue)                                                                                                 | 界面布局调整，无 Project Commit / History；不强制进入事实编辑协议。                                                     |
 
 现有边界已经足够检验跨对象复用。Clip Move / Trim / Stretch 尚未实现，不能把“未来可以
-接入”当作已经证明；Tempo 已由 G2 完成实际跨域验证；G3 已接入其余现有编辑消费者；G4 继续跨 Surface 与资源释放收口。
+接入”当作已经证明；Tempo 已由 G2 完成实际跨域验证，G3 已接入其余现有编辑消费者。
+
+## 5. G4 现行输入路径审计
+
+| 入口                                                                                                       | 当前职责与保留理由                                                                                                                            |
+| ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Editor Pointer Adapter](../../../packages/editor/src/browser/interaction/editor-pointer-input-adapter.ts) | Note、CC64、Track Pencil、Tempo 与 Locate 的唯一 Pointer 生命周期实现；拥有 Capture、Window blur 与 Modifier Listener，构造失败回滚自身注册。 |
+| [Studio Interaction Target](../src/workbench/actions/vue/studio-editor-action-context.ts)                  | 活动交互取得 Cancel；其他 Surface 接管或 runtime 释放会取消旧 owner；Focus 不代替手势状态，旧卸载不能释放新 owner。                           |
+| [Keyboard Layer](../src/workbench/actions/vue/studio-action-context.ts)                                    | Project / Add track / Piano Roll 菜单及快捷键 Dialog 暂停后台 Action；导航 Modal 由应用屏障接管。关闭当前层后才恢复 Cancel / Selection 路由。 |
+| Arrangement / Track 的 `pointerdown.capture`                                                               | 暂停各自 Timeline Follow，不拥有编辑 Capture、不提交事实。                                                                                    |
+| Track 的 `pointermove / pointerleave`                                                                      | Hover 候选与退出清理；活动手势期间不覆盖冻结 Preview。                                                                                        |
+| Piano Roll Context Menu 的 `pointerdown.capture`                                                           | 释放上次准备的菜单目标，不处理编辑 Pointer 生命周期。                                                                                         |
+| Workspace Dock Splitter 的 Pointer 处理                                                                    | 改变布局尺寸，没有 Project Command / History，不强制接入事实编辑 Session。                                                                    |
+| Ruler、Splitter、字段与 Reka 控件                                                                          | 保留 Slider / Separator / 输入提交与取消 / Widget 的键盘协议，区别于可改绑的 Action。                                                         |
+| [Shortcut Recorder](../src/workbench/keyboard/browser/browser-tanstack-hotkey-recorder.ts)                 | 录制期间的捕获监听与所有权屏障，不是手势 Modifier 或后台 Action 的第二入口。                                                                  |
+
+生产路径已无旧 Note XState、`TIMELINE_INTERACTION_KEYS` 字面键表、CC64
+`resolveTransformCommit / skipTransformCommit`，Tempo 和 Locate 也没有独立的 Pointer /
+Window Escape Handler。Note / CC64 的 Browser 工厂只是配置领域 Hit，委托同一个 Adapter。
+G4 没有发现需要再删除的旧生命周期；保留上述监听的实际 owner，避免把布局、Hover 或控件
+协议误认成重复编辑路径。
+
+本批修复 Add track 菜单遗漏的 Keyboard Layer，并通过菜单 / Dialog 与活动 Locate 的组合
+验证 Escape 不穿透；真实 TanStack DOM 测试另验证自定义 Cancel 组合的屏蔽与恢复。
+跨 Surface、Scope、Active Clip、Channel、Project / Session、Dock 与资源释放结果见
+[G4 实施记录](./editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19)。

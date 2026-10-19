@@ -3,6 +3,7 @@ import {
   PROJECT_MIDI_NOTE_CONTEXT_KEY,
   PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
   PROJECT_PLAYBACK_CONTEXT_KEY,
+  PROJECT_TRACK_CONTEXT_KEY,
 } from '@/symbols'
 import {
   getPianoRollContextMenuItem,
@@ -24,6 +25,8 @@ import { markRaw, nextTick, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue'
+import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
+import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import {
   createProjectPianoRollTrackPresentation,
@@ -147,7 +150,7 @@ function restorePrototypeProperty(
 function dispatchPointer(
   target: Element,
   type: string,
-  input: { readonly clientX: number; readonly clientY: number },
+  input: { readonly clientX: number; readonly clientY: number; readonly pointerId?: number },
 ): void {
   const event = new MouseEvent(type, {
     bubbles: true,
@@ -159,7 +162,7 @@ function dispatchPointer(
   })
   Object.defineProperties(event, {
     isPrimary: { value: true },
-    pointerId: { value: 1 },
+    pointerId: { value: input.pointerId ?? 1 },
     pointerType: { value: 'mouse' },
   })
   target.dispatchEvent(event)
@@ -193,11 +196,12 @@ function createSurfaceFixture() {
   })
   markRaw(session)
   const readyState = createReadyState(session)
-  const track = createProjectTrackCoordinator({
+  const projectTracks = createProjectTrackCoordinator({
     activeProject: { state: readyState },
     createRandomValue: () => 0,
     createUniqueId: createIdentitySource('track-surface-track', 'track-surface-device'),
-  }).addInstrumentTrack()
+  })
+  const track = projectTracks.addInstrumentTrack()
   const clip = createProjectClipCoordinator({
     activeProject: { state: readyState },
     createUniqueId: createIdentitySource('track-surface-clip', 'track-surface-source'),
@@ -285,6 +289,7 @@ function createSurfaceFixture() {
       [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
       [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: midiSustainPedalContext,
       [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
+      [PROJECT_TRACK_CONTEXT_KEY as symbol]: { projectTracks },
       ...keyboard.provide,
     },
   }
@@ -302,6 +307,7 @@ function createSurfaceFixture() {
 
   return {
     global,
+    pinia,
     clip,
     keyboard,
     playbackState,
@@ -427,6 +433,181 @@ describe('ProjectPianoRollTrackSurface', () => {
         (count) => count === 1,
       ),
     ).toBe(true)
+  })
+
+  it('cancels the old Track press when a Clip gesture takes ownership before Track teardown', async () => {
+    const fixture = createSurfaceFixture()
+    await nextTick()
+    const { wrapper, session, keyboard } = fixture
+    const clipPresentation = createProjectPianoRollPresentation(
+      session.getSnapshot(),
+      fixture.clip.clipId,
+    )
+    if (clipPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected Clip presentation')
+    const oldHost = wrapper.get('.project-piano-roll-track__canvas-host').element
+    const revision = session.modelRevision
+    dispatchPointer(oldHost, 'pointerdown', { clientX: 10, clientY: 125 })
+    expect(oldHost.hasPointerCapture(1)).toBe(true)
+    const oldTarget = keyboard.runtime.interactionTarget.current
+    const clip = mount(ProjectPianoRollSurface, {
+      attachTo: document.body,
+      global: fixture.global,
+      props: {
+        barSpanTick: parseTick(3840),
+        presentation: clipPresentation,
+        session,
+        timeSignatureNumerator: 4,
+      },
+    })
+    await nextTick()
+    const newHost = clip.get('.project-piano-roll__canvas-host').element
+    dispatchPointer(newHost, 'pointerdown', { clientX: 240, clientY: 125, pointerId: 2 })
+    const newTarget = keyboard.runtime.interactionTarget.current
+    expect(oldHost.hasPointerCapture(1)).toBe(false)
+    expect(oldTarget?.isCurrent()).toBe(false)
+    expect(newTarget?.value.isActive()).toBe(true)
+    dispatchPointer(oldHost, 'pointerup', { clientX: 10, clientY: 125 })
+    expect(session.modelRevision).toBe(revision)
+    wrapper.unmount()
+    expect(newTarget?.isCurrent()).toBe(true)
+    expect(newHost.hasPointerCapture(2)).toBe(true)
+    dispatchPointer(newHost, 'pointerup', { clientX: 240, clientY: 125, pointerId: 2 })
+    expect(session.modelRevision).toBe(revision + 1)
+    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(1)
+    session.undo()
+    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
+    clip.unmount()
+  })
+
+  it('ends a Track press when the Action runtime closes before the Surface', async () => {
+    const { wrapper, session, keyboard } = createSurfaceFixture()
+    await nextTick()
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    const revision = session.modelRevision
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+    keyboard.runtime.dispose()
+    expect(host.hasPointerCapture(1)).toBe(false)
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+    expect(session.modelRevision).toBe(revision)
+    wrapper.unmount()
+  })
+
+  it.each(['scope', 'minimize', 'close'] as const)(
+    'cancels the pending Note when the real Dock changes through %s without leaving stale ownership',
+    async (change) => {
+      const fixture = createSurfaceFixture()
+      fixture.wrapper.unmount()
+      const { session, keyboard } = fixture
+      const presentation = createProjectPianoRollPresentation(
+        session.getSnapshot(),
+        fixture.clip.clipId,
+      )
+      const dock = mount(ProjectWorkbenchContextEditorDock, {
+        attachTo: document.body,
+        global: fixture.global,
+        props: {
+          barSpanTick: parseTick(3840),
+          dockMode: 'docked',
+          isMaximized: false,
+          pianoRollPresentation: presentation,
+          pianoRollTrackPresentation: fixture.presentation,
+          projectSession: session,
+          selectedClip: null,
+          selectedTrack: null,
+          timeSignatureNumerator: 4,
+          timelineEndTick: parseTick(576000),
+        },
+      })
+      await nextTick()
+      const host = dock.get('.project-piano-roll-track__canvas-host').element
+      const revision = session.modelRevision
+      dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+      expect(host.hasPointerCapture(1)).toBe(true)
+      if (change === 'scope') usePianoRollPreferencesStore(fixture.pinia).selectEditingScope('clip')
+      else if (change === 'minimize') await dock.setProps({ dockMode: 'minimized' })
+      else dock.unmount()
+      await nextTick()
+      dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+      expect(host.hasPointerCapture(1)).toBe(false)
+      expect(keyboard.runtime.interactionTarget.current).toBeNull()
+      expect(session.modelRevision).toBe(revision)
+      if (change === 'scope') {
+        const currentHost = dock.get('.project-piano-roll__canvas-host').element
+        dispatchPointer(currentHost, 'pointerdown', { clientX: 240, clientY: 125 })
+        dispatchPointer(currentHost, 'pointerup', { clientX: 240, clientY: 125 })
+      }
+      if (change === 'minimize') {
+        await dock.setProps({ dockMode: 'docked' })
+        const currentHost = dock.get('.project-piano-roll-track__canvas-host').element
+        dispatchPointer(currentHost, 'pointerdown', { clientX: 10, clientY: 125 })
+        dispatchPointer(currentHost, 'pointerup', { clientX: 10, clientY: 125 })
+      }
+      expect(session.modelRevision).toBe(change === 'close' ? revision : revision + 1)
+      if (change !== 'close') dock.unmount()
+    },
+  )
+
+  it.each(['channel', 'active-clip', 'session', 'runtime'] as const)(
+    'cancels pending CC64 placement on %s without modifying either Project Session',
+    async (change) => {
+      const fixture = createSurfaceFixture()
+      const { wrapper, session, keyboard } = fixture
+      await nextTick()
+      const lane = wrapper.get('.piano-roll-sustain-pedal-lane').element
+      const snapshot = session.getSnapshot()
+      dispatchPointer(lane, 'pointerdown', { clientX: 10, clientY: 125 })
+      expect(lane.hasPointerCapture(1)).toBe(true)
+      let replacement: ProjectSession | null = null
+      if (change === 'channel')
+        usePianoRollPreferencesStore(fixture.pinia).selectSustainPedalChannel(parseMidiChannel(1))
+      if (change === 'active-clip') {
+        const presentation = createProjectPianoRollTrackPresentation(
+          snapshot,
+          fixture.presentation.trackId,
+          null,
+        )
+        if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+          throw new Error('Expected Track presentation')
+        await wrapper.setProps({ presentation })
+      }
+      if (change === 'session') {
+        replacement = markRaw(
+          createInitialProjectSession({
+            projectId: snapshot.project.id,
+            projectName: 'Replacement',
+            tempoEventId: parseTempoEventId('replacement-tempo'),
+            timeSignatureEventId: parseTimeSignatureEventId('replacement-meter'),
+          }),
+        )
+        await wrapper.setProps({ session: replacement })
+      }
+      if (change === 'runtime') keyboard.runtime.dispose()
+      await nextTick()
+      expect(lane.hasPointerCapture(1)).toBe(false)
+      dispatchPointer(lane, 'pointerup', { clientX: 10, clientY: 125 })
+      expect(session.getSnapshot()).toEqual(snapshot)
+      expect(replacement?.modelRevision ?? 0).toBe(0)
+      wrapper.unmount()
+    },
+  )
+
+  it('lets CC64 replace a pending Track Note and cancels only CC64 from Escape', async () => {
+    const { wrapper, session, keyboard } = createSurfaceFixture()
+    await nextTick()
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    const lane = wrapper.get('.piano-roll-sustain-pedal-lane').element
+    const snapshot = session.getSnapshot()
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(lane, 'pointerdown', { clientX: 10, clientY: 125, pointerId: 2 })
+    expect(host.hasPointerCapture(1)).toBe(false)
+    expect(lane.hasPointerCapture(2)).toBe(true)
+    keyboard.bindingRegistry.dispatch('Escape')
+    expect(lane.hasPointerCapture(2)).toBe(false)
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+    dispatchPointer(lane, 'pointerup', { clientX: 10, clientY: 125, pointerId: 2 })
+    expect(session.getSnapshot()).toEqual(snapshot)
+    wrapper.unmount()
   })
 
   it('renders global Track time, previews extension and commits one Pencil placement', async () => {

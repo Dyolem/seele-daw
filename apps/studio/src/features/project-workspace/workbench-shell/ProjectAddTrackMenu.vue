@@ -6,7 +6,7 @@ import MicIcon from '~icons/fluent/mic-20-regular'
 import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import SoundWaveIcon from '~icons/fluent/sound-wave-circle-20-regular'
 import SpeakerKeyboardIcon from '~icons/fluent/speaker-box-keyboard-20-regular'
-import type { Component } from 'vue'
+import { shallowRef, type Component } from 'vue'
 import {
   DropdownMenuContent,
   DropdownMenuItem,
@@ -23,6 +23,7 @@ import {
 import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
+import { useStudioKeyboardLayer } from '@/workbench/actions/vue/studio-action-context'
 
 interface AddTrackOption {
   readonly description: string
@@ -36,6 +37,9 @@ interface AddTrackOption {
 const emit = defineEmits<{
   select: [trackType: ProjectAddTrackType]
 }>()
+
+const isMenuOpen = shallowRef(false)
+useStudioKeyboardLayer(() => isMenuOpen.value)
 
 const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
   Object.freeze({
@@ -90,7 +94,7 @@ const ADD_TRACK_OPTIONS: readonly AddTrackOption[] = Object.freeze([
 </script>
 
 <template>
-  <DropdownMenuRoot>
+  <DropdownMenuRoot v-model:open="isMenuOpen">
     <DropdownMenuTrigger as-child>
       <UiButton class="project-add-track__trigger" size="small" variant="secondary">
         <template #leading>

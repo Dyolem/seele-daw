@@ -112,6 +112,7 @@ export interface ResizedMidiNoteResult {
 }
 
 export interface PlaceMidiNoteOnTrackInput {
+  readonly expectedSession?: Pick<ProjectSession, 'query'>
   readonly activeClipId: ClipId | null
   readonly barSpanTick: Tick
   readonly baseRevision: ModelRevision
@@ -290,6 +291,13 @@ class ProjectMidiNoteCoordinatorImpl implements ProjectMidiNoteCoordinator {
     }
 
     const session = activeState.session
+    if (input.expectedSession !== undefined && session !== input.expectedSession) {
+      throw new ProjectMidiNoteError(
+        'track-note-placement-stale',
+        'The Project session changed before the MIDI Note could be placed.',
+        { trackId: input.trackId },
+      )
+    }
     const snapshot = session.getSnapshot()
     if (snapshot.modelRevision !== input.baseRevision) {
       throw new ProjectMidiNoteError(

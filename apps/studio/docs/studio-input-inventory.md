@@ -80,22 +80,24 @@ Clip / Bar 的 Enter 在当前实现中区别于按钮默认的 Click / Space �
 | 临时绕过 Snap            | Alt                              | 拖动中使用 current modifiers | Note Move / Resize、CC64 Tick Transform                                                                                                                                                                                           |
 | 横向滚动关联 Follow 暂停 | 横向 Wheel 或 Shift + 纵向 Wheel | 当前 Wheel Event             | Arrangement / Track Surface                                                                                                                                                                                                       |
 
-这些规则不等于按一次触发一次 Action。迁移时必须逐项核验 origin / current 选择，不能统一
-读取 Pointer Up 时的物理键；尚未提供的 Modifier 自定义不能在设置中伪装为可修改。
+G3 的运行时与帮助权威为
+[Interaction Modifier Rules](../../../packages/editor/src/common/interaction/interaction-modifiers.ts)。
+这些规则不等于按一次触发一次 Action。Selection 固定 origin，Snap bypass 消费 current；
+Keyboard Settings 查询同一只读声明，未提供 Modifier 自定义。
 
 当前 Pencil Click 使用 Snap Preference；Track 放置函数没有读取 Alt，不能在帮助中宣称
 Pencil 已支持 Alt 临时绕过吸附。
 
 ## 4. 当前手势生命周期分布
 
-| 消费者                  | 当前所有者                                                                                                                                                                                   | 独立规则 / 迁移要点                                                                                                  |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Clip Focus Note         | [Note Interaction Session](../../../packages/editor/src/common/piano-roll/interaction/piano-roll-interaction-session.ts) 与 Studio Handler                                                   | 盘点时使用 XState；G1 已迁移为公共 InteractionSession 与 Note Operation，链接指向现行实现。                          |
-| Clip Focus / Track CC64 | [CC64 Session](../../../packages/editor/src/common/piano-roll/sustain-pedal-lane/sustain-pedal-interaction-session.ts) 与 Lane                                                               | 手写 pressing / transform / commit / authority；主导轴决定 Tick 或 Value 操作；Tool 类型依赖 Note 文件应移除。       |
-| Track Pencil            | [Track Surface](../src/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue)                                                                                        | End 使用当时 Tool、Active Clip、Grid 和 Read Model；改为 Begin 冻结目标与语义配置。                                  |
-| Tempo Lane              | [TempoTrackLane](../src/features/project-workspace/tempo-track/TempoTrackLane.vue) 与 [Tempo Session](../src/features/project-workspace/tempo-track/interaction/tempo-track-drag-session.ts) | G2 已迁入公共 Pointer / Session / Handoff；Begin 冻结目标与映射，执行校验 Session / revision，数值字段保留离散提交。 |
-| Timeline Locate         | [Arrangement](../src/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue) 与 Playback Locate Session                                                                  | 运行时定位与取消恢复，不写 Project Fact；已有 Edge Scroll，需要可更新坐标映射。                                      |
-| Dock Splitter           | [Workspace](../src/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue)                                                                                                 | 界面布局调整，无 Project Commit / History；不强制进入事实编辑协议。                                                  |
+| 消费者                  | 当前所有者                                                                                                                                                                                   | 独立规则 / 迁移要点                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Clip Focus Note         | [Note Interaction Session](../../../packages/editor/src/common/piano-roll/interaction/piano-roll-interaction-session.ts) 与 Studio Handler                                                   | 盘点时使用 XState；G1 已迁移为公共 InteractionSession 与 Note Operation，链接指向现行实现。                             |
+| Clip Focus / Track CC64 | [CC64 Session](../../../packages/editor/src/common/piano-roll/sustain-pedal-lane/sustain-pedal-interaction-session.ts) 与 Lane                                                               | G3 已迁入公共 Session / Handoff；固定 Begin 选择、目标和 Tool；保留 Tick / Value 轴锁定，回告携带交互身份。             |
+| Track Pencil            | [Track Surface](../src/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue)                                                                                        | G3 已由局部 Placement Session 固定 Begin Tool、Active Clip、Grid、Read Model 与 Session 身份；Hover 仍使用当前配置。    |
+| Tempo Lane              | [TempoTrackLane](../src/features/project-workspace/tempo-track/TempoTrackLane.vue) 与 [Tempo Session](../src/features/project-workspace/tempo-track/interaction/tempo-track-drag-session.ts) | G2 已迁入公共 Pointer / Session / Handoff；Begin 冻结目标与映射，执行校验 Session / revision，数值字段保留离散提交。    |
+| Timeline Locate         | [Arrangement](../src/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue) 与 Playback Locate Session                                                                  | G3 已迁入公共 Pointer / Session；Client 坐标允许 Edge Scroll 重映射，Playback 保留 commit / cancel 恢复，不写 Project。 |
+| Dock Splitter           | [Workspace](../src/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue)                                                                                                 | 界面布局调整，无 Project Commit / History；不强制进入事实编辑协议。                                                     |
 
 现有边界已经足够检验跨对象复用。Clip Move / Trim / Stretch 尚未实现，不能把“未来可以
-接入”当作已经证明；Tempo 已由 G2 完成实际跨域验证；Timeline 留在 G3。
+接入”当作已经证明；Tempo 已由 G2 完成实际跨域验证；G3 已接入其余现有编辑消费者；G4 继续跨 Surface 与资源释放收口。

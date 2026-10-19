@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, useTemplateRef, watch } from 'vue'
-import type { PianoRollSustainPedalLanePlacement } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import type { PianoRollSustainPedalLaneProps } from '@/features/piano-roll/components/sustain-pedal/types/sustain-pedal-lane'
 import { useSustainPedalViewport } from '@/features/piano-roll/components/sustain-pedal/hooks/use-sustain-pedal-viewport'
 import { useSustainPedalSelection } from '@/features/piano-roll/components/sustain-pedal/hooks/use-sustain-pedal-selection'
@@ -12,13 +11,15 @@ import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-ped
 const props = defineProps<PianoRollSustainPedalLaneProps>()
 const emit = defineEmits<{
   completed: []
-  failure: [cause: unknown]
-  placement: [placement: PianoRollSustainPedalLanePlacement]
+  failure: [cause: unknown, committed?: boolean]
   requestFocus: []
 }>()
 const { projectMidiSustainPedal } = useProjectMidiSustainPedal()
 const laneSurface = useTemplateRef<HTMLElement>('laneSurface')
-const reportFailure = (cause: unknown) => emit('failure', cause)
+const reportFailure = (cause: unknown, committed?: boolean) => {
+  if (committed) emit('failure', cause, true)
+  else emit('failure', cause)
+}
 const reportSuccess = () => emit('completed')
 const requestFocus = () => emit('requestFocus')
 const selection = useSustainPedalSelection({
@@ -34,6 +35,7 @@ const layout = useSustainPedalViewport({
 })
 const interaction = useSustainPedalInteraction({
   laneSurface,
+  getSession: () => props.session,
   getReadModel: () => props.readModel,
   getViewport: () => layout.viewport.value,
   getGrid: () => props.grid,
@@ -46,7 +48,6 @@ const interaction = useSustainPedalInteraction({
   reportFailure,
   reportSuccess,
   requestFocus,
-  placeEvent: (placement) => emit('placement', placement),
 })
 const { interactionState } = interaction
 const { thresholdStyle, occurrenceWindows, renderedSegments, renderedEvents, accessibleSummary } =
@@ -79,11 +80,12 @@ watch(
     interaction.invalidate()
     layout.refresh()
   },
-  { flush: 'pre' },
+  { flush: 'sync' },
 )
 watch(layout.viewport, interaction.invalidate, { flush: 'sync' })
 watch(
   [
+    () => props.session,
     () => props.readModel.projectId,
     () => props.readModel.channel,
     () => ('clipId' in props.readModel ? props.readModel.clipId : props.readModel.trackId),
@@ -96,7 +98,7 @@ watch(
     interaction.invalidate()
     selection.setSelectedEventIds([])
   },
-  { flush: 'pre' },
+  { flush: 'sync' },
 )
 watch(
   () => props.readModel.modelRevision,
@@ -104,7 +106,7 @@ watch(
     interaction.notifyAuthorityRevision(revision)
     selection.reconcileSelection()
   },
-  { flush: 'pre' },
+  { flush: 'post' },
 )
 
 function dispose(): void {

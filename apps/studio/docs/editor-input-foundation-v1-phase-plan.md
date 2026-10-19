@@ -1,6 +1,6 @@
 # Editor Input Foundation V1 阶段计划
 
-> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已审核提交；Symbol 与 Piano Roll 组织优化（含 O1–O3）已审核提交（`c614b9c`）；G2 已审核通过，G3–G4 尚未实施
+> 状态：S1–S3 与快捷键体验修订已审核提交；Keyboard 模块组织重构已审核提交；G1 已审核提交；Symbol 与 Piano Roll 组织优化（含 O1–O3）已审核提交（`c614b9c`）；G2 已审核提交（`c83d906`）；G3 已审核通过；G4 尚未实施
 >
 > 日期：2026-09-11
 >
@@ -470,3 +470,32 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
   Node 架构规则回归，以及格式、Lint、类型、Production Build 与音源资源边界检查。
   构建仅保留既有的大 chunk 提示。更新文档后的本地链接、格式与 `git diff --check` 通过。
 - 本批不实施 G3 / G4，不新增 E2E。代码已通过用户审核，按授权提交。
+
+## 18. G3：其余消费者迁移（2026-09-30）
+
+- G2 按授权提交为 `c83d906`，本批实现 CC64、Track Pencil 与 Timeline Locate 的剩余接入。
+- CC64 将契约、纯 Operation 和 Session 分开，使用公共 host / Handoff；Begin 固定 Scope、
+  Channel、Selection、Tool、网格及 Session / revision。Selection 输出已解析结果；新增、
+  移动和改值在 Studio Handler 领取一次完成后提交，并按身份回告。
+- Track Pencil 固定按下时的 Active Clip、Read Model、Tool、Grid、Snap 和坐标；Hover 仍
+  消费当前设置，活动交互期间不覆盖冻结预览。Note Hit 在 Begin 解析对应 Clip，删除 End
+  读取当前映射的旧路径。取消接入统一 Action，创建 / 扩展 Clip 与 Note 仍是一次 History。
+- 修复新建 Clip 成功后仍用旧投影验证成员身份、导致 Active Clip 留在 None 的问题。已提交的
+  放置结果直接更新 Selection；普通 Clip 选择继续验证可见目标，并补充投影尚未到达时的回归。
+- CC64 / Track 的 Coordinator 验证 Session 对象身份和原 revision；Session 的 Update、End
+  与领取同步检查版本，补齐 Project 通知尚在 microtask 队列中的窗口。Preview 等 post flush
+  对应事实投影后退场；提交后的显示失败不会被报告成事实写入失败。
+- Arrangement 删除直接 Pointer 监听和本地活动手势；Locate Hook 组合中立 Pointer Adapter、
+  Locate Session 与原 Playback Locate Session。Browser 提供可选 Client 坐标模式，保留静止
+  Pointer 下的 Edge Scroll；旧帧与旧 Follow 回调失效，失焦、目标和映射重建会取消。
+- Modifier 规则集中声明，Keyboard Settings 从相同声明生成只读帮助；未增加 Pencil Alt
+  绕过、鼠标改绑或多步骤快捷键。
+- 内置浏览器验证 Track Pencil 新建后立即激活 Clip、一次撤销同时移除 Clip / Note，CC64
+  新增、横向移动、纵向改值及各自的一次撤销，以及 Timeline 点击 / 拖动定位。临时事实已全部
+  撤销，项目恢复空项目 Saved；Console 无 warning / error，viewport 已恢复、临时标签已关闭。
+  取消、Edge Scroll 与 Playback 恢复的边界由自动化回归覆盖。
+- 完整 `pnpm check` 通过：171 个 Vitest 文件 / 1,653 项测试（本批新增 32 项）、14 项 Node
+  架构规则回归，以及格式、Lint、类型、Production Build 与音源资源边界检查。构建保留既有
+  大 chunk 提示。更新文档后的本地链接、格式与 `git diff --check` 通过。
+- 本批于 2026-10-19 通过用户审核，按授权提交。未实施 G4 或新的 Clip / Velocity 产品能力，
+  未新增 E2E。

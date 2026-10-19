@@ -4,13 +4,14 @@ import type {
   PianoRollSustainPedalClipLaneReadModel,
   PianoRollTrackSustainPedalLaneReadModel,
 } from '@seele-daw/editor'
-import type { Tick } from '@seele-daw/project-core'
+import type { Tick, ProjectSession } from '@seele-daw/project-core'
 
 export type SustainPedalLaneReadModel =
   | PianoRollSustainPedalClipLaneReadModel
   | PianoRollTrackSustainPedalLaneReadModel
 
 export interface PianoRollSustainPedalLaneProps {
+  readonly session: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly clipContext: PianoRollClipContext | null
   readonly grid: PianoRollGrid
   readonly label: string

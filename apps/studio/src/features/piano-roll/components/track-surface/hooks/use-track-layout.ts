@@ -1,6 +1,6 @@
 import { computed, shallowRef, watch, type ShallowRef, type StyleValue } from 'vue'
 import { createPianoRollTimelineViewport, type PianoRollTimelineViewport } from '@seele-daw/editor'
-import { ZERO_TICK, parseTick, type ClipId, type NoteId, type Tick } from '@seele-daw/project-core'
+import { ZERO_TICK, parseTick, type Tick } from '@seele-daw/project-core'
 import {
   INITIAL_MINIMUM_PITCH,
   INITIAL_MAXIMUM_PITCH,
@@ -64,14 +64,6 @@ export function useTrackLayout({
     ),
   )
 
-  const noteClipIdByNoteId = computed(() => {
-    const clipIdByNoteId = new Map<NoteId, ClipId>()
-    for (const { clip, notes } of getPresentation().readModel.clips) {
-      for (const { note } of notes) clipIdByNoteId.set(note.id, clip.clipId)
-    }
-    return clipIdByNoteId
-  })
-
   const clipWindows = computed(() =>
     Object.freeze(
       getPresentation().readModel.clips.flatMap((clipReadModel) => {
@@ -132,7 +124,6 @@ export function useTrackLayout({
     timelineBars,
     timelineContentStyle,
     visibleNotes,
-    noteClipIdByNoteId,
     clipWindows,
     mount() {
       const host = canvasHost.value

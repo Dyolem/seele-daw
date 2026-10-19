@@ -1,5 +1,5 @@
 import { computed, shallowRef, type ShallowRef } from 'vue'
-import type { ClipId, MidiChannel, NoteId, ProjectSession } from '@seele-daw/project-core'
+import type { ClipId, MidiChannel, ProjectSession } from '@seele-daw/project-core'
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import type { PianoRollContextMenuTarget } from '@/features/piano-roll/types/piano-roll-context-menu-target'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
@@ -15,14 +15,12 @@ export function useTrackActions({
   getPresentation,
   getSession,
   getSustainPedalChannel,
-  getNoteClipIdByNoteId,
   suspendTimelineFollow,
 }: {
   readonly sustainPedalLane: Readonly<ShallowRef<PianoRollSustainPedalLaneHandle | null>>
   readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
   readonly getSession: () => Pick<ProjectSession, 'query' | 'subscribe'>
   readonly getSustainPedalChannel: () => MidiChannel
-  readonly getNoteClipIdByNoteId: () => ReadonlyMap<NoteId, ClipId>
   readonly suspendTimelineFollow: () => void
 }) {
   const workbenchSelection = useProjectWorkbenchSelectionStore()
@@ -32,6 +30,11 @@ export function useTrackActions({
     if (!getPresentation().readModel.clips.some(({ clip }) => clip.clipId === clipId)) {
       return
     }
+    acceptPlacedClip(clipId)
+  }
+
+  // A successful placement may create a Clip before its new presentation arrives.
+  function acceptPlacedClip(clipId: ClipId): void {
     suspendTimelineFollow()
     workbenchSelection.selectClip(getPresentation().trackId, clipId)
   }
@@ -39,10 +42,6 @@ export function useTrackActions({
   function selectActiveClip(clipId: ClipId | null): void {
     if (clipId === null) workbenchSelection.clearClipSelection()
     else activateClip(clipId)
-  }
-  function activateNote(noteId: NoteId): void {
-    const clipId = getNoteClipIdByNoteId().get(noteId)
-    if (clipId !== undefined) activateClip(clipId)
   }
   function handleFocusIn(): void {
     isSustainPedalTarget.value = sustainPedalLane.value?.isFocused() ?? false
@@ -88,7 +87,7 @@ export function useTrackActions({
   return {
     activeClipId,
     activateClip,
-    activateNote,
+    acceptPlacedClip,
     selectActiveClip,
     handleFocusIn,
     prepareContextMenu,

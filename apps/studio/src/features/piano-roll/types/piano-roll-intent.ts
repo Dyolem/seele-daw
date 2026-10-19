@@ -2,7 +2,6 @@ import type {
   PianoRollEditorSession,
   PianoRollInteractionIntent,
   PianoRollInteractionSession,
-  PianoRollSustainPedalEditingScope,
   PianoRollSustainPedalInteractionIntent,
   PianoRollSustainPedalInteractionSession,
 } from '@seele-daw/editor'
@@ -32,14 +31,12 @@ export type ProjectPianoRollIntentHandler = (intent: PianoRollInteractionIntent)
 
 export interface ProjectPianoRollSustainPedalIntentHandlerDependencies {
   readonly getAuthorityRevision: () => ModelRevision
-  readonly getInteractionScope: () => PianoRollSustainPedalEditingScope | null
-  readonly getSelectedEventIds: () => readonly MidiSustainPedalEventId[]
   readonly interactionSession: Pick<
     PianoRollSustainPedalInteractionSession,
-    'resolveTransformCommit' | 'skipTransformCommit'
+    'claimCompletion' | 'resolveCommit' | 'finish'
   >
   readonly projectMidiSustainPedal: ProjectMidiSustainPedalCoordinator
-  readonly reportFailure: (cause: unknown) => void
+  readonly reportFailure: (cause: unknown, committed?: boolean) => void
   readonly reportSuccess: () => void
   readonly setSelectedEventIds: (eventIds: readonly MidiSustainPedalEventId[]) => void
 }

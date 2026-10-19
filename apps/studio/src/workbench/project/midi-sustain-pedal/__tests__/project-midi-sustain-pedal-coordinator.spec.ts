@@ -7,6 +7,7 @@ import {
   parseMidiChannel,
   parseMidiControlValue,
   parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parsePositiveTick,
   parseProjectId,
   parseTempoEventId,
@@ -342,5 +343,49 @@ describe('ProjectMidiSustainPedalCoordinator', () => {
         code: 'target-clip-looped',
       }),
     )
+  })
+  it('rejects a replacement Session with identical IDs and revision for every gesture command', () => {
+    const previous = createFixture('same-session-target')
+    const current = createFixture('same-session-target')
+    const target = {
+      expectedSession: previous.session,
+      baseRevision: previous.session.modelRevision,
+      clipId: previous.clipId,
+    }
+    const revision = current.session.modelRevision
+    const eventId = parseMidiSustainPedalEventId('uncommitted-event')
+    expect(() =>
+      current.coordinator.placeInClip({
+        ...target,
+        channel: parseMidiChannel(0),
+        clipTick: parseTick(100),
+        value: parseMidiControlValue(64),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'event-edit-stale' }))
+    expect(() =>
+      current.coordinator.placeOnTrack({
+        ...target,
+        activeClipId: previous.clipId,
+        channel: parseMidiChannel(0),
+        trackId: previous.trackId,
+        projectTick: parseTick(2000),
+        value: parseMidiControlValue(64),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'event-edit-stale' }))
+    expect(() =>
+      current.coordinator.moveEvents({
+        ...target,
+        eventIds: [eventId],
+        deltaTick: parseTickDelta(120),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'event-edit-stale' }))
+    expect(() =>
+      current.coordinator.replaceEventValue({
+        ...target,
+        eventId,
+        value: parseMidiControlValue(100),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'event-edit-stale' }))
+    expect(current.session.modelRevision).toBe(revision)
   })
 })

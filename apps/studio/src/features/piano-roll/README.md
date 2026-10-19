@@ -4,19 +4,19 @@ Studio 的 MIDI Note 与 CC64 编辑入口，遵循根 [工程代码准则](../.
 
 ## 目录与入口
 
-| 位置                                   | 职责                                                                                    |
-| -------------------------------------- | --------------------------------------------------------------------------------------- |
-| `components/clip-focus/`               | Clip Focus 组件、五个私有 hooks 与局部共享类型                                          |
-| `components/track-surface/`            | Track Surface、独立 Toolbar 与六个私有 hooks                                            |
-| `components/sustain-pedal/`            | 两种 Scope 共用的 CC64 Lane、五个私有 hooks 与局部契约                                  |
-| `components/PianoRollToolControls.vue` | 两种 Surface 共用的 Pencil / Cursor / Snap 视图                                         |
-| `types/`                               | 跨子模块共享的 Presentation、Preference、Intent、Lane Handle / Placement 与 Action 契约 |
-| `interaction/`                         | 将 Editor Intent 转成既有 Coordinator 调用，处理提交回告和失败反馈                      |
-| `presentation/`                        | Snapshot 投影、Renderer 选择、Theme、Pitch Layout、Channel 选项和反馈文案               |
-| `state/`                               | 应用生命周期的轻量 Piano Roll Preferences Store                                         |
-| `actions/`                             | Tool Action 定义、Vue 注册与 Context Menu                                               |
-| `playhead/`                            | Clip / Track 时间位置投影和显示                                                         |
-| `__tests__/`                           | Feature 行为测试及测试专用 support                                                      |
+| 位置                                   | 职责                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------- |
+| `components/clip-focus/`               | Clip Focus 组件、五个私有 hooks 与局部共享类型                               |
+| `components/track-surface/`            | Track Surface、Toolbar、私有 hooks、Placement Operation / Session 与局部契约 |
+| `components/sustain-pedal/`            | 两种 Scope 共用的 CC64 Lane、五个私有 hooks 与局部契约                       |
+| `components/PianoRollToolControls.vue` | 两种 Surface 共用的 Pencil / Cursor / Snap 视图                              |
+| `types/`                               | 跨子模块共享的 Presentation、Preference、Intent、Lane Handle 与 Action 契约  |
+| `interaction/`                         | 将 Editor Intent 转成既有 Coordinator 调用，处理提交回告和失败反馈           |
+| `presentation/`                        | Snapshot 投影、Renderer 选择、Theme、Pitch Layout、Channel 选项和反馈文案    |
+| `state/`                               | 应用生命周期的轻量 Piano Roll Preferences Store                              |
+| `actions/`                             | Tool Action 定义、Vue 注册与 Context Menu                                    |
+| `playhead/`                            | Clip / Track 时间位置投影和显示                                              |
+| `__tests__/`                           | Feature 行为测试及测试专用 support                                           |
 
 组件保留 DOM refs、Props / Emits、模板、无障碍语义及组合顺序；私有 hooks 不作为跨子模块 API。
 `PianoRollToolControls` 与 `PianoRollTrackToolbar` 只接收状态并上报意图，Surface 各自只注册一次
@@ -37,7 +37,7 @@ Tool Action Target。Active Clip 与 Channel 下拉框使用 `UiSelect` 的 smal
 4. [useEditingActions](./components/clip-focus/hooks/use-editing-actions.ts)：Note / CC64 Focus、
    Context Menu、Delete、Clear 与 Cancel 路由。
 5. [useClipSustainPedal](./components/clip-focus/hooks/use-clip-sustain-pedal.ts)：Clip CC64
-   Read Model、Channel 与 Placement。
+   Read Model、Channel 与提交 / 显示失败反馈。
 
 局部共享契约见 [clip-focus.ts](./components/clip-focus/types/clip-focus.ts)。
 
@@ -46,21 +46,24 @@ Tool Action Target。Active Clip 与 Channel 下拉框使用 `UiSelect` 的 smal
 从 [ProjectPianoRollTrackSurface](./components/track-surface/ProjectPianoRollTrackSurface.vue) 开始：
 
 1. [useTrackLayout](./components/track-surface/hooks/use-track-layout.ts)：Timeline Bars、内容宽度、
-   可见 Note、Clip Windows、Note 到 Clip 的映射，以及 Viewport 测量。
+   可见 Note、Clip Windows 与 Viewport 测量。
 2. [useTrackRendering](./components/track-surface/hooks/use-track-rendering.ts)：Grid / Note Renderer
    的创建、投影、失败反馈与释放，消费 Layout 提供的 Viewport。
 3. [useTrackFollow](./components/track-surface/hooks/use-track-follow.ts)：Playback 分页跟随、
    用户暂停 / 恢复，区分程序滚动，并使释放后的排队回调失效。
-4. [useTrackActions](./components/track-surface/hooks/use-track-actions.ts)：Active Clip、Note Hit
-   激活 Clip、CC64 Selection Target、Context Menu 与 Cancel 路由。
-5. [useTrackPlacement](./components/track-surface/hooks/use-track-placement.ts)：Hover、放置候选、
-   Preview、Pointer Adapter 与既有 Track Note 放置用例。
+4. [useTrackActions](./components/track-surface/hooks/use-track-actions.ts)：Active Clip、CC64 Selection Target、Context Menu 与 Cancel 路由。
+5. [useTrackPlacement](./components/track-surface/hooks/use-track-placement.ts)：Hover、Pointer Adapter、映射校验、统一 Cancel 与 Track Note 提交；
+   [useTrackPlacementPreview](./components/track-surface/hooks/use-track-placement-preview.ts) 只负责展示派生。
 6. [useTrackSustainPedal](./components/track-surface/hooks/use-track-sustain-pedal.ts)：Track CC64
-   Read Model、Placement 与 Warning / Danger 反馈。
+   Read Model 与 Warning / Danger 反馈。
 
 完整 Toolbar 的视图与样式由
 [PianoRollTrackToolbar](./components/track-surface/PianoRollTrackToolbar.vue) 拥有。
-`TrackPlacementPreview` 只被一个 hook 使用，保留在该文件内，不预建空的 `types/`。
+交互入口为 [TrackPlacementSession](./components/track-surface/interaction/track-placement-session.ts)，
+它组合公共 Session / Handoff，并拥有 Project 订阅；
+[TrackPlacementOperation](./components/track-surface/interaction/track-placement-operation.ts) 冻结点击
+时的候选与 Note Hit 对应 Clip。共享契约见
+[track-placement.ts](./components/track-surface/types/track-placement.ts)。
 
 ### Sustain Pedal Lane
 
@@ -71,7 +74,7 @@ Tool Action Target。Active Clip 与 Channel 下拉框使用 `UiSelect` 的 smal
 2. [useSustainPedalSelection](./components/sustain-pedal/hooks/use-sustain-pedal-selection.ts)：
    唯一 Selection 写入口、Editing Scope 解析与权威更新后的协调。
 3. [useSustainPedalInteraction](./components/sustain-pedal/hooks/use-sustain-pedal-interaction.ts)：
-   组合已有 Session、Pointer Adapter、冻结的 Begin 配置和 Intent Handler。
+   组合中立生命周期的 CC64 Session、Pointer Adapter、Begin 目标与 Intent Handler。
 4. [useSustainPedalProjection](./components/sustain-pedal/hooks/use-sustain-pedal-projection.ts)：
    Occurrence、Segment、Marker、Threshold、Preview 与无障碍摘要的纯派生。
 5. [useSustainPedalActions](./components/sustain-pedal/hooks/use-sustain-pedal-actions.ts)：
@@ -79,24 +82,31 @@ Tool Action Target。Active Clip 与 Channel 下拉框使用 `UiSelect` 的 smal
 
 Props 和 Read Model 联合类型见
 [sustain-pedal-lane.ts](./components/sustain-pedal/types/sustain-pedal-lane.ts)。Lane 通过 feature
-共享的 [Handle / Placement](./types/piano-roll-sustain-pedal.ts) 与两种 Surface 协作，不暴露 Session
-或内部 refs。Projection 内单独使用的类型仍与其实现共置。
+共享的 [Handle](./types/piano-roll-sustain-pedal.ts) 与两种 Surface 协作；Session 作为显式 Props
+输入，不从 Lane 暴露。新增、移动和改值统一通过 Intent Handler 返回真实 Commit，已删除无回告的 Placement Emit。Projection 内单独使用的类型仍与其实现共置。
 
 ## 失效与资源清理
 
-| Owner         | 创建与正常释放                                                                                                                                      | 失效来源与时机                                                                                                                      |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Clip Focus    | 创建 Selection；mount Renderer、Input、Viewport / Read Model。释放 Input / Interaction，再释放 Selection / Read Model / Observer，最后释放 Renderer | Clip / Source / Session 变化同步取消后重建；Selection 与 authority revision 由已有 Editor Session 协调                              |
-| Track Surface | mount Renderer、Input、Viewport Observer；逆序释放 Observer、Input、Renderer，同时关闭 Follow 的排队回调                                            | Viewport 变化同步取消放置；Project / Track / Active Clip / revision / Tool 在 pre watcher 取消；Follow 位置在 post watcher 消费     |
-| CC64 Lane     | 创建 Interaction Session 与订阅，mount Input 后观察 Viewport；释放 Observer、Input、订阅与 Session                                                  | Viewport 变化同步取消；Project / Scope / Clip / Source / Channel 在 pre watcher 取消并清空选择；revision 先通知 Session，再协调选择 |
+| Owner         | 创建与正常释放                                                                                                                                      | 失效来源与时机                                                                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Clip Focus    | 创建 Selection；mount Renderer、Input、Viewport / Read Model。释放 Input / Interaction，再释放 Selection / Read Model / Observer，最后释放 Renderer | Clip / Source / Session 变化同步取消后重建；Selection 与 authority revision 由已有 Editor Session 协调                                           |
+| Track Surface | mount Renderer、Input、Viewport Observer；逆序释放 Observer、Input、Renderer，同时关闭 Follow 的排队回调                                            | 映射、Session / Project / Track / Active Clip 改变取消；Tool / Grid / Snap 保留 Begin 快照；revision 由 Session 同步校验并在 post flush 交接     |
+| CC64 Lane     | 创建 Interaction Session 与订阅，mount Input 后观察 Viewport；释放 Observer、Input、订阅与 Session                                                  | Viewport 变化同步取消；Session / Project / Scope / Clip / Source / Channel 同步取消并清空选择；post flush 的 revision 先通知 Session，再协调选择 |
 
 资源组合由组件显式安排，不依赖多个 `onMounted` 的注册顺序。部分初始化失败立即回收已创建
 资源，`dispose` 幂等，已排队的 Resize / Follow 回调在释放后失效。Viewport 尺寸变化取消捕获，
 不能沿用旧坐标完成写入。CC64 revision 更新保留提交到权威投影的 Preview 交接。
 普通资源的顺序按依赖逆序；Clip Focus 为释放 Pointer Capture，优先关闭 Input / Interaction。
 
-真正的手势状态机、唯一完成领取和 revision 交接仍由 Editor classes 拥有，Hook 不建立第二份
-状态权威。Track / CC64 的中立语义协议迁移仍属于 G3，本次目录拆分不代表迁移完成。
+Note、CC64 与 Track Pencil 均组合 Editor 的公共 InteractionSession，事实编辑使用可选 Handoff。
+各自的领域 Session 拥有目标与订阅；Hook 只组合 Vue 与 Browser 资源。Update / End / completion
+领取同步检查 Begin revision，Command 边界再次验证 Session 对象身份；同 ID / revision 的替换
+Session 不能接收旧交互。旧 capture、回告与订阅不能取消或提交新的手势。
+
+CC64 保留首次越阈值后的单轴锁定，Tick 移动完整选择，Value 只改锚点。拖回原始值不增加
+History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设置；开始点击后，Hover 不再
+覆盖冻结预览。成功放置返回的 Clip 直接更新 Selection，避免新 Clip 尚未进入界面投影时
+被旧成员列表拒绝；普通 Clip 选择仍验证目标属于当前 Track。
 
 ## 依赖与共享边界
 
@@ -152,7 +162,7 @@ Props 和 Read Model 联合类型见
   恢复；Follow 状态不进入 Project Fact；
 - Active Clip 下拉选择、Clip window / Note 点击选择，以及 looped Clip 的可见不可编辑状态；
 - Track Pencil Hover Preview：明确显示写入已有 Clip、右扩 Clip、新建 Bar Clip 或 blocked
-  原因；点击时 Coordinator 对当前 Snapshot / revision 重新解析，并用 Add Note、
+  原因；按下时冻结 Active Clip / Tool / Grid / Snap / revision；完成时 Coordinator 对同一 Session 和原 revision 重新验证，并用 Add Note、
   Add Clip With Note 或 Extend Clip With Note 形成一次 Commit / History；
 - Track 与 Clip Focus 共用固定高度的 CC64 Sustain Pedal Lane：保留原始 `0..127` Value，显示
   Step Segment、`64` Down Threshold、Event Marker 与不影响当前 Clip 播放的右端 Terminal

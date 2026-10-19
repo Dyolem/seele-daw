@@ -38,6 +38,7 @@ export interface ProjectMidiSustainPedalCoordinatorDependencies {
 }
 
 export interface PlaceMidiSustainPedalEventInClipInput {
+  readonly expectedSession?: Pick<ProjectSession, 'query'>
   readonly baseRevision: ModelRevision
   readonly channel: MidiChannel
   readonly clipId: ClipId
@@ -46,6 +47,7 @@ export interface PlaceMidiSustainPedalEventInClipInput {
 }
 
 export interface PlaceMidiSustainPedalEventOnTrackInput {
+  readonly expectedSession?: Pick<ProjectSession, 'query'>
   readonly activeClipId: ClipId | null
   readonly baseRevision: ModelRevision
   readonly channel: MidiChannel
@@ -61,6 +63,7 @@ export interface PlacedMidiSustainPedalEventResult {
 }
 
 interface EditMidiSustainPedalEventsInput {
+  readonly expectedSession?: Pick<ProjectSession, 'query'>
   readonly baseRevision: ModelRevision
   readonly clipId: ClipId
 }
@@ -116,6 +119,7 @@ interface ReadyProjectAuthority {
 
 function requireReadyProject(
   dependencies: ProjectMidiSustainPedalCoordinatorDependencies,
+  expectedSession?: Pick<ProjectSession, 'query'>,
 ): ReadyProjectAuthority {
   const activeState = dependencies.activeProject.state
   if (activeState.phase !== ACTIVE_PROJECT_PHASE.READY) {
@@ -126,6 +130,12 @@ function requireReadyProject(
     )
   }
 
+  if (expectedSession !== undefined && activeState.session !== expectedSession) {
+    throw new ProjectMidiSustainPedalError(
+      'event-edit-stale',
+      'The Project session changed before the Sustain Pedal edit could be committed.',
+    )
+  }
   return Object.freeze({
     session: activeState.session,
     snapshot: activeState.session.getSnapshot(),
@@ -229,7 +239,7 @@ function requireEditableEventTarget(
   dependencies: ProjectMidiSustainPedalCoordinatorDependencies,
   input: EditMidiSustainPedalEventsInput,
 ) {
-  const { session, snapshot } = requireReadyProject(dependencies)
+  const { session, snapshot } = requireReadyProject(dependencies, input.expectedSession)
   requireCurrentRevision(snapshot, input.baseRevision, 'edit', { clipId: input.clipId })
   const clip = requireClip(snapshot, input.clipId)
   const source = requireClipSource(snapshot, clip)
@@ -263,7 +273,7 @@ class ProjectMidiSustainPedalCoordinatorImpl implements ProjectMidiSustainPedalC
   }
 
   placeInClip(input: PlaceMidiSustainPedalEventInClipInput): PlacedMidiSustainPedalEventResult {
-    const { session, snapshot } = requireReadyProject(this.#dependencies)
+    const { session, snapshot } = requireReadyProject(this.#dependencies, input.expectedSession)
     requireCurrentRevision(snapshot, input.baseRevision, 'clip', { clipId: input.clipId })
     const clip = requireClip(snapshot, input.clipId)
     const source = requireClipSource(snapshot, clip)
@@ -294,7 +304,7 @@ class ProjectMidiSustainPedalCoordinatorImpl implements ProjectMidiSustainPedalC
   }
 
   placeOnTrack(input: PlaceMidiSustainPedalEventOnTrackInput): PlacedMidiSustainPedalEventResult {
-    const { session, snapshot } = requireReadyProject(this.#dependencies)
+    const { session, snapshot } = requireReadyProject(this.#dependencies, input.expectedSession)
     requireCurrentRevision(snapshot, input.baseRevision, 'track', { trackId: input.trackId })
 
     const track = snapshot.tracks.find((candidate) => candidate.id === input.trackId)

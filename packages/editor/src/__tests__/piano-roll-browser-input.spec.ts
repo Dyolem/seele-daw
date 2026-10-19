@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { EditorPointerInputAdapterObserver } from '#internal/browser/interaction/editor-pointer-input-adapter'
 import { parseMidiPitch, parseNoteId, parseTick } from '@seele-daw/project-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +10,7 @@ import {
   PianoRollBrowserError,
   createPianoRollDomNoteRenderer,
   createPianoRollPointerInputAdapter,
+  createEditorPointerInputAdapter,
   resolvePianoRollDomNoteHit,
   type PianoRollNoteScene,
   type PianoRollPointerInputAdapterObserver,
@@ -634,5 +636,42 @@ describe('Piano Roll Pointer Input Adapter', () => {
     )
     adapter.dispose()
     fixture.renderer.dispose()
+  })
+})
+
+describe('Editor Pointer coordinate space', () => {
+  it('keeps client coordinates across scroll and modifier updates', () => {
+    const surface = document.createElement('div')
+    const capture = installPointerCapture(surface)
+    const bounds = vi
+      .spyOn(surface, 'getBoundingClientRect')
+      .mockReturnValue({ left: 100, top: 50 } as DOMRect)
+    const onInput = vi.fn<EditorPointerInputAdapterObserver<never>['onInput']>()
+    const adapter = createEditorPointerInputAdapter({
+      surface,
+      positionSpace: 'client',
+      resolveHit: () => null,
+      observer: { onInput, onError: vi.fn<EditorPointerInputAdapterObserver<never>['onError']>() },
+    })
+    dispatchPointer(surface, 'pointerdown', { clientX: 150, clientY: 70 })
+    bounds.mockReturnValue({ left: -100, top: 50 } as DOMRect)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true }))
+    expect(onInput).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        phase: 'update',
+        position: { xCssPixel: 150, yCssPixel: 70 },
+        originPosition: { xCssPixel: 150, yCssPixel: 70 },
+      }),
+    )
+    dispatchPointer(surface, 'pointerup', { clientX: 150, clientY: 70 })
+    expect(onInput).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        phase: 'end',
+        hasExceededDragThreshold: false,
+        position: { xCssPixel: 150, yCssPixel: 70 },
+      }),
+    )
+    expect(capture.releasePointerCapture).toHaveBeenCalledOnce()
+    adapter.dispose()
   })
 })

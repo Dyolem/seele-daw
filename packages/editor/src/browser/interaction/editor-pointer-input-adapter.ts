@@ -39,6 +39,8 @@ export type EditorBrowserHitResolver<Hit extends object> = (
 
 interface CreateEditorPointerInputAdapterBaseInput<Hit extends object> {
   readonly dragThresholdCssPixel?: number
+  /** Client coordinates keep a stationary Pointer stable while its Surface scrolls. */
+  readonly positionSpace?: 'surface' | 'client'
   readonly observer: EditorPointerInputAdapterObserver<Hit>
   readonly surface: HTMLElement
 }
@@ -129,6 +131,7 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
   readonly #observer: EditorPointerInputAdapterObserver<Hit>
   readonly #resolveHit: EditorBrowserHitResolver<Hit>
   readonly #surface: HTMLElement
+  readonly #positionSpace: 'surface' | 'client'
   readonly #window: Window | null
   #activePointer: ActivePointer<Hit> | null = null
   #disposed = false
@@ -141,6 +144,7 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     this.#observer = input.observer
     this.#resolveHit = input.resolveHit
     this.#surface = input.surface
+    this.#positionSpace = input.positionSpace ?? 'surface'
     this.#window = input.surface.ownerDocument.defaultView
 
     input.surface.addEventListener('pointerdown', this.#handlePointerDown)
@@ -313,6 +317,8 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
 
   #readPosition(event: PointerEvent): EditorCssPoint | null {
     try {
+      if (this.#positionSpace === 'client')
+        return Object.freeze({ xCssPixel: event.clientX, yCssPixel: event.clientY })
       return createPoint(event, this.#surface)
     } catch (cause) {
       this.cancel()

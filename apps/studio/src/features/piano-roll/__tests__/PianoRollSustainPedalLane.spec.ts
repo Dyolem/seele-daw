@@ -17,6 +17,7 @@ import {
   parseProjectId,
   parseTick,
   type ModelRevision,
+  type ProjectSession,
 } from '@seele-daw/project-core'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
@@ -133,9 +134,9 @@ function createClipContext(): PianoRollClipContext {
 }
 
 function createUnavailableCoordinator(): ProjectMidiSustainPedalCoordinator {
-  const unavailable = (): never => {
+  const unavailable = vi.fn<() => never>((): never => {
     throw new Error('Unexpected Sustain Pedal Project command in presentation-only test')
-  }
+  })
   return Object.freeze({
     moveEvents: unavailable,
     placeInClip: unavailable,
@@ -145,9 +146,17 @@ function createUnavailableCoordinator(): ProjectMidiSustainPedalCoordinator {
   })
 }
 
-function mountLane() {
+function mountLane(coordinator = createUnavailableCoordinator()) {
+  const session: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'> = {
+    modelRevision: 0 as ModelRevision,
+    subscribe: () => () => {},
+    query: () => {
+      throw new Error('Unexpected query')
+    },
+  }
   const wrapper = mount(PianoRollSustainPedalLane, {
     props: {
+      session,
       clipContext: createClipContext(),
       grid: createPianoRollGrid({
         barSpanTick: parsePositiveTick(960),
@@ -165,12 +174,12 @@ function mountLane() {
     global: {
       provide: {
         [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
-          projectMidiSustainPedal: createUnavailableCoordinator(),
+          projectMidiSustainPedal: coordinator,
         }),
       },
     },
   })
-  return wrapper
+  return { wrapper, coordinator }
 }
 
 beforeEach(() => {
@@ -190,7 +199,7 @@ afterEach(() => {
 describe('PianoRollSustainPedalLane', () => {
   it('releases input and the session immediately when viewport observation fails', async () => {
     const probe = installPianoRollResizeObserver('.piano-roll-sustain-pedal-lane')
-    const wrapper = mountLane()
+    const { wrapper, coordinator } = mountLane()
     await nextTick()
     const surface = wrapper.get('[role="group"]').element
     const observer = probe.forElement(surface)
@@ -202,7 +211,7 @@ describe('PianoRollSustainPedalLane', () => {
     dispatchPointer(surface, 'pointerup', 250, 64)
     observer.deliver()
     await nextTick()
-    expect(wrapper.emitted('placement')).toBeUndefined()
+    expect(coordinator.placeInClip).not.toHaveBeenCalled()
     expect(wrapper.emitted('requestFocus')).toBeUndefined()
     expect(wrapper.emitted('failure')).toHaveLength(1)
     wrapper.unmount()
@@ -211,7 +220,7 @@ describe('PianoRollSustainPedalLane', () => {
 
   it('cancels capture after geometry changes and ignores callbacks after unmount', async () => {
     const probe = installPianoRollResizeObserver()
-    const wrapper = mountLane()
+    const { wrapper, coordinator } = mountLane()
     await nextTick()
     const surface = wrapper.get('[role="group"]').element
     const observer = probe.forElement(surface)
@@ -221,17 +230,18 @@ describe('PianoRollSustainPedalLane', () => {
     observer.deliver()
     expect(surface.hasPointerCapture(1)).toBe(false)
     dispatchPointer(surface, 'pointerup', 250, 64)
-    expect(wrapper.emitted('placement')).toBeUndefined()
+    expect(coordinator.placeInClip).not.toHaveBeenCalled()
     wrapper.unmount()
     observer.deliver()
     dispatchPointer(surface, 'pointerdown', 250, 64)
     dispatchPointer(surface, 'pointerup', 250, 64)
-    expect(wrapper.emitted('placement')).toBeUndefined()
+    expect(coordinator.placeInClip).not.toHaveBeenCalled()
     expect(observer.disconnect).toHaveBeenCalledTimes(1)
   })
 
   it('renders raw CC64 state and resolves one blank Pencil click through Snap', async () => {
-    const wrapper = mountLane()
+    const { wrapper, coordinator } = mountLane()
+    const placeInClip = coordinator.placeInClip
     await nextTick()
     const surface = wrapper.get('[role="group"]')
 
@@ -246,22 +256,20 @@ describe('PianoRollSustainPedalLane', () => {
     dispatchPointer(surface.element, 'pointerup', 250, 64)
 
     expect(wrapper.emitted('requestFocus')).toHaveLength(1)
-    expect(wrapper.emitted('placement')).toEqual([
-      [
-        {
-          activeClipId: 'sustain-pedal-lane-clip',
-          channel: 0,
-          modelRevision: 0,
-          timelineTick: 240,
-          value: 64,
-        },
-      ],
-    ])
+    expect(placeInClip).toHaveBeenCalledExactlyOnceWith({
+      expectedSession: wrapper.props('session'),
+      clipId: 'sustain-pedal-lane-clip',
+      channel: 0,
+      baseRevision: 0,
+      clipTick: 240,
+      value: 64,
+    })
+    expect(wrapper.emitted('failure')).toHaveLength(1)
     wrapper.unmount()
   })
 
   it('does not turn an existing event marker into a second placement', async () => {
-    const wrapper = mountLane()
+    const { wrapper, coordinator } = mountLane()
     await nextTick()
     const marker = wrapper.get(
       '[data-piano-roll-sustain-pedal-event-id="sustain-pedal-lane-event"]',
@@ -270,7 +278,7 @@ describe('PianoRollSustainPedalLane', () => {
     dispatchPointer(marker.element, 'pointerdown', 960, 128)
     dispatchPointer(marker.element, 'pointerup', 960, 128)
 
-    expect(wrapper.emitted('placement')).toBeUndefined()
+    expect(coordinator.placeInClip).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 })

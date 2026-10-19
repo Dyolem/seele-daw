@@ -934,6 +934,18 @@ describe('ProjectMidiNoteCoordinator', () => {
       clipId: previous.clipId,
     }
     expect(() =>
+      coordinator.placeMidiNoteOnTrack({
+        expectedSession: previous.session,
+        baseRevision: previous.session.modelRevision,
+        activeClipId: previous.clipId,
+        trackId: previous.session.getSnapshot().tracks[0]!.id,
+        barSpanTick: parseTick(3840),
+        noteDurationTick: parseTick(240),
+        pitch: parseMidiPitch(60),
+        projectStartTick: parseTick(120),
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'track-note-placement-stale' }))
+    expect(() =>
       coordinator.addMidiNote({
         ...target,
         clipStartTick: parseTick(120),

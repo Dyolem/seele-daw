@@ -1,3 +1,4 @@
+import { resolveInteractionModifiers } from '#internal/common/interaction/interaction-modifiers'
 import type { MidiSustainPedalEventId } from '@seele-daw/project-core'
 
 import {
@@ -52,8 +53,8 @@ function createSelectionResolution(
 function requestsSelectionToggle(
   pointerInput: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
 ): boolean {
-  const modifiers = pointerInput.originModifiers
-  return modifiers.control || modifiers.meta || modifiers.shift
+  return resolveInteractionModifiers(pointerInput.originModifiers, pointerInput.modifiers)
+    .toggleSelection
 }
 
 /** Removes stale IDs and duplicates while preserving the current selection order. */

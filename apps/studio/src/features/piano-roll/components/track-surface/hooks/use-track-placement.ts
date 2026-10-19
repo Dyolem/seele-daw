@@ -1,30 +1,28 @@
-import { computed, shallowRef, type ShallowRef, type StyleValue } from 'vue'
+import { useTrackPlacementPreview } from './use-track-placement-preview'
+import { TrackPlacementSession } from '@/features/piano-roll/components/track-surface/interaction/track-placement-session'
+import { resolveTrackPlacement } from '@/features/piano-roll/components/track-surface/interaction/track-placement-operation'
+import type {
+  TrackPlacementConfiguration,
+  TrackPlacementIntent,
+  TrackPlacementPreview,
+} from '@/features/piano-roll/components/track-surface/types/track-placement'
+import { useStudioInteractionTarget } from '@/workbench/actions/vue/studio-editor-action-context'
+import {
+  STUDIO_ACTION_COMPLETED,
+  STUDIO_ACTION_NOT_APPLIED,
+} from '@/workbench/actions/studio-action'
+import { computed, shallowRef, watch, type ShallowRef } from 'vue'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
-  PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION,
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
-  TIMELINE_GRID_SNAP_MODE,
   createPianoRollPointerInputAdapter,
-  pianoRollCssPixelToMidiPitch,
-  pianoRollCssPixelToTimelineTickPosition,
-  pianoRollMidiPitchToCssPixel,
-  pianoRollTimelineTickToCssPixel,
   resolvePianoRollDomNoteHit,
-  resolvePianoRollTrackNotePlacement,
-  resolveTimelineGridTick,
   type PianoRollGrid,
   type PianoRollPointerInput,
   type PianoRollPointerInputAdapter,
   type PianoRollTimelineViewport,
-  type PianoRollTrackNotePlacement,
 } from '@seele-daw/editor'
-import {
-  parseTick,
-  type ClipId,
-  type MidiPitch,
-  type NoteId,
-  type Tick,
-} from '@seele-daw/project-core'
+import { type ClipId, type Tick, type ProjectSession } from '@seele-daw/project-core'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
@@ -37,142 +35,72 @@ export function useTrackPlacement({
   surfaceElement,
   getViewport,
   getPresentation,
+  getSession,
   getTimelineEndTick,
   getBarSpanTick,
   createDisplayGrid,
   activateClip,
-  activateNote,
+  acceptPlacedClip,
   failureMessage,
 }: {
   readonly canvasHost: Readonly<ShallowRef<HTMLElement | null>>
   readonly surfaceElement: Readonly<ShallowRef<HTMLElement | null>>
   readonly getViewport: () => PianoRollTimelineViewport | null
+  readonly getSession: () => Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
   readonly getTimelineEndTick: () => Tick
   readonly getBarSpanTick: () => Tick
   readonly createDisplayGrid: () => PianoRollGrid
+  readonly acceptPlacedClip: (clipId: ClipId) => void
   readonly activateClip: (clipId: ClipId) => void
-  readonly activateNote: (noteId: NoteId) => void
   readonly failureMessage: ShallowRef<string | null>
 }) {
-  interface TrackPlacementPreview {
-    readonly pitch: MidiPitch
-    readonly placement: PianoRollTrackNotePlacement
-  }
-
   const { projectMidiNotes } = useProjectMidiNotes()
   const pianoRollPreferences = usePianoRollPreferencesStore()
   const toasts = useUiToastStore()
   const placementPreview = shallowRef<TrackPlacementPreview | null>(null)
   let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
   let disposed = false
-  const previewNoteStyle = computed((): StyleValue | null => {
-    const currentViewport = getViewport()
-    const preview = placementPreview.value
-    if (currentViewport === null || preview === null) return null
+  let beginning = false
+  let captureBounds: DOMRect | null = null
+  const state = shallowRef<TrackPlacementSession['state']>({
+    awaitingAuthority: false,
+    interactionId: null,
+    pointerId: null,
+    preview: null,
+  })
+  let projectedRevision = getPresentation().readModel.modelRevision
+  const session = new TrackPlacementSession((next) => {
+    const previous = state.value
+    state.value = next
+    placementPreview.value = next.preview
+    if (next.pointerId === null) {
+      captureBounds = null
+      if (!beginning && previous.pointerId !== null) pointerInputAdapter?.cancel()
+    }
+  })
+  const { previewNoteStyle, previewClipStyle, previewMessage } = useTrackPlacementPreview({
+    placementPreview,
+    getViewport,
+    getPresentation,
+    getTimelineEndTick,
+    getBarSpanTick,
+  })
 
-    const rowHeight =
-      currentViewport.heightCssPixel /
-      (currentViewport.maximumPitch - currentViewport.minimumPitch + 1)
-    const inset = Math.min(1, rowHeight / 5)
-    const x = pianoRollTimelineTickToCssPixel(currentViewport, preview.placement.projectStartTick)
-    const endX = pianoRollTimelineTickToCssPixel(
-      currentViewport,
-      parseTick(Math.min(currentViewport.visibleEndTick, preview.placement.projectEndTick)),
-    )
+  function configuration(): TrackPlacementConfiguration | null {
+    const viewport = getViewport()
+    if (viewport === null) return null
     return {
-      blockSize: `${Math.max(1, rowHeight - inset * 2)}px`,
-      inlineSize: `${Math.max(1, endX - x)}px`,
-      transform: `translate3d(${x}px, ${
-        pianoRollMidiPitchToCssPixel(currentViewport, preview.pitch) + inset
-      }px, 0)`,
+      session: getSession(),
+      readModel: getPresentation().readModel,
+      viewport,
+      grid: createDisplayGrid(),
+      tool: pianoRollPreferences.activeTool,
+      snapEnabled: pianoRollPreferences.snapEnabled,
+      barSpanTick: getBarSpanTick(),
+      timelineEndTick: getTimelineEndTick(),
+      noteDurationTick: pianoRollPreferences.subdivisionSpanTick,
     }
-  })
-
-  const previewClipStyle = computed((): StyleValue | null => {
-    const preview = placementPreview.value?.placement
-    if (preview === undefined || preview.status !== PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.READY) {
-      return null
-    }
-
-    let startTick: Tick
-    let endTick: Tick
-    if (preview.action === PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.CREATE_CLIP) {
-      startTick = preview.clipStartTick
-      endTick = parseTick(
-        Math.min(getTimelineEndTick(), preview.clipStartTick + preview.clipSpanTick),
-      )
-    } else if (preview.action === PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.EXTEND_CLIP) {
-      const target = getPresentation().readModel.clips.find(
-        ({ clip }) => clip.clipId === preview.clipId,
-      )
-      if (target === undefined) return null
-      startTick = target.clip.endTick
-      endTick = parseTick(Math.min(getTimelineEndTick(), preview.projectEndTick))
-    } else {
-      return null
-    }
-
-    return {
-      inlineSize: `${((endTick - startTick) / getTimelineEndTick()) * 100}%`,
-      insetInlineStart: `${(startTick / getTimelineEndTick()) * 100}%`,
-    }
-  })
-
-  const previewMessage = computed(() => {
-    const placement = placementPreview.value?.placement
-    if (placement === undefined) return null
-    if (placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED) {
-      return placement.message
-    }
-    switch (placement.action) {
-      case PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.ADD_TO_CLIP:
-        return 'Add note to the Active Clip'
-      case PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.CREATE_CLIP:
-        return `Create a Clip at bar ${Math.floor(placement.clipStartTick / getBarSpanTick()) + 1}`
-      case PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.EXTEND_CLIP:
-        return 'Extend the Clip and add the note in one edit'
-    }
-    return null
-  })
-
-  function clampTrackStartTick(candidate: Tick): Tick {
-    const lastInteriorTick = parseTick(getTimelineEndTick() - 1)
-    if (candidate <= lastInteriorTick) return candidate
-    if (!pianoRollPreferences.snapEnabled) return lastInteriorTick
-    const subdivision = pianoRollPreferences.subdivisionSpanTick
-    return parseTick(Math.floor(lastInteriorTick / subdivision) * subdivision)
-  }
-
-  function resolvePlacementAt(xCssPixel: number, yCssPixel: number): TrackPlacementPreview | null {
-    const currentViewport = getViewport()
-    if (currentViewport === null) return null
-    if (
-      xCssPixel < 0 ||
-      xCssPixel > currentViewport.widthCssPixel ||
-      yCssPixel < 0 ||
-      yCssPixel >= currentViewport.heightCssPixel
-    ) {
-      return null
-    }
-
-    const projectStartTick = clampTrackStartTick(
-      resolveTimelineGridTick({
-        grid: createDisplayGrid(),
-        snapEnabled: pianoRollPreferences.snapEnabled,
-        snapMode: TIMELINE_GRID_SNAP_MODE.FLOOR,
-        tickPosition: pianoRollCssPixelToTimelineTickPosition(currentViewport, xCssPixel),
-      }),
-    )
-    return Object.freeze({
-      pitch: pianoRollCssPixelToMidiPitch(currentViewport, yCssPixel),
-      placement: resolvePianoRollTrackNotePlacement({
-        barSpanTick: getBarSpanTick(),
-        noteDurationTick: pianoRollPreferences.subdivisionSpanTick,
-        projectStartTick,
-        readModel: getPresentation().readModel,
-      }),
-    })
   }
 
   function localPoint(event: PointerEvent): {
@@ -189,6 +117,7 @@ export function useTrackPlacement({
   }
 
   function handleHover(event: PointerEvent): void {
+    if (disposed || state.value.interactionId !== null) return
     if (pianoRollPreferences.activeTool !== PIANO_ROLL_TOOL.PENCIL) {
       placementPreview.value = null
       return
@@ -199,72 +128,152 @@ export function useTrackPlacement({
       placementPreview.value = null
       return
     }
-    placementPreview.value = resolvePlacementAt(point.xCssPixel, point.yCssPixel)
+    const current = configuration()
+    placementPreview.value = current === null ? null : resolveTrackPlacement(current, point)
   }
 
+  function reportFailure(cause: unknown, committed = false): void {
+    invalidate()
+    const message = describeCause(cause, 'The Track Piano Roll interaction could not complete.')
+    failureMessage.value = message
+    if (committed) toasts.warning('MIDI note was placed but could not be displayed', message)
+    else toasts.danger('MIDI note could not be placed', message)
+  }
+
+  function complete(intent: TrackPlacementIntent): void {
+    if (!session.claimCompletion(intent.interactionId)) return
+    let committed = false
+    try {
+      if (intent.target.session !== getSession()) return
+      if (intent.type === 'activate-clip') {
+        activateClip(intent.clipId)
+        return
+      }
+      const { preview, target } = intent
+      if (preview.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED) {
+        failureMessage.value = preview.placement.message
+        toasts.warning('MIDI note placement needs attention', preview.placement.message)
+        return
+      }
+      const result = projectMidiNotes.placeMidiNoteOnTrack({
+        expectedSession: target.session,
+        activeClipId: target.readModel.activeClipId,
+        barSpanTick: target.barSpanTick,
+        baseRevision: target.readModel.modelRevision,
+        noteDurationTick: preview.placement.noteDurationTick,
+        pitch: preview.pitch,
+        projectStartTick: preview.placement.projectStartTick,
+        trackId: target.readModel.trackId,
+      })
+      committed = true
+      session.resolveCommit(intent.interactionId, result.commit.modelRevision, projectedRevision)
+      acceptPlacedClip(result.clipId)
+      failureMessage.value = null
+    } catch (cause) {
+      reportFailure(cause, committed)
+    } finally {
+      session.finish(intent.interactionId)
+    }
+  }
+
+  function stableMapping(): boolean {
+    if (captureBounds === null) return true
+    const current = canvasHost.value?.getBoundingClientRect()
+    if (
+      current?.left === captureBounds.left &&
+      current.top === captureBounds.top &&
+      current.width === captureBounds.width &&
+      current.height === captureBounds.height
+    )
+      return true
+    invalidate()
+    return false
+  }
+  function checkMapping(): void {
+    if (disposed) return
+    try {
+      stableMapping()
+    } catch (cause) {
+      reportFailure(cause)
+    }
+  }
   function handlePointerInput(input: PianoRollPointerInput): void {
     if (disposed) return
     if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
       surfaceElement.value?.focus({ preventScroll: true })
+      const current = configuration()
+      if (current === null) {
+        pointerInputAdapter?.cancel()
+        return
+      }
+      const bounds = canvasHost.value?.getBoundingClientRect() ?? null
+      beginning = true
+      try {
+        session.handlePointerInput(input, current)
+      } finally {
+        beginning = false
+      }
+      if (session.state.pointerId !== null) captureBounds = bounds
+      else pointerInputAdapter?.cancel()
       return
     }
-    if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL) {
-      placementPreview.value = null
-      return
-    }
-    if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.END || input.hasExceededDragThreshold) {
-      return
-    }
-
-    if (input.hit !== null) {
-      activateNote(input.hit.noteId)
-      placementPreview.value = null
-      return
-    }
-    if (pianoRollPreferences.activeTool !== PIANO_ROLL_TOOL.PENCIL) return
-
-    const preview = resolvePlacementAt(
-      input.originPosition.xCssPixel,
-      input.originPosition.yCssPixel,
-    )
-    placementPreview.value = preview
-    if (preview === null) return
-    if (preview.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED) {
-      failureMessage.value = preview.placement.message
-      toasts.warning('MIDI note placement needs attention', preview.placement.message)
-      return
-    }
-
-    try {
-      const result = projectMidiNotes.placeMidiNoteOnTrack({
-        activeClipId: getPresentation().readModel.activeClipId,
-        barSpanTick: getBarSpanTick(),
-        baseRevision: getPresentation().readModel.modelRevision,
-        noteDurationTick: preview.placement.noteDurationTick,
-        pitch: preview.pitch,
-        projectStartTick: preview.placement.projectStartTick,
-        trackId: getPresentation().trackId,
-      })
-      activateClip(result.clipId)
-      placementPreview.value = null
-      failureMessage.value = null
-    } catch (cause) {
-      const message = describeCause(
-        cause,
-        'The Project rejected the Track MIDI Note placement. Please try again.',
-      )
-      failureMessage.value = message
-      toasts.danger('MIDI note could not be placed', message)
-    }
+    if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL && !stableMapping()) return
+    const intent = session.handlePointerInput(input)
+    if (intent !== null) complete(intent)
   }
 
   function clearPreview(): void {
-    placementPreview.value = null
+    if (state.value.interactionId === null) placementPreview.value = null
   }
   function invalidate(): void {
-    pointerInputAdapter?.cancel()
-    clearPreview()
+    try {
+      session.cancel()
+    } finally {
+      pointerInputAdapter?.cancel()
+      captureBounds = null
+      placementPreview.value = null
+    }
   }
+  const stopTarget = watch(
+    [
+      getSession,
+      () => getPresentation().projectId,
+      () => getPresentation().trackId,
+      getViewport,
+      getTimelineEndTick,
+      getBarSpanTick,
+    ],
+    invalidate,
+    { flush: 'sync' },
+  )
+  const stopClip = watch(
+    () => getPresentation().readModel.activeClipId,
+    () => {
+      if (state.value.pointerId !== null) invalidate()
+      else clearPreview()
+    },
+    { flush: 'sync' },
+  )
+  const stopProjection = watch(
+    () => getPresentation().readModel.modelRevision,
+    (revision) => {
+      projectedRevision = revision
+      try {
+        session.notifyAuthorityRevision(revision)
+      } catch (cause) {
+        reportFailure(cause, state.value.awaitingAuthority)
+      }
+    },
+    { flush: 'post' },
+  )
+  useStudioInteractionTarget({
+    isActive: () => state.value.pointerId !== null,
+    cancel: () => {
+      if (state.value.pointerId === null) return STUDIO_ACTION_NOT_APPLIED
+      invalidate()
+      return STUDIO_ACTION_COMPLETED
+    },
+  })
 
   return {
     placementPreview: computed(() => placementPreview.value),
@@ -280,21 +289,27 @@ export function useTrackPlacement({
       pointerInputAdapter = createPianoRollPointerInputAdapter({
         observer: {
           onError: ({ cause }) => {
-            if (disposed) return
-            failureMessage.value = describeCause(
-              cause,
-              'The Track Piano Roll pointer input failed.',
-            )
+            if (!disposed) reportFailure(cause)
           },
           onInput: handlePointerInput,
         },
         surface: host,
       })
+      window.addEventListener('scroll', checkMapping, true)
+      window.addEventListener('resize', checkMapping)
     },
     dispose() {
+      if (disposed) return
+      stopTarget()
+      stopClip()
+      stopProjection()
+      window.removeEventListener('scroll', checkMapping, true)
+      window.removeEventListener('resize', checkMapping)
+      invalidate()
       disposed = true
       pointerInputAdapter?.dispose()
       pointerInputAdapter = null
+      session.dispose()
       clearPreview()
     },
   }

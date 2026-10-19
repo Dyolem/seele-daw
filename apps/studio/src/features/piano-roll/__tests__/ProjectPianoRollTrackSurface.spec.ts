@@ -20,7 +20,7 @@ import {
 } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { nextTick, shallowRef } from 'vue'
+import { markRaw, nextTick, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue'
@@ -191,6 +191,7 @@ function createSurfaceFixture() {
     tempoEventId: parseTempoEventId('track-surface-tempo'),
     timeSignatureEventId: parseTimeSignatureEventId('track-surface-meter'),
   })
+  markRaw(session)
   const readyState = createReadyState(session)
   const track = createProjectTrackCoordinator({
     activeProject: { state: readyState },
@@ -215,7 +216,11 @@ function createSurfaceFixture() {
 
   const projectMidiNotes = createProjectMidiNoteCoordinator({
     activeProject: { state: readyState },
-    createUniqueId: () => 'track-surface-note',
+    createUniqueId: createIdentitySource(
+      'track-surface-note',
+      'track-surface-new-clip',
+      'track-surface-new-source',
+    ),
   })
   const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
     projectMidiNotes,
@@ -805,6 +810,68 @@ describe('ProjectPianoRollTrackSurface', () => {
       session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
     ).toEqual([])
 
+    wrapper.unmount()
+  })
+  it('freezes Pencil settings while pressed and makes the placement one undoable edit', async () => {
+    const { wrapper, session, presentation } = createSurfaceFixture()
+    await nextTick()
+    await wrapper.get('button[aria-label="Pencil tool"]').trigger('click')
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+    await wrapper.get('button[aria-label="Cursor tool"]').trigger('click')
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+    expect(session.modelRevision).toBe(presentation.readModel.modelRevision + 1)
+    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(1)
+    session.undo()
+    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  it.each(['Escape', 'blur', 'scroll', 'revision'] as const)(
+    'cancels Track placement on %s and rejects the late Pointer Up',
+    async (reason) => {
+      const { wrapper, session, keyboard } = createSurfaceFixture()
+      await nextTick()
+      await wrapper.get('button[aria-label="Pencil tool"]').trigger('click')
+      const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+      dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+      if (reason === 'Escape') keyboard.bindingRegistry.dispatch('Escape')
+      if (reason === 'blur') window.dispatchEvent(new Event('blur'))
+      if (reason === 'scroll') {
+        vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({
+          left: -30,
+          top: 0,
+          width: 12000,
+          height: 250,
+        } as DOMRect)
+        window.dispatchEvent(new Event('scroll'))
+      }
+      if (reason === 'revision') session.undo()
+      const revision = session.modelRevision
+      dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+      expect(session.modelRevision).toBe(revision)
+      expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
+      expect(host.hasPointerCapture(1)).toBe(false)
+      wrapper.unmount()
+    },
+  )
+  it('activates a newly created Clip before the committed projection arrives', async () => {
+    const { wrapper, session, selection } = createSurfaceFixture()
+    await nextTick()
+    await wrapper.get('button[aria-label="Pencil tool"]').trigger('click')
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    const before = session.getSnapshot()
+    dispatchPointer(host, 'pointerdown', { clientX: 170, clientY: 125 })
+    dispatchPointer(host, 'pointerup', { clientX: 170, clientY: 125 })
+    const created = session
+      .getSnapshot()
+      .clips.find(({ id }) => !before.clips.some((clip) => clip.id === id))
+    expect(created).toBeDefined()
+    expect(selection.selectedClipId).toBe(created?.id)
+    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(1)
+    session.undo()
+    expect(session.getSnapshot().clips).toEqual(before.clips)
+    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
     wrapper.unmount()
   })
 })

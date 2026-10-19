@@ -1,3 +1,4 @@
+import { INTERACTION_MODIFIER_RULES } from '@seele-daw/editor'
 import type { StudioActionCategory, StudioActionId } from '@/workbench/actions/studio-action'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/keymap/studio-default-keymap'
@@ -90,16 +91,9 @@ export const STUDIO_KEYBOARD_CONTROL_HELP = Object.freeze([
     keys: 'Enter · Escape',
     description: 'Commit or cancel a field draft. Cancelling a draft keeps the editor selection.',
   },
-  {
-    label: 'Pointer selection',
-    keys: 'Shift · Ctrl / Cmd',
-    description:
-      'Modify Note or CC64 selection while clicking. These modifiers belong to the pointer gesture.',
-  },
-  {
-    label: 'Temporary snap bypass',
-    keys: 'Alt / Option',
-    description:
-      'Hold while moving or resizing Notes, or transforming CC64 time, to bypass grid snapping. Pencil placement uses the Snap setting.',
-  },
+  ...Object.values(INTERACTION_MODIFIER_RULES).map(({ label, keys, description }) => ({
+    label,
+    keys,
+    description,
+  })),
 ])

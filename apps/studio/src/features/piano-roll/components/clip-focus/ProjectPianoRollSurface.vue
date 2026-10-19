@@ -104,7 +104,6 @@ const {
   handleSustainPedalChannelChange,
   handleSustainPedalFailure,
   handleSustainPedalCompleted,
-  handleSustainPedalPlacement,
 } = useClipSustainPedal(props, interactionFailureMessage)
 const barLabels = computed(() => {
   const barCount = Math.max(
@@ -231,6 +230,7 @@ onBeforeUnmount(dispose)
           <span>0</span>
         </div>
         <PianoRollSustainPedalLane
+          :session="props.session"
           ref="sustainPedalLane"
           :clip-context="props.presentation.context"
           :grid="displayGrid"
@@ -242,7 +242,6 @@ onBeforeUnmount(dispose)
           :visible-start-tick="ZERO_TICK"
           @completed="handleSustainPedalCompleted"
           @failure="handleSustainPedalFailure"
-          @placement="handleSustainPedalPlacement"
           @request-focus="focusSustainPedalLane"
         />
 

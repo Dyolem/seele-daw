@@ -213,6 +213,21 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       },
     },
   })
+  const ruler = wrapper.get('.project-workbench__ruler-locate-surface').element
+  let captured: number | null = null
+  Object.defineProperties(ruler, {
+    setPointerCapture: {
+      value: (id: number) => {
+        captured = id
+      },
+    },
+    hasPointerCapture: { value: (id: number) => captured === id },
+    releasePointerCapture: {
+      value: () => {
+        captured = null
+      },
+    },
+  })
   mountedWrappers.push(wrapper)
 
   return {
@@ -1314,4 +1329,68 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(addEmptyMidiClip).not.toHaveBeenCalled()
     expect(wrapper.emitted('openMidiClip')).toHaveLength(2)
   })
+  it('ignores a queued edge-scroll frame after cancel and a new Locate begins', async () => {
+    const frames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const fixture = mountArrangement()
+    const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
+      .element as HTMLElement
+    Object.defineProperties(viewport, {
+      clientWidth: { configurable: true, value: 400 },
+      scrollWidth: { configurable: true, value: 1600 },
+    })
+    vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      right: 500,
+      width: 400,
+    } as DOMRect)
+    const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface').element
+    await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 490, pointerId: 10 })
+    const oldFrame = frames[0]
+    if (oldFrame === undefined) throw new Error('Expected edge-scroll frame')
+    await dispatchPointerEvent(ruler, 'pointercancel', { pointerId: 10 })
+    await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 490, pointerId: 10 })
+    const nextFrame = frames[1]
+    if (nextFrame === undefined) throw new Error('Expected a new frame')
+    oldFrame(16)
+    expect(viewport.scrollLeft).toBe(0)
+    nextFrame(32)
+    expect(viewport.scrollLeft).toBeGreaterThan(0)
+    const after = viewport.scrollLeft
+    fixture.wrapper.unmount()
+    nextFrame(48)
+    expect(viewport.scrollLeft).toBe(after)
+    expect(fixture.cancelTimelineLocate).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['blur', 'project', 'scale', 'geometry'] as const)(
+    'cancels Locate on %s without applying a late release',
+    async (reason) => {
+      const fixture = mountArrangement()
+      const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface').element
+      await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 100, pointerId: 10 })
+      if (reason === 'blur') window.dispatchEvent(new Event('blur'))
+      if (reason === 'project') await fixture.wrapper.setProps({ projectId: 'replacement-project' })
+      if (reason === 'scale') await fixture.wrapper.setProps({ timelineEndTick: parseTick(10000) })
+      if (reason === 'geometry') {
+        const viewport = fixture.wrapper.get(
+          '.project-workbench__arrangement-scroll-viewport',
+        ).element
+        vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue({
+          left: 0,
+          right: 500,
+          width: 500,
+        } as DOMRect)
+        window.dispatchEvent(new Event('resize'))
+      }
+      await dispatchPointerEvent(ruler, 'pointerup', { clientX: 500, pointerId: 10 })
+      expect(fixture.cancelTimelineLocate).toHaveBeenCalledOnce()
+      expect(fixture.commitTimelineLocate).not.toHaveBeenCalled()
+      expect((ruler as HTMLElement).hasPointerCapture(10)).toBe(false)
+    },
+  )
 })

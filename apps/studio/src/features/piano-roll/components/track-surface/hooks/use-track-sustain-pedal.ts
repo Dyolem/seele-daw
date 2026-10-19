@@ -1,11 +1,9 @@
 import { computed, type ShallowRef } from 'vue'
 import { createPianoRollTrackSustainPedalLaneReadModel } from '@seele-daw/editor'
-import type { PianoRollSustainPedalLanePlacement } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
 import { ProjectMidiSustainPedalError } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-error'
-import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 
 export function useTrackSustainPedal({
@@ -15,7 +13,6 @@ export function useTrackSustainPedal({
   readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
   readonly failureMessage: ShallowRef<string | null>
 }) {
-  const { projectMidiSustainPedal } = useProjectMidiSustainPedal()
   const pianoRollPreferences = usePianoRollPreferencesStore()
   const toasts = useUiToastStore()
   const sustainPedalLaneReadModel = computed(() =>
@@ -26,12 +23,16 @@ export function useTrackSustainPedal({
       trackId: getPresentation().trackId,
     }),
   )
-  function reportSustainPedalFailure(cause: unknown): void {
+  function reportSustainPedalFailure(cause: unknown, committed = false): void {
     const message = describeCause(
       cause,
       'The Sustain Pedal Lane could not complete the interaction.',
     )
     failureMessage.value = message
+    if (committed) {
+      toasts.warning('Sustain Pedal edit was committed but could not be displayed', message)
+      return
+    }
     if (
       cause instanceof ProjectMidiSustainPedalError &&
       ['target-clip-looped', 'timeline-tick-outside-clip', 'track-active-clip-required'].includes(
@@ -48,26 +49,9 @@ export function useTrackSustainPedal({
     failureMessage.value = null
   }
 
-  function handleSustainPedalPlacement(placement: PianoRollSustainPedalLanePlacement): void {
-    try {
-      projectMidiSustainPedal.placeOnTrack({
-        activeClipId: placement.activeClipId,
-        baseRevision: placement.modelRevision,
-        channel: placement.channel,
-        projectTick: placement.timelineTick,
-        trackId: getPresentation().trackId,
-        value: placement.value,
-      })
-      failureMessage.value = null
-    } catch (cause) {
-      reportSustainPedalFailure(cause)
-    }
-  }
-
   return {
     sustainPedalLaneReadModel,
     reportSustainPedalFailure,
     handleSustainPedalCompleted,
-    handleSustainPedalPlacement,
   }
 }

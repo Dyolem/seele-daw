@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, shallowRef, useTemplateRef } from 'vue'
 import { ContextMenuRoot } from 'reka-ui'
 import { createPianoRollGrid, PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS } from '@seele-daw/editor'
 import {
@@ -29,7 +29,7 @@ import PianoRollTrackToolbar from './PianoRollTrackToolbar.vue'
 interface ProjectPianoRollTrackSurfaceProps {
   readonly barSpanTick: Tick
   readonly presentation: ReadyProjectPianoRollTrackPresentation
-  readonly session: Pick<ProjectSession, 'query' | 'subscribe'>
+  readonly session: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly timelineEndTick: Tick
   readonly timeSignatureNumerator: number
 }
@@ -76,7 +76,7 @@ const {
 const {
   activeClipId,
   activateClip,
-  activateNote,
+  acceptPlacedClip,
   selectActiveClip,
   handleFocusIn,
   prepareContextMenu,
@@ -85,7 +85,6 @@ const {
   getPresentation: () => props.presentation,
   getSession: () => props.session,
   getSustainPedalChannel: () => pianoRollPreferences.sustainPedalChannel,
-  getNoteClipIdByNoteId: () => layout.noteClipIdByNoteId.value,
   suspendTimelineFollow: follow.suspendTimelineFollow,
 })
 const rendering = useTrackRendering({
@@ -99,6 +98,7 @@ const rendering = useTrackRendering({
   failureMessage,
 })
 const placement = useTrackPlacement({
+  getSession: () => props.session,
   canvasHost,
   surfaceElement,
   getViewport: () => layout.viewport.value,
@@ -107,20 +107,16 @@ const placement = useTrackPlacement({
   getBarSpanTick: () => props.barSpanTick,
   createDisplayGrid: () => displayGrid.value,
   activateClip,
-  activateNote,
+  acceptPlacedClip,
   failureMessage,
 })
 const { placementPreview, previewNoteStyle, previewClipStyle, previewMessage, handleHover } =
   placement
-const {
-  sustainPedalLaneReadModel,
-  reportSustainPedalFailure,
-  handleSustainPedalCompleted,
-  handleSustainPedalPlacement,
-} = useTrackSustainPedal({
-  getPresentation: () => props.presentation,
-  failureMessage,
-})
+const { sustainPedalLaneReadModel, reportSustainPedalFailure, handleSustainPedalCompleted } =
+  useTrackSustainPedal({
+    getPresentation: () => props.presentation,
+    failureMessage,
+  })
 const { controls: toolControls, invoke: invokeTool } = usePianoRollToolActions({
   isFocused: () => surfaceElement.value?.contains(document.activeElement) ?? false,
   getTool: () => pianoRollPreferences.activeTool,
@@ -138,20 +134,6 @@ function handleScroll(event: Event): void {
   placement.clearPreview()
   follow.handleScroll(event)
 }
-// Geometry and target changes cannot reuse a pending placement against a different projection.
-watch(layout.viewport, placement.invalidate, { flush: 'sync' })
-watch(
-  [
-    () => props.session,
-    () => props.presentation.projectId,
-    () => props.presentation.trackId,
-    () => props.presentation.readModel.activeClipId,
-    () => props.presentation.readModel.modelRevision,
-    () => pianoRollPreferences.activeTool,
-  ],
-  placement.invalidate,
-  { flush: 'pre' },
-)
 function dispose(): void {
   follow.dispose()
   layout.dispose()
@@ -283,6 +265,7 @@ onBeforeUnmount(dispose)
               ></div>
             </div>
             <PianoRollSustainPedalLane
+              :session="props.session"
               ref="sustainPedalLane"
               :clip-context="null"
               :grid="displayGrid"
@@ -294,7 +277,6 @@ onBeforeUnmount(dispose)
               :visible-start-tick="ZERO_TICK"
               @completed="handleSustainPedalCompleted"
               @failure="reportSustainPedalFailure"
-              @placement="handleSustainPedalPlacement"
             />
             <TrackPlayhead
               :bar-span-tick="props.barSpanTick"

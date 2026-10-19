@@ -1,3 +1,4 @@
+import { resolveInteractionModifiers } from '#internal/common/interaction/interaction-modifiers'
 import {
   MIDI_CONTROL_VALUE_MAX,
   MIDI_CONTROL_VALUE_MIN,
@@ -180,6 +181,7 @@ function resolveMoveDelta(input: ResolvePianoRollSustainPedalTransformPreviewInp
     input.pointerInput.position.xCssPixel - gesture.originPosition.xCssPixel,
     'horizontal',
   )
+  if (pointerDeltaCssPixel === 0) return parseTickDelta(0)
   const rawDelta =
     (pointerDeltaCssPixel / input.viewport.widthCssPixel) * input.viewport.visibleSpanTick
   const minimumDelta = Math.max(...gesture.moveEvents.map(({ event }) => -event.tick))
@@ -189,7 +191,11 @@ function resolveMoveDelta(input: ResolvePianoRollSustainPedalTransformPreviewInp
   const boundedRawDelta = clamp(rawDelta, minimumDelta, maximumDelta)
 
   let candidateDelta: number
-  if (!input.snapEnabled || input.pointerInput.modifiers.alt) {
+  if (
+    !input.snapEnabled ||
+    resolveInteractionModifiers(input.pointerInput.originModifiers, input.pointerInput.modifiers)
+      .bypassSnap
+  ) {
     candidateDelta = Math.round(boundedRawDelta)
   } else {
     const rawTargetTick = gesture.anchorEvent.timelineTick + boundedRawDelta

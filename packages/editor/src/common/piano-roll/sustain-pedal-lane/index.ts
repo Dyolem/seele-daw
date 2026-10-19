@@ -36,8 +36,7 @@ export type {
 export {
   PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT,
   PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS,
-  createPianoRollSustainPedalInteractionSession,
-} from './sustain-pedal-interaction-session'
+} from './sustain-pedal-interaction'
 export type {
   PianoRollSustainPedalInteractionConfiguration,
   PianoRollSustainPedalInteractionIntent,
@@ -50,8 +49,9 @@ export type {
   PianoRollSustainPedalPlaceEventIntent,
   PianoRollSustainPedalReplaceValueIntent,
   PianoRollSustainPedalResolveSelectionIntent,
-  ResolvePianoRollSustainPedalTransformCommitInput,
-} from './sustain-pedal-interaction-session'
+  PianoRollSustainPedalInteractionTarget,
+  ResolvePianoRollSustainPedalCommitInput,
+} from './sustain-pedal-interaction'
 export { resolvePianoRollSustainPedalPencilPlacement } from './sustain-pedal-pencil-interaction'
 export type {
   PianoRollSustainPedalPlacement,
@@ -67,3 +67,5 @@ export type {
   PianoRollTrackSustainPedalLaneClipReadModel,
   PianoRollTrackSustainPedalLaneReadModel,
 } from './sustain-pedal-lane-read-model'
+
+export { createPianoRollSustainPedalInteractionSession } from './sustain-pedal-interaction-session'

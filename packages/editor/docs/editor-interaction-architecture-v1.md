@@ -1,6 +1,6 @@
 # Editor Interaction V1：中立生命周期与领域 Operation
 
-> 状态：G1 已审核提交（`2b2d8c6`）；G2 Tempo 已审核通过，Timeline Locate 留在 G3 迁移。
+> 状态：G1 已审核提交（`2b2d8c6`）；G2 已提交（`c83d906`）；G3 CC64、Track Pencil 与 Timeline Locate 已审核通过（2026-10-19）。
 >
 > 日期：2026-09-30
 >
@@ -37,7 +37,7 @@ finished / cancelled`。领域 Operation 通过组合接入；事实编辑另行
 | Studio Surface / intent handler / MIDI Note Coordinator           | Surface 映射、当前能力验证、提交一次 Command、回告、Selection 与反馈               | 重新解释 Begin 的目标               |
 
 Note / CC64 的既有 Browser 工厂现在委托同一中立 Adapter；没有保留两份事件监听实现。
-CC64 的语义 Session 和 Track Pencil 的完成逻辑仍属于 G3，不能据此称其已完整迁移。
+G3 已将 CC64 的语义 Session、Track Pencil 和 Timeline Locate 接入相同 host，移除被替代的完成路径。
 
 公共内核直接用 class 构造，不新增 Interface → Implementation → Factory 链。Note 保留既有
 `createPianoRollInteractionSession` 公开门面以收敛 package root 的变更；它组合内部 host、
@@ -74,7 +74,7 @@ Preview 永远是可丢弃投影，不写 Project、Autosave、History 或 Playb
 
 ## Note、Tempo、Locate 转换对照
 
-| 阶段 / 事件            | Note（G1 已接入）                                      | Tempo（G2 已接入）                                                | Timeline Locate（G3 设计约束）                                          |
+| 阶段 / 事件            | Note（G1 已接入）                                      | Tempo（G2 已接入）                                                | Timeline Locate（G3 已接入）                                            |
 | ---------------------- | ------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Begin                  | 冻结 Clip、Note、选择、revision、Tool、Grid、映射      | 冻结 TempoEvent、Session、revision、原 Tick / BPM、整数 Tick 映射 | 保存 Playback Locate session、原播放 / Follow 状态和抓取锚点            |
 | 阈值以内               | pressing，End 解释为 Selection / Add                   | 点击选择事件；尚未决定编辑轴                                      | 可立即定位预览，无需制造“拖动后才能定位”的限制                          |
@@ -90,7 +90,7 @@ Edge Scroll 实现。G1 没有为了这些将来消费者加入无实际调用�
 
 ## 失效、异常与资源清理
 
-Note 与 Tempo 订阅 Project Commit，外部提交会取消活动或尚未领取的结果。Project 当前通过
+Note、Tempo、CC64 与 Track Pencil 订阅 Project Commit，外部提交会取消活动或尚未领取的结果。Project 当前通过
 microtask 发布通知，因此 Update / End 和提交领取还同步检查 `session.modelRevision`，不能只等通知。
 领取自己的执行结果后允许提交的同步或异步通知到达，不把它误判为外部编辑。
 
@@ -104,7 +104,7 @@ Cancel；Note observer 失败时清除内部状态，也向健康 observer 发�
 
 Note Surface 还处理 Selection 改变、Viewport 尺寸 /范围改变、Surface 位置改变和投影失败。
 等值 Viewport 和不改变该 Surface 映射的滚动不会取消。映射政策由各自 Surface 决定，不能推广为
-“所有 Editor 遇到 scroll / resize 都取消”；Locate Edge Scroll 必须在 G3 保留。
+“所有 Editor 遇到 scroll / resize 都取消”；Locate 接受连续的滚动偏移变化，仍会取消尺寸 / 范围的映射重建。
 
 ## G2：Tempo 的实际跨域消费者
 
@@ -128,6 +128,31 @@ Preview / Result；`TempoTrackDragSession` 拥有冻结的 Project 目标和 Com
   与每次 Update / End 都检查 Lane 映射；相等映射保留，实际映射变化取消。此政策不作用于
   G3 的 Locate Edge Scroll。
 
+## G3：CC64、Track Pencil 与 Timeline Locate
+
+- CC64 的契约、Operation 与 Session 分开。Operation 固定 Selection、Tool、Grid、Snap、Hit
+  与 Viewport；Session 固定 Clip / Track、Channel、Session 身份和 revision，并组合公共 host /
+  handoff。Selection 直接返回解析结果，Studio 不再在 End 查询当前选择。全部写入均经一次
+  completion 领取，删除旧 `resolveTransformCommit / skipTransformCommit` 无身份回告。
+- Track Pencil 的 [Session](../../../apps/studio/src/features/piano-roll/components/track-surface/interaction/track-placement-session.ts)
+  固定 Begin Read Model 和放置配置；其 Operation 同时处理 Note Hit 对应 Clip 激活。
+  Hover 使用实时设置，活动手势使用冻结候选。目标 / 映射变化取消，Tool / Grid / Snap 变化不会
+  把已开始的点击重新解释成其他操作。新增、扩展 Clip 与 Note 仍由原子 Coordinator 用例提交。
+- CC64 与 Track Hook 在 post flush 才确认投影 revision，避免 Command 回告早于 Vue 事实
+  投影时提前清除 Preview。CC64 placement 不再通过无返回值 Emit 交给两种 Surface；统一
+  Intent Handler 选择 Clip / Track 用例，并明确区分 Command 失败和已提交后的显示失败。
+- [Timeline Locate](../../../apps/studio/src/features/project-workspace/workbench-shell/arrangement/README.md)
+  使用公共 Pointer / Session，但不使用事实编辑的 Handoff。Playback Locate Session 继续拥有
+  暂停、commit / cancel 与恢复播放的决定；Vue Hook 拥有 Follow、Edge Scroll 与浏览器资源。
+- Browser Adapter 新增有实际消费者的 `positionSpace: 'client'`。Locate 的当前位置保持为
+  Client CSS 坐标，Pointer、Modifier 更新和 Edge Scroll 使用同一值重算 Tick；Surface 滚动
+  不会把静止 Pointer 当作移动。其他消费者默认保留相对 Surface 坐标。
+- Edge Scroll 回调同时核验帧句柄和 InteractionId，释放后的 Follow 回调核验生命周期代次；
+  旧回调不能推动新 Locate。滚动偏移允许更新，Project / 范围 / Viewport 尺寸变化取消。
+- `INTERACTION_MODIFIER_RULES` 集中声明物理键、origin / current 时机及帮助文案；Note / CC64
+  通过同一解释函数消费，Keyboard Settings 从同一规则生成只读帮助。Pencil 仍消费 Snap
+  Preference，未新增 Alt 绕过或 Modifier 自定义能力。
+
 ## 验证边界
 
 G2 另覆盖 Tempo 两种交接顺序、旧捕获 / 回告、映射失效、初始化失败、播放准备期间的
@@ -139,6 +164,11 @@ observer 失败；Browser 的捕获、取消、失焦、坐标失败和释放；
 目标替换、Pencil 版本校验与提交后的 Selection 失败。架构规则限制中立层只能依赖自身，
 Browser 可单向依赖 Common，Common 禁止 DOM 对象与事件。
 
+G3 新增 CC64 / Track 配置冻结、同 revision 的 Session 替换、提交通知前的同步校验、
+旧 capture / 回告 / observer、Locate 连续重映射、取消后的动画回调、失焦、Scope / 映射改变
+以及 Pointer / Playback 失败清理回归。
+
 完整门禁与手工验证结果记录在阶段计划的
 [G1](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#14-g1-中立协议与-note-迁移2026-09-29)
-与 [G2](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#17-g2tempo-跨域验证2026-09-30) 记录。
+、[G2](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#17-g2tempo-跨域验证2026-09-30)
+与 [G3](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#18-g3其余消费者迁移2026-09-30) 记录。

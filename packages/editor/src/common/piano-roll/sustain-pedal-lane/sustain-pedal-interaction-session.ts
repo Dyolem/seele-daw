@@ -1,205 +1,63 @@
-import type { MidiSustainPedalEventId, ModelRevision } from '@seele-daw/project-core'
-
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
+import { createAllProjectCommitsSubscription, type ModelRevision } from '@seele-daw/project-core'
 import {
-  PIANO_ROLL_INTERACTION_TOOL,
-  type PianoRollInteractionTool,
-} from '#internal/common/piano-roll/interaction/piano-roll-interaction'
-import type { PianoRollSustainPedalEditingScope } from '#internal/common/piano-roll/sustain-pedal-lane/sustain-pedal-editing-scope'
-import {
-  PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS,
-  createPianoRollSustainPedalTransformGesture,
-  resolvePianoRollSustainPedalTransformAxis,
-  resolvePianoRollSustainPedalTransformPreview,
-  type PianoRollSustainPedalMovePreview,
-  type PianoRollSustainPedalTransformAxis,
-  type PianoRollSustainPedalTransformGesture,
-  type PianoRollSustainPedalTransformPreview,
-  type PianoRollSustainPedalValuePreview,
-} from '#internal/common/piano-roll/sustain-pedal-lane/sustain-pedal-event-transform'
-import type { PianoRollSustainPedalLaneHit } from '#internal/common/piano-roll/sustain-pedal-lane/sustain-pedal-lane-input'
-import {
-  resolvePianoRollSustainPedalPencilPlacement,
-  type PianoRollSustainPedalPlacement,
-} from '#internal/common/piano-roll/sustain-pedal-lane/sustain-pedal-pencil-interaction'
+  InteractionSession,
+  type InteractionId,
+} from '#internal/common/interaction/interaction-session'
+import { InteractionCommitHandoff } from '#internal/common/interaction/interaction-commit-handoff'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   type PianoRollPointerInput,
 } from '#internal/common/piano-roll/piano-roll-input'
+import type { PianoRollSustainPedalLaneHit } from './sustain-pedal-lane-input'
+import { SustainPedalOperation, type SustainPedalOperationResult } from './sustain-pedal-operation'
+import type { PianoRollSustainPedalTransformPreview } from './sustain-pedal-event-transform'
 import {
-  createPianoRollValueLaneViewport,
-  type PianoRollValueLaneViewport,
-} from '#internal/common/piano-roll/value-lane/piano-roll-value-lane-viewport'
-import { createTimelineGrid, type TimelineGrid } from '#internal/common/timeline-grid'
-
-export const PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS = {
-  AWAITING_AUTHORITY: 'awaiting-authority',
-  COMMITTING_MOVE: 'committing-move',
-  COMMITTING_VALUE: 'committing-value',
-  IDLE: 'idle',
-  MOVING_EVENTS: 'moving-events',
-  PRESSING: 'pressing',
-  REPLACING_VALUE: 'replacing-value',
-} as const
-
-export type PianoRollSustainPedalInteractionStatus =
-  (typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS)[keyof typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS]
-
-export const PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT = {
-  MOVE_EVENTS: 'sustain-pedal-events.move',
-  PLACE_EVENT: 'sustain-pedal-event.place',
-  REPLACE_VALUE: 'sustain-pedal-event.replace-value',
-  RESOLVE_SELECTION: 'sustain-pedal-selection.resolve',
-} as const
-
-export interface PianoRollSustainPedalResolveSelectionIntent {
-  readonly pointerInput: PianoRollPointerInput<PianoRollSustainPedalLaneHit>
-  readonly type: typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.RESOLVE_SELECTION
-}
-
-export interface PianoRollSustainPedalPlaceEventIntent {
-  readonly placement: PianoRollSustainPedalPlacement
-  readonly type: typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.PLACE_EVENT
-}
-
-export interface PianoRollSustainPedalMoveEventsIntent {
-  readonly gesture: PianoRollSustainPedalTransformGesture
-  readonly preview: PianoRollSustainPedalMovePreview
-  readonly type: typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.MOVE_EVENTS
-}
-
-export interface PianoRollSustainPedalReplaceValueIntent {
-  readonly gesture: PianoRollSustainPedalTransformGesture
-  readonly preview: PianoRollSustainPedalValuePreview
-  readonly type: typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.REPLACE_VALUE
-}
-
-export type PianoRollSustainPedalInteractionIntent =
-  | PianoRollSustainPedalMoveEventsIntent
-  | PianoRollSustainPedalPlaceEventIntent
-  | PianoRollSustainPedalReplaceValueIntent
-  | PianoRollSustainPedalResolveSelectionIntent
-
-export interface PianoRollSustainPedalInteractionConfiguration {
-  readonly grid: TimelineGrid
-  readonly scope: PianoRollSustainPedalEditingScope | null
-  readonly selectedEventIds: readonly MidiSustainPedalEventId[]
-  readonly snapEnabled: boolean
-  readonly tool: PianoRollInteractionTool
-  readonly viewport: PianoRollValueLaneViewport
-}
-
-export interface PianoRollSustainPedalInteractionOutcome {
-  readonly failure: unknown | null
-  readonly intent: PianoRollSustainPedalInteractionIntent | null
-}
-
-export interface PianoRollSustainPedalInteractionState {
-  readonly activeAxis: PianoRollSustainPedalTransformAxis | null
-  readonly pointerId: number | null
-  readonly preview: PianoRollSustainPedalTransformPreview | null
-  readonly status: PianoRollSustainPedalInteractionStatus
-}
-
-export interface PianoRollSustainPedalInteractionSessionObserver {
-  onStateChange(state: PianoRollSustainPedalInteractionState): void
-}
-
-export interface ResolvePianoRollSustainPedalTransformCommitInput {
-  readonly authorityRevision: ModelRevision
-  readonly commitRevision: ModelRevision
-}
-
-export interface PianoRollSustainPedalInteractionSession {
-  readonly state: PianoRollSustainPedalInteractionState
-  cancel(): boolean
-  dispose(): void
-  handlePointerInput(
-    input: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
-    configuration?: PianoRollSustainPedalInteractionConfiguration,
-  ): PianoRollSustainPedalInteractionOutcome
-  notifyAuthorityRevision(revision: ModelRevision): void
-  resolveTransformCommit(input: ResolvePianoRollSustainPedalTransformCommitInput): void
-  skipTransformCommit(): void
-  subscribe(observer: PianoRollSustainPedalInteractionSessionObserver): () => void
-}
-
-interface ActiveInteraction {
-  readonly axis: PianoRollSustainPedalTransformAxis | null
-  readonly configuration: PianoRollSustainPedalInteractionConfiguration
-  readonly gesture: PianoRollSustainPedalTransformGesture | null
-  readonly pointerId: number
-}
+  PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS,
+  type PianoRollSustainPedalInteractionConfiguration,
+  type PianoRollSustainPedalInteractionOutcome,
+  type PianoRollSustainPedalInteractionSession,
+  type PianoRollSustainPedalInteractionSessionObserver,
+  type PianoRollSustainPedalInteractionState,
+  type PianoRollSustainPedalInteractionTarget,
+  type ResolvePianoRollSustainPedalCommitInput,
+} from './sustain-pedal-interaction'
 
 const EMPTY_OUTCOME: PianoRollSustainPedalInteractionOutcome = Object.freeze({
   failure: null,
   intent: null,
 })
-
-const IDLE_STATE: PianoRollSustainPedalInteractionState = Object.freeze({
-  activeAxis: null,
+const IDLE: PianoRollSustainPedalInteractionState = Object.freeze({
+  interactionId: null,
   pointerId: null,
+  activeAxis: null,
   preview: null,
   status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.IDLE,
 })
 
-function freezeConfiguration(
-  configuration: PianoRollSustainPedalInteractionConfiguration,
-): PianoRollSustainPedalInteractionConfiguration {
-  if (
-    configuration.tool !== PIANO_ROLL_INTERACTION_TOOL.CURSOR &&
-    configuration.tool !== PIANO_ROLL_INTERACTION_TOOL.PENCIL
-  ) {
-    throw new PianoRollError(
-      'invalid-sustain-pedal-gesture',
-      `Unknown Sustain Pedal interaction tool: ${String(configuration.tool)}`,
-    )
-  }
-
-  return Object.freeze({
-    ...configuration,
-    grid: createTimelineGrid(configuration.grid),
-    selectedEventIds: Object.freeze([...configuration.selectedEventIds]),
-    viewport: createPianoRollValueLaneViewport({
-      heightCssPixel: configuration.viewport.heightCssPixel,
-      visibleSpanTick: configuration.viewport.visibleSpanTick,
-      visibleStartTick: configuration.viewport.visibleStartTick,
-      widthCssPixel: configuration.viewport.widthCssPixel,
-    }),
-  })
+interface ActiveSustainPedalInteraction {
+  readonly interactionId: InteractionId
+  readonly captureId: symbol
+  readonly pointerId: number
+  readonly target: PianoRollSustainPedalInteractionTarget
 }
 
-function createOutcome(
-  intent: PianoRollSustainPedalInteractionIntent | null,
-  failure: unknown | null = null,
-): PianoRollSustainPedalInteractionOutcome {
-  return Object.freeze({ failure, intent })
-}
-
+/** CC64 specialization; the shared host owns identity and one-shot completion. */
 class PianoRollSustainPedalInteractionSessionImpl implements PianoRollSustainPedalInteractionSession {
+  readonly #host = new InteractionSession<
+    PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
+    PianoRollSustainPedalTransformPreview,
+    SustainPedalOperationResult
+  >()
+  readonly #handoff = new InteractionCommitHandoff()
   readonly #observers = new Set<PianoRollSustainPedalInteractionSessionObserver>()
-  #active: ActiveInteraction | null = null
+  #active: ActiveSustainPedalInteraction | null = null
+  #state = IDLE
+  #unsubscribe: (() => void) | null = null
+  #executing: InteractionId | null = null
   #disposed = false
-  #pendingCommitRevision: ModelRevision | null = null
-  #state = IDLE_STATE
 
   get state(): PianoRollSustainPedalInteractionState {
     return this.#state
-  }
-
-  cancel(): boolean {
-    if (this.#disposed || this.#state.status === PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.IDLE) {
-      return false
-    }
-    this.#reset()
-    return true
-  }
-
-  dispose(): void {
-    if (this.#disposed) return
-    this.cancel()
-    this.#disposed = true
-    this.#observers.clear()
   }
 
   handlePointerInput(
@@ -207,302 +65,219 @@ class PianoRollSustainPedalInteractionSessionImpl implements PianoRollSustainPed
     configuration?: PianoRollSustainPedalInteractionConfiguration,
   ): PianoRollSustainPedalInteractionOutcome {
     if (this.#disposed) return EMPTY_OUTCOME
-
-    switch (input.phase) {
-      case PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN:
-        if (configuration === undefined) {
-          return createOutcome(
-            null,
-            new Error('Sustain Pedal interaction configuration is required at Pointer Begin.'),
-          )
-        }
-        return this.#begin(input, configuration)
-      case PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE:
-        return this.#update(input)
-      case PIANO_ROLL_POINTER_INPUT_PHASE.END:
-        return this.#end(input)
-      case PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL:
-        if (this.#active?.pointerId !== input.pointerId || !this.#acceptsPointerFrames()) {
-          return EMPTY_OUTCOME
-        }
-        this.#reset()
+    try {
+      if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
+        if (this.#handoff.pending) this.cancel()
+        if (this.#active !== null) return EMPTY_OUTCOME
+        if (configuration === undefined)
+          throw new Error('Sustain Pedal interaction configuration is required at Pointer Begin.')
+        this.#begin(input, configuration)
+        this.#publish()
         return EMPTY_OUTCOME
+      }
+      const active = this.#active
+      if (
+        active === null ||
+        active.captureId !== input.captureId ||
+        active.pointerId !== input.pointerId
+      )
+        return EMPTY_OUTCOME
+      if (
+        this.#executing === null &&
+        active.target.session.modelRevision !== active.target.baseRevision
+      ) {
+        this.cancel()
+        return EMPTY_OUTCOME
+      }
+      if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL) {
+        this.cancel()
+        return EMPTY_OUTCOME
+      }
+      if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE) {
+        this.#host.update(active.interactionId, input)
+        this.#publish()
+        return EMPTY_OUTCOME
+      }
+      const result = this.#host.complete(active.interactionId, input)
+      this.#publish()
+      if (result === null || this.#active?.interactionId !== active.interactionId)
+        return EMPTY_OUTCOME
+      return Object.freeze({
+        failure: null,
+        intent: Object.freeze({
+          ...result,
+          interactionId: active.interactionId,
+          target: active.target,
+        }),
+      })
+    } catch (failure) {
+      this.cancel()
+      return Object.freeze({ failure, intent: null })
     }
+  }
+
+  claimCompletion(interactionId: InteractionId): boolean {
+    if (this.#active?.interactionId !== interactionId || this.#executing === interactionId)
+      return false
+    if (this.#active.target.session.modelRevision !== this.#active.target.baseRevision) {
+      this.cancel()
+      return false
+    }
+    if (!this.#host.claimCompletion(interactionId)) return false
+    this.#executing = interactionId
+    return true
+  }
+
+  resolveCommit(input: ResolvePianoRollSustainPedalCommitInput): void {
+    if (
+      this.#disposed ||
+      this.#active?.interactionId !== input.interactionId ||
+      this.#executing !== input.interactionId ||
+      this.#host.state.phase !== 'completing' ||
+      this.#handoff.pending
+    )
+      return
+    if (this.#handoff.accept(input.interactionId, input.commitRevision, input.authorityRevision))
+      this.#host.finish(input.interactionId)
+    this.#publish()
+  }
+
+  finish(interactionId: InteractionId): void {
+    if (this.#disposed || this.#handoff.pending) return
+    if (this.#host.finish(interactionId)) this.#publish()
   }
 
   notifyAuthorityRevision(revision: ModelRevision): void {
-    if (
-      this.#disposed ||
-      this.#state.status !== PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.AWAITING_AUTHORITY ||
-      this.#pendingCommitRevision === null ||
-      revision < this.#pendingCommitRevision
-    ) {
+    if (this.#disposed || this.#active === null) return
+    if (this.#executing === null && revision !== this.#active.target.baseRevision) {
+      this.cancel()
       return
     }
-    this.#reset()
+    const completed = this.#handoff.observe(revision)
+    if (completed !== null) this.#host.finish(completed)
+    this.#publish()
   }
 
-  resolveTransformCommit(input: ResolvePianoRollSustainPedalTransformCommitInput): void {
-    if (
-      this.#disposed ||
-      (this.#state.status !== PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_MOVE &&
-        this.#state.status !== PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_VALUE)
-    ) {
-      return
-    }
-
-    if (input.authorityRevision >= input.commitRevision) {
-      this.#reset()
-      return
-    }
-
-    this.#active = null
-    this.#pendingCommitRevision = input.commitRevision
-    this.#publish({
-      activeAxis: this.#state.preview?.axis ?? null,
-      pointerId: null,
-      preview: this.#state.preview,
-      status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.AWAITING_AUTHORITY,
-    })
+  cancel(): boolean {
+    if (this.#disposed || this.#active === null) return false
+    const cancelled = this.#host.cancel(this.#active.interactionId)
+    this.#publish()
+    return cancelled
   }
 
-  skipTransformCommit(): void {
-    if (
-      this.#disposed ||
-      (this.#state.status !== PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_MOVE &&
-        this.#state.status !== PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_VALUE)
-    ) {
-      return
+  dispose(): void {
+    if (this.#disposed) return
+    try {
+      this.cancel()
+    } finally {
+      this.#disposed = true
+      this.#host.dispose()
+      this.#observers.clear()
     }
-    this.#reset()
   }
 
   subscribe(observer: PianoRollSustainPedalInteractionSessionObserver): () => void {
-    if (this.#disposed) return () => undefined
-    this.#observers.add(observer)
-    let subscribed = true
+    if (!this.#disposed) this.#observers.add(observer)
     return () => {
-      if (!subscribed) return
-      subscribed = false
       this.#observers.delete(observer)
     }
   }
 
   #begin(
     input: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
-    configurationInput: PianoRollSustainPedalInteractionConfiguration,
-  ): PianoRollSustainPedalInteractionOutcome {
-    if (
-      this.#state.status !== PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.IDLE &&
-      this.#state.status !== PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.AWAITING_AUTHORITY
-    ) {
-      return EMPTY_OUTCOME
-    }
-
-    try {
-      const configuration = freezeConfiguration(configurationInput)
-      const gesture =
-        configuration.tool === PIANO_ROLL_INTERACTION_TOOL.CURSOR
-          ? createPianoRollSustainPedalTransformGesture({
-              pointerInput: input,
-              scope: configuration.scope,
-              selectedEventIds: configuration.selectedEventIds,
-            })
-          : null
-      this.#pendingCommitRevision = null
-      this.#active = Object.freeze({
-        axis: null,
-        configuration,
-        gesture,
-        pointerId: input.pointerId,
-      })
-      this.#publish({
-        activeAxis: null,
-        pointerId: input.pointerId,
-        preview: null,
-        status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.PRESSING,
-      })
-      return EMPTY_OUTCOME
-    } catch (failure) {
-      this.#reset()
-      return createOutcome(null, failure)
-    }
-  }
-
-  #update(
-    input: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
-  ): PianoRollSustainPedalInteractionOutcome {
-    const active = this.#active
-    if (
-      !this.#acceptsPointerFrames() ||
-      active === null ||
-      active.pointerId !== input.pointerId ||
-      active.gesture === null
-    ) {
-      return EMPTY_OUTCOME
-    }
-
-    try {
-      const axis = active.axis ?? resolvePianoRollSustainPedalTransformAxis(active.gesture, input)
-      if (axis === null) return EMPTY_OUTCOME
-      const preview = resolvePianoRollSustainPedalTransformPreview({
-        axis,
-        gesture: active.gesture,
-        grid: active.configuration.grid,
-        pointerInput: input,
-        snapEnabled: active.configuration.snapEnabled,
-        viewport: active.configuration.viewport,
-      })
-      if (preview === null) return EMPTY_OUTCOME
-
-      this.#active = Object.freeze({ ...active, axis })
-      this.#publish({
-        activeAxis: axis,
-        pointerId: active.pointerId,
-        preview,
-        status:
-          axis === PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS.TICK
-            ? PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.MOVING_EVENTS
-            : PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.REPLACING_VALUE,
-      })
-      return EMPTY_OUTCOME
-    } catch (failure) {
-      this.#reset()
-      return createOutcome(null, failure)
-    }
-  }
-
-  #end(
-    input: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
-  ): PianoRollSustainPedalInteractionOutcome {
-    const active = this.#active
-    if (!this.#acceptsPointerFrames() || active === null || active.pointerId !== input.pointerId) {
-      return EMPTY_OUTCOME
-    }
-
-    if (active.configuration.tool === PIANO_ROLL_INTERACTION_TOOL.PENCIL) {
-      return this.#completePencil(input, active.configuration)
-    }
-    if (!input.hasExceededDragThreshold || active.gesture === null) {
-      this.#reset()
-      return input.hasExceededDragThreshold
-        ? EMPTY_OUTCOME
-        : createOutcome(
-            Object.freeze({
-              pointerInput: input,
-              type: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.RESOLVE_SELECTION,
-            }),
-          )
-    }
-
-    try {
-      const axis = active.axis ?? resolvePianoRollSustainPedalTransformAxis(active.gesture, input)
-      if (axis === null) {
-        this.#reset()
-        return EMPTY_OUTCOME
-      }
-      const preview = resolvePianoRollSustainPedalTransformPreview({
-        axis,
-        gesture: active.gesture,
-        grid: active.configuration.grid,
-        pointerInput: input,
-        snapEnabled: active.configuration.snapEnabled,
-        viewport: active.configuration.viewport,
-      })
-      if (preview === null) {
-        this.#reset()
-        return EMPTY_OUTCOME
-      }
-
-      this.#active = Object.freeze({ ...active, axis })
-      if (preview.axis === PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS.TICK) {
-        this.#publish({
-          activeAxis: axis,
-          pointerId: active.pointerId,
-          preview,
-          status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_MOVE,
-        })
-        return createOutcome(
-          Object.freeze({
-            gesture: active.gesture,
-            preview,
-            type: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.MOVE_EVENTS,
-          }),
-        )
-      }
-
-      this.#publish({
-        activeAxis: axis,
-        pointerId: active.pointerId,
-        preview,
-        status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_VALUE,
-      })
-      return createOutcome(
-        Object.freeze({
-          gesture: active.gesture,
-          preview,
-          type: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.REPLACE_VALUE,
-        }),
-      )
-    } catch (failure) {
-      this.#reset()
-      return createOutcome(null, failure)
-    }
-  }
-
-  #completePencil(
-    input: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
     configuration: PianoRollSustainPedalInteractionConfiguration,
-  ): PianoRollSustainPedalInteractionOutcome {
-    try {
-      const placement = resolvePianoRollSustainPedalPencilPlacement({
-        grid: configuration.grid,
-        pointerInput: input,
-        snapEnabled: configuration.snapEnabled,
-        viewport: configuration.viewport,
-      })
-      this.#reset()
-      return placement === null
-        ? EMPTY_OUTCOME
-        : createOutcome(
-            Object.freeze({
-              placement,
-              type: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.PLACE_EVENT,
-            }),
-          )
-    } catch (failure) {
-      this.#reset()
-      return createOutcome(null, failure)
-    }
-  }
-
-  #acceptsPointerFrames(): boolean {
-    return (
-      this.#state.status === PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.PRESSING ||
-      this.#state.status === PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.MOVING_EVENTS ||
-      this.#state.status === PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.REPLACING_VALUE
+  ): void {
+    const target = Object.freeze({ ...configuration.target })
+    if (
+      target.session.modelRevision !== target.baseRevision ||
+      (configuration.scope !== null && configuration.scope.modelRevision !== target.baseRevision)
     )
+      return
+    const operation = new SustainPedalOperation(configuration, input)
+    const interactionId = this.#host.begin(operation)
+    if (interactionId === null) return
+    this.#active = Object.freeze({
+      interactionId,
+      captureId: input.captureId,
+      pointerId: input.pointerId,
+      target,
+    })
+    this.#handoff.reset(target.baseRevision)
+    this.#unsubscribe = target.session.subscribe(createAllProjectCommitsSubscription(), {
+      onCommit: () => {
+        // Only the claimed execution may synchronously publish its own commit.
+        if (this.#active?.interactionId === interactionId && this.#executing !== interactionId)
+          this.cancel()
+      },
+      onError: () => {
+        if (this.#active?.interactionId === interactionId) this.cancel()
+      },
+    })
   }
 
-  #reset(): void {
+  #clearProjection(): void {
     this.#active = null
-    this.#pendingCommitRevision = null
-    this.#publish(IDLE_STATE)
+    this.#executing = null
+    const unsubscribe = this.#unsubscribe
+    this.#unsubscribe = null
+    this.#handoff.reset(0)
+    this.#state = IDLE
+    unsubscribe?.()
   }
 
-  #publish(state: PianoRollSustainPedalInteractionState): void {
-    this.#state = Object.isFrozen(state) ? state : Object.freeze({ ...state })
+  #publish(): void {
+    const host = this.#host.state
+    const active = this.#active
+    if (
+      active === null ||
+      host.phase === 'finished' ||
+      host.phase === 'cancelled' ||
+      host.phase === 'idle'
+    ) {
+      this.#clearProjection()
+    } else {
+      let status: PianoRollSustainPedalInteractionState['status'] =
+        PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.PRESSING
+      if (this.#handoff.pending)
+        status = PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.AWAITING_AUTHORITY
+      else if (host.phase === 'completing') {
+        status = PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMPLETING
+        if (host.preview?.axis === 'tick')
+          status = PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_MOVE
+        if (host.preview?.axis === 'value')
+          status = PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_VALUE
+      } else if (host.preview?.axis === 'value')
+        status = PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.REPLACING_VALUE
+      else if (host.preview?.axis === 'tick')
+        status = PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.MOVING_EVENTS
+      this.#state = Object.freeze({
+        interactionId: active.interactionId,
+        pointerId: host.phase === 'active' ? active.pointerId : null,
+        activeAxis: host.preview?.axis ?? null,
+        preview: host.preview,
+        status,
+      })
+    }
     for (const observer of this.#observers) {
       try {
         observer.onStateChange(this.#state)
-      } catch {
-        // One observer must not interrupt the active Pointer gesture.
+      } catch (cause) {
+        // A failed projection must not leave an unsubmitted completion available.
+        if (this.#active !== null) this.#host.cancel(this.#active.interactionId)
+        this.#clearProjection()
+        for (const recipient of this.#observers) {
+          try {
+            recipient.onStateChange(IDLE)
+          } catch {
+            // Cleanup must reach healthy observers even when one projection keeps failing.
+          }
+        }
+        throw cause
       }
     }
   }
 }
 
-/** Creates one framework-neutral CC64 Lane interaction lifecycle. */
 export function createPianoRollSustainPedalInteractionSession(): PianoRollSustainPedalInteractionSession {
   return new PianoRollSustainPedalInteractionSessionImpl()
 }

@@ -766,6 +766,11 @@ Vue 状态选择的完整规则见
 - Toast Region。
 - Reka UI 驱动的 Dropdown Menu、Dialog 与 Toast 行为。
 
+通用 `UiSelect` 用于 MIDI Editor 的 Active Clip、CC64 Channel 和 Keyboard Shortcuts 设置。
+展开列表最多显示约 8 个标准选项，并根据可视窗口与 Trigger 位置进一步限制高度；完整选项
+保留在带可见滚动条的内部列表中。选中项打开时可见，方向键与 Home / End 可导航，Enter
+确认，Escape 取消并返回 Trigger。显示与滚动调整不修改 Project Facts。
+
 Toast 支持信息、成功、警告和危险语义，可自动关闭、手动关闭、使用 `F8` 聚焦通知区，并支持
 Swipe dismiss。业务 Feature 通过应用级 Pinia Toast Store 的命令式
 `info / success / warning / danger` 触发通知；根 `App` 只挂载一个声明式

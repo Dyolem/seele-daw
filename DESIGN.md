@@ -916,6 +916,12 @@ Mute、Solo、Record Arm、Snap 和 Tool 都是持续状态，不应只在按下
 - 菜单与 Popover 使用不透明的 `surface-overlay` 背景。尺寸上限使用标准 CSS 视口单位
   和 Studio 设计令牌，不直接引用 Reka 的 available-size CSS 变量。定位交由 Reka 处理，
   长内容在自有节点内滚动。
+- `UiSelect` 的展开列表最多显示约 8 个标准选项；短窗口、浏览器缩放或屏幕边缘打开时，
+  还须受 Trigger 与可视窗口之间的可用高度约束。尺寸测量集中在 UI 层，关闭或卸载即释放。
+  外壳不滚动，内部 Viewport 是唯一滚动 owner，并保留可见滚动条；选中项打开时可见，
+  方向键与 Home / End 导航继续由 Reka 管理，Escape 关闭后返回 Trigger。
+- `UiSelect` 的 Trigger 文字直接由当前值与选项派生，不依赖展开列表的挂载状态；取消选择
+  并关闭列表时，文字与按钮宽度保持稳定，实际切换选项时仍按内容自然调整宽度。
 
 ### 14.7 Dialog
 

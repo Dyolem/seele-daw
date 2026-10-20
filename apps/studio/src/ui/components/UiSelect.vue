@@ -13,48 +13,76 @@ import {
 } from 'reka-ui'
 import ChevronDownIcon from '~icons/fluent/chevron-down-16-regular'
 import CheckmarkIcon from '~icons/fluent/checkmark-16-regular'
+import { computed, shallowRef, useTemplateRef } from 'vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'
+import {
+  SELECT_CONTENT_COLLISION_PADDING,
+  SELECT_CONTENT_SIDE_OFFSET,
+  useSelectContentSize,
+} from './use-select-content-size'
 
 defineOptions({ inheritAttrs: false })
 const value = defineModel<Value>({ required: true })
-defineProps<{
+const props = defineProps<{
   readonly options: readonly { readonly value: Value; readonly label: string }[]
   readonly disabled?: boolean
   readonly size?: 'small' | 'medium'
   readonly placeholder?: string
 }>()
+// Trigger text must remain independent of the popup items' mount lifecycle.
+const displayLabel = computed(
+  () =>
+    props.options.find((option) => option.value === value.value)?.label ?? props.placeholder ?? '',
+)
+const open = shallowRef(false)
+const triggerElement = useTemplateRef<HTMLButtonElement>('triggerElement')
+const contentStyle = useSelectContentSize(triggerElement, open)
 </script>
 
 <template>
-  <SelectRoot v-model="value" :disabled="disabled">
-    <SelectTrigger v-bind="$attrs" class="ui-select__trigger" :data-size="size ?? 'medium'">
-      <SelectValue class="ui-select__value" :placeholder="placeholder" />
-      <SelectIcon class="ui-select__chevron"
-        ><UiIcon :icon="ChevronDownIcon" :size="16"
-      /></SelectIcon>
+  <SelectRoot v-model="value" v-model:open="open" :disabled="disabled">
+    <SelectTrigger as-child>
+      <button
+        ref="triggerElement"
+        v-bind="$attrs"
+        class="ui-select__trigger"
+        :data-size="size ?? 'medium'"
+        type="button"
+      >
+        <SelectValue class="ui-select__value" :placeholder="placeholder">{{
+          displayLabel
+        }}</SelectValue>
+        <SelectIcon class="ui-select__chevron"
+          ><UiIcon :icon="ChevronDownIcon" :size="16"
+        /></SelectIcon>
+      </button>
     </SelectTrigger>
     <SelectPortal>
       <SelectContent
         as-child
         position="popper"
         align="start"
-        :side-offset="6"
-        :collision-padding="8"
+        avoid-collisions
+        side-flip
+        :side-offset="SELECT_CONTENT_SIDE_OFFSET"
+        :collision-padding="SELECT_CONTENT_COLLISION_PADDING"
       >
-        <UiMenuSurface class="ui-select__content">
-          <SelectViewport>
-            <SelectItem
-              v-for="option in options"
-              :key="option.value"
-              :value="option.value"
-              class="ui-select__option"
-            >
-              <SelectItemText>{{ option.label }}</SelectItemText>
-              <SelectItemIndicator class="ui-select__check"
-                ><UiIcon :icon="CheckmarkIcon" :size="16"
-              /></SelectItemIndicator>
-            </SelectItem>
+        <UiMenuSurface class="ui-select__content" :style="contentStyle">
+          <SelectViewport as-child>
+            <div class="ui-select__viewport">
+              <SelectItem
+                v-for="option in options"
+                :key="option.value"
+                :value="option.value"
+                class="ui-select__option"
+              >
+                <SelectItemText>{{ option.label }}</SelectItemText>
+                <SelectItemIndicator class="ui-select__check"
+                  ><UiIcon :icon="CheckmarkIcon" :size="16"
+                /></SelectItemIndicator>
+              </SelectItem>
+            </div>
           </SelectViewport>
         </UiMenuSurface>
       </SelectContent>
@@ -107,8 +135,33 @@ defineProps<{
   white-space: nowrap;
 }
 .ui-select__content {
+  --ui-select-visible-option-count: 8;
   z-index: var(--sd-layer-modal);
-  min-inline-size: 12rem;
+  min-inline-size: min(12rem, calc(100dvw - var(--sd-space-4)));
+  max-block-size: min(
+    calc(
+      var(--ui-select-visible-option-count) * var(--sd-control-height-md) + var(--sd-space-2) * 2 +
+        2px
+    ),
+    var(--ui-select-available-height, calc(100dvh - var(--sd-space-4)))
+  );
+  overflow: hidden;
+}
+.ui-select__viewport {
+  min-block-size: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sd-color-border-strong) transparent;
+}
+/* SelectViewport hides native scrollbars by default; the Studio list keeps them discoverable. */
+.ui-select__viewport::-webkit-scrollbar {
+  display: block;
+  width: var(--sd-space-2);
+}
+.ui-select__viewport::-webkit-scrollbar-thumb {
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-color-border-strong);
 }
 .ui-select__option {
   display: flex;

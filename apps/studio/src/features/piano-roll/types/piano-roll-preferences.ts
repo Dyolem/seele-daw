@@ -19,3 +19,10 @@ export const PIANO_ROLL_GRID_PRESET = {
 } as const
 
 export type PianoRollGridPreset = ValueOf<typeof PIANO_ROLL_GRID_PRESET>
+
+export const PIANO_ROLL_PITCH_VIEW_MODE = {
+  STANDARD: 'standard',
+  RANGE: 'range',
+} as const
+
+export type PianoRollPitchViewMode = ValueOf<typeof PIANO_ROLL_PITCH_VIEW_MODE>

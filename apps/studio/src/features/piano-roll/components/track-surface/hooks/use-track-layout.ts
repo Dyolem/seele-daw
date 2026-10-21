@@ -1,25 +1,20 @@
-import { computed, shallowRef, watch, type ShallowRef, type StyleValue } from 'vue'
-import { createPianoRollTimelineViewport, type PianoRollTimelineViewport } from '@seele-daw/editor'
+import { computed, type StyleValue } from 'vue'
+import { createPianoRollTimelineViewport } from '@seele-daw/editor'
 import { ZERO_TICK, parseTick, type Tick } from '@seele-daw/project-core'
-import {
-  INITIAL_MINIMUM_PITCH,
-  INITIAL_MAXIMUM_PITCH,
-} from '@/features/piano-roll/presentation/piano-roll-pitch-layout'
+import type { PianoRollSurfaceGeometry } from '@/features/piano-roll/types/piano-roll-pitch-viewport'
 import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 
 export function useTrackLayout({
-  canvasHost,
+  getGeometry,
   getPresentation,
   getTimelineEndTick,
   getBarSpanTick,
-  reportFailure,
 }: {
-  readonly canvasHost: Readonly<ShallowRef<HTMLElement | null>>
+  readonly getGeometry: () => PianoRollSurfaceGeometry | null
   readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
   readonly getTimelineEndTick: () => Tick
   readonly getBarSpanTick: () => Tick
-  readonly reportFailure: (cause: unknown) => void
 }) {
   const timelineBars = computed(() => {
     const barCount = Math.ceil(getTimelineEndTick() / getBarSpanTick())
@@ -51,7 +46,9 @@ export function useTrackLayout({
         notes
           .filter(
             ({ note }) =>
-              note.pitch >= INITIAL_MINIMUM_PITCH && note.pitch <= INITIAL_MAXIMUM_PITCH,
+              viewport.value !== null &&
+              note.pitch >= viewport.value.minimumPitch &&
+              note.pitch <= viewport.value.maximumPitch,
           )
           .map(({ note, projectEndTick, projectStartTick }) =>
             Object.freeze({
@@ -85,64 +82,21 @@ export function useTrackLayout({
     ),
   )
 
-  const viewport = shallowRef<PianoRollTimelineViewport | null>(null)
-  let observer: ResizeObserver | null = null
-  let observing = false
-  function refreshViewport(): void {
-    if (!observing) return
-    const host = canvasHost.value
-    if (host === null || host.clientWidth <= 0 || host.clientHeight <= 0) {
-      viewport.value = null
-      return
-    }
-    try {
-      const previous = viewport.value
-      if (
-        previous !== null &&
-        previous.widthCssPixel === host.clientWidth &&
-        previous.heightCssPixel === host.clientHeight &&
-        previous.visibleSpanTick === getTimelineEndTick()
-      )
-        return
-      viewport.value = createPianoRollTimelineViewport({
-        heightCssPixel: host.clientHeight,
-        maximumPitch: INITIAL_MAXIMUM_PITCH,
-        minimumPitch: INITIAL_MINIMUM_PITCH,
-        visibleSpanTick: getTimelineEndTick(),
-        visibleStartTick: ZERO_TICK,
-        widthCssPixel: host.clientWidth,
-      })
-    } catch (cause) {
-      viewport.value = null
-      reportFailure(cause)
-    }
-  }
-  watch([getTimelineEndTick, getBarSpanTick], refreshViewport, { flush: 'post' })
+  const viewport = computed(() => {
+    const geometry = getGeometry()
+    if (geometry === null) return null
+    return createPianoRollTimelineViewport({
+      ...geometry,
+      visibleSpanTick: getTimelineEndTick(),
+      visibleStartTick: ZERO_TICK,
+    })
+  })
 
   return {
-    viewport: computed(() => viewport.value),
+    viewport,
     timelineBars,
     timelineContentStyle,
     visibleNotes,
     clipWindows,
-    mount() {
-      const host = canvasHost.value
-      if (host === null || observing) return
-      observing = true
-      if (typeof ResizeObserver === 'function') {
-        observer = new ResizeObserver(refreshViewport)
-        observer.observe(host)
-      } else {
-        window.addEventListener('resize', refreshViewport)
-      }
-      refreshViewport()
-    },
-    dispose() {
-      observing = false
-      observer?.disconnect()
-      observer = null
-      window.removeEventListener('resize', refreshViewport)
-      viewport.value = null
-    },
   }
 }

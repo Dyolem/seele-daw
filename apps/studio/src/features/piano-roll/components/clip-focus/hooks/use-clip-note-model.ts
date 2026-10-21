@@ -1,34 +1,30 @@
 import {
   createPianoRollEditorSession,
-  createInitialPianoRollViewport,
   createPianoRollNoteReadModel,
+  createInitialPianoRollViewport,
   type PianoRollEditorSession,
   type PianoRollEditorSessionState,
   type PianoRollNoteReadModel,
   type PianoRollNoteReadModelState,
   type PianoRollInteractionSession,
 } from '@seele-daw/editor'
-import { shallowRef, type ShallowRef } from 'vue'
+import { shallowRef, watch, type ShallowRef } from 'vue'
 import { describeFailure } from '@/features/piano-roll/presentation/piano-roll-feedback'
-import {
-  INITIAL_MINIMUM_PITCH,
-  INITIAL_MAXIMUM_PITCH,
-} from '@/features/piano-roll/presentation/piano-roll-pitch-layout'
+import type { PianoRollSurfaceGeometry } from '@/features/piano-roll/types/piano-roll-pitch-viewport'
 import type {
   PianoRollClipNoteModel,
-  PianoRollSurfaceElements,
   ProjectPianoRollSurfaceProps,
 } from '@/features/piano-roll/components/clip-focus/types/clip-focus'
 
 /** Composes Editor selection and read models against one Clip target. */
 export function useClipNoteModel({
   props,
-  canvasHost,
+  getGeometry,
   interactionSession,
   interactionFailureMessage,
 }: {
   readonly props: ProjectPianoRollSurfaceProps
-  readonly canvasHost: PianoRollSurfaceElements['canvasHost']
+  readonly getGeometry: () => PianoRollSurfaceGeometry | null
   readonly interactionSession: PianoRollInteractionSession
   readonly interactionFailureMessage: ShallowRef<string | null>
 }): PianoRollClipNoteModel {
@@ -40,8 +36,7 @@ export function useClipNoteModel({
   let readModel: PianoRollNoteReadModel | null = null
   let unsubscribeReadModel: (() => void) | null = null
   let disposed = false
-  let resizeObserver: ResizeObserver | null = null
-  let removeResizeListener: (() => void) | null = null
+  let stopViewport: (() => void) | null = null
 
   function disposeEditorSession(): void {
     unsubscribeEditorSession?.()
@@ -97,20 +92,15 @@ export function useClipNoteModel({
 
   function createOrResizeReadModel(): void {
     if (disposed) return
-    const host = canvasHost.value
-    if (host === null || host.clientWidth <= 0 || host.clientHeight <= 0) {
+    const geometry = getGeometry()
+    if (geometry === null) {
       interactionSession.notifyViewport(null)
+      disposeReadModel()
       return
     }
 
     try {
-      const viewport = createInitialPianoRollViewport(props.presentation.context, {
-        heightCssPixel: host.clientHeight,
-        maximumPitch: INITIAL_MAXIMUM_PITCH,
-        minimumPitch: INITIAL_MINIMUM_PITCH,
-        widthCssPixel: host.clientWidth,
-      })
-
+      const viewport = createInitialPianoRollViewport(props.presentation.context, geometry)
       interactionSession.notifyViewport(viewport)
       if (readModel !== null) {
         readModel.setViewport(viewport)
@@ -147,25 +137,6 @@ export function useClipNoteModel({
     createOrResizeReadModel()
   }
 
-  function observeViewport(checkPointerMapping: () => boolean): void {
-    if (disposed) return
-    const host = canvasHost.value
-    if (host === null) return
-    const handleResize = () => {
-      if (disposed) return
-      checkPointerMapping()
-      createOrResizeReadModel()
-    }
-    if (typeof ResizeObserver === 'function') {
-      resizeObserver = new ResizeObserver(handleResize)
-      resizeObserver.observe(host)
-    } else {
-      window.addEventListener('resize', handleResize)
-      removeResizeListener = () => window.removeEventListener('resize', handleResize)
-    }
-    createOrResizeReadModel()
-  }
-
   composeEditorSession()
   return {
     get editorSession() {
@@ -174,7 +145,10 @@ export function useClipNoteModel({
     editorState,
     noteState,
     failureMessage: readModelFailureMessage,
-    observeViewport,
+    mount() {
+      if (disposed || stopViewport !== null) return
+      stopViewport = watch(getGeometry, createOrResizeReadModel, { immediate: true, flush: 'sync' })
+    },
     recompose() {
       if (disposed) return
       recomposeReadModel()
@@ -183,10 +157,8 @@ export function useClipNoteModel({
     dispose() {
       if (disposed) return
       disposed = true
-      resizeObserver?.disconnect()
-      resizeObserver = null
-      removeResizeListener?.()
-      removeResizeListener = null
+      stopViewport?.()
+      stopViewport = null
       disposeEditorSession()
       disposeReadModel()
     },

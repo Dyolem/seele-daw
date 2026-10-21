@@ -330,6 +330,34 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollTrackSurface', () => {
+  it('uses vertical scroll for pitch while preserving time scroll and cancelling stale placement', async () => {
+    const { wrapper, session, pinia } = createSurfaceFixture()
+    await nextTick()
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    const timeline = wrapper.get<HTMLElement>('.project-piano-roll-track__scroll-viewport').element
+    const revision = session.modelRevision
+    const preferences = usePianoRollPreferencesStore(pinia)
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+    host.dispatchEvent(new WheelEvent('wheel', { deltaY: -480, bubbles: true, cancelable: true }))
+    expect(host.hasPointerCapture(1)).toBe(false)
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+    await nextTick()
+    expect(session.modelRevision).toBe(revision)
+    expect(preferences.pitchCenter).toBe(84)
+    expect(timeline.scrollLeft).toBe(0)
+    const horizontal = new WheelEvent('wheel', { deltaX: 80, bubbles: true, cancelable: true })
+    host.dispatchEvent(horizontal)
+    expect(horizontal.defaultPrevented).toBe(false)
+    expect(preferences.pitchCenter).toBe(84)
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125, pointerId: 2 })
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125, pointerId: 2 })
+    await nextTick()
+    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)[0]?.pitch).toBe(
+      84,
+    )
+    wrapper.unmount()
+  })
+
   it('rolls back renderers and input when viewport observation fails during mount', async () => {
     const probe = installPianoRollResizeObserver('.project-piano-roll-track__canvas-host')
     const { session, wrapper } = createSurfaceFixture()

@@ -33,7 +33,7 @@ export interface PianoRollClipNoteModel {
   readonly editorState: Readonly<ShallowRef<PianoRollEditorSessionState | null>>
   readonly noteState: Readonly<ShallowRef<PianoRollNoteReadModelState | null>>
   readonly failureMessage: Readonly<ShallowRef<string | null>>
-  observeViewport(checkPointerMapping: () => boolean): void
+  mount(): void
   recompose(): void
   dispose(): void
 }

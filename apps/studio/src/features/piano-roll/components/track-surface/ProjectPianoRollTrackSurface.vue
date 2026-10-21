@@ -8,7 +8,9 @@ import {
   type ProjectSession,
   type Tick,
 } from '@seele-daw/project-core'
-import { PIANO_ROLL_KEYS as pianoKeys } from '@/features/piano-roll/presentation/piano-roll-pitch-layout'
+import PianoRollKeyboard from '@/features/piano-roll/components/pitch-view/PianoRollKeyboard.vue'
+import PianoRollPitchScrollbar from '@/features/piano-roll/components/pitch-view/PianoRollPitchScrollbar.vue'
+import { usePitchViewport } from '@/features/piano-roll/viewport/use-pitch-viewport'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
@@ -42,6 +44,7 @@ const noteHost = useTemplateRef<HTMLElement>('noteHost')
 const scrollViewport = useTemplateRef<HTMLElement>('scrollViewport')
 const sustainPedalLane = useTemplateRef<PianoRollSustainPedalLaneHandle>('sustainPedalLane')
 const failureMessage = shallowRef<string | null>(null)
+const pitchView = usePitchViewport(canvasHost)
 const displayGrid = computed(() =>
   createPianoRollGrid({
     barSpanTick: props.barSpanTick,
@@ -51,13 +54,10 @@ const displayGrid = computed(() =>
   }),
 )
 const layout = useTrackLayout({
-  canvasHost,
+  getGeometry: () => pitchView.geometry.value,
   getPresentation: () => props.presentation,
   getTimelineEndTick: () => props.timelineEndTick,
   getBarSpanTick: () => props.barSpanTick,
-  reportFailure: (cause) => {
-    failureMessage.value = describeCause(cause, 'The Track Piano Roll could not be rendered.')
-  },
 })
 const { timelineBars, timelineContentStyle, clipWindows, visibleNotes } = layout
 const follow = useTrackFollow({
@@ -136,7 +136,7 @@ function handleScroll(event: Event): void {
 }
 function dispose(): void {
   follow.dispose()
-  layout.dispose()
+  pitchView.dispose()
   placement.dispose()
   rendering.dispose()
 }
@@ -144,7 +144,7 @@ onMounted(() => {
   try {
     rendering.mount()
     placement.mount()
-    layout.mount()
+    pitchView.mount()
   } catch (cause) {
     dispose()
     failureMessage.value = describeCause(cause, 'The Track Piano Roll could not be composed.')
@@ -164,6 +164,11 @@ onBeforeUnmount(dispose)
         :data-placement-status="placementPreview?.placement.status ?? 'idle'"
         :data-snap-enabled="pianoRollPreferences.snapEnabled"
         :data-tool="pianoRollPreferences.activeTool"
+        :style="{
+          '--project-piano-roll-track-pitch-height': pitchView.geometry.value
+            ? `${pitchView.geometry.value.heightCssPixel}px`
+            : undefined,
+        }"
         tabindex="0"
         @focusin="handleFocusIn"
       >
@@ -191,17 +196,7 @@ onBeforeUnmount(dispose)
 
         <div class="project-piano-roll-track__left-stack">
           <div class="project-piano-roll-track__ruler-corner" aria-hidden="true">PITCH</div>
-          <div class="project-piano-roll-track__keyboard" aria-label="Piano keyboard">
-            <div
-              v-for="key in pianoKeys"
-              :key="key.pitch"
-              class="project-piano-roll-track__key-row"
-            >
-              <span :class="{ 'project-piano-roll-track__key--black': key.isBlack }">
-                {{ key.label }}
-              </span>
-            </div>
-          </div>
+          <PianoRollKeyboard :viewport="pitchView.geometry.value" @wheel="pitchView.handleWheel" />
           <div class="project-piano-roll-track__lane-label" aria-hidden="true">
             <strong>CC64</strong>
             <span>127</span>
@@ -228,6 +223,7 @@ onBeforeUnmount(dispose)
               class="project-piano-roll-track__canvas-host"
               @pointerleave="placement.clearPreview"
               @pointermove="handleHover"
+              @wheel="pitchView.handleWheel"
             >
               <canvas ref="gridCanvas" aria-hidden="true"></canvas>
               <div ref="noteHost" class="project-piano-roll-track__note-host"></div>
@@ -285,6 +281,12 @@ onBeforeUnmount(dispose)
             />
           </div>
         </div>
+        <div class="project-piano-roll-track__pitch-scrollbar-stack">
+          <PianoRollPitchScrollbar
+            :layout="pitchView.layout.value"
+            @scroll-pitch="pitchView.scrollTo"
+          />
+        </div>
 
         <p class="project-piano-roll-track__accessible-status" aria-live="polite">
           {{ accessibleStatus }}
@@ -315,7 +317,9 @@ onBeforeUnmount(dispose)
   min-inline-size: 0;
   min-block-size: 0;
   block-size: 100%;
-  grid-template-columns: var(--project-piano-roll-track-keyboard-width) minmax(0, 1fr);
+  grid-template-columns: var(--project-piano-roll-track-keyboard-width) minmax(0, 1fr) var(
+      --sd-space-3
+    );
   grid-template-rows: var(--project-piano-roll-track-toolbar-height) minmax(0, 1fr);
   overflow: hidden;
   color: var(--sd-color-text-secondary);
@@ -336,9 +340,15 @@ onBeforeUnmount(dispose)
   min-block-size: 0;
   grid-template-rows:
     var(--project-piano-roll-track-ruler-height)
-    minmax(0, 1fr)
+    var(--project-piano-roll-track-pitch-height, minmax(0, 1fr))
     var(--project-piano-roll-track-lane-height);
   border-inline-end: 1px solid var(--sd-color-border-default);
+}
+
+.project-piano-roll-track__pitch-scrollbar-stack {
+  padding-block-start: var(--project-piano-roll-track-ruler-height);
+  min-block-size: 0;
+  overflow: hidden;
 }
 
 .project-piano-roll-track__ruler-corner {
@@ -351,14 +361,6 @@ onBeforeUnmount(dispose)
   font-size: var(--sd-font-size-xs);
   letter-spacing: 0.08em;
   background: var(--sd-color-surface-panel);
-}
-
-.project-piano-roll-track__keyboard {
-  display: grid;
-  min-block-size: 0;
-  grid-template-rows: repeat(25, minmax(0, 1fr));
-  overflow: hidden;
-  background: var(--sd-editor-key-white);
 }
 
 .project-piano-roll-track__lane-label {
@@ -382,33 +384,6 @@ onBeforeUnmount(dispose)
 
 .project-piano-roll-track__lane-label span {
   align-self: flex-end;
-}
-
-.project-piano-roll-track__key-row {
-  position: relative;
-  min-block-size: 0;
-  border-bottom: 1px solid var(--sd-color-border-strong);
-  color: var(--sd-color-text-inverse);
-  font-family: var(--sd-font-family-numeric);
-  font-size: var(--sd-font-size-xs);
-}
-
-.project-piano-roll-track__key-row > span {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-inline-end: var(--sd-space-2);
-}
-
-.project-piano-roll-track__key-row > .project-piano-roll-track__key--black {
-  z-index: 1;
-  inline-size: 68%;
-  justify-content: flex-start;
-  border-radius: 0 var(--sd-radius-xs) var(--sd-radius-xs) 0;
-  color: var(--sd-color-text-secondary);
-  background: var(--sd-editor-key-black);
 }
 
 .project-piano-roll-track__scroll-viewport {

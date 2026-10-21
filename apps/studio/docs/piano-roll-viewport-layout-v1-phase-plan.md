@@ -1,6 +1,6 @@
 # Piano Roll 视口与布局 V1 阶段计划
 
-> 状态：V1–V4 方案已确认；V1 已完成验证，待审核；V2–V4 尚未实施
+> 状态：V1 已审核提交 `86fcbf6`；V2 已完成验证，待审核；V3–V4 尚未实施
 >
 > 创建日期：2026-10-20
 >
@@ -14,8 +14,8 @@
 
 - Track / Clip Focus 共用同一套 Pitch Viewport。标准键高模式固定半音行高，面板高度只改变
   可见行数；音域缩放模式保持目标音域，随可用高度调整行高。完整 MIDI 0–127 音高可滚动访问。
-- 标准键高以 20 CSS px 为候选；音域模式最小行高以 16 CSS px 为候选。行高触及上下限时
-  保证可操作性，允许滚动或显示周边音域，不能继续压缩 Note。具体尺寸随浏览器验收调整。
+- V2 确定标准键高为 20 CSS px，音域模式行高限制为 16–48 CSS px。行高触及上下限时
+  保证可操作性，允许滚动或显示周边音域，不能继续压缩 Note。
 - 音域由用户显式选择或适配，不随 Note 增删自动跳变；面板调整保持中心音高。Pitch 显示
   模式与 Track / Clip Focus 编辑 Scope 相互独立。
 - CC64 保留底部同时间轴，独立边界、内部安全间距和高度控制，支持收起与恢复。未来 Velocity
@@ -55,11 +55,32 @@
   保持原生输入区域高于浏览器的最小尺寸，避免测试输入坐标失效。
 - V1 初次完整 `pnpm check` 通过：Architecture、Workspace Quality、Format、Oxlint、ESLint、全仓
   Type Check、172 个测试文件 / 1,678 项测试、Studio Production Build 与 soundbank dist
-  boundary。构建仍提示主包超过 500kB，该体积优化不属于本批。代码尚未提交。
+  boundary。构建仍提示主包超过 500kB，该体积优化不属于本批。V1 已按授权提交为 `86fcbf6`。
 - 收拢闪烁修复：Reka 默认文字依赖列表项注册，开合重建期间可能短暂清空；现在通过
   `SelectValue` 的公开 Slot 渲染由 `modelValue / options` 派生的文字。真实浏览器修复前
   捕获按钮从约 116px 收缩到 58px；修复后外部点击与 Escape 均保持原宽度，切换短选项
   正常调整至约 63px。10 项组件测试与浏览器文字、宽度采样通过。
+
+## V2 实现边界与验证
+
+- 标准模式固定 20px，音域模式保持目标跨度并在 16–48px 内适配；初始中心 MIDI 60、目标
+  25 键，缩放按 1.25 倍调整至 3–128 键。`Fit notes` 根据当前 Scope 的全部音符计算两侧各
+  2 半音余量，显式进入音域模式。显示 `Target N keys` 及提示，说明短面板仍需滚动。
+- 两种 Scope 共用 feature 层 Pitch policy / hook 和三个视图组件；`PianoRollPreferences`
+  只保存模式、中心和跨度。局部 Read Model / Renderer / Input 仍由各 Surface 拥有。
+- Editor 公共 Pitch Viewport 增加行高与顶部部分行偏移，键盘、Grid、Note、Move、Preview
+  与 Hit 共用坐标。Canvas 仅分配可见高度，完整音域由独立原生滚动条表达。
+- Pitch 映射改变同步取消捕获，迟到 End 不提交；Project / History / dirty 不因视图操作改变。
+  Clip 目标重建与几何观察分开，避免一次切换触发重复订阅。
+- 自动化覆盖完整音域、部分行正反映射、Grid / Note 对齐、两种行高策略、中心锚点、滚动后
+  落笔和手势取消、偏好与资源释放。完整 `pnpm check` 通过：Architecture、Workspace Quality、
+  Format、Oxlint、ESLint、全仓 Type Check、173 个测试文件 / 1,694 项测试、Studio Production
+  Build 与 soundbank dist boundary。仍有既有主包超过 500kB 的构建提示。
+- 2026-10-21 使用 Codex 内置浏览器及独立测试 Project：MIDI 0 / 127、滚轮与 Home / End、
+  模式与 Scope 切换、Fit / Zoom、最大化和还原、低音区落笔 / Move / Undo 均通过；CC64 与
+  横向时间映射不随 Pitch 滚动。900px 窗口中工具栏可滚动，键盘聚焦自动带入屏外控件。
+- 小窗口中 Workspace 主区域最小高度与 Dock 总高度仍会竞争，CC64 / Tempo 边界和高度政策
+  继续按 V3 解决。本批只完成 Pitch Viewport，不提前实施辅助 Lane 或 Clip 全高区域。
 
 ## 不变量
 

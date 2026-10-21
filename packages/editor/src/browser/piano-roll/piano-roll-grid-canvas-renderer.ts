@@ -56,21 +56,17 @@ function requireTheme(theme: PianoRollGridCanvasTheme): PianoRollGridCanvasTheme
   return theme
 }
 
-function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
-  return viewport.heightCssPixel / (viewport.maximumPitch - viewport.minimumPitch + 1)
-}
-
 function drawPitchRows(
   context: CanvasRenderingContext2D,
   viewport: PianoRollTimelineViewport,
   theme: PianoRollGridCanvasTheme,
 ): void {
-  const rowHeight = pitchRowHeight(viewport)
+  const rowHeight = viewport.pitchRowHeightCssPixel
   context.fillStyle = theme.background
   context.fillRect(0, 0, viewport.widthCssPixel, viewport.heightCssPixel)
 
   for (let pitch: number = viewport.maximumPitch; pitch >= viewport.minimumPitch; pitch -= 1) {
-    const y = (viewport.maximumPitch - pitch) * rowHeight
+    const y = (viewport.maximumPitch - pitch) * rowHeight - viewport.pitchOffsetCssPixel
     context.fillStyle = BLACK_PITCH_CLASSES.has(pitch % 12)
       ? theme.blackPitchRow
       : theme.whitePitchRow
@@ -81,7 +77,7 @@ function drawPitchRows(
   context.strokeStyle = theme.pitchRowBorder
   context.lineWidth = 1
   for (let row = 1; row <= viewport.maximumPitch - viewport.minimumPitch; row += 1) {
-    const y = row * rowHeight
+    const y = row * rowHeight - viewport.pitchOffsetCssPixel
     context.moveTo(0, y)
     context.lineTo(viewport.widthCssPixel, y)
   }

@@ -108,6 +108,7 @@ export {
   PIANO_ROLL_DEFAULT_CENTER_PITCH,
   createInitialPianoRollViewport,
   createPianoRollTimelineViewport,
+  createPianoRollPitchViewport,
   createPianoRollViewport,
   pianoRollClipTickToCssPixel,
   pianoRollCssPixelToClipTickPosition,
@@ -119,8 +120,10 @@ export {
 export type {
   CreateInitialPianoRollViewportInput,
   CreatePianoRollTimelineViewportInput,
+  CreatePianoRollPitchViewportInput,
   CreatePianoRollViewportInput,
   PianoRollTimelineViewport,
+  PianoRollPitchViewport,
   PianoRollViewport,
 } from './piano-roll-viewport'
 

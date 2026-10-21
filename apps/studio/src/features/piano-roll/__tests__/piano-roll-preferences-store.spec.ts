@@ -1,4 +1,4 @@
-import { PROJECT_PPQ, parseMidiChannel } from '@seele-daw/project-core'
+import { PROJECT_PPQ, parseMidiChannel, parseMidiPitch } from '@seele-daw/project-core'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
@@ -21,6 +21,27 @@ beforeEach(() => {
 })
 
 describe('Piano Roll Preferences Store', () => {
+  it('fits an explicit note range and preserves it across scope changes until the next view action', () => {
+    const preferences = usePianoRollPreferencesStore()
+    expect(preferences.pitchViewMode).toBe('standard')
+    expect(preferences.pitchCenter).toBe(60)
+    expect(preferences.pitchRangeSize).toBe(25)
+    preferences.fitPitchRange([parseMidiPitch(72), parseMidiPitch(84)])
+    expect(preferences.pitchViewMode).toBe('range')
+    expect(preferences.pitchCenter).toBe(78)
+    expect(preferences.pitchRangeSize).toBe(17)
+    preferences.selectEditingScope(PIANO_ROLL_EDITING_SCOPE.CLIP)
+    preferences.zoomPitchRange('in')
+    expect(preferences.pitchCenter).toBe(78)
+    expect(preferences.pitchRangeSize).toBe(14)
+    preferences.selectPitchViewMode('standard')
+    expect(preferences.pitchCenter).toBe(78)
+    preferences.reset()
+    expect(preferences.pitchViewMode).toBe('standard')
+    expect(preferences.pitchCenter).toBe(60)
+    expect(preferences.pitchRangeSize).toBe(25)
+  })
+
   it('starts with the accepted Pencil, Snap and 1/16 defaults', () => {
     const preferences = usePianoRollPreferencesStore()
 

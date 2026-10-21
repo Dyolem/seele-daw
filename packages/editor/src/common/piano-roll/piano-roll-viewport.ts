@@ -16,11 +16,17 @@ import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 
 export const PIANO_ROLL_DEFAULT_CENTER_PITCH = parseMidiPitch(60)
 
-/** Shared time-and-pitch geometry for Clip-local and global Track Piano Rolls. */
-export interface PianoRollTimelineViewport {
+/** Visible rows may be clipped at either edge without changing their height. */
+export interface PianoRollPitchViewport {
   readonly heightCssPixel: number
   readonly maximumPitch: MidiPitch
   readonly minimumPitch: MidiPitch
+  readonly pitchRowHeightCssPixel: number
+  readonly pitchOffsetCssPixel: number
+}
+
+/** Shared time-and-pitch geometry for Clip-local and global Track Piano Rolls. */
+export interface PianoRollTimelineViewport extends PianoRollPitchViewport {
   readonly visibleEndTick: Tick
   readonly visibleSpanTick: Tick
   readonly visibleStartTick: Tick
@@ -31,10 +37,15 @@ export interface PianoRollViewport extends PianoRollTimelineViewport {
   readonly clipId: ClipId
 }
 
-export interface CreatePianoRollTimelineViewportInput {
+export interface CreatePianoRollPitchViewportInput {
   readonly heightCssPixel: number
   readonly maximumPitch: MidiPitch
   readonly minimumPitch: MidiPitch
+  readonly pitchRowHeightCssPixel?: number
+  readonly pitchOffsetCssPixel?: number
+}
+
+export interface CreatePianoRollTimelineViewportInput extends CreatePianoRollPitchViewportInput {
   readonly visibleSpanTick: Tick
   readonly visibleStartTick: Tick
   readonly widthCssPixel: number
@@ -42,10 +53,7 @@ export interface CreatePianoRollTimelineViewportInput {
 
 export type CreatePianoRollViewportInput = CreatePianoRollTimelineViewportInput
 
-export interface CreateInitialPianoRollViewportInput {
-  readonly heightCssPixel: number
-  readonly maximumPitch: MidiPitch
-  readonly minimumPitch: MidiPitch
+export interface CreateInitialPianoRollViewportInput extends CreatePianoRollPitchViewportInput {
   readonly widthCssPixel: number
 }
 
@@ -85,6 +93,18 @@ export function createPianoRollTimelineViewport(
   const visibleStartTick = parseTick(input.visibleStartTick)
   const visibleSpanTick = parsePositiveTick(input.visibleSpanTick)
   const visibleEndTick = addTicks(visibleStartTick, visibleSpanTick)
+  return Object.freeze({
+    ...createPianoRollPitchViewport(input),
+    visibleEndTick,
+    visibleSpanTick,
+    visibleStartTick,
+    widthCssPixel: requirePositiveCssPixel(input.widthCssPixel, 'width'),
+  })
+}
+
+export function createPianoRollPitchViewport(
+  input: CreatePianoRollPitchViewportInput,
+): PianoRollPitchViewport {
   const minimumPitch = parseMidiPitch(input.minimumPitch)
   const maximumPitch = parseMidiPitch(input.maximumPitch)
 
@@ -95,14 +115,28 @@ export function createPianoRollTimelineViewport(
     )
   }
 
+  const heightCssPixel = requirePositiveCssPixel(input.heightCssPixel, 'height')
+  const pitchRowHeightCssPixel = requirePositiveCssPixel(
+    input.pitchRowHeightCssPixel ?? heightCssPixel / (maximumPitch - minimumPitch + 1),
+    'pitch row height',
+  )
+  const pitchOffsetCssPixel = input.pitchOffsetCssPixel ?? 0
+  if (
+    !Number.isFinite(pitchOffsetCssPixel) ||
+    pitchOffsetCssPixel < 0 ||
+    pitchOffsetCssPixel >= pitchRowHeightCssPixel
+  ) {
+    throw new PianoRollError(
+      'invalid-viewport-dimension',
+      'Pitch offset must be within the first visible row',
+    )
+  }
   return Object.freeze({
-    heightCssPixel: requirePositiveCssPixel(input.heightCssPixel, 'height'),
+    heightCssPixel,
     maximumPitch,
     minimumPitch,
-    visibleEndTick,
-    visibleSpanTick,
-    visibleStartTick,
-    widthCssPixel: requirePositiveCssPixel(input.widthCssPixel, 'width'),
+    pitchRowHeightCssPixel,
+    pitchOffsetCssPixel,
   })
 }
 
@@ -186,12 +220,8 @@ export function pianoRollCssPixelToTimelineTickPosition(
   return viewport.visibleStartTick + (xCssPixel / viewport.widthCssPixel) * viewport.visibleSpanTick
 }
 
-function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
-  return viewport.heightCssPixel / (viewport.maximumPitch - viewport.minimumPitch + 1)
-}
-
 export function pianoRollMidiPitchToCssPixel(
-  viewport: PianoRollTimelineViewport,
+  viewport: PianoRollPitchViewport,
   pitchInput: MidiPitch,
 ): number {
   const pitch = parseMidiPitch(pitchInput)
@@ -201,11 +231,13 @@ export function pianoRollMidiPitchToCssPixel(
       `MIDI Pitch ${pitch} is outside the Piano Roll Viewport`,
     )
   }
-  return (viewport.maximumPitch - pitch) * pitchRowHeight(viewport)
+  return (
+    (viewport.maximumPitch - pitch) * viewport.pitchRowHeightCssPixel - viewport.pitchOffsetCssPixel
+  )
 }
 
 export function pianoRollCssPixelToMidiPitch(
-  viewport: PianoRollTimelineViewport,
+  viewport: PianoRollPitchViewport,
   yCssPixelInput: number,
 ): MidiPitch {
   const yCssPixel = requireCssPixelPosition(
@@ -214,6 +246,14 @@ export function pianoRollCssPixelToMidiPitch(
     'vertical',
     false,
   )
-  const pitch = viewport.maximumPitch - Math.floor(yCssPixel / pitchRowHeight(viewport))
+  const pitch =
+    viewport.maximumPitch -
+    Math.floor((yCssPixel + viewport.pitchOffsetCssPixel) / viewport.pitchRowHeightCssPixel)
+  if (pitch < viewport.minimumPitch) {
+    throw new PianoRollError(
+      'coordinate-outside-viewport',
+      'Vertical position is below the visible MIDI range',
+    )
+  }
   return parseMidiPitch(Math.min(MIDI_PITCH_MAX, Math.max(MIDI_PITCH_MIN, pitch)))
 }

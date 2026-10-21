@@ -12,7 +12,10 @@ import { useNoteInteraction } from '@/features/piano-roll/components/clip-focus/
 import { useNoteRendering } from '@/features/piano-roll/components/clip-focus/hooks/use-note-rendering'
 import { useEditingActions } from '@/features/piano-roll/components/clip-focus/hooks/use-editing-actions'
 import { useClipSustainPedal } from '@/features/piano-roll/components/clip-focus/hooks/use-clip-sustain-pedal'
-import { PIANO_ROLL_KEYS as pianoKeys } from '@/features/piano-roll/presentation/piano-roll-pitch-layout'
+import PianoRollKeyboard from '@/features/piano-roll/components/pitch-view/PianoRollKeyboard.vue'
+import PianoRollPitchControls from '@/features/piano-roll/components/pitch-view/PianoRollPitchControls.vue'
+import PianoRollPitchScrollbar from '@/features/piano-roll/components/pitch-view/PianoRollPitchScrollbar.vue'
+import { usePitchViewport } from '@/features/piano-roll/viewport/use-pitch-viewport'
 import { describeFailure } from '@/features/piano-roll/presentation/piano-roll-feedback'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
@@ -42,9 +45,25 @@ const elements: PianoRollSurfaceElements = {
 const focusedEditingTarget = shallowRef<FocusedPianoRollEditingTarget>('notes')
 const interactionFailureMessage = shallowRef<string | null>(null)
 const interactionSession = createPianoRollInteractionSession()
+const pitchView = usePitchViewport(canvasHost)
+const fitPitches = computed(() => {
+  const context = props.presentation.context
+  const partition = props.presentation.snapshot.midiNotePartitions.find(
+    ({ sourceId }) => sourceId === context.sourceId,
+  )
+  return (
+    partition?.notes
+      .filter(
+        (note) =>
+          note.startTick < context.sourceEndTick &&
+          note.startTick + note.durationTick > context.sourceStartTick,
+      )
+      .map((note) => note.pitch) ?? []
+  )
+})
 const model = useClipNoteModel({
   props,
-  canvasHost,
+  getGeometry: () => pitchView.geometry.value,
   interactionSession,
   interactionFailureMessage,
 })
@@ -147,7 +166,8 @@ onMounted(() => {
   try {
     rendering.mount()
     interaction.mount()
-    model.observeViewport(interaction.hasStablePointerMapping)
+    model.mount()
+    pitchView.mount(interaction.hasStablePointerMapping)
   } catch (cause) {
     dispose()
     rendering.failureMessage.value = describeFailure(cause)
@@ -159,6 +179,7 @@ function dispose(): void {
   // Release capture and its semantic owner before disposing projections and renderers.
   interaction.dispose()
   model.dispose()
+  pitchView.dispose()
   rendering.dispose()
 }
 onBeforeUnmount(dispose)
@@ -197,6 +218,7 @@ onBeforeUnmount(dispose)
               @update:model-value="handleSustainPedalChannelChange"
             />
           </label>
+          <PianoRollPitchControls :pitches="fitPitches" />
         </header>
 
         <div class="project-piano-roll__ruler-corner" aria-hidden="true">PITCH</div>
@@ -204,15 +226,17 @@ onBeforeUnmount(dispose)
           <span v-for="bar in barLabels" :key="bar">{{ bar }}</span>
         </div>
 
-        <div class="project-piano-roll__keyboard" aria-label="Piano keyboard">
-          <div v-for="key in pianoKeys" :key="key.pitch" class="project-piano-roll__key-row">
-            <span :class="{ 'project-piano-roll__key--black': key.isBlack }">
-              {{ key.label }}
-            </span>
-          </div>
-        </div>
+        <PianoRollKeyboard
+          class="project-piano-roll__keyboard"
+          :viewport="pitchView.geometry.value"
+          @wheel="pitchView.handleWheel"
+        />
 
-        <div ref="canvasHost" class="project-piano-roll__canvas-host">
+        <div
+          ref="canvasHost"
+          class="project-piano-roll__canvas-host"
+          @wheel="pitchView.handleWheel"
+        >
           <canvas ref="gridCanvas" aria-hidden="true"></canvas>
           <div
             v-if="snapGuideStyle"
@@ -222,6 +246,11 @@ onBeforeUnmount(dispose)
           ></div>
           <div ref="noteHost" class="project-piano-roll__note-host"></div>
         </div>
+        <PianoRollPitchScrollbar
+          class="project-piano-roll__pitch-scrollbar"
+          :layout="pitchView.layout.value"
+          @scroll-pitch="pitchView.scrollTo"
+        />
 
         <div class="project-piano-roll__lane-label" aria-hidden="true">
           <strong>CC64</strong>
@@ -231,6 +260,7 @@ onBeforeUnmount(dispose)
         </div>
         <PianoRollSustainPedalLane
           :session="props.session"
+          class="project-piano-roll__sustain-lane"
           ref="sustainPedalLane"
           :clip-context="props.presentation.context"
           :grid="displayGrid"
@@ -279,7 +309,7 @@ onBeforeUnmount(dispose)
   min-inline-size: 0;
   min-block-size: 0;
   block-size: 100%;
-  grid-template-columns: var(--project-piano-roll-keyboard-width) minmax(0, 1fr);
+  grid-template-columns: var(--project-piano-roll-keyboard-width) minmax(0, 1fr) var(--sd-space-3);
   grid-template-rows:
     var(--project-piano-roll-toolbar-height)
     var(--project-piano-roll-ruler-height)
@@ -297,6 +327,7 @@ onBeforeUnmount(dispose)
   gap: var(--sd-space-2);
   min-inline-size: 0;
   padding-inline: var(--sd-space-2);
+  overflow-x: auto;
   border-bottom: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
 }
@@ -320,6 +351,8 @@ onBeforeUnmount(dispose)
 
 .project-piano-roll__ruler-corner,
 .project-piano-roll__ruler {
+  grid-row: 2;
+  grid-column: 2;
   border-bottom: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
 }
@@ -349,15 +382,21 @@ onBeforeUnmount(dispose)
 }
 
 .project-piano-roll__keyboard {
-  display: grid;
-  min-block-size: 0;
-  grid-template-rows: repeat(25, minmax(0, 1fr));
-  overflow: hidden;
-  border-inline-end: 1px solid var(--sd-color-border-default);
-  background: var(--sd-editor-key-white);
+  grid-row: 3;
+  grid-column: 1;
+}
+.project-piano-roll__pitch-scrollbar {
+  grid-row: 3;
+  grid-column: 3;
+}
+.project-piano-roll__sustain-lane {
+  grid-row: 4;
+  grid-column: 2;
 }
 
 .project-piano-roll__lane-label {
+  grid-row: 4;
+  grid-column: 1;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -382,34 +421,9 @@ onBeforeUnmount(dispose)
   align-self: flex-end;
 }
 
-.project-piano-roll__key-row {
-  position: relative;
-  min-block-size: 0;
-  border-bottom: 1px solid var(--sd-color-border-strong);
-  color: var(--sd-color-text-inverse);
-  font-family: var(--sd-font-family-numeric);
-  font-size: var(--sd-font-size-xs);
-}
-
-.project-piano-roll__key-row > span {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-inline-end: var(--sd-space-2);
-}
-
-.project-piano-roll__key-row > .project-piano-roll__key--black {
-  inline-size: 68%;
-  z-index: 1;
-  justify-content: flex-start;
-  border-radius: 0 var(--sd-radius-xs) var(--sd-radius-xs) 0;
-  color: var(--sd-color-text-secondary);
-  background: var(--sd-editor-key-black);
-}
-
 .project-piano-roll__canvas-host {
+  grid-row: 3;
+  grid-column: 2;
   position: relative;
   min-inline-size: 0;
   min-block-size: 0;

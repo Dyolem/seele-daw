@@ -9,18 +9,21 @@ Studio 的 MIDI Note 与 CC64 编辑入口，遵循根 [工程代码准则](../.
 | `components/clip-focus/`               | Clip Focus 组件、五个私有 hooks 与局部共享类型                               |
 | `components/track-surface/`            | Track Surface、Toolbar、私有 hooks、Placement Operation / Session 与局部契约 |
 | `components/sustain-pedal/`            | 两种 Scope 共用的 CC64 Lane、五个私有 hooks 与局部契约                       |
+| `components/pitch-view/`               | 两种 Scope 共用的可见琴键、Pitch 模式控件与独立纵向滚动条                    |
 | `components/PianoRollToolControls.vue` | 两种 Surface 共用的 Pencil / Cursor / Snap 视图                              |
 | `types/`                               | 跨子模块共享的 Presentation、Preference、Intent、Lane Handle 与 Action 契约  |
 | `interaction/`                         | 将 Editor Intent 转成既有 Coordinator 调用，处理提交回告和失败反馈           |
-| `presentation/`                        | Snapshot 投影、Renderer 选择、Theme、Pitch Layout、Channel 选项和反馈文案    |
+| `presentation/`                        | Snapshot 投影、Renderer 选择、Theme、Channel 选项和反馈文案                  |
+| `viewport/`                            | Pitch 视口纯计算政策、宿主测量与滚轮的 Vue / Browser 适配                    |
 | `state/`                               | 应用生命周期的轻量 Piano Roll Preferences Store                              |
 | `actions/`                             | Tool Action 定义、Vue 注册与 Context Menu                                    |
 | `playhead/`                            | Clip / Track 时间位置投影和显示                                              |
 | `__tests__/`                           | Feature 行为测试及测试专用 support                                           |
 
 组件保留 DOM refs、Props / Emits、模板、无障碍语义及组合顺序；私有 hooks 不作为跨子模块 API。
-`PianoRollToolControls` 与 `PianoRollTrackToolbar` 只接收状态并上报意图，Surface 各自只注册一次
-Tool Action Target。Active Clip 与 Channel 下拉框使用 `UiSelect` 的 small 规格和统一菜单外观。
+`PianoRollToolControls` 与 `PianoRollTrackToolbar` 接收编辑状态并上报编辑意图，Surface 各自只注册一次
+Tool Action Target。`PianoRollPitchControls` 消费共享 UI Preferences，Scope 内待适配的全部音高
+由父级输入。Active Clip、Channel 与 Pitch 模式下拉框均使用 `UiSelect` 的 small 规格。
 
 ## 推荐阅读顺序
 
@@ -29,7 +32,7 @@ Tool Action Target。Active Clip 与 Channel 下拉框使用 `UiSelect` 的 smal
 从 [ProjectPianoRollSurface](./components/clip-focus/ProjectPianoRollSurface.vue) 开始：
 
 1. [useClipNoteModel](./components/clip-focus/hooks/use-clip-note-model.ts)：Editor Selection
-   Session、Note Read Model、Project 订阅与 Viewport Observer。
+   Session、Note Read Model 与 Project 订阅；监听共享几何变化，目标变化由显式 recompose 处理。
 2. [useNoteInteraction](./components/clip-focus/hooks/use-note-interaction.ts)：Browser Pointer
    Adapter、Editor Interaction Session、capture bounds 与 Intent 转交。
 3. [useNoteRendering](./components/clip-focus/hooks/use-note-rendering.ts)：权威 Note、Selection、
@@ -46,7 +49,7 @@ Tool Action Target。Active Clip 与 Channel 下拉框使用 `UiSelect` 的 smal
 从 [ProjectPianoRollTrackSurface](./components/track-surface/ProjectPianoRollTrackSurface.vue) 开始：
 
 1. [useTrackLayout](./components/track-surface/hooks/use-track-layout.ts)：Timeline Bars、内容宽度、
-   可见 Note、Clip Windows 与 Viewport 测量。
+   可见 Note、Clip Windows 与时间 / 音高 Viewport 组合；尺寸由共享 Pitch hook 提供。
 2. [useTrackRendering](./components/track-surface/hooks/use-track-rendering.ts)：Grid / Note Renderer
    的创建、投影、失败反馈与释放，消费 Layout 提供的 Viewport。
 3. [useTrackFollow](./components/track-surface/hooks/use-track-follow.ts)：Playback 分页跟随、
@@ -85,16 +88,31 @@ Props 和 Read Model 联合类型见
 共享的 [Handle](./types/piano-roll-sustain-pedal.ts) 与两种 Surface 协作；Session 作为显式 Props
 输入，不从 Lane 暴露。新增、移动和改值统一通过 Intent Handler 返回真实 Commit，已删除无回告的 Placement Emit。Projection 内单独使用的类型仍与其实现共置。
 
+### Pitch Viewport
+
+1. [pitch-viewport-policy](./viewport/pitch-viewport-policy.ts)：标准行高、音域缩放上下限、完整
+   MIDI 范围、中心锚点与可见部分行的纯计算。
+2. [usePitchViewport](./viewport/use-pitch-viewport.ts)：测量可视宿主、组合 Preferences、适配
+   纵向滚轮，显式 mount / dispose 唯一 ResizeObserver 或 fallback listener。
+3. [PianoRollKeyboard](./components/pitch-view/PianoRollKeyboard.vue)、
+   [PianoRollPitchScrollbar](./components/pitch-view/PianoRollPitchScrollbar.vue) 与
+   [PianoRollPitchControls](./components/pitch-view/PianoRollPitchControls.vue)：消费同一几何与
+   偏好，不另存音高或 Project 状态。共享契约见 [pitch viewport types](./types/piano-roll-pitch-viewport.ts)。
+
+Editor 公共 `PianoRollPitchViewport` 使用明确行高与顶部部分行偏移；Grid、Note Scene、
+Move、Placement 和 Hit 共用映射。Studio 只提供当前可见音域与像素高度，Canvas 不按完整
+128 行分配位图。时间坐标继续由各 Scope 拥有，CC64 不受 Pitch 滚动影响。
+
 ## 失效与资源清理
 
-| Owner         | 创建与正常释放                                                                                                                                      | 失效来源与时机                                                                                                                                   |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Clip Focus    | 创建 Selection；mount Renderer、Input、Viewport / Read Model。释放 Input / Interaction，再释放 Selection / Read Model / Observer，最后释放 Renderer | Clip / Source / Session 变化同步取消后重建；Selection 与 authority revision 由已有 Editor Session 协调                                           |
-| Track Surface | mount Renderer、Input、Viewport Observer；逆序释放 Observer、Input、Renderer，同时关闭 Follow 的排队回调                                            | 映射、Session / Project / Track / Active Clip 改变取消；Tool / Grid / Snap 保留 Begin 快照；revision 由 Session 同步校验并在 post flush 交接     |
-| CC64 Lane     | 创建 Interaction Session 与订阅，mount Input 后观察 Viewport；释放 Observer、Input、订阅与 Session                                                  | Viewport 变化同步取消；Session / Project / Scope / Clip / Source / Channel 同步取消并清空选择；post flush 的 revision 先通知 Session，再协调选择 |
+| Owner         | 创建与正常释放                                                                                                                                       | 失效来源与时机                                                                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Clip Focus    | 创建 Selection；mount Renderer、Input、几何监听、Pitch Observer。释放 Input / Interaction、Selection / Read Model、Pitch Observer，最后释放 Renderer | Clip / Source / Session 变化同步取消后重建；几何监听只响应测量和 Pitch 偏好，避免目标切换时重复订阅；revision 由 Editor Session 协调             |
+| Track Surface | mount Renderer、Input、Viewport Observer；逆序释放 Observer、Input、Renderer，同时关闭 Follow 的排队回调                                             | 映射、Session / Project / Track / Active Clip 改变取消；Tool / Grid / Snap 保留 Begin 快照；revision 由 Session 同步校验并在 post flush 交接     |
+| CC64 Lane     | 创建 Interaction Session 与订阅，mount Input 后观察 Viewport；释放 Observer、Input、订阅与 Session                                                   | Viewport 变化同步取消；Session / Project / Scope / Clip / Source / Channel 同步取消并清空选择；post flush 的 revision 先通知 Session，再协调选择 |
 
 资源组合由组件显式安排，不依赖多个 `onMounted` 的注册顺序。部分初始化失败立即回收已创建
-资源，`dispose` 幂等，已排队的 Resize / Follow 回调在释放后失效。Viewport 尺寸变化取消捕获，
+资源，`dispose` 幂等，已排队的 Resize / Follow 回调在释放后失效。Viewport 尺寸、Pitch 行高或偏移变化取消捕获，
 不能沿用旧坐标完成写入。CC64 revision 更新保留提交到权威投影的 Preview 交接。
 普通资源的顺序按依赖逆序；Clip Focus 为释放 Pointer Capture，优先关闭 Input / Interaction。
 
@@ -134,7 +152,10 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
 
 - 从 Snapshot 派生选中 Clip 的非循环 `PianoRollClipContext`、Track Color 和 muted；
 - 在 Context Editor Dock 组合真实 Project Query / Subscription；
-- DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note 摘要；
+- DOM 标尺、MIDI 0–127 可滚动钢琴键盘、焦点与可访问 Note 摘要；
+- `Standard keys` 固定 20px 行高；`Pitch range` 保留目标跨度、随面板适配为 16–48px 行高；
+  `− / +` 调整目标键数，`Fit notes` 显式适配当前 Scope 全部音符。中心与显示偏好跨 Scope / Dock
+  保留，音符增删不自动跳转。短面板通过滚动访问范围，不继续压缩音符；
 - `@seele-daw/editor` 提供的 Canvas Grid、Note Scene 与 keyed DOM Note
   Renderer；Canvas Note Adapter 保留为可替换实现；
 - Clip-scoped Note Selection、DOM Hit、Primary Pointer Click 与 focused Escape；

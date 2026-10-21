@@ -59,10 +59,6 @@ function requireOpacity(value: number): number {
   return value
 }
 
-function pitchRowHeight(viewport: PianoRollTimelineViewport): number {
-  return viewport.heightCssPixel / (viewport.maximumPitch - viewport.minimumPitch + 1)
-}
-
 function createSceneNotes(input: CreatePianoRollNoteSceneInput): readonly SceneNote[] {
   const previewNoteIds = new Set(input.movePreview?.movedNoteIds ?? [])
   if (input.resizePreview !== null && input.resizePreview !== undefined) {
@@ -137,7 +133,7 @@ export function createPianoRollNoteScene(input: CreatePianoRollNoteSceneInput): 
   if (input.resizePreview !== null && input.resizePreview !== undefined) {
     selectedNoteIds.add(input.resizePreview.resizedNoteId)
   }
-  const rowHeight = pitchRowHeight(input.viewport)
+  const rowHeight = input.viewport.pitchRowHeightCssPixel
   const inset = Math.min(1, rowHeight / 5)
   const notes = createSceneNotes(input).map((note): PianoRollNoteVisual => {
     const selected = selectedNoteIds.has(note.noteId)

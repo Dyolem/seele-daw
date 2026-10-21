@@ -26,6 +26,7 @@ import {
   createPianoRollGrid,
   createPianoRollGridCanvasRenderer,
   createPianoRollNoteScene,
+  createPianoRollTimelineViewport,
   createPianoRollViewport,
   PianoRollError,
   type PianoRollGridCanvasTheme,
@@ -113,6 +114,45 @@ afterEach(() => {
 })
 
 describe('Piano Roll Browser Renderers', () => {
+  it('keeps Grid rows and Note bodies aligned when both edge rows are clipped', () => {
+    const fixture = createRendererFixture()
+    const viewport = createPianoRollTimelineViewport({
+      ...fixture.viewport,
+      heightCssPixel: 40,
+      maximumPitch: parseMidiPitch(62),
+      minimumPitch: parseMidiPitch(60),
+      pitchRowHeightCssPixel: 20,
+      pitchOffsetCssPixel: 5,
+    })
+    fixture.gridRenderer.render({
+      grid: createPianoRollGrid({
+        barSpanTick: parsePositiveTick(3_840),
+        beatSpanTick: parsePositiveTick(960),
+        originTick: parseTick(0),
+        subdivisionSpanTick: parsePositiveTick(240),
+      }),
+      theme: gridTheme,
+      viewport,
+    })
+    expect(fixture.gridCanvas.canvas.height).toBe(80)
+    const fills = fixture.gridCanvas.operations.filter(({ name }) => name === 'fillRect')
+    expect(fills.map((operation) => operation.arguments)).toContainEqual([0, -5, 960, 20])
+    expect(fills.map((operation) => operation.arguments)).toContainEqual([0, 35, 960, 20])
+    const scene = createPianoRollNoteScene({
+      notes: [fixture.visibleNote],
+      selectedNoteIds: [],
+      style: {
+        borderColor: '#fff',
+        fillColor: '#888',
+        opacity: 1,
+        selectedBorderColor: '#fff',
+        selectedGlowColor: '#fff',
+      },
+      viewport,
+    })
+    expect(scene.notes[0]).toMatchObject({ xCssPixel: 240, yCssPixel: 36, heightCssPixel: 18 })
+    fixture.gridRenderer.dispose()
+  })
   it('creates an evenly nested immutable display grid', () => {
     const grid = createPianoRollGrid({
       barSpanTick: parsePositiveTick(3_840),

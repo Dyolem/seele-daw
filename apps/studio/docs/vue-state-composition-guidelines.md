@@ -2,7 +2,7 @@
 
 > Status: Normative
 > Scope: `apps/studio` Vue application layer
-> Last updated: 2026-08-13
+> Last updated: 2026-10-21
 
 本文档规定 Seele Studio 如何在组件本地状态、Props / Emits、Pinia 与
 `provide / inject` 之间选择。它补充根目录 `DESIGN.md` 的状态所有权约束，不改变
@@ -136,11 +136,16 @@ Clip Selection 保持 `selectedClipId -> selectedTrackId` 所有权一致性：�
 Piano Roll Preferences 是第二个 feature Store，只保存：
 
 - `activeTool`：`pencil` 或 `cursor`；
+- `editingScope`：`track` 或 `clip-focus`；
 - `snapEnabled`；
-- `gridPreset` 以及由 Preset 派生的 Subdivision Tick。
+- `gridPreset` 以及由 Preset 派生的 Subdivision Tick；
+- `sustainPedalChannel`：MIDI `0..15`；
+- `pitchViewMode`、连续中心音高 `pitchCenter` 与目标跨度 `pitchRangeSize`。
 
 这些偏好跨 Project、Clip 和 Dock 布局共享，不随编辑对象销毁；新的 Studio 应用 Pinia 实例
-恢复默认 Pencil、Snap 开启和 `1/16`。Store 不保存 Note、Selection、Pointer Gesture 或
+恢复默认 Track、Pencil、Snap 开启、`1/16`、CC64 Channel 1、标准键高、中心 MIDI 60 和目标 25 键。
+实际像素尺寸、滚动位置和 Viewport 从宿主测量与偏好派生，Observer 由 Surface 释放。
+Store 不保存 Note、Selection、Pointer Gesture 或
 ProjectSession，也不因为当前只有一个已确认 Grid Preset 就预建未决定的产品选项。
 
 UI Toast 是第三个 Store。通知会由 Arrangement、Piano Roll 和后续远距离 Feature 触发，

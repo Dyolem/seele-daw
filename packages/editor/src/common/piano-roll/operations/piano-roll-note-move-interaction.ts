@@ -177,8 +177,7 @@ function resolveTickDelta(
 }
 
 function resolvePitchDelta(input: ResolvePianoRollNoteMovePreviewInput): MidiPitchDelta {
-  const pitchRowHeight =
-    input.viewport.heightCssPixel / (input.viewport.maximumPitch - input.viewport.minimumPitch + 1)
+  const pitchRowHeight = input.viewport.pitchRowHeightCssPixel
   const rawDelta =
     (input.gesture.originPosition.yCssPixel - input.pointerInput.position.yCssPixel) /
     pitchRowHeight

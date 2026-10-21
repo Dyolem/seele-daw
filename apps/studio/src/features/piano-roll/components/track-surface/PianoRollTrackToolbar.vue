@@ -4,6 +4,7 @@ import { PIANO_ROLL_TRACK_CLIP_STATUS, type PianoRollTrackReadModel } from '@see
 import { parseMidiChannel, type ClipId, type MidiChannel } from '@seele-daw/project-core'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import PianoRollToolControls from '@/features/piano-roll/components/PianoRollToolControls.vue'
+import PianoRollPitchControls from '@/features/piano-roll/components/pitch-view/PianoRollPitchControls.vue'
 import { PIANO_ROLL_MIDI_CHANNEL_OPTIONS } from '@/features/piano-roll/presentation/piano-roll-channel-options'
 import type { PianoRollToolControlsProps } from '@/features/piano-roll/types/piano-roll-tool-controls'
 import type { StudioActionId } from '@/workbench/actions/studio-action'
@@ -35,6 +36,9 @@ const clipOptions = computed(() => [
     label: `${clip.name}${clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED ? ' (looped)' : ''}`,
   })),
 ])
+const fitPitches = computed(() =>
+  props.clips.flatMap(({ notes }) => notes.map(({ note }) => note.pitch)),
+)
 function selectClip(value: string): void {
   if (value === 'none') {
     emit('selectClip', null)
@@ -85,6 +89,7 @@ function selectClip(value: string): void {
         @update:model-value="emit('selectChannel', parseMidiChannel(Number($event)))"
       />
     </label>
+    <PianoRollPitchControls :pitches="fitPitches" />
     <span
       v-if="previewMessage"
       class="project-piano-roll-track__preview-message"
@@ -102,7 +107,7 @@ function selectClip(value: string): void {
   align-items: center;
   gap: var(--sd-space-2);
   padding-inline: var(--sd-space-2);
-  overflow: hidden;
+  overflow-x: auto;
   border-bottom: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
 }

@@ -29,9 +29,7 @@ export function useTrackPlacementPreview({
     const preview = placementPreview.value
     if (currentViewport === null || preview === null) return null
 
-    const rowHeight =
-      currentViewport.heightCssPixel /
-      (currentViewport.maximumPitch - currentViewport.minimumPitch + 1)
+    const rowHeight = currentViewport.pitchRowHeightCssPixel
     const inset = Math.min(1, rowHeight / 5)
     const x = pianoRollTimelineTickToCssPixel(currentViewport, preview.placement.projectStartTick)
     const endX = pianoRollTimelineTickToCssPixel(

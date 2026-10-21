@@ -89,6 +89,24 @@ function createFixture(tool: PianoRollInteractionTool = PIANO_ROLL_INTERACTION_T
 }
 
 describe('Piano Roll Interaction Session', () => {
+  it.each([{ pitchOffsetCssPixel: 1 }, { pitchRowHeightCssPixel: 20 }])(
+    'cancels capture when pitch geometry changes without resizing the surface: %o',
+    (change) => {
+      const fixture = createFixture()
+      const session = createPianoRollInteractionSession()
+      session.handlePointerInput(createPointerInput(), fixture.configuration)
+      session.notifyViewport(
+        createPianoRollViewport(fixture.context, { ...fixture.configuration.viewport!, ...change }),
+      )
+      expect(session.state.pointerId).toBeNull()
+      expect(
+        session.handlePointerInput(
+          createPointerInput({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }),
+        ).intent,
+      ).toBeNull()
+      session.dispose()
+    },
+  )
   it('resolves a completed Cursor press as one Selection intent', () => {
     const fixture = createFixture()
     const session = createPianoRollInteractionSession()

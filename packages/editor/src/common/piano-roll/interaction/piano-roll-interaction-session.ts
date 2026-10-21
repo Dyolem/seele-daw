@@ -173,7 +173,9 @@ class PianoRollInteractionSessionImpl implements PianoRollInteractionSession {
       original.visibleSpanTick !== viewport.visibleSpanTick ||
       original.visibleStartTick !== viewport.visibleStartTick ||
       original.minimumPitch !== viewport.minimumPitch ||
-      original.maximumPitch !== viewport.maximumPitch
+      original.maximumPitch !== viewport.maximumPitch ||
+      original.pitchRowHeightCssPixel !== viewport.pitchRowHeightCssPixel ||
+      original.pitchOffsetCssPixel !== viewport.pitchOffsetCssPixel
     )
       this.cancel()
   }

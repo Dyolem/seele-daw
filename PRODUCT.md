@@ -904,7 +904,7 @@ Threshold 的 Cursor Edge Click 仍解析 Selection，Pencil Edge Click 不写 P
 - Surface-local CSS Pixel、Pointer Capture、4 CSS Pixel Drag Threshold 和取消生命周期；
 - origin / current Modifier 分离、活动拖动中的动态 Alt、Window blur 与显式取消；
 - 小节、拍、1/16 细分三级网格，以及密集级别抑制；
-- DOM 标尺、MIDI 48–72 钢琴键盘、焦点与可访问 Note / Selection 摘要；
+- DOM 标尺、覆盖 MIDI 0–127 的可滚动钢琴键盘、焦点与可访问 Note / Selection 摘要；
 - Clip / Track Color Note 和 muted 视觉；
 - 可见 Pencil / Cursor 单选工具、Snap Toggle 与当前 `1/16` Grid 标识；
 - Docked、Minimized、Maximized 与 Workspace Fullscreen 布局复用；
@@ -956,12 +956,25 @@ Selection 只保存稳定 `NoteId`，属于当前 Clip Editor lifetime；它不�
 History、Snapshot、Checkpoint 或 IndexedDB。Note 移出当前可见 Viewport 时仍保持选中；
 Note 被删除或移出当前 Clip Source 时间窗口时由权威 Query 清理。
 
+Track 与 Clip Focus 共用两种 Pitch 显示模式，初始中心为 MIDI 60：
+
+- `Standard keys` 固定每个半音 20 CSS px；面板变高只增加可见键数。
+- `Pitch range` 保留目标音域跨度，初始为 25 键；按面板高度适配行高，并限制在 16–48 CSS px。
+  空间不足时保留可操作行高，通过滚动访问目标范围内的其他音高；空间过大时显示周边音域。
+  `− / +` 调整目标跨度，范围为 3–128 键。
+- `Fit notes` 显式居中并适配当前 Scope 全部音符音域，两端各留 2 半音余量，受 MIDI 边界与
+  行高限制；无音符时禁用。增删音符不会自动改变中心或音域。
+- 键盘或 Note 区的纵向滚轮、右侧独立滚动条可访问完整 MIDI 音域；横向滚动与 Shift 滚轮
+  保留时间轴语义，CC64 和 Ruler 不随 Pitch 滚动。
+- 面板高度、Scope 和模式变化保留中心音高，在 MIDI 边界处限制到合法滚动范围。显示模式、
+  中心和目标跨度属于应用生命周期的 UI Preference，不写入 Project、History 或 dirty。
+- 滚动、缩放或面板变化使捕获时的坐标映射失效时，同步取消未提交手势；迟到 Pointer Up 不写入。
+
 当前明确限制：
 
 - 不支持 looped Clip 编辑，不能把循环实例错误显示成非循环 Source；
 - Grid Preset UI 当前只显示已确认的 `1/16`，尚不能选择其他直线、三连音或附点值；
-- 当前可见基线固定显示 MIDI 48–72；Clip Focus 显示完整 Clip，Track Scope 已有横向 Scroll 但
-  尚无 Zoom；
+- Clip Focus 在横向显示完整 Clip，Track Scope 已有横向 Scroll，二者尚无时间轴 Zoom；
 - 用户可以创建、选择、移动、调整长度和删除 Note，但还不能编辑 Velocity；
 - Canvas Note Adapter 可以显示 Resize Preview，但尚未提供 Canvas Hit；当前产品默认使用
   DOM Note Renderer 完成 Edge Hit。

@@ -554,7 +554,7 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 
 当前混合 Renderer 切片：
 
-- DOM 承载标尺、MIDI 48–72 钢琴键盘、焦点和可访问摘要；
+- DOM 承载标尺、MIDI 0–127 可滚动钢琴键盘、焦点和可访问摘要；
 - 静态 Pitch / Grid 使用 Canvas；首批可见 Note 使用 keyed DOM；
 - Canvas bitmap 按设备像素比配置，DOM / Canvas Note Adapter 共享 CSS Pixel Scene；
 - Renderer 主题颜色只能来自宿主解析后的 Editor Rendering Tokens 与 Track Color；
@@ -587,7 +587,17 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
   语义，左右 Edge Hit 使用水平 Resize Cursor；Resize Handle 只在 Hover、Focus 或
   Selected 等可操作状态出现，不常驻干扰密集 Note；
 - 创建失败使用全局 Error Toast，并让 Piano Roll 的可访问 Live Status 同步解释原因；
-- 左侧钢琴键盘固定，音符网格横向滚动。
+- 左侧钢琴键盘横向固定，与音符网格共用 Pitch 纵向映射；Track 时间轴可独立横向滚动。
+- `Standard keys` 使用 20 CSS px 标准行高，面板变高增加可见行数；`Pitch range` 保留目标
+  音域跨度并按面板适配行高，限制为 16–48 CSS px，触及限制后允许滚动或显示周边音高。
+  默认中心 MIDI 60、目标 25 键；面板、Scope 与模式变化保持中心，在 MIDI 边界限制滚动。
+- 工具栏使用自定义 `UiSelect` 切换 Pitch 模式，音域模式显示 `− / Target N keys / +`；
+  `Fit notes` 显式适配当前 Scope 的全部音符并在两侧各留 2 半音余量，无音符时禁用。
+  控件提示说明目标键数与短面板中实际可见键数的区别，窄窗口允许工具栏横向滚动。
+- Pitch 纵向滚轮仅作用于键盘与 Note 区，右侧原生滚动条只覆盖 Note 高度，可聚焦并使用
+  Arrow / Page / Home / End。Shift 或横向滚轮继续交给时间轴，Ctrl / Meta 滚轮不由 Pitch 消费。
+- 键盘、Canvas Grid、Note、Preview 与 Hit 共用行高和顶部部分行偏移；Canvas 只分配可视高度。
+  CC64 与 Ruler 不随 Pitch 滚动，音符增删不触发自动音域适配。
 - 黑键行通过轻微明度差异识别，不使用高对比棋盘纹。
 - 小节、拍和细分网格有明确的三级强度。
 - 音符继承轨道颜色；Selected 使用高亮轮廓、控制点或亮度变化叠加表达。

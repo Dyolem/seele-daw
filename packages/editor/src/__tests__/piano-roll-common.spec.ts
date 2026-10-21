@@ -18,6 +18,7 @@ import {
   PIANO_ROLL_DEFAULT_CENTER_PITCH,
   PianoRollError,
   createInitialPianoRollViewport,
+  createPianoRollPitchViewport,
   createPianoRollClipContext,
   createPianoRollNoteReadModel,
   createPianoRollViewport,
@@ -131,6 +132,31 @@ describe('PianoRollClipContext', () => {
 })
 
 describe('PianoRollViewport', () => {
+  it('maps partially visible rows and rejects invalid pitch metrics', () => {
+    const input = {
+      heightCssPixel: 40,
+      maximumPitch: parseMidiPitch(72),
+      minimumPitch: parseMidiPitch(70),
+      pitchRowHeightCssPixel: 20,
+      pitchOffsetCssPixel: 5,
+    }
+    const viewport = createPianoRollPitchViewport(input)
+    expect(pianoRollMidiPitchToCssPixel(viewport, parseMidiPitch(72))).toBe(-5)
+    expect(pianoRollMidiPitchToCssPixel(viewport, parseMidiPitch(70))).toBe(35)
+    expect(pianoRollCssPixelToMidiPitch(viewport, 14.99)).toBe(72)
+    expect(pianoRollCssPixelToMidiPitch(viewport, 15)).toBe(71)
+    expect(pianoRollCssPixelToMidiPitch(viewport, 39.99)).toBe(70)
+    for (const pitchOffsetCssPixel of [-1, 20, Infinity, NaN]) {
+      expect(() => createPianoRollPitchViewport({ ...input, pitchOffsetCssPixel })).toThrow(
+        PianoRollError,
+      )
+    }
+    for (const pitchRowHeightCssPixel of [0, -1, Infinity, NaN]) {
+      expect(() => createPianoRollPitchViewport({ ...input, pitchRowHeightCssPixel })).toThrow(
+        PianoRollError,
+      )
+    }
+  })
   it('maps the full initial Clip and discrete pitch rows in CSS Pixels', () => {
     const { clip, source } = createClipRecords()
     const context = createPianoRollClipContext(clip, source)

@@ -373,6 +373,57 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollSurface', () => {
+  it('scrolls pitch without writing facts, cancels capture, and places the next note using the new mapping', async () => {
+    const fixture = mountSelectionMenuFixture('pitch-scroll')
+    await nextTick()
+    const host = fixture.wrapper.get('.project-piano-roll__canvas-host').element
+    fixture.preferences.activateTool(PIANO_ROLL_TOOL.PENCIL)
+    await nextTick()
+    const revision = fixture.session.modelRevision
+    const contentState = fixture.session.contentStateId
+    const laneBefore = fixture.wrapper.get('.piano-roll-sustain-pedal-lane').html()
+    dispatchPointer(host, 'pointerdown', { clientX: 240, clientY: 125 })
+    expect(host.hasPointerCapture(1)).toBe(true)
+    host.dispatchEvent(new WheelEvent('wheel', { deltaY: 480, bubbles: true, cancelable: true }))
+    expect(host.hasPointerCapture(1)).toBe(false)
+    dispatchPointer(host, 'pointerup', { clientX: 240, clientY: 125 })
+    await nextTick()
+    expect(fixture.session.modelRevision).toBe(revision)
+    expect(fixture.session.contentStateId).toBe(contentState)
+    expect(fixture.wrapper.get('.piano-roll-sustain-pedal-lane').html()).toBe(laneBefore)
+    expect(fixture.wrapper.get('[data-pitch="36"]').attributes('style')).toContain(
+      'translateY(115px)',
+    )
+    dispatchPointer(host, 'pointerdown', { clientX: 240, clientY: 125, pointerId: 2 })
+    dispatchPointer(host, 'pointerup', { clientX: 240, clientY: 125, pointerId: 2 })
+    await flushPromises()
+    const note = fixture.session
+      .getSnapshot()
+      .midiNotePartitions.flatMap(({ notes }) => notes)
+      .find((note) => note.pitch === 36)
+    expect(note).toBeDefined()
+    expect(
+      fixture.wrapper.get(`[data-piano-roll-note-id="${note?.id}"]`).attributes('style'),
+    ).toContain('translate3d(240px, 116px, 0)')
+  })
+
+  it('keeps center pitch and standard key height across panel resize', async () => {
+    const probe = installPianoRollResizeObserver()
+    const fixture = mountSelectionMenuFixture('pitch-resize')
+    const host = fixture.wrapper.get('.project-piano-roll__canvas-host').element
+    const revision = fixture.session.modelRevision
+    Object.defineProperty(host, 'clientHeight', { configurable: true, value: 500 })
+    probe.forElement(host).deliver()
+    await nextTick()
+    expect(fixture.wrapper.get('[data-pitch="60"]').attributes('style')).toContain(
+      'translateY(240px)',
+    )
+    expect(fixture.wrapper.get('[data-pitch="60"]').attributes('style')).toContain(
+      'block-size: 20px',
+    )
+    expect(fixture.session.modelRevision).toBe(revision)
+  })
+
   it('rolls back Clip input, projections and renderers when viewport observation fails', async () => {
     const probe = installPianoRollResizeObserver('.project-piano-roll__canvas-host')
     const { session, preferences, wrapper } = mountSelectionMenuFixture('clip-viewport-failure')
@@ -658,12 +709,12 @@ describe('ProjectPianoRollSurface', () => {
     expect(wrapper.get('.project-piano-roll').attributes('aria-label')).toBe(
       'Piano Roll for Midnight Keys',
     )
-    expect(wrapper.findAll('.project-piano-roll__key-row')).toHaveLength(25)
+    expect(wrapper.findAll('.piano-roll-keyboard__row')).toHaveLength(13)
     expect(wrapper.findAll('.project-piano-roll__ruler span')).toHaveLength(1)
     expect(wrapper.text()).toContain('Midnight Keys, 1 visible MIDI note, 0 selected')
     expect(
       wrapper.get('[data-piano-roll-note-id="studio-piano-roll-note"]').attributes('style'),
-    ).toContain('translate3d(240px, 121px, 0)')
+    ).toContain('translate3d(240px, 116px, 0)')
     expect(
       query.mock.calls.filter(
         ([projectQuery]) => projectQuery.type === PROJECT_QUERY_TYPE.MIDI_NOTE.INTERSECTING_RANGE,
@@ -1465,7 +1516,7 @@ describe('ProjectPianoRollSurface', () => {
         .find(({ id }) => id === 'surface-pencil-note-2'),
     ).toMatchObject({
       durationTick: 240,
-      pitch: 62,
+      pitch: 61,
       startTick: 1_204,
     })
     expect(wrapper.text()).toContain('1 selected')

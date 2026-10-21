@@ -35,3 +35,14 @@ facts、History 或 dirty，也不引入 Commit Handoff。
 Add track 菜单与快捷键 Dialog 打开时暂停后台 Action；当前层的 Escape 只关闭该层，关闭
 后的下一次 Escape 才取消活动 Locate。单纯打开菜单不完成定位；取消后的迟到 End 不调用
 Playback commit。
+
+## 高度与 Tempo 摘要
+
+`use-tempo-lane-layout.ts` 只持有局部展开偏好并测量 Arrangement 与 Track Panel；根据真实可用
+高度为 Track 预留空间，派生左右统一的 Tempo 高度。默认紧凑摘要，展开时挂载原有 Lane / Control。
+临时收起保留用户偏好，卸载 Lane 取消捕获。Workspace 收起 Arrangement 使用隐藏视图保留
+横向滚动与 Tempo 偏好；几何失效仍遵守 G4 取消规则。
+
+上层 `layout/use-workspace-layout.ts` 分开持有请求模式、常规高度、最大化和最近操作区域；
+`workspace-layout-policy.ts` 只计算有效高度 / 模式，不修改偏好。测量与分隔条复用 `ui/` 的
+`useElementHeight`、`UiHeightResizeHandle`，不增加 Project Command 或 Editor 事实权威。

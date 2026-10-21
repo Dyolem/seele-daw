@@ -106,6 +106,11 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     )
   })
   const keyboard = createTestStudioActionRuntime()
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.classList.contains('project-workbench__track-panel') ? 85 : 600
+    },
+  )
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
   const toasts = useUiToastStore(pinia)
@@ -298,6 +303,55 @@ afterEach(() => {
 })
 
 describe('ProjectWorkbenchArrangement', () => {
+  it('starts compact, cancels captured Tempo edits when collapsed, and restores expansion after resize', async () => {
+    const initial = createTempoEventRecord({
+      bpm: parseTempoBpm(120),
+      id: parseTempoEventId('compact-initial'),
+      tick: parseTick(0),
+    })
+    const fixture = mountArrangement({ tempoEvents: [initial], selectedTempoEventId: initial.id })
+    const { wrapper, tempoActions } = fixture
+    await nextTick()
+    expect(wrapper.find('.tempo-track-lane').exists()).toBe(false)
+    expect(wrapper.get('.project-workbench__tempo-summary').text()).toBe('120 BPM · 1 event')
+    await wrapper.get('[aria-label="Expand Tempo editor"]').trigger('click')
+    const plot = wrapper.get('.tempo-track-lane__plot').element as HTMLElement
+    vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      top: 50,
+      width: 1000,
+      height: 100,
+      right: 1100,
+      bottom: 150,
+    } as DOMRect)
+    installTempoPointerCapture(plot)
+    const point = wrapper.get('.tempo-track-lane__point')
+    await dispatchPointerEvent(point.element, 'pointerdown', {
+      clientX: 100,
+      clientY: 100,
+      pointerId: 81,
+    })
+    await dispatchPointerEvent(plot, 'pointermove', { clientX: 100, clientY: 70, pointerId: 81 })
+    expect(plot.hasPointerCapture(81)).toBe(true)
+    await wrapper.get('[aria-label="Collapse Tempo editor"]').trigger('click')
+    expect(plot.hasPointerCapture(81)).toBe(false)
+    await dispatchPointerEvent(plot, 'pointerup', { clientX: 100, clientY: 70, pointerId: 81 })
+    expect(tempoActions.commitDrag).not.toHaveBeenCalled()
+    await wrapper.get('[aria-label="Expand Tempo editor"]').trigger('click')
+    const surface = wrapper.element as HTMLElement
+    let height = 240
+    Object.defineProperty(surface, 'clientHeight', { configurable: true, get: () => height })
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(wrapper.find('.tempo-track-lane').exists()).toBe(false)
+    height = 600
+    window.dispatchEvent(new Event('resize'))
+    await nextTick()
+    expect(wrapper.find('.tempo-track-lane').exists()).toBe(true)
+    expect(wrapper.emitted('tempoEventBpmCommit')).toBeUndefined()
+    expect(tempoActions.commitDrag).not.toHaveBeenCalled()
+  })
+
   it('renders the 150-bar minimum Timeline as one shared Ruler and lane width', () => {
     const { wrapper } = mountArrangement({
       timelineEndTick: parseTick(576_000),
@@ -671,6 +725,8 @@ describe('ProjectWorkbenchArrangement', () => {
       selectedTempoEventId: selected.id,
       tempoEvents: Object.freeze([next, initial, selected]),
     })
+    await nextTick()
+    await fixture.wrapper.get('button[aria-label="Expand Tempo editor"]').trigger('click')
     const viewport = fixture.wrapper.get('.project-workbench__arrangement-scroll-viewport')
     const viewportElement = viewport.element as HTMLElement
     Object.defineProperties(viewportElement, {
@@ -727,6 +783,8 @@ describe('ProjectWorkbenchArrangement', () => {
         selected,
       ]),
     })
+    await nextTick()
+    await fixture.wrapper.get('button[aria-label="Expand Tempo editor"]').trigger('click')
     const bar = fixture.wrapper.get<HTMLInputElement>(
       'input[aria-label="Selected Tempo Event bar"]',
     )
@@ -780,6 +838,8 @@ describe('ProjectWorkbenchArrangement', () => {
       tempoEvents: Object.freeze([initial, selected]),
       timelineEndTick: parseTick(3_840),
     })
+    await nextTick()
+    await fixture.wrapper.get('button[aria-label="Expand Tempo editor"]').trigger('click')
     const plot = fixture.wrapper.get('.tempo-track-lane__plot').element as HTMLElement
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
       bottom: 150,
@@ -1392,6 +1452,8 @@ describe('ProjectWorkbenchArrangement', () => {
         tempoEvents: [initial, later],
         selectedTempoEventId: later.id,
       })
+      await nextTick()
+      await fixture.wrapper.get('button[aria-label="Expand Tempo editor"]').trigger('click')
       const { wrapper, keyboard, cancelTimelineLocate, commitTimelineLocate, tempoActions } =
         fixture
       const viewport = wrapper.get('.project-workbench__arrangement-scroll-viewport')

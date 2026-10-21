@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import ChevronDownIcon from '~icons/fluent/chevron-down-16-regular'
+import ChevronRightIcon from '~icons/fluent/chevron-right-16-regular'
+
+import { useTempoLaneLayout } from './arrangement/hooks/use-tempo-lane-layout'
+import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-control'
+
 import type {
   ProjectTempoEventPositionDraft,
   ProjectTempoEventNavigationDirection,
@@ -34,6 +40,7 @@ import {
   computed,
   nextTick,
   onBeforeUnmount,
+  onMounted,
   onUnmounted,
   shallowRef,
   type StyleValue,
@@ -124,6 +131,11 @@ const {
 const { projectTracks } = useProjectTracks()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const toasts = useUiToastStore()
+const arrangementElement = shallowRef<HTMLElement | null>(null)
+const trackPanelElement = shallowRef<HTMLElement | null>(null)
+const tempoLayout = useTempoLaneLayout(arrangementElement, trackPanelElement)
+onMounted(tempoLayout.mount)
+onBeforeUnmount(tempoLayout.dispose)
 const arrangementViewportElement = shallowRef<HTMLElement | null>(null)
 const trackViewportElement = shallowRef<HTMLElement | null>(null)
 const trackFollowerElement = shallowRef<HTMLElement | null>(null)
@@ -629,17 +641,28 @@ watch(
 onUnmounted(() => {
   tempoPreview.cancelPreview()
 })
+const tempoSummary = computed(() => {
+  const events = orderProjectTempoEvents(presentedTempoEvents.value)
+  let current = events[0]
+  for (const event of events) {
+    if (event.tick > rulerPositionTick.value) break
+    current = event
+  }
+  const bpm = current ? `${formatProjectTempoBpm(current.bpm)} BPM` : 'No tempo events'
+  return `${bpm} · ${events.length} ${events.length === 1 ? 'event' : 'events'}`
+})
 </script>
 
 <template>
   <div
+    ref="arrangementElement"
     class="project-workbench__arrangement-layout"
     role="region"
     aria-label="Arrangement tracks and lanes"
-    :style="timelineStyle"
+    :style="[timelineStyle, tempoLayout.style.value]"
   >
     <aside class="project-workbench__track-column" aria-label="Tracks">
-      <div class="project-workbench__track-panel">
+      <div ref="trackPanelElement" class="project-workbench__track-panel">
         <header class="project-workbench__track-heading">
           <strong>Tracks</strong>
           <UiIconButton
@@ -653,20 +676,50 @@ onUnmounted(() => {
           <ProjectAddTrackMenu @select="handleTrackTypeSelection" />
         </div>
       </div>
-      <TempoTrackControl
-        :can-navigate-to-next="canNavigateToNextTempoEvent"
-        :can-navigate-to-previous="canNavigateToPreviousTempoEvent"
-        :editing-disabled="props.tempoEditingDisabled"
-        :selected-tempo-event="selectedTempoEvent"
-        :selected-tempo-event-is-initial="selectedTempoEventIsInitial"
-        :selected-tempo-event-location="selectedTempoEventLocation"
-        @bpm-commit="(tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)"
-        @edit-start="emit('tempoEditStart')"
-        @navigate="navigateSelectedTempoEvent"
-        @position-commit="commitSelectedTempoEventPosition"
-        @remove="emit('tempoEventRemove', $event)"
-        @reveal="revealSelectedTempoEvent"
-      />
+      <section class="project-workbench__tempo-section" aria-label="Tempo controls">
+        <div class="project-workbench__tempo-header">
+          <UiButton
+            size="small"
+            variant="ghost"
+            :aria-expanded="tempoLayout.expanded.value"
+            :aria-label="
+              tempoLayout.expanded.value ? 'Collapse Tempo editor' : 'Expand Tempo editor'
+            "
+            :disabled="!tempoLayout.canExpand.value"
+            :title="
+              tempoLayout.canExpand.value
+                ? 'Edit tempo events'
+                : 'Increase Arrangement height to edit tempo events'
+            "
+            @click="tempoLayout.toggle"
+          >
+            <template #leading
+              ><UiIcon
+                :icon="tempoLayout.expanded.value ? ChevronDownIcon : ChevronRightIcon"
+                :size="16"
+            /></template>
+            Tempo
+          </UiButton>
+          <span v-if="!tempoLayout.canExpand.value" class="project-workbench__tempo-hint"
+            >More height needed</span
+          >
+        </div>
+        <TempoTrackControl
+          v-if="tempoLayout.expanded.value"
+          :can-navigate-to-next="canNavigateToNextTempoEvent"
+          :can-navigate-to-previous="canNavigateToPreviousTempoEvent"
+          :editing-disabled="props.tempoEditingDisabled"
+          :selected-tempo-event="selectedTempoEvent"
+          :selected-tempo-event-is-initial="selectedTempoEventIsInitial"
+          :selected-tempo-event-location="selectedTempoEventLocation"
+          @bpm-commit="(tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)"
+          @edit-start="emit('tempoEditStart')"
+          @navigate="navigateSelectedTempoEvent"
+          @position-commit="commitSelectedTempoEventPosition"
+          @remove="emit('tempoEventRemove', $event)"
+          @reveal="revealSelectedTempoEvent"
+        />
+      </section>
       <div
         ref="trackViewportElement"
         class="project-workbench__track-viewport"
@@ -772,17 +825,23 @@ onUnmounted(() => {
           <div class="project-workbench__lane-heading" aria-hidden="true">
             <span>Track lanes</span>
           </div>
-          <TempoTrackLane
-            :bar-span-tick="props.barSpanTick"
-            :editing-disabled="props.tempoEditingDisabled"
-            :project-id="props.projectId"
-            :selected-tempo-event-id="props.selectedTempoEventId"
-            :tempo-events="props.tempoEvents"
-            :timeline-end-tick="props.timelineEndTick"
-            @add="({ bpm, tick }) => emit('tempoEventAdd', bpm, tick)"
-            @edit-start="emit('tempoEditStart')"
-            @select="emit('tempoEventSelect', $event)"
-          />
+          <div class="project-workbench__tempo-section">
+            <div class="project-workbench__tempo-header project-workbench__tempo-summary">
+              {{ tempoSummary }}
+            </div>
+            <TempoTrackLane
+              v-if="tempoLayout.expanded.value"
+              :bar-span-tick="props.barSpanTick"
+              :editing-disabled="props.tempoEditingDisabled"
+              :project-id="props.projectId"
+              :selected-tempo-event-id="props.selectedTempoEventId"
+              :tempo-events="props.tempoEvents"
+              :timeline-end-tick="props.timelineEndTick"
+              @add="({ bpm, tick }) => emit('tempoEventAdd', bpm, tick)"
+              @edit-start="emit('tempoEditStart')"
+              @select="emit('tempoEventSelect', $event)"
+            />
+          </div>
         </div>
 
         <div v-if="props.tracks.length === 0" class="project-workbench__surface-empty">
@@ -880,6 +939,35 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.project-workbench__tempo-section {
+  display: grid;
+  min-block-size: 0;
+  grid-template-rows: var(--project-workbench-tempo-header-height) minmax(0, 1fr);
+  overflow: hidden;
+  border-block-end: 1px solid var(--sd-color-border-strong);
+}
+.project-workbench__tempo-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  min-inline-size: 0;
+  border-block-start: 1px solid var(--sd-color-border-strong);
+  background: var(--sd-color-surface-panel);
+}
+.project-workbench__tempo-summary {
+  position: sticky;
+  inset-inline-start: 0;
+  inline-size: fit-content;
+  padding-inline: var(--sd-space-3);
+  color: var(--sd-color-text-secondary);
+  font-family: var(--sd-font-family-numeric);
+  font-size: var(--sd-font-size-xs);
+}
+.project-workbench__tempo-hint {
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
+}
+
 .project-workbench__arrangement-layout {
   --project-workbench-arrangement-tools-width: calc(
     var(--sd-control-height-sm) + var(--sd-control-height-sm) + var(--sd-control-height-sm) +

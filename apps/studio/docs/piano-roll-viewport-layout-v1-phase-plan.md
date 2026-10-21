@@ -1,6 +1,6 @@
 # Piano Roll 视口与布局 V1 阶段计划
 
-> 状态：V1 已审核提交 `86fcbf6`；V2 已完成验证，待审核；V3–V4 尚未实施
+> 状态：V1 已审核提交 `86fcbf6`；V2 已审核提交 `27df7e7`；V3 已完成验证，待审核；V4 尚未实施
 >
 > 创建日期：2026-10-20
 >
@@ -81,6 +81,30 @@
   横向时间映射不随 Pitch 滚动。900px 窗口中工具栏可滚动，键盘聚焦自动带入屏外控件。
 - 小窗口中 Workspace 主区域最小高度与 Dock 总高度仍会竞争，CC64 / Tempo 边界和高度政策
   继续按 V3 解决。本批只完成 Pitch Viewport，不提前实施辅助 Lane 或 Clip 全高区域。
+
+## V3 实现边界与验证
+
+- Workspace 使用真实宿主高度，不再使用比例上限与 CSS 最小高度的两套约束。默认 Dock 360px，
+  常规最小 Dock 240px、Arrangement 200px；极矮窗口保留最近操作区域，另一块显示恢复入口。
+  请求模式 / 常规高度与有效布局分开，缩小再放大恢复偏好；最大化 / 工作区全屏同样保留原高度。
+- CC64 增加独立标题栏、收起 / 恢复、默认 88px 与 64–240px 调整范围，保留至少 96px Note 内容。
+  12px 上下安全间距属于 Frame，内部 Plot 同时作为输入、测量和绘制坐标 owner；时间 X 没有 inset。
+  Track 的标题栏固定，Note / CC64 保留唯一横向滚动 owner。
+- Tempo 默认 32px 摘要，展开增加 144px 编辑区；左右同步，空间不足临时收起，保留展开偏好。
+  Workspace 和 CC64 共用 12px 语义 Splitter；Pointer、Arrow / Home / End、取消与清理统一。
+- 自动化覆盖尺寸拖动终点、Keyboard 调整、Escape / blur / lost capture / Pointer Cancel /
+  卸载 / 边界变化回滚、无位移 Click 保留偏好；Workspace 缩小 / 放大与主区域恢复；CC64 /
+  Tempo 收起时取消捕获、迟到 End 不提交、偏好恢复与测量资源清理。既有 Tempo Page Command /
+  Undo、Note 与 CC64 编辑回归继续通过。
+- 2026-10-21 使用 Codex 内置浏览器及独立测试 Project，验证 1280×900、1280×500、1280×380、
+  900×600、Track / Clip Focus、鼠标和键盘调高、工作区全屏 / 恢复、窗口缩小 / 放大与紧凑摘要。
+  Track 横向滚动时 Note 与 CC64 移动相同距离，标题栏保持固定；Clip Focus 中点落笔得到 Value 64，
+  Undo 恢复 Saved；Tempo 数值编辑与单步 Undo 通过。
+- 修复 CC64 Terminal Marker 的旋转作用域：只旋转内部菱形图形，不旋转承载时间 / Value 位移的
+  Button；浏览器确认右端标记位于真实 Clip 末端与 Value 0，而非偏移到视口外。
+- 最终完整 `pnpm check` 通过：Architecture、Workspace Quality、Format、Oxlint、ESLint、全仓
+  Type Check、175 个测试文件 / 1,706 项测试、Studio Production Build 与 soundbank dist boundary。
+  仍有既有主包超过 500kB 的构建提示。V3 保留未提交供审核，V4 尚未实施。
 
 ## 不变量
 

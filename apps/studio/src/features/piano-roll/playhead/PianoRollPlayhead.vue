@@ -44,7 +44,7 @@ const playheadStyle = computed((): StyleValue | null => {
 .project-piano-roll__playhead {
   position: absolute;
   z-index: var(--sd-layer-sticky-raised);
-  inset-block-start: var(--project-piano-roll-toolbar-height);
+  inset-block-start: var(--piano-roll-toolbar-height);
   inset-block-end: 0;
   inset-inline-start: var(--project-piano-roll-keyboard-width);
   inline-size: 1px;

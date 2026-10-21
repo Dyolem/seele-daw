@@ -177,7 +177,7 @@ function removeSelectedTempoEvent(): void {
 <template>
   <section class="tempo-track-control" aria-label="Tempo Track controls">
     <header>
-      <strong>Tempo</strong>
+      <strong>Selected event</strong>
       <span>STEP</span>
     </header>
 

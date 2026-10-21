@@ -23,7 +23,7 @@ import { parseSoundbankId } from '@seele-daw/playback'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
@@ -54,6 +54,13 @@ import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback
 import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
 import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
 import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
+
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(640)
+})
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 interface MountShellOptions {
   readonly clips?: readonly ProjectMidiClipPresentation[]
@@ -366,16 +373,16 @@ describe('ProjectWorkbenchShell', () => {
     expect(workspace.attributes('data-dock-mode')).toBe('docked')
 
     await wrapper.get('button[aria-label="Maximize MIDI editor"]').trigger('click')
-    expect(wrapper.get('[role="separator"]').attributes('aria-valuenow')).toBe('460')
+    expect(wrapper.get('[role="separator"]').attributes('aria-valuenow')).toBe('428')
 
     await wrapper.get('button[aria-label="Restore MIDI editor height"]').trigger('click')
-    expect(wrapper.get('[role="separator"]').attributes('aria-valuenow')).toBe('304')
+    expect(wrapper.get('[role="separator"]').attributes('aria-valuenow')).toBe('360')
 
     await wrapper
       .get('button[aria-label="Open MIDI editor in workspace fullscreen"]')
       .trigger('click')
     expect(workspace.attributes('data-dock-mode')).toBe('fullscreen')
-    expect(wrapper.find('.project-workbench__arrangement-layout').exists()).toBe(false)
+    expect(wrapper.get('.project-workbench__arrangement-layout').isVisible()).toBe(false)
 
     await wrapper.get('button[aria-label="Exit workspace fullscreen"]').trigger('click')
     expect(workspace.attributes('data-dock-mode')).toBe('docked')
@@ -393,14 +400,47 @@ describe('ProjectWorkbenchShell', () => {
 
   it('supports keyboard resizing through the semantic Splitter', async () => {
     const wrapper = mountShell()
+    await nextTick()
     const splitter = wrapper.get('[role="separator"]')
 
-    expect(splitter.attributes('aria-valuenow')).toBe('304')
+    expect(splitter.attributes('aria-valuenow')).toBe('360')
 
     await splitter.trigger('keydown', { key: 'ArrowUp' })
 
-    expect(splitter.attributes('aria-valuenow')).toBe('320')
+    expect(splitter.attributes('aria-valuenow')).toBe('376')
     expect(splitter.attributes('aria-orientation')).toBe('horizontal')
+  })
+
+  it('restores preferred height after constraints and keeps both pane recovery controls reachable', async () => {
+    const wrapper = mountShell()
+    await nextTick()
+    const workspace = wrapper.get('.project-workbench__workspace')
+    const element = workspace.element as HTMLElement
+    let height = 640
+    Object.defineProperty(element, 'clientHeight', { configurable: true, get: () => height })
+    const resize = async (next: number) => {
+      height = next
+      window.dispatchEvent(new Event('resize'))
+      await nextTick()
+    }
+    await wrapper.get('[aria-label="Resize MIDI editor"]').trigger('keydown', { key: 'ArrowUp' })
+    await resize(500)
+    expect(wrapper.get('[aria-label="Resize MIDI editor"]').attributes('aria-valuenow')).toBe('288')
+    await resize(640)
+    expect(wrapper.get('[aria-label="Resize MIDI editor"]').attributes('aria-valuenow')).toBe('376')
+    await wrapper.get('.project-workbench__dock').trigger('focusin')
+    await resize(350)
+    expect(workspace.attributes('style')).toContain('32px 0px 318px')
+    await wrapper.get('.project-workbench__arrangement-restore').trigger('click')
+    expect(workspace.attributes('data-dock-mode')).toBe('minimized')
+    expect(workspace.attributes('style')).toContain('306px 0px 44px')
+    await wrapper.get('[aria-label="Restore MIDI editor"]').trigger('click')
+    expect(workspace.attributes('data-dock-mode')).toBe('docked')
+    expect(wrapper.find('.project-workbench__arrangement-restore').exists()).toBe(true)
+    await resize(640)
+    expect(wrapper.get('[aria-label="Resize MIDI editor"]').attributes('aria-valuenow')).toBe('376')
+    wrapper.unmount()
+    window.dispatchEvent(new Event('resize'))
   })
 
   it('projects the selected Track into the Context Editor Dock', () => {

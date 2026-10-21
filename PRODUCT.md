@@ -266,7 +266,7 @@ Workbench 已建立真实项目状态驱动的布局：
 
 - Global Bar：项目菜单、品牌、项目名称、保存状态、Save，以及“导入为新项目 / 新 Track”入口。
 - Transport Bar：Undo / Redo、Tempo、拍号、播放区和 MIDI Editor 开关。
-- Arrangement：Track 控制区、时间标尺、固定 Tempo Track、Track Lane 和 Add Track；右侧时间内容持有唯一真实
+- Arrangement：Track 控制区、时间标尺、可收起的 Tempo Track、Track Lane 和 Add Track；右侧时间内容持有唯一真实
   纵向 / 横向滚动状态，左侧 Track 控制列以裁切从视图保持行对齐。至少 150 小节的 Ruler /
   Lane 可横向滚动，原生横向滚动条只出现在时间内容下方。
 - Context Editor Dock：Track Inspector 与未来 MIDI Editor 宿主。
@@ -279,6 +279,13 @@ Workbench 已建立真实项目状态驱动的布局：
 - `Import MIDI as new tracks…`：把来源 Note Track 追加到当前项目；保留当前 Tempo / 拍号并形成
   一个 Undo / Redo 步骤。
 - `MIDI editor`：重新打开已关闭或最小化的 Context Editor Dock。
+
+Workspace 按实际剩余高度分配 Arrangement 与 MIDI Editor，默认 Dock 高 360px；常规布局保留
+Arrangement 至少 200px、Dock 至少 240px，分隔条为 12px。窗口无法同时容纳时，最近操作的
+编辑区优先：MIDI 优先时 Arrangement 保留 `Show Arrangement` 入口，Arrangement 优先时
+Dock 保留 44px 标题栏。窗口扩大后恢复原模式和用户设定高度，临时受约束高度不覆盖偏好。
+拖动分隔条或用方向键、Home / End 调整布局不产生 History 或 dirty；Escape、失焦或捕获丢失
+取消正在进行的尺寸调整。
 
 Arrangement 在最后一个 Track Lane 下方提供“导入为新 Track”操作；它是独立动作行，不代表
 额外 Track，也不破坏 Track 控制行与真实 Lane 的一一对应。空 Arrangement 的空状态同样提供该
@@ -301,6 +308,11 @@ Arrangement Ruler 可点击或静默拖动定位，拖到视口边缘会连续�
 - Playback Loading 期间主控暂时只读。
 
 Arrangement 的 Tempo Track 遵循以下规则：
+
+- 默认以 32px 摘要显示当前定位位置的 BPM 与事件数；点击 `Expand Tempo editor` 展开曲线与
+  数值编辑。左右区域共享同一高度。空间不足时临时收起，保留展开偏好；扩大 Arrangement 后
+  恢复。展开入口在空间不足时说明需要增加高度，Track 内容至少保留 96px。
+- 收起会取消未完成的 Tempo 拖动并释放 Capture，迟到 Pointer Up 不提交；显示模式不写 Project。
 
 - Tempo Track 固定在 Ruler / Track Actions 下方，不随普通 Track Lane 的纵向滚动离开视口；右侧
   Tempo 时间内容与 Ruler、Clip 和 Playhead 共享同一横向滚动与绝对 Project Tick 坐标；
@@ -984,10 +996,16 @@ Track 与 Clip Focus 共用两种 Pitch 显示模式，初始中心为 MIDI 60�
 **局部可用；导入、二值播放与 Event 编辑已有用户界面**
 
 Project Core 把每个 CC64 Event 保存为 MidiSource-owned 独立事实，保留 Tick、MIDI Channel 与
-原始 `0..127` Value，不把踏板状态烘焙进 Note Duration。Piano Roll 的固定 CC64 Lane 使用
+原始 `0..127` Value，不把踏板状态烘焙进 Note Duration。Piano Roll 底部的 CC64 Lane 使用
 Step Segment 显示所选 Channel 的事件；`64` 是当前二值播放的 Pedal Down Threshold，但 UI
 不会把原始 Value 量化为只有 `0 / 127`。右端点 Event 作为 Terminal Marker 保留和显示，却不
 改变刚结束的半开 Clip 播放窗口。
+
+Lane 保留在 Note 区下方，标题栏、12px 拖动柄与事件区有独立边界；默认事件区高 88px，可调整
+至 64–240px 并收起 / 恢复。上下各留 12px 安全间距，127 / 0 Marker 与数值坐标处于事件区
+内部，横向仍与 Note、Ruler、Playhead 对齐。布局优先保留至少 96px Note 高度；空间不足时
+先限制 Lane 高度，仍不够则临时收起，扩大后恢复原偏好。Track / Clip Focus 共用展开与高度
+偏好，不写入 Project 或 History；收起卸载 Lane 并取消未完成的手势。
 
 CC64 Channel Selector 在界面显示 `1..16`，项目事实仍使用 MIDI `0..15`。该选择与 Tool、Snap、
 Scope 一样只属于 Studio 应用生命周期 Preference；切换 Channel 不执行 Command，不产生 dirty

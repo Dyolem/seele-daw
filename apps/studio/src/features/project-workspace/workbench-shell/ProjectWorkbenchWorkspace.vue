@@ -6,7 +6,7 @@ import type {
   TempoEventRecord,
   Tick,
 } from '@seele-daw/project-core'
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
+import { computed, onMounted, onBeforeUnmount, shallowRef } from 'vue'
 import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 
@@ -21,15 +21,13 @@ import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
 import {
   PROJECT_WORKBENCH_DOCK_MODE,
-  type ProjectWorkbenchDockMode,
   type ProjectWorkbenchWorkspaceHandle,
 } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 
-interface DockResizeInteraction {
-  readonly pointerId: number
-  readonly startClientY: number
-  readonly startHeight: number
-}
+import UiButton from '@/ui/components/UiButton.vue'
+import UiHeightResizeHandle from '@/ui/components/UiHeightResizeHandle.vue'
+import { useWorkspaceLayout } from './layout/use-workspace-layout'
+import { WORKSPACE_MINIMUM_DOCK_HEIGHT } from './layout/workspace-layout-policy'
 
 const props = withDefaults(
   defineProps<{
@@ -65,12 +63,8 @@ const emit = defineEmits<{
 }>()
 
 const workspaceElement = shallowRef<HTMLElement | null>(null)
-const dockMode = shallowRef<ProjectWorkbenchDockMode>(PROJECT_WORKBENCH_DOCK_MODE.DOCKED)
-const dockHeight = shallowRef(304)
-const restoredDockHeight = shallowRef(304)
-const isDockMaximized = shallowRef(false)
-let resizeInteraction: DockResizeInteraction | null = null
-
+const dock = useWorkspaceLayout(workspaceElement)
+const { layout, mode: dockMode, maximized: isDockMaximized, style: workspaceStyle } = dock
 const isContextEditorOpen = computed(() => dockMode.value !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED)
 const selectedTrack = computed(
   () => props.tracks.find((track) => track.id === workbenchSelection.selectedTrackId) ?? null,
@@ -78,166 +72,12 @@ const selectedTrack = computed(
 const selectedClip = computed(
   () => props.clips.find((clip) => clip.id === workbenchSelection.selectedClipId) ?? null,
 )
-const workspaceStyle = computed(() => ({
-  '--project-workbench-dock-height': `${dockHeight.value}px`,
-}))
-
-function dockBounds(): { readonly maximum: number; readonly minimum: number } {
-  const measuredHeight = workspaceElement.value?.clientHeight ?? 0
-  const workspaceHeight = measuredHeight > 0 ? measuredHeight : 640
-  const minimum = Math.min(220, workspaceHeight)
-  return {
-    minimum,
-    maximum: Math.max(minimum, Math.floor(workspaceHeight * 0.72)),
-  }
-}
-
-function setDockHeight(height: number): void {
-  const { maximum, minimum } = dockBounds()
-  dockHeight.value = Math.min(maximum, Math.max(minimum, Math.round(height)))
-}
-
-function openContextEditor(): void {
-  if (dockMode.value === PROJECT_WORKBENCH_DOCK_MODE.CLOSED) {
-    dockMode.value = PROJECT_WORKBENCH_DOCK_MODE.DOCKED
-    setDockHeight(restoredDockHeight.value)
-    isDockMaximized.value = false
-    return
-  }
-
-  if (dockMode.value === PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED) restoreDock()
-}
-
-function closeDock(): void {
-  if (dockMode.value === PROJECT_WORKBENCH_DOCK_MODE.DOCKED) {
-    restoredDockHeight.value = dockHeight.value
-  }
-  resizeInteraction = null
-  dockMode.value = PROJECT_WORKBENCH_DOCK_MODE.CLOSED
-}
-
-function minimizeDock(): void {
-  if (dockMode.value === PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED) {
-    restoreDock()
-    return
-  }
-
-  if (dockMode.value === PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN) {
-    exitDockFullscreen()
-  }
-  restoredDockHeight.value = dockHeight.value
-  resizeInteraction = null
-  dockMode.value = PROJECT_WORKBENCH_DOCK_MODE.MINIMIZED
-}
-
-function restoreDock(): void {
-  dockMode.value = PROJECT_WORKBENCH_DOCK_MODE.DOCKED
-  setDockHeight(restoredDockHeight.value)
-  isDockMaximized.value = false
-}
-
-function toggleDockMaximized(): void {
-  if (dockMode.value !== PROJECT_WORKBENCH_DOCK_MODE.DOCKED) return
-
-  if (isDockMaximized.value) {
-    setDockHeight(restoredDockHeight.value)
-    isDockMaximized.value = false
-    return
-  }
-
-  restoredDockHeight.value = dockHeight.value
-  setDockHeight(dockBounds().maximum)
-  isDockMaximized.value = true
-}
-
-function toggleDockFullscreen(): void {
-  if (dockMode.value === PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN) {
-    exitDockFullscreen()
-    return
-  }
-
-  if (dockMode.value === PROJECT_WORKBENCH_DOCK_MODE.DOCKED) {
-    restoredDockHeight.value = dockHeight.value
-  }
-  resizeInteraction = null
-  dockMode.value = PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN
-}
-
-function exitDockFullscreen(): void {
-  dockMode.value = PROJECT_WORKBENCH_DOCK_MODE.DOCKED
-  setDockHeight(restoredDockHeight.value)
-  isDockMaximized.value = false
-}
-
-function startDockResize(event: PointerEvent): void {
-  if (dockMode.value !== PROJECT_WORKBENCH_DOCK_MODE.DOCKED || event.button !== 0) return
-
-  resizeInteraction = {
-    pointerId: event.pointerId,
-    startClientY: event.clientY,
-    startHeight: dockHeight.value,
-  }
-  const handle = event.currentTarget as HTMLElement
-  handle.setPointerCapture?.(event.pointerId)
-  event.preventDefault()
-}
-
-function continueDockResize(event: PointerEvent): void {
-  if (resizeInteraction?.pointerId !== event.pointerId) return
-
-  setDockHeight(resizeInteraction.startHeight + resizeInteraction.startClientY - event.clientY)
-  isDockMaximized.value = false
-  event.preventDefault()
-}
-
-function finishDockResize(event: PointerEvent): void {
-  if (resizeInteraction?.pointerId !== event.pointerId) return
-
-  restoredDockHeight.value = dockHeight.value
-  resizeInteraction = null
-  const handle = event.currentTarget as HTMLElement
-  if (handle.hasPointerCapture?.(event.pointerId)) handle.releasePointerCapture(event.pointerId)
-}
-
-function handleSplitterKeydown(event: KeyboardEvent): void {
-  switch (event.key) {
-    case 'ArrowDown':
-      setDockHeight(dockHeight.value - 16)
-      isDockMaximized.value = false
-      break
-    case 'ArrowUp':
-      setDockHeight(dockHeight.value + 16)
-      isDockMaximized.value = false
-      break
-    case 'End':
-      restoredDockHeight.value = dockHeight.value
-      setDockHeight(dockBounds().maximum)
-      isDockMaximized.value = true
-      event.preventDefault()
-      return
-    case 'Home':
-      setDockHeight(dockBounds().minimum)
-      isDockMaximized.value = false
-      break
-    default:
-      return
-  }
-
-  restoredDockHeight.value = dockHeight.value
-  event.preventDefault()
-}
-
-onMounted(() => {
-  setDockHeight(dockHeight.value)
-})
-
-onUnmounted(() => {
-  resizeInteraction = null
-})
+onMounted(dock.mount)
+onBeforeUnmount(dock.dispose)
 
 const midiEditor = Object.freeze({
   isOpen: () => isContextEditorOpen.value,
-  open: openContextEditor,
+  open: dock.open,
 })
 defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor })
 </script>
@@ -246,12 +86,14 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
   <section
     ref="workspaceElement"
     class="project-workbench__workspace"
-    :data-dock-mode="dockMode"
+    :data-dock-mode="layout.dockMode"
     :style="workspaceStyle"
     aria-label="Project workbench"
   >
     <ProjectWorkbenchArrangement
-      v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN"
+      v-show="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN && !layout.arrangementCompact"
+      @pointerdown.capture="dock.activateArrangement"
+      @focusin="dock.activateArrangement"
       :bar-span-tick="props.barSpanTick"
       :clips="props.clips"
       :midi-import-action="props.midiImportAction"
@@ -263,7 +105,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
       @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
-      @open-midi-clip="openContextEditor"
+      @open-midi-clip="dock.open"
       @tempo-edit-start="emit('tempoEditStart')"
       @tempo-event-add="(bpm, tick) => emit('tempoEventAdd', bpm, tick)"
       @tempo-event-bpm-commit="
@@ -274,28 +116,32 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
       @tempo-event-select="emit('tempoEventSelect', $event)"
     />
 
-    <div
-      v-if="dockMode === PROJECT_WORKBENCH_DOCK_MODE.DOCKED"
-      class="project-workbench__splitter"
-      role="separator"
-      aria-label="Resize MIDI editor"
-      aria-orientation="horizontal"
-      :aria-valuemin="dockBounds().minimum"
-      :aria-valuemax="dockBounds().maximum"
-      :aria-valuenow="dockHeight"
-      tabindex="0"
-      @keydown="handleSplitterKeydown"
-      @pointerdown="startDockResize"
-      @pointermove="continueDockResize"
-      @pointerup="finishDockResize"
-      @pointercancel="finishDockResize"
+    <UiButton
+      v-if="layout.arrangementCompact"
+      class="project-workbench__arrangement-restore"
+      size="small"
+      variant="ghost"
+      @click="dock.activateArrangement"
     >
-      <span></span>
-    </div>
+      Show Arrangement
+    </UiButton>
+    <UiHeightResizeHandle
+      v-if="layout.splitterHeight > 0"
+      class="project-workbench__splitter"
+      label="Resize MIDI editor"
+      :model-value="isDockMaximized ? layout.dockHeight : dock.preferredHeight.value"
+      :minimum="WORKSPACE_MINIMUM_DOCK_HEIGHT"
+      :maximum="layout.maximum"
+      @update:model-value="dock.resize"
+      @resize-start="dock.beginResize"
+      @resize-end="dock.endResize"
+    />
 
     <ProjectWorkbenchContextEditorDock
       v-if="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED"
-      :dock-mode="dockMode"
+      :dock-mode="layout.dockMode"
+      @pointerdown.capture="dock.activateMidi"
+      @focusin="dock.activateMidi"
       :is-maximized="isDockMaximized"
       :piano-roll-presentation="props.pianoRollPresentation"
       :piano-roll-track-presentation="props.pianoRollTrackPresentation"
@@ -305,10 +151,10 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
       :bar-span-tick="props.barSpanTick"
       :time-signature-numerator="props.timeSignatureNumerator"
       :timeline-end-tick="props.timelineEndTick"
-      @close="closeDock"
-      @minimize="minimizeDock"
-      @toggle-fullscreen="toggleDockFullscreen"
-      @toggle-maximized="toggleDockMaximized"
+      @close="dock.close"
+      @minimize="dock.toggleMinimized"
+      @toggle-fullscreen="dock.toggleFullscreen"
+      @toggle-maximized="dock.toggleMaximized"
     />
   </section>
 </template>
@@ -318,54 +164,20 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
   --project-workbench-track-width: 16.25rem;
   --project-workbench-ruler-height: 2rem;
   --project-workbench-track-actions-height: 3.3125rem;
-  --project-workbench-tempo-track-height: 9rem;
   --project-workbench-track-row-height: 4.75rem;
   display: grid;
   min-block-size: 0;
   block-size: 100%;
-  grid-template-rows: minmax(13.75rem, 1fr) 0 0;
   overflow: hidden;
 }
 
-.project-workbench__workspace[data-dock-mode='docked'] {
-  grid-template-rows:
-    minmax(13.75rem, 1fr) var(--sd-space-3)
-    var(--project-workbench-dock-height);
-}
-
-.project-workbench__workspace[data-dock-mode='minimized'] {
-  grid-template-rows: minmax(13.75rem, 1fr) 0 2.75rem;
-}
-
-.project-workbench__workspace[data-dock-mode='fullscreen'] {
-  grid-template-rows: minmax(0, 1fr);
-}
-
 .project-workbench__splitter {
-  display: grid;
   grid-row: 2;
-  place-items: center;
-  border-block: 1px solid transparent;
-  background: var(--sd-color-surface-sunken);
-  cursor: ns-resize;
-  touch-action: none;
 }
-
-.project-workbench__splitter > span {
-  inline-size: 3.5rem;
-  block-size: var(--sd-space-1);
-  border-radius: var(--sd-radius-pill);
-  background: var(--sd-color-border-default);
-}
-
-.project-workbench__splitter:hover > span,
-.project-workbench__splitter:focus-visible > span {
-  background: var(--sd-color-border-focus);
-}
-
-.project-workbench__splitter:focus-visible {
-  outline: 2px solid var(--sd-color-border-focus);
-  outline-offset: -2px;
+.project-workbench__arrangement-restore {
+  grid-row: 1;
+  justify-self: start;
+  margin-inline: var(--sd-space-2);
 }
 
 @media (max-width: 71.9375rem) {

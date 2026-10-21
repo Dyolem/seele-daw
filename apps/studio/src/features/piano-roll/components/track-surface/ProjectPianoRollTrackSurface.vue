@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import PianoRollControllerHeader from '@/features/piano-roll/components/controller-lane/PianoRollControllerHeader.vue'
+import PianoRollControllerScale from '@/features/piano-roll/components/controller-lane/PianoRollControllerScale.vue'
+import { useControllerLaneLayout } from '@/features/piano-roll/layout/use-controller-lane-layout'
+
 import { computed, onMounted, onBeforeUnmount, shallowRef, useTemplateRef } from 'vue'
 import { ContextMenuRoot } from 'reka-ui'
 import { createPianoRollGrid, PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS } from '@seele-daw/editor'
@@ -45,6 +49,7 @@ const scrollViewport = useTemplateRef<HTMLElement>('scrollViewport')
 const sustainPedalLane = useTemplateRef<PianoRollSustainPedalLaneHandle>('sustainPedalLane')
 const failureMessage = shallowRef<string | null>(null)
 const pitchView = usePitchViewport(canvasHost)
+const controllerLane = useControllerLaneLayout(surfaceElement)
 const displayGrid = computed(() =>
   createPianoRollGrid({
     barSpanTick: props.barSpanTick,
@@ -139,9 +144,11 @@ function dispose(): void {
   pitchView.dispose()
   placement.dispose()
   rendering.dispose()
+  controllerLane.dispose()
 }
 onMounted(() => {
   try {
+    controllerLane.mount()
     rendering.mount()
     placement.mount()
     pitchView.mount()
@@ -165,6 +172,7 @@ onBeforeUnmount(dispose)
         :data-snap-enabled="pianoRollPreferences.snapEnabled"
         :data-tool="pianoRollPreferences.activeTool"
         :style="{
+          ...controllerLane.style.value,
           '--project-piano-roll-track-pitch-height': pitchView.geometry.value
             ? `${pitchView.geometry.value.heightCssPixel}px`
             : undefined,
@@ -197,12 +205,10 @@ onBeforeUnmount(dispose)
         <div class="project-piano-roll-track__left-stack">
           <div class="project-piano-roll-track__ruler-corner" aria-hidden="true">PITCH</div>
           <PianoRollKeyboard :viewport="pitchView.geometry.value" @wheel="pitchView.handleWheel" />
-          <div class="project-piano-roll-track__lane-label" aria-hidden="true">
-            <strong>CC64</strong>
-            <span>127</span>
-            <span>64</span>
-            <span>0</span>
-          </div>
+          <PianoRollControllerScale
+            v-if="controllerLane.layout.value.visible"
+            class="project-piano-roll-track__lane-label"
+          />
         </div>
 
         <div
@@ -261,6 +267,8 @@ onBeforeUnmount(dispose)
               ></div>
             </div>
             <PianoRollSustainPedalLane
+              class="project-piano-roll-track__sustain-lane"
+              v-if="controllerLane.layout.value.visible"
               :session="props.session"
               ref="sustainPedalLane"
               :clip-context="null"
@@ -288,6 +296,13 @@ onBeforeUnmount(dispose)
           />
         </div>
 
+        <PianoRollControllerHeader
+          class="project-piano-roll-track__controller-header"
+          :visible="controllerLane.layout.value.visible"
+          :can-expand="controllerLane.layout.value.canExpand"
+          :maximum="controllerLane.layout.value.maximum"
+        />
+
         <p class="project-piano-roll-track__accessible-status" aria-live="polite">
           {{ accessibleStatus }}
         </p>
@@ -309,9 +324,6 @@ onBeforeUnmount(dispose)
 <style scoped>
 .project-piano-roll-track {
   --project-piano-roll-track-keyboard-width: 4.5rem;
-  --project-piano-roll-track-ruler-height: 1.625rem;
-  --project-piano-roll-track-lane-height: 5.5rem;
-  --project-piano-roll-track-toolbar-height: 2.25rem;
   position: relative;
   display: grid;
   min-inline-size: 0;
@@ -320,7 +332,7 @@ onBeforeUnmount(dispose)
   grid-template-columns: var(--project-piano-roll-track-keyboard-width) minmax(0, 1fr) var(
       --sd-space-3
     );
-  grid-template-rows: var(--project-piano-roll-track-toolbar-height) minmax(0, 1fr);
+  grid-template-rows: var(--piano-roll-toolbar-height) minmax(0, 1fr);
   overflow: hidden;
   color: var(--sd-color-text-secondary);
   background: var(--sd-color-surface-canvas);
@@ -339,14 +351,15 @@ onBeforeUnmount(dispose)
   display: grid;
   min-block-size: 0;
   grid-template-rows:
-    var(--project-piano-roll-track-ruler-height)
+    var(--piano-roll-ruler-height)
     var(--project-piano-roll-track-pitch-height, minmax(0, 1fr))
-    var(--project-piano-roll-track-lane-height);
+    var(--piano-roll-controller-header-height)
+    var(--piano-roll-controller-height);
   border-inline-end: 1px solid var(--sd-color-border-default);
 }
 
 .project-piano-roll-track__pitch-scrollbar-stack {
-  padding-block-start: var(--project-piano-roll-track-ruler-height);
+  padding-block-start: var(--piano-roll-ruler-height);
   min-block-size: 0;
   overflow: hidden;
 }
@@ -364,26 +377,19 @@ onBeforeUnmount(dispose)
 }
 
 .project-piano-roll-track__lane-label {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-block-size: 0;
-  padding: var(--sd-space-1) var(--sd-space-2);
-  border-block-start: 1px solid var(--sd-color-border-default);
-  color: var(--sd-color-text-muted);
-  font-family: var(--sd-font-family-numeric);
-  font-size: var(--sd-font-size-xs);
-  background: var(--sd-color-surface-panel);
+  grid-row: 4;
 }
-
-.project-piano-roll-track__lane-label strong {
-  color: var(--sd-color-text-secondary);
-  font-size: var(--sd-font-size-xs);
-  letter-spacing: 0.06em;
+.project-piano-roll-track__controller-header {
+  position: absolute;
+  z-index: var(--sd-layer-sticky-raised);
+  inset-inline: 0;
+  inset-block-start: calc(
+    var(--piano-roll-toolbar-height) + var(--piano-roll-ruler-height) +
+      var(--project-piano-roll-track-pitch-height, 0px)
+  );
 }
-
-.project-piano-roll-track__lane-label span {
-  align-self: flex-end;
+.project-piano-roll-track__sustain-lane {
+  grid-row: 4;
 }
 
 .project-piano-roll-track__scroll-viewport {
@@ -401,9 +407,10 @@ onBeforeUnmount(dispose)
   min-inline-size: 100%;
   block-size: 100%;
   grid-template-rows:
-    var(--project-piano-roll-track-ruler-height)
+    var(--piano-roll-ruler-height)
     minmax(0, 1fr)
-    var(--project-piano-roll-track-lane-height);
+    var(--piano-roll-controller-header-height)
+    var(--piano-roll-controller-height);
 }
 
 .project-piano-roll-track__ruler {

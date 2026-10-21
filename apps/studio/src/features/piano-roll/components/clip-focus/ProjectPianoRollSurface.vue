@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import PianoRollControllerHeader from '@/features/piano-roll/components/controller-lane/PianoRollControllerHeader.vue'
+import PianoRollControllerScale from '@/features/piano-roll/components/controller-lane/PianoRollControllerScale.vue'
+import { useControllerLaneLayout } from '@/features/piano-roll/layout/use-controller-lane-layout'
+
 import { createPianoRollInteractionSession, createPianoRollGrid } from '@seele-daw/editor'
 import { ZERO_TICK, parsePositiveTick } from '@seele-daw/project-core'
 import { ContextMenuRoot } from 'reka-ui'
@@ -46,6 +50,7 @@ const focusedEditingTarget = shallowRef<FocusedPianoRollEditingTarget>('notes')
 const interactionFailureMessage = shallowRef<string | null>(null)
 const interactionSession = createPianoRollInteractionSession()
 const pitchView = usePitchViewport(canvasHost)
+const controllerLane = useControllerLaneLayout(surfaceElement)
 const fitPitches = computed(() => {
   const context = props.presentation.context
   const partition = props.presentation.snapshot.midiNotePartitions.find(
@@ -164,6 +169,7 @@ onMounted(() => {
   )
     return
   try {
+    controllerLane.mount()
     rendering.mount()
     interaction.mount()
     model.mount()
@@ -181,6 +187,7 @@ function dispose(): void {
   model.dispose()
   pitchView.dispose()
   rendering.dispose()
+  controllerLane.dispose()
 }
 onBeforeUnmount(dispose)
 </script>
@@ -197,6 +204,7 @@ onBeforeUnmount(dispose)
         :data-resizing-note="resizePreview !== null"
         :data-snap-enabled="pianoRollPreferences.snapEnabled"
         :data-tool="pianoRollPreferences.activeTool"
+        :style="controllerLane.style.value"
         tabindex="0"
         @focusin="handleFocusIn"
       >
@@ -252,13 +260,12 @@ onBeforeUnmount(dispose)
           @scroll-pitch="pitchView.scrollTo"
         />
 
-        <div class="project-piano-roll__lane-label" aria-hidden="true">
-          <strong>CC64</strong>
-          <span>127</span>
-          <span>64</span>
-          <span>0</span>
-        </div>
+        <PianoRollControllerScale
+          v-if="controllerLane.layout.value.visible"
+          class="project-piano-roll__lane-label"
+        />
         <PianoRollSustainPedalLane
+          v-if="controllerLane.layout.value.visible"
           :session="props.session"
           class="project-piano-roll__sustain-lane"
           ref="sustainPedalLane"
@@ -281,6 +288,13 @@ onBeforeUnmount(dispose)
           :viewport="noteState.viewport"
         />
 
+        <PianoRollControllerHeader
+          class="project-piano-roll__controller-header"
+          :visible="controllerLane.layout.value.visible"
+          :can-expand="controllerLane.layout.value.canExpand"
+          :maximum="controllerLane.layout.value.maximum"
+        />
+
         <p class="project-piano-roll__accessible-status" aria-live="polite">
           {{ accessibleStatus }}
         </p>
@@ -301,9 +315,6 @@ onBeforeUnmount(dispose)
 <style scoped>
 .project-piano-roll {
   --project-piano-roll-keyboard-width: 4.5rem;
-  --project-piano-roll-ruler-height: 1.625rem;
-  --project-piano-roll-lane-height: 5.5rem;
-  --project-piano-roll-toolbar-height: 2.25rem;
   position: relative;
   display: grid;
   min-inline-size: 0;
@@ -311,10 +322,11 @@ onBeforeUnmount(dispose)
   block-size: 100%;
   grid-template-columns: var(--project-piano-roll-keyboard-width) minmax(0, 1fr) var(--sd-space-3);
   grid-template-rows:
-    var(--project-piano-roll-toolbar-height)
-    var(--project-piano-roll-ruler-height)
+    var(--piano-roll-toolbar-height)
+    var(--piano-roll-ruler-height)
     minmax(0, 1fr)
-    var(--project-piano-roll-lane-height);
+    var(--piano-roll-controller-header-height)
+    var(--piano-roll-controller-height);
   overflow: hidden;
   color: var(--sd-color-text-secondary);
   background: var(--sd-color-surface-canvas);
@@ -390,35 +402,18 @@ onBeforeUnmount(dispose)
   grid-column: 3;
 }
 .project-piano-roll__sustain-lane {
-  grid-row: 4;
+  grid-row: 5;
   grid-column: 2;
 }
 
 .project-piano-roll__lane-label {
-  grid-row: 4;
+  grid-row: 5;
   grid-column: 1;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-block-size: 0;
-  padding: var(--sd-space-1) var(--sd-space-2);
-  border-block-start: 1px solid var(--sd-color-border-default);
-  border-inline-end: 1px solid var(--sd-color-border-default);
-  color: var(--sd-color-text-muted);
-  font-family: var(--sd-font-family-numeric);
-  font-size: var(--sd-font-size-xs);
-  background: var(--sd-color-surface-panel);
 }
-
-.project-piano-roll__lane-label strong {
-  color: var(--sd-color-text-secondary);
-  font-size: var(--sd-font-size-xs);
-  letter-spacing: 0.06em;
-}
-
-.project-piano-roll__lane-label span {
-  align-self: flex-end;
+.project-piano-roll__controller-header {
+  z-index: var(--sd-layer-sticky-raised);
+  grid-row: 4;
+  grid-column: 1 / -1;
 }
 
 .project-piano-roll__canvas-host {

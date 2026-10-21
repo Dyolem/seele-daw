@@ -159,17 +159,17 @@ Workbench Shell 不负责：
 
 这些值是默认密度的布局假设，不是允许组件直接硬编码的数值。Global Bar 与 Transport 若合并为一行，应重新验证总高度、信息优先级和窄屏行为。
 
-| 区域                  |         默认 | 约束                                  |
-| --------------------- | -----------: | ------------------------------------- |
-| Global Bar            |     52 px 高 | 不随内容滚动                          |
-| Transport             |     48 px 高 | 关键播放控件保持固定位置              |
-| Track column          |    260 px 宽 | 最小 220 px，最大 360 px              |
-| Timeline ruler        |     28 px 高 | 与 Track List 标题区对齐              |
-| Track row             |     80 px 高 | 紧凑模式可为 64 px                    |
-| Context Editor header |     44 px 高 | 最小化时保留                          |
-| Context Editor dock   | 视口高的 38% | 可调整，编辑区最小 220 px，最大约 72% |
-| Splitter visible line |       1–4 px | 实际命中区域至少 12 px                |
-| Primary control       |  32–36 px 高 | 高频图标按钮至少 32 × 32 px           |
+| 区域                  |        默认 | 约束                                                                    |
+| --------------------- | ----------: | ----------------------------------------------------------------------- |
+| Global Bar            |    52 px 高 | 不随内容滚动                                                            |
+| Transport             |    48 px 高 | 关键播放控件保持固定位置                                                |
+| Track column          |   260 px 宽 | 最小 220 px，最大 360 px                                                |
+| Timeline ruler        |    28 px 高 | 与 Track List 标题区对齐                                                |
+| Track row             |    80 px 高 | 紧凑模式可为 64 px                                                      |
+| Context Editor header |    44 px 高 | 最小化时保留                                                            |
+| Context Editor dock   |   360 px 高 | 常规最小 240px；最大值为剩余高度扣除 Arrangement 200px 与 Splitter 12px |
+| Splitter visible line |      1–4 px | 实际命中区域至少 12 px                                                  |
+| Primary control       | 32–36 px 高 | 高频图标按钮至少 32 × 32 px                                             |
 
 最低高度应按“可完成核心任务”定义，而不是按还看得到几行内容定义。若视口无法同时满足两个编辑区的最低高度，系统 SHOULD 主动最小化非焦点编辑器。
 
@@ -196,6 +196,14 @@ Workspace Fullscreen
 - 用户调整后的高度属于本地 Workbench Preference，不属于 Project Model。
 - Project 切换时 MAY 保留面板偏好，但 MUST 清理失效的编辑对象与选择。
 - Splitter 拖动必须即时跟手，过程中不播放缓动动画。
+- Workspace 的有效布局从实际宿主高度派生，不能把临时受约束高度写回用户偏好。
+  两个主区域无法同时容纳时，最近操作区域优先；另一块保留 32px Arrangement 恢复栏或
+  44px Dock 标题栏。放大后恢复常规布局。
+- Workspace / CC64 共用 12px 高度分隔条；支持 Arrow Up / Down（16px）、Home / End。
+  Escape、Window blur、Pointer Cancel、lost capture、边界改变与卸载取消拖动并恢复原偏好。
+- Tempo 默认以 32px 摘要显示 BPM 与事件数，显式展开增加 144px 曲线和数值编辑；左右高度同步。
+  展开后保留至少 96px Track 内容，并为非覆盖式滚动条预留 16px；不足时临时收起，恢复空间后
+  还原展开状态。禁用展开入口时同时显示需要增加高度的提示。
 
 ### 5.4 空间层级
 
@@ -598,6 +606,11 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
   Arrow / Page / Home / End。Shift 或横向滚轮继续交给时间轴，Ctrl / Meta 滚轮不由 Pitch 消费。
 - 键盘、Canvas Grid、Note、Preview 与 Hit 共用行高和顶部部分行偏移；Canvas 只分配可视高度。
   CC64 与 Ruler 不随 Pitch 滚动，音符增删不触发自动音域适配。
+- CC64 保留底部同一时间轴，标题栏高 32px、拖动柄高 12px；事件区默认 88px、可调 64–240px。
+  标题栏不随横向时间滚动，明确展示展开 / 收起状态；内部 Plot 上下各留 12px，数值轴与 Marker
+  共用该安全间距，不能靠移动 Marker 视觉位置来伪造不同的输入坐标。
+- 辅助 Lane 高度受 Note 至少 96px 与非覆盖式横向滚动条 16px 的预留限制；不足时临时收起，
+  原偏好保留。用户主动收起保持收起；扩大窗口不会擅自重新打开。
 - 黑键行通过轻微明度差异识别，不使用高对比棋盘纹。
 - 小节、拍和细分网格有明确的三级强度。
 - 音符继承轨道颜色；Selected 使用高亮轮廓、控制点或亮度变化叠加表达。

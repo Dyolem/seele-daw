@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CONTROLLER_LANE_VALUE_INSET } from '@/features/piano-roll/layout/controller-lane-policy'
 import { onMounted, onBeforeUnmount, useTemplateRef, watch } from 'vue'
 import type { PianoRollSustainPedalLaneProps } from '@/features/piano-roll/components/sustain-pedal/types/sustain-pedal-lane'
 import { useSustainPedalViewport } from '@/features/piano-roll/components/sustain-pedal/hooks/use-sustain-pedal-viewport'
@@ -127,76 +128,88 @@ onBeforeUnmount(dispose)
 
 <template>
   <div
-    ref="laneSurface"
-    class="piano-roll-sustain-pedal-lane"
-    :class="{ 'piano-roll-sustain-pedal-lane--pencil': props.pencilEnabled }"
-    :aria-label="props.label"
-    :data-interaction-status="interactionState.status"
-    role="group"
-    tabindex="0"
-    @focusin="emit('requestFocus')"
+    class="piano-roll-sustain-pedal-frame"
+    :style="{ paddingBlock: `${CONTROLLER_LANE_VALUE_INSET}px` }"
   >
-    <span
-      v-if="thresholdStyle"
-      class="piano-roll-sustain-pedal-lane__threshold"
-      :style="thresholdStyle"
-      aria-hidden="true"
-    ></span>
-    <span
-      v-for="occurrence in occurrenceWindows"
-      :key="`${occurrence.key}:window`"
-      class="piano-roll-sustain-pedal-lane__occurrence"
-      :class="{
-        'piano-roll-sustain-pedal-lane__occurrence--active': occurrence.active,
-        'piano-roll-sustain-pedal-lane__occurrence--unsupported': occurrence.unsupported,
-      }"
-      :style="occurrence.style"
-      aria-hidden="true"
-    ></span>
-    <span
-      v-for="segment in renderedSegments"
-      :key="segment.key"
-      class="piano-roll-sustain-pedal-lane__segment"
-      :class="{
-        'piano-roll-sustain-pedal-lane__segment--down': segment.pedalDown,
-        'piano-roll-sustain-pedal-lane__segment--inactive': !segment.active,
-      }"
-      :style="segment.style"
-      aria-hidden="true"
-    ></span>
-    <button
-      v-for="event in renderedEvents"
-      :key="event.key"
-      type="button"
-      class="piano-roll-sustain-pedal-lane__event"
-      :class="{
-        'piano-roll-sustain-pedal-lane__event--down': event.pedalDown,
-        'piano-roll-sustain-pedal-lane__event--inactive': !event.active,
-        'piano-roll-sustain-pedal-lane__event--preview': event.preview,
-        'piano-roll-sustain-pedal-lane__event--selected': event.selected,
-        'piano-roll-sustain-pedal-lane__event--terminal': !event.affectsPlayback,
-      }"
-      :data-piano-roll-sustain-pedal-event-id="event.event.id"
-      :data-piano-roll-clip-id="event.clipId"
-      :style="event.style"
-      :aria-label="`Sustain Pedal value ${event.value} at tick ${event.timelineTick}${
-        event.affectsPlayback ? '' : ', terminal endpoint'
-      }${event.selected ? ', selected' : ''}`"
-      :aria-pressed="event.selected"
-    ></button>
-    <span class="piano-roll-sustain-pedal-lane__accessible-status" aria-live="polite">
-      {{ accessibleSummary }}
-    </span>
+    <div
+      ref="laneSurface"
+      class="piano-roll-sustain-pedal-lane"
+      :class="{ 'piano-roll-sustain-pedal-lane--pencil': props.pencilEnabled }"
+      :aria-label="props.label"
+      :data-interaction-status="interactionState.status"
+      role="group"
+      tabindex="0"
+      @focusin="emit('requestFocus')"
+    >
+      <span
+        v-if="thresholdStyle"
+        class="piano-roll-sustain-pedal-lane__threshold"
+        :style="thresholdStyle"
+        aria-hidden="true"
+      ></span>
+      <span
+        v-for="occurrence in occurrenceWindows"
+        :key="`${occurrence.key}:window`"
+        class="piano-roll-sustain-pedal-lane__occurrence"
+        :class="{
+          'piano-roll-sustain-pedal-lane__occurrence--active': occurrence.active,
+          'piano-roll-sustain-pedal-lane__occurrence--unsupported': occurrence.unsupported,
+        }"
+        :style="occurrence.style"
+        aria-hidden="true"
+      ></span>
+      <span
+        v-for="segment in renderedSegments"
+        :key="segment.key"
+        class="piano-roll-sustain-pedal-lane__segment"
+        :class="{
+          'piano-roll-sustain-pedal-lane__segment--down': segment.pedalDown,
+          'piano-roll-sustain-pedal-lane__segment--inactive': !segment.active,
+        }"
+        :style="segment.style"
+        aria-hidden="true"
+      ></span>
+      <button
+        v-for="event in renderedEvents"
+        :key="event.key"
+        type="button"
+        class="piano-roll-sustain-pedal-lane__event"
+        :class="{
+          'piano-roll-sustain-pedal-lane__event--down': event.pedalDown,
+          'piano-roll-sustain-pedal-lane__event--inactive': !event.active,
+          'piano-roll-sustain-pedal-lane__event--preview': event.preview,
+          'piano-roll-sustain-pedal-lane__event--selected': event.selected,
+          'piano-roll-sustain-pedal-lane__event--terminal': !event.affectsPlayback,
+        }"
+        :data-piano-roll-sustain-pedal-event-id="event.event.id"
+        :data-piano-roll-clip-id="event.clipId"
+        :style="event.style"
+        :aria-label="`Sustain Pedal value ${event.value} at tick ${event.timelineTick}${
+          event.affectsPlayback ? '' : ', terminal endpoint'
+        }${event.selected ? ', selected' : ''}`"
+        :aria-pressed="event.selected"
+      ></button>
+      <span class="piano-roll-sustain-pedal-lane__accessible-status" aria-live="polite">
+        {{ accessibleSummary }}
+      </span>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.piano-roll-sustain-pedal-frame {
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  background: var(--sd-color-surface-canvas);
+}
+
 .piano-roll-sustain-pedal-lane {
+  block-size: 100%;
   position: relative;
   min-inline-size: 0;
   min-block-size: 0;
-  overflow: hidden;
-  border-block-start: 1px solid var(--sd-color-border-default);
+  overflow: visible;
   background:
     linear-gradient(
       to bottom,
@@ -312,8 +325,21 @@ onBeforeUnmount(dispose)
 
 .piano-roll-sustain-pedal-lane__event--terminal {
   border-radius: 0;
-  rotate: 45deg;
+  border: 0;
   background: transparent;
+  box-shadow: none;
+}
+
+/* Rotate only the glyph: rotating the positioned button also rotates its time/value translation. */
+.piano-roll-sustain-pedal-lane__event--terminal::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  border: 2px solid var(--sd-color-text-muted);
+  rotate: 45deg;
+}
+.piano-roll-sustain-pedal-lane__event--terminal.piano-roll-sustain-pedal-lane__event--down::after {
+  border-color: var(--sd-color-border-focus);
 }
 
 .piano-roll-sustain-pedal-lane__accessible-status {

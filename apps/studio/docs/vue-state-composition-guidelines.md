@@ -140,11 +140,14 @@ Piano Roll Preferences 是第二个 feature Store，只保存：
 - `snapEnabled`；
 - `gridPreset` 以及由 Preset 派生的 Subdivision Tick；
 - `sustainPedalChannel`：MIDI `0..15`；
-- `pitchViewMode`、连续中心音高 `pitchCenter` 与目标跨度 `pitchRangeSize`。
+- `pitchViewMode`、连续中心音高 `pitchCenter` 与目标跨度 `pitchRangeSize`；
+- CC64 的 `controllerLaneExpanded` 与 `controllerLaneHeight`（默认展开、88px）。
 
 这些偏好跨 Project、Clip 和 Dock 布局共享，不随编辑对象销毁；新的 Studio 应用 Pinia 实例
 恢复默认 Track、Pencil、Snap 开启、`1/16`、CC64 Channel 1、标准键高、中心 MIDI 60 和目标 25 键。
 实际像素尺寸、滚动位置和 Viewport 从宿主测量与偏好派生，Observer 由 Surface 释放。
+CC64 有效高度与临时收起从可用高度派生，不覆盖 Store 的用户偏好。Workspace Dock 的常规高度
+与 Tempo 展开偏好只影响各自组件树，继续使用局部 Ref。
 Store 不保存 Note、Selection、Pointer Gesture 或
 ProjectSession，也不因为当前只有一个已确认 Grid Preset 就预建未决定的产品选项。
 

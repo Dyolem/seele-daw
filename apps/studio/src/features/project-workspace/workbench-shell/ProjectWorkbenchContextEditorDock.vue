@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { WORKSPACE_DOCK_HEADER_HEIGHT } from './layout/workspace-layout-policy'
 import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { parseSoundbankId } from '@seele-daw/playback'
 import DismissIcon from '~icons/fluent/dismiss-16-regular'
@@ -122,6 +123,7 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
 <template>
   <section
     class="project-workbench__dock"
+    :style="{ '--project-workbench-dock-header-height': `${WORKSPACE_DOCK_HEADER_HEIGHT}px` }"
     :data-dock-mode="props.dockMode"
     aria-label="Context editor dock"
   >
@@ -330,14 +332,14 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
 }
 
 .project-workbench__dock[data-dock-mode='fullscreen'] {
-  grid-row: 1;
+  grid-row: 3;
   border-top: 0;
 }
 
 .project-workbench__inspector {
   display: grid;
   min-block-size: 0;
-  grid-template-rows: 2.75rem minmax(0, 1fr);
+  grid-template-rows: var(--project-workbench-dock-header-height) minmax(0, 1fr);
   border-inline-end: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
 }
@@ -347,7 +349,7 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
   display: flex;
   align-items: center;
   min-inline-size: 0;
-  block-size: 2.75rem;
+  block-size: var(--project-workbench-dock-header-height);
   border-bottom: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
 }
@@ -453,7 +455,7 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
   display: grid;
   min-inline-size: 0;
   min-block-size: 0;
-  grid-template-rows: 2.75rem minmax(0, 1fr);
+  grid-template-rows: var(--project-workbench-dock-header-height) minmax(0, 1fr);
 }
 
 .project-workbench__dock-heading {
@@ -553,6 +555,6 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
 
 .project-workbench__dock[data-dock-mode='minimized'] .project-workbench__inspector,
 .project-workbench__dock[data-dock-mode='minimized'] .project-workbench__context-editor {
-  grid-template-rows: 2.75rem;
+  grid-template-rows: var(--project-workbench-dock-header-height);
 }
 </style>

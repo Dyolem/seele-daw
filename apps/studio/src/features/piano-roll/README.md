@@ -15,6 +15,8 @@ Studio 的 MIDI Note 与 CC64 编辑入口，遵循根 [工程代码准则](../.
 | `interaction/`                         | 将 Editor Intent 转成既有 Coordinator 调用，处理提交回告和失败反馈           |
 | `presentation/`                        | Snapshot 投影、Renderer 选择、Theme、Channel 选项和反馈文案                  |
 | `viewport/`                            | Pitch 视口纯计算政策、宿主测量与滚轮的 Vue / Browser 适配                    |
+| `layout/`                              | Controller Lane 高度政策、真实 Surface 测量与有效布局派生                    |
+| `components/controller-lane/`          | 共享 CC64 标题栏、尺寸分隔条与数值轴                                         |
 | `state/`                               | 应用生命周期的轻量 Piano Roll Preferences Store                              |
 | `actions/`                             | Tool Action 定义、Vue 注册与 Context Menu                                    |
 | `playhead/`                            | Clip / Track 时间位置投影和显示                                              |
@@ -190,7 +192,7 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
 - Track Pencil Hover Preview：明确显示写入已有 Clip、右扩 Clip、新建 Bar Clip 或 blocked
   原因；按下时冻结 Active Clip / Tool / Grid / Snap / revision；完成时 Coordinator 对同一 Session 和原 revision 重新验证，并用 Add Note、
   Add Clip With Note 或 Extend Clip With Note 形成一次 Commit / History；
-- Track 与 Clip Focus 共用固定高度的 CC64 Sustain Pedal Lane：保留原始 `0..127` Value，显示
+- Track 与 Clip Focus 共用可调高度、可收起的 CC64 Sustain Pedal Lane：保留原始 `0..127` Value，显示
   Step Segment、`64` Down Threshold、Event Marker 与不影响当前 Clip 播放的右端 Terminal
   Marker；
 - CC64 Channel 以 `1..16` 显示、以 MIDI `0..15` 写入，属于应用生命周期 Preference，不是
@@ -220,3 +222,15 @@ CC64 Add / Selection / Move / Replace Value / Remove 写入闭环，但仍不能
 默认 DOM Note Renderer 提供互不重叠的左右 Edge 热区；Canvas Note Adapter 可以显示同一
 Resize Preview，但尚无 Canvas Hit 实现。DOM Event 必须继续先归一化为 Renderer-neutral Hit，
 不直接修改 Project Model，也不把 ProjectSession 放入 Pinia。
+
+## 辅助 Lane 布局
+
+`useControllerLaneLayout` 观察 Surface 的实际高度，与 Preferences 的展开 / 高度偏好共同派生
+可见布局。Track 与 Clip Focus 使用相同政策；Toolbar、Ruler、标题栏与分隔条尺寸通过自有
+CSS 变量进入布局。Track 的标题栏固定于编辑器宽度，CC64 Plot 与 Note 仍在同一横向滚动 owner
+内；左侧数值轴及 Pitch Scrollbar 依据实测 Note 高度对齐。
+
+CC64 Frame 仅负责上下安全间距与裁切，内部 Plot 同时拥有几何测量、Pointer Adapter 和 Marker
+坐标，X 不增加额外 inset。收起卸载 Lane 并取消捕获；显示偏好保留在 Store，短窗口的临时高度
+不回写偏好。布局测量在 Surface 初始化时先创建，结束时在 Input / Model / Renderer 之后清理；
+部分失败走同一个幂等 dispose。

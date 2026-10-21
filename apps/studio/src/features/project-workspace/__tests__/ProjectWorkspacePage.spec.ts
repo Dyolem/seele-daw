@@ -225,6 +225,12 @@ async function mountPage(
   projectId: ProjectId,
   actionOptions: Parameters<typeof createTestStudioActionRuntime>[0] = {},
 ) {
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.classList.contains('project-workbench__track-panel') ? 85 : 800
+    },
+  )
+
   const router = createStudioRouter(createMemoryHistory())
   const pinia = createPinia()
   await router.push(createProjectWorkspaceLocation(projectId))
@@ -360,6 +366,7 @@ async function mountTempoDragPage() {
   )
   const page = await mountPage(fixture, projectId)
   await flushPromises()
+  await page.wrapper.get('[aria-label="Expand Tempo editor"]').trigger('click')
   const plot = page.wrapper.get('.tempo-track-lane__plot').element as HTMLElement
   const width = Number(page.wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick'))
   vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
@@ -1443,6 +1450,7 @@ describe('ProjectWorkspacePage', () => {
     )
     const { playbackState, projectPlayback, wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
+    await wrapper.get('[aria-label="Expand Tempo editor"]').trigger('click')
     const shell = wrapper.getComponent(ProjectWorkbenchShell)
 
     await wrapper.get('.tempo-track-lane__point').trigger('click')

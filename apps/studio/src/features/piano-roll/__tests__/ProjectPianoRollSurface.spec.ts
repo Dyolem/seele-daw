@@ -118,7 +118,11 @@ function installSurfaceEnvironment(): void {
   }
 
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(960)
-  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(250)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.matches('.project-piano-roll, .project-piano-roll-track') ? 500 : 250
+    },
+  )
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(createFakeCanvasContext())
   vi.spyOn(globalThis, 'getComputedStyle').mockReturnValue({
     getPropertyValue: () => '#111111',
@@ -405,6 +409,44 @@ describe('ProjectPianoRollSurface', () => {
     expect(
       fixture.wrapper.get(`[data-piano-roll-note-id="${note?.id}"]`).attributes('style'),
     ).toContain('translate3d(240px, 116px, 0)')
+  })
+
+  it('cancels a captured CC64 edit when collapsed and restores its height after a short viewport', async () => {
+    const probe = installPianoRollResizeObserver()
+    const fixture = mountSelectionMenuFixture('controller-collapse')
+    await nextTick()
+    fixture.preferences.setControllerLaneHeight(180)
+    const revision = fixture.session.modelRevision
+    const contentState = fixture.session.contentStateId
+    const lane = fixture.wrapper.get('.piano-roll-sustain-pedal-lane').element
+    const marker = fixture.markers('sustain-pedal')[0]!.element
+    dispatchPointer(marker, 'pointerdown', { clientX: 120, clientY: 124 })
+    dispatchPointer(lane, 'pointermove', { clientX: 240, clientY: 124 })
+    expect(lane.hasPointerCapture(1)).toBe(true)
+    await fixture.wrapper.get('[aria-label="Collapse CC64 lane"]').trigger('click')
+    expect(lane.hasPointerCapture(1)).toBe(false)
+    dispatchPointer(lane, 'pointerup', { clientX: 240, clientY: 124 })
+    expect(fixture.session.modelRevision).toBe(revision)
+    expect(fixture.session.contentStateId).toBe(contentState)
+    expect(fixture.wrapper.find('.piano-roll-sustain-pedal-lane').exists()).toBe(false)
+    await fixture.wrapper.get('[aria-label="Expand CC64 lane"]').trigger('click')
+    const surface = fixture.wrapper.get('.project-piano-roll').element
+    const observer = probe.forElement(surface)
+    Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 250 })
+    observer.deliver()
+    await nextTick()
+    expect(fixture.wrapper.find('.piano-roll-sustain-pedal-lane').exists()).toBe(false)
+    expect(fixture.preferences.controllerLaneHeight).toBe(180)
+    expect(fixture.preferences.controllerLaneExpanded).toBe(true)
+    Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 500 })
+    observer.deliver()
+    await nextTick()
+    expect(surface.getAttribute('style')).toContain('--piano-roll-controller-height: 180px')
+    expect(fixture.wrapper.find('.piano-roll-sustain-pedal-lane').exists()).toBe(true)
+    expect(fixture.session.modelRevision).toBe(revision)
+    fixture.wrapper.unmount()
+    observer.deliver()
+    expect(observer.disconnect).toHaveBeenCalledOnce()
   })
 
   it('keeps center pitch and standard key height across panel resize', async () => {

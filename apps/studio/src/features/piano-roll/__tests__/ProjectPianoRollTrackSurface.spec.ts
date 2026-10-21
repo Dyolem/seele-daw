@@ -177,7 +177,11 @@ function installSurfaceEnvironment(): void {
         : 960
     },
   )
-  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(250)
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.matches('.project-piano-roll, .project-piano-roll-track') ? 500 : 250
+    },
+  )
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(createFakeCanvasContext())
   vi.spyOn(globalThis, 'getComputedStyle').mockReturnValue({
     getPropertyValue: () => '#111111',

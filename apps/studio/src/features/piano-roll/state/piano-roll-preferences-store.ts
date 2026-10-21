@@ -1,4 +1,9 @@
 import {
+  CONTROLLER_LANE_DEFAULT_HEIGHT,
+  CONTROLLER_LANE_MINIMUM_HEIGHT,
+  CONTROLLER_LANE_MAXIMUM_HEIGHT,
+} from '@/features/piano-roll/layout/controller-lane-policy'
+import {
   PIANO_ROLL_TOOL,
   PIANO_ROLL_EDITING_SCOPE,
   PIANO_ROLL_GRID_PRESET,
@@ -54,6 +59,8 @@ export const usePianoRollPreferencesStore = defineStore('piano-roll-preferences'
   const pitchViewMode = shallowRef<PianoRollPitchViewMode>(PIANO_ROLL_PITCH_VIEW_MODE.STANDARD)
   const pitchCenter = shallowRef<number>(PIANO_ROLL_DEFAULT_CENTER_PITCH)
   const pitchRangeSize = shallowRef(PIANO_ROLL_DEFAULT_PITCH_RANGE_SIZE)
+  const controllerLaneExpanded = shallowRef(true)
+  const controllerLaneHeight = shallowRef(CONTROLLER_LANE_DEFAULT_HEIGHT)
   const subdivisionSpanTick = computed(() => GRID_PRESET_SUBDIVISION_SPAN_TICK[gridPreset.value])
 
   function activateTool(tool: PianoRollTool): void {
@@ -80,7 +87,20 @@ export const usePianoRollPreferencesStore = defineStore('piano-roll-preferences'
     sustainPedalChannel.value = parseMidiChannel(channel)
   }
 
+  function setControllerLaneExpanded(expanded: boolean): void {
+    controllerLaneExpanded.value = expanded
+  }
+  function setControllerLaneHeight(height: number): void {
+    if (Number.isFinite(height))
+      controllerLaneHeight.value = Math.max(
+        CONTROLLER_LANE_MINIMUM_HEIGHT,
+        Math.min(CONTROLLER_LANE_MAXIMUM_HEIGHT, Math.round(height)),
+      )
+  }
+
   function reset(): void {
+    controllerLaneExpanded.value = true
+    controllerLaneHeight.value = CONTROLLER_LANE_DEFAULT_HEIGHT
     activeTool.value = PIANO_ROLL_DEFAULT_TOOL
     editingScope.value = PIANO_ROLL_DEFAULT_EDITING_SCOPE
     snapEnabled.value = PIANO_ROLL_DEFAULT_SNAP_ENABLED
@@ -125,6 +145,10 @@ export const usePianoRollPreferencesStore = defineStore('piano-roll-preferences'
   }
 
   return {
+    controllerLaneExpanded,
+    controllerLaneHeight,
+    setControllerLaneExpanded,
+    setControllerLaneHeight,
     activeTool,
     editingScope,
     snapEnabled,

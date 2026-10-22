@@ -572,7 +572,7 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 首批 Pointer Input 语义：
 
 - Note 不安装独立事件监听器，Surface 使用事件委托把 DOM 命中标准化为稳定
-  `NoteId + Hit Zone`；
+  `ClipId + NoteId + Hit Zone`；
 - Tool 与 Selection Session 只能消费 Renderer-neutral Hit 和 Surface-local CSS Pixel，
   不读取 DOM 元素、CSS class 或 Vue Event；
 - Pointer Down 冻结手势起点、命中目标与修饰键；Pointer Capture 后允许指针离开 Surface；
@@ -606,6 +606,14 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
   Arrow / Page / Home / End。Shift 或横向滚轮继续交给时间轴，Ctrl / Meta 滚轮不由 Pitch 消费。
 - 键盘、Canvas Grid、Note、Preview 与 Hit 共用行高和顶部部分行偏移；Canvas 只分配可视高度。
   CC64 与 Ruler 不随 Pitch 滚动，音符增删不触发自动音域适配。
+- Track Clip 以全高淡色区域和时间边界分组，背景 `pointer-events: none`，不截获空白落笔或
+  Note 输入。Header 位于独立行，每行 24px、最多显示两行；重叠区间稳定分行，超出部分可在
+  Header 内滚动和键盘访问。选择状态使用边框、顶部色线与 `aria-pressed`，不能只依赖颜色。
+- Header 不随 Pitch 滚动；横向位置跟随 Note / CC64 时间轴，聚焦屏外 Header 时同步揭示时间
+  位置。新增 Header 高度参与 Note 最小高度预算。Pencil / Cursor 均可选择 Header；尚未提供
+  Clip Move / Copy，因此当前 Header 使用普通 Pointer Cursor。
+- 同源 Note 保留 `(ClipId, NoteId)` 展示身份；完全重叠时 Active Clip 的 Note 与 CC64 Marker
+  位于上层，其他 Clip 可通过独立 Header 激活。Clip 颜色优先于 Track 颜色。
 - CC64 保留底部同一时间轴，标题栏高 32px、拖动柄高 12px；事件区默认 88px、可调 64–240px。
   标题栏不随横向时间滚动，明确展示展开 / 收起状态；内部 Plot 上下各留 12px，数值轴与 Marker
   共用该安全间距，不能靠移动 Marker 视觉位置来伪造不同的输入坐标。

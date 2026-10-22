@@ -1,4 +1,5 @@
 import {
+  parseClipId,
   parseMidiPitch,
   parseNoteId,
   parsePositiveTick,
@@ -41,6 +42,7 @@ function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): Pia
   return Object.freeze({
     hasExceededDragThreshold: false,
     hit: Object.freeze({
+      clipId: parseClipId('editor-piano-roll-clip'),
       noteId: parseNoteId('editor-note-inside'),
       zone: PIANO_ROLL_HIT_ZONE.BODY,
     }),
@@ -89,6 +91,32 @@ function createFixture(tool: PianoRollInteractionTool = PIANO_ROLL_INTERACTION_T
 }
 
 describe('Piano Roll Interaction Session', () => {
+  it.each([PIANO_ROLL_HIT_ZONE.BODY, PIANO_ROLL_HIT_ZONE.RESIZE_END])(
+    'ignores a %s occurrence from another Clip even when the source Note exists',
+    (zone) => {
+      const fixture = createFixture()
+      const session = createPianoRollInteractionSession()
+      const begin = createPointerInput({
+        hit: {
+          clipId: parseClipId('another-clip'),
+          noteId: parseNoteId('editor-note-inside'),
+          zone,
+        },
+      })
+      session.handlePointerInput(begin, fixture.configuration)
+      const end = { ...begin, phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }
+      expect(session.handlePointerInput(end).intent).toBeNull()
+      session.handlePointerInput(begin, fixture.configuration)
+      expect(
+        session.handlePointerInput({
+          ...end,
+          hasExceededDragThreshold: true,
+          position: { xCssPixel: 500, yCssPixel: 64 },
+        }).intent,
+      ).toBeNull()
+      session.dispose()
+    },
+  )
   it.each([{ pitchOffsetCssPixel: 1 }, { pitchRowHeightCssPixel: 20 }])(
     'cancels capture when pitch geometry changes without resizing the surface: %o',
     (change) => {
@@ -229,6 +257,7 @@ describe('Piano Roll Interaction Session', () => {
       const session = createPianoRollInteractionSession()
       const begin = createPointerInput({
         hit: Object.freeze({
+          clipId: parseClipId('editor-piano-roll-clip'),
           noteId: parseNoteId('editor-note-inside'),
           zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
         }),
@@ -315,6 +344,7 @@ describe('Piano Roll Interaction Session', () => {
     const session = createPianoRollInteractionSession()
     const begin = createPointerInput({
       hit: Object.freeze({
+        clipId: parseClipId('editor-piano-roll-clip'),
         noteId: parseNoteId('editor-note-inside'),
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
       }),
@@ -347,6 +377,7 @@ describe('Piano Roll Interaction Session', () => {
     const session = createPianoRollInteractionSession()
     const begin = createPointerInput({
       hit: Object.freeze({
+        clipId: parseClipId('editor-piano-roll-clip'),
         noteId: parseNoteId('editor-note-inside'),
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
       }),
@@ -371,6 +402,7 @@ describe('Piano Roll Interaction Session', () => {
     const session = createPianoRollInteractionSession()
     const begin = createPointerInput({
       hit: Object.freeze({
+        clipId: parseClipId('editor-piano-roll-clip'),
         noteId: parseNoteId('editor-note-inside'),
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
       }),
@@ -411,6 +443,7 @@ describe('Piano Roll Interaction Session', () => {
     const session = createPianoRollInteractionSession()
     const begin = createPointerInput({
       hit: Object.freeze({
+        clipId: parseClipId('editor-piano-roll-clip'),
         noteId: parseNoteId('editor-note-inside'),
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
       }),
@@ -701,7 +734,9 @@ describe('Piano Roll Interaction Session', () => {
     (zone) => {
       const fixture = createFixture()
       const session = createPianoRollInteractionSession()
-      const begin = createPointerInput({ hit: { zone, noteId: parseNoteId('editor-note-inside') } })
+      const begin = createPointerInput({
+        hit: { clipId: fixture.context.clipId, zone, noteId: parseNoteId('editor-note-inside') },
+      })
       session.handlePointerInput(begin, fixture.configuration)
       session.handlePointerInput({
         ...begin,

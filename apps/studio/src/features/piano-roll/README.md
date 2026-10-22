@@ -51,7 +51,7 @@ Tool Action Target。`PianoRollPitchControls` 消费共享 UI Preferences，Scop
 从 [ProjectPianoRollTrackSurface](./components/track-surface/ProjectPianoRollTrackSurface.vue) 开始：
 
 1. [useTrackLayout](./components/track-surface/hooks/use-track-layout.ts)：Timeline Bars、内容宽度、
-   可见 Note、Clip Windows 与时间 / 音高 Viewport 组合；尺寸由共享 Pitch hook 提供。
+   分 Clip 的可见 Note、Clip 区域与时间 / 音高 Viewport 组合；尺寸由共享 Pitch hook 提供。
 2. [useTrackRendering](./components/track-surface/hooks/use-track-rendering.ts)：Grid / Note Renderer
    的创建、投影、失败反馈与释放，消费 Layout 提供的 Viewport。
 3. [useTrackFollow](./components/track-surface/hooks/use-track-follow.ts)：Playback 分页跟随、
@@ -67,8 +67,23 @@ Tool Action Target。`PianoRollPitchControls` 消费共享 UI Preferences，Scop
 交互入口为 [TrackPlacementSession](./components/track-surface/interaction/track-placement-session.ts)，
 它组合公共 Session / Handoff，并拥有 Project 订阅；
 [TrackPlacementOperation](./components/track-surface/interaction/track-placement-operation.ts) 冻结点击
-时的候选与 Note Hit 对应 Clip。共享契约见
+时的候选，并以 `ClipId + NoteId` 校验 Note Hit 对应 Clip。共享契约见
 [track-placement.ts](./components/track-surface/types/track-placement.ts)。
+
+Clip 展示由 [clip-regions](./components/track-surface/presentation/clip-regions.ts) 纯函数分配
+不相交 Header 行；[PianoRollTrackClipHeaders](./components/track-surface/PianoRollTrackClipHeaders.vue)
+负责有界 Header 展示，
+[useClipHeaderScroll](./components/track-surface/hooks/use-clip-header-scroll.ts) 拥有焦点带入与
+水平滚动回传；
+[PianoRollTrackClipRegions](./components/track-surface/PianoRollTrackClipRegions.vue) 只绘制全高
+背景和时间边界。共享契约见 [track-clip-region](./components/track-surface/types/track-clip-region.ts)。
+Note / CC64 保留同一水平滚动容器，Header 镜像其位置；Header 聚焦引起的滚动回交该容器并
+以实际结果校准。Header 默认一行 24px、最多两行，额外高度进入 Controller Lane 预算。
+
+Layout 保留 Clip 分组直到 Scene 输入；Renderer 按 `(ClipId, NoteId)` 复用显示节点，不能再
+扁平化成仅 NoteId 身份。完全重叠时 Active Clip 的 Note / CC64 在上层；Header、Note 激活和
+Active Clip 下拉框继续使用既有 Workbench Selection 权威，不提供 Clip 拖动或复制命令。
+Core 当前仍强制 Source 一对一；测试的同源实例属于只读显示契约，不是新开放的 Project facts。
 
 ### Sustain Pedal Lane
 

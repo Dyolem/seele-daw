@@ -129,7 +129,7 @@ onBeforeUnmount(dispose)
 <template>
   <div
     class="piano-roll-sustain-pedal-frame"
-    :style="{ paddingBlock: `${CONTROLLER_LANE_VALUE_INSET}px` }"
+    :style="{ '--piano-roll-controller-value-inset': `${CONTROLLER_LANE_VALUE_INSET}px` }"
   >
     <div
       ref="laneSurface"
@@ -198,6 +198,7 @@ onBeforeUnmount(dispose)
 
 <style scoped>
 .piano-roll-sustain-pedal-frame {
+  padding-block: var(--piano-roll-controller-value-inset);
   min-block-size: 0;
   min-inline-size: 0;
   overflow: hidden;
@@ -241,7 +242,7 @@ onBeforeUnmount(dispose)
 .piano-roll-sustain-pedal-lane__occurrence {
   position: absolute;
   z-index: 0;
-  inset-block: 0;
+  inset-block: calc(-1 * var(--piano-roll-controller-value-inset));
   inset-inline-start: 0;
   box-sizing: border-box;
   pointer-events: none;

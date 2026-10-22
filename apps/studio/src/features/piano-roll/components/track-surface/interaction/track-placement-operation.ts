@@ -69,8 +69,10 @@ export class TrackPlacementOperation implements InteractionOperation<
     const clip =
       input.hit === null
         ? undefined
-        : configuration.readModel.clips.find(({ notes }) =>
-            notes.some(({ note }) => note.id === input.hit?.noteId),
+        : configuration.readModel.clips.find(
+            ({ clip, notes }) =>
+              clip.clipId === input.hit?.clipId &&
+              notes.some(({ note }) => note.id === input.hit?.noteId),
           )
     if (clip !== undefined)
       this.#result = Object.freeze({ type: 'activate-clip', clipId: clip.clip.clipId })

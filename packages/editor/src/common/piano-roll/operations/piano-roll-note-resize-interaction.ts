@@ -86,6 +86,7 @@ export function createPianoRollNoteResizeGesture(
   if (
     pointerInput.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN ||
     pointerInput.hit === null ||
+    pointerInput.hit.clipId !== input.context.clipId ||
     !isResizeEdge(pointerInput.hit.zone)
   ) {
     return null

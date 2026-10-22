@@ -74,6 +74,7 @@ export function useNoteRendering({
       })
       currentNoteRenderer.render(
         createPianoRollNoteScene({
+          clipId: state.clipId,
           movePreview: movePreview.value,
           notes: state.notes,
           resizePreview: resizePreview.value,

@@ -7,7 +7,10 @@ import {
   resolveControllerLaneLayout,
 } from './controller-lane-policy'
 
-export function useControllerLaneLayout(surface: Readonly<ShallowRef<HTMLElement | null>>) {
+export function useControllerLaneLayout(
+  surface: Readonly<ShallowRef<HTMLElement | null>>,
+  getAdditionalHeaderHeight: () => number = () => 0,
+) {
   const size = useElementHeight(surface)
   const preferences = usePianoRollPreferencesStore()
   const layout = computed(() =>
@@ -15,6 +18,7 @@ export function useControllerLaneLayout(surface: Readonly<ShallowRef<HTMLElement
       size.height.value,
       preferences.controllerLaneExpanded,
       preferences.controllerLaneHeight,
+      getAdditionalHeaderHeight(),
     ),
   )
   const style = computed(() => ({

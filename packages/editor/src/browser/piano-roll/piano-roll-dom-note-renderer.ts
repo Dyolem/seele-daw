@@ -1,6 +1,7 @@
 import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import {
   PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE,
+  PIANO_ROLL_DOM_NOTE_CLIP_ID_ATTRIBUTE,
   PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE,
 } from '#internal/browser/piano-roll/piano-roll-dom-note-hit'
 import type {
@@ -13,7 +14,6 @@ import {
   PIANO_ROLL_HIT_ZONE,
   type PianoRollNoteResizeEdge,
 } from '#internal/common/piano-roll/index'
-import type { NoteId } from '@seele-daw/project-core'
 
 const PIANO_ROLL_DOM_NOTE_RESIZE_HANDLE_WIDTH_CSS_PIXEL = 6
 
@@ -69,9 +69,10 @@ function configureNoteElements(
   element.className = visual.selected
     ? 'sd-piano-roll-dom-note sd-piano-roll-dom-note--selected'
     : 'sd-piano-roll-dom-note'
-  element.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
-  elements.startHandle.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
-  elements.endHandle.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
+  for (const target of [element, elements.startHandle, elements.endHandle]) {
+    target.setAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE, visual.noteId)
+    target.setAttribute(PIANO_ROLL_DOM_NOTE_CLIP_ID_ATTRIBUTE, visual.clipId)
+  }
   const handleWidthCssPixel = Math.min(
     PIANO_ROLL_DOM_NOTE_RESIZE_HANDLE_WIDTH_CSS_PIXEL,
     visual.widthCssPixel / 2,
@@ -95,7 +96,7 @@ function configureNoteElements(
 }
 
 class PianoRollDomNoteRenderer implements PianoRollNoteRenderer {
-  readonly #elementsByNoteId = new Map<NoteId, PianoRollDomNoteElements>()
+  readonly #elementsByOccurrence = new Map<string, PianoRollDomNoteElements>()
   readonly #root: HTMLDivElement
   #disposed = false
 
@@ -108,25 +109,27 @@ class PianoRollDomNoteRenderer implements PianoRollNoteRenderer {
   render(scene: PianoRollNoteScene): void {
     this.#requireActive()
     const fragment = this.#root.ownerDocument.createDocumentFragment()
-    const retainedNoteIds = new Set<NoteId>()
+    const retainedOccurrences = new Set<string>()
 
     this.#root.style.width = `${scene.widthCssPixel}px`
     this.#root.style.height = `${scene.heightCssPixel}px`
 
     for (const visual of scene.notes) {
-      let elements = this.#elementsByNoteId.get(visual.noteId)
+      // Tuple serialization preserves Clip occurrence identity without changing source Note IDs.
+      const key = JSON.stringify([visual.clipId, visual.noteId])
+      let elements = this.#elementsByOccurrence.get(key)
       if (elements === undefined) {
         elements = createNoteElements(this.#root.ownerDocument)
-        this.#elementsByNoteId.set(visual.noteId, elements)
+        this.#elementsByOccurrence.set(key, elements)
       }
 
       configureNoteElements(elements, visual)
-      retainedNoteIds.add(visual.noteId)
+      retainedOccurrences.add(key)
       fragment.append(elements.note)
     }
 
-    for (const noteId of this.#elementsByNoteId.keys()) {
-      if (!retainedNoteIds.has(noteId)) this.#elementsByNoteId.delete(noteId)
+    for (const key of this.#elementsByOccurrence.keys()) {
+      if (!retainedOccurrences.has(key)) this.#elementsByOccurrence.delete(key)
     }
     this.#root.replaceChildren(fragment)
   }
@@ -134,14 +137,14 @@ class PianoRollDomNoteRenderer implements PianoRollNoteRenderer {
   clear(): void {
     this.#requireActive()
     this.#root.replaceChildren()
-    this.#elementsByNoteId.clear()
+    this.#elementsByOccurrence.clear()
   }
 
   dispose(): void {
     if (this.#disposed) return
     this.#root.replaceChildren()
     this.#root.remove()
-    this.#elementsByNoteId.clear()
+    this.#elementsByOccurrence.clear()
     this.#disposed = true
   }
 

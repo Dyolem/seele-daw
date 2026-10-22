@@ -1,6 +1,7 @@
-import type { MidiPitch, NoteId, Tick } from '@seele-daw/project-core'
+import type { ClipId, MidiPitch, NoteId, Tick } from '@seele-daw/project-core'
 
 export interface PianoRollNoteVisual {
+  readonly clipId: ClipId
   readonly borderColor: string
   readonly fillColor: string
   readonly glowColor: string | null

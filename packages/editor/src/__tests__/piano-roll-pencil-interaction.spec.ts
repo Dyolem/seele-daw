@@ -174,6 +174,7 @@ describe('Piano Roll Pencil Interaction', () => {
     createPointerInput({ hasExceededDragThreshold: true }),
     createPointerInput({
       hit: Object.freeze({
+        clipId: parseClipId('editor-piano-roll-clip'),
         noteId: parseNoteId('pencil-existing-note'),
         zone: PIANO_ROLL_HIT_ZONE.BODY,
       }),

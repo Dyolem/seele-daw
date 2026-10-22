@@ -1,6 +1,6 @@
 # Piano Roll 视口与布局 V1 阶段计划
 
-> 状态：V1 已审核提交 `86fcbf6`；V2 已审核提交 `27df7e7`；V3 已完成验证，待审核；V4 尚未实施
+> 状态：V1 已审核提交 `86fcbf6`；V2 已审核提交 `27df7e7`；V3 已审核提交 `30a129d`；V4 已完成验证，待审核
 >
 > 创建日期：2026-10-20
 >
@@ -104,7 +104,33 @@
   Button；浏览器确认右端标记位于真实 Clip 末端与 Value 0，而非偏移到视口外。
 - 最终完整 `pnpm check` 通过：Architecture、Workspace Quality、Format、Oxlint、ESLint、全仓
   Type Check、175 个测试文件 / 1,706 项测试、Studio Production Build 与 soundbank dist boundary。
-  仍有既有主包超过 500kB 的构建提示。V3 保留未提交供审核，V4 尚未实施。
+  仍有既有主包超过 500kB 的构建提示。V3 已按授权提交为 `30a129d`。
+
+## V4 实现边界与验证
+
+- Track Clip Header 与 Note 行分离，每行 24px、最多显示两行；区间重叠稳定分行，超出行数
+  在 Header 内滚动。Header 横向镜像 Note / CC64 的滚动容器；焦点带入屏外 Header 时回交
+  时间轴并按其实际位置校准。额外 Header 高度计入 Note / Controller 高度分配。
+- Clip 背景贯穿 Note 视口，Pointer 穿透；CC64 时间边界延伸至 Frame 安全间距。Header 在
+  Pencil / Cursor 下均可激活 Clip，尚不提供 Clip Move / Copy 或拖动光标。
+- Scene 显式接收 ClipId，Track 保留分 Clip 的可见 Note；DOM 节点以 `(ClipId, NoteId)`
+  复用，保留源 NoteId。Body / Edge Hit 带 ClipId，Track 激活与 Clip Focus 交互校验归属。
+  完全重叠时 Active Clip 的 Note / CC64 Marker 排在上层。
+- Core 仍强制 Clip / Source 一对一；同源多实例由只读投影 fixture 验证，未放宽领域不变量，
+  也未新增 Linked Clip 创建 / 写回能力。真实 Project 的重叠行为用独立 Source 验证。
+
+- 自动化覆盖同源多实例 DOM 节点保留 / 重排 / 删除与 Canvas 双投影、缺失 / 非法 Clip Hit、
+  Clip Focus 拒绝跨 Clip 的 Selection / Move / Resize、重叠 Header 分行、Active Clip 层级、
+  Header 选择不写 facts、真实重叠 Project 的 Pencil 路由和单步 Undo、水平镜像与右端校准，
+  以及额外 Header 高度下 CC64 临时收起 / 恢复。
+- 2026-10-22 使用 Codex 内置浏览器验证独立测试 Project：1280×900、900×500、900×380、
+  停靠 / 工作区全屏、三层重叠 Header 的滚轮 / Tab / Enter、屏外 Header 焦点带入、背景落笔
+  / Undo、Note 激活所属 Clip、Pitch 滚动和横向对齐。Header / Clip / CC64 的 X 位移一致，
+  短窗口收起 Lane 后扩大恢复；Clip Focus 选择回归通过。临时编辑已全部 Undo 回 Saved，
+  控制台无 warn / error。验收截图 `/tmp/seele-v4-clip-regions.jpg` 记录三层重叠场景。
+- 完整 `pnpm check` 通过：Architecture、Workspace Quality、Format、Oxlint、ESLint、全仓
+  Type Check、175 个测试文件 / 1,714 项测试、Studio Production Build 与 soundbank dist boundary。
+  仍有既有主包超过 500kB 的构建提示。本批保留未提交供审核，不进入 Velocity Editing。
 
 ## 不变量
 

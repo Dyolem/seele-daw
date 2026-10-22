@@ -36,6 +36,7 @@ function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): Pia
   return Object.freeze({
     hasExceededDragThreshold: false,
     hit: Object.freeze({
+      clipId: parseClipId('editor-piano-roll-clip'),
       noteId: parseNoteId('editor-note-inside'),
       zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
     }),
@@ -119,6 +120,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     const noteId = parseNoteId('editor-note-inside')
     const begin = createPointerInput({
       hit: Object.freeze({
+        clipId: fixture.context.clipId,
         noteId,
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
       }),
@@ -162,6 +164,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     const noteId = parseNoteId('editor-note-high')
     const begin = createPointerInput({
       hit: Object.freeze({
+        clipId: fixture.context.clipId,
         noteId,
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
       }),
@@ -226,7 +229,11 @@ describe('Piano Roll Note Resize Interaction', () => {
       session: fixture.session,
     })
     const endBegin = createPointerInput({
-      hit: Object.freeze({ noteId, zone: PIANO_ROLL_HIT_ZONE.RESIZE_END }),
+      hit: Object.freeze({
+        clipId: fixture.context.clipId,
+        noteId,
+        zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
+      }),
       originPosition: Object.freeze({ xCssPixel: 360, yCssPixel: 64 }),
       position: Object.freeze({ xCssPixel: 360, yCssPixel: 64 }),
     })
@@ -281,7 +288,11 @@ describe('Piano Roll Note Resize Interaction', () => {
     const noteId = parseNoteId('editor-note-inside')
     const startBegin = createPointerInput()
     const endBegin = createPointerInput({
-      hit: Object.freeze({ noteId, zone: PIANO_ROLL_HIT_ZONE.RESIZE_END }),
+      hit: Object.freeze({
+        clipId: fixture.context.clipId,
+        noteId,
+        zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
+      }),
       originPosition: Object.freeze({ xCssPixel: 360, yCssPixel: 64 }),
       position: Object.freeze({ xCssPixel: 360, yCssPixel: 64 }),
     })
@@ -342,7 +353,11 @@ describe('Piano Roll Note Resize Interaction', () => {
     const fixture = createFixture()
     const noteId = parseNoteId('editor-note-leading')
     const begin = createPointerInput({
-      hit: Object.freeze({ noteId, zone: PIANO_ROLL_HIT_ZONE.RESIZE_END }),
+      hit: Object.freeze({
+        clipId: fixture.context.clipId,
+        noteId,
+        zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
+      }),
       originPosition: Object.freeze({ xCssPixel: 120, yCssPixel: 64 }),
       position: Object.freeze({ xCssPixel: 120, yCssPixel: 64 }),
     })
@@ -383,6 +398,7 @@ describe('Piano Roll Note Resize Interaction', () => {
         context: fixture.context,
         pointerInput: createPointerInput({
           hit: Object.freeze({
+            clipId: parseClipId('editor-piano-roll-clip'),
             noteId: parseNoteId('editor-note-inside'),
             zone: PIANO_ROLL_HIT_ZONE.BODY,
           }),

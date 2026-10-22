@@ -78,6 +78,7 @@ export function useEditingActions({
     if (currentEditor === null) return null
     try {
       const hit = resolvePianoRollDomNoteHit(event, host)
+      if (hit !== null && hit.clipId !== props.presentation.context.clipId) return null
       if (hit !== null && !currentEditor.state.selectedNoteIds.includes(hit.noteId)) {
         if (!currentEditor.selectOnly(hit.noteId)) return null
       }

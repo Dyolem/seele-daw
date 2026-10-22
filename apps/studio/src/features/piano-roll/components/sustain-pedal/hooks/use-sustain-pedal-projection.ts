@@ -87,17 +87,23 @@ export function useSustainPedalProjection({
     }
 
     return Object.freeze(
-      model.clips.map(({ clip, events, segments }) =>
-        Object.freeze({
-          active: clip.clipId === model.activeClipId,
-          endTick: clip.endTick,
-          events,
-          key: clip.clipId,
-          segments,
-          startTick: clip.startTick,
-          unsupported: clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED,
-        }),
-      ),
+      [...model.clips]
+        .sort(
+          (left, right) =>
+            Number(left.clip.clipId === model.activeClipId) -
+            Number(right.clip.clipId === model.activeClipId),
+        )
+        .map(({ clip, events, segments }) =>
+          Object.freeze({
+            active: clip.clipId === model.activeClipId,
+            endTick: clip.endTick,
+            events,
+            key: clip.clipId,
+            segments,
+            startTick: clip.startTick,
+            unsupported: clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED,
+          }),
+        ),
     )
   })
 

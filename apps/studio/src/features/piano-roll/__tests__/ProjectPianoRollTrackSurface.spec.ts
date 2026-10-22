@@ -11,6 +11,13 @@ import {
 } from '@/features/piano-roll/__tests__/support/piano-roll-context-menu-test-support'
 import {
   createInitialProjectSession,
+  createAddNoteCommand,
+  createAddMidiSustainPedalEventCommand,
+  parseMidiSustainPedalEventId,
+  parseClipId,
+  parseMidiPitch,
+  parseMidiVelocity,
+  parseNoteId,
   parseProjectId,
   parseMidiChannel,
   parseMidiControlValue,
@@ -189,7 +196,7 @@ function installSurfaceEnvironment(): void {
   installPointerCapture()
 }
 
-function createSurfaceFixture() {
+function createSurfaceFixture(linkedClipStarts: readonly number[] = []) {
   installSurfaceEnvironment()
   const projectId = parseProjectId('track-surface-project')
   const session = createInitialProjectSession({
@@ -213,8 +220,50 @@ function createSurfaceFixture() {
     targetTick: parseTick(0),
     trackId: track.trackId,
   })
+  if (linkedClipStarts.length > 0) {
+    const sourceId = session.getSnapshot().midiSources[0]?.id
+    if (sourceId === undefined) throw new Error('Expected a MIDI Source')
+    session.execute(
+      createAddNoteCommand({
+        baseRevision: session.modelRevision,
+        sourceId,
+        noteId: parseNoteId('linked-note'),
+        channel: parseMidiChannel(0),
+        pitch: parseMidiPitch(60),
+        velocity: parseMidiVelocity(100),
+        startTick: parseTick(480),
+        durationTick: parseTick(480),
+      }),
+    )
+    session.execute(
+      createAddMidiSustainPedalEventCommand({
+        baseRevision: session.modelRevision,
+        sourceId,
+        eventId: parseMidiSustainPedalEventId('linked-pedal'),
+        channel: parseMidiChannel(0),
+        tick: parseTick(480),
+        value: parseMidiControlValue(127),
+      }),
+    )
+  }
+  const snapshot = session.getSnapshot()
+  const original = snapshot.clips[0]
+  if (original === undefined) throw new Error('Expected a MIDI Clip')
+  // Core enforces 1:1 Source ownership; this read-only fixture tests repeated display occurrences only.
+  const projectionSnapshot = {
+    ...snapshot,
+    clips: [
+      ...snapshot.clips,
+      ...linkedClipStarts.map((startTick, index) => ({
+        ...original,
+        id: parseClipId(`linked-clip-${index}`),
+        name: `Linked ${index + 1}`,
+        startTick: parseTick(startTick),
+      })),
+    ],
+  }
   const presentation = createProjectPianoRollTrackPresentation(
-    session.getSnapshot(),
+    projectionSnapshot,
     track.trackId,
     clip.clipId,
   )
@@ -317,6 +366,7 @@ function createSurfaceFixture() {
     playbackState,
     playbackVisualPosition,
     presentation,
+    projectionSnapshot,
     projectMidiSustainPedal,
     selection,
     session,
@@ -334,6 +384,147 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollTrackSurface', () => {
+  it('retains linked Note occurrences, separates overlapping Headers and activates the exact Clip', async () => {
+    const { wrapper, session, presentation, projectionSnapshot, selection, clip } =
+      createSurfaceFixture([0, 1920, 7680])
+    await nextTick()
+    const before = session.getSnapshot()
+    const contentStateId = session.contentStateId
+    const headers = wrapper.findAll<HTMLButtonElement>('.piano-roll-clip-headers button')
+    expect(headers).toHaveLength(4)
+    expect(wrapper.get('.project-piano-roll-track__canvas-host').find('button').exists()).toBe(
+      false,
+    )
+    expect(
+      new Set(headers.slice(0, 3).map((header) => header.element.style.insetBlockStart)).size,
+    ).toBe(3)
+    expect(headers[3]?.element.style.insetBlockStart).toBe('0px')
+    expect(wrapper.get('.project-piano-roll-track').attributes('style')).toContain(
+      '--piano-roll-clip-header-height: 48px',
+    )
+    const bodies = wrapper.findAll('.sd-piano-roll-dom-note')
+    expect(bodies).toHaveLength(4)
+    expect(bodies.map((body) => body.attributes('data-piano-roll-note-id'))).toEqual(
+      Array(4).fill('linked-note'),
+    )
+    expect(bodies.at(-1)?.attributes('data-piano-roll-clip-id')).toBe(clip.clipId)
+    const linked = wrapper.get('.sd-piano-roll-dom-note[data-piano-roll-clip-id="linked-clip-2"]')
+    dispatchPointer(linked.element, 'pointerdown', { clientX: 170, clientY: 125 })
+    dispatchPointer(linked.element, 'pointerup', { clientX: 170, clientY: 125 })
+    expect(selection.selectedClipId).toBe('linked-clip-2')
+
+    await wrapper.get('button[data-clip-id="linked-clip-0"]').trigger('click')
+    expect(selection.selectedClipId).toBe('linked-clip-0')
+    const active = createProjectPianoRollTrackPresentation(
+      projectionSnapshot,
+      presentation.trackId,
+      selection.selectedClipId,
+    )
+    if (active?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected presentation')
+    await wrapper.setProps({ presentation: active })
+    expect(
+      wrapper.findAll('.sd-piano-roll-dom-note').at(-1)?.attributes('data-piano-roll-clip-id'),
+    ).toBe('linked-clip-0')
+    expect(
+      wrapper.get('.sd-piano-roll-dom-note[data-piano-roll-clip-id="linked-clip-2"]').element,
+    ).toBe(linked.element)
+    expect(wrapper.get('button[data-clip-id="linked-clip-0"]').attributes('aria-pressed')).toBe(
+      'true',
+    )
+    expect(
+      wrapper
+        .get('.piano-roll-clip-regions__clip[data-clip-id="linked-clip-0"]')
+        .attributes('data-active'),
+    ).toBe('true')
+    expect(wrapper.findAll('.piano-roll-sustain-pedal-lane__occurrence--active')).toHaveLength(1)
+    expect(wrapper.findAll('.piano-roll-sustain-pedal-lane__event')).toHaveLength(4)
+    expect(
+      wrapper
+        .findAll('.piano-roll-sustain-pedal-lane__event')
+        .at(-1)
+        ?.attributes('data-piano-roll-clip-id'),
+    ).toBe('linked-clip-0')
+
+    linked.element.setAttribute('data-piano-roll-clip-id', 'missing-clip')
+    dispatchPointer(linked.element, 'pointerdown', { clientX: 170, clientY: 125 })
+    dispatchPointer(linked.element, 'pointerup', { clientX: 170, clientY: 125 })
+    expect(selection.selectedClipId).toBe('linked-clip-0')
+    expect(session.contentStateId).toBe(contentStateId)
+    expect(session.getSnapshot()).toEqual(before)
+    wrapper.unmount()
+  })
+
+  it('mirrors timeline scrolling into Headers and reveals offscreen focused Headers in the timeline', async () => {
+    const { wrapper, session } = createSurfaceFixture([7680])
+    await nextTick()
+    const revision = session.modelRevision
+    const timeline = wrapper.get<HTMLElement>('.project-piano-roll-track__scroll-viewport')
+    const headers = wrapper.get<HTMLElement>('.piano-roll-clip-headers')
+    timeline.element.scrollLeft = 180
+    await timeline.trigger('scroll')
+    expect(headers.element.scrollLeft).toBe(180)
+    headers.element.scrollLeft = 320
+    await headers.trigger('scroll')
+    expect(timeline.element.scrollLeft).toBe(320)
+    headers.element.scrollTop = 24
+    await headers.trigger('scroll')
+    expect(timeline.element.scrollLeft).toBe(320)
+    let actualLeft = 320
+    Object.defineProperty(timeline.element, 'scrollLeft', {
+      get: () => actualLeft,
+      set: (left: number) => {
+        actualLeft = Math.min(500, left)
+      },
+    })
+    headers.element.scrollLeft = 520
+    await headers.trigger('scroll')
+    await nextTick()
+    expect(headers.element.scrollLeft).toBe(500)
+    await headers.trigger('wheel', { deltaX: -80 })
+    expect(timeline.element.scrollLeft).toBe(420)
+    expect(session.modelRevision).toBe(revision)
+    wrapper.unmount()
+  })
+
+  it('routes Pencil placement to the Header-selected Clip in a real overlapping Project', async () => {
+    const { wrapper, session, selection, presentation, clip } = createSurfaceFixture()
+    const overlapping = createProjectClipCoordinator({
+      activeProject: { state: createReadyState(session) },
+      createUniqueId: createIdentitySource('overlapping-clip', 'overlapping-source'),
+    }).addEmptyMidiClip({ targetTick: parseTick(0), trackId: presentation.trackId })
+    const before = session.getSnapshot()
+    const initial = createProjectPianoRollTrackPresentation(
+      before,
+      presentation.trackId,
+      clip.clipId,
+    )
+    if (initial?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected presentation')
+    await wrapper.setProps({ presentation: initial })
+    await wrapper.get(`button[data-clip-id="${overlapping.clipId}"]`).trigger('click')
+    expect(session.modelRevision).toBe(before.modelRevision)
+    expect(selection.selectedClipId).toBe(overlapping.clipId)
+    const active = createProjectPianoRollTrackPresentation(
+      before,
+      presentation.trackId,
+      selection.selectedClipId,
+    )
+    if (active?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected presentation')
+    await wrapper.setProps({ presentation: active })
+    const host = wrapper.get('.project-piano-roll-track__canvas-host').element
+    dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
+    dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
+    const changed = session.getSnapshot().midiNotePartitions.filter(({ notes }) => notes.length > 0)
+    expect(changed).toHaveLength(1)
+    expect(changed[0]?.sourceId).toBe('overlapping-source')
+    expect(session.modelRevision).toBe(before.modelRevision + 1)
+    session.undo()
+    expect(session.getSnapshot().midiNotePartitions).toEqual(before.midiNotePartitions)
+    wrapper.unmount()
+  })
+
   it('uses vertical scroll for pitch while preserving time scroll and cancelling stale placement', async () => {
     const { wrapper, session, pinia } = createSurfaceFixture()
     await nextTick()
@@ -650,7 +841,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     expect(
       wrapper.find('.project-piano-roll-track__timeline-content').attributes('style'),
     ).toContain('750rem')
-    expect(wrapper.findAll('.project-piano-roll-track__clip-windows button')).toHaveLength(1)
+    expect(wrapper.findAll<HTMLButtonElement>('.piano-roll-clip-headers button')).toHaveLength(1)
     expect(wrapper.get('[role="combobox"][aria-label="Active Clip"]').text()).toBe(
       presentation.readModel.clips[0]?.clip.name,
     )
@@ -749,7 +940,7 @@ describe('ProjectPianoRollTrackSurface', () => {
 
     await scrollViewport.trigger('keydown', { key: 'ArrowRight' })
     expect(followControl.attributes('aria-pressed')).toBe('true')
-    await wrapper.get('.project-piano-roll-track__clip-windows button').trigger('click')
+    await wrapper.get('.piano-roll-clip-headers button').trigger('click')
     expect(followControl.attributes('aria-pressed')).toBe('false')
 
     playbackVisualPosition.value = Object.freeze({

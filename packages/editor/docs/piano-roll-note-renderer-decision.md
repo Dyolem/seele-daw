@@ -52,7 +52,7 @@ keyed DOM Renderer
    - `ProjectSession` 继续留在应用服务边界，不进入 Pinia，也不进入 Vue 深代理。
 5. **Scene 与 DOM 都是可丢弃的显示缓存。**
    - Scene 只把当前可见 Note 转换为 CSS Pixel 几何，不成为新的业务真相；
-   - DOM Renderer 以 `NoteId` 为 Key 复用原生元素，只创建、更新或删除发生变化的可见节点；
+   - DOM Renderer 以 `(ClipId, NoteId)` 为 Key 复用原生元素，只创建、更新或删除发生变化的可见节点；
    - 单个 Note 不是 Vue Component，Pointer 输入也通过 Surface 事件委托，因此不会随 Note
      数量线性增加组件实例和事件监听器；
    - Renderer 节点与缓存都可由同一 Read Model State 重建，不参与 Save、Undo 或 Redo。
@@ -113,16 +113,23 @@ Renderer 只拥有可重建的原生节点、Canvas bitmap 和绘制缓存。
 
 ## Hit Test 与输入
 
-DOM Adapter 可以通过 `event.target` 快速取得候选 `NoteId`，但 Tool 不能依赖
+DOM Adapter 可以通过 `event.composedPath()` 取得候选 `(ClipId, NoteId)`，但 Tool 不能依赖
 `HTMLElement`、`dataset`、CSS class 或 `getBoundingClientRect()`。Browser Input 必须把
 DOM 或 Canvas 命中统一转换为：
 
 ```ts
 interface PianoRollHit {
+  readonly clipId: ClipId
   readonly noteId: NoteId
   readonly zone: 'body' | 'resize-start' | 'resize-end'
 }
 ```
+
+Scene 创建入口显式接收一个 ClipId，Selection / Move / Resize Preview 只在该 Clip 上下文内
+解析；Track 为各 Clip 创建 Scene 后合并 Note Visual，Active Clip 排在最后。DOM 用二元组
+序列化键区分共享 Source 的多个实例，保留原 NoteId，不生成伪造的领域 ID。每个 Note Body
+和 Edge 均携带 ClipId；缺少或非法身份在 Browser 边界拒绝，领域 Operation 再校验目标归属。
+Canvas Adapter 顺序绘制同一 Scene，身份不改变几何与 Project 权威。
 
 Canvas Adapter 的首批空间索引使用 MIDI Pitch Bucket 与按 `startTick` 排序的 Note，
 不预建通用 R-tree / Quadtree。框选同样按 Pitch 范围和 Tick 范围查询。

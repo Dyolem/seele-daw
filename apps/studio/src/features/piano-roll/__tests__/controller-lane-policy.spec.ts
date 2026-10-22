@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { resolveControllerLaneLayout } from '@/features/piano-roll/layout/controller-lane-policy'
 
 describe('Controller lane layout', () => {
+  it('includes the bounded Clip Header rows when reserving Note height', () => {
+    expect(resolveControllerLaneLayout(315, true, 88, 24)).toMatchObject({
+      visible: true,
+      bodyHeight: 73,
+    })
+    expect(resolveControllerLaneLayout(315, true, 88, 48)).toMatchObject({
+      visible: false,
+      canExpand: false,
+    })
+    expect(resolveControllerLaneLayout(400, true, 88, 48)).toMatchObject({
+      visible: true,
+      bodyHeight: 88,
+    })
+  })
   it('reserves note space, constrains only the displayed height, and restores the preference', () => {
     expect(resolveControllerLaneLayout(600, true, 180)).toMatchObject({
       visible: true,

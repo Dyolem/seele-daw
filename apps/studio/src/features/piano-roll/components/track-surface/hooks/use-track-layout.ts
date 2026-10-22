@@ -4,6 +4,12 @@ import { ZERO_TICK, parseTick, type Tick } from '@seele-daw/project-core'
 import type { PianoRollSurfaceGeometry } from '@/features/piano-roll/types/piano-roll-pitch-viewport'
 import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import {
+  CLIP_HEADER_ROW_HEIGHT,
+  CLIP_HEADER_MAXIMUM_VISIBLE_ROWS,
+  createTrackClipRegions,
+} from '@/features/piano-roll/components/track-surface/presentation/clip-regions'
+import type { TrackVisibleClipNotes } from '@/features/piano-roll/components/track-surface/types/track-clip-region'
 
 export function useTrackLayout({
   getGeometry,
@@ -40,10 +46,11 @@ export function useTrackLayout({
     }),
   )
 
-  const visibleNotes = computed(() =>
+  const visibleClips = computed<readonly TrackVisibleClipNotes[]>(() =>
     Object.freeze(
-      getPresentation().readModel.clips.flatMap(({ notes }) =>
-        notes
+      getPresentation().readModel.clips.map(({ clip, notes }) => ({
+        clip,
+        notes: notes
           .filter(
             ({ note }) =>
               viewport.value !== null &&
@@ -57,29 +64,23 @@ export function useTrackLayout({
               visibleStartTick: projectStartTick,
             }),
           ),
-      ),
+      })),
     ),
   )
 
-  const clipWindows = computed(() =>
-    Object.freeze(
-      getPresentation().readModel.clips.flatMap((clipReadModel) => {
-        const { clip } = clipReadModel
-        if (clip.startTick >= getTimelineEndTick()) return []
-        const visibleEndTick = Math.min(clip.endTick, getTimelineEndTick())
-        const color = clip.color ?? getPresentation().color ?? 'var(--sd-color-border-focus)'
-        return [
-          Object.freeze({
-            clipReadModel,
-            style: Object.freeze({
-              '--project-piano-roll-track-clip-color': color,
-              inlineSize: `${((visibleEndTick - clip.startTick) / getTimelineEndTick()) * 100}%`,
-              insetInlineStart: `${(clip.startTick / getTimelineEndTick()) * 100}%`,
-            }) as StyleValue,
-          }),
-        ]
-      }),
+  const clipRegions = computed(() =>
+    createTrackClipRegions(
+      getPresentation().readModel,
+      getTimelineEndTick(),
+      getPresentation().color,
     ),
+  )
+  const clipHeaderRowCount = computed(() =>
+    Math.max(1, ...clipRegions.value.map(({ headerRow }) => headerRow + 1)),
+  )
+  const clipHeaderHeight = computed(
+    () =>
+      Math.min(CLIP_HEADER_MAXIMUM_VISIBLE_ROWS, clipHeaderRowCount.value) * CLIP_HEADER_ROW_HEIGHT,
   )
 
   const viewport = computed(() => {
@@ -96,7 +97,9 @@ export function useTrackLayout({
     viewport,
     timelineBars,
     timelineContentStyle,
-    visibleNotes,
-    clipWindows,
+    visibleClips,
+    clipRegions,
+    clipHeaderRowCount,
+    clipHeaderHeight,
   }
 }

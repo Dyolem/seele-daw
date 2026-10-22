@@ -872,10 +872,21 @@ Command、一个 Commit 和一个 History 步骤；Studio 不得通过多次命�
 模式不会因为用户在局部视口操作而自动创建其他 Clip。
 
 当前实现状态需要与已确认的最终规则区分：默认 Track Surface 已显示全局 Ruler、横向滚动、
-Clip window、可见 Note、Active Clip 与原子 Pencil 放置；公共标题栏可以切换到既有 Clip Focus
+Clip 全高区域、独立 Header、可见 Note、Active Clip 与原子 Pencil 放置；公共标题栏可以切换到既有 Clip Focus
 Surface，切换只改变 Studio 应用偏好。两个模式都显示来自共享 Transport 位置的 Playhead，Track
 模式另提供独立分页 Follow。Track Cursor 的完整 Note Selection / Move / Resize 尚未接入，不能
 从双模式 UI 推断为已经交付。
+
+Track Clip Header 位于 Ruler 与 Note 视口之间，每行 24px；重叠 Clip 按时间区间分行，最多
+显示两行，更多行在 Header 内纵向滚动，键盘聚焦可带入屏外 Header。Header 与 Note / CC64
+共用 Track 时间映射，Pitch 滚动不移动 Header。两种 Tool 均可点击 Header 激活 Clip；此入口
+尚不支持 Clip Move / Copy，不显示拖动光标。极短 Clip 也可通过工具栏 Active Clip 列表选择。
+
+Clip 使用贯穿 Note 视口的淡色背景与两端边界，背景不参与 Pointer 命中；时间边界延续到 CC64
+事件区及安全间距。选择 Header 不修改 Project Facts、History 或 dirty。共享 MidiSource 的每个
+Note 投影以 `(ClipId, NoteId)` 区分，NoteId 仍代表原 Source 事实；完全重叠时 Active Clip 的 Note
+与 CC64 Marker 位于上层。点击 Note 使用该实例的 ClipId 激活目标，不按相同 NoteId 猜测归属。
+Project Core 当前仍强制 Clip 与 Source 一对一；显示层的实例身份不意味着已开放 Linked Clip 创建或写回。
 
 `@seele-daw/editor/common` 已提供：
 

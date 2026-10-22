@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { EditorPointerInputAdapterObserver } from '#internal/browser/interaction/editor-pointer-input-adapter'
-import { parseMidiPitch, parseNoteId, parseTick } from '@seele-daw/project-core'
+import { parseClipId, parseMidiPitch, parseNoteId, parseTick } from '@seele-daw/project-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -101,6 +101,7 @@ function createDomNoteFixture() {
   installSurfaceGeometry(surface)
   const capture = installPointerCapture(surface)
   const noteId = parseNoteId('browser-input-note')
+  const clipId = parseClipId('browser-input-clip')
   const scene: PianoRollNoteScene = Object.freeze({
     heightCssPixel: 200,
     notes: Object.freeze([
@@ -109,6 +110,7 @@ function createDomNoteFixture() {
         fillColor: '#8b5cf6',
         glowColor: null,
         heightCssPixel: 10,
+        clipId,
         noteId,
         opacity: 1,
         pitch: parseMidiPitch(60),
@@ -141,6 +143,7 @@ function createDomNoteFixture() {
     endHandle,
     note,
     noteChild,
+    clipId,
     noteId,
     renderer,
     startHandle,
@@ -154,6 +157,19 @@ afterEach(() => {
 })
 
 describe('Piano Roll DOM Note Hit', () => {
+  it('fails closed when a Note occurrence has a missing or invalid Clip identity', () => {
+    const fixture = createDomNoteFixture()
+    const hits: unknown[] = []
+    fixture.surface.addEventListener('pointerdown', (event) =>
+      hits.push(resolvePianoRollDomNoteHit(event, fixture.surface)),
+    )
+    fixture.note.removeAttribute('data-piano-roll-clip-id')
+    dispatchPointer(fixture.noteChild, 'pointerdown')
+    fixture.note.setAttribute('data-piano-roll-clip-id', ' ')
+    dispatchPointer(fixture.noteChild, 'pointerdown')
+    expect(hits).toEqual([null, null])
+    fixture.renderer.dispose()
+  })
   it('converts a nested rendered Note target into a frozen semantic body hit', () => {
     const fixture = createDomNoteFixture()
     let resolvedHit: ReturnType<typeof resolvePianoRollDomNoteHit> | undefined
@@ -164,6 +180,7 @@ describe('Piano Roll DOM Note Hit', () => {
     dispatchPointer(fixture.noteChild, 'pointerdown')
 
     expect(resolvedHit).toEqual({
+      clipId: fixture.clipId,
       noteId: fixture.noteId,
       zone: PIANO_ROLL_HIT_ZONE.BODY,
     })
@@ -183,10 +200,12 @@ describe('Piano Roll DOM Note Hit', () => {
 
     expect(resolvedHits).toEqual([
       {
+        clipId: fixture.clipId,
         noteId: fixture.noteId,
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_START,
       },
       {
+        clipId: fixture.clipId,
         noteId: fixture.noteId,
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
       },
@@ -255,6 +274,7 @@ describe('Piano Roll Pointer Input Adapter', () => {
     expect(onInput.mock.calls.map(([input]) => input.modifiers.shift)).toEqual([true, false, false])
     for (const [input] of onInput.mock.calls) {
       expect(input.hit).toEqual({
+        clipId: fixture.clipId,
         noteId: fixture.noteId,
         zone: PIANO_ROLL_HIT_ZONE.BODY,
       })
@@ -351,6 +371,7 @@ describe('Piano Roll Pointer Input Adapter', () => {
     expect(onInput).toHaveBeenCalledTimes(3)
     for (const [input] of onInput.mock.calls) {
       expect(input.hit).toEqual({
+        clipId: fixture.clipId,
         noteId: fixture.noteId,
         zone: PIANO_ROLL_HIT_ZONE.RESIZE_END,
       })

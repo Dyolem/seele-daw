@@ -14,11 +14,13 @@ export function resolveControllerLaneLayout(
   surfaceHeight: number,
   expanded: boolean,
   preferredHeight: number,
+  additionalHeaderHeight = 0,
 ) {
   const available =
     surfaceHeight -
     PIANO_ROLL_TOOLBAR_HEIGHT -
     PIANO_ROLL_RULER_HEIGHT -
+    additionalHeaderHeight -
     MINIMUM_NOTE_HEIGHT -
     CONTROLLER_LANE_HEADER_HEIGHT -
     CONTROLLER_LANE_SPLITTER_HEIGHT -

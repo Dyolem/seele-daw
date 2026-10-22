@@ -3,9 +3,10 @@ import {
   type PianoRollHit,
   type PianoRollHitZone,
 } from '#internal/common/piano-roll/index'
-import { parseNoteId } from '@seele-daw/project-core'
+import { parseClipId, parseNoteId } from '@seele-daw/project-core'
 
 export const PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE = 'data-piano-roll-note-id'
+export const PIANO_ROLL_DOM_NOTE_CLIP_ID_ATTRIBUTE = 'data-piano-roll-clip-id'
 export const PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE = 'data-piano-roll-note-zone'
 
 function resolveHitZone(value: string | null): PianoRollHitZone | null {
@@ -44,11 +45,14 @@ export function resolvePianoRollDomNoteHit(
 
     const noteIdValue = target.getAttribute(PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE)
     if (noteIdValue === null) continue
+    const clipIdValue = target.getAttribute(PIANO_ROLL_DOM_NOTE_CLIP_ID_ATTRIBUTE)
+    if (clipIdValue === null) return null
     const zone = resolveHitZone(target.getAttribute(PIANO_ROLL_DOM_NOTE_ZONE_ATTRIBUTE))
     if (zone === null) return null
 
     try {
       return Object.freeze({
+        clipId: parseClipId(clipIdValue),
         noteId: parseNoteId(noteIdValue),
         zone,
       })

@@ -73,6 +73,8 @@ export function createPianoRollNoteOperation(
     preview: PianoRollOperationPreview | null
     result: PianoRollOperationResult | null
   }> {
+    if (origin.hit !== null && origin.hit.clipId !== configuration.context.clipId)
+      return { preview: null, result: null }
     const pointerInput = Object.freeze({
       ...input,
       hit: origin.hit,

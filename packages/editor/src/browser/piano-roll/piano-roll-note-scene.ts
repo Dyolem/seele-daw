@@ -13,7 +13,13 @@ import type {
   PianoRollNoteScene,
   PianoRollNoteVisual,
 } from '#internal/browser/piano-roll/piano-roll-note-renderer'
-import { parseTick, type MidiPitch, type NoteId, type Tick } from '@seele-daw/project-core'
+import {
+  parseTick,
+  type ClipId,
+  type MidiPitch,
+  type NoteId,
+  type Tick,
+} from '@seele-daw/project-core'
 
 export interface PianoRollNoteSceneStyle {
   readonly borderColor: string
@@ -24,6 +30,7 @@ export interface PianoRollNoteSceneStyle {
 }
 
 export interface CreatePianoRollNoteSceneInput {
+  readonly clipId: ClipId
   readonly movePreview?: PianoRollNoteMovePreview | null
   readonly notes: PianoRollNoteReadModelState['notes']
   readonly resizePreview?: PianoRollNoteResizePreview | null
@@ -141,6 +148,7 @@ export function createPianoRollNoteScene(input: CreatePianoRollNoteSceneInput): 
     const endXCssPixel = pianoRollClipTickToCssPixel(input.viewport, note.visibleEndTick)
 
     return Object.freeze({
+      clipId: input.clipId,
       borderColor: selected ? selectedBorderColor : borderColor,
       fillColor,
       glowColor: selected ? selectedGlowColor : null,

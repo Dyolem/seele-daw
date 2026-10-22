@@ -86,6 +86,7 @@ export function createPianoRollNoteMoveGesture(
   if (
     pointerInput.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN ||
     pointerInput.hit === null ||
+    pointerInput.hit.clipId !== input.context.clipId ||
     pointerInput.hit.zone !== PIANO_ROLL_HIT_ZONE.BODY
   ) {
     return null

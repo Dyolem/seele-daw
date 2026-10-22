@@ -1,4 +1,4 @@
-import type { NoteId } from '@seele-daw/project-core'
+import type { ClipId, NoteId } from '@seele-daw/project-core'
 
 export const PIANO_ROLL_HIT_ZONE = {
   BODY: 'body',
@@ -9,6 +9,7 @@ export const PIANO_ROLL_HIT_ZONE = {
 export type PianoRollHitZone = (typeof PIANO_ROLL_HIT_ZONE)[keyof typeof PIANO_ROLL_HIT_ZONE]
 
 export interface PianoRollHit {
+  readonly clipId: ClipId
   readonly noteId: NoteId
   readonly zone: PianoRollHitZone
 }

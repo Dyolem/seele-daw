@@ -6,8 +6,8 @@ import {
   type PianoRollGridCanvasRenderer,
   type PianoRollNoteRenderer,
   type PianoRollTimelineViewport,
-  type PianoRollVisibleNote,
 } from '@seele-daw/editor'
+import type { TrackVisibleClipNotes } from '@/features/piano-roll/components/track-surface/types/track-clip-region'
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/presentation/project-piano-roll-note-renderer'
 import { createPianoRollThemeSnapshot } from '@/features/piano-roll/presentation/piano-roll-theme'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
@@ -19,7 +19,7 @@ export function useTrackRendering({
   noteHost,
   getPresentation,
   getViewport,
-  getVisibleNotes,
+  getVisibleClips,
   createDisplayGrid,
   failureMessage,
 }: {
@@ -28,7 +28,7 @@ export function useTrackRendering({
   readonly noteHost: Readonly<ShallowRef<HTMLElement | null>>
   readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
   readonly getViewport: () => PianoRollTimelineViewport | null
-  readonly getVisibleNotes: () => readonly PianoRollVisibleNote[]
+  readonly getVisibleClips: () => readonly TrackVisibleClipNotes[]
   readonly createDisplayGrid: () => PianoRollGrid
   readonly failureMessage: ShallowRef<string | null>
 }) {
@@ -57,20 +57,33 @@ export function useTrackRendering({
         theme: theme.grid,
         viewport: nextViewport,
       })
-      currentNoteRenderer.render(
-        createPianoRollNoteScene({
-          notes: getVisibleNotes(),
-          selectedNoteIds: Object.freeze([]),
-          style: {
-            borderColor: theme.noteBorderColor,
-            fillColor: theme.noteFillColor,
-            opacity: getPresentation().muted ? 0.46 : 1,
-            selectedBorderColor: theme.selectedNoteBorderColor,
-            selectedGlowColor: theme.selectedNoteGlowColor,
-          },
-          viewport: nextViewport,
-        }),
+      const presentation = getPresentation()
+      const clips = [...getVisibleClips()].sort(
+        (left, right) =>
+          Number(left.clip.clipId === presentation.readModel.activeClipId) -
+          Number(right.clip.clipId === presentation.readModel.activeClipId),
       )
+      const notes = clips.flatMap(
+        ({ clip, notes }) =>
+          createPianoRollNoteScene({
+            clipId: clip.clipId,
+            notes,
+            selectedNoteIds: [],
+            style: {
+              borderColor: theme.noteBorderColor,
+              fillColor: clip.color ?? theme.noteFillColor,
+              opacity: clip.muted || presentation.muted ? 0.46 : 1,
+              selectedBorderColor: theme.selectedNoteBorderColor,
+              selectedGlowColor: theme.selectedNoteGlowColor,
+            },
+            viewport: nextViewport,
+          }).notes,
+      )
+      currentNoteRenderer.render({
+        notes,
+        heightCssPixel: nextViewport.heightCssPixel,
+        widthCssPixel: nextViewport.widthCssPixel,
+      })
       failureMessage.value = null
     } catch (cause) {
       failureMessage.value = describeCause(cause, 'The Track Piano Roll could not be rendered.')

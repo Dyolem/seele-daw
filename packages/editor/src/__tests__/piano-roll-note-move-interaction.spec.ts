@@ -1,4 +1,10 @@
-import { parseMidiPitch, parseNoteId, parsePositiveTick, parseTick } from '@seele-daw/project-core'
+import {
+  parseClipId,
+  parseMidiPitch,
+  parseNoteId,
+  parsePositiveTick,
+  parseTick,
+} from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -23,6 +29,7 @@ function createPointerInput(overrides: Partial<PianoRollPointerInput> = {}): Pia
   return Object.freeze({
     hasExceededDragThreshold: false,
     hit: Object.freeze({
+      clipId: parseClipId('editor-piano-roll-clip'),
       noteId: parseNoteId('editor-note-inside'),
       zone: PIANO_ROLL_HIT_ZONE.BODY,
     }),
@@ -128,7 +135,11 @@ describe('Piano Roll Note Move Interaction', () => {
       startTick: parseTick(1_000),
     })
     const begin = createPointerInput({
-      hit: Object.freeze({ noteId, zone: PIANO_ROLL_HIT_ZONE.BODY }),
+      hit: Object.freeze({
+        clipId: fixture.context.clipId,
+        noteId,
+        zone: PIANO_ROLL_HIT_ZONE.BODY,
+      }),
       originPosition: Object.freeze({ xCssPixel: 260, yCssPixel: 32 }),
       position: Object.freeze({ xCssPixel: 260, yCssPixel: 32 }),
     })
@@ -166,7 +177,11 @@ describe('Piano Roll Note Move Interaction', () => {
     const fixture = createFixture()
     const noteId = parseNoteId('editor-note-high')
     const begin = createPointerInput({
-      hit: Object.freeze({ noteId, zone: PIANO_ROLL_HIT_ZONE.BODY }),
+      hit: Object.freeze({
+        clipId: fixture.context.clipId,
+        noteId,
+        zone: PIANO_ROLL_HIT_ZONE.BODY,
+      }),
       originPosition: Object.freeze({ xCssPixel: 260, yCssPixel: 32 }),
       position: Object.freeze({ xCssPixel: 260, yCssPixel: 32 }),
     })

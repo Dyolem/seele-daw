@@ -87,6 +87,7 @@ function createRendererFixture() {
     visibleStartTick: parseTick(960),
   })
   const noteScene = createPianoRollNoteScene({
+    clipId: parseClipId('renderer-clip'),
     notes: Object.freeze([visibleNote]),
     selectedNoteIds: Object.freeze([]),
     style: {
@@ -114,6 +115,41 @@ afterEach(() => {
 })
 
 describe('Piano Roll Browser Renderers', () => {
+  it('keeps separate linked Clip nodes and reuses the surviving occurrence after removal', () => {
+    const fixture = createRendererFixture()
+    const first = fixture.noteScene.notes[0]
+    if (first === undefined) throw new Error('Expected Note visual')
+    const linked = { ...first, clipId: parseClipId('linked-clip'), xCssPixel: 600 }
+    const scene = { ...fixture.noteScene, notes: [first, linked] }
+    const container = document.createElement('div')
+    const renderer = createPianoRollDomNoteRenderer({ container })
+    renderer.render(scene)
+    const bodies = container.querySelectorAll<HTMLElement>('.sd-piano-roll-dom-note')
+    expect(bodies).toHaveLength(2)
+    expect(bodies[0]?.style.transform).toContain('240px')
+    expect(bodies[1]?.style.transform).toContain('600px')
+    expect(bodies[1]?.dataset.pianoRollNoteId).toBe(first.noteId)
+    expect(bodies[1]?.dataset.pianoRollClipId).toBe(linked.clipId)
+    renderer.render({ ...scene, notes: [linked, first] })
+    expect(container.querySelector('.sd-piano-roll-dom-note')).toBe(bodies[1])
+    renderer.render({ ...scene, notes: [linked] })
+    expect(container.querySelectorAll('.sd-piano-roll-dom-note')).toHaveLength(1)
+    expect(container.querySelector('.sd-piano-roll-dom-note')).toBe(bodies[1])
+    renderer.dispose()
+    expect(container.childElementCount).toBe(0)
+
+    const canvas = createFakeCanvasFixture()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(canvas.context)
+    const canvasRenderer = createPianoRollCanvasNoteRenderer({ container })
+    canvasRenderer.render(scene)
+    expect(
+      canvas.operations
+        .filter(({ name }) => name === 'fillRect')
+        .map(({ arguments: args }) => args[0]),
+    ).toEqual([240, 600])
+    canvasRenderer.dispose()
+    fixture.gridRenderer.dispose()
+  })
   it('keeps Grid rows and Note bodies aligned when both edge rows are clipped', () => {
     const fixture = createRendererFixture()
     const viewport = createPianoRollTimelineViewport({
@@ -139,6 +175,7 @@ describe('Piano Roll Browser Renderers', () => {
     expect(fills.map((operation) => operation.arguments)).toContainEqual([0, -5, 960, 20])
     expect(fills.map((operation) => operation.arguments)).toContainEqual([0, 35, 960, 20])
     const scene = createPianoRollNoteScene({
+      clipId: parseClipId('renderer-clip'),
       notes: [fixture.visibleNote],
       selectedNoteIds: [],
       style: {
@@ -245,6 +282,7 @@ describe('Piano Roll Browser Renderers', () => {
     expect(Object.isFrozen(fixture.noteScene)).toBe(true)
     expect(Object.isFrozen(fixture.noteScene.notes)).toBe(true)
     expect(visual).toEqual({
+      clipId: fixture.viewport.clipId,
       borderColor: '#f2eee5',
       fillColor: '#8B5CF6',
       glowColor: null,
@@ -299,6 +337,7 @@ describe('Piano Roll Browser Renderers', () => {
   it('replaces the authoritative Note with one selected Resize Preview', () => {
     const fixture = createRendererFixture()
     const previewScene = createPianoRollNoteScene({
+      clipId: parseClipId('renderer-clip'),
       notes: Object.freeze([fixture.visibleNote]),
       resizePreview: Object.freeze({
         durationTick: parsePositiveTick(1_200),
@@ -339,6 +378,7 @@ describe('Piano Roll Browser Renderers', () => {
   it('carries selected state through the shared Scene into DOM and Canvas', () => {
     const fixture = createRendererFixture()
     const selectedScene = createPianoRollNoteScene({
+      clipId: parseClipId('renderer-clip'),
       notes: Object.freeze([fixture.visibleNote]),
       selectedNoteIds: Object.freeze([fixture.visibleNote.note.id]),
       style: {
@@ -404,6 +444,7 @@ describe('Piano Roll Browser Renderers', () => {
   it('carries muted opacity in the shared Scene rather than either Renderer', () => {
     const fixture = createRendererFixture()
     const mutedScene = createPianoRollNoteScene({
+      clipId: parseClipId('renderer-clip'),
       notes: Object.freeze([fixture.visibleNote]),
       selectedNoteIds: Object.freeze([]),
       style: {

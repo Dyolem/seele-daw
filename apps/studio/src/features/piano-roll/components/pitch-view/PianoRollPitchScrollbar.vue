@@ -43,7 +43,7 @@ function handleScroll(): void {
   min-block-size: 0;
   overflow-y: scroll;
   overflow-x: hidden;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
   scrollbar-width: thin;
   scrollbar-color: var(--sd-color-border-strong) var(--sd-color-surface-panel);
   background: var(--sd-color-surface-panel);

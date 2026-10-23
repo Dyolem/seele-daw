@@ -115,6 +115,41 @@ afterEach(() => {
 })
 
 describe('Piano Roll Browser Renderers', () => {
+  it('keeps surviving nodes connected and only patches changed visual properties on pitch scroll', () => {
+    const { noteScene } = createRendererFixture()
+    const first = noteScene.notes[0]
+    if (first === undefined) throw new Error('Expected Note visual')
+    const second = { ...first, noteId: parseNoteId('second-note'), xCssPixel: 500 }
+    const container = document.createElement('div')
+    const renderer = createPianoRollDomNoteRenderer({ container })
+    renderer.render({ ...noteScene, notes: [first, second] })
+    const layer = container.firstElementChild
+    const body = layer?.lastElementChild
+    if (!layer || !body) throw new Error('Expected rendered Notes')
+    const observer = new MutationObserver(() => undefined)
+    observer.observe(layer, { childList: true })
+    observer.observe(body, { attributes: true, subtree: true })
+
+    renderer.render({
+      ...noteScene,
+      notes: [first, { ...second, yCssPixel: second.yCssPixel + 20 }],
+    })
+    const mutations = observer.takeRecords()
+    expect(mutations).toHaveLength(1)
+    expect(mutations[0]?.attributeName).toBe('style')
+    expect(mutations[0]?.target).toBe(body)
+    expect(layer.lastElementChild).toBe(body)
+
+    renderer.render({ ...noteScene, notes: [{ ...second, yCssPixel: second.yCssPixel + 20 }] })
+    const removal = observer.takeRecords()
+    expect(removal).toHaveLength(1)
+    expect(removal[0]?.removedNodes).toHaveLength(1)
+    expect(removal[0]?.addedNodes).toHaveLength(0)
+    expect(layer.firstElementChild).toBe(body)
+    observer.disconnect()
+    renderer.dispose()
+  })
+
   it('keeps separate linked Clip nodes and reuses the surviving occurrence after removal', () => {
     const fixture = createRendererFixture()
     const first = fixture.noteScene.notes[0]

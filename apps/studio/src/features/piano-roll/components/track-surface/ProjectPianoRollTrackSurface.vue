@@ -21,6 +21,7 @@ import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-ro
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { usePianoRollToolActions } from '@/features/piano-roll/actions/use-piano-roll-tool-actions'
+import { useTrackRenderWindow } from '@/features/piano-roll/components/track-surface/hooks/use-track-render-window'
 import { useTrackLayout } from '@/features/piano-roll/components/track-surface/hooks/use-track-layout'
 import { useTrackRendering } from '@/features/piano-roll/components/track-surface/hooks/use-track-rendering'
 import { useTrackPlacement } from '@/features/piano-roll/components/track-surface/hooks/use-track-placement'
@@ -59,11 +60,18 @@ const displayGrid = computed(() =>
     subdivisionSpanTick: pianoRollPreferences.subdivisionSpanTick,
   }),
 )
+const timelineScrollLeft = shallowRef(0)
+const renderWindow = useTrackRenderWindow({
+  scrollViewport,
+  getContentWidth: () => pitchView.geometry.value?.widthCssPixel ?? 0,
+  getScrollLeft: () => timelineScrollLeft.value,
+})
 const layout = useTrackLayout({
   getGeometry: () => pitchView.geometry.value,
   getPresentation: () => props.presentation,
   getTimelineEndTick: () => props.timelineEndTick,
   getBarSpanTick: () => props.barSpanTick,
+  getRenderWindow: () => renderWindow.window.value,
 })
 const {
   timelineBars,
@@ -74,7 +82,6 @@ const {
   visibleClips,
 } = layout
 const controllerLane = useControllerLaneLayout(surfaceElement, () => clipHeaderHeight.value)
-const timelineScrollLeft = shallowRef(0)
 const follow = useTrackFollow({
   scrollViewport,
   getProjectId: () => props.presentation.projectId,
@@ -107,7 +114,7 @@ const rendering = useTrackRendering({
   gridCanvas,
   noteHost,
   getPresentation: () => props.presentation,
-  getViewport: () => layout.viewport.value,
+  getViewport: () => layout.renderViewport.value,
   getVisibleClips: () => visibleClips.value,
   createDisplayGrid: () => displayGrid.value,
   failureMessage,
@@ -159,6 +166,7 @@ function scrollTimeline(left: number): void {
 }
 function dispose(): void {
   follow.dispose()
+  renderWindow.dispose()
   pitchView.dispose()
   placement.dispose()
   rendering.dispose()
@@ -170,6 +178,7 @@ onMounted(() => {
     rendering.mount()
     placement.mount()
     pitchView.mount()
+    renderWindow.mount()
   } catch (cause) {
     dispose()
     failureMessage.value = describeCause(cause, 'The Track Piano Roll could not be composed.')
@@ -210,15 +219,9 @@ onBeforeUnmount(dispose)
           :is-playing="isCurrentProjectPlaying"
           :is-following="isTimelineFollowActive"
           :follow-label="timelineFollowLabel"
-          :sustain-pedal-channel="pianoRollPreferences.sustainPedalChannel"
-          :preview-message="previewMessage"
-          :preview-blocked="
-            placementPreview?.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED
-          "
           @invoke="invokeTool"
           @toggle-follow="toggleTimelineFollow"
           @select-clip="selectActiveClip"
-          @select-channel="pianoRollPreferences.selectSustainPedalChannel"
         />
 
         <div class="project-piano-roll-track__left-stack">
@@ -252,13 +255,21 @@ onBeforeUnmount(dispose)
               @pointermove="handleHover"
               @wheel="pitchView.handleWheel"
             >
-              <canvas ref="gridCanvas" aria-hidden="true"></canvas>
+              <canvas
+                ref="gridCanvas"
+                :style="layout.renderWindowStyle.value"
+                aria-hidden="true"
+              ></canvas>
               <PianoRollTrackClipRegions
                 class="project-piano-roll-track__clip-regions"
                 :regions="clipRegions"
                 :active-clip-id="activeClipId"
               />
-              <div ref="noteHost" class="project-piano-roll-track__note-host"></div>
+              <div
+                ref="noteHost"
+                class="project-piano-roll-track__note-host"
+                :style="layout.renderWindowStyle.value"
+              ></div>
               <div
                 v-if="previewClipStyle"
                 class="project-piano-roll-track__clip-preview"
@@ -326,6 +337,16 @@ onBeforeUnmount(dispose)
           :maximum="controllerLane.layout.value.maximum"
         />
 
+        <p
+          v-if="previewMessage"
+          class="project-piano-roll-track__preview-message"
+          :data-blocked="
+            placementPreview?.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED
+          "
+          role="status"
+        >
+          {{ previewMessage }}
+        </p>
         <p class="project-piano-roll-track__accessible-status" aria-live="polite">
           {{ accessibleStatus }}
         </p>
@@ -422,7 +443,7 @@ onBeforeUnmount(dispose)
   min-block-size: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  overscroll-behavior-inline: contain;
+  overscroll-behavior: none;
   scrollbar-gutter: stable;
 }
 
@@ -544,6 +565,33 @@ onBeforeUnmount(dispose)
 .project-piano-roll-track__note-preview--blocked {
   border-color: var(--sd-color-state-danger);
   background: color-mix(in srgb, var(--sd-color-state-danger) 35%, transparent);
+}
+
+.project-piano-roll-track__preview-message {
+  position: absolute;
+  z-index: var(--sd-layer-sticky);
+  inset-inline-start: calc(var(--project-piano-roll-track-keyboard-width) + var(--sd-space-2));
+  inset-inline-end: var(--sd-space-5);
+  inset-block-end: calc(
+    var(--piano-roll-controller-height) + var(--piano-roll-controller-header-height) +
+      var(--sd-space-2)
+  );
+  inline-size: fit-content;
+  max-inline-size: calc(100% - var(--project-piano-roll-track-keyboard-width) - var(--sd-space-5));
+  margin: 0;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  overflow: hidden;
+  border: 1px solid var(--sd-color-border-default);
+  border-radius: var(--sd-radius-sm);
+  color: var(--sd-color-text-secondary);
+  background: var(--sd-color-surface-overlay);
+  font-size: var(--sd-font-size-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.project-piano-roll-track__preview-message[data-blocked='true'] {
+  color: var(--sd-color-state-danger);
 }
 
 .project-piano-roll-track__accessible-status {

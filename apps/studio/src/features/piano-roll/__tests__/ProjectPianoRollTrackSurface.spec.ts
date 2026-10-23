@@ -12,6 +12,7 @@ import {
 import {
   createInitialProjectSession,
   createAddNoteCommand,
+  createMidiNoteRecord,
   createAddMidiSustainPedalEventCommand,
   parseMidiSustainPedalEventId,
   parseClipId,
@@ -384,6 +385,122 @@ afterEach(() => {
 })
 
 describe('ProjectPianoRollTrackSurface', () => {
+  it('bounds long Clip rendering to the horizontal window while keeping full timeline input coordinates', async () => {
+    const probe = installPianoRollResizeObserver()
+    const { wrapper, session, presentation, projectionSnapshot, clip, pinia } =
+      createSurfaceFixture()
+    const partition = projectionSnapshot.midiNotePartitions[0]
+    if (partition === undefined) throw new Error('Expected Note partition')
+    const longSnapshot = {
+      ...projectionSnapshot,
+      clips: projectionSnapshot.clips.map((entry) => ({ ...entry, spanTick: parseTick(576_000) })),
+      midiSources: projectionSnapshot.midiSources.map((source) => ({
+        ...source,
+        lengthTick: parseTick(576_000),
+      })),
+      midiNotePartitions: [
+        {
+          ...partition,
+          notes: [
+            ...Array.from({ length: 3000 }, (_, index) =>
+              createMidiNoteRecord({
+                id: parseNoteId(`long-note-${index}`),
+                startTick: parseTick(index * 192),
+                durationTick: parseTick(96),
+                channel: parseMidiChannel(0),
+                pitch: parseMidiPitch(60),
+                velocity: parseMidiVelocity(100),
+              }),
+            ),
+            createMidiNoteRecord({
+              id: parseNoteId('spanning-note'),
+              startTick: parseTick(0),
+              durationTick: parseTick(576_000),
+              channel: parseMidiChannel(0),
+              pitch: parseMidiPitch(60),
+              velocity: parseMidiVelocity(100),
+            }),
+          ],
+        },
+      ],
+    }
+    const longPresentation = createProjectPianoRollTrackPresentation(
+      longSnapshot,
+      presentation.trackId,
+      clip.clipId,
+    )
+    if (longPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
+      throw new Error('Expected Track')
+    await wrapper.setProps({ presentation: longPresentation })
+    const revision = session.modelRevision
+    const canvas = wrapper.get<HTMLCanvasElement>('canvas').element
+    const noteHost = wrapper.get<HTMLElement>('.project-piano-roll-track__note-host')
+    const timeline = wrapper.get<HTMLElement>('.project-piano-roll-track__scroll-viewport')
+    expect(canvas.width).toBe(1920)
+    expect(wrapper.findAll('.sd-piano-roll-dom-note')).toHaveLength(481)
+    const firstBody = noteHost.get('.sd-piano-roll-dom-note').element
+    timeline.element.scrollLeft = 200
+    await timeline.trigger('scroll')
+    expect(noteHost.get('.sd-piano-roll-dom-note').element).toBe(firstBody)
+    expect(noteHost.element.style.transform).toBe('translateX(0px)')
+
+    timeline.element.scrollLeft = 4800
+    await timeline.trigger('scroll')
+    expect(canvas.width).toBe(2880)
+    expect(wrapper.findAll('.sd-piano-roll-dom-note')).toHaveLength(721)
+    expect(noteHost.element.style.transform).toBe('translateX(3840px)')
+    expect(noteHost.find('[data-piano-roll-note-id="long-note-960"]').exists()).toBe(true)
+    expect(noteHost.find('[data-piano-roll-note-id="long-note-959"]').exists()).toBe(false)
+    expect(
+      noteHost.get<HTMLElement>('.sd-piano-roll-dom-note[data-piano-roll-note-id="spanning-note"]')
+        .element.style.width,
+    ).toBe('2880px')
+
+    usePianoRollPreferencesStore(pinia).setPitchCenter(96)
+    await nextTick()
+    expect(wrapper.findAll('.sd-piano-roll-dom-note')).toHaveLength(0)
+    usePianoRollPreferencesStore(pinia).setPitchCenter(60)
+    timeline.element.scrollLeft = 11040
+    await timeline.trigger('scroll')
+    expect(canvas.width).toBeLessThanOrEqual(2880)
+    expect(noteHost.find('[data-piano-roll-note-id="long-note-2999"]').exists()).toBe(true)
+    expect(session.modelRevision).toBe(revision)
+
+    const host = wrapper.get<HTMLElement>('.project-piano-roll-track__canvas-host').element
+    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(new DOMRect(-11040, 0, 12000, 250))
+    dispatchPointer(host, 'pointermove', { clientX: 0, clientY: 125 })
+    await nextTick()
+    expect(wrapper.get('.project-piano-roll-track__note-preview').attributes('style')).toContain(
+      'translate3d(11040px,',
+    )
+    const observer = probe.forElement(timeline.element)
+    Object.defineProperty(timeline.element, 'clientWidth', { configurable: true, value: 480 })
+    observer.deliver()
+    await nextTick()
+    expect(canvas.width).toBeLessThanOrEqual(1440)
+    wrapper.unmount()
+    observer.deliver()
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('rolls back and ignores queued callbacks if horizontal window observation fails', async () => {
+    const probe = installPianoRollResizeObserver('.project-piano-roll-track__scroll-viewport')
+    const { wrapper, session } = createSurfaceFixture()
+    const timeline = wrapper.get('.project-piano-roll-track__scroll-viewport').element
+    const observer = probe.forElement(timeline)
+    await nextTick()
+    expect(wrapper.text()).toContain('Viewport observation failed')
+    const revision = session.modelRevision
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+    observer.deliver()
+    await nextTick()
+    expect(wrapper.get('.project-piano-roll-track__note-host').element.childElementCount).toBe(0)
+    expect(session.modelRevision).toBe(revision)
+    wrapper.unmount()
+    observer.deliver()
+    expect(observer.disconnect).toHaveBeenCalledTimes(1)
+  })
+
   it('retains linked Note occurrences, separates overlapping Headers and activates the exact Clip', async () => {
     const { wrapper, session, presentation, projectionSnapshot, selection, clip } =
       createSurfaceFixture([0, 1920, 7680])

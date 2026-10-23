@@ -5,6 +5,9 @@ import ChevronRightIcon from '~icons/fluent/chevron-right-16-regular'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiHeightResizeHandle from '@/ui/components/UiHeightResizeHandle.vue'
+import UiSelect from '@/ui/components/UiSelect.vue'
+import { parseMidiChannel } from '@seele-daw/project-core'
+import { PIANO_ROLL_MIDI_CHANNEL_OPTIONS } from '@/features/piano-roll/presentation/piano-roll-channel-options'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import {
   CONTROLLER_LANE_MINIMUM_HEIGHT,
@@ -51,6 +54,18 @@ const preferences = usePianoRollPreferencesStore()
         /></template>
         CC64 · Sustain Pedal
       </UiButton>
+      <label class="piano-roll-controller-header__channel">
+        <span>Ch</span>
+        <UiSelect
+          size="small"
+          aria-label="Sustain Pedal MIDI Channel"
+          :model-value="String(preferences.sustainPedalChannel)"
+          :options="PIANO_ROLL_MIDI_CHANNEL_OPTIONS"
+          @update:model-value="
+            preferences.selectSustainPedalChannel(parseMidiChannel(Number($event)))
+          "
+        />
+      </label>
       <span v-if="!canExpand" class="piano-roll-controller-header__hint">More height needed</span>
     </div>
   </div>
@@ -71,6 +86,19 @@ const preferences = usePianoRollPreferencesStore()
   gap: var(--sd-space-3);
   block-size: var(--controller-title-height);
   border-block: 1px solid var(--sd-color-border-strong);
+  white-space: nowrap;
+  overflow-x: auto;
+  overscroll-behavior: none;
+}
+.piano-roll-controller-header__title > * {
+  flex: 0 0 auto;
+}
+.piano-roll-controller-header__channel {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-1);
+  color: var(--sd-color-text-muted);
+  font-size: var(--sd-font-size-xs);
 }
 .piano-roll-controller-header__hint {
   color: var(--sd-color-text-muted);

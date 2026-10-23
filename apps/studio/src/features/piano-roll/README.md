@@ -25,7 +25,10 @@ Studio 的 MIDI Note 与 CC64 编辑入口，遵循根 [工程代码准则](../.
 组件保留 DOM refs、Props / Emits、模板、无障碍语义及组合顺序；私有 hooks 不作为跨子模块 API。
 `PianoRollToolControls` 与 `PianoRollTrackToolbar` 接收编辑状态并上报编辑意图，Surface 各自只注册一次
 Tool Action Target。`PianoRollPitchControls` 消费共享 UI Preferences，Scope 内待适配的全部音高
-由父级输入。Active Clip、Channel 与 Pitch 模式下拉框均使用 `UiSelect` 的 small 规格。
+由父级输入。`Pitch` Popover 拥有模式和缩放控件，打开时通过统一 Keyboard Layer 暂停后台快捷键；
+`Fit notes` 保留直接入口。Active Clip、Channel 与 Pitch 模式下拉框均使用 `UiSelect` 的 small 规格。
+Channel 属于 Controller Header；Track Hover 提示在 Surface 内独立显示，不参与工具栏布局。
+工具组不压缩换行，超出宽度局部滚动；编辑滚动 owner 使用 `overscroll-behavior: none`。
 
 ## 推荐阅读顺序
 
@@ -52,8 +55,11 @@ Tool Action Target。`PianoRollPitchControls` 消费共享 UI Preferences，Scop
 
 1. [useTrackLayout](./components/track-surface/hooks/use-track-layout.ts)：Timeline Bars、内容宽度、
    分 Clip 的可见 Note、Clip 区域与时间 / 音高 Viewport 组合；尺寸由共享 Pitch hook 提供。
+   [useTrackRenderWindow](./components/track-surface/hooks/use-track-render-window.ts) 测量水平可视
+   容器，按页提供左右缓冲窗口；Layout 将它转换为有界 Render Viewport，并按时间 / Pitch 裁剪。
+   完整 Viewport 继续用于输入和 Preview；Render Viewport 仅用于 Grid / Note 显示。
 2. [useTrackRendering](./components/track-surface/hooks/use-track-rendering.ts)：Grid / Note Renderer
-   的创建、投影、失败反馈与释放，消费 Layout 提供的 Viewport。
+   的创建、投影、失败反馈与释放，消费 Layout 提供的 Render Viewport。
 3. [useTrackFollow](./components/track-surface/hooks/use-track-follow.ts)：Playback 分页跟随、
    用户暂停 / 恢复，区分程序滚动，并使释放后的排队回调失效。
 4. [useTrackActions](./components/track-surface/hooks/use-track-actions.ts)：Active Clip、CC64 Selection Target、Context Menu 与 Cancel 路由。
@@ -118,14 +124,15 @@ Props 和 Read Model 联合类型见
 
 Editor 公共 `PianoRollPitchViewport` 使用明确行高与顶部部分行偏移；Grid、Note Scene、
 Move、Placement 和 Hit 共用映射。Studio 只提供当前可见音域与像素高度，Canvas 不按完整
-128 行分配位图。时间坐标继续由各 Scope 拥有，CC64 不受 Pitch 滚动影响。
+128 行分配位图。时间坐标继续由各 Scope 拥有，CC64 不受 Pitch 滚动影响。Track 额外按水平页面及相邻缓冲
+裁剪 Grid / Note；排查基线见 [长 Clip 滚动排查](../../../docs/piano-roll-scroll-performance.md)。
 
 ## 失效与资源清理
 
 | Owner         | 创建与正常释放                                                                                                                                       | 失效来源与时机                                                                                                                                   |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Clip Focus    | 创建 Selection；mount Renderer、Input、几何监听、Pitch Observer。释放 Input / Interaction、Selection / Read Model、Pitch Observer，最后释放 Renderer | Clip / Source / Session 变化同步取消后重建；几何监听只响应测量和 Pitch 偏好，避免目标切换时重复订阅；revision 由 Editor Session 协调             |
-| Track Surface | mount Renderer、Input、Viewport Observer；逆序释放 Observer、Input、Renderer，同时关闭 Follow 的排队回调                                             | 映射、Session / Project / Track / Active Clip 改变取消；Tool / Grid / Snap 保留 Begin 快照；revision 由 Session 同步校验并在 post flush 交接     |
+| Track Surface | mount Renderer、Input、Pitch / Render Window Observer；逆序释放 Observer、Input、Renderer，同时关闭 Follow 的排队回调                                | 映射、Session / Project / Track / Active Clip 改变取消；Tool / Grid / Snap 保留 Begin 快照；revision 由 Session 同步校验并在 post flush 交接     |
 | CC64 Lane     | 创建 Interaction Session 与订阅，mount Input 后观察 Viewport；释放 Observer、Input、订阅与 Session                                                   | Viewport 变化同步取消；Session / Project / Scope / Clip / Source / Channel 同步取消并清空选择；post flush 的 revision 先通知 Session，再协调选择 |
 
 资源组合由组件显式安排，不依赖多个 `onMounted` 的注册顺序。部分初始化失败立即回收已创建

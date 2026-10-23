@@ -30,7 +30,6 @@ import type {
 } from '@/features/piano-roll/components/clip-focus/types/clip-focus'
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import PianoRollToolControls from '@/features/piano-roll/components/PianoRollToolControls.vue'
-import UiSelect from '@/ui/components/UiSelect.vue'
 
 const props = defineProps<ProjectPianoRollSurfaceProps>()
 const pianoRollPreferences = usePianoRollPreferencesStore()
@@ -122,13 +121,8 @@ const { prepareContextMenu, handleFocusIn, focusSustainPedalLane } = useEditingA
   focusedEditingTarget,
   interactionFailureMessage,
 })
-const {
-  sustainPedalLaneReadModel,
-  midiChannelOptions,
-  handleSustainPedalChannelChange,
-  handleSustainPedalFailure,
-  handleSustainPedalCompleted,
-} = useClipSustainPedal(props, interactionFailureMessage)
+const { sustainPedalLaneReadModel, handleSustainPedalFailure, handleSustainPedalCompleted } =
+  useClipSustainPedal(props, interactionFailureMessage)
 const barLabels = computed(() => {
   const barCount = Math.max(
     1,
@@ -216,16 +210,6 @@ onBeforeUnmount(dispose)
             :snap-enabled="pianoRollPreferences.snapEnabled"
             @invoke="invokeTool"
           />
-          <label class="project-piano-roll__channel-control">
-            <span>CC64 Ch</span>
-            <UiSelect
-              size="small"
-              :model-value="String(pianoRollPreferences.sustainPedalChannel)"
-              :options="midiChannelOptions"
-              aria-label="Sustain Pedal MIDI Channel"
-              @update:model-value="handleSustainPedalChannelChange"
-            />
-          </label>
           <PianoRollPitchControls :pitches="fitPitches" />
         </header>
 
@@ -340,20 +324,16 @@ onBeforeUnmount(dispose)
   min-inline-size: 0;
   padding-inline: var(--sd-space-2);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  overscroll-behavior: none;
+  white-space: nowrap;
   border-bottom: 1px solid var(--sd-color-border-default);
   background: var(--sd-color-surface-panel);
 }
 
-.project-piano-roll__channel-control {
-  display: flex;
-  align-items: center;
-  gap: var(--sd-space-1);
-}
-
-.project-piano-roll__channel-control > span {
-  color: var(--sd-color-text-muted);
-  font-family: var(--sd-font-family-numeric);
-  font-size: var(--sd-font-size-xs);
+.project-piano-roll__toolbar > * {
+  flex: 0 0 auto;
 }
 
 .project-piano-roll:focus-visible {

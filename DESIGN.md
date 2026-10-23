@@ -599,13 +599,18 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 - `Standard keys` 使用 20 CSS px 标准行高，面板变高增加可见行数；`Pitch range` 保留目标
   音域跨度并按面板适配行高，限制为 16–48 CSS px，触及限制后允许滚动或显示周边音高。
   默认中心 MIDI 60、目标 25 键；面板、Scope 与模式变化保持中心，在 MIDI 边界限制滚动。
-- 工具栏使用自定义 `UiSelect` 切换 Pitch 模式，音域模式显示 `− / Target N keys / +`；
-  `Fit notes` 显式适配当前 Scope 的全部音符并在两侧各留 2 半音余量，无音符时禁用。
-  控件提示说明目标键数与短面板中实际可见键数的区别，窄窗口允许工具栏横向滚动。
+- 工具栏保留 Tool、Snap、Follow、Active Clip、`Pitch` 与 `Fit notes`，不重复显示 Track Time
+  Badge。控件组不压缩换行；窄窗口通过局部横向滚动和键盘聚焦访问，长 Clip 名有界省略。
+  Pitch 模式和 `− / Target N keys / +` 放入独立 Popover，使用自有组件提供内容与样式、Reka
+  提供开合 / 定位 / 焦点。弹层打开时暂停后台快捷键，Escape 关闭并归还焦点。
+  `Fit notes` 直接可用，显式适配当前 Scope 的全部音符并在两侧各留 2 半音余量，无音符时禁用。
+  操作指引在 Note 区边缘独立显示，Pointer 穿透，不参与工具栏宽度分配。
 - Pitch 纵向滚轮仅作用于键盘与 Note 区，右侧原生滚动条只覆盖 Note 高度，可聚焦并使用
   Arrow / Page / Home / End。Shift 或横向滚轮继续交给时间轴，Ctrl / Meta 滚轮不由 Pitch 消费。
 - 键盘、Canvas Grid、Note、Preview 与 Hit 共用行高和顶部部分行偏移；Canvas 只分配可视高度。
   CC64 与 Ruler 不随 Pitch 滚动，音符增删不触发自动音域适配。
+- Arrangement、Track 时间轴、Pitch 滚动条和 Clip Header 禁止滚动链及边缘回弹，防止与独立
+  容器中的对齐元素错位；下拉框和菜单保留自己的滚动策略。
 - Track Clip 以全高淡色区域和时间边界分组，背景 `pointer-events: none`，不截获空白落笔或
   Note 输入。Header 位于独立行，每行 24px、最多显示两行；重叠区间稳定分行，超出部分可在
   Header 内滚动和键盘访问。选择状态使用边框、顶部色线与 `aria-pressed`，不能只依赖颜色。
@@ -615,7 +620,7 @@ Tool、Snap、创建结果、失败、History 和边界的完整显式规则见
 - 同源 Note 保留 `(ClipId, NoteId)` 展示身份；完全重叠时 Active Clip 的 Note 与 CC64 Marker
   位于上层，其他 Clip 可通过独立 Header 激活。Clip 颜色优先于 Track 颜色。
 - CC64 保留底部同一时间轴，标题栏高 32px、拖动柄高 12px；事件区默认 88px、可调 64–240px。
-  标题栏不随横向时间滚动，明确展示展开 / 收起状态；内部 Plot 上下各留 12px，数值轴与 Marker
+  标题栏不随横向时间滚动，明确展示展开 / 收起状态，并承载 `Ch` Channel Selector；内部 Plot 上下各留 12px，数值轴与 Marker
   共用该安全间距，不能靠移动 Marker 视觉位置来伪造不同的输入坐标。
 - 辅助 Lane 高度受 Note 至少 96px 与非覆盖式横向滚动条 16px 的预留限制；不足时临时收起，
   原偏好保留。用户主动收起保持收起；扩大窗口不会擅自重新打开。

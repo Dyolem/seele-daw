@@ -11,8 +11,8 @@ Scroll 和高频重绘有更稳定的性能上限，但需要自行建立 Hit Te
 DOM 可以直接使用 Pointer Event、CSS Animation、Focus 和语义元素，但成本随可见节点数、
 样式复杂度及每帧更新比例增长。
 
-当前 Project Query 和 Piano Roll Read Model 只返回可见 Tick / Pitch 范围内的 Note，
-因此没有证据表明 DOM Note 在首批产品规模下必然性能不足。框架无关的音序器 SDK 也不由
+Clip Focus 的 Project Query 和 Read Model 按可见 Tick / Pitch 范围返回 Note；Track Read Model
+保留整条轨道的 Clip 投影，由 Studio Layout 按当前水平绘制窗口及 Pitch 裁剪。框架无关的音序器 SDK 也不由
 Canvas 决定，而由 Common Model、Scene、Input、Tool、Command 与 Renderer Port 决定。
 
 ## 现有数据结构为何有利于性能
@@ -41,6 +41,8 @@ keyed DOM Renderer
    - Query 同时按 `MidiSourceId`、可见 Source Tick 范围和 Pitch 范围筛选；
    - Project Query Index 负责定位候选数据，UI 不需要扫描或投影整个 Project；
    - Scene 和 Renderer 接收的是可见结果，而不是完整 MIDI Source。
+   - 上述 Query 路径用于 Clip Focus；Track Layout 从既有 Track Read Model 筛选绘制窗口。
+     完整 Track 时间映射与有界 Render Viewport 分开，缓冲范围最多为当前页与左右相邻页。
 3. **Commit 通知同样按数据相关性收窄。**
    - Read Model 只订阅当前 Source 以及与当前 Tick 窗口相交的 MIDI Note 变化；
    - 不相关 Track、Source 或时间范围内的 Commit 不会触发当前 Piano Roll 的 Note 重查；
@@ -74,7 +76,7 @@ keyed DOM Renderer
 2. 首批可见 Note 使用 keyed DOM Renderer：
    - 只创建可见 Note；
    - 每个 Note 是轻量原生元素，不是 Vue Component；
-   - Renderer 按 `NoteId` 复用节点；
+   - Renderer 按 `(ClipId, NoteId)` 复用节点；
    - 后续 Pointer 输入使用 Surface 事件委托，不为每个 Note 创建监听器。
 3. `PianoRollNoteScene` 是唯一可见 Note 几何：
    - 由 Common Viewport 与 Note Read Model 投影；
@@ -151,6 +153,18 @@ Canvas Adapter 的首批空间索引使用 MIDI Pitch Bucket 与按 `startTick` 
 - Theme-only 变化必须通过未来的响应式 Theme revision 触发 render effect；不能依赖偶然的
   其他状态变化刷新 Canvas 或内联 DOM 颜色。
 - ResizeObserver 只更新 Viewport，不拥有 Project 或 Note 状态。
+
+## 长 Clip 滚动修正
+
+2026-10-22 的 280 小节、4,480 个 Note 测试发现：原 Track 路径只过滤 Pitch，纵向滚动仍
+更新整条时间轴的 Note；keyed DOM 虽复用元素，却每次搬入 Fragment 再整体装回。
+实测 DOM 阶段约 26–34ms，是该场景中主要的同步开销。现在 Track Grid / Note 只渲染水平
+窗口与相邻页缓冲；DOM 保留幸存节点连接，只重排真正改变的层级，并按变化属性更新样式。
+完整输入坐标、Project 权威、Note 身份和 Clip Focus 全 Clip 时间语义不变。
+
+同条件下渲染函数耗时由 27.3–36.8ms 降至 0.7–1.3ms；这不是完整帧耗时或 CPU 降速测量。
+测试数据生成方式、采样边界和未覆盖范围见
+[Studio 长 Clip 滚动排查](../../../apps/studio/docs/piano-roll-scroll-performance.md)。
 
 ## 基准与切换条件
 

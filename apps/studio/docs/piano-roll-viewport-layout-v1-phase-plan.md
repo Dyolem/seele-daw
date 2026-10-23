@@ -1,6 +1,6 @@
 # Piano Roll 视口与布局 V1 阶段计划
 
-> 状态：V1 已审核提交 `86fcbf6`；V2 已审核提交 `27df7e7`；V3 已审核提交 `30a129d`；V4 已完成验证，待审核
+> 状态：V1 已审核提交 `86fcbf6`；V2 已审核提交 `27df7e7`；V3 已审核提交 `30a129d`；V4 已审核提交 `c89972a`；使用反馈修复已完成验证并于 2026-10-23 审核通过
 >
 > 创建日期：2026-10-20
 >
@@ -130,7 +130,28 @@
   控制台无 warn / error。验收截图 `/tmp/seele-v4-clip-regions.jpg` 记录三层重叠场景。
 - 完整 `pnpm check` 通过：Architecture、Workspace Quality、Format、Oxlint、ESLint、全仓
   Type Check、175 个测试文件 / 1,714 项测试、Studio Production Build 与 soundbank dist boundary。
-  仍有既有主包超过 500kB 的构建提示。本批保留未提交供审核，不进入 Velocity Editing。
+  仍有既有主包超过 500kB 的构建提示。本批已审核提交 `c89972a`，不进入 Velocity Editing。
+
+## 使用反馈修复
+
+- 工具栏按操作归属收拢：Pitch 模式和 Zoom 放入自定义 Popover，Fit 保留直接入口，CC64
+  Channel 移至 Controller Header。移除重复 Track Time Badge；工具组保持单行、窄窗口局部滚动，
+  长 Clip 名有界省略。Track Hover 指引单独显示，不挤压控件。Popover 接入统一 Keyboard Layer。
+- Arrangement、Track 时间轴、Clip Header、Pitch Scrollbar 禁止 overscroll 回弹；Select 内部
+  列表策略保持独立。
+- 长 Clip 按水平页及相邻缓冲窗口绘制 Grid / Note，DOM 保留未退出的节点，仅更新改变的属性。
+  完整 Pointer / Preview 坐标不变，资源在失败 / 卸载时释放。实测方法与结果见
+  [长 Clip 滚动排查](./piano-roll-scroll-performance.md)。
+- 新增回归覆盖长 Clip 窗口数量、跨页 / 末端 / Resize、长 Note 相交裁剪、绘制与输入坐标分离、
+  Observer 创建失败与迟到回调、稳定 DOM 连接及属性更新、Pitch 弹层键盘选择 / Escape / 焦点恢复
+  与后台快捷键屏蔽。
+- 2026-10-22 使用 Codex 内置浏览器及独立 280 小节 / 4,480 Note Project 验证：1280×900、
+  900×500、900×380，停靠 / 全屏、Track / Clip Focus、长 Clip 名和 Pitch range、16 项 Channel
+  键盘首尾可达、跨绘制窗口滚动及 Header 对齐。横向滚动与缩放后真实落笔 / 单步 Undo 通过，
+  恢复 Saved；最终控制台无新增 warn / error。截图 `/tmp/seele-piano-roll-toolbar-scroll.jpg`。
+- 完整 `pnpm check` 通过：Architecture、Workspace Quality、Format、Oxlint、ESLint、全仓
+  Type Check、176 个测试文件 / 1,718 项测试、Production Build 与 soundbank dist boundary。
+  仍有既有主包超过 500kB 的构建提示。本轮修复于 2026-10-23 审核通过。
 
 ## 不变量
 

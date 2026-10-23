@@ -1100,7 +1100,7 @@ const tempoSummary = computed(() => {
   min-block-size: 0;
   grid-column: 2;
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
   scrollbar-gutter: stable;
 }
 

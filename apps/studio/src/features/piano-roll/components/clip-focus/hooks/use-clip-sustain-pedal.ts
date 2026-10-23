@@ -1,6 +1,4 @@
-import { PIANO_ROLL_MIDI_CHANNEL_OPTIONS } from '@/features/piano-roll/presentation/piano-roll-channel-options'
 import { createPianoRollSustainPedalClipLaneReadModel } from '@seele-daw/editor'
-import { parseMidiChannel } from '@seele-daw/project-core'
 import { computed, type ShallowRef } from 'vue'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
@@ -21,12 +19,6 @@ export function useClipSustainPedal(
       snapshot: props.presentation.snapshot,
     }),
   )
-  const midiChannelOptions = PIANO_ROLL_MIDI_CHANNEL_OPTIONS
-
-  function handleSustainPedalChannelChange(value: string): void {
-    pianoRollPreferences.selectSustainPedalChannel(parseMidiChannel(Number(value)))
-  }
-
   function handleSustainPedalFailure(cause: unknown, committed = false): void {
     const message = describeCause(
       cause,
@@ -46,8 +38,6 @@ export function useClipSustainPedal(
 
   return {
     sustainPedalLaneReadModel,
-    midiChannelOptions,
-    handleSustainPedalChannelChange,
     handleSustainPedalFailure,
     handleSustainPedalCompleted,
   }

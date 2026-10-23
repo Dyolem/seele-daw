@@ -10,17 +10,20 @@ import {
   createTrackClipRegions,
 } from '@/features/piano-roll/components/track-surface/presentation/clip-regions'
 import type { TrackVisibleClipNotes } from '@/features/piano-roll/components/track-surface/types/track-clip-region'
+import type { TrackRenderWindow } from '@/features/piano-roll/components/track-surface/types/track-render-window'
 
 export function useTrackLayout({
   getGeometry,
   getPresentation,
   getTimelineEndTick,
   getBarSpanTick,
+  getRenderWindow,
 }: {
   readonly getGeometry: () => PianoRollSurfaceGeometry | null
   readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
   readonly getTimelineEndTick: () => Tick
   readonly getBarSpanTick: () => Tick
+  readonly getRenderWindow: () => TrackRenderWindow | null
 }) {
   const timelineBars = computed(() => {
     const barCount = Math.ceil(getTimelineEndTick() / getBarSpanTick())
@@ -46,27 +49,31 @@ export function useTrackLayout({
     }),
   )
 
-  const visibleClips = computed<readonly TrackVisibleClipNotes[]>(() =>
-    Object.freeze(
-      getPresentation().readModel.clips.map(({ clip, notes }) => ({
+  const visibleClips = computed<readonly TrackVisibleClipNotes[]>(() => {
+    const visible = renderViewport.value
+    if (visible === null) return []
+    return getPresentation()
+      .readModel.clips.filter(
+        ({ clip }) =>
+          clip.startTick < visible.visibleEndTick && clip.endTick > visible.visibleStartTick,
+      )
+      .map(({ clip, notes }) => ({
         clip,
         notes: notes
           .filter(
-            ({ note }) =>
-              viewport.value !== null &&
-              note.pitch >= viewport.value.minimumPitch &&
-              note.pitch <= viewport.value.maximumPitch,
+            ({ note, projectStartTick, projectEndTick }) =>
+              note.pitch >= visible.minimumPitch &&
+              note.pitch <= visible.maximumPitch &&
+              projectStartTick < visible.visibleEndTick &&
+              projectEndTick > visible.visibleStartTick,
           )
-          .map(({ note, projectEndTick, projectStartTick }) =>
-            Object.freeze({
-              note,
-              visibleEndTick: projectEndTick,
-              visibleStartTick: projectStartTick,
-            }),
-          ),
-      })),
-    ),
-  )
+          .map(({ note, projectEndTick, projectStartTick }) => ({
+            note,
+            visibleEndTick: parseTick(Math.min(projectEndTick, visible.visibleEndTick)),
+            visibleStartTick: parseTick(Math.max(projectStartTick, visible.visibleStartTick)),
+          })),
+      }))
+  })
 
   const clipRegions = computed(() =>
     createTrackClipRegions(
@@ -93,8 +100,39 @@ export function useTrackLayout({
     })
   })
 
+  const renderViewport = computed(() => {
+    const full = viewport.value
+    const window = getRenderWindow()
+    if (full === null || window === null) return null
+    const ticksPerPixel = full.visibleSpanTick / full.widthCssPixel
+    const start = parseTick(Math.floor(window.leftCssPixel * ticksPerPixel))
+    const end = parseTick(
+      Math.min(
+        full.visibleEndTick,
+        Math.ceil((window.leftCssPixel + window.widthCssPixel) * ticksPerPixel),
+      ),
+    )
+    return createPianoRollTimelineViewport({
+      ...full,
+      visibleStartTick: start,
+      visibleSpanTick: parseTick(end - start),
+      widthCssPixel: (end - start) / ticksPerPixel,
+    })
+  })
+  const renderWindowStyle = computed((): StyleValue => {
+    const full = viewport.value
+    const rendered = renderViewport.value
+    if (full === null || rendered === null) return { display: 'none' }
+    return {
+      width: `${rendered.widthCssPixel}px`,
+      transform: `translateX(${(rendered.visibleStartTick / full.visibleSpanTick) * full.widthCssPixel}px)`,
+    }
+  })
+
   return {
     viewport,
+    renderViewport,
+    renderWindowStyle,
     timelineBars,
     timelineContentStyle,
     visibleClips,

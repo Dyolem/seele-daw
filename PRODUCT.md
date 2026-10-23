@@ -993,6 +993,15 @@ Track 与 Clip Focus 共用两种 Pitch 显示模式，初始中心为 MIDI 60�
   中心和目标跨度属于应用生命周期的 UI Preference，不写入 Project、History 或 dirty。
 - 滚动、缩放或面板变化使捕获时的坐标映射失效时，同步取消未提交手势；迟到 Pointer Up 不写入。
 
+常用 Tool、Snap、Active Clip 和 `Fit notes` 保留在工具栏；`Pitch` 打开模式与缩放设置面板。
+CC64 Channel 放在 Lane 标题栏，操作指引独立显示于 Note 区边缘，不挤压工具栏。控件保持单行，
+长 Clip 名省略，宽度不足可局部横向滚动。Arrangement 和 Piano Roll 的编辑滚动容器禁用边缘回弹，
+菜单列表仍保留独立滚动行为。
+
+Track 的 Grid 与 Note 按水平可视窗口及相邻页缓冲绘制，纵向滚动不再更新整条长 Clip 的屏外
+节点。绘制裁剪保持全局时间与编辑坐标不变；Clip Focus 继续显示完整 Clip。排查方法与结果见
+[长 Clip 滚动排查](./apps/studio/docs/piano-roll-scroll-performance.md)。
+
 当前明确限制：
 
 - 不支持 looped Clip 编辑，不能把循环实例错误显示成非循环 Source；

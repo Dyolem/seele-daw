@@ -69,7 +69,7 @@ const { handleScroll, handleWheel } = useClipHeaderScroll({
 .piano-roll-clip-headers {
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
   background: var(--sd-color-surface-panel);
   box-shadow: inset 0 -1px var(--sd-color-border-default);
 }

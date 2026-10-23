@@ -18,7 +18,8 @@ const DEFAULT_LIMITS: RestrictedZipArchiveLimits = Object.freeze({
 })
 
 function createArchive(entries: Readonly<Record<string, Uint8Array>>): Uint8Array {
-  return zipSync(entries, { level: 6, mtime: new Date('1980-01-01T00:00:00Z') })
+  // ZIP timestamps are local DOS time, so a local date stays valid in every time zone.
+  return zipSync(entries, { level: 6, mtime: new Date(1980, 0, 2) })
 }
 
 function replaceCentralDirectoryCompressionMethod(

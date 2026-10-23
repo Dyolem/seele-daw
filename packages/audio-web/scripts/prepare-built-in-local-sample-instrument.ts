@@ -455,7 +455,10 @@ async function assertExistingOutputMatches(
   const existingPaths: string[] = []
   const existingDirectories: string[] = []
   for (const entry of await readdir(outputDirectory, { recursive: true, withFileTypes: true })) {
+    // Output paths are compared in the portable `/` form used by the definition.
     const entryPath = relative(outputDirectory, resolve(entry.parentPath, entry.name))
+      .split(sep)
+      .join('/')
     if (entry.isFile()) existingPaths.push(entryPath)
     else if (entry.isDirectory()) existingDirectories.push(entryPath)
     else fail('output-conflict', 'generated output contains an unsupported entry type', entryPath)

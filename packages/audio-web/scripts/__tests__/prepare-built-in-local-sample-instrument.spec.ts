@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 
 import { parseSoundbankId } from '@seele-daw/playback'
@@ -358,7 +358,7 @@ describe('built-in local Sample Instrument preparation', () => {
         code: 'invalid-definition',
       }),
     )
-    expect(relative(fixture.localSoundbankRoot, fixture.outputDirectory)).toBe(
+    expect(relative(fixture.localSoundbankRoot, fixture.outputDirectory).split(sep).join('/')).toBe(
       'generated/fixture-strings',
     )
   })

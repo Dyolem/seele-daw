@@ -202,23 +202,6 @@ describe('AddMidiClipCommand preparation', () => {
     expect(plan.forward[3].after).toBe(preparation.command.clip)
   })
 
-  it('binds aggregate correspondence to the normalized Record references', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const preparation = prepareProjectCommand(store, createCommand(store))
-
-    if (preparation.status !== 'ready') {
-      throw new Error('Expected a ready MIDI Clip command preparation')
-    }
-
-    const valueEqualCommand = createCommand(store)
-
-    expect(() => createProjectCommitCandidate(valueEqualCommand, preparation.plan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
-    expect(() => createProjectCommitCandidate(preparation.command, preparation.plan)).not.toThrow()
-  })
-
   it('rejects missing and non-Instrument target Tracks', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
@@ -409,7 +392,7 @@ describe('MIDI Clip commit and History semantics', () => {
     expect(store.hasMidiSustainPedalEventPartition(command.source.id)).toBe(true)
   })
 
-  it('fails closed when a MIDI Clip graph is incomplete or not empty', () => {
+  it('fails closed when a MIDI Clip graph is incomplete', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createCommand(store)
@@ -419,32 +402,9 @@ describe('MIDI Clip commit and History semantics', () => {
         after: command.source,
       },
     ])
-    const populatedPlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
-        after: command.source,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
-        sourceId: command.source.id,
-        after: [fixture.records.nonLoopNote],
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
-        sourceId: command.source.id,
-        after: [],
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
-        after: command.clip,
-      },
-    ])
 
     expect(() => createProjectCommitCandidate(command, incompletePlan)).toThrowError(
       expect.objectContaining({ code: 'unsupported-mutation-type' }),
-    )
-    expect(() => createProjectCommitCandidate(command, populatedPlan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
     )
   })
 })

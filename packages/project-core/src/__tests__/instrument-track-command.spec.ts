@@ -220,23 +220,6 @@ describe('AddInstrumentTrackCommand preparation', () => {
     expect(plan.forward[1].after).toBe(preparation.command.track)
   })
 
-  it('binds aggregate correspondence to the normalized Record references', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const preparation = prepareProjectCommand(store, createCommand(store))
-
-    if (preparation.status !== 'ready') {
-      throw new Error('Expected a ready Instrument Track command preparation')
-    }
-
-    const valueEqualCommand = createCommand(store)
-
-    expect(() => createProjectCommitCandidate(valueEqualCommand, preparation.plan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
-    expect(() => createProjectCommitCandidate(preparation.command, preparation.plan)).not.toThrow()
-  })
-
   it('rejects occupied Track and Device identities and an out-of-bounds position', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)

@@ -150,7 +150,7 @@ describe('ProjectDelta Note semantics', () => {
     })
   })
 
-  it('maps ordered multi-Note removal and rejects a reordered Command plan', () => {
+  it('maps ordered multi-Note removal', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const command = createRemoveNotesCommand({
@@ -173,26 +173,6 @@ describe('ProjectDelta Note semantics', () => {
         before: fixture.records.nonLoopHarmonyNote,
       }),
     ])
-
-    const reorderedPlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-        sourceId: command.sourceId,
-        before: fixture.records.nonLoopHarmonyNote,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-        sourceId: command.sourceId,
-        before: fixture.records.nonLoopNote,
-      },
-    ])
-    const error = captureCandidateError(
-      () => createProjectCommitCandidate(command, reorderedPlan),
-      'command-plan-mismatch',
-    )
-
-    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE)
-    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REMOVE)
   })
 
   it('uses the conservative union of old and new intervals for MoveNote', () => {
@@ -413,142 +393,5 @@ describe('ProjectCommit candidate boundary', () => {
     )
 
     expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD)
-  })
-
-  it('rejects an AddNote Plan whose Note payload differs from the Command', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = createAddCommand(store)
-    const plan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
-        sourceId: command.sourceId,
-        after: createMidiNoteRecord({
-          id: command.noteId,
-          startTick: command.startTick,
-          durationTick: command.durationTick,
-          pitch: parseMidiPitch(71),
-          velocity: command.velocity,
-          channel: command.channel,
-        }),
-      },
-    ])
-    const error = captureCandidateError(
-      () => createProjectCommitCandidate(command, plan),
-      'command-plan-mismatch',
-    )
-
-    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD)
-    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.INSERT)
-  })
-
-  it('rejects a RemoveNotes Plan for a different Note address', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = createRemoveNotesCommand({
-      baseRevision: store.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [fixture.records.nonLoopNote.id],
-    })
-    const plan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-        sourceId: command.sourceId,
-        before: fixture.records.nonLoopHarmonyNote,
-      },
-    ])
-    const error = captureCandidateError(
-      () => createProjectCommitCandidate(command, plan),
-      'command-plan-mismatch',
-    )
-
-    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE)
-    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REMOVE)
-  })
-
-  it('rejects Plans that change extra fields or bypass MoveNote no-change semantics', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = createMoveNotesCommand({
-      baseRevision: store.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [fixture.records.nonLoopNote.id],
-      deltaTick: parseTickDelta(720),
-      deltaPitch: parseMidiPitchDelta(5),
-    })
-    const plan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: command.sourceId,
-        before: fixture.records.nonLoopNote,
-        after: createMidiNoteRecord({
-          ...fixture.records.nonLoopNote,
-          startTick: parseTick(fixture.records.nonLoopNote.startTick + command.deltaTick),
-          pitch: parseMidiPitch(fixture.records.nonLoopNote.pitch + command.deltaPitch),
-          velocity: parseMidiVelocity(1),
-        }),
-      },
-    ])
-    const error = captureCandidateError(
-      () => createProjectCommitCandidate(command, plan),
-      'command-plan-mismatch',
-    )
-    const noChangeCommand = createMoveNotesCommand({
-      baseRevision: store.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [fixture.records.nonLoopNote.id],
-      deltaTick: parseTickDelta(0),
-      deltaPitch: parseMidiPitchDelta(0),
-    })
-    const noChangePlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: noChangeCommand.sourceId,
-        before: fixture.records.nonLoopNote,
-        after: createMidiNoteRecord(fixture.records.nonLoopNote),
-      },
-    ])
-
-    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE)
-    expect(error.mutationIndex).toBe(0)
-    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
-    captureCandidateError(
-      () => createProjectCommitCandidate(noChangeCommand, noChangePlan),
-      'command-plan-mismatch',
-    )
-    expect(store.modelRevision).toBe(0)
-  })
-
-  it('rejects a ResizeNote Plan that changes facts outside target geometry', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = createResizeNoteCommand({
-      baseRevision: store.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
-      startTick: parseTick(120),
-      durationTick: parseTick(600),
-    })
-    const plan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: command.sourceId,
-        before: fixture.records.nonLoopNote,
-        after: createMidiNoteRecord({
-          ...fixture.records.nonLoopNote,
-          startTick: command.startTick,
-          durationTick: command.durationTick,
-          velocity: parseMidiVelocity(1),
-        }),
-      },
-    ])
-    const error = captureCandidateError(
-      () => createProjectCommitCandidate(command, plan),
-      'command-plan-mismatch',
-    )
-
-    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE)
-    expect(error.mutationType).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
-    expect(store.modelRevision).toBe(0)
   })
 })

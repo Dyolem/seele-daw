@@ -9,10 +9,8 @@ import {
   createAllProjectCommitsSubscription,
   createMidiNoteChangesSubscription,
   createReplaceTempoEventBpmCommand,
-  createTempoEventRecord,
   parseTempoBpm,
   parseTempoEventId,
-  parseTick,
   type CreateReplaceTempoEventBpmCommandInput,
   type ProjectCommit,
   type ProjectChange,
@@ -20,9 +18,7 @@ import {
   type TempoEventUpdatedChange,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import {
   createCompleteProjectFixture,
@@ -144,48 +140,6 @@ describe('ReplaceTempoEventBpmCommand preparation', () => {
         commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM,
         tempoEventId: missingTempoEventId,
       }),
-    )
-  })
-
-  it('fails closed when a supplied plan changes the Event Tick or a different BPM', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const preparation = prepareProjectCommand(store, createCommand(store, fixture))
-    const plan = requireReadyProjectCommandPlan(preparation)
-
-    if (
-      preparation.status !== 'ready' ||
-      preparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE
-    ) {
-      throw new Error('Expected a ready Tempo Event BPM replacement')
-    }
-
-    const before = plan.forward[0].before
-    const wrongTickPlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
-        before,
-        after: createTempoEventRecord({
-          ...before,
-          tick: parseTick(1),
-          bpm: preparation.command.bpm,
-        }),
-      },
-    ])
-    const wrongBpmPlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
-        before,
-        after: createTempoEventRecord({ ...before, bpm: parseTempoBpm(144) }),
-      },
-    ])
-
-    expect(() => createProjectCommitCandidate(preparation.command, wrongTickPlan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
-    expect(() => createProjectCommitCandidate(preparation.command, wrongBpmPlan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
     )
   })
 })

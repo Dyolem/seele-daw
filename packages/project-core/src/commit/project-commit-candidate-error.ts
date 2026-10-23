@@ -1,10 +1,7 @@
 import type { ProjectCommandType } from '#internal/commands/protocol/project-command'
 import type { ProjectMutationType } from '#internal/mutation/mutation-type'
 
-export type ProjectCommitCandidateErrorCode =
-  | 'base-revision-mismatch'
-  | 'command-plan-mismatch'
-  | 'unsupported-mutation-type'
+export type ProjectCommitCandidateErrorCode = 'base-revision-mismatch' | 'unsupported-mutation-type'
 
 export interface ProjectCommitCandidateErrorDetails {
   readonly commandType?: ProjectCommandType

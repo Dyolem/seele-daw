@@ -11,7 +11,6 @@ import {
   createMidiNoteChangesSubscription,
   createMoveTempoEventCommand,
   createRemoveTempoEventCommand,
-  createTempoEventRecord,
   parseTempoBpm,
   parseTempoEventId,
   parseTick,
@@ -28,9 +27,7 @@ import {
   type TempoEventUpdatedChange,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
@@ -376,83 +373,6 @@ describe('RemoveTempoEventCommand preparation', () => {
         tempoEventId: missingTempoEventId,
       }),
     )
-  })
-})
-
-describe('Tempo Event lifecycle command-plan correspondence', () => {
-  it('fails closed when supplied plans do not represent the exact lifecycle intent', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-
-    const addPreparation = prepareProjectCommand(store, createAddCommand(store))
-    const addPlan = requireReadyProjectCommandPlan(addPreparation)
-    if (
-      addPreparation.status !== 'ready' ||
-      addPreparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD
-    ) {
-      throw new Error('Expected a ready Tempo Event insertion')
-    }
-    const wrongAddPlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT,
-        after: createTempoEventRecord({
-          ...addPreparation.command.tempoEvent,
-          bpm: parseTempoBpm(97),
-        }),
-      },
-    ])
-    expect(() => createProjectCommitCandidate(addPreparation.command, wrongAddPlan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
-    expect(() => createProjectCommitCandidate(addPreparation.command, addPlan)).not.toThrow()
-
-    const moveCommand = createMoveTempoEventCommand({
-      baseRevision: store.modelRevision,
-      tempoEventId: fixture.records.laterTempoEvent.id,
-      tick: MOVED_TEMPO_EVENT_TICK,
-    })
-    const movePreparation = prepareProjectCommand(store, moveCommand)
-    if (
-      movePreparation.status !== 'ready' ||
-      movePreparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE
-    ) {
-      throw new Error('Expected a ready Tempo Event move')
-    }
-    const wrongMovePlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
-        before: fixture.records.laterTempoEvent,
-        after: createTempoEventRecord({
-          ...fixture.records.laterTempoEvent,
-          tick: MOVED_TEMPO_EVENT_TICK,
-          bpm: parseTempoBpm(129),
-        }),
-      },
-    ])
-    expect(() => createProjectCommitCandidate(movePreparation.command, wrongMovePlan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
-
-    const removeCommand = createRemoveTempoEventCommand({
-      baseRevision: store.modelRevision,
-      tempoEventId: fixture.records.laterTempoEvent.id,
-    })
-    const removePreparation = prepareProjectCommand(store, removeCommand)
-    if (
-      removePreparation.status !== 'ready' ||
-      removePreparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE
-    ) {
-      throw new Error('Expected a ready Tempo Event removal')
-    }
-    const wrongRemovePlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE,
-        before: fixture.records.initialTempoEvent,
-      },
-    ])
-    expect(() =>
-      createProjectCommitCandidate(removePreparation.command, wrongRemovePlan),
-    ).toThrowError(expect.objectContaining({ code: 'command-plan-mismatch' }))
   })
 })
 

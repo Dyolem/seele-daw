@@ -26,10 +26,7 @@ import {
   type ReplaceInstrumentDeviceCommand,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import {
-  createHistoryProjectCommitCandidate,
-  createProjectCommitCandidate,
-} from '#internal/commit/project-commit-candidate'
+import { createHistoryProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
@@ -253,7 +250,7 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     })
   })
 
-  it('fails closed for altered ownership and an unowned raw Device replacement', () => {
+  it('fails closed for an unowned raw Device replacement', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const preparation = prepareProjectCommand(store, createCommand(store, fixture))
@@ -266,16 +263,6 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     ) {
       throw new Error('Expected a ready Instrument Device replacement')
     }
-
-    const wrongOwnerPlan = createMutationPlan(store.modelRevision, [
-      {
-        ...plan.forward[0],
-        trackId: fixture.records.audioTrack.id,
-      },
-    ])
-    expect(() => createProjectCommitCandidate(preparation.command, wrongOwnerPlan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
 
     const unownedPlan = createMutationPlan(store.modelRevision, [
       {

@@ -9,7 +9,6 @@ import {
   createAddMidiSustainPedalEventCommand,
   createAllProjectCommitsSubscription,
   createMidiNoteChangesSubscription,
-  createMidiSustainPedalEventRecord,
   createMoveMidiSustainPedalEventsCommand,
   createRemoveMidiSustainPedalEventsCommand,
   createReplaceMidiSustainPedalEventValueCommand,
@@ -34,9 +33,7 @@ import {
   type ReplaceMidiSustainPedalEventValueCommand,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPreparation } from './support/project-command-test-support'
@@ -458,54 +455,6 @@ describe('Move, Remove, and Value Replace preparation', () => {
       code: 'sustain-pedal-event-tick-channel-already-exists',
       blockingSustainPedalEventId: fixture.records.nonLoopPedalUp.id,
     })
-  })
-})
-
-describe('MIDI Sustain Pedal Event command-plan correspondence', () => {
-  it('fails closed when a plan changes the Add payload or reorders collection removal', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const addPreparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, createAddCommand(store)),
-    )
-    if (addPreparation.command.type !== PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD) {
-      throw new Error('Expected a normalized Sustain Pedal Event Add command')
-    }
-    const wrongAddPlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
-        sourceId: addPreparation.command.sourceId,
-        after: createMidiSustainPedalEventRecord({
-          ...addPreparation.command.event,
-          value: parseMidiControlValue(64),
-        }),
-      },
-    ])
-    expect(() => createProjectCommitCandidate(addPreparation.command, wrongAddPlan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
-
-    const removePreparation = requireReadyProjectCommandPreparation(
-      prepareProjectCommand(store, createRemoveCommand(store)),
-    )
-    if (removePreparation.command.type !== PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE) {
-      throw new Error('Expected a normalized Sustain Pedal Event Remove command')
-    }
-    const reorderedRemovePlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalUp,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
-      },
-    ])
-    expect(() =>
-      createProjectCommitCandidate(removePreparation.command, reorderedRemovePlan),
-    ).toThrowError(expect.objectContaining({ code: 'command-plan-mismatch' }))
   })
 })
 

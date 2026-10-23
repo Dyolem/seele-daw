@@ -298,16 +298,13 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
     expect(store.modelRevision).toBe(before)
   })
 
-  it('binds the aggregate plan to every normalized Record reference', () => {
+  it('rejects an aggregate plan that misses part of the Track graph', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const preparation = prepareProjectCommand(store, createCommand(store))
 
     if (preparation.status !== 'ready') throw new Error('Expected ready collection command')
 
-    expect(() => createProjectCommitCandidate(createCommand(store), preparation.plan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
     expect(() => createProjectCommitCandidate(preparation.command, preparation.plan)).not.toThrow()
 
     const incompletePlan = createMutationPlan(

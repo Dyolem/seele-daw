@@ -218,9 +218,6 @@ describe('AddMidiClipWithNoteCommand preparation', () => {
         before: preparation.command.source,
       },
     ])
-    expect(() => createProjectCommitCandidate(command, preparation.plan)).toThrowError(
-      expect.objectContaining({ code: 'command-plan-mismatch' }),
-    )
     expect(() => createProjectCommitCandidate(preparation.command, preparation.plan)).not.toThrow()
   })
 

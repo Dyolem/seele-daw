@@ -1,34 +1,14 @@
 <script setup lang="ts">
-import {
-  PROJECT_PPQ,
-  ZERO_TICK,
-  parsePositiveTick,
-  parseProjectId,
-  parseTick,
-  type ProjectId,
-  type Tick,
-} from '@seele-daw/project-core'
-import {
-  AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
-  deriveAudibleMidiTimelineRange,
-} from '@seele-daw/playback'
+import { parseProjectId, parseTick, type ProjectId } from '@seele-daw/project-core'
 import { computed, onBeforeUnmount, onUnmounted, shallowRef, watch } from 'vue'
 import { isNavigationFailure, useRouter } from 'vue-router'
-import {
-  createProjectPianoRollPresentation,
-  createProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { useProjectWorkbenchMidiImport } from '@/features/project-workspace/actions/use-project-workbench-midi-import'
 import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
-import { createProjectMidiClipPresentations } from '@/features/project-workspace/project-clip-presentation'
 import { provideTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
-import {
-  useProjectWorkbenchSelectionStore,
-  type ProjectWorkbenchClipSelectionCandidate,
-} from '@/features/project-workspace/project-workbench-selection-store'
-import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
+import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useWorkspacePresentation } from '@/features/project-workspace/use-workspace-presentation'
 import { formatProjectTimelineTime } from '@/features/project-workspace/timeline/presentation'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
@@ -41,7 +21,6 @@ import {
 } from '@/workbench/actions/studio-action'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 import { WORKBENCH_CONTEXT } from '@/features/project-workspace/actions/project-workbench-actions'
-import { resolveInitialBarRange } from '@/workbench/edits/bar-range'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   type FailedProjectEntryResolution,
@@ -52,19 +31,6 @@ import { useStudio } from '@/workbench/studio-services'
 const props = defineProps<{
   readonly projectId: string
 }>()
-
-const DEFAULT_BAR_SPAN_TICK = parsePositiveTick(PROJECT_PPQ * 4)
-const DEFAULT_TIMELINE_END_TICK = parseTick(
-  DEFAULT_BAR_SPAN_TICK * AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
-)
-
-interface ProjectPresentation {
-  readonly barSpanTick: Tick
-  readonly projectId: ProjectId | null
-  readonly projectName: string
-  readonly timeSignatureDenominator: number
-  readonly timeSignatureNumerator: number
-}
 
 const studio = useStudio()
 const { activeProject, state } = studio.project
@@ -83,13 +49,6 @@ const failure = shallowRef<FailedProjectEntryResolution | null>(null)
 const isOpening = shallowRef(false)
 const workbenchShell = shallowRef<ProjectWorkbenchWorkspaceHandle | null>(null)
 const isShowingProjects = shallowRef(false)
-const projectPresentation = shallowRef<ProjectPresentation>({
-  barSpanTick: DEFAULT_BAR_SPAN_TICK,
-  projectId: null,
-  projectName: 'Untitled Project',
-  timeSignatureDenominator: 4,
-  timeSignatureNumerator: 4,
-})
 let requestGeneration = 0
 let isUnmounted = false
 
@@ -108,47 +67,8 @@ const midiImport = useProjectWorkbenchMidiImport({
   getPlacementTick: () => parseTick(Math.round(playbackVisualPosition.value.positionTick)),
 })
 const midiFileInput = midiImport.input
-const projectSnapshot = computed(() => readyProject.value?.session.getSnapshot() ?? null)
-const timelineEndTick = computed(() => {
-  const snapshot = projectSnapshot.value
-  return snapshot === null
-    ? DEFAULT_TIMELINE_END_TICK
-    : deriveAudibleMidiTimelineRange(snapshot).timelineEndTick
-})
-const trackPresentations = computed(() => {
-  const snapshot = projectSnapshot.value
-  return snapshot === null ? Object.freeze([]) : createProjectTrackPresentations(snapshot)
-})
-const clipPresentations = computed(() => {
-  const snapshot = projectSnapshot.value
-  return snapshot === null ? Object.freeze([]) : createProjectMidiClipPresentations(snapshot)
-})
-const pianoRollPresentation = computed(() => {
-  const snapshot = projectSnapshot.value
-  const selectedClipId = workbenchSelection.selectedClipId
-  return snapshot === null || selectedClipId === null
-    ? null
-    : createProjectPianoRollPresentation(snapshot, selectedClipId)
-})
-const pianoRollTrackPresentation = computed(() => {
-  const snapshot = projectSnapshot.value
-  const selectedTrackId = workbenchSelection.selectedTrackId
-  return snapshot === null || selectedTrackId === null
-    ? null
-    : createProjectPianoRollTrackPresentation(
-        snapshot,
-        selectedTrackId,
-        workbenchSelection.selectedClipId,
-      )
-})
-const clipSelectionCandidates = computed((): readonly ProjectWorkbenchClipSelectionCandidate[] => {
-  return Object.freeze(
-    clipPresentations.value.map((clip) =>
-      Object.freeze({ clipId: clip.id, trackId: clip.trackId }),
-    ),
-  )
-})
-
+const { project, timelineEndTick, tracks, clips, pianoRoll, pianoRollTrack } =
+  useWorkspacePresentation(readyProject)
 const playbackTime = computed(() =>
   formatProjectTimelineTime(playbackVisualPosition.value.positionProjectSecond),
 )
@@ -290,48 +210,6 @@ watch(
   { immediate: true },
 )
 
-watch(
-  () => readyProject.value?.projectId ?? null,
-  (projectId) => {
-    const ready = readyProject.value
-    if (projectId === null || ready === null) {
-      projectPresentation.value = {
-        barSpanTick: DEFAULT_BAR_SPAN_TICK,
-        projectId: null,
-        projectName: 'Untitled Project',
-        timeSignatureDenominator: 4,
-        timeSignatureNumerator: 4,
-      }
-      return
-    }
-
-    const snapshot = ready.session.getSnapshot()
-    const timeSignature = snapshot.timeSignatureEvents[0]
-    projectPresentation.value = {
-      barSpanTick: resolveInitialBarRange(snapshot, ZERO_TICK).spanTick,
-      projectId,
-      projectName: snapshot.project.name,
-      timeSignatureDenominator: timeSignature?.denominator ?? 4,
-      timeSignatureNumerator: timeSignature?.numerator ?? 4,
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  [() => readyProject.value?.projectId ?? null, trackPresentations, clipSelectionCandidates],
-  ([projectId, tracks, clips]) => {
-    if (projectId === null) return
-
-    workbenchSelection.reconcileProject(
-      projectId,
-      tracks.map((track) => track.id),
-      clips,
-    )
-  },
-  { immediate: true },
-)
-
 onUnmounted(() => {
   if (playbackCanReturnToLastStartPosition.value) {
     projectPlayback.returnToLastStartPosition()
@@ -359,22 +237,22 @@ onUnmounted(() => {
     v-if="readyProject"
     ref="workbenchShell"
     :action-controls="actionControls"
-    :bar-span-tick="projectPresentation.barSpanTick"
-    :clips="clipPresentations"
+    :bar-span-tick="project.barSpanTick"
+    :clips="clips"
     :is-dirty="readyProject.isDirty"
-    :piano-roll-presentation="pianoRollPresentation"
-    :piano-roll-track-presentation="pianoRollTrackPresentation"
+    :piano-roll-presentation="pianoRoll"
+    :piano-roll-track-presentation="pianoRollTrack"
     :playback-feedback="playbackState.feedback?.message ?? null"
     :playback-time="playbackTime"
     :project-id="readyProject.projectId"
-    :project-name="projectPresentation.projectName"
+    :project-name="project.projectName"
     :project-session="readyProject.session"
     :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
     :save-status="readyProject.saveStatus"
-    :time-signature-denominator="projectPresentation.timeSignatureDenominator"
-    :time-signature-numerator="projectPresentation.timeSignatureNumerator"
+    :time-signature-denominator="project.timeSignatureDenominator"
+    :time-signature-numerator="project.timeSignatureNumerator"
     :timeline-end-tick="timelineEndTick"
-    :tracks="trackPresentations"
+    :tracks="tracks"
   />
 
   <main v-else class="project-route-state" aria-labelledby="project-open-title">

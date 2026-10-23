@@ -136,7 +136,9 @@ onBeforeUnmount(dispose)
       class="piano-roll-sustain-pedal-lane"
       :class="{ 'piano-roll-sustain-pedal-lane--pencil': props.pencilEnabled }"
       :aria-label="props.label"
-      :data-interaction-status="interactionState.status"
+      :data-interaction-phase="
+        interactionState.awaitingAuthority ? 'awaiting-authority' : interactionState.phase
+      "
       role="group"
       tabindex="0"
       @focusin="emit('requestFocus')"

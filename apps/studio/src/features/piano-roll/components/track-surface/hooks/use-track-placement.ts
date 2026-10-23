@@ -1,5 +1,5 @@
 import { useTrackPlacementPreview } from './use-track-placement-preview'
-import { TrackPlacementSession } from '@/features/piano-roll/components/track-surface/interaction/track-placement-session'
+import { createTrackPlacementSession } from '@/features/piano-roll/components/track-surface/interaction/track-placement-session'
 import { resolveTrackPlacement } from '@/features/piano-roll/components/track-surface/interaction/track-placement-operation'
 import type {
   TrackPlacementConfiguration,
@@ -15,6 +15,7 @@ import { computed, shallowRef, watch, type ShallowRef } from 'vue'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
+  completeGesture,
   createPianoRollPointerInputAdapter,
   resolvePianoRollDomNoteHit,
   type PianoRollGrid,
@@ -63,14 +64,10 @@ export function useTrackPlacement({
   let disposed = false
   let beginning = false
   let captureBounds: DOMRect | null = null
-  const state = shallowRef<TrackPlacementSession['state']>({
-    awaitingAuthority: false,
-    interactionId: null,
-    pointerId: null,
-    preview: null,
-  })
+  const session = createTrackPlacementSession()
+  const state = shallowRef(session.state)
   let projectedRevision = getPresentation().readModel.modelRevision
-  const session = new TrackPlacementSession((next) => {
+  session.subscribe((next) => {
     const previous = state.value
     state.value = next
     placementPreview.value = next.preview
@@ -141,39 +138,40 @@ export function useTrackPlacement({
   }
 
   function complete(intent: TrackPlacementIntent): void {
-    if (!session.claimCompletion(intent.interactionId)) return
-    let committed = false
-    try {
-      if (intent.target.session !== getSession()) return
-      if (intent.type === 'activate-clip') {
-        activateClip(intent.clipId)
-        return
-      }
-      const { preview, target } = intent
-      if (preview.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED) {
-        failureMessage.value = preview.placement.message
-        toasts.warning('MIDI note placement needs attention', preview.placement.message)
-        return
-      }
-      const result = notes.placeOnTrack({
-        expectedSession: target.session,
-        activeClipId: target.readModel.activeClipId,
-        barSpanTick: target.barSpanTick,
-        baseRevision: target.readModel.modelRevision,
-        noteDurationTick: preview.placement.noteDurationTick,
-        pitch: preview.pitch,
-        projectStartTick: preview.placement.projectStartTick,
-        trackId: target.readModel.trackId,
-      })
-      committed = true
-      session.resolveCommit(intent.interactionId, result.commit.modelRevision, projectedRevision)
-      acceptPlacedClip(result.clipId)
-      failureMessage.value = null
-    } catch (cause) {
-      reportFailure(cause, committed)
-    } finally {
-      session.finish(intent.interactionId)
-    }
+    let placedClipId: ClipId | null = null
+    completeGesture(session, intent.interactionId, {
+      apply: () => {
+        if (intent.target.session !== getSession()) return null
+        if (intent.type === 'activate-clip') {
+          activateClip(intent.clipId)
+          return null
+        }
+        const { preview, target } = intent
+        if (preview.placement.status === PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED) {
+          failureMessage.value = preview.placement.message
+          toasts.warning('MIDI note placement needs attention', preview.placement.message)
+          return null
+        }
+        const placed = notes.placeOnTrack({
+          expectedSession: target.session,
+          activeClipId: target.readModel.activeClipId,
+          barSpanTick: target.barSpanTick,
+          baseRevision: target.readModel.modelRevision,
+          noteDurationTick: preview.placement.noteDurationTick,
+          pitch: preview.pitch,
+          projectStartTick: preview.placement.projectStartTick,
+          trackId: target.readModel.trackId,
+        })
+        placedClipId = placed.clipId
+        return placed.commit
+      },
+      authorityRevision: () => projectedRevision,
+      afterCommit: () => {
+        if (placedClipId !== null) acceptPlacedClip(placedClipId)
+        failureMessage.value = null
+      },
+      onFailure: reportFailure,
+    })
   }
 
   function stableMapping(): boolean {
@@ -208,18 +206,21 @@ export function useTrackPlacement({
       }
       const bounds = canvasHost.value?.getBoundingClientRect() ?? null
       beginning = true
+      let failure: unknown = null
       try {
-        session.handlePointerInput(input, current)
+        failure = session.handlePointerInput(input, current).failure
       } finally {
         beginning = false
       }
-      if (session.state.pointerId !== null) captureBounds = bounds
+      if (failure !== null) reportFailure(failure)
+      else if (session.state.pointerId !== null) captureBounds = bounds
       else pointerInputAdapter?.cancel()
       return
     }
     if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL && !stableMapping()) return
-    const intent = session.handlePointerInput(input)
-    if (intent !== null) complete(intent)
+    const { failure, intent } = session.handlePointerInput(input)
+    if (failure !== null) reportFailure(failure)
+    else if (intent !== null) complete(intent)
   }
 
   function clearPreview(): void {

@@ -1,4 +1,4 @@
-import type { EditorPointerInput, InteractionId } from '@seele-daw/editor'
+import type { EditorPointerInput, GestureState, InteractionId } from '@seele-daw/editor'
 import type {
   ModelRevision,
   ProjectSession,
@@ -44,9 +44,4 @@ export interface TempoTrackDragPreview extends TempoTrackEventPreview {
   readonly axis: ProjectTempoTrackDragAxis | null
 }
 
-export interface TempoTrackDragState {
-  readonly awaitingAuthority: boolean
-  readonly interactionId: InteractionId | null
-  readonly pointerId: number | null
-  readonly preview: TempoTrackDragPreview | null
-}
+export type TempoTrackDragState = GestureState<TempoTrackDragPreview>

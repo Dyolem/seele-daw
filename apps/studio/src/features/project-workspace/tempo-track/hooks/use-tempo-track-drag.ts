@@ -1,11 +1,12 @@
 import {
   EDITOR_POINTER_INPUT_PHASE,
+  completeGesture,
   createEditorPointerInputAdapter,
   type EditorPointerInputAdapter,
 } from '@seele-daw/editor'
 import { type TempoEventId, type TempoEventRecord, type Tick } from '@seele-daw/project-core'
 import { shallowRef, watch, type ShallowRef } from 'vue'
-import { TempoTrackDragSession } from '@/features/project-workspace/tempo-track/interaction/tempo-track-drag-session'
+import { createTempoTrackDragSession } from '@/features/project-workspace/tempo-track/interaction/tempo-track-drag-session'
 import { useTempoEventActions } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
 import type { ProjectTempoTrackScale } from '@/features/project-workspace/tempo-track/types/tempo-track'
 import type {
@@ -46,18 +47,14 @@ export function useTempoTrackDrag({
 }) {
   const actions = useTempoEventActions()
   const toasts = useUiToastStore()
-  const state = shallowRef<TempoTrackDragSession['state']>({
-    awaitingAuthority: false,
-    interactionId: null,
-    pointerId: null,
-    preview: null,
-  })
+  const session = createTempoTrackDragSession()
+  const state = shallowRef(session.state)
   let disposed = false
   let adapter: EditorPointerInputAdapter | null = null
   let observer: ResizeObserver | null = null
   let captureBounds: DOMRect | null = null
   let projectedRevision = actions.projectedRevision
-  const session = new TempoTrackDragSession((next) => {
+  session.subscribe((next) => {
     const previous = state.value
     if (next.interactionId !== null && next.preview !== null) {
       if (!projection.publishPreview(next.interactionId, next.preview))
@@ -117,24 +114,14 @@ export function useTempoTrackDrag({
   }
 
   function complete(intent: TempoTrackDragIntent): void {
-    if (!session.claimCompletion(intent.interactionId)) return
-    let committed = false
-    try {
-      if (actions.session !== intent.target.expectedSession || props.editingDisabled) return
-      const commit = actions.commitDrag(intent)
-      if (commit !== null) {
-        committed = true
-        session.resolveCommit(
-          intent.interactionId,
-          commit.modelRevision,
-          projectedRevision ?? intent.target.baseRevision,
-        )
-      }
-    } catch (cause) {
-      reportFailure(cause, committed)
-    } finally {
-      session.finish(intent.interactionId)
-    }
+    completeGesture(session, intent.interactionId, {
+      apply: () =>
+        actions.session === intent.target.expectedSession && !props.editingDisabled
+          ? actions.commitDrag(intent)
+          : null,
+      authorityRevision: () => projectedRevision ?? intent.target.baseRevision,
+      onFailure: reportFailure,
+    })
   }
 
   function onInput(input: TempoTrackPointerInput): void {
@@ -152,7 +139,7 @@ export function useTempoTrackDrag({
         adapter?.cancel()
         return
       }
-      session.handlePointerInput(input, {
+      const { failure } = session.handlePointerInput(input, {
         session: projectSession,
         projectedRevision,
         mapping: {
@@ -162,14 +149,16 @@ export function useTempoTrackDrag({
           timelineEndTick: props.timelineEndTick,
         },
       })
+      if (failure !== null) reportFailure(failure)
       // Begin may retire a previous handoff, so record the new mapping after it returns.
-      if (session.state.pointerId !== null) captureBounds = bounds
+      else if (session.state.pointerId !== null) captureBounds = bounds
       else adapter?.cancel()
       return
     }
     if (input.phase !== EDITOR_POINTER_INPUT_PHASE.CANCEL && !hasStableMapping()) return
-    const intent = session.handlePointerInput(input)
-    if (intent !== null) complete(intent)
+    const { failure, intent } = session.handlePointerInput(input)
+    if (failure !== null) reportFailure(failure)
+    else if (intent !== null) complete(intent)
   }
 
   const stopInvalidation = watch(

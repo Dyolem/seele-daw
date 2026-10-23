@@ -62,10 +62,6 @@ export function createPianoRollNoteOperation(
   ) {
     throw new Error('The Project changed while the Note interaction was starting.')
   }
-  let kind: 'note-resize' | 'note-move' | null = null
-  if (resize !== null) kind = 'note-resize'
-  else if (move !== null) kind = 'note-move'
-
   function resolve(
     input: PianoRollPointerInput,
     completing: boolean,
@@ -160,13 +156,12 @@ export function createPianoRollNoteOperation(
     }
   }
 
-  const operation: InteractionOperation<
+  return {
+    update: (input) => resolve(input, false).preview,
+    complete: (input) => resolve(input, true),
+  } satisfies InteractionOperation<
     PianoRollPointerInput,
     PianoRollOperationPreview,
     PianoRollOperationResult
-  > = {
-    update: (input) => resolve(input, false).preview,
-    complete: (input) => resolve(input, true),
-  }
-  return { kind, operation }
+  >
 }

@@ -1672,7 +1672,7 @@ describe('ProjectPianoRollSurface', () => {
     expect(
       fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
     ).toContainEqual({ ...beforeMove, tick: beforeMove.tick + horizontalDeltaTick })
-    expect(lane.attributes('data-interaction-status')).toBe('awaiting-authority')
+    expect(lane.attributes('data-interaction-phase')).toBe('awaiting-authority')
     expect(marker.classes()).toContain('piano-roll-sustain-pedal-lane__event--selected')
 
     let refreshed = createProjectPianoRollPresentation(
@@ -1684,7 +1684,7 @@ describe('ProjectPianoRollSurface', () => {
     }
     await wrapper.setProps({ presentation: refreshed })
     await nextTick()
-    expect(lane.attributes('data-interaction-status')).toBe('idle')
+    expect(lane.attributes('data-interaction-phase')).toBe('idle')
     expect(wrapper.get(`[data-piano-roll-note-id="${noteId}"]`).classes()).toContain(
       'sd-piano-roll-dom-note--selected',
     )

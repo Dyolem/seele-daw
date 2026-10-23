@@ -1,8 +1,8 @@
 import type { ModelRevision, NoteId, ProjectSession } from '@seele-daw/project-core'
+import type { GestureState } from '#internal/common/interaction/gesture-session'
 import type { InteractionId } from '#internal/common/interaction/interaction-session'
 import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
 import type { PianoRollGrid } from '#internal/common/piano-roll/piano-roll-grid'
-import type { PianoRollPointerInput } from '#internal/common/piano-roll/piano-roll-input'
 import type { PianoRollViewport } from '#internal/common/piano-roll/piano-roll-viewport'
 import type {
   PianoRollNoteMoveGesture,
@@ -14,11 +14,13 @@ import type {
 } from '#internal/common/piano-roll/operations/piano-roll-note-resize-interaction'
 import type { PianoRollSelectionChange } from '#internal/common/piano-roll/operations/piano-roll-select-interaction'
 import type { PianoRollNotePlacement } from '#internal/common/piano-roll/operations/piano-roll-pencil-interaction'
+import type { PianoRollOperationPreview } from './piano-roll-note-operation'
 
 export interface PianoRollInteractionTarget {
   readonly session: Pick<ProjectSession, 'query' | 'modelRevision'>
   readonly context: PianoRollClipContext
   readonly baseRevision: ModelRevision
+  readonly viewport: PianoRollViewport | null
 }
 
 interface PianoRollInteractionIdentity {
@@ -33,20 +35,6 @@ export const PIANO_ROLL_INTERACTION_TOOL = {
 
 export type PianoRollInteractionTool =
   (typeof PIANO_ROLL_INTERACTION_TOOL)[keyof typeof PIANO_ROLL_INTERACTION_TOOL]
-
-export const PIANO_ROLL_INTERACTION_STATUS = {
-  AWAITING_AUTHORITY: 'awaiting-authority',
-  COMPLETING: 'completing',
-  COMMITTING_NOTE_MOVE: 'committing-note-move',
-  COMMITTING_NOTE_RESIZE: 'committing-note-resize',
-  IDLE: 'idle',
-  MOVING_NOTE: 'moving-note',
-  PRESSING: 'pressing',
-  RESIZING_NOTE: 'resizing-note',
-} as const
-
-export type PianoRollInteractionStatus =
-  (typeof PIANO_ROLL_INTERACTION_STATUS)[keyof typeof PIANO_ROLL_INTERACTION_STATUS]
 
 export const PIANO_ROLL_INTERACTION_INTENT = {
   ADD_NOTE: 'note.add',
@@ -98,38 +86,4 @@ export interface PianoRollInteractionOutcome {
   readonly intent: PianoRollInteractionIntent | null
 }
 
-export interface PianoRollInteractionState {
-  readonly interactionId: InteractionId | null
-  readonly activeGesture: 'note-move' | 'note-resize' | null
-  readonly movePreview: PianoRollNoteMovePreview | null
-  readonly pointerId: number | null
-  readonly resizePreview: PianoRollNoteResizePreview | null
-  readonly status: PianoRollInteractionStatus
-}
-
-export interface PianoRollInteractionSessionObserver {
-  onStateChange(state: PianoRollInteractionState): void
-}
-
-export interface ResolvePianoRollCommitInput {
-  readonly interactionId: InteractionId
-  readonly authorityRevision: ModelRevision
-  readonly commitRevision: ModelRevision
-}
-
-export interface PianoRollInteractionSession {
-  readonly state: PianoRollInteractionState
-
-  cancel(): boolean
-  dispose(): void
-  handlePointerInput(
-    input: PianoRollPointerInput,
-    configuration?: PianoRollInteractionConfiguration,
-  ): PianoRollInteractionOutcome
-  notifyAuthorityRevision(revision: ModelRevision): void
-  claimCompletion(interactionId: InteractionId): boolean
-  resolveCommit(input: ResolvePianoRollCommitInput): void
-  finish(interactionId: InteractionId): void
-  notifyViewport(viewport: PianoRollViewport | null): void
-  subscribe(observer: PianoRollInteractionSessionObserver): () => void
-}
+export type PianoRollInteractionState = GestureState<PianoRollOperationPreview>

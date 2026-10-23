@@ -37,8 +37,8 @@ export function useNoteRendering({
   const noteRenderer = shallowRef<PianoRollNoteRenderer | null>(null)
   let disposed = false
   const renderFailureMessage = shallowRef<string | null>(null)
-  const movePreview = computed(() => interaction.state.value.movePreview)
-  const resizePreview = computed(() => interaction.state.value.resizePreview)
+  const movePreview = computed(() => interaction.state.value.preview?.move ?? null)
+  const resizePreview = computed(() => interaction.state.value.preview?.resize ?? null)
   const snapGuideStyle = computed(() => {
     const snapGuideTick = resizePreview.value?.snapGuideTick ?? movePreview.value?.snapGuideTick
     const viewport = noteState.value?.viewport

@@ -19,11 +19,25 @@ import {
   type PianoRollPointerInput,
 } from '@seele-daw/editor'
 import { describe, expect, it, vi } from 'vitest'
-import { TrackPlacementSession } from '@/features/piano-roll/components/track-surface/interaction/track-placement-session'
+import {
+  createTrackPlacementSession,
+  type TrackPlacementSession,
+} from '@/features/piano-roll/components/track-surface/interaction/track-placement-session'
 import type {
   TrackPlacementConfiguration,
   TrackPlacementState,
 } from '@/features/piano-roll/components/track-surface/types/track-placement'
+
+/** Feeds one input; a failure the session reports is rethrown, as the placement hook reports it. */
+function pointer(
+  session: TrackPlacementSession,
+  event: PianoRollPointerInput,
+  configuration?: TrackPlacementConfiguration,
+) {
+  const { failure, intent } = session.handlePointerInput(event, configuration)
+  if (failure !== null) throw failure
+  return intent
+}
 
 function fixture() {
   const project = createInitialProjectSession({
@@ -33,7 +47,8 @@ function fixture() {
     timeSignatureEventId: parseTimeSignatureEventId('meter'),
   })
   const observer = vi.fn<(state: TrackPlacementState) => void>()
-  const session = new TrackPlacementSession(observer)
+  const session = createTrackPlacementSession()
+  session.subscribe(observer)
   const configuration: TrackPlacementConfiguration = {
     session: project,
     readModel: {
@@ -92,11 +107,11 @@ describe('TrackPlacementSession', () => {
   it('freezes tool, grid, target and original point, and claims completion once', () => {
     const { session, configuration, begin, end } = fixture()
     const mutable = { ...configuration, grid: { ...configuration.grid } }
-    session.handlePointerInput(begin, mutable)
+    pointer(session, begin, mutable)
     mutable.tool = 'cursor'
     mutable.snapEnabled = false
     mutable.grid.subdivisionSpanTick = parsePositiveTick(960)
-    const intent = session.handlePointerInput({
+    const intent = pointer(session, {
       ...end,
       originPosition: { xCssPixel: 750, yCssPixel: 0 },
     })
@@ -110,7 +125,7 @@ describe('TrackPlacementSession', () => {
     if (intent === null) throw new Error('Expected placement')
     expect(session.claimCompletion(intent.interactionId)).toBe(true)
     expect(session.claimCompletion(intent.interactionId)).toBe(false)
-    expect(session.handlePointerInput(end)).toBeNull()
+    expect(pointer(session, end)).toBeNull()
     session.finish(intent.interactionId)
     session.dispose()
   })
@@ -118,12 +133,12 @@ describe('TrackPlacementSession', () => {
     'rejects authority changes before notification (completed: %s)',
     async (completed) => {
       const { session, configuration, begin, end, edit } = fixture()
-      session.handlePointerInput(begin, configuration)
+      pointer(session, begin, configuration)
       const id = session.state.interactionId
       if (id === null) throw new Error('Expected interaction')
-      if (completed) session.handlePointerInput(end)
+      if (completed) pointer(session, end)
       edit()
-      expect(session.handlePointerInput(end)).toBeNull()
+      expect(pointer(session, end)).toBeNull()
       expect(session.claimCompletion(id)).toBe(false)
       await Promise.resolve()
       expect(session.state.interactionId).toBeNull()
@@ -131,36 +146,48 @@ describe('TrackPlacementSession', () => {
   )
   it('keeps preview until projection and rejects old captures and replies during the next gesture', () => {
     const { session, configuration, begin, end } = fixture()
-    session.handlePointerInput(begin, configuration)
-    const intent = session.handlePointerInput(end)
+    pointer(session, begin, configuration)
+    const intent = pointer(session, end)
     if (intent === null) throw new Error('Expected placement')
     session.claimCompletion(intent.interactionId)
-    session.resolveCommit(intent.interactionId, 1 as ModelRevision, 0 as ModelRevision)
+    session.resolveCommit({
+      interactionId: intent.interactionId,
+      commitRevision: 1 as ModelRevision,
+      authorityRevision: 0 as ModelRevision,
+    })
     expect(session.state.awaitingAuthority).toBe(true)
     expect(session.state.preview).not.toBeNull()
     const next = { ...begin, captureId: Symbol('next') }
-    session.handlePointerInput(next, configuration)
+    pointer(session, next, configuration)
     const id = session.state.interactionId
-    expect(session.handlePointerInput(end)).toBeNull()
-    session.resolveCommit(intent.interactionId, 1 as ModelRevision, 1 as ModelRevision)
+    expect(pointer(session, end)).toBeNull()
+    session.resolveCommit({
+      interactionId: intent.interactionId,
+      commitRevision: 1 as ModelRevision,
+      authorityRevision: 1 as ModelRevision,
+    })
     session.finish(intent.interactionId)
     expect(session.state.interactionId).toBe(id)
-    const current = session.handlePointerInput({ ...end, captureId: next.captureId })
+    const current = pointer(session, { ...end, captureId: next.captureId })
     if (current === null) throw new Error('Expected new placement')
     session.claimCompletion(current.interactionId)
     session.notifyAuthorityRevision(1 as ModelRevision)
-    session.resolveCommit(current.interactionId, 1 as ModelRevision, 0 as ModelRevision)
+    session.resolveCommit({
+      interactionId: current.interactionId,
+      commitRevision: 1 as ModelRevision,
+      authorityRevision: 0 as ModelRevision,
+    })
     expect(session.state.preview).toBeNull()
   })
   it('cancels dragged clicks and ignores input after disposal', () => {
     const { session, configuration, begin, end } = fixture()
-    session.handlePointerInput(begin, configuration)
-    expect(session.handlePointerInput({ ...end, hasExceededDragThreshold: true })).toBeNull()
+    pointer(session, begin, configuration)
+    expect(pointer(session, { ...end, hasExceededDragThreshold: true })).toBeNull()
     expect(session.state.interactionId).toBeNull()
-    session.handlePointerInput(begin, configuration)
+    pointer(session, begin, configuration)
     session.dispose()
     session.dispose()
-    expect(session.handlePointerInput(end)).toBeNull()
+    expect(pointer(session, end)).toBeNull()
   })
   it('closes failed projections and ignores a retired subscription callback', () => {
     const { session, configuration, begin, end, observer } = fixture()
@@ -174,11 +201,11 @@ describe('TrackPlacementSession', () => {
         return unsubscribe
       }),
     }
-    session.handlePointerInput(begin, { ...configuration, session: authority })
+    pointer(session, begin, { ...configuration, session: authority })
     session.cancel()
     expect(unsubscribe).toHaveBeenCalledOnce()
     const retired = oldObserver
-    session.handlePointerInput({ ...begin, captureId: Symbol('next') }, configuration)
+    pointer(session, { ...begin, captureId: Symbol('next') }, configuration)
     const id = session.state.interactionId
     const committed = fixture().project.execute(
       createReplaceTempoEventBpmCommand({
@@ -198,9 +225,9 @@ describe('TrackPlacementSession', () => {
     observer.mockImplementationOnce(() => {
       throw new Error('Broken projection')
     })
-    expect(() => session.handlePointerInput(begin, configuration)).toThrow('Broken projection')
+    expect(() => pointer(session, begin, configuration)).toThrow('Broken projection')
     expect(session.state.interactionId).toBeNull()
-    expect(session.handlePointerInput(end)).toBeNull()
+    expect(pointer(session, end)).toBeNull()
     session.dispose()
   })
 })

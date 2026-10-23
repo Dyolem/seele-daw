@@ -1,14 +1,11 @@
 import {
   PIANO_ROLL_INTERACTION_INTENT,
   applyPianoRollSelectInteraction,
-  type PianoRollAddNoteIntent,
+  completeGesture,
   type PianoRollEditorSession,
   type PianoRollInteractionIntent,
-  type PianoRollMoveNotesIntent,
-  type PianoRollResizeNoteIntent,
-  type PianoRollResolveSelectionIntent,
 } from '@seele-daw/editor'
-import type { ModelRevision, NoteId } from '@seele-daw/project-core'
+import type { NoteId, ProjectCommit } from '@seele-daw/project-core'
 
 import type {
   ProjectPianoRollIntentHandler,
@@ -16,245 +13,162 @@ import type {
 } from '@/features/piano-roll/types/piano-roll-intent'
 
 function describeCause(cause: unknown, fallback: string): string {
-  if (cause instanceof Error && cause.message.trim().length > 0) {
-    return cause.message
-  }
+  if (cause instanceof Error && cause.message.trim().length > 0) return cause.message
   return fallback
 }
 
-function acknowledgeCommit(
-  dependencies: ProjectPianoRollIntentHandlerDependencies,
-  intent: PianoRollInteractionIntent,
-  commitRevision: ModelRevision,
-): boolean {
-  try {
-    dependencies.interactionSession.resolveCommit({
-      interactionId: intent.interactionId,
-      authorityRevision: dependencies.getAuthorityRevision() ?? intent.target.baseRevision,
-      commitRevision,
-    })
-    return true
-  } catch (cause) {
-    const message = describeCause(
-      cause,
-      'The Note edit was committed, but its preview could not be updated.',
-    )
-    dependencies.setFailureMessage(message)
-    dependencies.reportWarning('MIDI note edit was committed but could not be displayed', message)
-    return false
-  }
+const REJECTIONS: Record<PianoRollInteractionIntent['type'], readonly [string, string]> = {
+  [PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE]: [
+    'MIDI note could not be added',
+    'The Project rejected the MIDI Note command. Please try again.',
+  ],
+  [PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES]: [
+    'MIDI notes could not be moved',
+    'The Project rejected the MIDI Note move. Please try again.',
+  ],
+  [PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE]: [
+    'MIDI note could not be resized',
+    'The Project rejected the MIDI Note resize. Please try again.',
+  ],
+  [PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION]: [
+    'MIDI notes could not be selected',
+    'The Piano Roll selection could not be updated.',
+  ],
 }
 
-function selectOnlyCommittedNote(
-  dependencies: ProjectPianoRollIntentHandlerDependencies,
-  editorSession: PianoRollEditorSession,
-  noteId: NoteId,
-  failureTitle: string,
-  failureFallback: string,
-): boolean {
-  try {
-    editorSession.selectOnly(noteId)
-    if (editorSession.state.selectedNoteIds.includes(noteId)) return true
-    dependencies.setFailureMessage(failureFallback)
-    dependencies.reportWarning(failureTitle, failureFallback)
-  } catch (cause) {
-    const message = describeCause(cause, failureFallback)
-    dependencies.setFailureMessage(message)
-    dependencies.reportWarning(failureTitle, message)
-  }
-  return false
-}
-
-function handleSelectionIntent(
-  dependencies: ProjectPianoRollIntentHandlerDependencies,
-  intent: PianoRollResolveSelectionIntent,
-): void {
-  const editorSession = dependencies.getEditorSession()
-  if (editorSession === null) return
-
-  try {
-    applyPianoRollSelectInteraction(editorSession, intent.selection)
-    dependencies.setFailureMessage(null)
-  } catch (cause) {
-    dependencies.setFailureMessage(
-      describeCause(cause, 'The Piano Roll selection could not be updated.'),
-    )
-  }
-}
-
-function handleAddNoteIntent(
-  dependencies: ProjectPianoRollIntentHandlerDependencies,
-  intent: PianoRollAddNoteIntent,
-): void {
-  const editorSession = dependencies.getEditorSession()
-  if (editorSession === null) {
-    const message = 'The Piano Roll is not ready to place a MIDI Note.'
-    dependencies.setFailureMessage(message)
-    dependencies.reportDanger('MIDI note could not be added', message)
-    return
-  }
-
-  let addedNoteId: NoteId
-  try {
-    const result = dependencies.notes.add({
-      expectedSession: intent.target.session,
-      baseRevision: intent.target.baseRevision,
-      clipId: intent.target.context.clipId,
-      clipStartTick: intent.placement.clipStartTick,
-      pitch: intent.placement.pitch,
-      requestedDurationTick: intent.placement.requestedDurationTick,
-    })
-    addedNoteId = result.noteId
-    if (!acknowledgeCommit(dependencies, intent, result.commit.modelRevision)) return
-  } catch (cause) {
-    const message = describeCause(
-      cause,
-      'The Project rejected the MIDI Note command. Please try again.',
-    )
-    dependencies.setFailureMessage(message)
-    dependencies.reportDanger('MIDI note could not be added', message)
-    return
-  }
-
-  if (
-    !selectOnlyCommittedNote(
-      dependencies,
-      editorSession,
-      addedNoteId,
-      'MIDI note was added but could not be selected',
-      'The MIDI Note was added, but its selection could not be restored.',
-    )
-  ) {
-    return
-  }
-
-  dependencies.setFailureMessage(null)
-}
-
-function handleMoveNotesIntent(
-  dependencies: ProjectPianoRollIntentHandlerDependencies,
-  intent: PianoRollMoveNotesIntent,
-): void {
-  const editorSession = dependencies.getEditorSession()
-  if (editorSession === null) {
-    return
-  }
-
-  try {
-    const preview = intent.preview
-    const commit =
-      preview.deltaTick === 0 && preview.deltaPitch === 0
-        ? null
-        : dependencies.notes.move({
-            baseRevision: intent.target.baseRevision,
-            expectedSession: intent.target.session,
-            clipId: intent.target.context.clipId,
-            deltaPitch: preview.deltaPitch,
-            deltaTick: preview.deltaTick,
-            noteIds: preview.movedNoteIds,
-          })
-
-    if (commit !== null) {
-      if (!acknowledgeCommit(dependencies, intent, commit.modelRevision)) return
-      if (
-        intent.gesture.selectOnlyOnCommit &&
-        !selectOnlyCommittedNote(
-          dependencies,
-          editorSession,
-          intent.gesture.anchorNoteId,
-          'MIDI notes were moved but selection could not be updated',
-          'The MIDI Notes were moved, but the target Note could not be selected.',
-        )
-      ) {
-        return
-      }
-    }
-    dependencies.setFailureMessage(null)
-  } catch (cause) {
-    const message = describeCause(
-      cause,
-      'The Project rejected the MIDI Note move. Please try again.',
-    )
-    dependencies.setFailureMessage(message)
-    dependencies.reportDanger('MIDI notes could not be moved', message)
-  }
-}
-
-function handleResizeNoteIntent(
-  dependencies: ProjectPianoRollIntentHandlerDependencies,
-  intent: PianoRollResizeNoteIntent,
-): void {
-  const editorSession = dependencies.getEditorSession()
-  if (editorSession === null) {
-    return
-  }
-
-  try {
-    const commit = dependencies.notes.resize({
-      baseRevision: intent.target.baseRevision,
-      expectedSession: intent.target.session,
-      clipId: intent.target.context.clipId,
-      durationTick: intent.preview.durationTick,
-      noteId: intent.preview.resizedNoteId,
-      sourceStartTick: intent.preview.sourceStartTick,
-    })
-
-    if (commit !== null) {
-      if (!acknowledgeCommit(dependencies, intent, commit.modelRevision)) return
-      if (
-        intent.gesture.selectOnlyOnCommit &&
-        !selectOnlyCommittedNote(
-          dependencies,
-          editorSession,
-          intent.preview.resizedNoteId,
-          'MIDI note was resized but could not be selected',
-          'The MIDI Note was resized, but its selection could not be restored.',
-        )
-      ) {
-        return
-      }
-    }
-    dependencies.setFailureMessage(null)
-  } catch (cause) {
-    const message = describeCause(
-      cause,
-      'The Project rejected the MIDI Note resize. Please try again.',
-    )
-    dependencies.setFailureMessage(message)
-    dependencies.reportDanger('MIDI note could not be resized', message)
-  }
-}
-
-/** Applies one Editor intent at the Studio command, selection and feedback boundary. */
+/** Applies one completed note gesture as a Project edit, then restores the editor selection. */
 export function createProjectPianoRollIntentHandler(
   dependencies: ProjectPianoRollIntentHandlerDependencies,
 ): ProjectPianoRollIntentHandler {
-  return (intent) => {
-    if (!dependencies.interactionSession.claimCompletion(intent.interactionId)) return
-    try {
-      const editorSession = dependencies.getEditorSession()
-      if (
-        dependencies.getSession() !== intent.target.session ||
-        editorSession?.state.clipId !== intent.target.context.clipId ||
-        editorSession.state.sourceId !== intent.target.context.sourceId
-      )
-        return
+  const { interactionSession, notes } = dependencies
 
-      switch (intent.type) {
-        case PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION:
-          handleSelectionIntent(dependencies, intent)
-          return
-        case PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE:
-          handleAddNoteIntent(dependencies, intent)
-          return
-        case PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES:
-          handleMoveNotesIntent(dependencies, intent)
-          return
-        case PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE:
-          handleResizeNoteIntent(dependencies, intent)
+  function selectOnlyCommittedNote(
+    editorSession: PianoRollEditorSession,
+    noteId: NoteId,
+    title: string,
+    fallback: string,
+  ): void {
+    try {
+      editorSession.selectOnly(noteId)
+      if (editorSession.state.selectedNoteIds.includes(noteId)) {
+        dependencies.setFailureMessage(null)
+        return
       }
-    } finally {
-      dependencies.interactionSession.finish(intent.interactionId)
+      dependencies.setFailureMessage(fallback)
+      dependencies.reportWarning(title, fallback)
+    } catch (cause) {
+      const message = describeCause(cause, fallback)
+      dependencies.setFailureMessage(message)
+      dependencies.reportWarning(title, message)
     }
+  }
+
+  return (intent) => {
+    const editorSession = dependencies.getEditorSession()
+    let afterCommit = (): void => dependencies.setFailureMessage(null)
+    const settled = (commit: ProjectCommit | null) => {
+      if (commit === null) dependencies.setFailureMessage(null)
+      return commit
+    }
+
+    completeGesture(interactionSession, intent.interactionId, {
+      apply: () => {
+        // The view may show another Session or Clip than the one the gesture began in.
+        if (
+          dependencies.getSession() !== intent.target.session ||
+          editorSession?.state.clipId !== intent.target.context.clipId ||
+          editorSession.state.sourceId !== intent.target.context.sourceId
+        )
+          return null
+        const target = {
+          expectedSession: intent.target.session,
+          baseRevision: intent.target.baseRevision,
+          clipId: intent.target.context.clipId,
+        }
+        switch (intent.type) {
+          case PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION:
+            try {
+              applyPianoRollSelectInteraction(editorSession, intent.selection)
+              dependencies.setFailureMessage(null)
+            } catch (cause) {
+              dependencies.setFailureMessage(describeCause(cause, REJECTIONS[intent.type][1]))
+            }
+            return null
+          case PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE: {
+            const { clipStartTick, pitch, requestedDurationTick } = intent.placement
+            const added = notes.add({ ...target, clipStartTick, pitch, requestedDurationTick })
+            afterCommit = () =>
+              selectOnlyCommittedNote(
+                editorSession,
+                added.noteId,
+                'MIDI note was added but could not be selected',
+                'The MIDI Note was added, but its selection could not be restored.',
+              )
+            return added.commit
+          }
+          case PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES: {
+            const { gesture, preview } = intent
+            if (preview.deltaTick === 0 && preview.deltaPitch === 0) return settled(null)
+            if (gesture.selectOnlyOnCommit) {
+              afterCommit = () =>
+                selectOnlyCommittedNote(
+                  editorSession,
+                  gesture.anchorNoteId,
+                  'MIDI notes were moved but selection could not be updated',
+                  'The MIDI Notes were moved, but the target Note could not be selected.',
+                )
+            }
+            return settled(
+              notes.move({
+                ...target,
+                deltaPitch: preview.deltaPitch,
+                deltaTick: preview.deltaTick,
+                noteIds: preview.movedNoteIds,
+              }),
+            )
+          }
+          case PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE: {
+            const { gesture, preview } = intent
+            if (gesture.selectOnlyOnCommit) {
+              afterCommit = () =>
+                selectOnlyCommittedNote(
+                  editorSession,
+                  preview.resizedNoteId,
+                  'MIDI note was resized but could not be selected',
+                  'The MIDI Note was resized, but its selection could not be restored.',
+                )
+            }
+            return settled(
+              notes.resize({
+                ...target,
+                durationTick: preview.durationTick,
+                noteId: preview.resizedNoteId,
+                sourceStartTick: preview.sourceStartTick,
+              }),
+            )
+          }
+        }
+      },
+      authorityRevision: () => dependencies.getAuthorityRevision() ?? intent.target.baseRevision,
+      afterCommit: () => afterCommit(),
+      onFailure: (cause, committed) => {
+        if (committed) {
+          const message = describeCause(
+            cause,
+            'The Note edit was committed, but its preview could not be updated.',
+          )
+          dependencies.setFailureMessage(message)
+          dependencies.reportWarning(
+            'MIDI note edit was committed but could not be displayed',
+            message,
+          )
+          return
+        }
+        const [title, fallback] = REJECTIONS[intent.type]
+        const message = describeCause(cause, fallback)
+        dependencies.setFailureMessage(message)
+        dependencies.reportDanger(title, message)
+      },
+    })
   }
 }

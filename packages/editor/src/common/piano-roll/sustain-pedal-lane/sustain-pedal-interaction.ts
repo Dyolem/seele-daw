@@ -6,34 +6,18 @@ import type {
   ProjectSession,
   TrackId,
 } from '@seele-daw/project-core'
+import type { GestureState } from '#internal/common/interaction/gesture-session'
 import type { InteractionId } from '#internal/common/interaction/interaction-session'
-import type { PianoRollPointerInput } from '#internal/common/piano-roll/piano-roll-input'
 import type { PianoRollValueLaneViewport } from '#internal/common/piano-roll/value-lane/piano-roll-value-lane-viewport'
 import type { TimelineGrid } from '#internal/common/timeline-grid'
 import type { PianoRollSustainPedalEditingScope } from './sustain-pedal-editing-scope'
-import type { PianoRollSustainPedalLaneHit } from './sustain-pedal-lane-input'
 import type { PianoRollSustainPedalPlacement } from './sustain-pedal-pencil-interaction'
 import type {
   PianoRollSustainPedalMovePreview,
   PianoRollSustainPedalValuePreview,
-  PianoRollSustainPedalTransformAxis,
   PianoRollSustainPedalTransformGesture,
   PianoRollSustainPedalTransformPreview,
 } from './sustain-pedal-event-transform'
-
-export const PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS = {
-  AWAITING_AUTHORITY: 'awaiting-authority',
-  COMMITTING_MOVE: 'committing-move',
-  COMMITTING_VALUE: 'committing-value',
-  IDLE: 'idle',
-  COMPLETING: 'completing',
-  MOVING_EVENTS: 'moving-events',
-  PRESSING: 'pressing',
-  REPLACING_VALUE: 'replacing-value',
-} as const
-
-export type PianoRollSustainPedalInteractionStatus =
-  (typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS)[keyof typeof PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS]
 
 export const PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT = {
   MOVE_EVENTS: 'sustain-pedal-events.move',
@@ -98,35 +82,5 @@ export interface PianoRollSustainPedalInteractionOutcome {
   readonly intent: PianoRollSustainPedalInteractionIntent | null
 }
 
-export interface PianoRollSustainPedalInteractionState {
-  readonly interactionId: InteractionId | null
-  readonly activeAxis: PianoRollSustainPedalTransformAxis | null
-  readonly pointerId: number | null
-  readonly preview: PianoRollSustainPedalTransformPreview | null
-  readonly status: PianoRollSustainPedalInteractionStatus
-}
-
-export interface PianoRollSustainPedalInteractionSessionObserver {
-  onStateChange(state: PianoRollSustainPedalInteractionState): void
-}
-
-export interface ResolvePianoRollSustainPedalCommitInput {
-  readonly interactionId: InteractionId
-  readonly authorityRevision: ModelRevision
-  readonly commitRevision: ModelRevision
-}
-
-export interface PianoRollSustainPedalInteractionSession {
-  readonly state: PianoRollSustainPedalInteractionState
-  cancel(): boolean
-  dispose(): void
-  handlePointerInput(
-    input: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
-    configuration?: PianoRollSustainPedalInteractionConfiguration,
-  ): PianoRollSustainPedalInteractionOutcome
-  notifyAuthorityRevision(revision: ModelRevision): void
-  claimCompletion(interactionId: InteractionId): boolean
-  resolveCommit(input: ResolvePianoRollSustainPedalCommitInput): void
-  finish(interactionId: InteractionId): void
-  subscribe(observer: PianoRollSustainPedalInteractionSessionObserver): () => void
-}
+export type PianoRollSustainPedalInteractionState =
+  GestureState<PianoRollSustainPedalTransformPreview>

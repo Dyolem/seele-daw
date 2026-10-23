@@ -1,9 +1,8 @@
 import type {
+  GestureCompletion,
   PianoRollEditorSession,
   PianoRollInteractionIntent,
-  PianoRollInteractionSession,
   PianoRollSustainPedalInteractionIntent,
-  PianoRollSustainPedalInteractionSession,
 } from '@seele-daw/editor'
 import type {
   ModelRevision,
@@ -17,10 +16,7 @@ export interface ProjectPianoRollIntentHandlerDependencies {
   readonly getAuthorityRevision: () => ModelRevision | null
   readonly getSession: () => Pick<ProjectSession, 'query'>
   readonly getEditorSession: () => PianoRollEditorSession | null
-  readonly interactionSession: Pick<
-    PianoRollInteractionSession,
-    'claimCompletion' | 'resolveCommit' | 'finish'
-  >
+  readonly interactionSession: GestureCompletion
   readonly notes: NoteEdits
   readonly reportDanger: (title: string, description: string) => void
   readonly reportWarning: (title: string, description: string) => void
@@ -31,10 +27,7 @@ export type ProjectPianoRollIntentHandler = (intent: PianoRollInteractionIntent)
 
 export interface ProjectPianoRollSustainPedalIntentHandlerDependencies {
   readonly getAuthorityRevision: () => ModelRevision
-  readonly interactionSession: Pick<
-    PianoRollSustainPedalInteractionSession,
-    'claimCompletion' | 'resolveCommit' | 'finish'
-  >
+  readonly interactionSession: GestureCompletion
   readonly sustainPedal: SustainPedalEdits
   readonly reportFailure: (cause: unknown, committed?: boolean) => void
   readonly reportSuccess: () => void

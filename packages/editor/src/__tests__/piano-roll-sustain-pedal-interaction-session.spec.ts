@@ -13,7 +13,6 @@ import {
   PIANO_ROLL_INTERACTION_TOOL,
   PIANO_ROLL_POINTER_INPUT_PHASE,
   PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT,
-  PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS,
   PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS,
   createPianoRollSustainPedalClipLaneReadModel,
   createPianoRollSustainPedalInteractionSession,
@@ -113,9 +112,8 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
       session.handlePointerInput(createPointerInput(fixture.eventId), fixture.configuration),
     ).toEqual({ failure: null, intent: null })
     expect(session.state).toMatchObject({
-      activeAxis: null,
       pointerId: 11,
-      status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.PRESSING,
+      phase: 'active',
     })
 
     const end = createPointerInput(fixture.eventId, {
@@ -130,7 +128,7 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
     expect(session.claimCompletion(intent.interactionId)).toBe(true)
     expect(session.claimCompletion(intent.interactionId)).toBe(false)
     session.finish(intent.interactionId)
-    expect(session.state.status).toBe(PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
     session.dispose()
   })
 
@@ -138,7 +136,7 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
     const fixture = createFixture()
     const session = createPianoRollSustainPedalInteractionSession()
     const onStateChange = vi.fn<(state: PianoRollSustainPedalInteractionState) => void>()
-    session.subscribe({ onStateChange })
+    session.subscribe(onStateChange)
     session.handlePointerInput(createPointerInput(fixture.eventId), fixture.configuration)
 
     const drag = createPointerInput(fixture.eventId, {
@@ -148,9 +146,8 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
     })
     session.handlePointerInput(drag)
     expect(session.state).toMatchObject({
-      activeAxis: PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS.TICK,
       preview: { deltaTick: 240 },
-      status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.MOVING_EVENTS,
+      phase: 'active',
     })
 
     const outcome = session.handlePointerInput(
@@ -164,7 +161,7 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
       preview: { deltaTick: 240 },
       type: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.MOVE_EVENTS,
     })
-    expect(session.state.status).toBe(PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_MOVE)
+    expect(session.state).toMatchObject({ phase: 'completing', preview: { axis: 'tick' } })
     expect(
       session.handlePointerInput(
         createPointerInput(fixture.eventId, {
@@ -185,15 +182,15 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
     expect(session.state).toMatchObject({
       pointerId: null,
       preview: { deltaTick: 240 },
-      status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.AWAITING_AUTHORITY,
+      awaitingAuthority: true,
     })
     session.notifyAuthorityRevision(commitRevision)
     expect(session.state).toEqual({
+      awaitingAuthority: false,
       interactionId: null,
-      activeAxis: null,
+      phase: 'idle',
       pointerId: null,
       preview: null,
-      status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.IDLE,
     })
     expect(onStateChange).toHaveBeenCalled()
     session.dispose()
@@ -212,8 +209,7 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
       }),
     )
     expect(session.state).toMatchObject({
-      activeAxis: PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS.VALUE,
-      status: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.REPLACING_VALUE,
+      phase: 'active',
     })
 
     const outcome = session.handlePointerInput(
@@ -230,10 +226,10 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
       },
       type: PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_INTENT.REPLACE_VALUE,
     })
-    expect(session.state.status).toBe(PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.COMMITTING_VALUE)
+    expect(session.state).toMatchObject({ phase: 'completing', preview: { axis: 'value' } })
     if (outcome.intent === null) throw new Error('Expected a value completion')
     session.finish(outcome.intent.interactionId)
-    expect(session.state.status).toBe(PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
     session.dispose()
   })
 
@@ -246,7 +242,7 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
         phase: PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL,
       }),
     )
-    expect(session.state.status).toBe(PIANO_ROLL_SUSTAIN_PEDAL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
     expect(
       session.handlePointerInput(
         createPointerInput(fixture.eventId, {
@@ -413,11 +409,9 @@ describe('Piano Roll Sustain Pedal Interaction Session', () => {
     const session = createPianoRollSustainPedalInteractionSession()
     const onStateChange = vi.fn<(state: PianoRollSustainPedalInteractionState) => void>()
     const failure = new Error('Preview failed')
-    session.subscribe({ onStateChange })
-    session.subscribe({
-      onStateChange: () => {
-        throw failure
-      },
+    session.subscribe(onStateChange)
+    session.subscribe(() => {
+      throw failure
     })
     expect(
       session.handlePointerInput(createPointerInput(fixture.eventId), fixture.configuration)

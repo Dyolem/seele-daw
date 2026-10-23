@@ -11,7 +11,6 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   PIANO_ROLL_HIT_ZONE,
   PIANO_ROLL_INTERACTION_INTENT,
-  PIANO_ROLL_INTERACTION_STATUS,
   PIANO_ROLL_INTERACTION_TOOL,
   PIANO_ROLL_POINTER_INPUT_PHASE,
   createPianoRollGrid,
@@ -144,8 +143,7 @@ describe('Piano Roll Interaction Session', () => {
       intent: null,
     })
     expect(session.state).toMatchObject({
-      activeGesture: 'note-move',
-      status: PIANO_ROLL_INTERACTION_STATUS.PRESSING,
+      phase: 'active',
     })
 
     const end = createPointerInput({
@@ -160,15 +158,13 @@ describe('Piano Roll Interaction Session', () => {
         type: PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION,
       },
     })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMPLETING)
+    expect(session.state.phase).toBe('completing')
     session.finish(outcome.intent!.interactionId)
     expect(session.state).toMatchObject({
       interactionId: null,
-      activeGesture: null,
-      movePreview: null,
       pointerId: null,
-      resizePreview: null,
-      status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+      phase: 'idle',
+      preview: null,
     })
     expect(
       session.handlePointerInput(
@@ -185,7 +181,7 @@ describe('Piano Roll Interaction Session', () => {
     const fixture = createFixture()
     const session = createPianoRollInteractionSession()
     const onStateChange = vi.fn<(state: PianoRollInteractionState) => void>()
-    const unsubscribe = session.subscribe({ onStateChange })
+    const unsubscribe = session.subscribe(onStateChange)
     session.handlePointerInput(createPointerInput(), fixture.configuration)
 
     session.handlePointerInput(
@@ -196,12 +192,13 @@ describe('Piano Roll Interaction Session', () => {
       }),
     )
     expect(session.state).toMatchObject({
-      activeGesture: 'note-move',
-      movePreview: {
-        deltaPitch: 2,
-        deltaTick: 240,
+      phase: 'active',
+      preview: {
+        move: {
+          deltaPitch: 2,
+          deltaTick: 240,
+        },
       },
-      status: PIANO_ROLL_INTERACTION_STATUS.MOVING_NOTE,
     })
 
     const outcome = session.handlePointerInput(
@@ -218,7 +215,10 @@ describe('Piano Roll Interaction Session', () => {
       },
       type: PIANO_ROLL_INTERACTION_INTENT.MOVE_NOTES,
     })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_MOVE)
+    expect(session.state).toMatchObject({
+      phase: 'completing',
+      preview: { move: expect.anything() },
+    })
 
     const commitRevision = (fixture.session.modelRevision + 1) as ModelRevision
     expect(session.claimCompletion(outcome.intent!.interactionId)).toBe(true)
@@ -228,21 +228,21 @@ describe('Piano Roll Interaction Session', () => {
       commitRevision,
     })
     expect(session.state).toMatchObject({
-      movePreview: {
-        deltaPitch: 2,
-        deltaTick: 240,
+      awaitingAuthority: true,
+      preview: {
+        move: {
+          deltaPitch: 2,
+          deltaTick: 240,
+        },
       },
-      status: PIANO_ROLL_INTERACTION_STATUS.AWAITING_AUTHORITY,
     })
 
     session.notifyAuthorityRevision(commitRevision)
     expect(session.state).toMatchObject({
       interactionId: null,
-      activeGesture: null,
-      movePreview: null,
       pointerId: null,
-      resizePreview: null,
-      status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+      phase: 'idle',
+      preview: null,
     })
     expect(onStateChange).toHaveBeenCalled()
 
@@ -273,13 +273,13 @@ describe('Piano Roll Interaction Session', () => {
         }),
       )
       expect(session.state).toMatchObject({
-        activeGesture: 'note-resize',
-        movePreview: null,
-        resizePreview: {
-          durationTick: 480,
-          sourceStartTick: 720,
+        phase: 'active',
+        preview: {
+          resize: {
+            durationTick: 480,
+            sourceStartTick: 720,
+          },
         },
-        status: PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE,
       })
 
       const outcome = session.handlePointerInput(
@@ -302,14 +302,20 @@ describe('Piano Roll Interaction Session', () => {
         },
         type: PIANO_ROLL_INTERACTION_INTENT.RESIZE_NOTE,
       })
-      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
+      expect(session.state).toMatchObject({
+        phase: 'completing',
+        preview: { resize: expect.anything() },
+      })
 
       session.resolveCommit({
         interactionId: Symbol('stale-interaction'),
         authorityRevision: fixture.session.modelRevision,
         commitRevision: fixture.session.modelRevision,
       })
-      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
+      expect(session.state).toMatchObject({
+        phase: 'completing',
+        preview: { resize: expect.anything() },
+      })
 
       const commitRevision = (fixture.session.modelRevision + 1) as ModelRevision
       expect(session.claimCompletion(outcome.intent!.interactionId)).toBe(true)
@@ -319,20 +325,20 @@ describe('Piano Roll Interaction Session', () => {
         commitRevision,
       })
       expect(session.state).toMatchObject({
-        resizePreview: {
-          durationTick: 480,
-          sourceStartTick: 720,
+        awaitingAuthority: true,
+        preview: {
+          resize: {
+            durationTick: 480,
+            sourceStartTick: 720,
+          },
         },
-        status: PIANO_ROLL_INTERACTION_STATUS.AWAITING_AUTHORITY,
       })
 
       session.notifyAuthorityRevision(commitRevision)
       expect(session.state).toMatchObject({
-        activeGesture: null,
-        movePreview: null,
         pointerId: null,
-        resizePreview: null,
-        status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+        phase: 'idle',
+        preview: null,
       })
 
       session.dispose()
@@ -365,9 +371,9 @@ describe('Piano Roll Interaction Session', () => {
         type: PIANO_ROLL_INTERACTION_INTENT.RESOLVE_SELECTION,
       },
     })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMPLETING)
+    expect(session.state.phase).toBe('completing')
     session.finish(outcome.intent!.interactionId)
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
 
     session.dispose()
   })
@@ -392,7 +398,7 @@ describe('Piano Roll Interaction Session', () => {
         }),
       ),
     ).toEqual({ failure: null, intent: null })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
 
     session.dispose()
   })
@@ -415,16 +421,14 @@ describe('Piano Roll Interaction Session', () => {
       position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
     })
     session.handlePointerInput(update)
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.RESIZING_NOTE)
+    expect(session.state).toMatchObject({ phase: 'active', preview: { resize: expect.anything() } })
 
     expect(session.cancel()).toBe(true)
     expect(session.state).toMatchObject({
       interactionId: null,
-      activeGesture: null,
-      movePreview: null,
       pointerId: null,
-      resizePreview: null,
-      status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+      phase: 'idle',
+      preview: null,
     })
     expect(
       session.handlePointerInput(
@@ -457,16 +461,17 @@ describe('Piano Roll Interaction Session', () => {
         position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
       }),
     )
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMMITTING_NOTE_RESIZE)
+    expect(session.state).toMatchObject({
+      phase: 'completing',
+      preview: { resize: expect.anything() },
+    })
 
     session.finish(session.state.interactionId!)
     expect(session.state).toMatchObject({
       interactionId: null,
-      activeGesture: null,
-      movePreview: null,
       pointerId: null,
-      resizePreview: null,
-      status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+      phase: 'idle',
+      preview: null,
     })
 
     session.dispose()
@@ -496,9 +501,9 @@ describe('Piano Roll Interaction Session', () => {
         type: PIANO_ROLL_INTERACTION_INTENT.ADD_NOTE,
       },
     })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.COMPLETING)
+    expect(session.state.phase).toBe('completing')
     session.finish(outcome.intent!.interactionId)
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
 
     session.dispose()
   })
@@ -517,7 +522,7 @@ describe('Piano Roll Interaction Session', () => {
         }),
       ),
     ).toEqual({ failure: null, intent: null })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
 
     session.dispose()
   })
@@ -540,7 +545,7 @@ describe('Piano Roll Interaction Session', () => {
     )
 
     expect(outcome).toMatchObject({ failure: null, intent: null })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
 
     session.dispose()
   })
@@ -597,11 +602,11 @@ describe('Piano Roll Interaction Session', () => {
       position: { xCssPixel: 370, yCssPixel: 64 },
     })
     session.handlePointerInput(input)
-    expect(session.state.movePreview?.deltaTick).toBe(240)
+    expect(session.state.preview?.move?.deltaTick).toBe(240)
     session.handlePointerInput({ ...input, modifiers: { ...NO_MODIFIERS, alt: true } })
-    expect(session.state.movePreview?.deltaTick).toBe(260)
+    expect(session.state.preview?.move?.deltaTick).toBe(260)
     session.handlePointerInput(input)
-    expect(session.state.movePreview?.deltaTick).toBe(240)
+    expect(session.state.preview?.move?.deltaTick).toBe(240)
     session.dispose()
   })
 
@@ -644,7 +649,7 @@ describe('Piano Roll Interaction Session', () => {
       authorityRevision: fixture.session.modelRevision,
       commitRevision,
     })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.AWAITING_AUTHORITY)
+    expect(session.state.awaitingAuthority).toBe(true)
     session.handlePointerInput(
       createPointerInput({ captureId: Symbol('new-capture') }),
       fixture.configuration,
@@ -659,7 +664,7 @@ describe('Piano Roll Interaction Session', () => {
     expect(session.claimCompletion(first.interactionId)).toBe(false)
     expect(session.state).toMatchObject({
       interactionId: currentId,
-      status: PIANO_ROLL_INTERACTION_STATUS.PRESSING,
+      phase: 'active',
     })
     session.dispose()
   })
@@ -678,7 +683,7 @@ describe('Piano Roll Interaction Session', () => {
     session.claimCompletion(intent.interactionId)
     const commitRevision = (fixture.session.modelRevision + 1) as ModelRevision
     session.notifyAuthorityRevision(commitRevision)
-    expect(session.state.movePreview).not.toBeNull()
+    expect(session.state.preview?.move).not.toBeNull()
     session.resolveCommit({
       interactionId: intent.interactionId,
       authorityRevision: fixture.session.modelRevision,
@@ -686,8 +691,8 @@ describe('Piano Roll Interaction Session', () => {
     })
     expect(session.state).toMatchObject({
       interactionId: null,
-      movePreview: null,
-      status: PIANO_ROLL_INTERACTION_STATUS.IDLE,
+      phase: 'idle',
+      preview: null,
     })
     session.dispose()
   })
@@ -706,7 +711,7 @@ describe('Piano Roll Interaction Session', () => {
       expect(session.handlePointerInput(end).intent).toBeNull()
       expect(session.claimCompletion(interactionId)).toBe(false)
       await Promise.resolve()
-      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+      expect(session.state.phase).toBe('idle')
       expect(session.claimCompletion(interactionId)).toBe(false)
       expect(session.handlePointerInput(end).intent).toBeNull()
       session.dispose()
@@ -719,9 +724,9 @@ describe('Piano Roll Interaction Session', () => {
     session.handlePointerInput(createPointerInput(), fixture.configuration)
     const viewport = fixture.configuration.viewport!
     session.notifyViewport({ ...viewport })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.PRESSING)
+    expect(session.state.phase).toBe('active')
     session.notifyViewport({ ...viewport, widthCssPixel: viewport.widthCssPixel + 1 })
-    expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+    expect(session.state.phase).toBe('idle')
     expect(
       session.handlePointerInput(createPointerInput({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }))
         .intent,
@@ -750,7 +755,7 @@ describe('Piano Roll Interaction Session', () => {
         hasExceededDragThreshold: true,
       })
       expect(outcome).toEqual({ failure: null, intent: null })
-      expect(session.state.status).toBe(PIANO_ROLL_INTERACTION_STATUS.IDLE)
+      expect(session.state.phase).toBe('idle')
       session.dispose()
     },
   )
@@ -760,18 +765,16 @@ describe('Piano Roll Interaction Session', () => {
     const session = createPianoRollInteractionSession()
     const failure = new Error('Broken preview consumer')
     const onStateChange = vi.fn<(state: PianoRollInteractionState) => void>()
-    session.subscribe({ onStateChange })
-    session.subscribe({
-      onStateChange: () => {
-        throw failure
-      },
+    session.subscribe(onStateChange)
+    session.subscribe(() => {
+      throw failure
     })
     expect(session.handlePointerInput(createPointerInput(), fixture.configuration)).toEqual({
       failure,
       intent: null,
     })
     expect(onStateChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ interactionId: null, status: PIANO_ROLL_INTERACTION_STATUS.IDLE }),
+      expect.objectContaining({ interactionId: null, phase: 'idle' }),
     )
     expect(
       session.handlePointerInput(createPointerInput({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.END }))

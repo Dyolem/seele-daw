@@ -73,14 +73,12 @@ export function useSustainPedalInteraction({
     reportSuccess: () => reportSuccess(),
     setSelectedEventIds,
   })
-  const unsubscribeInteractionSession = interactionSession.subscribe({
-    onStateChange: (state) => {
-      interactionState.value = state
-      if (state.pointerId === null) {
-        captureBounds = null
-        if (!beginning) pointerInputAdapter?.cancel()
-      }
-    },
+  const unsubscribeInteractionSession = interactionSession.subscribe((state) => {
+    interactionState.value = state
+    if (state.pointerId === null) {
+      captureBounds = null
+      if (!beginning) pointerInputAdapter?.cancel()
+    }
   })
 
   function invalidate(): void {

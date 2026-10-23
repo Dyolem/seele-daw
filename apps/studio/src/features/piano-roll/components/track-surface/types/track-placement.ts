@@ -1,4 +1,5 @@
 import type {
+  GestureState,
   InteractionId,
   PianoRollGrid,
   PianoRollTimelineViewport,
@@ -30,9 +31,4 @@ export type TrackPlacementIntent = TrackPlacementResult &
     interactionId: InteractionId
     target: TrackPlacementConfiguration
   }>
-export interface TrackPlacementState {
-  readonly awaitingAuthority: boolean
-  readonly interactionId: InteractionId | null
-  readonly pointerId: number | null
-  readonly preview: TrackPlacementPreview | null
-}
+export type TrackPlacementState = GestureState<TrackPlacementPreview>

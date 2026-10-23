@@ -71,15 +71,13 @@ export function useNoteInteraction({
       interactionFailureMessage.value = message
     },
   })
-  const unsubscribeInteractionSession = interactionSession.subscribe({
-    onStateChange: (state) => {
-      const wasCapturing = interactionState.value.pointerId !== null
-      interactionState.value = state
-      if (state.pointerId === null) {
-        captureBounds = null
-        if (wasCapturing) pointerInputAdapter?.cancel()
-      }
-    },
+  const unsubscribeInteractionSession = interactionSession.subscribe((state) => {
+    const wasCapturing = interactionState.value.pointerId !== null
+    interactionState.value = state
+    if (state.pointerId === null) {
+      captureBounds = null
+      if (wasCapturing) pointerInputAdapter?.cancel()
+    }
   })
   function resolveInteractionTool(tool: PianoRollTool): PianoRollInteractionTool {
     switch (tool) {

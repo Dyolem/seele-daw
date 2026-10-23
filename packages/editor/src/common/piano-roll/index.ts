@@ -35,7 +35,6 @@ export type {
 
 export {
   PIANO_ROLL_INTERACTION_INTENT,
-  PIANO_ROLL_INTERACTION_STATUS,
   PIANO_ROLL_INTERACTION_TOOL,
 } from './interaction/piano-roll-interaction'
 export type {
@@ -43,16 +42,12 @@ export type {
   PianoRollInteractionConfiguration,
   PianoRollInteractionIntent,
   PianoRollInteractionOutcome,
-  PianoRollInteractionSession,
-  PianoRollInteractionSessionObserver,
   PianoRollInteractionState,
-  PianoRollInteractionStatus,
   PianoRollInteractionTool,
   PianoRollMoveNotesIntent,
   PianoRollResizeNoteIntent,
   PianoRollResolveSelectionIntent,
   PianoRollInteractionTarget,
-  ResolvePianoRollCommitInput,
 } from './interaction/piano-roll-interaction'
 
 export { PianoRollError } from './piano-roll-error'
@@ -131,4 +126,7 @@ export * from './track/index'
 export * from './sustain-pedal-lane/index'
 export * from './value-lane/index'
 
-export { createPianoRollInteractionSession } from './interaction/piano-roll-interaction-session'
+export {
+  PianoRollInteractionSession,
+  createPianoRollInteractionSession,
+} from './interaction/piano-roll-interaction-session'

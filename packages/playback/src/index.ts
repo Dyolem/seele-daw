@@ -11,6 +11,28 @@ export type {
   PlaybackDiagnosticCode,
   TrackPlaybackPlan,
 } from './compiler/audible-midi-plan'
+export { PLAYBACK_PHASE, PlaybackEngineError, createPlaybackEngine } from './engine/playback-engine'
+export type {
+  PlaybackEngine,
+  PlaybackEngineDependencies,
+  PlaybackEngineErrorCode,
+  PlaybackEngineState,
+  PlaybackLocateSession,
+  PlaybackPhase,
+  PlaybackVisualPosition,
+} from './engine/playback-engine'
+export { PLAYBACK_INSTRUMENT_FAILURE_MODE } from './engine/playback-runtime'
+export type {
+  InstrumentPreparationFailure,
+  PlaybackAbortSignal,
+  PlaybackInstrumentFailureMode,
+  PlaybackPreparationOptions,
+  PlaybackRuntimePort,
+  PlaybackTimerPort,
+  PlaybackVoiceHandle,
+  PreparedPlaybackRuntime,
+  UnsupportedNoteOccurrence,
+} from './engine/playback-runtime'
 export {
   AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND,
   AUDIBLE_MIDI_RECONCILIATION_REASON,

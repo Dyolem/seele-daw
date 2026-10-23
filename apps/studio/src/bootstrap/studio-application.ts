@@ -1,3 +1,4 @@
+import { type PlaybackRuntimePort, type PlaybackTimerPort } from '@seele-daw/playback'
 import { ToneJsMidiFileDecoder, type MidiFileDecoder } from '@seele-daw/midi-file'
 import { BrowserLocalFileByteReader, type LocalFileByteReader } from '@seele-daw/platform-browser'
 import type { ProjectMidiImportIdFactory } from '@seele-daw/project-midi'
@@ -48,8 +49,6 @@ import { createBrowserProjectPlaybackTimer } from '@/workbench/project/playback/
 import {
   createProjectPlaybackCoordinator,
   type ProjectPlaybackCoordinator,
-  type ProjectPlaybackRuntimePort,
-  type ProjectPlaybackTimerPort,
 } from '@/workbench/project/playback/project-playback-coordinator'
 import type { ProjectPlaybackVisualFramePort } from '@/workbench/project/playback/project-playback-visual-position'
 import { createProjectPlaybackVueBinding } from '@/workbench/project/playback/vue/project-playback-vue-binding'
@@ -71,8 +70,8 @@ export interface StudioApplicationComposition extends BrowserStudioApplicationOp
   readonly keyboardBindingRegistry?: StudioKeyboardBindingRegistry
   readonly midiFileDecoder?: MidiFileDecoder
   readonly midiFileReader?: LocalFileByteReader
-  readonly projectPlaybackRuntime?: ProjectPlaybackRuntimePort
-  readonly projectPlaybackTimer?: ProjectPlaybackTimerPort
+  readonly projectPlaybackRuntime?: PlaybackRuntimePort
+  readonly projectPlaybackTimer?: PlaybackTimerPort
   readonly projectPlaybackVisualFrame?: ProjectPlaybackVisualFramePort
 }
 

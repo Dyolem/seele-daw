@@ -1,20 +1,18 @@
-import type {
-  ProjectPlaybackInstrumentPreparationFailure,
-  ProjectPlaybackPreparedRuntime,
-  ProjectPlaybackPreparationOptions,
-  ProjectPlaybackRuntimePort,
-  ProjectPlaybackTimerPort,
-  ProjectPlaybackUnsupportedNoteOccurrence,
-  ProjectPlaybackVoiceHandle,
-} from '@/workbench/project/playback/project-playback-coordinator'
-import type {
-  AudibleMidiProjectPlan,
-  EngineGeneration,
-  PlaybackClockSecond,
-  ScheduledSampleVoicePlan,
+import {
+  type AudibleMidiProjectPlan,
+  type EngineGeneration,
+  type PlaybackClockSecond,
+  type ScheduledSampleVoicePlan,
+  type InstrumentPreparationFailure,
+  type PreparedPlaybackRuntime,
+  type PlaybackPreparationOptions,
+  type PlaybackRuntimePort,
+  type PlaybackTimerPort,
+  type UnsupportedNoteOccurrence,
+  type PlaybackVoiceHandle,
 } from '@seele-daw/playback'
 
-export class ManualProjectPlaybackTimer implements ProjectPlaybackTimerPort {
+export class ManualProjectPlaybackTimer implements PlaybackTimerPort {
   readonly callbacks = new Map<object, () => void>()
   readonly intervals: number[] = []
 
@@ -34,7 +32,7 @@ export class ManualProjectPlaybackTimer implements ProjectPlaybackTimerPort {
   }
 }
 
-export class ManualProjectPlaybackVoiceHandle implements ProjectPlaybackVoiceHandle {
+export class ManualProjectPlaybackVoiceHandle implements PlaybackVoiceHandle {
   readonly cancelCalls: (PlaybackClockSecond | undefined)[] = []
   readonly releaseUpdates: PlaybackClockSecond[] = []
   #active = true
@@ -69,7 +67,7 @@ export class ManualProjectPlaybackVoiceHandle implements ProjectPlaybackVoiceHan
   }
 }
 
-export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRuntime {
+export class ManualPreparedPlaybackRuntime implements PreparedPlaybackRuntime {
   readonly generations: EngineGeneration[] = []
   readonly handles: ManualProjectPlaybackVoiceHandle[] = []
   readonly scheduled: ScheduledSampleVoicePlan[] = []
@@ -77,21 +75,17 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
   allNotesOffFailure: unknown = null
   disposeCount = 0
   currentTime = 0 as PlaybackClockSecond
-  readonly preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[]
-  readonly unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[]
-  readonly #unavailableSoundbankIds: ReadonlySet<
-    ProjectPlaybackInstrumentPreparationFailure['soundbankId']
-  >
-  readonly #unsupportedOccurrenceKeys: ReadonlySet<
-    ProjectPlaybackUnsupportedNoteOccurrence['occurrenceKey']
-  >
+  readonly preparationFailures: readonly InstrumentPreparationFailure[]
+  readonly unsupportedNoteOccurrences: readonly UnsupportedNoteOccurrence[]
+  readonly #unavailableSoundbankIds: ReadonlySet<InstrumentPreparationFailure['soundbankId']>
+  readonly #unsupportedOccurrenceKeys: ReadonlySet<UnsupportedNoteOccurrence['occurrenceKey']>
   readonly #voicesRemainActiveDuringRelease: boolean
 
   constructor(
-    readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision'],
-    preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = [],
+    readonly modelRevision: PreparedPlaybackRuntime['modelRevision'],
+    preparationFailures: readonly InstrumentPreparationFailure[] = [],
     voicesRemainActiveDuringRelease = false,
-    unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[] = [],
+    unsupportedNoteOccurrences: readonly UnsupportedNoteOccurrence[] = [],
   ) {
     this.preparationFailures = Object.freeze([...preparationFailures])
     this.unsupportedNoteOccurrences = Object.freeze([...unsupportedNoteOccurrences])
@@ -123,7 +117,7 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
     return this.currentTime
   }
 
-  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
+  schedule(plan: ScheduledSampleVoicePlan): PlaybackVoiceHandle | null {
     if (
       this.#unavailableSoundbankIds.has(plan.soundbankId) ||
       this.#unsupportedOccurrenceKeys.has(plan.occurrenceKey)
@@ -141,29 +135,29 @@ export class ManualPreparedPlaybackRuntime implements ProjectPlaybackPreparedRun
   }
 }
 
-export class ControlledProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
+export class ControlledProjectPlaybackRuntime implements PlaybackRuntimePort {
   readonly plans: AudibleMidiProjectPlan[] = []
-  readonly preparationOptions: ProjectPlaybackPreparationOptions[] = []
+  readonly preparationOptions: PlaybackPreparationOptions[] = []
   readonly signals: AbortSignal[] = []
   readonly prepared: ManualPreparedPlaybackRuntime[] = []
   currentTime = 0 as PlaybackClockSecond
   disposeCount = 0
   failure: unknown = null
-  preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[] = []
+  preparationFailures: readonly InstrumentPreparationFailure[] = []
   unsupportedNotePitches: readonly number[] = []
   voicesRemainActiveDuringRelease = false
 
   async prepare(
     plan: AudibleMidiProjectPlan,
     signal: AbortSignal,
-    options: ProjectPlaybackPreparationOptions,
+    options: PlaybackPreparationOptions,
   ) {
     this.plans.push(plan)
     this.signals.push(signal)
     this.preparationOptions.push(options)
     if (this.failure !== null) throw this.failure
     const unsupportedPitches = new Set(this.unsupportedNotePitches)
-    const unsupportedNoteOccurrences: ProjectPlaybackUnsupportedNoteOccurrence[] = []
+    const unsupportedNoteOccurrences: UnsupportedNoteOccurrence[] = []
     for (const span of plan.midiNoteSpans) {
       if (!unsupportedPitches.has(span.pitch)) continue
       const route = plan.tracks.find(({ trackId }) => trackId === span.trackId)
@@ -195,14 +189,14 @@ export class ControlledProjectPlaybackRuntime implements ProjectPlaybackRuntimeP
 }
 
 interface DeferredPreparationRequest {
-  readonly options: ProjectPlaybackPreparationOptions
+  readonly options: PlaybackPreparationOptions
   readonly plan: AudibleMidiProjectPlan
   readonly reject: (cause: unknown) => void
   readonly resolve: (runtime: ManualPreparedPlaybackRuntime) => void
   readonly signal: AbortSignal
 }
 
-export class DeferredProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
+export class DeferredProjectPlaybackRuntime implements PlaybackRuntimePort {
   readonly prepared: ManualPreparedPlaybackRuntime[] = []
   readonly requests: DeferredPreparationRequest[] = []
   disposeCount = 0
@@ -210,8 +204,8 @@ export class DeferredProjectPlaybackRuntime implements ProjectPlaybackRuntimePor
   prepare(
     plan: AudibleMidiProjectPlan,
     signal: AbortSignal,
-    options: ProjectPlaybackPreparationOptions,
-  ): Promise<ProjectPlaybackPreparedRuntime> {
+    options: PlaybackPreparationOptions,
+  ): Promise<PreparedPlaybackRuntime> {
     return new Promise((resolve, reject) => {
       this.requests.push(Object.freeze({ options, plan, reject, resolve, signal }))
     })

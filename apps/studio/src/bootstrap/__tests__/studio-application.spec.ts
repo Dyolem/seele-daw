@@ -8,7 +8,11 @@ import { defineStore } from 'pinia'
 import { createApp, defineComponent, h, onUnmounted } from 'vue'
 import { createMemoryHistory, createRouter, useRouter, type Router } from 'vue-router'
 import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
-import { decodeSampleInstrumentDeviceState } from '@seele-daw/playback'
+import {
+  decodeSampleInstrumentDeviceState,
+  type PlaybackRuntimePort,
+  type PlaybackTimerPort,
+} from '@seele-daw/playback'
 import { PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE } from '@seele-daw/project-midi'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -24,10 +28,6 @@ import {
 } from '@/workbench/project/active-project-state'
 import type { BrowserActiveProjectRuntime } from '@/workbench/project/browser-active-project-runtime'
 import { PROJECT_ENTRY_RESOLUTION_KIND } from '@/workbench/project/entry/project-entry-coordinator'
-import type {
-  ProjectPlaybackRuntimePort,
-  ProjectPlaybackTimerPort,
-} from '@/workbench/project/playback/project-playback-coordinator'
 import type { ProjectPlaybackVisualFramePort } from '@/workbench/project/playback/project-playback-visual-position'
 import {
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
@@ -50,12 +50,12 @@ interface RuntimeFixture {
   readonly subscriptions: ReturnType<typeof vi.fn<() => void>>[]
 }
 
-const INERT_PLAYBACK_RUNTIME: ProjectPlaybackRuntimePort = Object.freeze({
+const INERT_PLAYBACK_RUNTIME: PlaybackRuntimePort = Object.freeze({
   prepare: () => Promise.reject(new Error('Playback is not used by this composition test')),
   dispose() {},
 })
 
-const INERT_PLAYBACK_TIMER: ProjectPlaybackTimerPort = Object.freeze({
+const INERT_PLAYBACK_TIMER: PlaybackTimerPort = Object.freeze({
   clear() {},
   setRepeating: () => Object.freeze({}),
 })
@@ -158,7 +158,7 @@ function createCompositionOptions() {
   }
 }
 
-function createTrackedPlaybackRuntime(order: string[]): ProjectPlaybackRuntimePort {
+function createTrackedPlaybackRuntime(order: string[]): PlaybackRuntimePort {
   return Object.freeze({
     prepare: () => Promise.reject(new Error('Playback is not used by this composition test')),
     dispose: () => order.push('playback-runtime'),

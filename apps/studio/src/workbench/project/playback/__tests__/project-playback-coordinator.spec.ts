@@ -54,6 +54,7 @@ import {
   parseSoundbankId,
   type AudibleMidiProjectPlan,
   type SoundbankId,
+  PLAYBACK_INSTRUMENT_FAILURE_MODE,
 } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -75,10 +76,7 @@ import {
   ManualProjectPlaybackTimer,
   type ManualProjectPlaybackVoiceHandle,
 } from '@/workbench/project/playback/__tests__/project-playback-test-support'
-import {
-  PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE,
-  createProjectPlaybackCoordinator,
-} from '@/workbench/project/playback/project-playback-coordinator'
+import { createProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 
 class ActiveProjectHarness {
   readonly commitObservers = new Set<ActiveProjectCommitObserver>()
@@ -999,8 +997,8 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(
       runtime.preparationOptions.map(({ instrumentFailureMode }) => instrumentFailureMode),
     ).toEqual([
-      PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
-      PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
+      PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
     ])
 
     const nextRuntime = runtime.prepared[1]!

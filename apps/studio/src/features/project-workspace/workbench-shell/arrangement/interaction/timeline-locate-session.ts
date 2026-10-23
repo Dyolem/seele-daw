@@ -1,10 +1,10 @@
+import { type PlaybackLocateSession } from '@seele-daw/playback'
 import {
   EDITOR_POINTER_INPUT_PHASE,
   InteractionSession,
   type InteractionId,
 } from '@seele-daw/editor'
 import type { Tick } from '@seele-daw/project-core'
-import type { ProjectPlaybackLocateSession } from '@/workbench/project/playback/project-playback-coordinator'
 import type {
   TimelineLocateCompletion,
   TimelineLocateConfiguration,
@@ -16,7 +16,7 @@ interface ActiveLocate {
   readonly interactionId: InteractionId
   readonly captureId: symbol
   readonly pointerId: number
-  readonly playback: ProjectPlaybackLocateSession
+  readonly playback: PlaybackLocateSession
   readonly wasFollowSuspended: boolean
 }
 const IDLE: TimelineLocateState = Object.freeze({ interactionId: null, previewTick: null })

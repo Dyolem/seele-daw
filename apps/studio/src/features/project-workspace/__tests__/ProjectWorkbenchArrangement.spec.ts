@@ -26,7 +26,7 @@ import {
   type TempoEventRecord,
   type Tick,
 } from '@seele-daw/project-core'
-import { parseSoundbankId } from '@seele-daw/playback'
+import { parseSoundbankId, type PlaybackLocateSession } from '@seele-daw/playback'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { h, nextTick, shallowRef, type ShallowRef } from 'vue'
@@ -39,10 +39,7 @@ import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import type { ClipEdits } from '@/workbench/edits/clip-edits'
 import type { TrackEdits } from '@/workbench/edits/track-edits'
-import type {
-  ProjectPlaybackCoordinator,
-  ProjectPlaybackLocateSession,
-} from '@/workbench/project/playback/project-playback-coordinator'
+import { type ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
@@ -71,8 +68,8 @@ interface ArrangementFixture {
   readonly beginTimelineLocate: ReturnType<
     typeof vi.fn<ProjectPlaybackCoordinator['beginTimelineLocate']>
   >
-  readonly cancelTimelineLocate: ReturnType<typeof vi.fn<ProjectPlaybackLocateSession['cancel']>>
-  readonly commitTimelineLocate: ReturnType<typeof vi.fn<ProjectPlaybackLocateSession['commit']>>
+  readonly cancelTimelineLocate: ReturnType<typeof vi.fn<PlaybackLocateSession['cancel']>>
+  readonly commitTimelineLocate: ReturnType<typeof vi.fn<PlaybackLocateSession['commit']>>
   readonly locateAtTick: ReturnType<typeof vi.fn<ProjectPlaybackCoordinator['locateAtTick']>>
   readonly wrapper: VueWrapper
 }
@@ -156,8 +153,8 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       projectId,
     }),
   )
-  const cancelTimelineLocate = vi.fn<ProjectPlaybackLocateSession['cancel']>(() => true)
-  const commitTimelineLocate = vi.fn<ProjectPlaybackLocateSession['commit']>(() => true)
+  const cancelTimelineLocate = vi.fn<PlaybackLocateSession['cancel']>(() => true)
+  const commitTimelineLocate = vi.fn<PlaybackLocateSession['commit']>(() => true)
   const beginTimelineLocate = vi.fn<ProjectPlaybackCoordinator['beginTimelineLocate']>(() =>
     Object.freeze({
       cancel: cancelTimelineLocate,

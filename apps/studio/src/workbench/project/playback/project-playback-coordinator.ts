@@ -1,48 +1,22 @@
 import {
-  AUDIBLE_MIDI_PLAN_STATUS,
-  AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND,
-  AUDIBLE_MIDI_RECONCILIATION_SCOPE,
-  AUDIBLE_MIDI_SCHEDULER_OUTCOME,
-  AUDIBLE_MIDI_TRACK_CHANGE_KIND,
-  AUDIBLE_MIDI_TRANSPORT_OUTCOME,
-  compileAudibleMidiProject,
-  createAudibleMidiReconciliationPlan,
-  createAudibleMidiSchedulerPlanner,
-  createAudibleMidiTransport,
-  parsePlaybackClockDurationSecond,
-  parsePlaybackClockSecond,
-  type AudibleMidiOccurrenceChange,
-  type AudibleMidiProjectPlan,
-  type AudibleMidiReconciliationPlan,
-  type AudibleMidiSchedulerPlanner,
-  type AudibleMidiTransport,
-  type AudibleMidiTransportSnapshot,
-  type PlaybackDiagnostic,
-  type PlaybackClockSecond,
-  type ScheduledSampleVoicePlan,
-  type SoundbankId,
+  createPlaybackEngine,
+  type PlaybackEngine,
+  type PlaybackEngineState,
+  type PlaybackLocateSession,
+  type PlaybackRuntimePort,
+  type PlaybackTimerPort,
 } from '@seele-daw/playback'
-import {
-  PROJECT_CHANGE_TYPE,
-  type ModelRevision,
-  type ProjectCommit,
-  type ProjectId,
-  type ProjectSession,
-  type Tick,
-} from '@seele-daw/project-core'
+import type { ProjectId, ProjectSession, Tick } from '@seele-daw/project-core'
 
-import type {
-  ActiveProjectCommitEvent,
-  ActiveProjectService,
-} from '@/workbench/project/active-project-service'
+import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
   ACTIVE_PROJECT_PHASE,
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
 import { ProjectPlaybackError } from '@/workbench/project/playback/project-playback-error'
+import { describePlaybackFeedback } from '@/workbench/project/playback/project-playback-feedback'
 import {
   PROJECT_PLAYBACK_PHASE,
-  type ProjectPlaybackFeedback,
   type ProjectPlaybackState,
   type ProjectPlaybackStateDeliveryFailure,
   type ProjectPlaybackStateObserver,
@@ -50,73 +24,15 @@ import {
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 
-export interface ProjectPlaybackPreparedRuntime {
-  readonly modelRevision: ModelRevision
-  readonly preparationFailures: readonly ProjectPlaybackInstrumentPreparationFailure[]
-  readonly unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[]
-  advanceGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void
-  allNotesOff(): void
-  dispose(): void
-  now(): ReturnType<typeof parsePlaybackClockSecond>
-  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null
-}
-
-export const PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE = Object.freeze({
-  FAIL_PLAN: 'fail-plan',
-  SKIP_UNAVAILABLE_INSTRUMENTS: 'skip-unavailable-instruments',
-} as const)
-
-export type ProjectPlaybackInstrumentFailureMode =
-  (typeof PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE)[keyof typeof PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE]
-
-export interface ProjectPlaybackInstrumentPreparationFailure {
-  readonly cause: unknown
-  readonly soundbankId: SoundbankId
-}
-
-export interface ProjectPlaybackUnsupportedNoteOccurrence {
-  readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey']
-  readonly pitch: ScheduledSampleVoicePlan['pitch']
-  readonly reason: 'no-matching-zone'
-  readonly soundbankId: SoundbankId
-  readonly trackId: ScheduledSampleVoicePlan['trackId']
-}
-
-export interface ProjectPlaybackPreparationOptions {
-  readonly instrumentFailureMode: ProjectPlaybackInstrumentFailureMode
-}
-
-export interface ProjectPlaybackVoiceHandle {
-  readonly engineGeneration: ScheduledSampleVoicePlan['engineGeneration']
-  readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey']
-  cancel(atPlaybackClockSecond?: PlaybackClockSecond): boolean
-  isActive(): boolean
-  rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): boolean
-}
-
-export interface ProjectPlaybackRuntimePort {
-  prepare(
-    plan: AudibleMidiProjectPlan,
-    signal: AbortSignal,
-    options: ProjectPlaybackPreparationOptions,
-  ): Promise<ProjectPlaybackPreparedRuntime>
-  dispose(): void
-}
-
-export interface ProjectPlaybackTimerPort {
-  clear(handle: unknown): void
-  setRepeating(callback: () => void, intervalMillisecond: number): unknown
-}
-
 export interface ProjectPlaybackCoordinatorDependencies {
   readonly activeProject: Pick<ActiveProjectService, 'state' | 'subscribe' | 'subscribeCommits'>
-  readonly runtime: ProjectPlaybackRuntimePort
-  readonly timer: ProjectPlaybackTimerPort
+  readonly runtime: PlaybackRuntimePort
+  readonly timer: PlaybackTimerPort
 }
 
 export interface ProjectPlaybackCoordinator {
   readonly state: ProjectPlaybackState
-  beginTimelineLocate(): ProjectPlaybackLocateSession | null
+  beginTimelineLocate(): PlaybackLocateSession | null
   canReturnToLastStartPosition(): boolean
   locateAtTick(tick: Tick): boolean
   pause(): boolean
@@ -128,50 +44,20 @@ export interface ProjectPlaybackCoordinator {
   dispose(): void
 }
 
-/** Owns one silent Ruler locate gesture without exposing audio runtime state to Vue. */
-export interface ProjectPlaybackLocateSession {
-  readonly startedWhilePlaying: boolean
-  cancel(): boolean
-  commit(tick: Tick): boolean
-}
-
 interface StateSubscriptionEntry {
   active: boolean
   readonly observer: ProjectPlaybackStateObserver
 }
 
-interface ActivePlanIdentity {
-  readonly modelRevision: ModelRevision
+interface PlayedProject {
   readonly projectId: ProjectId
   readonly session: ProjectSession
 }
 
-interface ScheduledVoiceEntry {
-  readonly handle: ProjectPlaybackVoiceHandle
-  readonly plan: ScheduledSampleVoicePlan
-  readonly runtime: ProjectPlaybackPreparedRuntime
-}
-
-interface ActiveLocateSession {
-  readonly modelRevision: ModelRevision
-  readonly projectId: ProjectId
-  readonly startedWhilePlaying: boolean
-}
-
-const SCHEDULER_WAKE_CADENCE_SECOND = parsePlaybackClockDurationSecond(0.025)
-const SCHEDULER_LOOK_AHEAD_HORIZON_SECOND = parsePlaybackClockDurationSecond(0.2)
-const SCHEDULER_WAKE_CADENCE_MILLISECOND = SCHEDULER_WAKE_CADENCE_SECOND * 1_000
-const EMPTY_PREPARATION_FAILURES = Object.freeze<
-  readonly ProjectPlaybackInstrumentPreparationFailure[]
->([])
-const EMPTY_UNSUPPORTED_NOTE_OCCURRENCES = Object.freeze<
-  readonly ProjectPlaybackUnsupportedNoteOccurrence[]
->([])
-const MAXIMUM_UNSUPPORTED_NOTE_SUMMARY_ITEMS = 6
-const ZERO_VISUAL_POSITION_TICK = 0 as ProjectPlaybackVisualPosition['positionTick']
+const NO_DIAGNOSTICS = Object.freeze([])
 
 const UNAVAILABLE_STATE = Object.freeze<ProjectPlaybackState>({
-  diagnostics: Object.freeze([]),
+  diagnostics: NO_DIAGNOSTICS,
   failureCause: null,
   feedback: null,
   modelRevision: null,
@@ -181,212 +67,62 @@ const UNAVAILABLE_STATE = Object.freeze<ProjectPlaybackState>({
   projectId: null,
 })
 
-function feedbackForPlan(plan: AudibleMidiProjectPlan): ProjectPlaybackFeedback | null {
-  if (plan.status === AUDIBLE_MIDI_PLAN_STATUS.BLOCKED) {
-    return Object.freeze({
-      kind: 'error',
-      message: 'Playback is blocked by unsupported project routing.',
-    })
-  }
-  if (plan.status === AUDIBLE_MIDI_PLAN_STATUS.EMPTY) {
-    return Object.freeze({ kind: 'info', message: 'No audible MIDI notes to play.' })
-  }
-  if (plan.status === AUDIBLE_MIDI_PLAN_STATUS.PARTIAL) {
-    return Object.freeze({
-      kind: 'warning',
-      message: 'Some unsupported project content will be skipped.',
-    })
-  }
-  return null
-}
-
-function feedbackForFailure(cause: unknown): ProjectPlaybackFeedback {
-  const message =
-    cause instanceof Error && cause.message.trim() !== ''
-      ? cause.message
-      : 'The audio runtime could not start playback.'
-  return Object.freeze({ kind: 'error', message })
-}
-
-function feedbackForPreparationResults(
-  failures: readonly ProjectPlaybackInstrumentPreparationFailure[],
-  unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[],
-): ProjectPlaybackFeedback | null {
-  const messages: string[] = []
-  if (failures.length > 0) {
-    const soundbankIds = [...new Set(failures.map(({ soundbankId }) => soundbankId))]
-    messages.push(
-      `Instrument resources could not be loaded for ${soundbankIds.join(', ')}; affected tracks are silent.`,
-    )
-  }
-  if (unsupportedNoteOccurrences.length > 0) {
-    const countsBySoundbank = new Map<SoundbankId, Map<number, number>>()
-    for (const occurrence of unsupportedNoteOccurrences) {
-      let countsByPitch = countsBySoundbank.get(occurrence.soundbankId)
-      if (countsByPitch === undefined) {
-        countsByPitch = new Map()
-        countsBySoundbank.set(occurrence.soundbankId, countsByPitch)
-      }
-      countsByPitch.set(occurrence.pitch, (countsByPitch.get(occurrence.pitch) ?? 0) + 1)
-    }
-    const summaryItems = [...countsBySoundbank]
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .flatMap(([soundbankId, countsByPitch]) =>
-        [...countsByPitch]
-          .sort(([left], [right]) => left - right)
-          .map(([pitch, count]) => `${soundbankId} MIDI ${pitch}${count > 1 ? ` ×${count}` : ''}`),
-      )
-    const visibleItems = summaryItems.slice(0, MAXIMUM_UNSUPPORTED_NOTE_SUMMARY_ITEMS)
-    const hiddenItemCount = summaryItems.length - visibleItems.length
-    const hiddenSummary = hiddenItemCount > 0 ? `; plus ${hiddenItemCount} more` : ''
-    const eventLabel = unsupportedNoteOccurrences.length === 1 ? 'event was' : 'events were'
-    messages.push(
-      `${unsupportedNoteOccurrences.length} MIDI note ${eventLabel} skipped because the selected instrument control files do not cover those pitches: ${visibleItems.join('; ')}${hiddenSummary}.`,
-    )
-  }
-  if (messages.length === 0) return null
+function projectPlaybackState(
+  engine: PlaybackEngineState,
+  projectId: ProjectId,
+): ProjectPlaybackState {
+  if (engine.phase === PROJECT_PLAYBACK_PHASE.UNAVAILABLE) return UNAVAILABLE_STATE
   return Object.freeze({
-    kind: 'warning',
-    message: messages.join(' '),
-  })
-}
-
-function hasSampleCoveredNoteOccurrence(
-  plan: AudibleMidiProjectPlan,
-  unsupportedNoteOccurrences: readonly ProjectPlaybackUnsupportedNoteOccurrence[],
-): boolean {
-  if (plan.midiNoteSpans.length === 0) return false
-  if (unsupportedNoteOccurrences.length === 0) return true
-  const unsupportedOccurrenceKeys = new Set(
-    unsupportedNoteOccurrences.map(({ occurrenceKey }) => occurrenceKey),
-  )
-  return plan.midiNoteSpans.some(
-    ({ occurrenceKey }) => !unsupportedOccurrenceKeys.has(occurrenceKey),
-  )
-}
-
-function createState(input: {
-  readonly diagnostics: readonly PlaybackDiagnostic[]
-  readonly failureCause?: unknown
-  readonly feedback?: ProjectPlaybackFeedback | null
-  readonly phase: ProjectPlaybackState['phase']
-  readonly plan: AudibleMidiProjectPlan
-  readonly positionProjectSecond?: number
-  readonly projectId: ProjectId
-}): ProjectPlaybackState {
-  return Object.freeze({
-    diagnostics: input.diagnostics,
-    failureCause: input.failureCause ?? null,
-    feedback: input.feedback === undefined ? feedbackForPlan(input.plan) : input.feedback,
-    modelRevision: input.plan.modelRevision,
-    phase: input.phase,
-    planStatus: input.plan.status,
-    positionProjectSecond: input.positionProjectSecond ?? 0,
-    projectId: input.projectId,
-  })
-}
-
-function createVisualPosition(
-  state: ProjectPlaybackState,
-  positionProjectSecond = state.positionProjectSecond,
-  positionTick = ZERO_VISUAL_POSITION_TICK,
-): ProjectPlaybackVisualPosition {
-  return Object.freeze({
-    modelRevision: state.modelRevision,
-    phase: state.phase,
-    positionProjectSecond,
-    positionTick,
-    projectId: state.projectId,
-  })
-}
-
-function isPlayablePlan(plan: AudibleMidiProjectPlan): boolean {
-  return (
-    plan.status === AUDIBLE_MIDI_PLAN_STATUS.PARTIAL ||
-    plan.status === AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE
-  )
-}
-
-/**
- * A sounding voice survives an edit only when its note now ends or releases at another tick, as a
- * resize, a sustain pedal edit or a clip extension does. Any other change needs a new voice.
- */
-function onlyReleaseChanged(change: AudibleMidiOccurrenceChange): boolean {
-  return change.changedFields.every((field) => field === 'endTick' || field === 'releaseTick')
-}
-
-/** Routes command and History commits by their semantic Tempo Delta, not their origin label. */
-function changesTempoMap(commit: ProjectCommit): boolean {
-  return commit.delta.changes.some((change) => {
-    switch (change.type) {
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED:
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED:
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED:
-        return true
-      default:
-        return false
-    }
+    diagnostics: engine.plan?.diagnostics ?? NO_DIAGNOSTICS,
+    // Outside a failure, the instruments that could not load explain the tracks that are silent.
+    failureCause:
+      engine.phase === PROJECT_PLAYBACK_PHASE.FAILED
+        ? engine.failureCause
+        : engine.preparationFailures.length > 0
+          ? engine.preparationFailures
+          : null,
+    feedback: describePlaybackFeedback(engine),
+    modelRevision: engine.modelRevision,
+    phase: engine.phase,
+    planStatus: engine.plan?.status ?? null,
+    positionProjectSecond: engine.positionProjectSecond,
+    projectId,
   })
 }
 
 /**
- * Owns the Studio use case that joins Project facts, browser-independent playback planning, audio
- * resource preparation, native scheduling, user commands, and project/application cleanup.
+ * Plays the active Project: loads each ready Project into the playback engine, forwards its
+ * commits, and publishes the engine's state with the Project's identity and user-facing feedback.
  */
 class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
-  readonly #runtimePort: ProjectPlaybackRuntimePort
-  readonly #timerPort: ProjectPlaybackTimerPort
+  readonly #engine: PlaybackEngine
   readonly #subscriptions = new Set<StateSubscriptionEntry>()
-  readonly #unsubscribeActiveProject: ProjectPlaybackUnsubscribe
-  readonly #unsubscribeActiveProjectCommits: ProjectPlaybackUnsubscribe
-  readonly #retiredRuntimes = new Set<ProjectPlaybackPreparedRuntime>()
-  readonly #scheduledVoices = new Set<ScheduledVoiceEntry>()
-  readonly #playbackClock = Object.freeze({
-    now: () => {
-      const runtime = this.#preparedRuntime
-      if (runtime === null) {
-        throw new ProjectPlaybackError(
-          'playback-unavailable',
-          'Project Playback has no active audio clock',
-        )
-      }
-      return runtime.now()
-    },
-  })
-  #activePlanIdentity: ActivePlanIdentity | null = null
-  #plan: AudibleMidiProjectPlan | null = null
-  #preparedRuntime: ProjectPlaybackPreparedRuntime | null = null
-  #transport: AudibleMidiTransport | null = null
-  #scheduler: AudibleMidiSchedulerPlanner | null = null
-  #timerHandle: unknown = null
-  #inactiveVoiceCleanupTimerHandle: unknown = null
-  #preparationAbortController: AbortController | null = null
-  #requestSequence = 0
-  #pendingCommits: ProjectCommit[] = []
-  #pendingCommitEvent: ActiveProjectCommitEvent | null = null
-  #pendingCommitFlushQueued = false
-  #pendingCommitChainBroken = false
-  #pendingPlan: AudibleMidiProjectPlan | null = null
-  #pendingStartLocatedDuringLoading = false
-  #runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
-  #runtimeUnsupportedNoteOccurrences = EMPTY_UNSUPPORTED_NOTE_OCCURRENCES
-  #suppressedOccurrenceKeys = new Set<ScheduledSampleVoicePlan['occurrenceKey']>()
-  #suppressedTrackIds = new Set<ScheduledSampleVoicePlan['trackId']>()
+  readonly #unsubscribeState: ProjectPlaybackUnsubscribe
+  readonly #unsubscribeCommits: ProjectPlaybackUnsubscribe
+  #project: PlayedProject | null = null
   #state: ProjectPlaybackState = UNAVAILABLE_STATE
-  #activeLocateSession: ActiveLocateSession | null = null
   #disposed = false
 
   constructor(dependencies: ProjectPlaybackCoordinatorDependencies) {
-    this.#runtimePort = dependencies.runtime
-    this.#timerPort = dependencies.timer
-    this.#synchronizeActiveProject(dependencies.activeProject.state)
-    this.#unsubscribeActiveProject = dependencies.activeProject.subscribe({
-      onStateChange: (state) => this.#synchronizeActiveProject(state),
-      onError: (failure) => this.#failCurrentPlan(failure.cause),
+    this.#engine = createPlaybackEngine({
+      runtime: dependencies.runtime,
+      timer: dependencies.timer,
+      onStateChange: (state) => this.#publish(state),
     })
-    this.#unsubscribeActiveProjectCommits = dependencies.activeProject.subscribeCommits({
-      onCommit: (event) => this.#reconcileActiveProjectCommit(event),
-      onError: (failure) => this.#failCurrentPlan(failure.cause),
+    this.#follow(dependencies.activeProject.state)
+    this.#unsubscribeState = dependencies.activeProject.subscribe({
+      onStateChange: (state) => this.#follow(state),
+      onError: (failure) => this.#engine.fail(failure.cause),
+    })
+    this.#unsubscribeCommits = dependencies.activeProject.subscribeCommits({
+      onCommit: ({ commit, projectId, session }) => {
+        const project = this.#project
+        if (this.#disposed || project?.projectId !== projectId || project.session !== session) {
+          return
+        }
+        this.#engine.commit(commit, () => session.getSnapshot())
+      },
+      onError: (failure) => this.#engine.fail(failure.cause),
     })
   }
 
@@ -396,376 +132,43 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
 
   readVisualPosition(): ProjectPlaybackVisualPosition {
     this.#assertLive()
-    const transport = this.#transport
-    if (transport === null) return createVisualPosition(this.#state)
-
-    try {
-      const snapshot = transport.getSnapshot()
-      if (this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING && snapshot.state !== 'playing') {
-        // A visual sample may observe natural end before the Scheduler wakes. Close the same
-        // low-frequency state transition here while retaining the Transport's End position.
-        this.#stopTimer()
-        this.#startInactiveVoiceCleanup()
-        this.#publishTransportState(snapshot)
-      }
-      return createVisualPosition(
-        this.#state,
-        snapshot.positionProjectSecond,
-        snapshot.positionTick,
-      )
-    } catch (cause) {
-      this.#failCurrentPlan(cause)
-      return createVisualPosition(this.#state)
-    }
+    const position = this.#engine.readVisualPosition()
+    return Object.freeze({ ...position, projectId: this.#state.projectId })
   }
 
-  beginTimelineLocate(): ProjectPlaybackLocateSession | null {
+  beginTimelineLocate(): PlaybackLocateSession | null {
     this.#assertLive()
-    if (this.#transport === null || this.#activeLocateSession !== null) return null
-
-    const identity = this.#activePlanIdentity
-    if (identity === null) return null
-    const startedWhilePlaying = this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
-    if (startedWhilePlaying && !this.#pauseForLocatePreview()) return null
-
-    const activeSession = Object.freeze<ActiveLocateSession>({
-      modelRevision: identity.modelRevision,
-      projectId: identity.projectId,
-      startedWhilePlaying,
-    })
-    this.#activeLocateSession = activeSession
-
-    return Object.freeze({
-      startedWhilePlaying,
-      cancel: () => this.#cancelTimelineLocate(activeSession),
-      commit: (tick: Tick) => this.#commitTimelineLocate(activeSession, tick),
-    })
+    return this.#engine.beginTimelineLocate()
   }
 
   locateAtTick(tick: Tick): boolean {
     this.#assertLive()
-    if (this.#activeLocateSession !== null) return false
-    return this.#locateAtTick(tick)
+    return this.#engine.locateAtTick(tick)
   }
 
   canReturnToLastStartPosition(): boolean {
     this.#assertLive()
-    if (
-      this.#activeLocateSession !== null ||
-      this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING ||
-      this.#state.phase === PROJECT_PLAYBACK_PHASE.PAUSED ||
-      this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
-    ) {
-      return true
-    }
-    if (this.#state.phase !== PROJECT_PLAYBACK_PHASE.STOPPED) return false
-
-    const snapshot = this.#transport?.getSnapshot()
-    return (
-      snapshot !== undefined && Number(snapshot.positionTick) !== Number(snapshot.returnAnchorTick)
-    )
+    return this.#engine.canReturnToLastStartPosition()
   }
 
-  async play(): Promise<boolean> {
+  play(): Promise<boolean> {
     this.#assertLive()
-    const plan = this.#requirePlayablePlan()
-    if (
-      this.#activeLocateSession !== null ||
-      this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING ||
-      this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
-    ) {
-      return false
-    }
-
-    if (this.#transport === null || this.#scheduler === null) {
-      this.#installPlanControls(plan)
-    }
-
-    if (
-      this.#preparedRuntime?.modelRevision === plan.modelRevision &&
-      this.#transport !== null &&
-      this.#scheduler !== null
-    ) {
-      return this.#resumePreparedPlayback()
-    }
-
-    const projectId = this.#requireProjectId()
-    const requestSequence = ++this.#requestSequence
-    const abortController = new AbortController()
-    this.#preparationAbortController?.abort()
-    this.#preparationAbortController = abortController
-    this.#pendingStartLocatedDuringLoading = false
-    this.#publish(
-      createState({
-        diagnostics: plan.diagnostics,
-        feedback: Object.freeze({ kind: 'info', message: 'Loading instrument…' }),
-        phase: PROJECT_PLAYBACK_PHASE.LOADING,
-        plan,
-        positionProjectSecond: this.#state.positionProjectSecond,
-        projectId,
-      }),
-    )
-
-    try {
-      const previousRuntime = this.#preparedRuntime
-      previousRuntime?.dispose()
-      if (previousRuntime !== null) {
-        for (const entry of this.#scheduledVoices) {
-          if (entry.runtime === previousRuntime) this.#scheduledVoices.delete(entry)
-        }
-      }
-      this.#preparedRuntime = null
-      const preparedRuntime = await this.#runtimePort.prepare(plan, abortController.signal, {
-        instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
-      })
-      if (!this.#isCurrentRequest(requestSequence, plan, abortController)) {
-        preparedRuntime.dispose()
-        return false
-      }
-
-      this.#preparedRuntime = preparedRuntime
-      this.#runtimePreparationFailures = preparedRuntime.preparationFailures
-      this.#runtimeUnsupportedNoteOccurrences = preparedRuntime.unsupportedNoteOccurrences
-      const transport = this.#transport
-      if (transport === null || this.#scheduler === null) {
-        throw new ProjectPlaybackError(
-          'playback-unavailable',
-          'Project Playback has no Transport for the active Plan',
-        )
-      }
-
-      const pendingSnapshot = transport.getSnapshot()
-      if (
-        this.#pendingStartLocatedDuringLoading &&
-        Number(pendingSnapshot.positionTick) === pendingSnapshot.timelineEndTick
-      ) {
-        this.#pendingStartLocatedDuringLoading = false
-        this.#publishTransportState(pendingSnapshot)
-        return true
-      }
-
-      if (!hasSampleCoveredNoteOccurrence(plan, this.#runtimeUnsupportedNoteOccurrences)) {
-        this.#pendingStartLocatedDuringLoading = false
-        this.#publishTransportState(pendingSnapshot)
-        return false
-      }
-
-      const transition = transport.play()
-      if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) {
-        throw new ProjectPlaybackError(
-          'playback-unavailable',
-          `Transport rejected Play with outcome ${transition.outcome}`,
-        )
-      }
-      preparedRuntime.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#scheduleNextWindow(transition.snapshot)
-      this.#startTimer()
-      this.#publishTransportState(transition.snapshot)
-      this.#pendingStartLocatedDuringLoading = false
-      return true
-    } catch (cause) {
-      if (!this.#isCurrentRequest(requestSequence, plan, abortController)) return false
-      this.#failCurrentPlan(cause)
-      return false
-    } finally {
-      if (this.#preparationAbortController === abortController) {
-        this.#preparationAbortController = null
-      }
-    }
+    return this.#engine.play()
   }
 
   pause(): boolean {
     this.#assertLive()
-    if (this.#activeLocateSession !== null) return false
-    return this.#pauseTransport()
-  }
-
-  #pauseForLocatePreview(): boolean {
-    return this.#pauseTransport()
-  }
-
-  #pauseTransport(): boolean {
-    const transport = this.#transport
-    if (transport === null) return false
-    try {
-      const transition = transport.pause()
-      if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PAUSED) return false
-
-      this.#stopTimer()
-      this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#allNotesOffRuntimes()
-      this.#startInactiveVoiceCleanup()
-      this.#publishTransportState(transition.snapshot)
-      return true
-    } catch (cause) {
-      this.#failCurrentPlan(cause)
-      return false
-    }
-  }
-
-  #cancelTimelineLocate(session: ActiveLocateSession): boolean {
-    if (!this.#claimLocateSession(session)) return false
-    if (!session.startedWhilePlaying) return true
-    return this.#resumePreparedPlayback()
-  }
-
-  #commitTimelineLocate(session: ActiveLocateSession, tick: Tick): boolean {
-    if (!this.#claimLocateSession(session)) return false
-    return session.startedWhilePlaying
-      ? this.#resumeAndLocateAtTick(tick)
-      : this.#locateAtTick(tick)
-  }
-
-  #claimLocateSession(session: ActiveLocateSession): boolean {
-    if (this.#disposed || this.#activeLocateSession !== session) return false
-    const identity = this.#activePlanIdentity
-    this.#activeLocateSession = null
-    return (
-      identity !== null &&
-      identity.projectId === session.projectId &&
-      identity.modelRevision === session.modelRevision
-    )
-  }
-
-  #invalidateLocateSession(): void {
-    this.#activeLocateSession = null
-  }
-
-  #locateAtTick(tick: Tick): boolean {
-    const transport = this.#transport
-    if (transport === null) return false
-    const wasLoading = this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING
-
-    try {
-      const transition = transport.locateAtTick(tick)
-      if (wasLoading) {
-        this.#pendingStartLocatedDuringLoading = true
-        this.#publishLoadingPosition(transition.snapshot)
-        return true
-      }
-
-      if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE) return true
-      this.#stopTimer()
-      this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#allNotesOffRuntimes()
-      this.#collectFinishedVoicesAndRuntimes()
-      if (transition.snapshot.state === 'playing') {
-        this.#scheduleNextWindow(transition.snapshot)
-        this.#startTimer()
-      } else {
-        this.#startInactiveVoiceCleanup()
-      }
-      this.#publishTransportState(transition.snapshot)
-      return true
-    } catch (cause) {
-      this.#failCurrentPlan(cause)
-      return false
-    }
-  }
-
-  #resumeAndLocateAtTick(tick: Tick): boolean {
-    const transport = this.#transport
-    const runtime = this.#preparedRuntime
-    if (transport === null || runtime === null || this.#scheduler === null) return false
-
-    try {
-      const played = transport.play()
-      if (played.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) {
-        throw new ProjectPlaybackError(
-          'playback-unavailable',
-          `Transport rejected locate resume with outcome ${played.outcome}`,
-        )
-      }
-      const located = transport.locateAtTick(tick)
-      runtime.advanceGeneration(located.snapshot.engineGeneration)
-      this.#collectFinishedVoicesAndRuntimes()
-      if (located.snapshot.state === 'playing') {
-        this.#scheduleNextWindow(located.snapshot)
-        this.#startTimer()
-      } else {
-        this.#stopTimer()
-        this.#startInactiveVoiceCleanup()
-      }
-      this.#publishTransportState(located.snapshot)
-      return true
-    } catch (cause) {
-      this.#failCurrentPlan(cause)
-      return false
-    }
-  }
-
-  #resumePreparedPlayback(): boolean {
-    const transport = this.#transport
-    const runtime = this.#preparedRuntime
-    const plan = this.#plan
-    if (transport === null || runtime === null || this.#scheduler === null || plan === null) {
-      return false
-    }
-    if (!hasSampleCoveredNoteOccurrence(plan, this.#runtimeUnsupportedNoteOccurrences)) {
-      this.#publishTransportState(transport.getSnapshot())
-      return false
-    }
-
-    try {
-      const transition = transport.play()
-      if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) return false
-      runtime.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#collectFinishedVoicesAndRuntimes()
-      this.#scheduleNextWindow(transition.snapshot)
-      this.#startTimer()
-      this.#publishTransportState(transition.snapshot)
-      return true
-    } catch (cause) {
-      this.#failCurrentPlan(cause)
-      return false
-    }
+    return this.#engine.pause()
   }
 
   returnToLastStartPosition(): boolean {
     this.#assertLive()
-    return this.#returnToLastStartPosition()
-  }
-
-  #returnToLastStartPosition(): boolean {
-    this.#invalidateLocateSession()
-    const wasLoading = this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING
-    this.#cancelPreparation()
-    this.#stopTimer()
-    try {
-      const transport = this.#transport
-      if (transport === null) {
-        this.#allNotesOffRuntimes()
-        this.#startInactiveVoiceCleanup()
-        this.#publishStoppedAtStart()
-        return wasLoading
-      }
-
-      const transition = transport.returnToLastStartPosition()
-      if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION) {
-        this.#preparedRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-        this.#allNotesOffRuntimes()
-      } else {
-        this.#allNotesOffRuntimes()
-      }
-      this.#startInactiveVoiceCleanup()
-      this.#publishTransportState(transition.snapshot)
-      return (
-        wasLoading ||
-        transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION
-      )
-    } catch (cause) {
-      this.#failCurrentPlan(cause)
-      return false
-    }
+    return this.#engine.returnToLastStartPosition()
   }
 
   togglePlayPause(): boolean {
     this.#assertLive()
-    if (this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING) return this.pause()
-    if (this.#state.phase === PROJECT_PLAYBACK_PHASE.LOADING) return false
-    if (this.#plan === null || !isPlayablePlan(this.#plan)) return false
-    void this.play()
-    return true
+    return this.#engine.togglePlayPause()
   }
 
   subscribe(observer: ProjectPlaybackStateObserver): ProjectPlaybackUnsubscribe {
@@ -782,12 +185,10 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
-    this.#unsubscribeActiveProject()
-    this.#unsubscribeActiveProjectCommits()
-    this.#releasePlanRuntime()
-    this.#runtimePort.dispose()
-    this.#activePlanIdentity = null
-    this.#plan = null
+    this.#unsubscribeState()
+    this.#unsubscribeCommits()
+    this.#engine.dispose()
+    this.#project = null
     this.#state = UNAVAILABLE_STATE
     for (const entry of this.#subscriptions) entry.active = false
     this.#subscriptions.clear()
@@ -799,93 +200,25 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     }
   }
 
-  #cancelPreparation(): void {
-    this.#requestSequence += 1
-    this.#preparationAbortController?.abort()
-    this.#preparationAbortController = null
-  }
-
-  #failCurrentPlan(cause: unknown): void {
+  #follow(state: ActiveProjectState): void {
     if (this.#disposed) return
-    const plan = this.#plan
-    const projectId = this.#activePlanIdentity?.projectId
-    this.#releasePlanRuntime()
-    if (plan === null || projectId === undefined) {
-      this.#publish(UNAVAILABLE_STATE)
+    if (state.phase !== ACTIVE_PROJECT_PHASE.READY) {
+      this.#project = null
+      this.#engine.unload()
       return
     }
-    this.#publish(
-      createState({
-        diagnostics: plan.diagnostics,
-        failureCause: cause,
-        feedback: feedbackForFailure(cause),
-        phase: PROJECT_PLAYBACK_PHASE.FAILED,
-        plan,
-        projectId,
-      }),
-    )
+    const current = this.#project
+    // The service publishes the matching ready state before forwarding its commit; the commit
+    // reconciles the new revision, so a state update for the same session changes nothing here.
+    if (current?.projectId === state.projectId && current.session === state.session) return
+    this.#project = Object.freeze({ projectId: state.projectId, session: state.session })
+    this.#engine.load(state.session.getSnapshot())
   }
 
-  #failActiveProjectRevision(event: ActiveProjectCommitEvent, cause: unknown): void {
-    this.#releasePlanRuntime()
-    this.#activePlanIdentity = Object.freeze({
-      modelRevision: event.state.modelRevision,
-      projectId: event.projectId,
-      session: event.session,
-    })
-    this.#plan = null
-    this.#publish(
-      Object.freeze({
-        diagnostics: Object.freeze([]),
-        failureCause: cause,
-        feedback: feedbackForFailure(cause),
-        modelRevision: event.state.modelRevision,
-        phase: PROJECT_PLAYBACK_PHASE.FAILED,
-        planStatus: null,
-        positionProjectSecond: 0,
-        projectId: event.projectId,
-      }),
-    )
-  }
-
-  #failReconciledPlan(
-    event: ActiveProjectCommitEvent,
-    nextPlan: AudibleMidiProjectPlan,
-    cause: unknown,
-  ): void {
-    this.#releasePlanRuntime()
-    this.#activePlanIdentity = Object.freeze({
-      modelRevision: nextPlan.modelRevision,
-      projectId: event.projectId,
-      session: event.session,
-    })
-    this.#plan = nextPlan
-    this.#publish(
-      createState({
-        diagnostics: nextPlan.diagnostics,
-        failureCause: cause,
-        feedback: feedbackForFailure(cause),
-        phase: PROJECT_PLAYBACK_PHASE.FAILED,
-        plan: nextPlan,
-        projectId: event.projectId,
-      }),
-    )
-  }
-
-  #isCurrentRequest(
-    requestSequence: number,
-    plan: AudibleMidiProjectPlan,
-    abortController: AbortController,
-  ): boolean {
-    return (
-      !this.#disposed &&
-      !abortController.signal.aborted &&
-      requestSequence === this.#requestSequence &&
-      this.#plan === plan
-    )
-  }
-
-  #publish(state: ProjectPlaybackState): void {
+  #publish(engine: PlaybackEngineState): void {
+    const projectId = this.#project?.projectId
+    const state =
+      projectId === undefined ? UNAVAILABLE_STATE : projectPlaybackState(engine, projectId)
     this.#state = state
     for (const entry of this.#subscriptions) {
       if (!entry.active) continue
@@ -901,637 +234,6 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
           // The failed observer is detached, so error reporting cannot recurse.
         }
       }
-    }
-  }
-
-  #publishStoppedAtStart(): void {
-    const plan = this.#plan
-    const projectId = this.#activePlanIdentity?.projectId
-    if (plan === null || projectId === undefined) return
-    this.#publish(
-      createState({
-        diagnostics: plan.diagnostics,
-        phase: PROJECT_PLAYBACK_PHASE.STOPPED,
-        plan,
-        projectId,
-      }),
-    )
-  }
-
-  #publishLoadingPosition(snapshot: AudibleMidiTransportSnapshot): void {
-    const plan = this.#plan
-    const projectId = this.#activePlanIdentity?.projectId
-    if (plan === null || projectId === undefined) return
-    this.#publish(
-      createState({
-        diagnostics: plan.diagnostics,
-        failureCause: this.#state.failureCause,
-        feedback: this.#state.feedback,
-        phase: PROJECT_PLAYBACK_PHASE.LOADING,
-        plan,
-        positionProjectSecond: snapshot.positionProjectSecond,
-        projectId,
-      }),
-    )
-  }
-
-  #publishTransportState(snapshot: AudibleMidiTransportSnapshot): void {
-    const plan = this.#plan
-    const projectId = this.#activePlanIdentity?.projectId
-    if (plan === null || projectId === undefined) return
-    let phase: ProjectPlaybackState['phase']
-    switch (snapshot.state) {
-      case 'paused':
-        phase = PROJECT_PLAYBACK_PHASE.PAUSED
-        break
-      case 'playing':
-        phase = PROJECT_PLAYBACK_PHASE.PLAYING
-        break
-      case 'stopped':
-        phase = PROJECT_PLAYBACK_PHASE.STOPPED
-        break
-    }
-    const preparationFeedback = feedbackForPreparationResults(
-      this.#runtimePreparationFailures,
-      this.#runtimeUnsupportedNoteOccurrences,
-    )
-    this.#publish(
-      createState({
-        diagnostics: plan.diagnostics,
-        failureCause:
-          this.#runtimePreparationFailures.length === 0
-            ? undefined
-            : this.#runtimePreparationFailures,
-        feedback: preparationFeedback ?? undefined,
-        phase,
-        plan,
-        positionProjectSecond: snapshot.positionProjectSecond,
-        projectId,
-      }),
-    )
-  }
-
-  #releasePlanRuntime(): void {
-    this.#invalidateLocateSession()
-    this.#cancelPreparation()
-    this.#stopTimer()
-    this.#stopInactiveVoiceCleanup()
-    try {
-      this.#allNotesOffRuntimes()
-    } catch {
-      // Runtime disposal below remains authoritative after a release failure.
-    }
-    const runtimes = new Set(this.#retiredRuntimes)
-    if (this.#preparedRuntime !== null) runtimes.add(this.#preparedRuntime)
-    for (const runtime of runtimes) runtime.dispose()
-    this.#preparedRuntime = null
-    this.#retiredRuntimes.clear()
-    this.#scheduledVoices.clear()
-    this.#pendingCommits = []
-    this.#pendingCommitEvent = null
-    this.#pendingCommitFlushQueued = false
-    this.#pendingCommitChainBroken = false
-    this.#pendingPlan = null
-    this.#pendingStartLocatedDuringLoading = false
-    this.#runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
-    this.#runtimeUnsupportedNoteOccurrences = EMPTY_UNSUPPORTED_NOTE_OCCURRENCES
-    this.#suppressedOccurrenceKeys.clear()
-    this.#suppressedTrackIds.clear()
-    this.#transport = null
-    this.#scheduler = null
-  }
-
-  #installPlanControls(plan: AudibleMidiProjectPlan): void {
-    this.#transport = createAudibleMidiTransport(plan, this.#playbackClock)
-    this.#scheduler = createAudibleMidiSchedulerPlanner(plan, {
-      lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
-      wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,
-    })
-  }
-
-  #allNotesOffRuntimes(): void {
-    let firstFailure: unknown = null
-    const runtimes = new Set(this.#retiredRuntimes)
-    if (this.#preparedRuntime !== null) runtimes.add(this.#preparedRuntime)
-    for (const runtime of runtimes) {
-      try {
-        runtime.allNotesOff()
-      } catch (error) {
-        firstFailure ??= error
-      }
-    }
-    if (firstFailure !== null && !this.#disposed) throw firstFailure
-  }
-
-  #collectFinishedVoicesAndRuntimes(): void {
-    for (const entry of this.#scheduledVoices) {
-      let active = false
-      try {
-        active = entry.handle.isActive()
-      } catch {
-        // A failed or disposed Runtime cannot retain a usable scheduled Voice.
-      }
-      if (!active) this.#scheduledVoices.delete(entry)
-    }
-
-    for (const runtime of this.#retiredRuntimes) {
-      const hasActiveVoice = [...this.#scheduledVoices].some((entry) => entry.runtime === runtime)
-      if (hasActiveVoice) continue
-      runtime.dispose()
-      this.#retiredRuntimes.delete(runtime)
-    }
-    if (this.#retiredRuntimes.size === 0 && this.#scheduledVoices.size === 0) {
-      this.#stopInactiveVoiceCleanup()
-    }
-  }
-
-  #requirePlayablePlan(): AudibleMidiProjectPlan {
-    const plan = this.#plan
-    if (plan === null || !isPlayablePlan(plan)) {
-      throw new ProjectPlaybackError(
-        'playback-unavailable',
-        'The Active Project has no playable Audible MIDI Plan',
-      )
-    }
-    return plan
-  }
-
-  #requireProjectId(): ProjectId {
-    const projectId = this.#activePlanIdentity?.projectId
-    if (projectId === undefined) {
-      throw new ProjectPlaybackError(
-        'active-project-not-ready',
-        'Project Playback requires a ready Active Project',
-      )
-    }
-    return projectId
-  }
-
-  #scheduleNextWindow(snapshot: AudibleMidiTransportSnapshot): void {
-    const scheduler = this.#scheduler
-    const preparedRuntime = this.#preparedRuntime
-    if (scheduler === null || preparedRuntime === null) {
-      throw new ProjectPlaybackError(
-        'playback-unavailable',
-        'Project Playback scheduling resources are unavailable',
-      )
-    }
-    const batch = scheduler.planNextWindow(snapshot)
-    if (batch.outcome !== AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED) return
-    for (const voicePlan of batch.voicePlans) {
-      if (
-        this.#suppressedOccurrenceKeys.has(voicePlan.occurrenceKey) ||
-        this.#suppressedTrackIds.has(voicePlan.trackId)
-      ) {
-        continue
-      }
-      const handle = preparedRuntime.schedule(voicePlan)
-      if (handle !== null) {
-        this.#scheduledVoices.add(
-          Object.freeze({ handle, plan: voicePlan, runtime: preparedRuntime }),
-        )
-      }
-    }
-  }
-
-  #startTimer(): void {
-    this.#stopInactiveVoiceCleanup()
-    if (this.#timerHandle !== null) return
-    this.#timerHandle = this.#timerPort.setRepeating(
-      () => this.#tick(),
-      SCHEDULER_WAKE_CADENCE_MILLISECOND,
-    )
-  }
-
-  #stopTimer(): void {
-    if (this.#timerHandle === null) return
-    this.#timerPort.clear(this.#timerHandle)
-    this.#timerHandle = null
-  }
-
-  #startInactiveVoiceCleanup(): void {
-    if (this.#disposed) return
-    this.#collectFinishedVoicesAndRuntimes()
-    if (
-      (this.#retiredRuntimes.size === 0 && this.#scheduledVoices.size === 0) ||
-      this.#inactiveVoiceCleanupTimerHandle !== null
-    ) {
-      return
-    }
-    // Playback is inactive here, so the Scheduler timer cannot collect a normal or fast release
-    // tail. Keep only this lightweight ownership sweep alive until every handle and retired
-    // Runtime has reached its terminal state.
-    this.#inactiveVoiceCleanupTimerHandle = this.#timerPort.setRepeating(() => {
-      if (this.#disposed) return
-      this.#collectFinishedVoicesAndRuntimes()
-    }, SCHEDULER_WAKE_CADENCE_MILLISECOND)
-  }
-
-  #stopInactiveVoiceCleanup(): void {
-    if (this.#inactiveVoiceCleanupTimerHandle === null) return
-    this.#timerPort.clear(this.#inactiveVoiceCleanupTimerHandle)
-    this.#inactiveVoiceCleanupTimerHandle = null
-  }
-
-  #reconcileActiveProjectCommit(event: ActiveProjectCommitEvent): void {
-    if (this.#disposed) return
-    const identity = this.#activePlanIdentity
-    if (
-      identity === null ||
-      identity.projectId !== event.projectId ||
-      identity.session !== event.session
-    ) {
-      return
-    }
-
-    const expectedBaseRevision =
-      this.#pendingCommits.at(-1)?.modelRevision ?? identity.modelRevision
-    if (event.commit.baseRevision !== expectedBaseRevision) {
-      this.#pendingCommitChainBroken = true
-    }
-    this.#pendingCommits.push(event.commit)
-    this.#pendingCommitEvent = event
-
-    if (this.#pendingCommitFlushQueued) return
-    this.#pendingCommitFlushQueued = true
-    void Promise.resolve().then(() => {
-      this.#pendingCommitFlushQueued = false
-      this.#flushActiveProjectCommits()
-    })
-  }
-
-  #flushActiveProjectCommits(): void {
-    if (this.#disposed) return
-    const event = this.#pendingCommitEvent
-    const previousPlan = this.#plan
-    const identity = this.#activePlanIdentity
-    if (event === null || identity === null) return
-    if (event.projectId !== identity.projectId || event.session !== identity.session) return
-
-    let nextPlan: AudibleMidiProjectPlan
-    try {
-      nextPlan = compileAudibleMidiProject(event.session.getSnapshot())
-    } catch (cause) {
-      this.#failActiveProjectRevision(event, cause)
-      return
-    }
-
-    if (previousPlan === null) {
-      this.#installStoppedPlan(event, nextPlan)
-      return
-    }
-
-    if (
-      this.#pendingCommitChainBroken ||
-      this.#pendingCommits.at(-1)?.modelRevision !== nextPlan.modelRevision
-    ) {
-      this.#installStoppedPlan(event, nextPlan)
-      return
-    }
-
-    if (this.#pendingCommits.some(changesTempoMap)) {
-      this.#installTempoMapHandoff(event, nextPlan)
-      return
-    }
-
-    let reconciliation: AudibleMidiReconciliationPlan
-    try {
-      reconciliation = createAudibleMidiReconciliationPlan({
-        commits: this.#pendingCommits,
-        nextPlan,
-        previousPlan,
-      })
-    } catch (cause) {
-      this.#failReconciledPlan(event, nextPlan, cause)
-      return
-    }
-
-    const canContinueRuntime =
-      (this.#state.phase === PROJECT_PLAYBACK_PHASE.PLAYING ||
-        this.#state.phase === PROJECT_PLAYBACK_PHASE.PAUSED) &&
-      this.#preparedRuntime !== null &&
-      this.#transport !== null &&
-      this.#scheduler !== null
-    if (
-      !canContinueRuntime ||
-      reconciliation.scope !== AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE
-    ) {
-      this.#installStoppedPlan(event, nextPlan)
-      return
-    }
-
-    try {
-      this.#applyImmediateReconciliation(reconciliation)
-    } catch (cause) {
-      this.#failReconciledPlan(event, nextPlan, cause)
-      return
-    }
-    this.#suppressedOccurrenceKeys = new Set(reconciliation.invalidatedPreviousOccurrenceKeys)
-    this.#suppressedTrackIds = new Set(
-      reconciliation.trackChanges
-        .filter(({ kind }) => kind !== AUDIBLE_MIDI_TRACK_CHANGE_KIND.ADDED)
-        .map(({ trackId }) => trackId),
-    )
-    this.#prepareSelectiveHandoff(event, previousPlan, nextPlan)
-  }
-
-  #applyImmediateReconciliation(reconciliation: AudibleMidiReconciliationPlan): void {
-    const runtime = this.#preparedRuntime
-    const transport = this.#transport
-    if (runtime === null || transport === null) return
-    const now = runtime.now()
-
-    for (const change of reconciliation.trackChanges) {
-      if (change.kind === AUDIBLE_MIDI_TRACK_CHANGE_KIND.ADDED) continue
-      for (const entry of this.#scheduledVoices) {
-        if (entry.plan.trackId === change.trackId) entry.handle.cancel(now)
-      }
-    }
-
-    for (const change of reconciliation.occurrenceChanges) {
-      if (change.kind === AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED) continue
-      const entries = [...this.#scheduledVoices].filter(
-        ({ handle }) => handle.occurrenceKey === change.occurrenceKey,
-      )
-      for (const entry of entries) {
-        if (!entry.handle.isActive()) {
-          this.#scheduledVoices.delete(entry)
-          continue
-        }
-        if (entry.plan.startPlaybackClockSecond >= now) {
-          entry.handle.cancel(now)
-          continue
-        }
-        if (change.after === null || !onlyReleaseChanged(change)) {
-          entry.handle.cancel(now)
-          continue
-        }
-        if (this.#state.phase !== PROJECT_PLAYBACK_PHASE.PLAYING) {
-          entry.handle.cancel(now)
-          continue
-        }
-
-        const nextStart = transport.playbackClockSecondAtTick(change.after.startTick)
-        if (nextStart > now) {
-          entry.handle.cancel(now)
-          continue
-        }
-        const nextRelease = transport.playbackClockSecondAtTick(change.after.releaseTick)
-        entry.handle.rescheduleRelease(nextRelease)
-      }
-    }
-  }
-
-  #prepareSelectiveHandoff(
-    event: ActiveProjectCommitEvent,
-    previousPlan: AudibleMidiProjectPlan,
-    nextPlan: AudibleMidiProjectPlan,
-  ): void {
-    this.#preparationAbortController?.abort()
-    const abortController = new AbortController()
-    const requestSequence = ++this.#requestSequence
-    this.#preparationAbortController = abortController
-    this.#pendingPlan = nextPlan
-
-    void this.#runtimePort
-      .prepare(nextPlan, abortController.signal, {
-        instrumentFailureMode:
-          PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
-      })
-      .then((preparedRuntime) => {
-        if (
-          this.#disposed ||
-          abortController.signal.aborted ||
-          requestSequence !== this.#requestSequence ||
-          this.#plan !== previousPlan ||
-          this.#pendingPlan !== nextPlan ||
-          this.#activePlanIdentity?.session !== event.session
-        ) {
-          preparedRuntime.dispose()
-          return
-        }
-        if (preparedRuntime.modelRevision !== nextPlan.modelRevision) {
-          preparedRuntime.dispose()
-          throw new ProjectPlaybackError(
-            'playback-unavailable',
-            'Prepared Playback Runtime does not match the reconciled modelRevision',
-          )
-        }
-        this.#installSelectiveHandoff(event, nextPlan, preparedRuntime)
-      })
-      .catch((cause: unknown) => {
-        if (
-          this.#disposed ||
-          abortController.signal.aborted ||
-          requestSequence !== this.#requestSequence
-        ) {
-          return
-        }
-        this.#failReconciledPlan(event, nextPlan, cause)
-      })
-      .finally(() => {
-        if (this.#preparationAbortController === abortController) {
-          this.#preparationAbortController = null
-        }
-      })
-  }
-
-  #installSelectiveHandoff(
-    event: ActiveProjectCommitEvent,
-    nextPlan: AudibleMidiProjectPlan,
-    nextRuntime: ProjectPlaybackPreparedRuntime,
-  ): void {
-    this.#invalidateLocateSession()
-    const transport = this.#transport
-    const previousRuntime = this.#preparedRuntime
-    if (transport === null || previousRuntime === null) {
-      nextRuntime.dispose()
-      this.#installStoppedPlan(event, nextPlan)
-      return
-    }
-
-    const now = previousRuntime.now()
-    for (const entry of this.#scheduledVoices) {
-      if (entry.plan.startPlaybackClockSecond >= now) entry.handle.cancel(now)
-    }
-    const transition = transport.handoffPlan(nextPlan)
-    nextRuntime.advanceGeneration(transition.snapshot.engineGeneration)
-
-    this.#preparedRuntime = nextRuntime
-    this.#runtimePreparationFailures = nextRuntime.preparationFailures
-    this.#runtimeUnsupportedNoteOccurrences = nextRuntime.unsupportedNoteOccurrences
-    this.#retiredRuntimes.add(previousRuntime)
-    this.#scheduler = createAudibleMidiSchedulerPlanner(nextPlan, {
-      lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
-      wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,
-    })
-    this.#plan = nextPlan
-    this.#activePlanIdentity = Object.freeze({
-      modelRevision: nextPlan.modelRevision,
-      projectId: event.projectId,
-      session: event.session,
-    })
-    this.#pendingCommits = []
-    this.#pendingCommitEvent = null
-    this.#pendingCommitChainBroken = false
-    this.#pendingPlan = null
-    this.#suppressedOccurrenceKeys.clear()
-    this.#suppressedTrackIds.clear()
-
-    if (transition.snapshot.state === 'playing') {
-      this.#scheduleNextWindow(transition.snapshot)
-      this.#startTimer()
-    } else {
-      this.#stopTimer()
-      this.#startInactiveVoiceCleanup()
-    }
-    this.#publishTransportState(transition.snapshot)
-    this.#collectFinishedVoicesAndRuntimes()
-  }
-
-  #installStoppedPlan(event: ActiveProjectCommitEvent, nextPlan: AudibleMidiProjectPlan): void {
-    this.#releasePlanRuntime()
-    this.#activePlanIdentity = Object.freeze({
-      modelRevision: nextPlan.modelRevision,
-      projectId: event.projectId,
-      session: event.session,
-    })
-    this.#plan = nextPlan
-    this.#installPlanControls(nextPlan)
-    this.#publish(
-      createState({
-        diagnostics: nextPlan.diagnostics,
-        phase: PROJECT_PLAYBACK_PHASE.STOPPED,
-        plan: nextPlan,
-        projectId: event.projectId,
-      }),
-    )
-  }
-
-  /**
-   * Replaces the wall-clock mapping without replacing the musical position. A live Transport is
-   * first made inactive, then the old Runtime is retired so Tempo edits never resume implicitly.
-   */
-  #installTempoMapHandoff(event: ActiveProjectCommitEvent, nextPlan: AudibleMidiProjectPlan): void {
-    this.#invalidateLocateSession()
-    this.#cancelPreparation()
-    this.#stopTimer()
-    this.#stopInactiveVoiceCleanup()
-
-    const transport = this.#transport
-    if (transport === null) {
-      this.#installStoppedPlan(event, nextPlan)
-      return
-    }
-
-    try {
-      const startedPlaying = transport.getSnapshot().state === 'playing'
-      if (startedPlaying) transport.pause()
-
-      const transition = transport.handoffPlan(nextPlan)
-      const previousRuntime = this.#preparedRuntime
-      previousRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-      if (startedPlaying) this.#allNotesOffRuntimes()
-      if (previousRuntime !== null) this.#retiredRuntimes.add(previousRuntime)
-
-      this.#preparedRuntime = null
-      this.#runtimePreparationFailures = EMPTY_PREPARATION_FAILURES
-      this.#runtimeUnsupportedNoteOccurrences = EMPTY_UNSUPPORTED_NOTE_OCCURRENCES
-      this.#scheduler = createAudibleMidiSchedulerPlanner(nextPlan, {
-        lookAheadHorizonSecond: SCHEDULER_LOOK_AHEAD_HORIZON_SECOND,
-        wakeCadenceSecond: SCHEDULER_WAKE_CADENCE_SECOND,
-      })
-      this.#plan = nextPlan
-      this.#activePlanIdentity = Object.freeze({
-        modelRevision: nextPlan.modelRevision,
-        projectId: event.projectId,
-        session: event.session,
-      })
-      this.#pendingCommits = []
-      this.#pendingCommitEvent = null
-      this.#pendingCommitChainBroken = false
-      this.#pendingPlan = null
-      this.#pendingStartLocatedDuringLoading = false
-      this.#suppressedOccurrenceKeys.clear()
-      this.#suppressedTrackIds.clear()
-
-      this.#publishTransportState(transition.snapshot)
-      this.#startInactiveVoiceCleanup()
-      this.#collectFinishedVoicesAndRuntimes()
-    } catch (cause) {
-      this.#failReconciledPlan(event, nextPlan, cause)
-    }
-  }
-
-  #synchronizeActiveProject(state: ActiveProjectState): void {
-    if (this.#disposed) return
-    if (state.phase !== ACTIVE_PROJECT_PHASE.READY) {
-      this.#releasePlanRuntime()
-      this.#activePlanIdentity = null
-      this.#plan = null
-      this.#publish(UNAVAILABLE_STATE)
-      return
-    }
-
-    const current = this.#activePlanIdentity
-    if (current?.projectId === state.projectId && current.session === state.session) {
-      // ActiveProjectService publishes the matching Ready state before forwarding its Commit.
-      // The Commit path owns revision reconciliation so state consumers cannot race it.
-      return
-    }
-
-    this.#releasePlanRuntime()
-    this.#activePlanIdentity = Object.freeze({
-      modelRevision: state.modelRevision,
-      projectId: state.projectId,
-      session: state.session,
-    })
-    try {
-      const plan = compileAudibleMidiProject(state.session.getSnapshot())
-      this.#plan = plan
-      this.#installPlanControls(plan)
-      this.#publish(
-        createState({
-          diagnostics: plan.diagnostics,
-          phase: PROJECT_PLAYBACK_PHASE.STOPPED,
-          plan,
-          projectId: state.projectId,
-        }),
-      )
-    } catch (cause) {
-      this.#plan = null
-      this.#publish(
-        Object.freeze({
-          diagnostics: Object.freeze([]),
-          failureCause: cause,
-          feedback: feedbackForFailure(cause),
-          modelRevision: state.modelRevision,
-          phase: PROJECT_PLAYBACK_PHASE.FAILED,
-          planStatus: null,
-          positionProjectSecond: 0,
-          projectId: state.projectId,
-        }),
-      )
-    }
-  }
-
-  #tick(): void {
-    if (this.#disposed) return
-    this.#collectFinishedVoicesAndRuntimes()
-    const transport = this.#transport
-    if (transport === null) return
-    try {
-      const snapshot = transport.getSnapshot()
-      if (snapshot.state !== 'playing') {
-        this.#stopTimer()
-        this.#startInactiveVoiceCleanup()
-        this.#publishTransportState(snapshot)
-        return
-      }
-      // Scheduler cadence plans audio only; visual consumers sample this Transport separately.
-      this.#scheduleNextWindow(snapshot)
-    } catch (cause) {
-      this.#failCurrentPlan(cause)
     }
   }
 }

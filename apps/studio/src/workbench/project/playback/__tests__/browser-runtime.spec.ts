@@ -3,6 +3,7 @@ import {
   type AudibleMidiProjectPlan,
   type ScheduledSampleVoicePlan,
   type SoundbankId,
+  PLAYBACK_INSTRUMENT_FAILURE_MODE,
 } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -12,7 +13,6 @@ import {
   createBrowserProjectPlaybackRuntime,
   createDefaultBuiltInSampleAssetLocations,
 } from '@/workbench/project/playback/browser-runtime'
-import { PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE } from '@/workbench/project/playback/project-playback-coordinator'
 
 const FIRST_SOUNDBANK_ID = parseSoundbankId('fixture-piano')
 const SECOND_SOUNDBANK_ID = parseSoundbankId('fixture-strings')
@@ -216,11 +216,11 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     const plan = createPlan([FIRST_SOUNDBANK_ID, SECOND_SOUNDBANK_ID])
 
     const first = await runtime.prepare(plan, new AbortController().signal, {
-      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
     first.dispose()
     const second = await runtime.prepare(plan, new AbortController().signal, {
-      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
     second.dispose()
 
@@ -246,7 +246,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     const plan = createPlan([FIRST_SOUNDBANK_ID, FIRST_SOUNDBANK_ID], [47, 60])
 
     const prepared = await runtime.prepare(plan, new AbortController().signal, {
-      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
 
     expect(prepared.preparationFailures).toEqual([])
@@ -286,7 +286,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     const plan = createPlan([FIRST_SOUNDBANK_ID], [33])
 
     const prepared = await runtime.prepare(plan, new AbortController().signal, {
-      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
 
     expect(prepared.unsupportedNoteOccurrences).toEqual([
@@ -330,7 +330,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
 
     await expect(
       runtime.prepare(plan, new AbortController().signal, {
-        instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+        instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
       }),
     ).rejects.toEqual(
       expect.objectContaining({ code: 'manifest-load-failed', soundbankId: SECOND_SOUNDBANK_ID }),
@@ -338,7 +338,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     await vi.waitFor(() => expect(context.decodeAudioData).toHaveBeenCalledOnce())
 
     const selective = await runtime.prepare(plan, new AbortController().signal, {
-      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
+      instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
     })
     expect(selective.preparationFailures).toEqual([
       expect.objectContaining({
@@ -349,7 +349,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     selective.dispose()
 
     const retried = await runtime.prepare(plan, new AbortController().signal, {
-      instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
+      instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
     expect(retried.preparationFailures).toEqual([])
     expect(secondManifestRequestCount).toBe(3)
@@ -381,7 +381,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     const preparation = runtime.prepare(
       createPlan([FIRST_SOUNDBANK_ID]),
       new AbortController().signal,
-      { instrumentFailureMode: PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN },
+      { instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN },
     )
 
     await vi.waitFor(() => expect(manifestSignals).toHaveLength(1))

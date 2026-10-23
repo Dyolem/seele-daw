@@ -14,17 +14,16 @@ import {
   type AudibleMidiProjectPlan,
   type ScheduledSampleVoicePlan,
   type SoundbankId,
+  PLAYBACK_INSTRUMENT_FAILURE_MODE,
+  type PlaybackInstrumentFailureMode,
+  type PreparedPlaybackRuntime,
+  type PlaybackAbortSignal,
+  type PlaybackPreparationOptions,
+  type PlaybackRuntimePort,
+  type PlaybackVoiceHandle,
 } from '@seele-daw/playback'
 
 import { BUILT_IN_INSTRUMENT_CATALOGUE } from '@/workbench/instrument/built-in-instrument-catalogue'
-import {
-  PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE,
-  type ProjectPlaybackInstrumentFailureMode,
-  type ProjectPlaybackPreparedRuntime,
-  type ProjectPlaybackPreparationOptions,
-  type ProjectPlaybackRuntimePort,
-  type ProjectPlaybackVoiceHandle,
-} from '@/workbench/project/playback/project-playback-coordinator'
 
 export interface BrowserProjectPlaybackRuntimeOptions {
   readonly assetBaseBySoundbank?: ReadonlyMap<SoundbankId, string | URL>
@@ -45,20 +44,20 @@ export const DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS =
   })
 
 function resolvePreparationFailureMode(
-  mode: ProjectPlaybackInstrumentFailureMode,
+  mode: PlaybackInstrumentFailureMode,
 ): AudibleMidiSamplePreparationFailureMode {
   switch (mode) {
-    case PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN:
+    case PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN:
       return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST
-    case PROJECT_PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS:
+    case PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS:
       return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS
   }
 }
 
-class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRuntime {
-  readonly modelRevision: ProjectPlaybackPreparedRuntime['modelRevision']
-  readonly preparationFailures: ProjectPlaybackPreparedRuntime['preparationFailures']
-  readonly unsupportedNoteOccurrences: ProjectPlaybackPreparedRuntime['unsupportedNoteOccurrences']
+class PreparedBrowserProjectPlaybackRuntime implements PreparedPlaybackRuntime {
+  readonly modelRevision: PreparedPlaybackRuntime['modelRevision']
+  readonly preparationFailures: PreparedPlaybackRuntime['preparationFailures']
+  readonly unsupportedNoteOccurrences: PreparedPlaybackRuntime['unsupportedNoteOccurrences']
   readonly #voiceRuntime: SampleInstrumentVoiceRuntime
   readonly #audioContext: AudioContext
   readonly #unavailableSoundbankIds: ReadonlySet<SoundbankId>
@@ -98,7 +97,7 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
     return parsePlaybackClockSecond(this.#audioContext.currentTime)
   }
 
-  schedule(plan: ScheduledSampleVoicePlan): ProjectPlaybackVoiceHandle | null {
+  schedule(plan: ScheduledSampleVoicePlan): PlaybackVoiceHandle | null {
     if (
       this.#unavailableSoundbankIds.has(plan.soundbankId) ||
       this.#unsupportedOccurrenceKeys.has(plan.occurrenceKey)
@@ -108,7 +107,7 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
     const result = this.#voiceRuntime.schedule(plan)
     if (result.outcome !== 'scheduled' || result.token === null) return null
     const token = result.token
-    return Object.freeze<ProjectPlaybackVoiceHandle>({
+    return Object.freeze<PlaybackVoiceHandle>({
       cancel: (atPlaybackClockSecond) => this.#voiceRuntime.cancel(token, atPlaybackClockSecond),
       engineGeneration: token.engineGeneration,
       isActive: () => this.#voiceRuntime.hasVoice(token),
@@ -125,7 +124,7 @@ class PreparedBrowserProjectPlaybackRuntime implements ProjectPlaybackPreparedRu
   }
 }
 
-class BrowserProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
+class BrowserProjectPlaybackRuntime implements PlaybackRuntimePort {
   readonly #assetBaseBySoundbank: ReadonlyMap<SoundbankId, string | URL>
   readonly #contextRuntime: WebAudioContextRuntime
   readonly #expectedOrigin: string
@@ -146,10 +145,27 @@ class BrowserProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
 
   async prepare(
     plan: AudibleMidiProjectPlan,
-    signal: AbortSignal,
-    options: ProjectPlaybackPreparationOptions,
-  ): Promise<ProjectPlaybackPreparedRuntime> {
+    signal: PlaybackAbortSignal,
+    options: PlaybackPreparationOptions,
+  ): Promise<PreparedPlaybackRuntime> {
     if (this.#disposed) throw new Error('Browser Project Playback Runtime is disposed')
+    // Audio Web fetches with a DOM AbortSignal; mirror the engine's cancellation onto one.
+    const controller = new AbortController()
+    const abort = () => controller.abort()
+    if (signal.aborted) abort()
+    else signal.addEventListener('abort', abort)
+    try {
+      return await this.#prepare(plan, controller.signal, options)
+    } finally {
+      signal.removeEventListener('abort', abort)
+    }
+  }
+
+  async #prepare(
+    plan: AudibleMidiProjectPlan,
+    signal: AbortSignal,
+    options: PlaybackPreparationOptions,
+  ): Promise<PreparedPlaybackRuntime> {
     // AudioContext activation stays at the start of the synchronous user-gesture call stack;
     // resource Fetch/decode can then continue asynchronously without losing browser permission.
     const output = await this.#contextRuntime.activate()
@@ -197,7 +213,7 @@ class BrowserProjectPlaybackRuntime implements ProjectPlaybackRuntimePort {
 /** Creates the browser resources without activating an AudioContext before the first Play gesture. */
 export function createBrowserProjectPlaybackRuntime(
   options: BrowserProjectPlaybackRuntimeOptions,
-): ProjectPlaybackRuntimePort {
+): PlaybackRuntimePort {
   return new BrowserProjectPlaybackRuntime(options)
 }
 

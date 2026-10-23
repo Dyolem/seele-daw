@@ -1,6 +1,6 @@
+import { type PlaybackLocateSession } from '@seele-daw/playback'
 import type { EditorPointerInput, InteractionId } from '@seele-daw/editor'
 import type { Tick } from '@seele-daw/project-core'
-import type { ProjectPlaybackLocateSession } from '@/workbench/project/playback/project-playback-coordinator'
 
 export type TimelineLocateInput = EditorPointerInput<never>
 export interface TimelineLocateState {
@@ -8,7 +8,7 @@ export interface TimelineLocateState {
   readonly previewTick: Tick | null
 }
 export interface TimelineLocateConfiguration {
-  readonly beginPlayback: () => ProjectPlaybackLocateSession | null
+  readonly beginPlayback: () => PlaybackLocateSession | null
   readonly wasFollowSuspended: boolean
 }
 export interface TimelineLocateCompletion {

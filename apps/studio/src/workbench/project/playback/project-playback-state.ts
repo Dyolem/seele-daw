@@ -1,17 +1,15 @@
-import type { AudibleMidiPlanStatus, PlaybackDiagnostic } from '@seele-daw/playback'
+import {
+  PLAYBACK_PHASE,
+  type AudibleMidiPlanStatus,
+  type PlaybackDiagnostic,
+  type PlaybackPhase,
+} from '@seele-daw/playback'
 import type { ModelRevision, ProjectId } from '@seele-daw/project-core'
 
-export const PROJECT_PLAYBACK_PHASE = Object.freeze({
-  FAILED: 'failed',
-  LOADING: 'loading',
-  PAUSED: 'paused',
-  PLAYING: 'playing',
-  STOPPED: 'stopped',
-  UNAVAILABLE: 'unavailable',
-} as const)
+/** Studio shows the engine's phases unchanged. */
+export const PROJECT_PLAYBACK_PHASE = PLAYBACK_PHASE
 
-export type ProjectPlaybackPhase =
-  (typeof PROJECT_PLAYBACK_PHASE)[keyof typeof PROJECT_PLAYBACK_PHASE]
+export type ProjectPlaybackPhase = PlaybackPhase
 
 export type ProjectPlaybackFeedbackKind = 'error' | 'info' | 'warning'
 

@@ -1,10 +1,6 @@
-export type ProjectPlaybackErrorCode =
-  | 'active-project-not-ready'
-  | 'coordinator-disposed'
-  | 'missing-context'
-  | 'playback-unavailable'
+export type ProjectPlaybackErrorCode = 'coordinator-disposed'
 
-/** Stable caller misuse at the Studio Project Playback boundary. */
+/** Use of the Studio playback coordinator after it was disposed. */
 export class ProjectPlaybackError extends Error {
   readonly code: ProjectPlaybackErrorCode
 

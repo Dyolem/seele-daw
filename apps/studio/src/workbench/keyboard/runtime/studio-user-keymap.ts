@@ -1,4 +1,5 @@
-import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionDescriptor } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioUserKeymapStorage } from '@/workbench/keyboard/contracts/studio-user-keymap-storage'
 import type {
   StudioUserKeymap,
@@ -10,7 +11,7 @@ import type {
 import {
   createStudioKeyboardKeymap,
   type StudioKeyboardKeymapOverrides,
-} from '@/workbench/keyboard/keymap/studio-default-keymap'
+} from '@/workbench/keyboard/keymap/studio-keyboard-keymap'
 import type { StudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/contracts/studio-keyboard-binding-registry'
 import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/runtime/studio-keyboard-input-router'
@@ -52,7 +53,7 @@ class StudioUserKeymapImpl implements StudioUserKeymapRuntime {
   constructor(options: StudioUserKeymapOptions) {
     this.#options = options
     this.#defaults = options.router.keymap
-    this.#knownIds = new Set(options.catalogue.map((action) => action.actionId))
+    this.#knownIds = new Set(options.catalogue.map((action) => action.id))
     this.#state = this.#load()
   }
 
@@ -92,7 +93,7 @@ class StudioUserKeymapImpl implements StudioUserKeymapRuntime {
       relations: Object.freeze(relations),
       conflicts: Object.freeze(conflicts),
       reassignBlockedReason: damagedPeer
-        ? `Repair the saved bindings for ${this.#options.catalogue.find((action) => action.actionId === damagedPeer)?.label} before reassigning this shortcut.`
+        ? `Repair the saved bindings for ${this.#options.catalogue.find((action) => action.id === damagedPeer)?.label} before reassigning this shortcut.`
         : null,
     })
   }
@@ -183,13 +184,16 @@ class StudioUserKeymapImpl implements StudioUserKeymapRuntime {
   #evaluate(candidate: Record<string, unknown>) {
     const overrides: StudioKeyboardKeymapOverrides = {}
     const rejected = new Map<StudioActionId, string>()
-    for (const { actionId } of this.#options.catalogue) {
+    for (const { id: actionId } of this.#options.catalogue) {
       if (!Object.hasOwn(candidate, actionId)) continue
       const parsed = this.#parseBindings(candidate[actionId])
       if (parsed.error !== null) rejected.set(actionId, parsed.error)
       else overrides[actionId] = Object.freeze(parsed.bindings)
     }
-    let keymap = createStudioKeyboardKeymap({ ...this.#defaults, ...overrides })
+    let keymap = createStudioKeyboardKeymap(this.#options.catalogue, {
+      ...this.#defaults,
+      ...overrides,
+    })
     const requestedKeymap = keymap
     // Removing one conflicting override restores its default, which may reveal another conflict.
     for (;;) {
@@ -202,7 +206,7 @@ class StudioUserKeymapImpl implements StudioUserKeymapRuntime {
       let removed = false
       for (const conflict of conflicts) {
         const labels = conflict.actionIds
-          .map((id) => this.#options.catalogue.find((action) => action.actionId === id)?.label)
+          .map((id) => this.#options.catalogue.find((action) => action.id === id)?.label)
           .join(' / ')
         for (const actionId of conflict.actionIds) {
           if (!Object.hasOwn(overrides, actionId)) continue
@@ -215,7 +219,10 @@ class StudioUserKeymapImpl implements StudioUserKeymapRuntime {
         }
       }
       if (!removed) throw new Error('The default keymap contains conflicting bindings.')
-      keymap = createStudioKeyboardKeymap({ ...this.#defaults, ...overrides })
+      keymap = createStudioKeyboardKeymap(this.#options.catalogue, {
+        ...this.#defaults,
+        ...overrides,
+      })
     }
     return {
       keymap,
@@ -234,8 +241,8 @@ class StudioUserKeymapImpl implements StudioUserKeymapRuntime {
       keymap: this.#options.router.keymap,
       modifiedActionIds: Object.freeze(
         this.#options.catalogue
-          .filter((action) => Object.hasOwn(this.#entries, action.actionId))
-          .map((action) => action.actionId),
+          .filter((action) => Object.hasOwn(this.#entries, action.id))
+          .map((action) => action.id),
       ),
       unknownActionIds: Object.freeze(
         Object.keys(this.#entries).filter((id) => !this.#knownIds.has(id)),
@@ -303,8 +310,8 @@ class StudioUserKeymapImpl implements StudioUserKeymapRuntime {
       return this.#snapshot(
         Object.freeze(
           this.#options.catalogue
-            .filter((action) => Object.hasOwn(this.#entries, action.actionId))
-            .map(({ actionId }) =>
+            .filter((action) => Object.hasOwn(this.#entries, action.id))
+            .map(({ id: actionId }) =>
               Object.freeze({
                 actionId,
                 message:

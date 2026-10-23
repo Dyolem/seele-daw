@@ -1,4 +1,4 @@
-import type { StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioKeyboardKeymap } from './studio-keyboard-binding'
 import type { StudioKeyboardRelation } from './studio-keyboard-relation'
 

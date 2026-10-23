@@ -29,6 +29,7 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTempoTrackPreviewController } from '@/features/project-workspace/tempo-track/tempo-track-preview'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
+import { EDITOR_SELECTION_CONTEXT } from '@/workbench/actions/studio-editor-actions'
 
 const mountedWrappers: VueWrapper[] = []
 
@@ -324,7 +325,7 @@ describe('TempoTrackLane', () => {
   it('uses focused Tempo selection instead of a previous Note target and never treats focus as selection', async () => {
     const { keyboard, remove, wrapper } = mountLane({ selectedTempoEventId: LATER_EVENT.id })
     const removeNotes = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
-    keyboard.runtime.selectionTarget.bind({
+    keyboard.runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => true,
       hasSelection: () => true,
       selectionLabel: () => 'Notes',

@@ -2,7 +2,6 @@
 import type { ProjectId } from '@seele-daw/project-core'
 import KeyboardIcon from '~icons/fluent/keyboard-20-regular'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
-import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
 import { presentStudioAction } from '@/workbench/actions/studio-action-control'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import AddIcon from '~icons/fluent/add-24-regular'
@@ -38,9 +37,7 @@ type ProjectEntryAction =
   | null
 
 const { actions, keyboard } = useStudioActions()
-const shortcutsControl = computed(() =>
-  presentStudioAction(actions, keyboard, STUDIO_ACTION.SHORTCUTS_SHOW),
-)
+const shortcutsControl = computed(() => presentStudioAction(actions, keyboard, 'shortcuts.show'))
 const { projectEntry, midiImport: projectMidiImport } = useStudio()
 const route = useRoute()
 const router = useRouter()
@@ -226,7 +223,7 @@ onUnmounted(() => {
           :icon="KeyboardIcon"
           label="Keyboard shortcuts"
           :title="shortcutsControl.title"
-          @click="actions.invoke(STUDIO_ACTION.SHORTCUTS_SHOW, 'toolbar')"
+          @click="actions.invoke('shortcuts.show', 'toolbar')"
         />
         <div class="project-entry__local-status">
           <span aria-hidden="true"></span>

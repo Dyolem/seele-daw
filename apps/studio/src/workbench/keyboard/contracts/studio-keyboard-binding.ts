@@ -9,6 +9,9 @@ import type { Brand } from '@seele-daw/type-utils'
  */
 export type StudioKeyboardBinding = Brand<string, 'StudioKeyboardBinding'>
 
+/** A key combination literal that TanStack can parse, checked at compile time. */
+export type StudioHotkey = Hotkey
+
 export type StudioKeyboardKeymap<ActionId extends string = string> = Readonly<
   Record<ActionId, readonly StudioKeyboardBinding[]>
 >

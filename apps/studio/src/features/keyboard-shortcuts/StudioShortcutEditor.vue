@@ -14,20 +14,19 @@ import UiSelect from '@/ui/components/UiSelect.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import KeyboardIcon from '~icons/fluent/keyboard-20-regular'
 import ArrowResetIcon from '~icons/fluent/arrow-reset-20-regular'
-import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
-import {
-  type StudioUserKeymapResult,
-  type StudioUserKeymapState,
-  type StudioKeyboardRelation,
-  STUDIO_SHORTCUT_POLICIES,
-  STUDIO_KEYBOARD_CONTEXTS,
+import type { StudioActionDescriptor } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type {
+  StudioUserKeymapResult,
+  StudioUserKeymapState,
+  StudioKeyboardRelation,
 } from '@/workbench/keyboard'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 
 const props = defineProps<{ action: StudioActionDescriptor }>()
 const emit = defineEmits<{ close: [message?: string] }>()
 const { actions, keyboard, userKeymap, keymapState, shortcutRecorder } = useStudioActions()
-const draft = ref([...userKeymap.bindingsForEditing(props.action.actionId)])
+const draft = ref([...userKeymap.bindingsForEditing(props.action.id)])
 const initialBindings = [...draft.value]
 const restoreRequested = shallowRef(false)
 const specialKeys = [
@@ -35,10 +34,8 @@ const specialKeys = [
   { value: 'Delete', label: 'Delete' },
   { value: 'Backspace', label: 'Backspace' },
 ] as const
-const defaultBindings = STUDIO_SHORTCUT_POLICIES[props.action.actionId].defaultBindings
-const isModified = computed(() =>
-  keymapState.value.modifiedActionIds.includes(props.action.actionId),
-)
+const defaultBindings = props.action.keys
+const isModified = computed(() => keymapState.value.modifiedActionIds.includes(props.action.id))
 const hasChanges = computed(() =>
   restoreRequested.value
     ? isModified.value
@@ -61,7 +58,7 @@ const confirmation = shallowRef<{
 } | null>(null)
 let cancelRecording: (() => void) | null = null
 const inspection = computed(() => ({
-  ...userKeymap.inspectBindings(props.action.actionId, draft.value),
+  ...userKeymap.inspectBindings(props.action.id, draft.value),
   state: keymapState.value,
 }))
 watch(
@@ -79,14 +76,17 @@ onBeforeUnmount(() => {
 })
 
 function actionLabel(actionId: StudioActionId): string {
-  return actions.catalogue.find((action) => action.actionId === actionId)?.label ?? actionId
+  return descriptorOf(actionId)?.label ?? actionId
 }
 function contextLabel(actionId: StudioActionId): string {
-  return STUDIO_KEYBOARD_CONTEXTS[STUDIO_SHORTCUT_POLICIES[actionId].context].label
+  return descriptorOf(actionId)?.context.label ?? actionId
+}
+function descriptorOf(actionId: StudioActionId) {
+  return actions.catalogue.find((action) => action.id === actionId)
 }
 function peerId(relation: StudioKeyboardRelation): StudioActionId {
   const [first, second] = relation.actionIds
-  return first === props.action.actionId ? second : first
+  return first === props.action.id ? second : first
 }
 function lowerPriorityId(relation: StudioKeyboardRelation): StudioActionId {
   const [first, second] = relation.actionIds
@@ -117,7 +117,7 @@ function reassign(): void {
   const review = confirmation.value
   if (!review) return
   finish(
-    userKeymap.reassignBindings(props.action.actionId, review.inputs, review.state),
+    userKeymap.reassignBindings(props.action.id, review.inputs, review.state),
     `${props.action.label} shortcuts reassigned and saved.`,
   )
 }
@@ -190,8 +190,8 @@ function save(): void {
   if (recordingIndex.value !== null || !hasChanges.value) return
   finish(
     restoreRequested.value
-      ? userKeymap.restoreAction(props.action.actionId)
-      : userKeymap.setBindings(props.action.actionId, draft.value),
+      ? userKeymap.restoreAction(props.action.id)
+      : userKeymap.setBindings(props.action.id, draft.value),
     `${props.action.label} shortcuts saved.`,
   )
 }
@@ -299,8 +299,7 @@ function restore(): void {
         >
         <template v-else-if="relation.kind === 'exclusive'">
           can be shared with {{ actionLabel(peerId(relation)) }}. They belong to separate focused
-          regions: {{ contextLabel(action.actionId) }} /
-          {{ contextLabel(peerId(relation)) }}.</template
+          regions: {{ contextLabel(action.id) }} / {{ contextLabel(peerId(relation)) }}.</template
         >
         <template v-else-if="relation.priorityActionId">
           gives priority to {{ actionLabel(relation.priorityActionId) }} ({{

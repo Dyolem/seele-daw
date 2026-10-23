@@ -23,7 +23,8 @@ import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-sh
 import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
-import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import type { StudioActionSource } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { ActiveProjectSaveStatus } from '@/workbench/project/active-project-state'
 
 interface ProjectWorkbenchShellProps {

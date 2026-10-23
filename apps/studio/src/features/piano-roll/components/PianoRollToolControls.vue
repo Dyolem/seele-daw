@@ -5,7 +5,7 @@ import PenIcon from '~icons/fluent/pen-20-regular'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import type { PianoRollToolControlsProps } from '@/features/piano-roll/types/piano-roll-tool-controls'
-import { STUDIO_ACTION, type StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 
 defineProps<PianoRollToolControlsProps>()
 const emit = defineEmits<{ invoke: [actionId: StudioActionId] }>()
@@ -20,7 +20,7 @@ const emit = defineEmits<{ invoke: [actionId: StudioActionId] }>()
         :title="controls.pencil.title"
         :pressed="activeTool === PIANO_ROLL_TOOL.PENCIL"
         size="small"
-        @click="emit('invoke', STUDIO_ACTION.PIANO_ROLL_TOOL_PENCIL)"
+        @click="emit('invoke', 'piano-roll.tool.pencil')"
       />
       <UiIconButton
         :icon="CursorIcon"
@@ -28,7 +28,7 @@ const emit = defineEmits<{ invoke: [actionId: StudioActionId] }>()
         :title="controls.cursor.title"
         :pressed="activeTool === PIANO_ROLL_TOOL.CURSOR"
         size="small"
-        @click="emit('invoke', STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR)"
+        @click="emit('invoke', 'piano-roll.tool.cursor')"
       />
     </div>
     <span class="piano-roll-tool-controls__divider" aria-hidden="true"></span>
@@ -39,7 +39,7 @@ const emit = defineEmits<{ invoke: [actionId: StudioActionId] }>()
         :label="`Snap to ${gridPreset} grid — ${snapEnabled ? 'on' : 'off'}`"
         :pressed="snapEnabled"
         size="small"
-        @click="emit('invoke', STUDIO_ACTION.PIANO_ROLL_SNAP_TOGGLE)"
+        @click="emit('invoke', 'piano-roll.snap.toggle')"
       />
       <span aria-hidden="true">{{ gridPreset }}</span>
     </div>

@@ -5,7 +5,6 @@ import {
   getPianoRollContextMenuItem,
   requestPianoRollContextMenu,
 } from '@/features/piano-roll/__tests__/support/piano-roll-context-menu-test-support'
-import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
 import {
   PROJECT_QUERY_TYPE,
   createInitialProjectSession,
@@ -555,10 +554,7 @@ describe('ProjectPianoRollSurface', () => {
       expect(fixture.session.modelRevision).toBe(revision)
       await getPianoRollContextMenuItem('Clear selection').trigger('click')
       await flushPromises()
-      expect(fixture.invoke).toHaveBeenCalledWith(
-        STUDIO_ACTION.EDITOR_SELECTION_CLEAR,
-        'context-menu',
-      )
+      expect(fixture.invoke).toHaveBeenCalledWith('editor.selection.clear', 'context-menu')
       expect(second.classes()).not.toContain(selectedClass)
       expect(fixture.session.modelRevision).toBe(revision)
       expect(fixture.records(kind)).toHaveLength(2)
@@ -593,10 +589,7 @@ describe('ProjectPianoRollSurface', () => {
       const revision = fixture.session.modelRevision
       await getPianoRollContextMenuItem('Delete selection').trigger('click')
       await flushPromises()
-      expect(fixture.invoke).toHaveBeenCalledWith(
-        STUDIO_ACTION.EDITOR_SELECTION_DELETE,
-        'context-menu',
-      )
+      expect(fixture.invoke).toHaveBeenCalledWith('editor.selection.delete', 'context-menu')
       expect(fixture.session.modelRevision).toBe(revision + 1)
       expect(fixture.records(kind)).toEqual([])
       expect(fixture.records(kind === 'notes' ? 'sustain-pedal' : 'notes')).toHaveLength(2)

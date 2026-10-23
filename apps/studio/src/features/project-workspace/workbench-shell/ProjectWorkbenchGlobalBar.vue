@@ -22,7 +22,8 @@ import {
   DropdownMenuTrigger,
 } from 'reka-ui'
 
-import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import type { StudioActionSource } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { useStudioKeyboardLayer } from '@/workbench/actions/vue/studio-action-context'
 import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'

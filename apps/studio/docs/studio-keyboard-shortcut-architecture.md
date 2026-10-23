@@ -53,9 +53,8 @@ User Keymap 在建立初始快照后返回，保留加载回退和版本化存�
 
 ## 2. 可查询目录与默认政策
 
-静态名称、说明、类别和中英文检索词由 `studio-action-catalogue.ts` 集中声明。
-`studio-default-keymap.ts` 为每个 Action 显式声明默认 Binding 或未分配、Context 和 Repeat。
-两份配置都以完整 `StudioActionId` Record 约束；新增 Action 不能悄悄省略默认政策。
+名称、说明、类别、中英文检索词、默认 Binding（可为空）、Context 和 Repeat 都写在
+`defineStudioAction` 的同一个声明里；`StudioActionId` 由目录推导，不存在需要同步的平行表。
 
 `queryStudioShortcuts()` 从 Catalogue、政策和 Router 的有效 Keymap 派生只读查询结果。
 未挂载或当前不可执行的 Action 仍然可查，不通过扫描组件或另建手工列表取得操作目录。
@@ -111,7 +110,7 @@ Project Menu 在打开导航确认或 Keyboard shortcuts Dialog 前，先关闭�
 
 ## 4. 当前默认绑定
 
-以下为产品规则说明；运行时权威是 `STUDIO_SHORTCUT_POLICIES`，UI 不从本文读取。
+以下为产品规则说明；运行时权威是各 Action 声明，UI 不从本文读取。
 
 | Action ID                                           | 默认 Binding               | Context / 能力                                                         |
 | --------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------- |

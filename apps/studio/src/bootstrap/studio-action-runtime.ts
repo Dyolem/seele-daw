@@ -1,141 +1,73 @@
-import {
-  createStudioEditorActions,
-  type StudioEditorSelectionTarget,
-  type StudioInteractionTarget,
-} from '@/workbench/actions/studio-editor-actions'
-import {
-  createProjectWorkbenchActions,
-  type ProjectWorkbenchActionTarget,
-} from '@/features/project-workspace/actions/project-workbench-actions'
-import {
-  createArrangementKeyboardActions,
-  type ArrangementKeyboardTarget,
-} from '@/features/project-workspace/actions/arrangement-keyboard-actions'
-import { type PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
-import { createPianoRollToolActions } from '@/features/piano-roll/actions/piano-roll-tool-actions'
-import {
-  createStudioInterfaceActions,
-  type StudioInterfaceActionTarget,
-} from '@/workbench/actions/studio-interface-actions'
-import type { StudioActionFailure, StudioActionId } from '@/workbench/actions/studio-action'
+import { DisposalStack } from '@/bootstrap/disposal-stack'
+import type { StudioActionFailure } from '@/workbench/actions/studio-action'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import { createStudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
+import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
+import { createStudioContextRegistry } from '@/workbench/actions/studio-context-registry'
 import {
   createBrowserStudioShortcutRecorder,
-  createStudioUserKeymap,
-  createStudioKeyboardVueBinding,
   createBrowserUserKeymapStorage,
-  type StudioUserKeymapStorage,
-  STUDIO_DEFAULT_KEYMAP,
-  type StudioKeyboardKeymap,
-  type StudioKeyboardBindingRegistry,
   createStudioKeyboardInputRouter,
+  createStudioKeyboardVueBinding,
+  createStudioUserKeymap,
+  type StudioKeyboardBindingRegistry,
+  type StudioKeyboardKeymapOverrides,
+  type StudioUserKeymapStorage,
 } from '@/workbench/keyboard/setup'
 
 export interface StudioActionRuntimeOptions {
   readonly bindingRegistry: StudioKeyboardBindingRegistry
   readonly userKeymapStorage?: StudioUserKeymapStorage
   readonly isModalActive: () => boolean
-  readonly keymap?: StudioKeyboardKeymap<StudioActionId>
+  /** Replaces declared default bindings, e.g. to free a key in a test. */
+  readonly keymap?: StudioKeyboardKeymapOverrides
   readonly reportFailure: (failure: StudioActionFailure) => void
 }
 
-/** The catalogue outlives views; selection focus and active interaction have separate owners. */
+/** The catalogue and keyboard input outlive views; views only bind their context targets. */
 export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
-  const workbenchTarget = createStudioActionTargetSlot<ProjectWorkbenchActionTarget>()
-  const selectionTarget = createStudioActionTargetSlot<StudioEditorSelectionTarget>()
-  const interactionTarget = createStudioActionTargetSlot<StudioInteractionTarget>()
-  const arrangementClipTarget = createStudioActionTargetSlot<ArrangementKeyboardTarget>()
-  const arrangementBarTarget = createStudioActionTargetSlot<ArrangementKeyboardTarget>()
-  const pianoRollToolTarget = createStudioActionTargetSlot<PianoRollToolActionTarget>()
-  const interfaceTarget = createStudioActionTargetSlot<StudioInterfaceActionTarget>()
-  const targets = {
-    workbenchTarget,
-    selectionTarget,
-    interactionTarget,
-    arrangementClipTarget,
-    arrangementBarTarget,
-    pianoRollToolTarget,
-    interfaceTarget,
-  }
-  const actions = createStudioActionCoordinator({
-    definitions: [
-      ...createProjectWorkbenchActions(workbenchTarget),
-      ...createStudioEditorActions(selectionTarget, interactionTarget),
-      ...createArrangementKeyboardActions(arrangementClipTarget, arrangementBarTarget),
-      ...createPianoRollToolActions(pianoRollToolTarget),
-      ...createStudioInterfaceActions(interfaceTarget),
-    ],
-    reportFailure: options.reportFailure,
-  })
-  function disposeTargets(): void {
-    for (const target of Object.values(targets)) target.dispose()
-  }
-  let keyboard: ReturnType<typeof createStudioKeyboardInputRouter> | null = null
+  const stack = new DisposalStack()
   try {
-    keyboard = createStudioKeyboardInputRouter({
-      actions,
-      bindingRegistry: options.bindingRegistry,
-      keymap: options.keymap ?? STUDIO_DEFAULT_KEYMAP,
-      reportFailure: options.reportFailure,
-      isModalActive: options.isModalActive,
-      isContextActive(context) {
-        switch (context) {
-          case 'global':
-            return true
-          case 'workbench':
-            return workbenchTarget.current?.value.getReadyProject() != null
-          case 'editor-selection':
-            return selectionTarget.current?.value.isFocused() ?? false
-          case 'interaction':
-            return interactionTarget.current?.value.isActive() ?? false
-          case 'piano-roll':
-            return pianoRollToolTarget.current?.value.isFocused() ?? false
-          case 'arrangement-clip':
-            return arrangementClipTarget.current?.value.isFocused() ?? false
-          case 'arrangement-bar':
-            return arrangementBarTarget.current?.value.isFocused() ?? false
-        }
-      },
-    })
-    const ownedKeyboard = keyboard
-    const userKeymap = createStudioUserKeymap({
-      catalogue: actions.catalogue,
-      registry: options.bindingRegistry,
-      router: keyboard,
-      storage: options.userKeymapStorage ?? createBrowserUserKeymapStorage(),
-    })
-    const keyboardBinding = createStudioKeyboardVueBinding(keyboard, userKeymap)
-    const shortcutRecorder = createBrowserStudioShortcutRecorder(keyboardBinding.keyboard)
+    const contexts = stack.own(createStudioContextRegistry())
+    const actions = stack.own(
+      createStudioActionCoordinator({
+        actions: STUDIO_ACTIONS,
+        contexts,
+        reportFailure: options.reportFailure,
+      }),
+    )
+    const router = stack.own(
+      createStudioKeyboardInputRouter({
+        actions,
+        bindingRegistry: options.bindingRegistry,
+        keymap: options.keymap ?? {},
+        reportFailure: options.reportFailure,
+        isModalActive: options.isModalActive,
+        isContextActive: (context) => contexts.isActive(context),
+      }),
+    )
+    const userKeymap = stack.own(
+      createStudioUserKeymap({
+        catalogue: actions.catalogue,
+        registry: options.bindingRegistry,
+        router,
+        storage: options.userKeymapStorage ?? createBrowserUserKeymapStorage(),
+      }),
+    )
+    const keyboardBinding = stack.own(createStudioKeyboardVueBinding(router, userKeymap))
+    const shortcutRecorder = stack.own(
+      createBrowserStudioShortcutRecorder(keyboardBinding.keyboard),
+    )
     return {
-      shortcutRecorder,
       actions,
+      contexts,
       keyboard: keyboardBinding.keyboard,
-      userKeymap,
       keymapState: keyboardBinding.keymapState,
-      ...targets,
-      dispose() {
-        try {
-          shortcutRecorder.dispose()
-          keyboardBinding.dispose()
-          userKeymap.dispose()
-          ownedKeyboard.dispose()
-        } finally {
-          try {
-            actions.dispose()
-          } finally {
-            disposeTargets()
-          }
-        }
-      },
+      shortcutRecorder,
+      userKeymap,
+      dispose: () => stack.dispose(),
     }
   } catch (cause) {
-    keyboard?.dispose()
-    try {
-      actions.dispose()
-    } finally {
-      disposeTargets()
-    }
+    stack.dispose()
     throw cause
   }
 }

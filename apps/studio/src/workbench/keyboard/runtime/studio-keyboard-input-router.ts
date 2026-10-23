@@ -1,5 +1,10 @@
 import { createKeyboardInputOwner } from '@/symbols'
-import { type StudioActionId, type StudioActionFailure } from '@/workbench/actions/studio-action'
+import type {
+  StudioActionDescriptor,
+  StudioActionFailure,
+  StudioContext,
+} from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type {
   StudioKeyboardBinding,
@@ -13,9 +18,8 @@ import type {
 } from '@/workbench/keyboard/contracts/studio-keyboard-binding-registry'
 import {
   createStudioKeyboardKeymap,
-  STUDIO_SHORTCUT_POLICIES,
-} from '@/workbench/keyboard/keymap/studio-default-keymap'
-import { type StudioKeyboardContext } from '@/workbench/keyboard/keymap/studio-keyboard-context'
+  type StudioKeyboardKeymapOverrides,
+} from '@/workbench/keyboard/keymap/studio-keyboard-keymap'
 import { analyzeStudioKeyboardRoutes } from '@/workbench/keyboard/keymap/studio-keyboard-routes'
 import { isWidgetOwnedKeyboardInput } from '@/workbench/keyboard/runtime/browser-keyboard-ownership'
 
@@ -31,9 +35,9 @@ export interface StudioKeyboardInputRouter extends StudioKeyboardInput {
 export interface StudioKeyboardInputRouterOptions {
   readonly actions: StudioActionCoordinator
   readonly bindingRegistry: StudioKeyboardBindingRegistry
-  readonly keymap: StudioKeyboardKeymap<StudioActionId>
+  readonly keymap: StudioKeyboardKeymapOverrides
   readonly isModalActive: () => boolean
-  readonly isContextActive: (context: StudioKeyboardContext) => boolean
+  readonly isContextActive: (context: StudioContext) => boolean
   readonly reportFailure: (failure: StudioActionFailure) => void
 }
 
@@ -49,7 +53,7 @@ class StudioKeyboardInputRouterImpl implements StudioKeyboardInputRouter {
 
   constructor(options: StudioKeyboardInputRouterOptions) {
     this.#options = options
-    this.#keymap = createStudioKeyboardKeymap(options.keymap)
+    this.#keymap = createStudioKeyboardKeymap(options.actions.catalogue, options.keymap)
     this.#routes = analyzeStudioKeyboardRoutes(
       options.actions.catalogue,
       this.#keymap,
@@ -81,7 +85,7 @@ class StudioKeyboardInputRouterImpl implements StudioKeyboardInputRouter {
   ): void => {
     if (this.#disposed) throw new Error('The keyboard router has been disposed.')
     if (this.#replacing) throw new Error('A keymap replacement is already in progress.')
-    const nextKeymap = createStudioKeyboardKeymap(candidate)
+    const nextKeymap = createStudioKeyboardKeymap(this.#options.actions.catalogue, candidate)
     const next = analyzeStudioKeyboardRoutes(
       this.#options.actions.catalogue,
       nextKeymap,
@@ -99,7 +103,7 @@ class StudioKeyboardInputRouterImpl implements StudioKeyboardInputRouter {
           prepared.set(
             identity,
             this.#options.bindingRegistry.register(route.binding, (event) =>
-              this.#dispatch(this.#routes.get(identity)?.actionIds ?? [], event),
+              this.#dispatch(this.#routes.get(identity)?.actions ?? [], event),
             ),
           )
         }
@@ -160,7 +164,7 @@ class StudioKeyboardInputRouterImpl implements StudioKeyboardInputRouter {
     }
   }
 
-  #dispatch(actionIds: readonly StudioActionId[], event: KeyboardEvent): void {
+  #dispatch(actions: readonly StudioActionDescriptor[], event: KeyboardEvent): void {
     if (
       this.#disposed ||
       this.#replacing ||
@@ -174,27 +178,26 @@ class StudioKeyboardInputRouterImpl implements StudioKeyboardInputRouter {
       // Modal ownership is a barrier even when the modal has no matching Action.
       if (this.#options.isModalActive()) return
     } catch (cause) {
-      this.#reportResolutionFailure(actionIds[0], cause)
+      this.#reportResolutionFailure(actions[0]?.id, cause)
       return
     }
-    for (const actionId of actionIds) {
+    for (const action of actions) {
       try {
         // Only query the matching scope: a broken editor must not disable Workbench Save.
-        const policy = STUDIO_SHORTCUT_POLICIES[actionId]
         if (
-          !this.#options.isContextActive(policy.context) ||
-          isWidgetOwnedKeyboardInput(event, policy.context)
+          !this.#options.isContextActive(action.context) ||
+          isWidgetOwnedKeyboardInput(event, action.context)
         )
           continue
-        if (event.repeat && !policy.allowRepeat) {
+        if (event.repeat && !action.repeat) {
           event.preventDefault()
           event.stopPropagation()
           return
         }
-        const invocation = this.#options.actions.invoke(actionId, 'keyboard')
+        const invocation = this.#options.actions.invoke(action.id, 'keyboard')
         if (invocation.status === 'unavailable') continue
       } catch (cause) {
-        this.#reportResolutionFailure(actionId, cause)
+        this.#reportResolutionFailure(action.id, cause)
       }
       // Input acceptance is independent of eventual business success, including sync failures.
       event.preventDefault()

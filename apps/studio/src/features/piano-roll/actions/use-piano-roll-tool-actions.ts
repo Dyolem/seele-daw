@@ -1,20 +1,19 @@
 import { computed, onBeforeUnmount } from 'vue'
 import type { PianoRollToolControlsPresentation } from '@/features/piano-roll/types/piano-roll-tool-controls'
-import { usePianoRollToolActionTarget } from '@/features/piano-roll/actions/piano-roll-action-context'
+import { PIANO_ROLL_CONTEXT } from '@/features/piano-roll/actions/piano-roll-tool-actions'
 import type { PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
-import { STUDIO_ACTION, type StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import { presentStudioAction } from '@/workbench/actions/studio-action-control'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 
 export function usePianoRollToolActions(target: PianoRollToolActionTarget) {
-  const { actions, keyboard } = useStudioActions()
-  const targets = usePianoRollToolActionTarget()
-  const release = targets.bind(target)
+  const { actions, contexts, keyboard } = useStudioActions()
+  const release = contexts.bind(PIANO_ROLL_CONTEXT, target)
   onBeforeUnmount(release)
   const controls = computed<PianoRollToolControlsPresentation>(() => ({
-    cursor: presentStudioAction(actions, keyboard, STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR),
-    pencil: presentStudioAction(actions, keyboard, STUDIO_ACTION.PIANO_ROLL_TOOL_PENCIL),
-    snap: presentStudioAction(actions, keyboard, STUDIO_ACTION.PIANO_ROLL_SNAP_TOGGLE),
+    cursor: presentStudioAction(actions, keyboard, 'piano-roll.tool.cursor'),
+    pencil: presentStudioAction(actions, keyboard, 'piano-roll.tool.pencil'),
+    snap: presentStudioAction(actions, keyboard, 'piano-roll.snap.toggle'),
   }))
   function invoke(actionId: StudioActionId): void {
     actions.invoke(actionId, 'toolbar')

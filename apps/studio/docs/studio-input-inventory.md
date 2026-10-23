@@ -21,7 +21,7 @@ S1 后产品内列表从 Catalogue 和有效 Keymap 自动生成，本文不成�
 
 ## 1. S1 前已进入 Action Catalogue 的快捷键
 
-默认键位权威是 [studio-default-keymap.ts](../src/workbench/keyboard/keymap/studio-default-keymap.ts)，
+默认键位权威是各 Action 声明（目录见 [studio-actions.ts](../src/workbench/actions/studio-actions.ts)），
 执行和 Scope 分派见 [Input Router](../src/workbench/keyboard/runtime/studio-keyboard-input-router.ts)。
 `Mod` 在 macOS 表示 Command，在 Windows / Linux 表示 Control。
 

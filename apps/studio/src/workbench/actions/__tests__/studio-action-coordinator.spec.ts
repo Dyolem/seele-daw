@@ -4,32 +4,30 @@ import { describe, expect, it, vi } from 'vitest'
 import { createActionInvocationFixture } from '@/workbench/actions/__tests__/support/studio-action-definition-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
-  STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
   type StudioActionFailure,
-  createStudioActionPresentation,
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
+import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
 
 describe('Studio Action invocation', () => {
   it('exposes the immutable catalogue without mounting any target or supplying a key binding', () => {
     const { runtime, bindingRegistry } = createTestStudioActionRuntime({
-      keymap: createStudioKeyboardKeymap({ [STUDIO_ACTION.PROJECT_SAVE]: [] }),
+      keymap: { 'project.save': [] },
     })
-    expect(runtime.actions.catalogue.map(({ actionId }) => actionId).sort()).toEqual(
-      Object.values(STUDIO_ACTION).sort(),
-    )
+    const ids = runtime.actions.catalogue.map(({ id }) => id)
+    expect(ids).toEqual(STUDIO_ACTIONS.map(({ id }) => id))
+    expect(new Set(ids).size).toBe(ids.length)
     expect(
       runtime.actions.catalogue.every(
-        (descriptor) => Object.isFrozen(descriptor) && !('bindings' in descriptor),
+        (descriptor) => Object.isFrozen(descriptor) && !('resolve' in descriptor),
       ),
     ).toBe(true)
     expect(Object.isFrozen(runtime.actions.catalogue)).toBe(true)
     expect(bindingRegistry.listeners.has('Mod+S')).toBe(false)
-    expect(runtime.actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE).enabled).toBe(false)
-    expect(runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu').status).toBe('unavailable')
+    expect(runtime.actions.presentationFor('project.save').enabled).toBe(false)
+    expect(runtime.actions.invoke('project.save', 'menu').status).toBe('unavailable')
   })
 
   it.each(['menu', 'toolbar', 'keyboard', 'context-menu'] as const)(
@@ -40,15 +38,14 @@ describe('Studio Action invocation', () => {
       let enabled = true
       targets.bind({
         execute,
-        presentation: () =>
-          createStudioActionPresentation('Save', enabled ? null : 'Saving', { busy: !enabled }),
+        state: () => ({ disabledReason: enabled ? null : 'Saving', busy: !enabled }),
       })
-      expect(actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE).enabled).toBe(true)
+      expect(actions.presentationFor('project.save').enabled).toBe(true)
       enabled = false
-      expect(actions.invoke(STUDIO_ACTION.PROJECT_SAVE, source).status).toBe('unavailable')
+      expect(actions.invoke('project.save', source).status).toBe('unavailable')
       expect(execute).not.toHaveBeenCalled()
       enabled = true
-      const invocation = actions.invoke(STUDIO_ACTION.PROJECT_SAVE, source)
+      const invocation = actions.invoke('project.save', source)
       expect(execute).toHaveBeenCalledOnce()
       if (invocation.status !== 'accepted') throw new Error('Expected accepted action')
       await expect(invocation.completion).resolves.toEqual({ status: 'completed' })
@@ -66,7 +63,7 @@ describe('Studio Action invocation', () => {
           throw cause
         },
       })
-      const invocation = actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'toolbar')
+      const invocation = actions.invoke('project.save', 'toolbar')
       if (invocation.status !== 'accepted') throw new Error('Expected accepted action')
       await expect(invocation.completion).resolves.toEqual({
         status: 'failed',
@@ -74,10 +71,10 @@ describe('Studio Action invocation', () => {
         reported: true,
       })
       expect(failures).toEqual([
-        { actionId: STUDIO_ACTION.PROJECT_SAVE, source: 'toolbar', operation: 'execute', cause },
+        { actionId: 'project.save', source: 'toolbar', operation: 'execute', cause },
       ])
       targets.bind({ execute: () => STUDIO_ACTION_COMPLETED })
-      const next = actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+      const next = actions.invoke('project.save', 'menu')
       if (next.status !== 'accepted') throw new Error('Expected accepted retry')
       await expect(next.completion).resolves.toEqual({ status: 'completed' })
     },
@@ -87,7 +84,7 @@ describe('Studio Action invocation', () => {
     const { actions, targets, failures } = createActionInvocationFixture()
     const cause = new Error('Already visible in the save status')
     targets.bind({ execute: () => ({ status: 'failed', cause, reported: true }) })
-    const invocation = actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+    const invocation = actions.invoke('project.save', 'menu')
     if (invocation.status !== 'accepted') throw new Error('Expected accepted action')
     await expect(invocation.completion).resolves.toEqual({
       status: 'failed',
@@ -110,7 +107,7 @@ describe('Studio Action invocation', () => {
       const { actions, targets, failures } = createActionInvocationFixture()
       const deferred = createDeferredActionResult<StudioActionCompletion>()
       const release = targets.bind({ execute: () => deferred.promise })
-      const invocation = actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+      const invocation = actions.invoke('project.save', 'menu')
       if (invocation.status !== 'accepted') throw new Error('Expected accepted action')
       if (mode === 'replace target') targets.bind({ execute: () => STUDIO_ACTION_COMPLETED })
       else if (mode === 'release target') release()
@@ -134,13 +131,13 @@ describe('Studio Action invocation', () => {
     releaseOld()
     releaseOld()
     expect(oldBinding?.isCurrent()).toBe(false)
-    const invocation = actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+    const invocation = actions.invoke('project.save', 'menu')
     if (invocation.status !== 'accepted') throw new Error('Expected current target')
     await invocation.completion
     expect(oldExecute).not.toHaveBeenCalled()
     expect(nextExecute).toHaveBeenCalledOnce()
     releaseNext()
-    expect(actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu').status).toBe('unavailable')
+    expect(actions.invoke('project.save', 'menu').status).toBe('unavailable')
   })
 
   it('contains presentation and resolution failures and allows a recovered target', () => {
@@ -148,26 +145,27 @@ describe('Studio Action invocation', () => {
     const cause = new Error('Presentation failed')
     targets.bind({
       execute: () => STUDIO_ACTION_COMPLETED,
-      presentation: () => {
+      state: () => {
         throw cause
       },
     })
-    expect(actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE).enabled).toBe(false)
-    expect(actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE).enabled).toBe(false)
+    expect(actions.presentationFor('project.save').enabled).toBe(false)
+    expect(actions.presentationFor('project.save').enabled).toBe(false)
     expect(failures).toHaveLength(1)
-    expect(actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')).toMatchObject({
+    expect(actions.invoke('project.save', 'menu')).toMatchObject({
       status: 'failed',
       failure: { cause, operation: 'resolve' },
     })
     targets.bind({ execute: () => STUDIO_ACTION_COMPLETED })
-    expect(actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE).enabled).toBe(true)
+    expect(actions.presentationFor('project.save').enabled).toBe(true)
   })
 
   it('rejects a duplicate definition before any handler can run', () => {
-    const { definition } = createActionInvocationFixture()
+    const { action, contexts } = createActionInvocationFixture()
     expect(() =>
       createStudioActionCoordinator({
-        definitions: [definition, definition],
+        actions: [action, action],
+        contexts,
         reportFailure: vi.fn<(failure: StudioActionFailure) => void>(),
       }),
     ).toThrow('Invalid or duplicate Studio Action')

@@ -1,26 +1,10 @@
-export const STUDIO_ACTION = {
-  HISTORY_REDO: 'history.redo',
-  HISTORY_UNDO: 'history.undo',
-  INTERACTION_CANCEL: 'interaction.cancel',
-  EDITOR_SELECTION_CLEAR: 'editor.selection.clear',
-  EDITOR_SELECTION_DELETE: 'editor.selection.delete',
-  ARRANGEMENT_CLIP_OPEN: 'arrangement.clip.open',
-  ARRANGEMENT_CLIP_CREATE: 'arrangement.clip.create',
-  PIANO_ROLL_TOOL_CURSOR: 'piano-roll.tool.cursor',
-  PIANO_ROLL_TOOL_PENCIL: 'piano-roll.tool.pencil',
-  PIANO_ROLL_SNAP_TOGGLE: 'piano-roll.snap.toggle',
-  NOTIFICATIONS_FOCUS: 'notifications.focus',
-  SHORTCUTS_SHOW: 'shortcuts.show',
-  PLAYBACK_TOGGLE: 'playback.toggle',
-  PLAYBACK_RETURN_TO_START: 'playback.return-to-last-start-position',
-  PROJECTS_SHOW: 'projects.show',
-  PROJECT_IMPORT_MIDI: 'project.import-midi',
-  PROJECT_IMPORT_MIDI_TRACKS: 'project.import-midi-tracks',
-  PROJECT_SAVE: 'project.save',
-  MIDI_EDITOR_OPEN: 'midi-editor.open',
-} as const
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import {
+  defineStudioKeyboardBinding,
+  type StudioHotkey,
+  type StudioKeyboardBinding,
+} from '@/workbench/keyboard'
 
-export type StudioActionId = (typeof STUDIO_ACTION)[keyof typeof STUDIO_ACTION]
 export type StudioActionSource = 'keyboard' | 'menu' | 'toolbar' | 'context-menu'
 
 export type StudioActionCategory =
@@ -31,21 +15,23 @@ export type StudioActionCategory =
   | 'arrangement'
   | 'interface'
 
-export interface StudioActionDescriptor {
-  readonly actionId: StudioActionId
-  readonly description: string
+/**
+ * A focus region or owner that actions run against. Views bind at most one target to a context
+ * at a time; a key shared by several active contexts goes to the one with the highest priority.
+ */
+export interface StudioContext<Target = unknown> {
+  readonly id: string
   readonly label: string
-  readonly category: StudioActionCategory
-  readonly keywords: readonly string[]
+  readonly priority: number
+  /** Same-priority contexts that can be active together, so they must not share a key. */
+  readonly overlaps?: readonly StudioContext[]
+  /** Enter on the focused target runs this context's action instead of activating the element. */
+  readonly ownsEnter?: boolean
+  isActive(target: Target): boolean
 }
 
-/** A disposable projection of business capability, independent of keyboard focus. */
-export interface StudioActionPresentation {
-  readonly busy: boolean
-  readonly checked?: boolean
-  readonly disabledReason: string | null
-  readonly enabled: boolean
-  readonly label: string
+export interface StudioContextReader {
+  isActive(context: StudioContext): boolean
 }
 
 export type StudioActionCompletion =
@@ -62,29 +48,79 @@ export const STUDIO_ACTION_NOT_APPLIED: StudioActionCompletion = Object.freeze({
   status: 'not-applied',
 })
 
-export interface StudioActionResolution {
-  readonly presentation: StudioActionPresentation
-  isCurrent(): boolean
-  onInvalidated(listener: () => void): () => void
-  execute(): StudioActionCompletion | Promise<StudioActionCompletion>
+/** What an action offers its bound target right now. */
+export interface StudioActionState {
+  /** Replaces the declared label, e.g. "Pause" while playing. */
+  readonly label?: string
+  /** Appended to the label, e.g. what the selection holds. */
+  readonly detail?: string
+  readonly disabledReason?: string | null
+  readonly busy?: boolean
+  readonly checked?: boolean
+  /** Narrows currency beyond the context binding, e.g. to one Project session. */
+  readonly isCurrent?: () => boolean
+  /** Returning nothing means the action completed. */
+  execute(): StudioActionCompletion | void | Promise<StudioActionCompletion | void>
 }
 
-/** Features contribute one definition; mounted views only supply its current target. */
-export interface StudioActionDefinition extends StudioActionDescriptor {
-  resolve(): StudioActionResolution | null
+export interface StudioActionDescriptor<Id extends string = StudioActionId> {
+  readonly id: Id
+  readonly label: string
+  readonly description: string
+  readonly category: StudioActionCategory
+  readonly keywords: readonly string[]
+  readonly context: StudioContext
+  /** Default bindings; the user keymap can replace them. */
+  readonly keys: readonly StudioKeyboardBinding[]
+  /** Whether holding a key repeats the action. */
+  readonly repeat: boolean
 }
 
-export interface StudioActionFailure {
-  readonly actionId: StudioActionId
-  readonly cause: unknown
-  readonly operation: 'presentation' | 'resolve' | 'execute'
-  readonly source: StudioActionSource | null
+export interface StudioAction<
+  Id extends string = StudioActionId,
+  Target = unknown,
+> extends StudioActionDescriptor<Id> {
+  readonly context: StudioContext<Target>
+  /** Null when the bound target cannot offer the action at all. */
+  resolve(target: Target, contexts: StudioContextReader): StudioActionState | null
 }
 
-export type StudioActionInvocation =
-  | { readonly status: 'unavailable'; readonly reason: string }
-  | { readonly status: 'failed'; readonly failure: StudioActionFailure }
-  | { readonly status: 'accepted'; readonly completion: Promise<StudioActionCompletion> }
+interface StudioActionDeclaration<Id extends string, Target> {
+  readonly id: Id
+  readonly context: StudioContext<Target>
+  readonly label: string
+  readonly description: string
+  readonly category: StudioActionCategory
+  readonly keywords?: readonly string[]
+  readonly keys?: readonly StudioHotkey[]
+  readonly repeat?: boolean
+  resolve(target: Target, contexts: StudioContextReader): StudioActionState | null
+}
+
+export function defineStudioContext<Target>(context: StudioContext<Target>): StudioContext<Target> {
+  return Object.freeze({ ...context })
+}
+
+/** The single declaration of an action: identity, text, default keys and behavior. */
+export function defineStudioAction<const Id extends string, Target>(
+  declaration: StudioActionDeclaration<Id, Target>,
+): StudioAction<Id, Target> {
+  return Object.freeze({
+    ...declaration,
+    keywords: Object.freeze([...(declaration.keywords ?? [])]),
+    keys: Object.freeze((declaration.keys ?? []).map((key) => defineStudioKeyboardBinding(key))),
+    repeat: declaration.repeat ?? false,
+  })
+}
+
+/** A disposable projection of business capability, independent of keyboard focus. */
+export interface StudioActionPresentation {
+  readonly busy: boolean
+  readonly checked?: boolean
+  readonly disabledReason: string | null
+  readonly enabled: boolean
+  readonly label: string
+}
 
 export function createStudioActionPresentation(
   label: string,
@@ -99,3 +135,15 @@ export function createStudioActionPresentation(
     label,
   })
 }
+
+export interface StudioActionFailure {
+  readonly actionId: StudioActionId
+  readonly cause: unknown
+  readonly operation: 'presentation' | 'resolve' | 'execute'
+  readonly source: StudioActionSource | null
+}
+
+export type StudioActionInvocation =
+  | { readonly status: 'unavailable'; readonly reason: string }
+  | { readonly status: 'failed'; readonly failure: StudioActionFailure }
+  | { readonly status: 'accepted'; readonly completion: Promise<StudioActionCompletion> }

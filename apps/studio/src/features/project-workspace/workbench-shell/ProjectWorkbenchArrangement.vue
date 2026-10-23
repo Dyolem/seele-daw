@@ -10,13 +10,12 @@ import type {
   ProjectTempoEventNavigationDirection,
 } from '@/features/project-workspace/tempo-track/types/tempo-track'
 import {
-  STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
   STUDIO_ACTION_NOT_APPLIED,
   type StudioActionCompletion,
-  type StudioActionId,
   type StudioActionSource,
 } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import {
   parseTick,
@@ -26,7 +25,7 @@ import {
   type Tick,
   type TrackId,
 } from '@seele-daw/project-core'
-import { useArrangementActionTargets } from '@/features/project-workspace/actions/project-workbench-action-context'
+import { ARRANGEMENT_BAR_CONTEXT } from '@/features/project-workspace/actions/arrangement-keyboard-actions'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 import { useTimelineLocate } from '@/features/project-workspace/workbench-shell/arrangement/hooks/use-timeline-locate'
 import GridIcon from '~icons/fluent/grid-20-regular'
@@ -140,14 +139,13 @@ const isTimelineFollowSuspended = shallowRef(false)
 const tempoPreview = provideTempoTrackPreview()
 let observedArrangementScrollLeft = 0
 
-const { actions, keyboard } = useStudioActions()
-const { arrangementBarTarget } = useArrangementActionTargets()
+const { actions, contexts, keyboard } = useStudioActions()
 let releaseBarTarget: (() => void) | null = null
 function bindBarTarget(track: ProjectTrackPresentation, tick: Tick, event: Event): void {
   const element = event.currentTarget
   if (!(element instanceof HTMLElement)) return
   releaseBarTarget?.()
-  releaseBarTarget = arrangementBarTarget.bind({
+  releaseBarTarget = contexts.bind(ARRANGEMENT_BAR_CONTEXT, {
     isFocused: () => element === document.activeElement && element.isConnected,
     execute: () => {
       const currentTrack = props.tracks.find(({ id }) => id === track.id)
@@ -159,7 +157,7 @@ function bindBarTarget(track: ProjectTrackPresentation, tick: Tick, event: Event
 }
 function createClipFromBar(track: ProjectTrackPresentation, tick: Tick, event: MouseEvent): void {
   bindBarTarget(track, tick, event)
-  actions.invoke(STUDIO_ACTION.ARRANGEMENT_CLIP_CREATE, 'toolbar')
+  actions.invoke('arrangement.clip.create', 'toolbar')
 }
 watch(
   () => props.projectId,
@@ -171,7 +169,7 @@ watch(
 )
 onBeforeUnmount(() => releaseBarTarget?.())
 const createClipHint = computed(() => {
-  const bindings = keyboard.displayBindingsFor(STUDIO_ACTION.ARRANGEMENT_CLIP_CREATE).join(' / ')
+  const bindings = keyboard.displayBindingsFor('arrangement.clip.create').join(' / ')
   return `Double-click${bindings ? ` or press ${bindings}` : ''} to create a MIDI clip`
 })
 

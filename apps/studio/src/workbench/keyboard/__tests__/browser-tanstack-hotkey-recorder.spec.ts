@@ -7,6 +7,7 @@ import {
 } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import type { StudioShortcutRecordingResult } from '@/workbench/keyboard/contracts/studio-shortcut-recorder'
 import { createTestUserKeymapStorage } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
+import { INTERFACE_CONTEXT } from '@/workbench/actions/studio-interface-actions'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -23,6 +24,11 @@ function setup(platform: StudioKeyboardPlatform = 'mac') {
     userKeymapStorage: storage,
     isModalActive: () => false,
     reportFailure: () => {},
+  })
+  // F8 probes whether input reaches Actions again, as it does once the shell is mounted.
+  runtime.contexts.bind(INTERFACE_CONTEXT, {
+    focusNotifications: () => {},
+    showShortcuts: () => {},
   })
   const invoke = vi.spyOn(runtime.actions, 'invoke')
   const owner = document.body.appendChild(document.createElement('button'))

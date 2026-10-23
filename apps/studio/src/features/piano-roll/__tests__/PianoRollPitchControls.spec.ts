@@ -6,6 +6,7 @@ import PianoRollPitchControls from '@/features/piano-roll/components/pitch-view/
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { PIANO_ROLL_PITCH_VIEW_MODE } from '@/features/piano-roll/types/piano-roll-preferences'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
+import { INTERFACE_CONTEXT } from '@/workbench/actions/studio-interface-actions'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -26,7 +27,10 @@ it('keeps mode and zoom in a keyboard-accessible panel while Fit notes stays dir
   const pinia = createPinia()
   const keyboard = createTestStudioActionRuntime()
   const focusNotifications = vi.fn<() => void>()
-  keyboard.runtime.interfaceTarget.bind({ focusNotifications, showShortcuts: () => undefined })
+  keyboard.runtime.contexts.bind(INTERFACE_CONTEXT, {
+    focusNotifications,
+    showShortcuts: () => undefined,
+  })
   const preferences = usePianoRollPreferencesStore(pinia)
   const wrapper = mount(PianoRollPitchControls, {
     props: { pitches: [parseMidiPitch(60), parseMidiPitch(72)] },

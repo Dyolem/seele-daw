@@ -1,4 +1,5 @@
-import type { StudioActionId, StudioActionPresentation } from '@/workbench/actions/studio-action'
+import type { StudioActionPresentation } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type { StudioKeyboardInput } from '@/workbench/keyboard'
 

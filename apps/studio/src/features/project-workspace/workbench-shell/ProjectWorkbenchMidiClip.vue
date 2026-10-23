@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, useTemplateRef, watch, type StyleValue } from 'vue'
 
-import { useArrangementActionTargets } from '@/features/project-workspace/actions/project-workbench-action-context'
+import { ARRANGEMENT_CLIP_CONTEXT } from '@/features/project-workspace/actions/arrangement-keyboard-actions'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
-import { STUDIO_ACTION, STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
+import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 
@@ -32,12 +32,11 @@ const clipStyle = computed<StyleValue>(() => {
 })
 
 const element = useTemplateRef<HTMLButtonElement>('element')
-const { actions, keyboard } = useStudioActions()
-const { arrangementClipTarget } = useArrangementActionTargets()
+const { actions, contexts, keyboard } = useStudioActions()
 let releaseTarget: (() => void) | null = null
 function activateTarget(): void {
   releaseTarget?.()
-  releaseTarget = arrangementClipTarget.bind({
+  releaseTarget = contexts.bind(ARRANGEMENT_CLIP_CONTEXT, {
     isFocused: () => element.value === document.activeElement,
     execute: () => {
       emit('select')
@@ -58,10 +57,10 @@ watch(
 onBeforeUnmount(() => releaseTarget?.())
 function openClip(): void {
   activateTarget()
-  actions.invoke(STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN, 'toolbar')
+  actions.invoke('arrangement.clip.open', 'toolbar')
 }
 const openHint = computed(() => {
-  const bindings = keyboard.displayBindingsFor(STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN).join(' / ')
+  const bindings = keyboard.displayBindingsFor('arrangement.clip.open').join(' / ')
   return `Double-click${bindings ? ` or press ${bindings}` : ''} to open.`
 })
 </script>

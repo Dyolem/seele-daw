@@ -16,13 +16,12 @@ import {
 } from '@/features/piano-roll/__tests__/support/piano-roll-context-menu-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
-  STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
   type StudioActionCompletion,
   type StudioActionFailure,
 } from '@/workbench/actions/studio-action'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { EDITOR_SELECTION_CONTEXT } from '@/workbench/actions/studio-editor-actions'
 
 const cleanups: Array<() => void> = []
 
@@ -38,8 +37,8 @@ function mountMenu(runtime: StudioActionRuntime) {
     deleteSelection,
     clearSelection,
   }
-  const releaseTarget = runtime.selectionTarget.bind(target)
-  const binding = runtime.selectionTarget.current
+  const releaseTarget = runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, target)
+  const binding = runtime.contexts.current(EDITOR_SELECTION_CONTEXT)
   const wrapper = mount(
     defineComponent({
       components: { ContextMenuRoot, PianoRollContextMenu },
@@ -88,7 +87,7 @@ afterEach(() => {
 describe('Piano Roll context menu', () => {
   it('uses live Action presentation and invokes an unbound Action through the same coordinator', async () => {
     const fixture = createTestStudioActionRuntime({
-      keymap: createStudioKeyboardKeymap({ [STUDIO_ACTION.EDITOR_SELECTION_DELETE]: [] }),
+      keymap: { 'editor.selection.delete': [] },
     })
     const invoke = vi.spyOn(fixture.runtime.actions, 'invoke')
     const { editor, target } = mountMenu(fixture.runtime)
@@ -96,10 +95,10 @@ describe('Piano Roll context menu', () => {
     const item = getPianoRollContextMenuItem('Delete selection — Notes')
     expect(item.find('.piano-roll-context-menu__shortcut').exists()).toBe(false)
     expect(getPianoRollContextMenuItem('Clear selection').text()).toContain('display:Escape')
-    expect(fixture.runtime.keyboard.bindingsFor(STUDIO_ACTION.EDITOR_SELECTION_DELETE)).toEqual([])
+    expect(fixture.runtime.keyboard.bindingsFor('editor.selection.delete')).toEqual([])
     await item.trigger('click')
     await flushPromises()
-    expect(invoke).toHaveBeenCalledWith(STUDIO_ACTION.EDITOR_SELECTION_DELETE, 'context-menu')
+    expect(invoke).toHaveBeenCalledWith('editor.selection.delete', 'context-menu')
     expect(target.deleteSelection).toHaveBeenCalledOnce()
     expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
   })
@@ -159,7 +158,10 @@ describe('Piano Roll context menu', () => {
     await requestPianoRollContextMenu(editor.element)
     const staleItem = getPianoRollContextMenuItem('Delete selection')
     const replacementDelete = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
-    runtime.selectionTarget.bind({ ...target, deleteSelection: replacementDelete })
+    runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
+      ...target,
+      deleteSelection: replacementDelete,
+    })
     // Dispatch before Vue teardown to exercise the capability guard itself.
     await staleItem.trigger('click')
     await flushPromises()

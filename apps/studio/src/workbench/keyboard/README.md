@@ -18,7 +18,7 @@
 | 位置         | 内容与所有权                                                                                                                     |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `contracts/` | 跨边界的 Binding、输入能力、录制能力、用户 Keymap 状态／结果、冲突关系，以及 Registry / Storage Port。局部类型仍留在所属实现中。 |
-| `keymap/`    | 默认 Binding / Context / Repeat、区域关系、路由冲突分析和只读目录查询；不注册监听或持有用户记录。                                |
+| `keymap/`    | 由 Action 目录组装 Keymap、路由冲突分析和只读目录查询；不注册监听或持有用户记录。                                                |
 | `runtime/`   | Input Router 拥有物理注册和暂停令牌，User Keymap 拥有用户覆盖及保存事务；控件按键归属与分派放在一起。                            |
 | `browser/`   | TanStack 匹配／录制、localStorage 和动态 Binding 错误；实现共享契约。                                                            |
 | `vue/`       | 从已提交快照派生响应式键位和设置状态，管理自己的订阅。                                                                           |
@@ -78,7 +78,8 @@ BrowserTanStackHotkeyRegistry：匹配组合、平台映射与 Editable 过滤
 
 审阅顺序：
 
-1. [默认政策](./keymap/studio-default-keymap.ts) 与 [Context](./keymap/studio-keyboard-context.ts)。
+1. 默认键位、Repeat 与 Context 写在各 Action 的声明里（见 [Action 契约](../actions/studio-action.ts)）；
+   [Keymap 组装](./keymap/studio-keyboard-keymap.ts) 为每个 Action 填入默认键位或用户覆盖。
 2. [路由分析](./keymap/studio-keyboard-routes.ts)：相同物理键位的互斥、优先级和真实冲突。
 3. [Input Router](./runtime/studio-keyboard-input-router.ts) 与
    [控件按键归属](./runtime/browser-keyboard-ownership.ts)：何时消费、回退或保留按键。
@@ -108,8 +109,9 @@ Settings 草稿／Recorder 结果
 
 ## 修改时如何定位
 
-- 修改默认键位或 Repeat：`keymap/studio-default-keymap.ts`。
-- 修改区域优先级／冲突：`keymap/studio-keyboard-context.ts` 和 `studio-keyboard-routes.ts`。
+- 修改默认键位或 Repeat：对应 Action 声明的 `keys` / `repeat`。
+- 修改区域优先级／重叠：对应 Context 声明的 `priority` / `overlaps`；冲突分析在
+  `keymap/studio-keyboard-routes.ts`。
 - 修改草稿保存或覆盖回退：`runtime/studio-user-keymap.ts`。
 - 修改浏览器占键提示／录制过滤：`browser/` 对应 Adapter。
 - 修改设置布局：`features/keyboard-shortcuts/`；通过公开入口消费本模块。

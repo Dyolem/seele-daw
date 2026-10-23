@@ -1,16 +1,12 @@
-import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
 import type { ProjectWorkbenchMidiEditor } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import {
-  STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
   STUDIO_ACTION_NOT_APPLIED,
-  createStudioActionPresentation,
-  type StudioActionDefinition,
+  defineStudioAction,
+  defineStudioContext,
   type StudioActionCompletion,
-  type StudioActionDescriptor,
-  type StudioActionResolution,
+  type StudioActionState,
 } from '@/workbench/actions/studio-action'
-import type { StudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
 import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ReadyActiveProjectState,
@@ -35,116 +31,141 @@ export interface ProjectWorkbenchActionTarget {
   getMidiEditor(): ProjectWorkbenchMidiEditor | null
 }
 
-/** Business owners provide capability; keyboard focus is resolved by the input router. */
-export function createProjectWorkbenchActions(
-  targets: StudioActionTargetSlot<ProjectWorkbenchActionTarget>,
-): readonly StudioActionDefinition[] {
-  function define(
-    actionId: StudioActionDescriptor['actionId'],
-    resolve: (
-      target: ProjectWorkbenchActionTarget,
-      ready: ReadyActiveProjectState,
-      defaultLabel: string,
-    ) => Pick<StudioActionResolution, 'presentation' | 'execute'>,
-  ): StudioActionDefinition {
-    const descriptor = describeStudioAction(actionId)
-    return Object.freeze({
-      ...descriptor,
-      resolve() {
-        const binding = targets.current
-        const ready = binding?.value.getReadyProject() ?? null
-        if (binding === null || ready === null) return null
-        return {
-          ...resolve(binding.value, ready, descriptor.label),
-          isCurrent: () =>
-            binding.isCurrent() && binding.value.getReadyProject()?.session === ready.session,
-          onInvalidated: binding.onInvalidated,
-        }
-      },
-    })
-  }
+export const WORKBENCH_CONTEXT = defineStudioContext<ProjectWorkbenchActionTarget>({
+  id: 'workbench',
+  label: 'Project workbench',
+  priority: 1,
+  isActive: (workbench) => workbench.getReadyProject() !== null,
+})
 
-  function defineMidiImport(
-    actionId: StudioActionDescriptor['actionId'],
-    destination: 'new-project' | 'new-tracks',
-  ): StudioActionDefinition {
-    const { label } = describeStudioAction(actionId)
-    return define(actionId, (target) => {
-      const phase = target.getMidiImportPhase()
-      const busy = phase !== 'idle'
-      let reason: string | null = null
-      let currentLabel = label
-      if (phase === 'selecting') {
-        reason = 'Finish choosing a MIDI file first.'
-        currentLabel = 'Choosing MIDI file…'
-      } else if (phase === 'importing') {
-        reason = 'A MIDI file is being imported.'
-        currentLabel = 'Importing MIDI…'
-      } else if (!target.canChooseMidiFile()) {
-        reason = 'The MIDI file chooser is unavailable.'
-      }
-      return {
-        presentation: createStudioActionPresentation(currentLabel, reason, { busy }),
-        execute: () => target.importMidi(destination),
-      }
-    })
-  }
-
-  function playbackCompletion(
-    target: ProjectWorkbenchActionTarget,
-    applied: boolean,
-  ): StudioActionCompletion {
-    if (applied) return STUDIO_ACTION_COMPLETED
-    const result = target.getPlaybackState()
-    if (result.phase === PROJECT_PLAYBACK_PHASE.FAILED) {
-      return { status: 'failed', cause: result.failureCause, reported: true }
+/** Workbench actions exist only for a ready Project and expire with its session. */
+function forReadyProject(
+  resolve: (
+    workbench: ProjectWorkbenchActionTarget,
+    ready: ReadyActiveProjectState,
+  ) => StudioActionState,
+) {
+  return (workbench: ProjectWorkbenchActionTarget): StudioActionState | null => {
+    const ready = workbench.getReadyProject()
+    if (ready === null) return null
+    return {
+      isCurrent: () => workbench.getReadyProject()?.session === ready.session,
+      ...resolve(workbench, ready),
     }
-    return STUDIO_ACTION_NOT_APPLIED
   }
+}
 
-  return Object.freeze([
-    define(STUDIO_ACTION.PROJECT_SAVE, (target, ready, defaultLabel) => {
+function playbackCompletion(
+  workbench: ProjectWorkbenchActionTarget,
+  applied: boolean,
+): StudioActionCompletion {
+  if (applied) return STUDIO_ACTION_COMPLETED
+  const result = workbench.getPlaybackState()
+  if (result.phase === PROJECT_PLAYBACK_PHASE.FAILED) {
+    return { status: 'failed', cause: result.failureCause, reported: true }
+  }
+  return STUDIO_ACTION_NOT_APPLIED
+}
+
+function importMidi(destination: 'new-project' | 'new-tracks') {
+  return forReadyProject((workbench) => {
+    const phase = workbench.getMidiImportPhase()
+    let label: string | undefined
+    let disabledReason: string | null = null
+    if (phase === 'selecting') {
+      label = 'Choosing MIDI file…'
+      disabledReason = 'Finish choosing a MIDI file first.'
+    } else if (phase === 'importing') {
+      label = 'Importing MIDI…'
+      disabledReason = 'A MIDI file is being imported.'
+    } else if (!workbench.canChooseMidiFile()) {
+      disabledReason = 'The MIDI file chooser is unavailable.'
+    }
+    return {
+      label,
+      disabledReason,
+      busy: phase !== 'idle',
+      execute: () => workbench.importMidi(destination),
+    }
+  })
+}
+
+export const PROJECT_WORKBENCH_ACTIONS = [
+  defineStudioAction({
+    id: 'project.save',
+    context: WORKBENCH_CONTEXT,
+    label: 'Save',
+    description: 'Save the current project.',
+    category: 'project',
+    keywords: ['保存', 'project'],
+    keys: ['Mod+S'],
+    resolve: forReadyProject((workbench, ready) => {
       const busy = ready.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.SAVING
-      let label = defaultLabel
+      let label: string | undefined
       if (busy) label = 'Saving…'
       else if (ready.saveStatus === ACTIVE_PROJECT_SAVE_STATUS.FAILED) label = 'Retry save'
-      let reason: string | null = null
-      if (busy) reason = 'The project is being saved.'
-      else if (!ready.isDirty) reason = 'All changes are saved.'
+      let disabledReason: string | null = null
+      if (busy) disabledReason = 'The project is being saved.'
+      else if (!ready.isDirty) disabledReason = 'All changes are saved.'
       return {
-        presentation: createStudioActionPresentation(label, reason, { busy }),
+        label,
+        disabledReason,
+        busy,
         async execute() {
           try {
-            await target.save()
+            await workbench.save()
             return STUDIO_ACTION_COMPLETED
           } catch (cause) {
             return {
               status: 'failed',
               cause,
-              reported: target.getReadyProject()?.saveFailure === cause,
+              reported: workbench.getReadyProject()?.saveFailure === cause,
             }
           }
         },
       }
     }),
-    define(STUDIO_ACTION.HISTORY_UNDO, (_target, ready, label) => ({
-      presentation: createStudioActionPresentation(
-        label,
-        ready.session.canUndo ? null : 'There is nothing to undo.',
-      ),
+  }),
+  defineStudioAction({
+    id: 'history.undo',
+    context: WORKBENCH_CONTEXT,
+    label: 'Undo',
+    description: 'Undo the last project edit.',
+    category: 'history',
+    keywords: ['撤销'],
+    keys: ['Mod+Z'],
+    repeat: true,
+    resolve: forReadyProject((_workbench, { session }) => ({
+      disabledReason: session.canUndo ? null : 'There is nothing to undo.',
       execute: () =>
-        ready.session.undo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
+        session.undo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
     })),
-    define(STUDIO_ACTION.HISTORY_REDO, (_target, ready, label) => ({
-      presentation: createStudioActionPresentation(
-        label,
-        ready.session.canRedo ? null : 'There is nothing to redo.',
-      ),
+  }),
+  defineStudioAction({
+    id: 'history.redo',
+    context: WORKBENCH_CONTEXT,
+    label: 'Redo',
+    description: 'Redo the last undone project edit.',
+    category: 'history',
+    keywords: ['重做'],
+    keys: ['Mod+Shift+Z', 'Control+Y'],
+    repeat: true,
+    resolve: forReadyProject((_workbench, { session }) => ({
+      disabledReason: session.canRedo ? null : 'There is nothing to redo.',
       execute: () =>
-        ready.session.redo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
+        session.redo() === null ? STUDIO_ACTION_NOT_APPLIED : STUDIO_ACTION_COMPLETED,
     })),
-    define(STUDIO_ACTION.PLAYBACK_TOGGLE, (target, ready) => {
-      const state = target.getPlaybackState()
+  }),
+  defineStudioAction({
+    id: 'playback.toggle',
+    context: WORKBENCH_CONTEXT,
+    label: 'Play / pause',
+    description: 'Play or pause the current project.',
+    category: 'playback',
+    keywords: ['播放', '暂停', 'transport'],
+    keys: ['Space'],
+    resolve: forReadyProject((workbench, ready) => {
+      const state = workbench.getPlaybackState()
       const busy = state.phase === PROJECT_PLAYBACK_PHASE.LOADING
       const playing = state.phase === PROJECT_PLAYBACK_PHASE.PLAYING
       const playable =
@@ -152,51 +173,93 @@ export function createProjectWorkbenchActions(
         (state.planStatus === 'playable' || state.planStatus === 'partial')
       let label = playing ? 'Pause' : 'Play'
       if (busy) label = 'Loading…'
-      let reason: string | null = null
-      if (busy) reason = 'Playback is loading.'
-      else if (!playable) reason = state.feedback?.message ?? 'No playable audio is available.'
+      let disabledReason: string | null = null
+      if (busy) disabledReason = 'Playback is loading.'
+      else if (!playable)
+        disabledReason = state.feedback?.message ?? 'No playable audio is available.'
       return {
-        presentation: createStudioActionPresentation(label, reason, { busy, checked: playing }),
+        label,
+        disabledReason,
+        busy,
+        checked: playing,
         async execute() {
-          const applied = playing ? target.playback.pause() : await target.playback.play()
-          return playbackCompletion(target, applied)
+          const applied = playing ? workbench.playback.pause() : await workbench.playback.play()
+          return playbackCompletion(workbench, applied)
         },
       }
     }),
-    define(STUDIO_ACTION.PLAYBACK_RETURN_TO_START, (target, _ready, label) => ({
-      presentation: createStudioActionPresentation(
-        label,
-        target.canReturnToLastStartPosition() ? null : 'Already at the last start position.',
-      ),
-      execute: () => playbackCompletion(target, target.playback.returnToLastStartPosition()),
+  }),
+  defineStudioAction({
+    id: 'playback.return-to-last-start-position',
+    context: WORKBENCH_CONTEXT,
+    label: 'Return to last start position',
+    description: 'Stop playback and return to the last start position.',
+    category: 'playback',
+    keywords: ['返回', '起点', 'transport'],
+    keys: ['Home'],
+    resolve: forReadyProject((workbench) => ({
+      disabledReason: workbench.canReturnToLastStartPosition()
+        ? null
+        : 'Already at the last start position.',
+      execute: () => playbackCompletion(workbench, workbench.playback.returnToLastStartPosition()),
     })),
-    define(STUDIO_ACTION.PROJECTS_SHOW, (target, _ready, label) => {
-      const busy = target.isShowingProjects()
+  }),
+  defineStudioAction({
+    id: 'projects.show',
+    context: WORKBENCH_CONTEXT,
+    label: 'Projects',
+    description: 'Return to the project list.',
+    category: 'project',
+    keywords: ['项目', '导航'],
+    keys: ['Mod+Alt+O'],
+    resolve: forReadyProject((workbench) => {
+      const busy = workbench.isShowingProjects()
       return {
-        presentation: createStudioActionPresentation(
-          label,
-          busy ? 'Project navigation is awaiting completion.' : null,
-          { busy },
-        ),
-        execute: () => target.showProjects(),
+        disabledReason: busy ? 'Project navigation is awaiting completion.' : null,
+        busy,
+        execute: () => workbench.showProjects(),
       }
     }),
-    defineMidiImport(STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'new-project'),
-    defineMidiImport(STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'new-tracks'),
-    define(STUDIO_ACTION.MIDI_EDITOR_OPEN, (target, _ready, label) => {
-      const editor = target.getMidiEditor()
+  }),
+  defineStudioAction({
+    id: 'project.import-midi',
+    context: WORKBENCH_CONTEXT,
+    label: 'Import MIDI as new project…',
+    description: 'Create a project from a MIDI file.',
+    category: 'project',
+    keywords: ['导入', 'MIDI'],
+    keys: ['Mod+Alt+Shift+M'],
+    resolve: importMidi('new-project'),
+  }),
+  defineStudioAction({
+    id: 'project.import-midi-tracks',
+    context: WORKBENCH_CONTEXT,
+    label: 'Import MIDI as new tracks…',
+    description: 'Add the tracks from a MIDI file to the current project.',
+    category: 'project',
+    keywords: ['导入', '轨道', 'MIDI'],
+    keys: ['Mod+I'],
+    resolve: importMidi('new-tracks'),
+  }),
+  defineStudioAction({
+    id: 'midi-editor.open',
+    context: WORKBENCH_CONTEXT,
+    label: 'Open MIDI editor',
+    description: 'Open or restore the MIDI editor dock.',
+    category: 'interface',
+    keywords: ['钢琴卷帘', '面板', 'dock'],
+    keys: ['P'],
+    resolve: forReadyProject((workbench) => {
+      const editor = workbench.getMidiEditor()
       return {
-        presentation: createStudioActionPresentation(
-          label,
-          editor === null ? 'The MIDI editor workspace is unavailable.' : null,
-          { checked: editor?.isOpen() ?? false },
-        ),
-        execute() {
+        disabledReason: editor === null ? 'The MIDI editor workspace is unavailable.' : null,
+        checked: editor?.isOpen() ?? false,
+        execute: () => {
           if (editor === null) return STUDIO_ACTION_NOT_APPLIED
           editor.open()
           return STUDIO_ACTION_COMPLETED
         },
       }
     }),
-  ])
-}
+  }),
+] as const

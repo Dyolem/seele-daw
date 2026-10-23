@@ -11,7 +11,7 @@ import {
 import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'
 import UiMenuItem from '@/ui/components/UiMenuItem.vue'
 import type { PianoRollContextMenuTarget } from '@/features/piano-roll/types/piano-roll-context-menu-target'
-import { STUDIO_ACTION, type StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import { presentStudioAction } from '@/workbench/actions/studio-action-control'
 import {
   useStudioActions,
@@ -28,8 +28,8 @@ let releaseTarget: (() => void) | null = null
 
 const menuActions = computed(() => {
   if (!target.value?.binding.isCurrent()) return []
-  return [STUDIO_ACTION.EDITOR_SELECTION_DELETE, STUDIO_ACTION.EDITOR_SELECTION_CLEAR].map(
-    (actionId) => presentStudioAction(actions, keyboard, actionId),
+  return (['editor.selection.delete', 'editor.selection.clear'] as const).map((actionId) =>
+    presentStudioAction(actions, keyboard, actionId),
   )
 })
 const hasExecutableAction = computed(() => menuActions.value.some((action) => action.enabled))

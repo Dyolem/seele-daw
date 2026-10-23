@@ -5,9 +5,9 @@ import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioK
 import UiToastRegion from '@/ui/components/UiToastRegion.vue'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { DOMWrapper } from '@vue/test-utils'
-import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
 import { createTestUserKeymapStorage } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
 import type { StudioUserKeymapStorage } from '@/workbench/keyboard/contracts/studio-user-keymap-storage'
+import { INTERFACE_CONTEXT } from '@/workbench/actions/studio-interface-actions'
 
 const cleanups: Array<() => void> = []
 afterEach(() => {
@@ -97,7 +97,7 @@ describe('Keyboard shortcuts dialog', () => {
     expect(source()).toBe('User')
     await dialog.get('[aria-label="Edit Save shortcuts"]').trigger('click')
     await buttonWithText(dialog, 'Restore defaults').trigger('click')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['F9'])
+    expect(runtime.keyboard.bindingsFor('project.save')).toEqual(['F9'])
     expect(storage.writes).toEqual([])
     await buttonWithText(dialog, 'Cancel editing').trigger('click')
     expect(source()).toBe('User')
@@ -105,7 +105,7 @@ describe('Keyboard shortcuts dialog', () => {
     await buttonWithText(dialog, 'Restore defaults').trigger('click')
     await buttonWithText(dialog, 'Save shortcuts').trigger('click')
     expect(source()).toBe('Default')
-    expect(runtime.keymapState.value.modifiedActionIds).not.toContain(STUDIO_ACTION.PROJECT_SAVE)
+    expect(runtime.keymapState.value.modifiedActionIds).not.toContain('project.save')
     expect(storage.writes).toHaveLength(1)
   })
 
@@ -123,6 +123,8 @@ describe('Keyboard shortcuts dialog', () => {
   it('records into a draft, cancels recording before closing the editor, and clears only a draft binding', async () => {
     const { dialog, runtime, storage, bindingRegistry } = await openSettings()
     const invoke = vi.spyOn(runtime.actions, 'invoke')
+    const focus = vi.fn<() => void>()
+    runtime.contexts.bind(INTERFACE_CONTEXT, { focusNotifications: focus, showShortcuts: () => {} })
     await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
     await dialog.get('[aria-label="Record key combination 1"]').trigger('click')
     await dialog
@@ -131,7 +133,7 @@ describe('Keyboard shortcuts dialog', () => {
     expect(dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]').element.value).toBe(
       'F9',
     )
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
+    expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual(['F8'])
     expect(storage.writes).toEqual([])
     expect(invoke).not.toHaveBeenCalled()
     await dialog.get('[aria-label="Record key combination 1"]').trigger('click')
@@ -148,7 +150,7 @@ describe('Keyboard shortcuts dialog', () => {
       .get('[aria-label="Stop recording key combination 1"]')
       .trigger('keydown', { key: 'Backspace' })
     expect(dialog.find('[aria-label="Key combination 1"]').exists()).toBe(false)
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
+    expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual(['F8'])
     expect(storage.writes).toEqual([])
     await buttonWithText(dialog, 'Add key combination').trigger('click')
     await dialog.get('[aria-label="Record key combination 1"]').trigger('click')
@@ -156,6 +158,7 @@ describe('Keyboard shortcuts dialog', () => {
     await flushPromises()
     bindingRegistry.dispatch('F8')
     expect(invoke).toHaveBeenCalledOnce()
+    expect(focus).toHaveBeenCalledOnce()
   })
 
   it.each(['Escape', 'Delete', 'Backspace'])(
@@ -167,9 +170,9 @@ describe('Keyboard shortcuts dialog', () => {
       expect(dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]').element.value).toBe(
         key,
       )
-      expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
+      expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual(['F8'])
       await dialog.get('form').trigger('submit')
-      expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([key])
+      expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual([key])
     },
   )
 
@@ -194,8 +197,8 @@ describe('Keyboard shortcuts dialog', () => {
     expect(dialog.find('form').exists()).toBe(true)
     await buttonWithText(dialog, 'Reassign conflicting keys…').trigger('click')
     await buttonWithText(dialog, 'Reassign and save').trigger('click')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['Mod+Shift+Z'])
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.HISTORY_REDO)).toEqual(['Control+Y'])
+    expect(runtime.keyboard.bindingsFor('project.save')).toEqual(['Mod+Shift+Z'])
+    expect(runtime.keyboard.bindingsFor('history.redo')).toEqual(['Control+Y'])
     expect(storage.writes).toHaveLength(1)
     expect(dialog.find('form').exists()).toBe(false)
   })
@@ -211,8 +214,8 @@ describe('Keyboard shortcuts dialog', () => {
     })
     await buttonWithText(dialog, 'Reassign and save').trigger('click')
     expect(dialog.get('[role="alert"]').text()).toContain('previous shortcuts are still active')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['Mod+S'])
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.HISTORY_UNDO)).toEqual(['Mod+Z'])
+    expect(runtime.keyboard.bindingsFor('project.save')).toEqual(['Mod+S'])
+    expect(runtime.keyboard.bindingsFor('history.undo')).toEqual(['Mod+Z'])
     await dialog.get('[aria-label="Key combination 1"]').setValue('F9')
     expect(dialog.find('[aria-label="Confirm shortcut reassignment"]').exists()).toBe(false)
     expect(dialog.find('[aria-label="Shortcut relationships"]').exists()).toBe(false)
@@ -240,7 +243,7 @@ describe('Keyboard shortcuts dialog', () => {
     const storage = createTestUserKeymapStorage()
     const { dialog, runtime, bindingRegistry, wrapper } = await openSettings(storage)
     const focus = vi.fn<() => void>()
-    runtime.interfaceTarget.bind({ focusNotifications: focus, showShortcuts: () => {} })
+    runtime.contexts.bind(INTERFACE_CONTEXT, { focusNotifications: focus, showShortcuts: () => {} })
     await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
     const first = dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]')
     expect(document.activeElement).toBe(first.element)
@@ -248,7 +251,7 @@ describe('Keyboard shortcuts dialog', () => {
     await buttonWithText(dialog, 'Add key combination').trigger('click')
     await dialog.get('[aria-label="Key combination 2"]').setValue('F10')
     await dialog.get('form').trigger('submit')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F9', 'F10'])
+    expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual(['F9', 'F10'])
     expect(bindingRegistry.listeners.has('F8')).toBe(false)
     bindingRegistry.dispatch('F9')
     expect(focus).not.toHaveBeenCalled()
@@ -263,13 +266,13 @@ describe('Keyboard shortcuts dialog', () => {
     await dialog.get('[aria-label="Remove key combination 1"]').trigger('click')
     expect(dialog.get('form').text()).toContain('remove all shortcuts')
     await dialog.get('form').trigger('submit')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([])
+    expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual([])
     expect(dialog.get('tbody tr').text()).toContain('Unassigned')
     await dialog.get('[aria-label="Edit Focus notifications shortcuts"]').trigger('click')
     await buttonWithText(dialog, 'Restore defaults').trigger('click')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([])
+    expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual([])
     await buttonWithText(dialog, 'Save shortcuts').trigger('click')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['F8'])
+    expect(runtime.keyboard.bindingsFor('notifications.focus')).toEqual(['F8'])
     expect(dialog.findAll('tbody tr')).toHaveLength(0)
     expect(document.activeElement?.getAttribute('aria-label')).toBe('Search keyboard shortcuts')
     await dialog.get('[aria-label="Close keyboard shortcuts"]').trigger('click')
@@ -295,7 +298,7 @@ describe('Keyboard shortcuts dialog', () => {
     expect(dialog.get<HTMLInputElement>('[aria-label="Key combination 1"]').element.value).toBe(
       'Mod+K',
     )
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['Mod+S'])
+    expect(runtime.keyboard.bindingsFor('project.save')).toEqual(['Mod+S'])
     await dialog.get('[aria-label="Key combination 1"]').trigger('keydown', { key: 'Escape' })
     await flushPromises()
     expect(dialog.find('form').exists()).toBe(false)
@@ -316,10 +319,10 @@ describe('Keyboard shortcuts dialog', () => {
     await dialog.get('form').trigger('submit')
     expect(dialog.get('[role="alert"]').text()).toContain('conflicts with')
     expect(dialog.get('[role="alert"]').text()).toContain('Undo')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['Mod+S'])
+    expect(runtime.keyboard.bindingsFor('project.save')).toEqual(['Mod+S'])
     await dialog.get('[aria-label="Key combination 1"]').setValue('UnrecognizedKey')
     expect(dialog.get('form').text()).toContain('Unknown key')
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PROJECT_SAVE)).toEqual(['Mod+S'])
+    expect(runtime.keyboard.bindingsFor('project.save')).toEqual(['Mod+S'])
   })
 
   it('keeps damaged records untouched until an explicit reset, and reports reset failures', async () => {
@@ -353,7 +356,10 @@ describe('Keyboard shortcuts dialog', () => {
   it('searches all Actions, filters unassigned keys, blocks background input and restores focus', async () => {
     const { runtime, provide, bindingRegistry } = createTestStudioActionRuntime()
     const focusNotifications = vi.fn<() => void>()
-    runtime.interfaceTarget.bind({ focusNotifications, showShortcuts: vi.fn<() => void>() })
+    runtime.contexts.bind(INTERFACE_CONTEXT, {
+      focusNotifications,
+      showShortcuts: vi.fn<() => void>(),
+    })
     const wrapper = mount(
       defineComponent({
         components: { StudioKeyboardShortcutsDialog },

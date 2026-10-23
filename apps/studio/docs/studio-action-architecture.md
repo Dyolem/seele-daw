@@ -24,7 +24,7 @@ Keyboard → Browser Registry → Input Router
                       修改事实时调用 Project Command
 ```
 
-`bootstrap/studio-action-runtime.ts` 装配各功能的 Action 定义、按所有权拆分的目标槽位、
+`bootstrap/studio-action-runtime.ts` 装配 Action 目录、Context 注册表、
 键盘路由器、User Keymap、Shortcut Recorder 和 Vue Binding。用户覆盖由独立本地记录保存，菜单、按钮和 Settings
 读取成功提交后的同一响应式键位快照；设置草稿和保存失败不会改变业务 Action 或 Project。
 Recorder 只更新设置草稿，持有自己的输入暂停与取消能力；释放顺序先结束录制，再释放键盘
@@ -145,9 +145,9 @@ Preview 或 Project facts 的副本。Tempo 删除由 Page 提供窄能力，保
 Command 结果、失败反馈和选择清理；Lane 不通过无返回值的 Emit 冒充业务完成。
 
 Cursor、Pencil、Snap、Arrangement Clip 打开／创建，以及通知焦点和快捷键查询均已进入
-Catalogue；具体能力仍属于各 Feature。静态 metadata 集中在 `studio-action-catalogue.ts`，
-默认 Binding / Context / Repeat 集中在 `studio-default-keymap.ts`，新增 ID 必须补齐两份
-穷尽配置。Settings 在 Feature 未挂载时仍能查询完整目录。
+Catalogue；具体能力仍属于各 Feature。每个 Action 由所属 Feature 用 `defineStudioAction`
+一次声明 ID、文案、默认键位、Context 与处理，`workbench/actions/studio-actions.ts` 汇总目录
+并推导 `StudioActionId`。Settings 在 Feature 未挂载时仍能查询完整目录。
 
 Track Scope 尚无完整的 Note 选择与编辑流程。焦点进入其 Note 区域后，不能删除先前的 CC64
 选择；通过键盘聚焦 CC64 lane 时，会重新激活对应的选择目标。Track／Clip 替换时，

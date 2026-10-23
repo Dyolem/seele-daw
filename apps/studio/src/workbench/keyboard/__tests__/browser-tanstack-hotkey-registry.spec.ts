@@ -7,7 +7,7 @@ import {
   validateStudioKeyboardBinding,
 } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
-import { STUDIO_DEFAULT_KEYMAP } from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
 
 afterEach(() => {
   HotkeyManager.resetInstance()
@@ -43,7 +43,7 @@ describe('BrowserTanStackHotkeyRegistry', () => {
         warnings: [expect.stringContaining('open browser feedback')],
       })
       expect(registry.validate('Shift+Delete').valid).toBe(true)
-      for (const binding of Object.values(STUDIO_DEFAULT_KEYMAP).flat()) {
+      for (const binding of STUDIO_ACTIONS.flatMap((action) => action.keys)) {
         expect(registry.validate(binding)).toMatchObject({ valid: true, warnings: [] })
       }
     },

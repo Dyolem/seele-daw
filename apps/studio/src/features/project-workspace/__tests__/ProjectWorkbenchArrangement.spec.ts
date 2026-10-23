@@ -9,7 +9,7 @@ import {
 import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/symbols'
 import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
+import { createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import {
   createTempoEventRecord,
   parseClipId,
@@ -49,6 +49,7 @@ import {
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
+import { INTERACTION_CONTEXT } from '@/workbench/actions/studio-editor-actions'
 
 const mountedWrappers: VueWrapper[] = []
 const STUDIO_GRAND_INSTRUMENT = Object.freeze({
@@ -188,7 +189,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       barSpanTick: parsePositiveTick(3_840),
       midiImportAction: {
         ...createStudioActionPresentation('Import MIDI as new tracks…'),
-        actionId: STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
+        actionId: 'project.import-midi-tracks',
         shortcut: '',
         title: 'Import MIDI as new tracks…',
       },
@@ -1028,15 +1029,11 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(laneChildren[1]?.textContent).toContain('Import MIDI as new tracks')
     expect(laneChildren[1]?.textContent).not.toContain('Creates a separate local project')
     await withTrack.get('.project-workbench__midi-import-lane button').trigger('click')
-    expect(withTrack.emitted('invokeAction')).toEqual([
-      [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'toolbar'],
-    ])
+    expect(withTrack.emitted('invokeAction')).toEqual([['project.import-midi-tracks', 'toolbar']])
 
     const empty = mountArrangement().wrapper
     await empty.get('.project-workbench__empty-midi-import').trigger('click')
-    expect(empty.emitted('invokeAction')).toEqual([
-      [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'toolbar'],
-    ])
+    expect(empty.emitted('invokeAction')).toEqual([['project.import-midi-tracks', 'toolbar']])
   })
 
   it('keeps ordered Track and Lane pairs under one Arrangement scroll authority', () => {
@@ -1482,7 +1479,7 @@ describe('ProjectWorkbenchArrangement', () => {
         clientY: 120,
         pointerId: 71,
       })
-      const tempoTarget = keyboard.runtime.interactionTarget.current
+      const tempoTarget = keyboard.runtime.contexts.current(INTERACTION_CONTEXT)
       await dispatchPointerEvent(plot, 'pointermove', { clientX: 600, clientY: 120, pointerId: 71 })
       expect(cancelTimelineLocate).toHaveBeenCalledOnce()
       expect(ruler.hasPointerCapture(10)).toBe(false)

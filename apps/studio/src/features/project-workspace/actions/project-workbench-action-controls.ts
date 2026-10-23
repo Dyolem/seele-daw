@@ -1,4 +1,4 @@
-import { STUDIO_ACTION, type StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import {
   presentStudioAction,
   type StudioActionControl,
@@ -15,16 +15,16 @@ export function presentProjectWorkbenchActions(
   }
 
   return Object.freeze({
-    save: present(STUDIO_ACTION.PROJECT_SAVE),
-    undo: present(STUDIO_ACTION.HISTORY_UNDO),
-    redo: present(STUDIO_ACTION.HISTORY_REDO),
-    togglePlayback: present(STUDIO_ACTION.PLAYBACK_TOGGLE),
-    returnToStart: present(STUDIO_ACTION.PLAYBACK_RETURN_TO_START),
-    projects: present(STUDIO_ACTION.PROJECTS_SHOW),
-    importMidiProject: present(STUDIO_ACTION.PROJECT_IMPORT_MIDI),
-    importMidiTracks: present(STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS),
-    openMidiEditor: present(STUDIO_ACTION.MIDI_EDITOR_OPEN),
-    keyboardShortcuts: present(STUDIO_ACTION.SHORTCUTS_SHOW),
+    save: present('project.save'),
+    undo: present('history.undo'),
+    redo: present('history.redo'),
+    togglePlayback: present('playback.toggle'),
+    returnToStart: present('playback.return-to-last-start-position'),
+    projects: present('projects.show'),
+    importMidiProject: present('project.import-midi'),
+    importMidiTracks: present('project.import-midi-tracks'),
+    openMidiEditor: present('midi-editor.open'),
+    keyboardShortcuts: present('shortcuts.show'),
   })
 }
 

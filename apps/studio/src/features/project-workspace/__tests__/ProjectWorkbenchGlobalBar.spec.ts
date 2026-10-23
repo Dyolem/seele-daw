@@ -10,31 +10,34 @@ import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/Pr
 import UiAlertDialog from '@/ui/components/UiAlertDialog.vue'
 import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
 import {
-  STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
-  type StudioActionId,
   type StudioActionSource,
   type StudioActionFailure,
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
+import {
+  EDITOR_SELECTION_CONTEXT,
+  INTERACTION_CONTEXT,
+} from '@/workbench/actions/studio-editor-actions'
+import { INTERFACE_CONTEXT } from '@/workbench/actions/studio-interface-actions'
 
 describe('Workbench menu keyboard ownership', () => {
   it('blocks a customized Cancel shortcut while Add track is open and resumes it after close', async () => {
     const cancel = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
     const runtime = createStudioActionRuntime({
       bindingRegistry: createBrowserTanStackHotkeyRegistry({ platform: 'mac', target: document }),
-      keymap: createStudioKeyboardKeymap({
-        [STUDIO_ACTION.INTERACTION_CANCEL]: [defineStudioKeyboardBinding('Alt+X')],
-      }),
+      keymap: {
+        'interaction.cancel': [defineStudioKeyboardBinding('Alt+X')],
+      },
       isModalActive: () => false,
       reportFailure: vi.fn<(failure: StudioActionFailure) => void>(),
     })
-    runtime.interactionTarget.bind({ isActive: () => true, cancel })
+    runtime.contexts.bind(INTERACTION_CONTEXT, { isActive: () => true, cancel })
     const wrapper = mount(ProjectAddTrackMenu, {
       attachTo: document.body,
       global: { provide: provideTestStudioServices({ actions: runtime }) },
@@ -99,7 +102,7 @@ describe('Workbench menu keyboard ownership', () => {
       document.body.replaceChildren()
     })
     expect(wrapper.get('.project-workbench__save').attributes('title')).toContain('display:Mod+S')
-    expect(runtime.userKeymap.setBindings(STUDIO_ACTION.PROJECT_SAVE, ['Mod+K'])).toEqual({
+    expect(runtime.userKeymap.setBindings('project.save', ['Mod+K'])).toEqual({
       status: 'saved',
     })
     await flushPromises()
@@ -113,7 +116,7 @@ describe('Workbench menu keyboard ownership', () => {
       element.getAttribute('title')?.startsWith('Save ('),
     )
     expect(saveItem?.textContent).toContain('display:Mod+K')
-    expect(runtime.userKeymap.restoreAction(STUDIO_ACTION.PROJECT_SAVE)).toEqual({
+    expect(runtime.userKeymap.restoreAction('project.save')).toEqual({
       status: 'saved',
     })
     await flushPromises()
@@ -129,13 +132,13 @@ describe('Workbench menu keyboard ownership', () => {
       isModalActive: () => false,
       reportFailure: vi.fn<(failure: StudioActionFailure) => void>(),
     })
-    runtime.interfaceTarget.bind({
+    runtime.contexts.bind(INTERFACE_CONTEXT, {
       showShortcuts: () => {
         open.value = true
       },
       focusNotifications: () => {},
     })
-    runtime.interactionTarget.bind({ isActive: () => true, cancel: cancelInteraction })
+    runtime.contexts.bind(INTERACTION_CONTEXT, { isActive: () => true, cancel: cancelInteraction })
     const wrapper = mount(
       {
         render: () =>
@@ -264,7 +267,7 @@ describe('Workbench menu keyboard ownership', () => {
       projects.click()
       await flushPromises()
 
-      expect(invokeAction).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.PROJECTS_SHOW, 'menu')
+      expect(invokeAction).toHaveBeenCalledExactlyOnceWith('projects.show', 'menu')
       expect(document.body.querySelector('[role="menu"]')).toBeNull()
       const dialog = document.body.querySelector<HTMLElement>('[role="alertdialog"]')
       const cancel = dialog?.querySelector('button')
@@ -296,7 +299,7 @@ describe('Workbench menu keyboard ownership', () => {
     const editor = document.createElement('div')
     editor.tabIndex = 0
     document.body.append(editor)
-    runtime.selectionTarget.bind({
+    runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => document.activeElement === editor,
       hasSelection: () => true,
       selectionLabel: () => 'Notes',

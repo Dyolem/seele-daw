@@ -1,17 +1,18 @@
 import {
-  STUDIO_ACTION,
   STUDIO_ACTION_CANCELLED,
+  STUDIO_ACTION_COMPLETED,
   createStudioActionPresentation,
+  type StudioAction,
   type StudioActionCompletion,
-  type StudioActionDefinition,
   type StudioActionDescriptor,
   type StudioActionFailure,
-  type StudioActionId,
   type StudioActionInvocation,
   type StudioActionPresentation,
-  type StudioActionResolution,
   type StudioActionSource,
+  type StudioActionState,
 } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioContextRegistry } from '@/workbench/actions/studio-context-registry'
 
 export interface StudioActionCoordinator {
   readonly catalogue: readonly StudioActionDescriptor[]
@@ -21,37 +22,39 @@ export interface StudioActionCoordinator {
 }
 
 export interface StudioActionCoordinatorOptions {
-  readonly definitions: readonly StudioActionDefinition[]
+  readonly actions: readonly StudioAction[]
+  readonly contexts: StudioContextRegistry
   readonly reportFailure: (failure: StudioActionFailure) => void
+}
+
+interface Resolution {
+  readonly presentation: StudioActionPresentation
+  readonly state: StudioActionState
+  isCurrent(): boolean
+  onInvalidated(listener: () => void): () => void
 }
 
 /** Owns invocation outcomes and lifetimes, never Project facts or business busy state. */
 export function createStudioActionCoordinator(
   options: StudioActionCoordinatorOptions,
 ): StudioActionCoordinator {
-  const definitions = new Map<StudioActionId, StudioActionDefinition>()
-  const knownIds = new Set<string>(Object.values(STUDIO_ACTION))
-  // Validate the whole contribution set before making any definition callable.
-  for (const definition of options.definitions) {
+  const { contexts } = options
+  const actions = new Map<StudioActionId, StudioAction>()
+  // Validate the whole set before making any action callable.
+  for (const action of options.actions) {
     if (
-      !knownIds.has(definition.actionId) ||
-      definitions.has(definition.actionId) ||
-      definition.label.trim().length === 0 ||
-      definition.description.trim().length === 0
+      actions.has(action.id) ||
+      action.label.trim().length === 0 ||
+      action.description.trim().length === 0
     ) {
-      throw new Error(`Invalid or duplicate Studio Action: ${definition.actionId}`)
+      throw new Error(`Invalid or duplicate Studio Action: ${action.id}`)
     }
-    definitions.set(definition.actionId, Object.freeze({ ...definition }))
+    actions.set(action.id, action)
   }
   const catalogue = Object.freeze(
-    [...definitions.values()].map(({ actionId, description, label, category, keywords }) =>
-      Object.freeze({
-        actionId,
-        description,
-        label,
-        category,
-        keywords: Object.freeze([...keywords]),
-      }),
+    [...actions.values()].map(
+      ({ id, label, description, category, keywords, context, keys, repeat }) =>
+        Object.freeze({ id, label, description, category, keywords, context, keys, repeat }),
     ),
   )
   const pending = new Set<() => void>()
@@ -78,10 +81,26 @@ export function createStudioActionCoordinator(
     return failure
   }
 
+  function resolve(action: StudioAction | undefined): Resolution | null {
+    if (action === undefined) return null
+    const binding = contexts.current(action.context)
+    if (binding === null) return null
+    const state = action.resolve(binding.target, contexts)
+    if (state === null) return null
+    let label = state.label ?? action.label
+    if (state.detail) label += ` — ${state.detail}`
+    return {
+      presentation: createStudioActionPresentation(label, state.disabledReason ?? null, state),
+      state,
+      isCurrent: () => binding.isCurrent() && (state.isCurrent?.() ?? true),
+      onInvalidated: binding.onInvalidated,
+    }
+  }
+
   function execute(
     actionId: StudioActionId,
     source: StudioActionSource,
-    resolution: StudioActionResolution,
+    resolution: Resolution,
   ): StudioActionInvocation {
     let finish: (result: StudioActionCompletion) => void = () => undefined
     const completion = new Promise<StudioActionCompletion>((resolve) => {
@@ -113,12 +132,16 @@ export function createStudioActionCoordinator(
       if (settled) releaseTarget()
       if (!settled) {
         // Execute synchronously up to the first await, preserving browser user activation.
-        const result = resolution.execute()
+        const result = resolution.state.execute()
         void Promise.resolve(result).then(
           (outcome) => {
             if (settled) return
             try {
-              settle(resolution.isCurrent() ? outcome : STUDIO_ACTION_CANCELLED)
+              settle(
+                resolution.isCurrent()
+                  ? (outcome ?? STUDIO_ACTION_COMPLETED)
+                  : STUDIO_ACTION_CANCELLED,
+              )
             } catch (cause) {
               settle({ status: 'failed', cause, reported: false })
             }
@@ -135,14 +158,13 @@ export function createStudioActionCoordinator(
   return {
     catalogue,
     presentationFor(actionId) {
-      const definition = definitions.get(actionId)
-      const label = definition?.label ?? actionId
+      const label = actions.get(actionId)?.label ?? actionId
       if (disposed) return createStudioActionPresentation(label, 'The application has been closed.')
       try {
-        const resolution = definition?.resolve() ?? null
+        const resolution = resolve(actions.get(actionId))
         const presentation =
           resolution !== null && resolution.isCurrent()
-            ? Object.freeze({ ...resolution.presentation })
+            ? resolution.presentation
             : createStudioActionPresentation(label, 'No active target is available.')
         presentationFailures.delete(actionId)
         return presentation
@@ -158,9 +180,9 @@ export function createStudioActionCoordinator(
     invoke(actionId, source) {
       if (disposed)
         return Object.freeze({ status: 'unavailable', reason: 'The application has been closed.' })
-      let resolution: StudioActionResolution | null
+      let resolution: Resolution | null
       try {
-        resolution = definitions.get(actionId)?.resolve() ?? null
+        resolution = resolve(actions.get(actionId))
         if (resolution === null || !resolution.isCurrent()) {
           return Object.freeze({ status: 'unavailable', reason: 'No active target is available.' })
         }
@@ -182,7 +204,7 @@ export function createStudioActionCoordinator(
       if (disposed) return
       disposed = true
       for (const cancel of pending) cancel()
-      definitions.clear()
+      actions.clear()
       presentationFailures.clear()
     },
   }

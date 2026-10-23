@@ -53,6 +53,10 @@ import {
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
 import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 import { createTrackEdits } from '@/workbench/edits/track-edits'
+import {
+  EDITOR_SELECTION_CONTEXT,
+  INTERACTION_CONTEXT,
+} from '@/workbench/actions/studio-editor-actions'
 
 const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
   hasPointerCapture: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hasPointerCapture'),
@@ -708,7 +712,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     let previous = fixture.wrapper
     ;(previous.get('.project-piano-roll-track').element as HTMLElement).focus()
     for (let iteration = 0; iteration < 4; iteration += 1) {
-      const oldTarget = runtime.selectionTarget.current
+      const oldTarget = runtime.contexts.current(EDITOR_SELECTION_CONTEXT)
       const clip = mount(ProjectPianoRollSurface, {
         attachTo: document.body,
         global: fixture.global,
@@ -719,12 +723,14 @@ describe('ProjectPianoRollTrackSurface', () => {
           timeSignatureNumerator: 4,
         },
       })
-      expect(runtime.selectionTarget.current).toBe(oldTarget)
+      expect(runtime.contexts.current(EDITOR_SELECTION_CONTEXT)).toBe(oldTarget)
       ;(clip.get('.project-piano-roll').element as HTMLElement).focus()
       previous.unmount()
       expect(oldTarget?.isCurrent()).toBe(false)
-      expect(runtime.selectionTarget.current?.isCurrent()).toBe(true)
-      expect(runtime.selectionTarget.current?.value.selectionLabel()).toBe('Notes')
+      expect(runtime.contexts.current(EDITOR_SELECTION_CONTEXT)?.isCurrent()).toBe(true)
+      expect(runtime.contexts.current(EDITOR_SELECTION_CONTEXT)?.target.selectionLabel()).toBe(
+        'Notes',
+      )
       const track = mount(ProjectPianoRollTrackSurface, {
         attachTo: document.body,
         global: fixture.global,
@@ -738,8 +744,10 @@ describe('ProjectPianoRollTrackSurface', () => {
       })
       ;(track.get('.project-piano-roll-track').element as HTMLElement).focus()
       clip.unmount()
-      expect(runtime.selectionTarget.current?.isCurrent()).toBe(true)
-      expect(runtime.selectionTarget.current?.value.selectionLabel()).toBe('Sustain Pedal events')
+      expect(runtime.contexts.current(EDITOR_SELECTION_CONTEXT)?.isCurrent()).toBe(true)
+      expect(runtime.contexts.current(EDITOR_SELECTION_CONTEXT)?.target.selectionLabel()).toBe(
+        'Sustain Pedal events',
+      )
       previous = track
       await nextTick()
     }
@@ -750,7 +758,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     ).toBe(true)
     expect(fixture.keyboard.bindingRegistry.disposalCountByBinding.size).toBe(0)
     previous.unmount()
-    expect(runtime.selectionTarget.current).toBeNull()
+    expect(runtime.contexts.current(EDITOR_SELECTION_CONTEXT)).toBeNull()
     runtime.dispose()
     expect(fixture.keyboard.bindingRegistry.listeners.size).toBe(0)
     expect(
@@ -774,7 +782,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     const revision = session.modelRevision
     dispatchPointer(oldHost, 'pointerdown', { clientX: 10, clientY: 125 })
     expect(oldHost.hasPointerCapture(1)).toBe(true)
-    const oldTarget = keyboard.runtime.interactionTarget.current
+    const oldTarget = keyboard.runtime.contexts.current(INTERACTION_CONTEXT)
     const clip = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
       global: fixture.global,
@@ -788,10 +796,10 @@ describe('ProjectPianoRollTrackSurface', () => {
     await nextTick()
     const newHost = clip.get('.project-piano-roll__canvas-host').element
     dispatchPointer(newHost, 'pointerdown', { clientX: 240, clientY: 125, pointerId: 2 })
-    const newTarget = keyboard.runtime.interactionTarget.current
+    const newTarget = keyboard.runtime.contexts.current(INTERACTION_CONTEXT)
     expect(oldHost.hasPointerCapture(1)).toBe(false)
     expect(oldTarget?.isCurrent()).toBe(false)
-    expect(newTarget?.value.isActive()).toBe(true)
+    expect(newTarget?.target.isActive()).toBe(true)
     dispatchPointer(oldHost, 'pointerup', { clientX: 10, clientY: 125 })
     expect(session.modelRevision).toBe(revision)
     wrapper.unmount()
@@ -855,7 +863,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       await nextTick()
       dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
       expect(host.hasPointerCapture(1)).toBe(false)
-      expect(keyboard.runtime.interactionTarget.current).toBeNull()
+      expect(keyboard.runtime.contexts.current(INTERACTION_CONTEXT)).toBeNull()
       expect(session.modelRevision).toBe(revision)
       if (change === 'scope') {
         const currentHost = dock.get('.project-piano-roll__canvas-host').element
@@ -1288,9 +1296,13 @@ describe('ProjectPianoRollTrackSurface', () => {
     await flushPromises()
     expect(document.body.querySelector('.piano-roll-context-menu')).toBeNull()
     expect(session.modelRevision).toBe(revision)
-    expect(fixture.keyboard.runtime.selectionTarget.current?.value.selectionLabel()).toBe('Notes')
+    expect(
+      fixture.keyboard.runtime.contexts.current(EDITOR_SELECTION_CONTEXT)?.target.selectionLabel(),
+    ).toBe('Notes')
     wrapper.unmount()
-    expect(fixture.keyboard.runtime.selectionTarget.current?.isCurrent()).toBe(true)
+    expect(fixture.keyboard.runtime.contexts.current(EDITOR_SELECTION_CONTEXT)?.isCurrent()).toBe(
+      true,
+    )
     next.unmount()
   })
 

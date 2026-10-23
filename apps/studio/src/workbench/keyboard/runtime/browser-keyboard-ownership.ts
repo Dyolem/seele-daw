@@ -1,16 +1,12 @@
-import type { StudioKeyboardContext } from '@/workbench/keyboard/keymap/studio-keyboard-context'
+import type { StudioContext } from '@/workbench/actions/studio-action'
 
 /** Native activation and composite-widget navigation take precedence over application shortcuts. */
-export function isWidgetOwnedKeyboardInput(
-  event: KeyboardEvent,
-  context: StudioKeyboardContext,
-): boolean {
+export function isWidgetOwnedKeyboardInput(event: KeyboardEvent, context: StudioContext): boolean {
   if (event.ctrlKey || event.metaKey || event.altKey) return false
   if (event.key === 'Tab') return true
   const element = event.composedPath().find((item): item is Element => item instanceof Element)
   if (element === undefined) return false
-  if (event.key === 'Enter' && (context === 'arrangement-clip' || context === 'arrangement-bar'))
-    return false
+  if (event.key === 'Enter' && context.ownsEnter) return false
   if (
     (event.key === 'Enter' || event.key === ' ') &&
     element.closest(

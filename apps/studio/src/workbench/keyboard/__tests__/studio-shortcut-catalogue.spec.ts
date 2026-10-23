@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
-import {
-  STUDIO_SHORTCUT_POLICIES,
-  createStudioKeyboardKeymap,
-} from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import { queryStudioShortcuts } from '@/workbench/keyboard/keymap/studio-shortcut-catalogue'
 
@@ -12,10 +8,7 @@ describe('Shortcut catalogue', () => {
   it('lists every Action and its explicit default policy without mounting a feature', () => {
     const { runtime } = createTestStudioActionRuntime()
     const rows = queryStudioShortcuts(runtime.actions, runtime.keyboard)
-    expect(rows.map((row) => row.actionId).sort()).toEqual(Object.values(STUDIO_ACTION).sort())
-    expect(Object.keys(STUDIO_SHORTCUT_POLICIES).sort()).toEqual(
-      Object.values(STUDIO_ACTION).sort(),
-    )
+    expect(rows.map((row) => row.id)).toEqual(STUDIO_ACTIONS.map(({ id }) => id))
     expect(
       rows.every((row) => row.label && row.description && row.categoryLabel && row.contextLabel),
     ).toBe(true)
@@ -28,19 +21,19 @@ describe('Shortcut catalogue', () => {
 
   it('searches Chinese terms and reports effective keys separately from defaults', () => {
     const { runtime } = createTestStudioActionRuntime({
-      keymap: createStudioKeyboardKeymap({
-        [STUDIO_ACTION.EDITOR_SELECTION_DELETE]: [defineStudioKeyboardBinding('Mod+D')],
-        [STUDIO_ACTION.PIANO_ROLL_TOOL_PENCIL]: [defineStudioKeyboardBinding('P')],
-      }),
+      keymap: {
+        'editor.selection.delete': [defineStudioKeyboardBinding('Mod+D')],
+        'piano-roll.tool.pencil': [defineStudioKeyboardBinding('P')],
+      },
     })
     expect(queryStudioShortcuts(runtime.actions, runtime.keyboard, '删除')[0]).toMatchObject({
-      actionId: STUDIO_ACTION.EDITOR_SELECTION_DELETE,
+      id: 'editor.selection.delete',
       currentBindings: ['display:Mod+D'],
       defaultBindings: ['display:Backspace', 'display:Delete'],
     })
-    expect(
-      queryStudioShortcuts(runtime.actions, runtime.keyboard, '画笔', 'assigned')[0]?.actionId,
-    ).toBe(STUDIO_ACTION.PIANO_ROLL_TOOL_PENCIL)
+    expect(queryStudioShortcuts(runtime.actions, runtime.keyboard, '画笔', 'assigned')[0]?.id).toBe(
+      'piano-roll.tool.pencil',
+    )
     expect(
       queryStudioShortcuts(runtime.actions, runtime.keyboard, '画笔', 'unassigned'),
     ).toHaveLength(0)

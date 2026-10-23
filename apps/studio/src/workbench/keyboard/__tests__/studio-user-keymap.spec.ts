@@ -2,7 +2,6 @@ import { computed } from 'vue'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import { STUDIO_ACTION } from '@/workbench/actions/studio-action'
 import { presentStudioAction } from '@/workbench/actions/studio-action-control'
 import type { StudioUserKeymapState } from '@/workbench/keyboard'
 import {
@@ -13,10 +12,11 @@ import {
   createBrowserUserKeymapStorage,
   STUDIO_USER_KEYMAP_STORAGE_KEY,
 } from '@/workbench/keyboard/browser/browser-user-keymap-storage'
+import { INTERFACE_CONTEXT } from '@/workbench/actions/studio-interface-actions'
 
-const notifications = STUDIO_ACTION.NOTIFICATIONS_FOCUS
-const save = STUDIO_ACTION.PROJECT_SAVE
-const undo = STUDIO_ACTION.HISTORY_UNDO
+const notifications = 'notifications.focus'
+const save = 'project.save'
+const undo = 'history.undo'
 const record = (overrides: Record<string, unknown>): string =>
   JSON.stringify({ version: 1, overrides })
 
@@ -69,33 +69,27 @@ describe('Studio user keymap', () => {
 
   it('distinguishes mutually exclusive contexts, explicit priorities and real overlap conflicts', () => {
     const { runtime, storage } = createTestStudioActionRuntime()
-    const shared = runtime.userKeymap.inspectBindings(STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN, [
-      'Enter',
-    ])
+    const shared = runtime.userKeymap.inspectBindings('arrangement.clip.open', ['Enter'])
     expect(shared.conflicts).toEqual([])
     expect(shared.relations).toEqual([
       expect.objectContaining({
         kind: 'exclusive',
-        actionIds: expect.arrayContaining([STUDIO_ACTION.ARRANGEMENT_CLIP_CREATE]),
+        actionIds: expect.arrayContaining(['arrangement.clip.create']),
       }),
     ])
-    const priority = runtime.userKeymap.inspectBindings(STUDIO_ACTION.EDITOR_SELECTION_CLEAR, [
-      'Escape',
-    ])
+    const priority = runtime.userKeymap.inspectBindings('editor.selection.clear', ['Escape'])
     expect(priority.conflicts).toEqual([])
     expect(priority.relations).toEqual([
       expect.objectContaining({
         kind: 'priority',
-        priorityActionId: STUDIO_ACTION.INTERACTION_CANCEL,
+        priorityActionId: 'interaction.cancel',
       }),
     ])
-    const conflict = runtime.userKeymap.inspectBindings(STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR, [
-      'Delete',
-    ])
+    const conflict = runtime.userKeymap.inspectBindings('piano-roll.tool.cursor', ['Delete'])
     expect(conflict.conflicts).toEqual([
       expect.objectContaining({
         kind: 'conflict',
-        actionIds: expect.arrayContaining([STUDIO_ACTION.EDITOR_SELECTION_DELETE]),
+        actionIds: expect.arrayContaining(['editor.selection.delete']),
       }),
     ])
     expect(storage.writes).toEqual([])
@@ -103,21 +97,21 @@ describe('Studio user keymap', () => {
 
   it('reassigns only conflicting keys in one transaction while preserving other bindings and compatible priorities', () => {
     const { runtime, storage } = createTestStudioActionRuntime()
-    const cursor = STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR
-    const remove = STUDIO_ACTION.EDITOR_SELECTION_DELETE
+    const cursor = 'piano-roll.tool.cursor'
+    const remove = 'editor.selection.delete'
     const state = runtime.userKeymap.state
     expect(runtime.userKeymap.reassignBindings(cursor, ['Delete', 'Escape'], state)).toEqual({
       status: 'saved',
     })
     expect(runtime.keyboard.bindingsFor(cursor)).toEqual(['Delete', 'Escape'])
     expect(runtime.keyboard.bindingsFor(remove)).toEqual(['Backspace'])
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.EDITOR_SELECTION_CLEAR)).toEqual([])
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.INTERACTION_CANCEL)).toEqual(['Escape'])
+    expect(runtime.keyboard.bindingsFor('editor.selection.clear')).toEqual([])
+    expect(runtime.keyboard.bindingsFor('interaction.cancel')).toEqual(['Escape'])
     expect(storage.writes).toHaveLength(1)
     const saved = JSON.parse(storage.read() ?? '')
     expect(saved.overrides[remove]).toEqual(['Backspace'])
-    expect(saved.overrides[STUDIO_ACTION.EDITOR_SELECTION_CLEAR]).toEqual([])
-    expect(saved.overrides[STUDIO_ACTION.INTERACTION_CANCEL]).toBeUndefined()
+    expect(saved.overrides['editor.selection.clear']).toEqual([])
+    expect(saved.overrides['interaction.cancel']).toBeUndefined()
   })
 
   it('rejects a stale reassignment review and rolls back every affected action on storage failure', () => {
@@ -188,7 +182,7 @@ describe('Studio user keymap', () => {
   it('publishes reactive hints only after persistence and blocks dispatch throughout the replacement', () => {
     const { runtime, bindingRegistry, storage } = createTestStudioActionRuntime()
     const focus = vi.fn<() => void>()
-    runtime.interfaceTarget.bind({ focusNotifications: focus, showShortcuts: () => {} })
+    runtime.contexts.bind(INTERFACE_CONTEXT, { focusNotifications: focus, showShortcuts: () => {} })
     const hint = computed(
       () => presentStudioAction(runtime.actions, runtime.keyboard, notifications).shortcut,
     )
@@ -266,7 +260,7 @@ describe('Studio user keymap', () => {
   it('keeps modal suspension across changes and releases current registrations on application disposal', () => {
     const { runtime, bindingRegistry, storage } = createTestStudioActionRuntime()
     const focus = vi.fn<() => void>()
-    runtime.interfaceTarget.bind({ focusNotifications: focus, showShortcuts: () => {} })
+    runtime.contexts.bind(INTERFACE_CONTEXT, { focusNotifications: focus, showShortcuts: () => {} })
     const release = runtime.keyboard.suspend()
     expect(runtime.userKeymap.setBindings(notifications, ['F9'])).toEqual({ status: 'saved' })
     bindingRegistry.dispatch('F9')
@@ -350,21 +344,21 @@ describe('Studio user keymap', () => {
       record({
         [save]: ['F6'],
         [undo]: ['F6'],
-        [STUDIO_ACTION.PLAYBACK_TOGGLE]: ['Mod+S'],
+        'playback.toggle': ['Mod+S'],
         [notifications]: ['F9'],
       }),
     )
     const { runtime } = createTestStudioActionRuntime({ userKeymapStorage: storage })
     expect(runtime.keyboard.bindingsFor(save)).toEqual(['Mod+S'])
     expect(runtime.keyboard.bindingsFor(undo)).toEqual(['Mod+Z'])
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PLAYBACK_TOGGLE)).toEqual(['Space'])
+    expect(runtime.keyboard.bindingsFor('playback.toggle')).toEqual(['Space'])
     expect(runtime.keyboard.bindingsFor(notifications)).toEqual(['F9'])
     expect(runtime.keymapState.value.rejectedOverrides).toHaveLength(3)
     expect(storage.writes).toEqual([])
     expect(runtime.userKeymap.setBindings(save, ['F10'])).toEqual({ status: 'saved' })
     expect(runtime.keymapState.value.rejectedOverrides).toEqual([])
     expect(runtime.keyboard.bindingsFor(undo)).toEqual(['F6'])
-    expect(runtime.keyboard.bindingsFor(STUDIO_ACTION.PLAYBACK_TOGGLE)).toEqual(['Mod+S'])
+    expect(runtime.keyboard.bindingsFor('playback.toggle')).toEqual(['Mod+S'])
   })
 
   it('rejects duplicate or conflicting edits, including a restore that collides with another user override', () => {

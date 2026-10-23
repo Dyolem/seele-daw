@@ -33,8 +33,7 @@ import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
-import { STUDIO_ACTION, STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
+import { STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { createStudioRouter } from '@/router'
@@ -88,6 +87,8 @@ import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue
 import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-vue-binding'
 import { createTempoEdits } from '@/workbench/edits/tempo-edits'
 import { createTrackEdits, type TrackEdits } from '@/workbench/edits/track-edits'
+import { EDITOR_SELECTION_CONTEXT } from '@/workbench/actions/studio-editor-actions'
+import { WORKBENCH_CONTEXT } from '@/features/project-workspace/actions/project-workbench-actions'
 
 interface PageFixture {
   readonly activeProjectContext: ActiveProjectVueContext
@@ -427,7 +428,7 @@ describe('ProjectWorkspacePage', () => {
         else keyboardBindingRegistry.dispatch('Mod+Z')
       }
       await flushPromises()
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.HISTORY_UNDO, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('history.undo', source)
       expect(session.modelRevision).toBe(undoRevision + 1)
       expect(session.getSnapshot().tempoEvents[0]?.bpm).toBe(tempo.bpm)
       expect(wrapper.get('button[aria-label="Undo"]').attributes('disabled')).toBeDefined()
@@ -449,7 +450,7 @@ describe('ProjectWorkspacePage', () => {
         else keyboardBindingRegistry.dispatch('Mod+Shift+Z')
       }
       await flushPromises()
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.HISTORY_REDO, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('history.redo', source)
       expect(session.modelRevision).toBe(redoRevision + 1)
       expect(session.getSnapshot().tempoEvents[0]?.bpm).toBe(135)
       expect(wrapper.get('button[aria-label="Redo"]').attributes('disabled')).toBeDefined()
@@ -481,7 +482,7 @@ describe('ProjectWorkspacePage', () => {
       else if (source === 'toolbar') await wrapper.get('button[aria-label="Play"]').trigger('click')
       else keyboardBindingRegistry.dispatch('Space')
       await flushPromises()
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.PLAYBACK_TOGGLE, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('playback.toggle', source)
       expect(projectPlayback.play).toHaveBeenCalledOnce()
       expect(wrapper.get('button[aria-label="Loading…"]').attributes('aria-busy')).toBe('true')
       expect(wrapper.get('button[aria-label="Loading…"]').attributes('disabled')).toBeDefined()
@@ -501,7 +502,7 @@ describe('ProjectWorkspacePage', () => {
         await wrapper.get('button[aria-label="Pause"]').trigger('click')
       else keyboardBindingRegistry.dispatch('Space')
       await flushPromises()
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.PLAYBACK_TOGGLE, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('playback.toggle', source)
       expect(projectPlayback.pause).toHaveBeenCalledOnce()
       expect(projectPlayback.togglePlayPause).not.toHaveBeenCalled()
       expect(wrapper.get('button[aria-label="Play"]').attributes('aria-pressed')).toBe('false')
@@ -518,9 +519,9 @@ describe('ProjectWorkspacePage', () => {
       )
       const { wrapper, playbackState, projectPlayback, keyboardBindingRegistry, invoke } =
         await mountPage(fixture, projectId, {
-          keymap: createStudioKeyboardKeymap({
-            [STUDIO_ACTION.PLAYBACK_RETURN_TO_START]: [defineStudioKeyboardBinding('Enter')],
-          }),
+          keymap: {
+            'playback.return-to-last-start-position': [defineStudioKeyboardBinding('Enter')],
+          },
         })
       vi.mocked(projectPlayback.canReturnToLastStartPosition).mockImplementation(
         () => playbackState.value.phase === PROJECT_PLAYBACK_PHASE.LOADING,
@@ -543,7 +544,10 @@ describe('ProjectWorkspacePage', () => {
         await wrapper.get(`button[aria-label="${label}"]`).trigger('click')
       else keyboardBindingRegistry.dispatch('Enter')
       await flushPromises()
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.PLAYBACK_RETURN_TO_START, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith(
+        'playback.return-to-last-start-position',
+        source,
+      )
       expect(projectPlayback.returnToLastStartPosition).toHaveBeenCalledOnce()
       expect(wrapper.get(`button[aria-label="${label}"]`).attributes('disabled')).toBeDefined()
       expect(keyboardBindingRegistry.dispatch('Enter').defaultPrevented).toBe(false)
@@ -563,9 +567,9 @@ describe('ProjectWorkspacePage', () => {
         fixture,
         projectId,
         {
-          keymap: createStudioKeyboardKeymap({
-            [STUDIO_ACTION.PROJECTS_SHOW]: [defineStudioKeyboardBinding('Mod+P')],
-          }),
+          keymap: {
+            'projects.show': [defineStudioKeyboardBinding('Mod+P')],
+          },
         },
       )
       const pending = createDeferredActionResult<boolean>()
@@ -577,25 +581,27 @@ describe('ProjectWorkspacePage', () => {
         await wrapper.get('.project-workbench__compact-warning button').trigger('click')
       else keyboardBindingRegistry.dispatch('Mod+P')
       await flushPromises()
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.PROJECTS_SHOW, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('projects.show', source)
       const invocation = invoke.mock.results[0]?.value
       if (invocation?.status !== 'accepted') throw new Error('Expected pending navigation')
       expect(guard).toHaveBeenCalledOnce()
-      expect(
-        actionFixture.runtime.actions.presentationFor(STUDIO_ACTION.PROJECTS_SHOW),
-      ).toMatchObject({ busy: true, enabled: false })
-      expect(actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECTS_SHOW, 'menu').status).toBe(
+      expect(actionFixture.runtime.actions.presentationFor('projects.show')).toMatchObject({
+        busy: true,
+        enabled: false,
+      })
+      expect(actionFixture.runtime.actions.invoke('projects.show', 'menu').status).toBe(
         'unavailable',
       )
       pending.resolve(false)
       await expect(invocation.completion).resolves.toEqual({ status: 'not-applied' })
       expect(router.currentRoute.value.params.projectId).toBe(projectId)
       expect(fixture.state.value).toBe(ready)
-      expect(
-        actionFixture.runtime.actions.presentationFor(STUDIO_ACTION.PROJECTS_SHOW),
-      ).toMatchObject({ busy: false, enabled: true })
+      expect(actionFixture.runtime.actions.presentationFor('projects.show')).toMatchObject({
+        busy: false,
+        enabled: true,
+      })
       removeGuard()
-      const retry = actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECTS_SHOW, 'toolbar')
+      const retry = actionFixture.runtime.actions.invoke('projects.show', 'toolbar')
       if (retry.status !== 'accepted') throw new Error('Expected navigation retry')
       await expect(retry.completion).resolves.toEqual({ status: 'completed' })
       expect(router.currentRoute.value.name).toBe(PROJECT_ROUTE_NAME.ENTRY)
@@ -616,9 +622,9 @@ describe('ProjectWorkspacePage', () => {
         fixture,
         projectId,
         {
-          keymap: createStudioKeyboardKeymap({
-            [STUDIO_ACTION.MIDI_EDITOR_OPEN]: [defineStudioKeyboardBinding('F4')],
-          }),
+          keymap: {
+            'midi-editor.open': [defineStudioKeyboardBinding('F4')],
+          },
         },
       )
       await flushPromises()
@@ -643,7 +649,7 @@ describe('ProjectWorkspacePage', () => {
         'false',
       )
       await openEditor()
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.MIDI_EDITOR_OPEN, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('midi-editor.open', source)
       expect(wrapper.get('.project-workbench__workspace').attributes('data-dock-mode')).toBe(
         'docked',
       )
@@ -657,9 +663,9 @@ describe('ProjectWorkspacePage', () => {
       )
       expect(ready.session.modelRevision).toBe(initialRevision)
       wrapper.unmount()
-      expect(
-        actionFixture.runtime.actions.invoke(STUDIO_ACTION.MIDI_EDITOR_OPEN, 'menu').status,
-      ).toBe('unavailable')
+      expect(actionFixture.runtime.actions.invoke('midi-editor.open', 'menu').status).toBe(
+        'unavailable',
+      )
     },
   )
 
@@ -679,9 +685,7 @@ describe('ProjectWorkspacePage', () => {
         ready,
       )
       const actionId =
-        destination === 'new-tracks'
-          ? STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS
-          : STUDIO_ACTION.PROJECT_IMPORT_MIDI
+        destination === 'new-tracks' ? 'project.import-midi-tracks' : 'project.import-midi'
       const {
         wrapper,
         router,
@@ -691,10 +695,10 @@ describe('ProjectWorkspacePage', () => {
         invoke,
         selection,
       } = await mountPage(fixture, projectId, {
-        keymap: createStudioKeyboardKeymap({
-          [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS]: [],
+        keymap: {
+          'project.import-midi-tracks': [],
           [actionId]: [defineStudioKeyboardBinding('Mod+I')],
-        }),
+        },
       })
       const pending = createDeferredActionResult<void>()
       const importedTrackId = parseTrackId(`imported-track-${source}`)
@@ -760,10 +764,7 @@ describe('ProjectWorkspacePage', () => {
       }
       const file = selectMidiFile(input.element)
       await flushPromises()
-      for (const id of [
-        STUDIO_ACTION.PROJECT_IMPORT_MIDI,
-        STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
-      ]) {
+      for (const id of ['project.import-midi', 'project.import-midi-tracks'] as const) {
         expect(actionFixture.runtime.actions.presentationFor(id)).toMatchObject({
           label: 'Importing MIDI…',
           busy: true,
@@ -803,14 +804,11 @@ describe('ProjectWorkspacePage', () => {
     await flushPromises()
     const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
     const chooser = vi.spyOn(input.element, 'click').mockImplementation(() => {})
-    const first = actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'menu')
+    const first = actionFixture.runtime.actions.invoke('project.import-midi', 'menu')
     if (first.status !== 'accepted') throw new Error('Expected file chooser')
     await input.trigger('cancel')
     await expect(first.completion).resolves.toEqual({ status: 'not-applied' })
-    const retry = actionFixture.runtime.actions.invoke(
-      STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
-      'toolbar',
-    )
+    const retry = actionFixture.runtime.actions.invoke('project.import-midi-tracks', 'toolbar')
     if (retry.status !== 'accepted') throw new Error('Expected chooser retry')
     expect(chooser).toHaveBeenCalledTimes(2)
     await input.trigger('cancel')
@@ -835,7 +833,7 @@ describe('ProjectWorkspacePage', () => {
       const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
       vi.spyOn(input.element, 'click').mockImplementation(() => {})
       const invocation = actionFixture.runtime.actions.invoke(
-        STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
+        'project.import-midi-tracks',
         'toolbar',
       )
       if (invocation.status !== 'accepted') throw new Error('Expected pending import')
@@ -867,10 +865,7 @@ describe('ProjectWorkspacePage', () => {
       await flushPromises()
       const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
       vi.spyOn(input.element, 'click').mockImplementation(() => {})
-      const invocation = actionFixture.runtime.actions.invoke(
-        STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
-        'menu',
-      )
+      const invocation = actionFixture.runtime.actions.invoke('project.import-midi-tracks', 'menu')
       if (invocation.status !== 'accepted') throw new Error('Expected pending chooser')
       if (phase === 'importing') selectMidiFile(input.element)
       fixture.state.value = createReadyState(projectId)
@@ -884,7 +879,7 @@ describe('ProjectWorkspacePage', () => {
       expect(useUiToastStore().message).toBeNull()
       expect(actionFixture.failures).toEqual([])
       expect(
-        actionFixture.runtime.actions.presentationFor(STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS),
+        actionFixture.runtime.actions.presentationFor('project.import-midi-tracks'),
       ).toMatchObject({ enabled: true, busy: false })
     },
   )
@@ -903,7 +898,7 @@ describe('ProjectWorkspacePage', () => {
     await flushPromises()
     const failure = new Error('Navigation failed')
     vi.spyOn(router, 'push').mockRejectedValueOnce(failure)
-    const invocation = actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECTS_SHOW, 'menu')
+    const invocation = actionFixture.runtime.actions.invoke('projects.show', 'menu')
     if (invocation.status !== 'accepted') throw new Error('Expected navigation invocation')
     await expect(invocation.completion).resolves.toEqual({
       status: 'failed',
@@ -912,12 +907,11 @@ describe('ProjectWorkspacePage', () => {
     })
     expect(fixture.state.value).toBe(ready)
     expect(router.currentRoute.value.params.projectId).toBe(projectId)
-    expect(
-      actionFixture.runtime.actions.presentationFor(STUDIO_ACTION.PROJECTS_SHOW),
-    ).toMatchObject({ enabled: true, busy: false })
-    expect(actionFixture.failures).toMatchObject([
-      { actionId: STUDIO_ACTION.PROJECTS_SHOW, cause: failure },
-    ])
+    expect(actionFixture.runtime.actions.presentationFor('projects.show')).toMatchObject({
+      enabled: true,
+      busy: false,
+    })
+    expect(actionFixture.failures).toMatchObject([{ actionId: 'projects.show', cause: failure }])
     expect(keyboardBindingRegistry.dispatch('Mod+S').defaultPrevented).toBe(true)
     await flushPromises()
     expect(fixture.save).toHaveBeenCalledOnce()
@@ -941,7 +935,7 @@ describe('ProjectWorkspacePage', () => {
         if (failurePhase === 'chooser') throw failure
       })
       const invocation = actionFixture.runtime.actions.invoke(
-        STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS,
+        'project.import-midi-tracks',
         'toolbar',
       )
       if (invocation.status !== 'accepted') throw new Error('Expected accepted MIDI operation')
@@ -952,7 +946,7 @@ describe('ProjectWorkspacePage', () => {
         reported: true,
       })
       expect(
-        actionFixture.runtime.actions.presentationFor(STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS),
+        actionFixture.runtime.actions.presentationFor('project.import-midi-tracks'),
       ).toMatchObject({ enabled: true, busy: false })
       expect(actionFixture.failures).toHaveLength(failurePhase === 'chooser' ? 1 : 0)
       expect(useUiToastStore().message?.title ?? null).toBe(
@@ -1016,12 +1010,12 @@ describe('ProjectWorkspacePage', () => {
       await flushPromises()
       expect(inputWasPrevented).toBe(source === 'keyboard')
       expect(menuShowsShortcut).toBe(source === 'menu')
-      expect(invoke).toHaveBeenCalledExactlyOnceWith(STUDIO_ACTION.PROJECT_SAVE, source)
+      expect(invoke).toHaveBeenCalledExactlyOnceWith('project.save', source)
       expect(fixture.save).toHaveBeenCalledOnce()
-      expect(actionFixture.runtime.workbenchTarget.current).not.toBeNull()
-      expect(
-        actionFixture.runtime.actions.presentationFor(STUDIO_ACTION.PROJECT_SAVE),
-      ).toMatchObject({ busy: true })
+      expect(actionFixture.runtime.contexts.current(WORKBENCH_CONTEXT)).not.toBeNull()
+      expect(actionFixture.runtime.actions.presentationFor('project.save')).toMatchObject({
+        busy: true,
+      })
       expect(
         wrapper.getComponent(ProjectWorkbenchShell).props('actionControls').save,
       ).toMatchObject({
@@ -1070,7 +1064,7 @@ describe('ProjectWorkspacePage', () => {
       fixture,
       projectId,
       {
-        keymap: createStudioKeyboardKeymap({ [STUDIO_ACTION.PROJECT_SAVE]: [] }),
+        keymap: { 'project.save': [] },
       },
     )
     await flushPromises()
@@ -1078,13 +1072,11 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.getComponent(ProjectWorkbenchShell).props('actionControls').save.shortcut).toBe(
       '',
     )
-    const invocation = actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+    const invocation = actionFixture.runtime.actions.invoke('project.save', 'menu')
     if (invocation.status !== 'accepted') throw new Error('Expected unbound Save')
     fixture.state.value = Object.freeze({ phase: ACTIVE_PROJECT_PHASE.IDLE })
     await expect(invocation.completion).resolves.toEqual({ status: 'cancelled' })
-    expect(actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu').status).toBe(
-      'unavailable',
-    )
+    expect(actionFixture.runtime.actions.invoke('project.save', 'menu').status).toBe('unavailable')
     pending.resolve()
     await flushPromises()
     expect(fixture.save).toHaveBeenCalledOnce()
@@ -1104,9 +1096,9 @@ describe('ProjectWorkspacePage', () => {
     const { wrapper, actionFixture, keyboardBindingRegistry } = await mountPage(fixture, projectId)
     await flushPromises()
     const before = ready.session.getSnapshot()
-    const binding = actionFixture.runtime.workbenchTarget.current
+    const binding = actionFixture.runtime.contexts.current(WORKBENCH_CONTEXT)
     const releaseMenu = actionFixture.runtime.keyboard.suspend()
-    const invocation = actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'menu')
+    const invocation = actionFixture.runtime.actions.invoke('project.save', 'menu')
     if (invocation.status !== 'accepted') throw new Error('Expected pending Save')
     expect(fixture.save).toHaveBeenCalledOnce()
 
@@ -1117,8 +1109,8 @@ describe('ProjectWorkspacePage', () => {
 
     await expect(invocation.completion).resolves.toEqual({ status: 'cancelled' })
     expect(binding?.isCurrent()).toBe(false)
-    expect(actionFixture.runtime.workbenchTarget.current).toBeNull()
-    expect(actionFixture.runtime.selectionTarget.current).toBeNull()
+    expect(actionFixture.runtime.contexts.current(WORKBENCH_CONTEXT)).toBeNull()
+    expect(actionFixture.runtime.contexts.current(EDITOR_SELECTION_CONTEXT)).toBeNull()
     expect(keyboardBindingRegistry.listeners.size).toBe(0)
     expect(keyboardBindingRegistry.disposalCountByBinding.size).toBe(
       keyboardBindingRegistry.registrationCountByBinding.size,
@@ -1126,7 +1118,7 @@ describe('ProjectWorkspacePage', () => {
     expect(
       [...keyboardBindingRegistry.disposalCountByBinding.values()].every((count) => count === 1),
     ).toBe(true)
-    expect(actionFixture.runtime.actions.invoke(STUDIO_ACTION.PROJECT_SAVE, 'toolbar').status).toBe(
+    expect(actionFixture.runtime.actions.invoke('project.save', 'toolbar').status).toBe(
       'unavailable',
     )
 
@@ -1146,7 +1138,7 @@ describe('ProjectWorkspacePage', () => {
     )
     const { wrapper, actionFixture, keyboardBindingRegistry } = await mountPage(fixture, projectId)
     await flushPromises()
-    actionFixture.runtime.selectionTarget.bind({
+    actionFixture.runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => {
         throw new Error('Editor focus query failed')
       },
@@ -1651,7 +1643,7 @@ describe('ProjectWorkspacePage', () => {
 
     wrapper
       .getComponent(ProjectWorkbenchShell)
-      .vm.$emit('invokeAction', STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'menu')
+      .vm.$emit('invokeAction', 'project.import-midi', 'menu')
     await nextTick()
     const file = new File([], 'new-project.mid', { type: 'audio/midi' })
     Object.defineProperty(input.element, 'files', {
@@ -1685,7 +1677,7 @@ describe('ProjectWorkspacePage', () => {
     const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
     wrapper
       .getComponent(ProjectWorkbenchShell)
-      .vm.$emit('invokeAction', STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'menu')
+      .vm.$emit('invokeAction', 'project.import-midi', 'menu')
     await nextTick()
     const file = new File([], 'cancelled.mid', { type: 'audio/midi' })
     Object.defineProperty(input.element, 'files', {

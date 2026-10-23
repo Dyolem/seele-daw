@@ -52,7 +52,7 @@ import {
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
-import { useProjectWorkbenchActionTarget } from '@/features/project-workspace/actions/project-workbench-action-context'
+import { WORKBENCH_CONTEXT } from '@/features/project-workspace/actions/project-workbench-actions'
 import { resolveInitialBarRange } from '@/workbench/edits/bar-range'
 import { staleEdit } from '@/workbench/edits/edit-session'
 import {
@@ -92,8 +92,7 @@ const studio = useStudio()
 const { activeProject, state } = studio.project
 const { projectEntry } = studio
 const tempoEdits = studio.edits.tempo
-const { actions, keyboard } = useStudioActions()
-const workbenchActionTarget = useProjectWorkbenchActionTarget()
+const { actions, contexts, keyboard } = useStudioActions()
 const {
   projectPlayback,
   state: playbackState,
@@ -450,7 +449,7 @@ const stopActionTarget = watch(
     releaseActionTarget?.()
     releaseActionTarget = null
     if (session === null) return
-    releaseActionTarget = workbenchActionTarget.bind({
+    releaseActionTarget = contexts.bind(WORKBENCH_CONTEXT, {
       getReadyProject: () => readyProject.value,
       getPlaybackState: () => playbackState.value,
       playback: projectPlayback,

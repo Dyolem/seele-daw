@@ -1,48 +1,55 @@
 import type { PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
-import {
-  STUDIO_ACTION,
-  STUDIO_ACTION_COMPLETED,
-  createStudioActionPresentation,
-  type StudioActionDefinition,
-} from '@/workbench/actions/studio-action'
-import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
-import type { StudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
+import { defineStudioAction, defineStudioContext } from '@/workbench/actions/studio-action'
+import { EDITOR_SELECTION_CONTEXT } from '@/workbench/actions/studio-editor-actions'
 
-export function createPianoRollToolActions(
-  targets: StudioActionTargetSlot<PianoRollToolActionTarget>,
-): readonly StudioActionDefinition[] {
-  return Object.freeze(
-    [
-      STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR,
-      STUDIO_ACTION.PIANO_ROLL_TOOL_PENCIL,
-      STUDIO_ACTION.PIANO_ROLL_SNAP_TOGGLE,
-    ].map((actionId) => {
-      const descriptor = describeStudioAction(actionId)
-      const tool =
-        actionId === STUDIO_ACTION.PIANO_ROLL_TOOL_CURSOR
-          ? PIANO_ROLL_TOOL.CURSOR
-          : PIANO_ROLL_TOOL.PENCIL
-      const snap = actionId === STUDIO_ACTION.PIANO_ROLL_SNAP_TOGGLE
-      return {
-        ...descriptor,
-        resolve() {
-          const binding = targets.current
-          if (binding === null) return null
-          return {
-            presentation: createStudioActionPresentation(descriptor.label, null, {
-              checked: snap ? binding.value.isSnapEnabled() : binding.value.getTool() === tool,
-            }),
-            isCurrent: binding.isCurrent,
-            onInvalidated: binding.onInvalidated,
-            execute() {
-              if (snap) binding.value.toggleSnap()
-              else binding.value.activateTool(tool)
-              return STUDIO_ACTION_COMPLETED
-            },
-          }
-        },
-      }
+export const PIANO_ROLL_CONTEXT = defineStudioContext<PianoRollToolActionTarget>({
+  id: 'piano-roll',
+  label: 'Piano roll',
+  priority: 2,
+  // The note selection lives inside the focused piano roll.
+  overlaps: [EDITOR_SELECTION_CONTEXT],
+  isActive: (tools) => tools.isFocused(),
+})
+
+export const PIANO_ROLL_TOOL_ACTIONS = [
+  defineStudioAction({
+    id: 'piano-roll.tool.cursor',
+    context: PIANO_ROLL_CONTEXT,
+    label: 'Cursor tool',
+    description: 'Select the piano roll cursor tool.',
+    category: 'editor',
+    keywords: ['选择工具', '光标'],
+    keys: ['1'],
+    resolve: (tools) => ({
+      checked: tools.getTool() === PIANO_ROLL_TOOL.CURSOR,
+      execute: () => tools.activateTool(PIANO_ROLL_TOOL.CURSOR),
     }),
-  )
-}
+  }),
+  defineStudioAction({
+    id: 'piano-roll.tool.pencil',
+    context: PIANO_ROLL_CONTEXT,
+    label: 'Pencil tool',
+    description: 'Select the piano roll pencil tool.',
+    category: 'editor',
+    keywords: ['画笔', '铅笔', '音符'],
+    keys: ['8'],
+    resolve: (tools) => ({
+      checked: tools.getTool() === PIANO_ROLL_TOOL.PENCIL,
+      execute: () => tools.activateTool(PIANO_ROLL_TOOL.PENCIL),
+    }),
+  }),
+  defineStudioAction({
+    id: 'piano-roll.snap.toggle',
+    context: PIANO_ROLL_CONTEXT,
+    label: 'Toggle snap',
+    description: 'Turn piano roll grid snapping on or off.',
+    category: 'editor',
+    keywords: ['吸附', '网格', 'Grid'],
+    keys: ['J'],
+    resolve: (tools) => ({
+      checked: tools.isSnapEnabled(),
+      execute: () => tools.toggleSnap(),
+    }),
+  }),
+] as const

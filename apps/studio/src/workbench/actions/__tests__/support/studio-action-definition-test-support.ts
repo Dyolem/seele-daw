@@ -1,49 +1,60 @@
-import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
 import { onTestFinished } from 'vitest'
 
 import {
-  STUDIO_ACTION,
-  createStudioActionPresentation,
+  defineStudioAction,
+  defineStudioContext,
   type StudioActionCompletion,
-  type StudioActionDefinition,
   type StudioActionFailure,
-  type StudioActionPresentation,
+  type StudioActionState,
 } from '@/workbench/actions/studio-action'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import { createStudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
+import { createStudioContextRegistry } from '@/workbench/actions/studio-context-registry'
 
 export interface TestActionTarget {
   execute(): StudioActionCompletion | Promise<StudioActionCompletion>
-  presentation?(): StudioActionPresentation
+  state?(): Omit<StudioActionState, 'execute'>
 }
 
+const TEST_CONTEXT = defineStudioContext<TestActionTarget>({
+  id: 'test',
+  label: 'Test',
+  priority: 0,
+  isActive: () => true,
+})
+
+/** One Save action bound to whatever target the test supplies. */
 export function createActionInvocationFixture() {
-  const targets = createStudioActionTargetSlot<TestActionTarget>()
+  const contexts = createStudioContextRegistry()
   const failures: StudioActionFailure[] = []
-  const definition: StudioActionDefinition = {
-    ...describeStudioAction(STUDIO_ACTION.PROJECT_SAVE),
+  const action = defineStudioAction({
+    id: 'project.save',
+    context: TEST_CONTEXT,
     label: 'Save',
     description: 'Save the project.',
-    resolve() {
-      const binding = targets.current
-      if (binding === null) return null
-      return {
-        presentation: binding.value.presentation?.() ?? createStudioActionPresentation('Save'),
-        isCurrent: binding.isCurrent,
-        onInvalidated: binding.onInvalidated,
-        execute: () => binding.value.execute(),
-      }
-    },
-  }
+    category: 'project',
+    resolve: (target) => ({ ...target.state?.(), execute: () => target.execute() }),
+  })
   const actions = createStudioActionCoordinator({
-    definitions: [definition],
+    actions: [action],
+    contexts,
     reportFailure: (failure) => {
       failures.push(failure)
     },
   })
   onTestFinished(() => {
     actions.dispose()
-    targets.dispose()
+    contexts.dispose()
   })
-  return { actions, definition, targets, failures }
+  return {
+    action,
+    actions,
+    contexts,
+    failures,
+    targets: {
+      bind: (target: TestActionTarget) => contexts.bind(TEST_CONTEXT, target),
+      get current() {
+        return contexts.current(TEST_CONTEXT)
+      },
+    },
+  }
 }

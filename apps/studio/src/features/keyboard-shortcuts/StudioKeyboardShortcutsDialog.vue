@@ -13,7 +13,8 @@ import DismissIcon from '~icons/fluent/dismiss-20-regular'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiSelect from '@/ui/components/UiSelect.vue'
 import StudioShortcutEditor from '@/features/keyboard-shortcuts/StudioShortcutEditor.vue'
-import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionDescriptor } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import {
   useStudioActions,
@@ -199,7 +200,7 @@ function restoreFocus(event: Event): void {
           </div>
           <StudioShortcutEditor
             v-if="editing"
-            :key="editing.actionId"
+            :key="editing.id"
             :action="editing"
             @close="closeEditor"
           />
@@ -218,13 +219,13 @@ function restoreFocus(event: Event): void {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in rows" :key="row.actionId">
+              <tr v-for="row in rows" :key="row.id">
                 <th scope="row">
                   <strong>{{ row.label }}</strong
                   ><span>{{ row.description }}</span
                   ><small>{{ row.categoryLabel }}</small>
-                  <small v-if="rejectedMessage(row.actionId)"
-                    >{{ rejectedMessage(row.actionId) }} Using defaults.</small
+                  <small v-if="rejectedMessage(row.id)"
+                    >{{ rejectedMessage(row.id) }} Using defaults.</small
                   >
                 </th>
                 <td>
@@ -240,12 +241,10 @@ function restoreFocus(event: Event): void {
                   >
                 </td>
                 <td class="studio-shortcuts__source">
-                  {{ row.modified && !rejectedMessage(row.actionId) ? 'User' : 'Default' }}
-                  <small v-if="rejectedMessage(row.actionId)">User override not applied</small>
+                  {{ row.modified && !rejectedMessage(row.id) ? 'User' : 'Default' }}
+                  <small v-if="rejectedMessage(row.id)">User override not applied</small>
                 </td>
-                <td>
-                  {{ row.contextLabel }}<small v-if="row.allowRepeat">Repeats while held</small>
-                </td>
+                <td>{{ row.contextLabel }}<small v-if="row.repeat">Repeats while held</small></td>
                 <td>
                   <UiButton
                     size="small"

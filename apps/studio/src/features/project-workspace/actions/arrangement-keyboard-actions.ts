@@ -1,40 +1,49 @@
 import {
-  STUDIO_ACTION,
-  createStudioActionPresentation,
+  defineStudioAction,
+  defineStudioContext,
   type StudioActionCompletion,
-  type StudioActionDefinition,
 } from '@/workbench/actions/studio-action'
-import { describeStudioAction } from '@/workbench/actions/studio-action-catalogue'
-import type { StudioActionTargetSlot } from '@/workbench/actions/studio-action-target'
 
 export interface ArrangementKeyboardTarget {
   isFocused(): boolean
   execute(): StudioActionCompletion
 }
 
-export function createArrangementKeyboardActions(
-  clip: StudioActionTargetSlot<ArrangementKeyboardTarget>,
-  bar: StudioActionTargetSlot<ArrangementKeyboardTarget>,
-): readonly StudioActionDefinition[] {
-  return Object.freeze(
-    [
-      { actionId: STUDIO_ACTION.ARRANGEMENT_CLIP_OPEN, target: clip },
-      { actionId: STUDIO_ACTION.ARRANGEMENT_CLIP_CREATE, target: bar },
-    ].map(({ actionId, target }) => {
-      const descriptor = describeStudioAction(actionId)
-      return {
-        ...descriptor,
-        resolve() {
-          const binding = target.current
-          if (binding === null) return null
-          return {
-            presentation: createStudioActionPresentation(descriptor.label),
-            isCurrent: binding.isCurrent,
-            onInvalidated: binding.onInvalidated,
-            execute: () => binding.value.execute(),
-          }
-        },
-      }
-    }),
-  )
-}
+export const ARRANGEMENT_CLIP_CONTEXT = defineStudioContext<ArrangementKeyboardTarget>({
+  id: 'arrangement-clip',
+  label: 'Focused arrangement clip',
+  priority: 2,
+  ownsEnter: true,
+  isActive: (clip) => clip.isFocused(),
+})
+
+export const ARRANGEMENT_BAR_CONTEXT = defineStudioContext<ArrangementKeyboardTarget>({
+  id: 'arrangement-bar',
+  label: 'Focused arrangement bar',
+  priority: 2,
+  ownsEnter: true,
+  isActive: (bar) => bar.isFocused(),
+})
+
+export const ARRANGEMENT_ACTIONS = [
+  defineStudioAction({
+    id: 'arrangement.clip.open',
+    context: ARRANGEMENT_CLIP_CONTEXT,
+    label: 'Open MIDI clip',
+    description: 'Select the focused MIDI clip and open it in the editor.',
+    category: 'arrangement',
+    keywords: ['打开', '片段', 'Clip'],
+    keys: ['Enter'],
+    resolve: (clip) => ({ execute: () => clip.execute() }),
+  }),
+  defineStudioAction({
+    id: 'arrangement.clip.create',
+    context: ARRANGEMENT_BAR_CONTEXT,
+    label: 'Create MIDI clip',
+    description: 'Create an empty MIDI clip at the focused track and bar.',
+    category: 'arrangement',
+    keywords: ['创建', '小节', '片段', 'Clip'],
+    keys: ['Enter'],
+    resolve: (bar) => ({ execute: () => bar.execute() }),
+  }),
+] as const

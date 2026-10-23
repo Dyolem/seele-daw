@@ -21,7 +21,7 @@ import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
-import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
+import { createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
@@ -245,7 +245,7 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Undo"]').trigger('click')
     await wrapper.get('button[aria-label="Redo"]').trigger('click')
 
-    expect(wrapper.emitted('invokeAction')).toEqual([[STUDIO_ACTION.HISTORY_UNDO, 'toolbar']])
+    expect(wrapper.emitted('invokeAction')).toEqual([['history.undo', 'toolbar']])
   })
 
   it('projects playback state and emits enabled Transport intents', async () => {
@@ -278,8 +278,8 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Return to last start position"]').trigger('click')
 
     expect(wrapper.emitted('invokeAction')).toEqual([
-      [STUDIO_ACTION.PLAYBACK_TOGGLE, 'toolbar'],
-      [STUDIO_ACTION.PLAYBACK_RETURN_TO_START, 'toolbar'],
+      ['playback.toggle', 'toolbar'],
+      ['playback.return-to-last-start-position', 'toolbar'],
     ])
   })
 
@@ -311,7 +311,7 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('button[aria-label="Open project menu"]').attributes('aria-expanded')).toBe(
       'false',
     )
-    expect(wrapper.emitted('invokeAction')).toEqual([[STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'menu']])
+    expect(wrapper.emitted('invokeAction')).toEqual([['project.import-midi', 'menu']])
 
     await wrapper.get('button[aria-label="Open project menu"]').trigger('click')
     await nextTick()
@@ -324,8 +324,8 @@ describe('ProjectWorkbenchShell', () => {
     reopenedImportAsTracks.click()
     await nextTick()
     expect(wrapper.emitted('invokeAction')).toEqual([
-      [STUDIO_ACTION.PROJECT_IMPORT_MIDI, 'menu'],
-      [STUDIO_ACTION.PROJECT_IMPORT_MIDI_TRACKS, 'menu'],
+      ['project.import-midi', 'menu'],
+      ['project.import-midi-tracks', 'menu'],
     ])
 
     wrapper.unmount()
@@ -346,7 +346,7 @@ describe('ProjectWorkbenchShell', () => {
 
     await wrapper.get('.project-workbench__save').trigger('click')
 
-    expect(wrapper.emitted('invokeAction')).toEqual([[STUDIO_ACTION.PROJECT_SAVE, 'toolbar']])
+    expect(wrapper.emitted('invokeAction')).toEqual([['project.save', 'toolbar']])
   })
 
   it('moves the Context Editor through minimized, fullscreen, closed and restored modes', async () => {

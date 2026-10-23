@@ -1,8 +1,7 @@
 import { INTERACTION_MODIFIER_RULES } from '@seele-daw/editor'
-import type { StudioActionCategory, StudioActionId } from '@/workbench/actions/studio-action'
+import type { StudioActionCategory } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import { STUDIO_SHORTCUT_POLICIES } from '@/workbench/keyboard/keymap/studio-default-keymap'
-import { STUDIO_KEYBOARD_CONTEXTS } from '@/workbench/keyboard/keymap/studio-keyboard-context'
 import type { StudioKeyboardInput } from '@/workbench/keyboard/contracts/studio-keyboard-input'
 
 export const STUDIO_ACTION_CATEGORIES = Object.freeze({
@@ -25,24 +24,22 @@ export function queryStudioShortcuts(
   const terms = query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean)
   return Object.freeze(
     actions.catalogue
-      .map((descriptor) => {
-        const policy = STUDIO_SHORTCUT_POLICIES[descriptor.actionId]
-        return Object.freeze({
-          ...descriptor,
-          modified: modifiedActionIds.includes(descriptor.actionId),
-          categoryLabel: STUDIO_ACTION_CATEGORIES[descriptor.category],
-          contextLabel: STUDIO_KEYBOARD_CONTEXTS[policy.context].label,
-          currentBindings: keyboard.displayBindingsFor(descriptor.actionId),
-          defaultBindings: Object.freeze(policy.defaultBindings.map(keyboard.formatBinding)),
-          allowRepeat: policy.allowRepeat,
-        })
-      })
+      .map((action) =>
+        Object.freeze({
+          ...action,
+          modified: modifiedActionIds.includes(action.id),
+          categoryLabel: STUDIO_ACTION_CATEGORIES[action.category],
+          contextLabel: action.context.label,
+          currentBindings: keyboard.displayBindingsFor(action.id),
+          defaultBindings: Object.freeze(action.keys.map(keyboard.formatBinding)),
+        }),
+      )
       .filter((row) => {
         if (assignment === 'modified' && !row.modified) return false
         if (assignment === 'assigned' && row.currentBindings.length === 0) return false
         if (assignment === 'unassigned' && row.currentBindings.length !== 0) return false
         const text = [
-          row.actionId,
+          row.id,
           row.label,
           row.description,
           row.categoryLabel,
@@ -50,8 +47,8 @@ export function queryStudioShortcuts(
           ...row.keywords,
           ...row.currentBindings,
           ...row.defaultBindings,
-          ...keyboard.bindingsFor(row.actionId),
-          ...STUDIO_SHORTCUT_POLICIES[row.actionId].defaultBindings,
+          ...keyboard.bindingsFor(row.id),
+          ...row.keys,
         ]
           .join(' ')
           .toLocaleLowerCase()

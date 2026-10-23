@@ -7,7 +7,8 @@ import type {
   Tick,
 } from '@seele-daw/project-core'
 import { computed, onMounted, onBeforeUnmount, shallowRef } from 'vue'
-import type { StudioActionId, StudioActionSource } from '@/workbench/actions/studio-action'
+import type { StudioActionSource } from '@/workbench/actions/studio-action'
+import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 
 import type {

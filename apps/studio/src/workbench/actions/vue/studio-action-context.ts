@@ -1,23 +1,10 @@
+import { inject, onBeforeUnmount, watch } from 'vue'
+
+import type { StudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import { STUDIO_SERVICES_KEY } from '@/symbols'
-import { inject, onBeforeUnmount, watch, type ComputedRef } from 'vue'
-import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import { useStudio } from '@/workbench/studio-services'
-import type {
-  StudioKeyboardInput,
-  StudioUserKeymap,
-  StudioUserKeymapState,
-  StudioShortcutRecorder,
-} from '@/workbench/keyboard'
 
-export interface StudioActionVueContext {
-  readonly shortcutRecorder: StudioShortcutRecorder
-  readonly userKeymap: StudioUserKeymap
-  readonly keymapState: ComputedRef<StudioUserKeymapState>
-  readonly actions: StudioActionCoordinator
-  readonly keyboard: StudioKeyboardInput
-}
-
-export function useStudioActions(): StudioActionVueContext {
+export function useStudioActions(): Omit<StudioActionRuntime, 'dispose'> {
   return useStudio().actions
 }
 

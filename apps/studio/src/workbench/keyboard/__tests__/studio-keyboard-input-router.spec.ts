@@ -3,14 +3,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
-  STUDIO_ACTION,
   STUDIO_ACTION_COMPLETED,
   type StudioActionCompletion,
   type StudioActionFailure,
 } from '@/workbench/actions/studio-action'
-import { createStudioKeyboardKeymap } from '@/workbench/keyboard/keymap/studio-default-keymap'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import { TestStudioKeyboardBindingRegistry } from '@/workbench/keyboard/__tests__/support/studio-keyboard-test-support'
+import {
+  EDITOR_SELECTION_CONTEXT,
+  INTERACTION_CONTEXT,
+} from '@/workbench/actions/studio-editor-actions'
+import { INTERFACE_CONTEXT } from '@/workbench/actions/studio-interface-actions'
 
 describe('Studio keyboard input routing', () => {
   it('keeps forwarded callbacks bound to their owner across keymap replacement', () => {
@@ -18,8 +21,11 @@ describe('Studio keyboard input routing', () => {
     const second = createTestStudioActionRuntime()
     const firstFocus = vi.fn<() => void>()
     const secondFocus = vi.fn<() => void>()
-    first.runtime.interfaceTarget.bind({ focusNotifications: firstFocus, showShortcuts: () => {} })
-    second.runtime.interfaceTarget.bind({
+    first.runtime.contexts.bind(INTERFACE_CONTEXT, {
+      focusNotifications: firstFocus,
+      showShortcuts: () => {},
+    })
+    second.runtime.contexts.bind(INTERFACE_CONTEXT, {
       focusNotifications: secondFocus,
       showShortcuts: () => {},
     })
@@ -32,13 +38,11 @@ describe('Studio keyboard input routing', () => {
     expect([defineStudioKeyboardBinding('F9')].map(formatBinding)).toEqual(['first:F9'])
     expect(validateBindingInput('F9').binding).toBe('F9')
     const release = suspend()
-    expect(first.runtime.userKeymap.setBindings(STUDIO_ACTION.NOTIFICATIONS_FOCUS, ['F9'])).toEqual(
-      {
-        status: 'saved',
-      },
-    )
-    expect(displayBindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual(['first:F9'])
-    expect(second.runtime.keyboard.displayBindingsFor(STUDIO_ACTION.NOTIFICATIONS_FOCUS)).toEqual([
+    expect(first.runtime.userKeymap.setBindings('notifications.focus', ['F9'])).toEqual({
+      status: 'saved',
+    })
+    expect(displayBindingsFor('notifications.focus')).toEqual(['first:F9'])
+    expect(second.runtime.keyboard.displayBindingsFor('notifications.focus')).toEqual([
       'display:F8',
     ])
     expect(first.bindingRegistry.dispatch('F9').defaultPrevented).toBe(false)
@@ -68,17 +72,15 @@ describe('Studio keyboard input routing', () => {
       interacting = false
       return STUDIO_ACTION_COMPLETED
     })
-    runtime.selectionTarget.bind({
+    runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => true,
       hasSelection: () => selected,
       selectionLabel: () => 'Notes',
       deleteSelection: () => STUDIO_ACTION_COMPLETED,
       clearSelection: clear,
     })
-    runtime.interactionTarget.bind({ isActive: () => interacting, cancel })
-    expect(runtime.actions.invoke(STUDIO_ACTION.EDITOR_SELECTION_CLEAR, 'menu').status).toBe(
-      'unavailable',
-    )
+    runtime.contexts.bind(INTERACTION_CONTEXT, { isActive: () => interacting, cancel })
+    expect(runtime.actions.invoke('editor.selection.clear', 'menu').status).toBe('unavailable')
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
     expect(cancel).toHaveBeenCalledOnce()
     expect(clear).not.toHaveBeenCalled()
@@ -97,14 +99,14 @@ describe('Studio keyboard input routing', () => {
       interacting = false
       throw cause
     })
-    runtime.selectionTarget.bind({
+    runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => true,
       hasSelection: () => true,
       selectionLabel: () => 'Notes',
       deleteSelection: () => STUDIO_ACTION_COMPLETED,
       clearSelection: clear,
     })
-    runtime.interactionTarget.bind({ isActive: () => interacting, cancel })
+    runtime.contexts.bind(INTERACTION_CONTEXT, { isActive: () => interacting, cancel })
 
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
     await Promise.resolve()
@@ -112,13 +114,13 @@ describe('Studio keyboard input routing', () => {
     expect(clear).not.toHaveBeenCalled()
     expect(failures).toEqual([
       {
-        actionId: STUDIO_ACTION.INTERACTION_CANCEL,
+        actionId: 'interaction.cancel',
         source: 'keyboard',
         operation: 'execute',
         cause,
       },
     ])
-    expect(runtime.actions.presentationFor(STUDIO_ACTION.EDITOR_SELECTION_CLEAR).enabled).toBe(true)
+    expect(runtime.actions.presentationFor('editor.selection.clear').enabled).toBe(true)
 
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
     expect(clear).toHaveBeenCalledOnce()
@@ -133,7 +135,7 @@ describe('Studio keyboard input routing', () => {
       isModalActive: () => modal,
     })
     const remove = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
-    runtime.selectionTarget.bind({
+    runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => focused,
       hasSelection: () => true,
       selectionLabel: () => 'Notes',
@@ -141,7 +143,7 @@ describe('Studio keyboard input routing', () => {
       clearSelection: () => STUDIO_ACTION_COMPLETED,
     })
     expect(bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
-    const menu = runtime.actions.invoke(STUDIO_ACTION.EDITOR_SELECTION_DELETE, 'menu')
+    const menu = runtime.actions.invoke('editor.selection.delete', 'menu')
     if (menu.status !== 'accepted') throw new Error('Expected explicit menu target')
     await menu.completion
     expect(remove).toHaveBeenCalledOnce()
@@ -164,7 +166,7 @@ describe('Studio keyboard input routing', () => {
     const remove = vi.fn<() => StudioActionCompletion>(() => {
       throw cause
     })
-    runtime.selectionTarget.bind({
+    runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => true,
       hasSelection: () => true,
       selectionLabel: () => 'Notes',
@@ -183,7 +185,7 @@ describe('Studio keyboard input routing', () => {
     expect(failures).toHaveLength(1)
     expect(failures[0]).toMatchObject({
       cause,
-      actionId: STUDIO_ACTION.EDITOR_SELECTION_DELETE,
+      actionId: 'editor.selection.delete',
       operation: 'execute',
     })
     expect(bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
@@ -194,9 +196,9 @@ describe('Studio keyboard input routing', () => {
     vi.spyOn(bindingRegistry, 'identity').mockImplementation((binding) =>
       binding.replace('Meta', 'Mod'),
     )
-    const keymap = createStudioKeyboardKeymap({
-      [STUDIO_ACTION.HISTORY_UNDO]: [defineStudioKeyboardBinding('Meta+S')],
-    })
+    const keymap = {
+      'history.undo': [defineStudioKeyboardBinding('Meta+S')],
+    }
     expect(() =>
       createStudioActionRuntime({
         bindingRegistry,

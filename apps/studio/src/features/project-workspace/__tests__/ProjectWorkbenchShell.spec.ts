@@ -1,6 +1,7 @@
-import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/symbols'
+import { TEMPO_EDITING_KEY } from '@/symbols'
+import { createTestTempoEditing } from './support/tempo-track-test-support'
 import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
-import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
+import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
@@ -19,7 +20,7 @@ import { parseSoundbankId } from '@seele-daw/playback'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { nextTick, shallowRef } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
@@ -72,6 +73,9 @@ const STUDIO_GRAND_INSTRUMENT = Object.freeze({
   soundbankId: parseSoundbankId('studio-grand'),
   status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
 })
+
+/** The coordinator's invoke, spied on by the latest mountShell(). */
+let invoke: MockInstance<StudioActionCoordinator['invoke']>
 
 function mountShell(options: MountShellOptions = {}) {
   const pinia = createPinia()
@@ -137,6 +141,7 @@ function mountShell(options: MountShellOptions = {}) {
     visualPosition: playbackVisualPosition,
   })
   const actionFixture = createTestStudioActionRuntime()
+  invoke = vi.spyOn(actionFixture.runtime.actions, 'invoke')
   const controls = presentProjectWorkbenchActions(
     actionFixture.runtime.actions,
     actionFixture.runtime.keyboard,
@@ -178,9 +183,6 @@ function mountShell(options: MountShellOptions = {}) {
       projectSession: createTestSession(parseProjectId('workbench-shell-project-session')),
       saveFailureMessage: options.saveFailureMessage,
       saveStatus: options.saveStatus ?? ACTIVE_PROJECT_SAVE_STATUS.IDLE,
-      tempoDisplayBpm: '120',
-      tempoEditable: true,
-      tempoMode: 'single',
       timeSignatureDenominator: 4,
       timeSignatureNumerator: 4,
       timelineEndTick: parseTick(576_000),
@@ -189,11 +191,7 @@ function mountShell(options: MountShellOptions = {}) {
     global: {
       plugins: [pinia],
       provide: {
-        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: {
-          session: null,
-          projectedRevision: null,
-          removeTempoEvent: () => STUDIO_ACTION_COMPLETED,
-        },
+        [TEMPO_EDITING_KEY as symbol]: createTestTempoEditing([]).tempo,
         ...provideTestStudioServices({
           actions: actionFixture.runtime,
           edits: { clips, tracks },
@@ -245,7 +243,7 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Undo"]').trigger('click')
     await wrapper.get('button[aria-label="Redo"]').trigger('click')
 
-    expect(wrapper.emitted('invokeAction')).toEqual([['history.undo', 'toolbar']])
+    expect(invoke.mock.calls).toEqual([['history.undo', 'toolbar']])
   })
 
   it('projects playback state and emits enabled Transport intents', async () => {
@@ -277,7 +275,7 @@ describe('ProjectWorkbenchShell', () => {
     await wrapper.get('button[aria-label="Pause"]').trigger('click')
     await wrapper.get('button[aria-label="Return to last start position"]').trigger('click')
 
-    expect(wrapper.emitted('invokeAction')).toEqual([
+    expect(invoke.mock.calls).toEqual([
       ['playback.toggle', 'toolbar'],
       ['playback.return-to-last-start-position', 'toolbar'],
     ])
@@ -311,7 +309,7 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.get('button[aria-label="Open project menu"]').attributes('aria-expanded')).toBe(
       'false',
     )
-    expect(wrapper.emitted('invokeAction')).toEqual([['project.import-midi', 'menu']])
+    expect(invoke.mock.calls).toEqual([['project.import-midi', 'menu']])
 
     await wrapper.get('button[aria-label="Open project menu"]').trigger('click')
     await nextTick()
@@ -323,7 +321,7 @@ describe('ProjectWorkbenchShell', () => {
     }
     reopenedImportAsTracks.click()
     await nextTick()
-    expect(wrapper.emitted('invokeAction')).toEqual([
+    expect(invoke.mock.calls).toEqual([
       ['project.import-midi', 'menu'],
       ['project.import-midi-tracks', 'menu'],
     ])
@@ -346,7 +344,7 @@ describe('ProjectWorkbenchShell', () => {
 
     await wrapper.get('.project-workbench__save').trigger('click')
 
-    expect(wrapper.emitted('invokeAction')).toEqual([['project.save', 'toolbar']])
+    expect(invoke.mock.calls).toEqual([['project.save', 'toolbar']])
   })
 
   it('moves the Context Editor through minimized, fullscreen, closed and restored modes', async () => {

@@ -10,12 +10,10 @@ import RecordIcon from '~icons/fluent/record-20-regular'
 import SpeakerIcon from '~icons/fluent/speaker-2-20-regular'
 import SpinnerIcon from '~icons/fluent/spinner-ios-20-regular'
 import { computed } from 'vue'
-import type { StudioActionSource } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
-
+import { useTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
 import ProjectTempoControl from '@/features/project-workspace/tempo/ProjectTempoControl.vue'
-import type { ProjectTempoControlMode } from '@/features/project-workspace/tempo/tempo-control'
+import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
@@ -23,19 +21,14 @@ interface ProjectWorkbenchTransportProps {
   readonly actionControls: ProjectWorkbenchActionControls
   readonly playbackFeedback: string | null
   readonly playbackTime: string
-  readonly tempoDisplayBpm: string
-  readonly tempoEditable: boolean
-  readonly tempoMode: ProjectTempoControlMode
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
 }
 
 const props = defineProps<ProjectWorkbenchTransportProps>()
-const emit = defineEmits<{
-  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
-  tempoCommit: [input: string]
-  tempoEditStart: []
-}>()
+const { actions } = useStudioActions()
+const tempo = useTempoEditing()
+const { field: tempoField, fieldEditable: tempoFieldEditable } = tempo
 
 const playbackIcon = computed(() => {
   if (props.actionControls.togglePlayback.busy) return SpinnerIcon
@@ -54,7 +47,7 @@ const playbackIcon = computed(() => {
           :label="props.actionControls.undo.label"
           :title="props.actionControls.undo.title"
           :aria-description="props.actionControls.undo.disabledReason ?? undefined"
-          @click="emit('invokeAction', props.actionControls.undo.actionId, 'toolbar')"
+          @click="actions.invoke(props.actionControls.undo.actionId, 'toolbar')"
         />
         <UiIconButton
           :disabled="!props.actionControls.redo.enabled"
@@ -62,17 +55,17 @@ const playbackIcon = computed(() => {
           :label="props.actionControls.redo.label"
           :title="props.actionControls.redo.title"
           :aria-description="props.actionControls.redo.disabledReason ?? undefined"
-          @click="emit('invokeAction', props.actionControls.redo.actionId, 'toolbar')"
+          @click="actions.invoke(props.actionControls.redo.actionId, 'toolbar')"
         />
       </div>
 
       <div class="project-workbench__meter-group" aria-label="Project meter">
         <ProjectTempoControl
-          :display-bpm="props.tempoDisplayBpm"
-          :editable="props.tempoEditable"
-          :mode="props.tempoMode"
-          @commit="emit('tempoCommit', $event)"
-          @edit-start="emit('tempoEditStart')"
+          :display-bpm="tempoField.displayBpm"
+          :editable="tempoFieldEditable"
+          :mode="tempoField.mode"
+          @commit="tempo.commitFieldInput"
+          @edit-start="tempo.beginEdit"
         />
         <span aria-label="Time signature">
           <strong>{{ props.timeSignatureNumerator }}</strong>
@@ -89,7 +82,7 @@ const playbackIcon = computed(() => {
         :label="props.actionControls.returnToStart.label"
         :title="props.actionControls.returnToStart.title"
         :aria-description="props.actionControls.returnToStart.disabledReason ?? undefined"
-        @click="emit('invokeAction', props.actionControls.returnToStart.actionId, 'toolbar')"
+        @click="actions.invoke(props.actionControls.returnToStart.actionId, 'toolbar')"
       />
       <UiIconButton
         :disabled="!props.actionControls.togglePlayback.enabled"
@@ -100,7 +93,7 @@ const playbackIcon = computed(() => {
         :title="props.actionControls.togglePlayback.title"
         :aria-description="props.actionControls.togglePlayback.disabledReason ?? undefined"
         :pressed="props.actionControls.togglePlayback.checked"
-        @click="emit('invokeAction', props.actionControls.togglePlayback.actionId, 'toolbar')"
+        @click="actions.invoke(props.actionControls.togglePlayback.actionId, 'toolbar')"
       />
       <UiIconButton
         class="project-workbench__record-control"
@@ -130,7 +123,7 @@ const playbackIcon = computed(() => {
         :title="props.actionControls.openMidiEditor.title"
         :aria-description="props.actionControls.openMidiEditor.disabledReason ?? undefined"
         :pressed="props.actionControls.openMidiEditor.checked"
-        @click="emit('invokeAction', props.actionControls.openMidiEditor.actionId, 'toolbar')"
+        @click="actions.invoke(props.actionControls.openMidiEditor.actionId, 'toolbar')"
       />
     </div>
   </section>

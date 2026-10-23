@@ -11,11 +11,9 @@ import UiAlertDialog from '@/ui/components/UiAlertDialog.vue'
 import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
 import {
   STUDIO_ACTION_COMPLETED,
-  type StudioActionSource,
   type StudioActionFailure,
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
@@ -149,8 +147,6 @@ describe('Workbench menu keyboard ownership', () => {
               projectId: 'shortcuts-menu-focus',
               projectName: 'Shortcuts',
               saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
-              onInvokeAction: (id: StudioActionId, source: StudioActionSource) =>
-                runtime.actions.invoke(id, source),
             }),
             h(StudioKeyboardShortcutsDialog, {
               open: open.value,
@@ -207,11 +203,11 @@ describe('Workbench menu keyboard ownership', () => {
         reportFailure: vi.fn<(failure: StudioActionFailure) => void>(),
       })
       const controls = presentProjectWorkbenchActions(runtime.actions, runtime.keyboard)
-      const invokeAction = vi.fn<(actionId: StudioActionId, source: StudioActionSource) => void>(
-        () => {
-          isDialogOpen.value = true
-        },
-      )
+      // Showing projects asks the navigation dialog first.
+      const invokeAction = vi.spyOn(runtime.actions, 'invoke').mockImplementation(() => {
+        isDialogOpen.value = true
+        return { status: 'accepted', completion: Promise.resolve(STUDIO_ACTION_COMPLETED) }
+      })
       const wrapper = mount(
         {
           render: () =>
@@ -225,7 +221,6 @@ describe('Workbench menu keyboard ownership', () => {
                 projectId: 'menu-navigation-focus',
                 projectName: 'Navigation Focus',
                 saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
-                onInvokeAction: invokeAction,
               }),
               h(
                 UiAlertDialog,

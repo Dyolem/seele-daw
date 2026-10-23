@@ -4,16 +4,15 @@ import {
   createEditorPointerInputAdapter,
   type EditorPointerInputAdapter,
 } from '@seele-daw/editor'
-import { type TempoEventId, type TempoEventRecord, type Tick } from '@seele-daw/project-core'
+import type { TempoEventRecord, Tick } from '@seele-daw/project-core'
 import { shallowRef, watch, type ShallowRef } from 'vue'
 import { createTempoTrackDragSession } from '@/features/project-workspace/tempo-track/interaction/tempo-track-drag-session'
-import { useTempoEventActions } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
+import { useTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
 import type { ProjectTempoTrackScale } from '@/features/project-workspace/tempo-track/types/tempo-track'
 import type {
   TempoTrackDragIntent,
   TempoTrackPointerInput,
 } from '@/features/project-workspace/tempo-track/types/tempo-track-drag'
-import type { TempoTrackPreviewController } from '@/features/project-workspace/tempo-track/types/tempo-track-preview'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   STUDIO_ACTION_COMPLETED,
@@ -23,29 +22,22 @@ import { useStudioInteractionTarget } from '@/workbench/actions/vue/studio-edito
 
 /** Adapts Tempo input, mapping invalidation and committed preview delivery to Vue. */
 export function useTempoTrackDrag({
-  props,
+  layout,
   plotElement,
   tempoScale,
-  projection,
   hitTest,
-  select,
-  editStart,
 }: {
-  readonly props: {
+  readonly layout: {
     readonly projectId: string
-    readonly editingDisabled: boolean
-    readonly selectedTempoEventId: TempoEventId | null
     readonly barSpanTick: Tick
     readonly timelineEndTick: Tick
   }
   readonly plotElement: ShallowRef<HTMLElement | null>
   readonly tempoScale: Readonly<ShallowRef<ProjectTempoTrackScale>>
-  readonly projection: TempoTrackPreviewController
   readonly hitTest: (event: PointerEvent, bounds: DOMRect) => TempoEventRecord | null
-  readonly select: (id: TempoEventId) => void
-  readonly editStart: () => void
 }) {
-  const actions = useTempoEventActions()
+  const tempo = useTempoEditing()
+  const projection = tempo.preview
   const toasts = useUiToastStore()
   const session = createTempoTrackDragSession()
   const state = shallowRef(session.state)
@@ -53,7 +45,7 @@ export function useTempoTrackDrag({
   let adapter: EditorPointerInputAdapter | null = null
   let observer: ResizeObserver | null = null
   let captureBounds: DOMRect | null = null
-  let projectedRevision = actions.projectedRevision
+  let projectedRevision = tempo.projectedRevision
   session.subscribe((next) => {
     const previous = state.value
     if (next.interactionId !== null && next.preview !== null) {
@@ -70,7 +62,7 @@ export function useTempoTrackDrag({
       next.preview?.axis != null &&
       next.preview.axis !== 'blocked-tick'
     )
-      editStart()
+      tempo.beginEdit()
   })
 
   function cancel(): void {
@@ -116,8 +108,8 @@ export function useTempoTrackDrag({
   function complete(intent: TempoTrackDragIntent): void {
     completeGesture(session, intent.interactionId, {
       apply: () =>
-        actions.session === intent.target.expectedSession && !props.editingDisabled
-          ? actions.commitDrag(intent)
+        tempo.session === intent.target.expectedSession && !tempo.editingDisabled.value
+          ? tempo.commitDrag(intent)
           : null,
       authorityRevision: () => projectedRevision ?? intent.target.baseRevision,
       onFailure: reportFailure,
@@ -127,10 +119,10 @@ export function useTempoTrackDrag({
   function onInput(input: TempoTrackPointerInput): void {
     if (disposed) return
     if (input.phase === EDITOR_POINTER_INPUT_PHASE.BEGIN) {
-      const projectSession = actions.session
+      const projectSession = tempo.session
       const bounds = plotElement.value?.getBoundingClientRect()
       if (
-        props.editingDisabled ||
+        tempo.editingDisabled.value ||
         input.hit === null ||
         projectSession === null ||
         projectedRevision === null ||
@@ -146,7 +138,7 @@ export function useTempoTrackDrag({
           width: bounds.width,
           height: bounds.height,
           scale: tempoScale.value,
-          timelineEndTick: props.timelineEndTick,
+          timelineEndTick: layout.timelineEndTick,
         },
       })
       if (failure !== null) reportFailure(failure)
@@ -163,11 +155,11 @@ export function useTempoTrackDrag({
 
   const stopInvalidation = watch(
     [
-      () => actions.session,
-      () => props.projectId,
-      () => props.editingDisabled,
-      () => props.barSpanTick,
-      () => props.timelineEndTick,
+      () => tempo.session,
+      () => layout.projectId,
+      () => tempo.editingDisabled.value,
+      () => layout.barSpanTick,
+      () => layout.timelineEndTick,
       () => tempoScale.value.minimumBpm,
       () => tempoScale.value.maximumBpm,
     ],
@@ -175,14 +167,14 @@ export function useTempoTrackDrag({
     { flush: 'sync' },
   )
   const stopSelection = watch(
-    () => props.selectedTempoEventId,
+    () => tempo.selectedEventId.value,
     (id) => {
       if (state.value.preview !== null && state.value.preview.tempoEventId !== id) cancel()
     },
     { flush: 'sync' },
   )
   const stopProjection = watch(
-    () => actions.projectedRevision,
+    () => tempo.projectedRevision,
     (revision) => {
       if (disposed || revision === null) return
       projectedRevision = revision
@@ -240,7 +232,7 @@ export function useTempoTrackDrag({
             const target = hitTest(event, plot.getBoundingClientRect())
             if (target === null) return null
             point.focus({ preventScroll: true })
-            select(target.id)
+            tempo.select(target.id)
             event.preventDefault()
             return { tempoEventId: target.id }
           },

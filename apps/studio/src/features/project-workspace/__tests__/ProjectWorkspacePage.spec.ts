@@ -1400,100 +1400,6 @@ describe('ProjectWorkspacePage', () => {
     expect(useUiToastStore().message?.title).toBe('Tempo edit could not complete')
   })
 
-  it('coordinates Tempo Track add, move, numeric BPM edit, selection, and removal', async () => {
-    const projectId = parseProjectId('project-workspace-page-tempo-track')
-    const session = createInitialProjectSession({
-      projectId,
-      projectName: 'Tempo Track Project',
-      tempoEventId: parseTempoEventId('tempo-track-project-initial'),
-      timeSignatureEventId: parseTimeSignatureEventId('tempo-track-project-meter'),
-    })
-    const fixture = createFixture(
-      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
-      createReadyState(projectId, session),
-    )
-    const { playbackState, projectPlayback, wrapper } = await mountPage(fixture, projectId)
-    await flushPromises()
-    await wrapper.get('[aria-label="Expand Tempo editor"]').trigger('click')
-    const shell = wrapper.getComponent(ProjectWorkbenchShell)
-
-    await wrapper.get('.tempo-track-lane__point').trigger('click')
-    expect(
-      wrapper.get<HTMLInputElement>('input[aria-label="Selected Tempo Event BPM"]').element.value,
-    ).toBe('120')
-
-    playbackState.value = Object.freeze({
-      ...STOPPED_PLAYBACK_STATE,
-      modelRevision: session.modelRevision,
-      phase: PROJECT_PLAYBACK_PHASE.PLAYING,
-      planStatus: 'playable',
-      projectId,
-    })
-    vi.mocked(projectPlayback.pause).mockImplementation(() => {
-      playbackState.value = Object.freeze({
-        ...playbackState.value,
-        phase: PROJECT_PLAYBACK_PHASE.PAUSED,
-      })
-      return true
-    })
-    await nextTick()
-
-    shell.vm.$emit('tempoEventAdd', parseTempoBpm(96), parseTick(960))
-    await nextTick()
-    expect(projectPlayback.pause).toHaveBeenCalledOnce()
-    expect(session.getSnapshot().tempoEvents).toContainEqual({
-      bpm: 96,
-      id: 'workspace-page-tempo-event-1',
-      tick: 960,
-    })
-
-    fixture.state.value = createReadyState(projectId, session)
-    await nextTick()
-    expect(shell.props('selectedTempoEventId')).toBe('workspace-page-tempo-event-1')
-
-    const addedTempoEventId = parseTempoEventId('workspace-page-tempo-event-1')
-    shell.vm.$emit('tempoEventMove', addedTempoEventId, parseTick(1_920))
-    shell.vm.$emit('tempoEventBpmCommit', addedTempoEventId, '101.25')
-    expect(session.getSnapshot().tempoEvents).toContainEqual({
-      bpm: 101.25,
-      id: addedTempoEventId,
-      tick: 1_920,
-    })
-
-    shell.vm.$emit('tempoEventRemove', addedTempoEventId)
-    await nextTick()
-    expect(session.getSnapshot().tempoEvents).toHaveLength(1)
-    expect(shell.props('selectedTempoEventId')).toBeNull()
-  })
-
-  it('surfaces Tempo Track Tick collisions without changing Project history', async () => {
-    const projectId = parseProjectId('project-workspace-page-tempo-track-collision')
-    const session = createInitialProjectSession({
-      projectId,
-      projectName: 'Tempo Track Collision Project',
-      tempoEventId: parseTempoEventId('tempo-track-collision-initial'),
-      timeSignatureEventId: parseTimeSignatureEventId('tempo-track-collision-meter'),
-    })
-    const fixture = createFixture(
-      async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
-      createReadyState(projectId, session),
-    )
-    const { wrapper } = await mountPage(fixture, projectId)
-    await flushPromises()
-    const revision = session.modelRevision
-
-    wrapper
-      .getComponent(ProjectWorkbenchShell)
-      .vm.$emit('tempoEventAdd', parseTempoBpm(90), parseTick(0))
-    await nextTick()
-
-    expect(session.modelRevision).toBe(revision)
-    expect(useUiToastStore().message).toMatchObject({
-      title: 'Tempo Event could not be added',
-      tone: 'danger',
-    })
-  })
-
   it('extends a long imported MIDI song through eight complete Timeline tail bars', async () => {
     const document: MidiFileDocument = {
       format: 1,
@@ -1637,13 +1543,11 @@ describe('ProjectWorkspacePage', () => {
       }),
     })
     fixture.importLocalFileReplacingActiveProject.mockResolvedValueOnce(importResult)
-    const { router, wrapper } = await mountPage(fixture, projectId)
+    const { actionFixture, router, wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
     const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
 
-    wrapper
-      .getComponent(ProjectWorkbenchShell)
-      .vm.$emit('invokeAction', 'project.import-midi', 'menu')
+    actionFixture.runtime.actions.invoke('project.import-midi', 'menu')
     await nextTick()
     const file = new File([], 'new-project.mid', { type: 'audio/midi' })
     Object.defineProperty(input.element, 'files', {
@@ -1672,12 +1576,10 @@ describe('ProjectWorkspacePage', () => {
       async () => Object.freeze({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
       createReadyState(projectId),
     )
-    const { router, wrapper } = await mountPage(fixture, projectId)
+    const { actionFixture, router, wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
     const input = wrapper.get<HTMLInputElement>('.project-workspace__midi-file-input')
-    wrapper
-      .getComponent(ProjectWorkbenchShell)
-      .vm.$emit('invokeAction', 'project.import-midi', 'menu')
+    actionFixture.runtime.actions.invoke('project.import-midi', 'menu')
     await nextTick()
     const file = new File([], 'cancelled.mid', { type: 'audio/midi' })
     Object.defineProperty(input.element, 'files', {

@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import type {
-  ProjectSession,
-  TempoBpm,
-  TempoEventId,
-  TempoEventRecord,
-  Tick,
-} from '@seele-daw/project-core'
+import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import OptionsIcon from '~icons/fluent/options-20-regular'
 import { shallowRef } from 'vue'
 
@@ -15,7 +9,6 @@ import type {
 } from '@/features/piano-roll/types/piano-roll-presentation'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
-import type { ProjectTempoControlMode } from '@/features/project-workspace/tempo/tempo-control'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
@@ -23,8 +16,7 @@ import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-sh
 import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
-import type { StudioActionSource } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 import type { ActiveProjectSaveStatus } from '@/workbench/project/active-project-state'
 
 interface ProjectWorkbenchShellProps {
@@ -41,12 +33,6 @@ interface ProjectWorkbenchShellProps {
   readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly saveFailureMessage?: string | null
   readonly saveStatus: ActiveProjectSaveStatus
-  readonly selectedTempoEventId?: TempoEventId | null
-  readonly tempoDisplayBpm: string
-  readonly tempoEditingDisabled?: boolean
-  readonly tempoEditable: boolean
-  readonly tempoEvents?: readonly TempoEventRecord[]
-  readonly tempoMode: ProjectTempoControlMode
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
   readonly timelineEndTick: Tick
@@ -55,20 +41,8 @@ interface ProjectWorkbenchShellProps {
 
 const props = withDefaults(defineProps<ProjectWorkbenchShellProps>(), {
   saveFailureMessage: null,
-  selectedTempoEventId: null,
-  tempoEditingDisabled: false,
-  tempoEvents: () => Object.freeze([]),
 })
-const emit = defineEmits<{
-  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
-  tempoCommit: [input: string]
-  tempoEditStart: []
-  tempoEventAdd: [bpm: TempoBpm, tick: Tick]
-  tempoEventBpmCommit: [tempoEventId: TempoEventId, input: string]
-  tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
-  tempoEventRemove: [tempoEventId: TempoEventId]
-  tempoEventSelect: [tempoEventId: TempoEventId]
-}>()
+const { actions } = useStudioActions()
 
 const workspace = shallowRef<ProjectWorkbenchWorkspaceHandle | null>(null)
 defineExpose<ProjectWorkbenchWorkspaceHandle>({
@@ -85,21 +59,14 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({
       :project-name="props.projectName"
       :save-failure-message="props.saveFailureMessage"
       :save-status="props.saveStatus"
-      @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
     />
 
     <ProjectWorkbenchTransport
       :action-controls="props.actionControls"
       :playback-feedback="props.playbackFeedback"
       :playback-time="props.playbackTime"
-      :tempo-display-bpm="props.tempoDisplayBpm"
-      :tempo-editable="props.tempoEditable"
-      :tempo-mode="props.tempoMode"
       :time-signature-denominator="props.timeSignatureDenominator"
       :time-signature-numerator="props.timeSignatureNumerator"
-      @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
-      @tempo-commit="emit('tempoCommit', $event)"
-      @tempo-edit-start="emit('tempoEditStart')"
     />
 
     <main class="project-workbench__main">
@@ -111,7 +78,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({
           :busy="props.actionControls.projects.busy"
           :disabled="!props.actionControls.projects.enabled"
           :title="props.actionControls.projects.title"
-          @click="emit('invokeAction', props.actionControls.projects.actionId, 'toolbar')"
+          @click="actions.invoke(props.actionControls.projects.actionId, 'toolbar')"
           >Back to projects</UiButton
         >
       </section>
@@ -125,21 +92,9 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({
         :piano-roll-track-presentation="props.pianoRollTrackPresentation"
         :project-id="props.projectId"
         :project-session="props.projectSession"
-        :selected-tempo-event-id="props.selectedTempoEventId"
-        :tempo-editing-disabled="props.tempoEditingDisabled"
-        :tempo-events="props.tempoEvents"
         :time-signature-numerator="props.timeSignatureNumerator"
         :timeline-end-tick="props.timelineEndTick"
         :tracks="props.tracks"
-        @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
-        @tempo-edit-start="emit('tempoEditStart')"
-        @tempo-event-add="(bpm, tick) => emit('tempoEventAdd', bpm, tick)"
-        @tempo-event-bpm-commit="
-          (tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)
-        "
-        @tempo-event-move="(tempoEventId, tick) => emit('tempoEventMove', tempoEventId, tick)"
-        @tempo-event-remove="emit('tempoEventRemove', $event)"
-        @tempo-event-select="emit('tempoEventSelect', $event)"
       />
     </main>
   </div>

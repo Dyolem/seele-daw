@@ -1,12 +1,12 @@
 import {
-  createTempoTrackTestActions,
+  createTestTempoEditing,
   installTempoPointerCapture,
 } from './support/tempo-track-test-support'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
   createReplaceTempoEventBpmCommand,
 } from '@seele-daw/project-core'
-import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/symbols'
+import { TEMPO_EDITING_KEY } from '@/symbols'
 import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { createStudioActionPresentation } from '@/workbench/actions/studio-action'
@@ -60,7 +60,7 @@ const STUDIO_GRAND_INSTRUMENT = Object.freeze({
 })
 
 interface ArrangementFixture {
-  readonly tempoActions: ReturnType<typeof createTempoTrackTestActions>
+  readonly tempoEditing: ReturnType<typeof createTestTempoEditing>
   readonly keyboard: ReturnType<typeof createTestStudioActionRuntime>
   readonly addEmptyMidiClip: ReturnType<typeof vi.fn<ClipEdits['addEmpty']>>
   readonly addInstrumentTrack: ReturnType<typeof vi.fn<TrackEdits['addInstrumentTrack']>>
@@ -89,9 +89,10 @@ interface MountArrangementOptions {
 }
 
 function mountArrangement(options: MountArrangementOptions = {}): ArrangementFixture {
-  const tempoActions = createTempoTrackTestActions(options.tempoEvents ?? [])
-  tempoActions.commitDrag.mockImplementation(() => {
-    const current = tempoActions.session.value
+  const tempoEditing = createTestTempoEditing(options.tempoEvents ?? [])
+  tempoEditing.selectedEventId.value = options.selectedTempoEventId ?? null
+  tempoEditing.commitDrag.mockImplementation(() => {
+    const current = tempoEditing.session.value
     const initial = current.getSnapshot().tempoEvents[0]!
     const result = current.execute(
       createReplaceTempoEventBpmCommand({
@@ -195,8 +196,6 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       },
       clips: options.clips ?? Object.freeze([]),
       projectId,
-      selectedTempoEventId: options.selectedTempoEventId ?? null,
-      tempoEvents: options.tempoEvents ?? Object.freeze([]),
       timeSignatureNumerator: 4,
       timelineEndTick: options.timelineEndTick ?? parseTick(3_840 * 8),
       tracks: options.tracks ?? Object.freeze([]),
@@ -204,7 +203,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     global: {
       plugins: [pinia],
       provide: {
-        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: tempoActions.context,
+        [TEMPO_EDITING_KEY as symbol]: tempoEditing.tempo,
         ...provideTestStudioServices({
           actions: keyboard.runtime,
           edits: { clips, tracks },
@@ -231,7 +230,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   mountedWrappers.push(wrapper)
 
   return {
-    tempoActions,
+    tempoEditing,
     keyboard,
     addEmptyMidiClip,
     addInstrumentTrack,
@@ -304,7 +303,7 @@ describe('ProjectWorkbenchArrangement', () => {
       tick: parseTick(0),
     })
     const fixture = mountArrangement({ tempoEvents: [initial], selectedTempoEventId: initial.id })
-    const { wrapper, tempoActions } = fixture
+    const { wrapper, tempoEditing } = fixture
     await nextTick()
     expect(wrapper.find('.tempo-track-lane').exists()).toBe(false)
     expect(wrapper.get('.project-workbench__tempo-summary').text()).toBe('120 BPM · 1 event')
@@ -330,7 +329,7 @@ describe('ProjectWorkbenchArrangement', () => {
     await wrapper.get('[aria-label="Collapse Tempo editor"]').trigger('click')
     expect(plot.hasPointerCapture(81)).toBe(false)
     await dispatchPointerEvent(plot, 'pointerup', { clientX: 100, clientY: 70, pointerId: 81 })
-    expect(tempoActions.commitDrag).not.toHaveBeenCalled()
+    expect(tempoEditing.commitDrag).not.toHaveBeenCalled()
     await wrapper.get('[aria-label="Expand Tempo editor"]').trigger('click')
     const surface = wrapper.element as HTMLElement
     let height = 240
@@ -342,8 +341,8 @@ describe('ProjectWorkbenchArrangement', () => {
     window.dispatchEvent(new Event('resize'))
     await nextTick()
     expect(wrapper.find('.tempo-track-lane').exists()).toBe(true)
-    expect(wrapper.emitted('tempoEventBpmCommit')).toBeUndefined()
-    expect(tempoActions.commitDrag).not.toHaveBeenCalled()
+    expect(tempoEditing.commitBpmInput).not.toHaveBeenCalled()
+    expect(tempoEditing.commitDrag).not.toHaveBeenCalled()
   })
 
   it('renders the 150-bar minimum Timeline as one shared Ruler and lane width', () => {
@@ -755,7 +754,7 @@ describe('ProjectWorkbenchArrangement', () => {
 
     await fixture.wrapper.get('button[aria-label="Select next Tempo Event"]').trigger('click')
 
-    expect(fixture.wrapper.emitted('tempoEventSelect')).toEqual([[next.id]])
+    expect(fixture.tempoEditing.select.mock.calls).toEqual([[next.id]])
     expect(viewportElement.scrollLeft).toBe(1_000)
     expect(fixture.locateAtTick).not.toHaveBeenCalled()
   })
@@ -794,7 +793,7 @@ describe('ProjectWorkbenchArrangement', () => {
     await beat.setValue('2')
     await offset.setValue('0')
     await offset.trigger('keydown', { key: 'Enter' })
-    expect(fixture.wrapper.emitted('tempoEventMove')).toBeUndefined()
+    expect(fixture.tempoEditing.move).not.toHaveBeenCalled()
 
     await bar.trigger('focus')
     await bar.setValue('2')
@@ -802,8 +801,8 @@ describe('ProjectWorkbenchArrangement', () => {
     await offset.setValue('240')
     await offset.trigger('keydown', { key: 'Enter' })
 
-    expect(fixture.wrapper.emitted('tempoEditStart')).toHaveLength(2)
-    expect(fixture.wrapper.emitted('tempoEventMove')).toEqual([[selected.id, parseTick(6_000)]])
+    expect(fixture.tempoEditing.beginEdit).toHaveBeenCalledTimes(2)
+    expect(fixture.tempoEditing.move.mock.calls).toEqual([[selected.id, parseTick(6_000)]])
 
     await bar.trigger('focus')
     await bar.setValue('10')
@@ -811,7 +810,7 @@ describe('ProjectWorkbenchArrangement', () => {
     await offset.setValue('0')
     await offset.trigger('keydown', { key: 'Enter' })
 
-    expect(fixture.wrapper.emitted('tempoEventMove')).toHaveLength(1)
+    expect(fixture.tempoEditing.move).toHaveBeenCalledOnce()
     expect(fixture.toasts.message?.title).toBe('Tempo Event was not moved')
     expect(fixture.toasts.message?.description).toContain('at or before Bar 9, beat 1, offset 0')
   })
@@ -873,7 +872,7 @@ describe('ProjectWorkbenchArrangement', () => {
     })
     await nextTick()
 
-    expect(fixture.tempoActions.commitDrag).not.toHaveBeenCalled()
+    expect(fixture.tempoEditing.commitDrag).not.toHaveBeenCalled()
     expect(bar.element.value).toBe('1')
     expect(beat.element.value).toBe('3')
     expect(offset.element.value).toBe('0')
@@ -884,7 +883,7 @@ describe('ProjectWorkbenchArrangement', () => {
       clientY: 121,
       pointerId: 71,
     })
-    expect(fixture.tempoActions.commitDrag.mock.calls[0]?.[0]).toMatchObject({
+    expect(fixture.tempoEditing.commitDrag.mock.calls[0]?.[0]).toMatchObject({
       axis: 'tick',
       tempoEventId: selected.id,
       tick: 1_920,
@@ -903,7 +902,7 @@ describe('ProjectWorkbenchArrangement', () => {
     })
     await nextTick()
 
-    expect(fixture.tempoActions.commitDrag).toHaveBeenCalledOnce()
+    expect(fixture.tempoEditing.commitDrag).toHaveBeenCalledOnce()
     expect(bpm.element.value).toBe('140')
 
     await dispatchPointerEvent(point.element, 'pointerup', {
@@ -911,7 +910,7 @@ describe('ProjectWorkbenchArrangement', () => {
       clientY: 100,
       pointerId: 72,
     })
-    expect(fixture.tempoActions.commitDrag.mock.calls[1]?.[0]).toMatchObject({
+    expect(fixture.tempoEditing.commitDrag.mock.calls[1]?.[0]).toMatchObject({
       axis: 'bpm',
       tempoEventId: selected.id,
       bpm: 140,
@@ -939,7 +938,7 @@ describe('ProjectWorkbenchArrangement', () => {
       clientY: 121,
       pointerId: 73,
     })
-    expect(fixture.tempoActions.commitDrag).toHaveBeenCalledTimes(2)
+    expect(fixture.tempoEditing.commitDrag).toHaveBeenCalledTimes(2)
     expect(fixture.wrapper.get('.tempo-track-control__time').text()).toContain('00:00.500')
   })
 
@@ -1010,7 +1009,7 @@ describe('ProjectWorkbenchArrangement', () => {
   })
 
   it('exposes MIDI import immediately after the final Track lane and in an empty Arrangement', async () => {
-    const withTrack = mountArrangement({
+    const withTrackFixture = mountArrangement({
       tracks: Object.freeze([
         Object.freeze({
           color: parseProjectColor('#4F8CFF'),
@@ -1020,7 +1019,9 @@ describe('ProjectWorkbenchArrangement', () => {
           name: 'Last Track',
         }),
       ]),
-    }).wrapper
+    })
+    const withTrack = withTrackFixture.wrapper
+    const invokeWithTrack = vi.spyOn(withTrackFixture.keyboard.runtime.actions, 'invoke')
     const laneList = withTrack.get('.project-workbench__arrangement-lane-list')
     const laneChildren = [...laneList.element.children]
 
@@ -1029,11 +1030,12 @@ describe('ProjectWorkbenchArrangement', () => {
     expect(laneChildren[1]?.textContent).toContain('Import MIDI as new tracks')
     expect(laneChildren[1]?.textContent).not.toContain('Creates a separate local project')
     await withTrack.get('.project-workbench__midi-import-lane button').trigger('click')
-    expect(withTrack.emitted('invokeAction')).toEqual([['project.import-midi-tracks', 'toolbar']])
+    expect(invokeWithTrack.mock.calls).toEqual([['project.import-midi-tracks', 'toolbar']])
 
-    const empty = mountArrangement().wrapper
-    await empty.get('.project-workbench__empty-midi-import').trigger('click')
-    expect(empty.emitted('invokeAction')).toEqual([['project.import-midi-tracks', 'toolbar']])
+    const emptyFixture = mountArrangement()
+    const invokeEmpty = vi.spyOn(emptyFixture.keyboard.runtime.actions, 'invoke')
+    await emptyFixture.wrapper.get('.project-workbench__empty-midi-import').trigger('click')
+    expect(invokeEmpty.mock.calls).toEqual([['project.import-midi-tracks', 'toolbar']])
   })
 
   it('keeps ordered Track and Lane pairs under one Arrangement scroll authority', () => {
@@ -1444,7 +1446,7 @@ describe('ProjectWorkbenchArrangement', () => {
       })
       await nextTick()
       await fixture.wrapper.get('button[aria-label="Expand Tempo editor"]').trigger('click')
-      const { wrapper, keyboard, cancelTimelineLocate, commitTimelineLocate, tempoActions } =
+      const { wrapper, keyboard, cancelTimelineLocate, commitTimelineLocate, tempoEditing } =
         fixture
       const viewport = wrapper.get('.project-workbench__arrangement-scroll-viewport')
         .element as HTMLElement
@@ -1493,12 +1495,12 @@ describe('ProjectWorkbenchArrangement', () => {
       await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 300, pointerId: 11 })
       expect(plot.hasPointerCapture(71)).toBe(false)
       await dispatchPointerEvent(plot, 'pointerup', { clientX: 600, clientY: 120, pointerId: 71 })
-      expect(tempoActions.commitDrag).not.toHaveBeenCalled()
-      const selectionCount = wrapper.emitted('selectTempoEvent')?.length ?? 0
+      expect(tempoEditing.commitDrag).not.toHaveBeenCalled()
+      const selectionCount = tempoEditing.select.mock.calls.length
       expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(true)
       expect(ruler.hasPointerCapture(11)).toBe(false)
       expect(cancelTimelineLocate).toHaveBeenCalledTimes(2)
-      expect(wrapper.emitted('selectTempoEvent')?.length ?? 0).toBe(selectionCount)
+      expect(tempoEditing.select).toHaveBeenCalledTimes(selectionCount)
       expect(error).toHaveBeenCalledTimes(failCancel ? 1 : 0)
     },
   )

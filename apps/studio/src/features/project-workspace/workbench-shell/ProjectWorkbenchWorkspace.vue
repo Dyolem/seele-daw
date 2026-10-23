@@ -1,14 +1,6 @@
 <script setup lang="ts">
-import type {
-  ProjectSession,
-  TempoBpm,
-  TempoEventId,
-  TempoEventRecord,
-  Tick,
-} from '@seele-daw/project-core'
+import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { computed, onMounted, onBeforeUnmount, shallowRef } from 'vue'
-import type { StudioActionSource } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 
 import type {
@@ -30,38 +22,19 @@ import UiHeightResizeHandle from '@/ui/components/UiHeightResizeHandle.vue'
 import { useWorkspaceLayout } from './layout/use-workspace-layout'
 import { WORKSPACE_MINIMUM_DOCK_HEIGHT } from './layout/workspace-layout-policy'
 
-const props = withDefaults(
-  defineProps<{
-    readonly barSpanTick: Tick
-    readonly clips: readonly ProjectMidiClipPresentation[]
-    readonly midiImportAction: StudioActionControl
-    readonly pianoRollPresentation: ProjectPianoRollPresentation | null
-    readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
-    readonly projectId: string
-    readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
-    readonly selectedTempoEventId?: TempoEventId | null
-    readonly tempoEditingDisabled?: boolean
-    readonly tempoEvents?: readonly TempoEventRecord[]
-    readonly timeSignatureNumerator: number
-    readonly timelineEndTick: Tick
-    readonly tracks: readonly ProjectTrackPresentation[]
-  }>(),
-  {
-    selectedTempoEventId: null,
-    tempoEditingDisabled: false,
-    tempoEvents: () => Object.freeze([]),
-  },
-)
-const workbenchSelection = useProjectWorkbenchSelectionStore()
-const emit = defineEmits<{
-  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
-  tempoEditStart: []
-  tempoEventAdd: [bpm: TempoBpm, tick: Tick]
-  tempoEventBpmCommit: [tempoEventId: TempoEventId, input: string]
-  tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
-  tempoEventRemove: [tempoEventId: TempoEventId]
-  tempoEventSelect: [tempoEventId: TempoEventId]
+const props = defineProps<{
+  readonly barSpanTick: Tick
+  readonly clips: readonly ProjectMidiClipPresentation[]
+  readonly midiImportAction: StudioActionControl
+  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
+  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
+  readonly projectId: string
+  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
+  readonly timeSignatureNumerator: number
+  readonly timelineEndTick: Tick
+  readonly tracks: readonly ProjectTrackPresentation[]
 }>()
+const workbenchSelection = useProjectWorkbenchSelectionStore()
 
 const workspaceElement = shallowRef<HTMLElement | null>(null)
 const dock = useWorkspaceLayout(workspaceElement)
@@ -99,22 +72,10 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
       :clips="props.clips"
       :midi-import-action="props.midiImportAction"
       :project-id="props.projectId"
-      :selected-tempo-event-id="props.selectedTempoEventId"
-      :tempo-editing-disabled="props.tempoEditingDisabled"
-      :tempo-events="props.tempoEvents"
       :time-signature-numerator="props.timeSignatureNumerator"
       :timeline-end-tick="props.timelineEndTick"
       :tracks="props.tracks"
-      @invoke-action="(actionId, source) => emit('invokeAction', actionId, source)"
       @open-midi-clip="dock.open"
-      @tempo-edit-start="emit('tempoEditStart')"
-      @tempo-event-add="(bpm, tick) => emit('tempoEventAdd', bpm, tick)"
-      @tempo-event-bpm-commit="
-        (tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)
-      "
-      @tempo-event-move="(tempoEventId, tick) => emit('tempoEventMove', tempoEventId, tick)"
-      @tempo-event-remove="emit('tempoEventRemove', $event)"
-      @tempo-event-select="emit('tempoEventSelect', $event)"
     />
 
     <UiButton

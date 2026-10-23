@@ -22,10 +22,12 @@ import {
   DropdownMenuTrigger,
 } from 'reka-ui'
 
-import type { StudioActionSource } from '@/workbench/actions/studio-action'
 import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
-import { useStudioKeyboardLayer } from '@/workbench/actions/vue/studio-action-context'
+import {
+  useStudioActions,
+  useStudioKeyboardLayer,
+} from '@/workbench/actions/vue/studio-action-context'
 import UiMenuSurface from '@/ui/components/UiMenuSurface.vue'
 import UiMenuItem from '@/ui/components/UiMenuItem.vue'
 import UiButton from '@/ui/components/UiButton.vue'
@@ -48,9 +50,7 @@ interface ProjectWorkbenchGlobalBarProps {
 const props = withDefaults(defineProps<ProjectWorkbenchGlobalBarProps>(), {
   saveFailureMessage: null,
 })
-const emit = defineEmits<{
-  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
-}>()
+const { actions } = useStudioActions()
 
 const playbackIcon = computed(() => {
   if (props.actionControls.togglePlayback.busy) return SpinnerIcon
@@ -104,7 +104,7 @@ function invokeMenuAction(actionId: StudioActionId): void {
     return
   }
   // Native file choosers must retain the original user activation.
-  emit('invokeAction', actionId, 'menu')
+  actions.invoke(actionId, 'menu')
 }
 
 function handleMenuCloseAutoFocus(event: Event): void {
@@ -113,7 +113,7 @@ function handleMenuCloseAutoFocus(event: Event): void {
   actionAfterMenuClose = null
   event.preventDefault()
   menuTrigger.value?.focus()
-  emit('invokeAction', actionId, 'menu')
+  actions.invoke(actionId, 'menu')
 }
 
 onBeforeUnmount(() => {
@@ -214,7 +214,7 @@ const saveStatusTitle = computed(
         :busy="props.actionControls.save.busy"
         :title="props.actionControls.save.title"
         :disabled="!props.actionControls.save.enabled"
-        @click="emit('invokeAction', props.actionControls.save.actionId, 'toolbar')"
+        @click="actions.invoke(props.actionControls.save.actionId, 'toolbar')"
       >
         <template #leading>
           <UiIcon :icon="SaveIcon" :size="16" />

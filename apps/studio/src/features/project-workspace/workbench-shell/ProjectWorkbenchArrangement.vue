@@ -13,13 +13,10 @@ import {
   STUDIO_ACTION_COMPLETED,
   STUDIO_ACTION_NOT_APPLIED,
   type StudioActionCompletion,
-  type StudioActionSource,
 } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import {
   parseTick,
-  type TempoBpm,
   type TempoEventId,
   type TempoEventRecord,
   type Tick,
@@ -51,7 +48,7 @@ import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
-import { provideTempoTrackPreview } from '@/features/project-workspace/tempo-track/tempo-track-preview'
+import { useTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
 import {
   createProjectTempoEventLocationPresentation,
   orderProjectTempoEvents,
@@ -89,34 +86,17 @@ interface TimelineBarPresentation {
   readonly style: StyleValue
 }
 
-const props = withDefaults(
-  defineProps<{
-    readonly barSpanTick: Tick
-    readonly clips: readonly ProjectMidiClipPresentation[]
-    readonly midiImportAction: StudioActionControl
-    readonly projectId: string
-    readonly selectedTempoEventId?: TempoEventId | null
-    readonly tempoEditingDisabled?: boolean
-    readonly tempoEvents?: readonly TempoEventRecord[]
-    readonly timeSignatureNumerator: number
-    readonly timelineEndTick: Tick
-    readonly tracks: readonly ProjectTrackPresentation[]
-  }>(),
-  {
-    selectedTempoEventId: null,
-    tempoEditingDisabled: false,
-    tempoEvents: () => Object.freeze([]),
-  },
-)
+const props = defineProps<{
+  readonly barSpanTick: Tick
+  readonly clips: readonly ProjectMidiClipPresentation[]
+  readonly midiImportAction: StudioActionControl
+  readonly projectId: string
+  readonly timeSignatureNumerator: number
+  readonly timelineEndTick: Tick
+  readonly tracks: readonly ProjectTrackPresentation[]
+}>()
 const emit = defineEmits<{
-  invokeAction: [actionId: StudioActionId, source: StudioActionSource]
   openMidiClip: []
-  tempoEditStart: []
-  tempoEventAdd: [bpm: TempoBpm, tick: Tick]
-  tempoEventBpmCommit: [tempoEventId: TempoEventId, input: string]
-  tempoEventMove: [tempoEventId: TempoEventId, tick: Tick]
-  tempoEventRemove: [tempoEventId: TempoEventId]
-  tempoEventSelect: [tempoEventId: TempoEventId]
 }>()
 
 const { clips: clipEdits, tracks: trackEdits } = useStudio().edits
@@ -136,7 +116,13 @@ const arrangementViewportElement = shallowRef<HTMLElement | null>(null)
 const trackViewportElement = shallowRef<HTMLElement | null>(null)
 const trackFollowerElement = shallowRef<HTMLElement | null>(null)
 const isTimelineFollowSuspended = shallowRef(false)
-const tempoPreview = provideTempoTrackPreview()
+const tempo = useTempoEditing()
+const {
+  editingDisabled: tempoEditingDisabled,
+  events: tempoEvents,
+  presentedEvents: presentedTempoEvents,
+  selectedEventId: selectedTempoEventId,
+} = tempo
 let observedArrangementScrollLeft = 0
 
 const { actions, contexts, keyboard } = useStudioActions()
@@ -215,34 +201,22 @@ const rulerPositionTick = computed(() =>
     ),
   ),
 )
-const presentedTempoEvents = computed(() => {
-  const preview = tempoPreview.preview.value
-  if (preview === null) return props.tempoEvents
-
-  return Object.freeze(
-    props.tempoEvents.map((tempoEvent) =>
-      tempoEvent.id === preview.tempoEventId
-        ? Object.freeze({ ...tempoEvent, bpm: preview.bpm, tick: preview.tick })
-        : tempoEvent,
-    ),
-  )
-})
 const selectedTempoEvent = computed(
-  () => presentedTempoEvents.value.find(({ id }) => id === props.selectedTempoEventId) ?? null,
+  () => presentedTempoEvents.value.find(({ id }) => id === selectedTempoEventId.value) ?? null,
 )
 const tempoPreviewHasPositionConflict = computed(() => {
-  const preview = tempoPreview.preview.value
+  const preview = tempo.preview.preview.value
   return (
     preview !== null &&
-    props.tempoEvents.some(({ id, tick }) => id !== preview.tempoEventId && tick === preview.tick)
+    tempoEvents.value.some(({ id, tick }) => id !== preview.tempoEventId && tick === preview.tick)
   )
 })
 const selectedTempoEventIsInitial = computed(
-  () => props.tempoEvents.find(({ id }) => id === props.selectedTempoEventId)?.tick === 0,
+  () => tempoEvents.value.find(({ id }) => id === selectedTempoEventId.value)?.tick === 0,
 )
-const orderedTempoEvents = computed(() => orderProjectTempoEvents(props.tempoEvents))
+const orderedTempoEvents = computed(() => orderProjectTempoEvents(tempoEvents.value))
 const selectedTempoEventIndex = computed(() =>
-  orderedTempoEvents.value.findIndex(({ id }) => id === props.selectedTempoEventId),
+  orderedTempoEvents.value.findIndex(({ id }) => id === selectedTempoEventId.value),
 )
 const selectedTempoEventLocation = computed(() => {
   const tempoEvent = selectedTempoEvent.value
@@ -451,7 +425,7 @@ function navigateSelectedTempoEvent(direction: ProjectTempoEventNavigationDirect
   const targetEvent = orderedTempoEvents.value[targetIndex]
   if (targetEvent === undefined) return
 
-  emit('tempoEventSelect', targetEvent.id)
+  tempo.select(targetEvent.id)
   revealTempoEvent(targetEvent)
 }
 
@@ -470,9 +444,9 @@ function commitSelectedTempoEventPosition(
     return
   }
 
-  const tempoEvent = props.tempoEvents.find(({ id }) => id === tempoEventId)
+  const tempoEvent = tempoEvents.value.find(({ id }) => id === tempoEventId)
   if (tempoEvent === undefined || tempoEvent.tick === result.tick) return
-  emit('tempoEventMove', tempoEventId, result.tick)
+  tempo.move(tempoEventId, result.tick)
 }
 
 function followCurrentPlaybackPosition(): void {
@@ -628,13 +602,8 @@ watch(
   () => void nextTick(followCurrentPlaybackPosition),
 )
 
-watch(
-  () => props.projectId,
-  () => tempoPreview.cancelPreview(),
-)
-
 onUnmounted(() => {
-  tempoPreview.cancelPreview()
+  tempo.preview.cancelPreview()
 })
 const tempoSummary = computed(() => {
   const events = orderProjectTempoEvents(presentedTempoEvents.value)
@@ -703,15 +672,15 @@ const tempoSummary = computed(() => {
           v-if="tempoLayout.expanded.value"
           :can-navigate-to-next="canNavigateToNextTempoEvent"
           :can-navigate-to-previous="canNavigateToPreviousTempoEvent"
-          :editing-disabled="props.tempoEditingDisabled"
+          :editing-disabled="tempoEditingDisabled"
           :selected-tempo-event="selectedTempoEvent"
           :selected-tempo-event-is-initial="selectedTempoEventIsInitial"
           :selected-tempo-event-location="selectedTempoEventLocation"
-          @bpm-commit="(tempoEventId, input) => emit('tempoEventBpmCommit', tempoEventId, input)"
-          @edit-start="emit('tempoEditStart')"
+          @bpm-commit="tempo.commitBpmInput"
+          @edit-start="tempo.beginEdit"
           @navigate="navigateSelectedTempoEvent"
           @position-commit="commitSelectedTempoEventPosition"
-          @remove="emit('tempoEventRemove', $event)"
+          @remove="tempo.remove"
           @reveal="revealSelectedTempoEvent"
         />
       </section>
@@ -827,14 +796,8 @@ const tempoSummary = computed(() => {
             <TempoTrackLane
               v-if="tempoLayout.expanded.value"
               :bar-span-tick="props.barSpanTick"
-              :editing-disabled="props.tempoEditingDisabled"
               :project-id="props.projectId"
-              :selected-tempo-event-id="props.selectedTempoEventId"
-              :tempo-events="props.tempoEvents"
               :timeline-end-tick="props.timelineEndTick"
-              @add="({ bpm, tick }) => emit('tempoEventAdd', bpm, tick)"
-              @edit-start="emit('tempoEditStart')"
-              @select="emit('tempoEventSelect', $event)"
             />
           </div>
         </div>
@@ -851,7 +814,7 @@ const tempoSummary = computed(() => {
               :busy="props.midiImportAction.busy"
               :disabled="!props.midiImportAction.enabled"
               :title="props.midiImportAction.title"
-              @click="emit('invokeAction', props.midiImportAction.actionId, 'toolbar')"
+              @click="actions.invoke(props.midiImportAction.actionId, 'toolbar')"
             >
               <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
               {{ props.midiImportAction.label }}
@@ -909,7 +872,7 @@ const tempoSummary = computed(() => {
                 :busy="props.midiImportAction.busy"
                 :disabled="!props.midiImportAction.enabled"
                 :title="props.midiImportAction.title"
-                @click="emit('invokeAction', props.midiImportAction.actionId, 'toolbar')"
+                @click="actions.invoke(props.midiImportAction.actionId, 'toolbar')"
               >
                 <template #leading><UiIcon :icon="MidiIcon" :size="16" /></template>
                 {{ props.midiImportAction.label }}

@@ -1,6 +1,5 @@
-import { TEMPO_TRACK_PREVIEW_KEY } from '@/symbols'
 import type { InteractionId } from '@seele-daw/editor'
-import { inject, provide, shallowRef } from 'vue'
+import { shallowRef } from 'vue'
 import type { TempoTrackEventPreview } from './types/tempo-track-drag'
 import type { TempoTrackPreviewController } from './types/tempo-track-preview'
 
@@ -27,18 +26,4 @@ export function createTempoTrackPreviewController(): TempoTrackPreviewController
       return true
     },
   })
-}
-
-export function provideTempoTrackPreview(): TempoTrackPreviewController {
-  const controller = createTempoTrackPreviewController()
-  provide(TEMPO_TRACK_PREVIEW_KEY, controller)
-  return controller
-}
-
-export function useTempoTrackPreview(): TempoTrackPreviewController {
-  const controller = inject(TEMPO_TRACK_PREVIEW_KEY, null)
-  if (controller === null) {
-    throw new Error('Tempo Track preview has not been provided')
-  }
-  return controller
 }

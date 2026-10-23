@@ -6,10 +6,10 @@ import {
   dispatchTempoPointer,
   installTempoResizeObserver,
 } from './support/tempo-track-test-support'
-import { TEMPO_EVENT_ACTION_CONTEXT_KEY, TEMPO_TRACK_PREVIEW_KEY } from '@/symbols'
+import { TEMPO_EDITING_KEY } from '@/symbols'
 import { createPinia } from 'pinia'
 import {
-  createTempoTrackTestActions,
+  createTestTempoEditing,
   installTempoPointerCapture,
 } from './support/tempo-track-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
@@ -53,34 +53,26 @@ function mountLane(
   } = {},
 ) {
   const keyboard = createTestStudioActionRuntime()
-  const actions = createTempoTrackTestActions(
+  const fixture = createTestTempoEditing(
     input.tempoEvents ?? [INITIAL_EVENT, LATER_EVENT],
     input.projectId,
   )
-  const { remove, commitDrag, session, projectedRevision } = actions
-  const controller = createTempoTrackPreviewController()
-  const interaction = {
-    ...controller,
-    publishPreview: vi.fn<typeof controller.publishPreview>(controller.publishPreview),
-  }
+  fixture.editingDisabled.value = input.editingDisabled ?? false
+  fixture.selectedEventId.value = input.selectedTempoEventId ?? null
   const pinia = createPinia()
   const toasts = useUiToastStore(pinia)
   const wrapper = mount(TempoTrackLane, {
     attachTo: document.body,
     props: {
       barSpanTick: parsePositiveTick(3_840),
-      editingDisabled: input.editingDisabled ?? false,
       projectId: input.projectId ?? 'tempo-track-project',
-      selectedTempoEventId: input.selectedTempoEventId ?? null,
-      tempoEvents: input.tempoEvents ?? Object.freeze([INITIAL_EVENT, LATER_EVENT]),
       timelineEndTick: parseTick(3_840),
     },
     global: {
       plugins: [pinia],
       provide: {
         ...keyboard.provide,
-        [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: actions.context,
-        [TEMPO_TRACK_PREVIEW_KEY as symbol]: interaction,
+        [TEMPO_EDITING_KEY as symbol]: fixture.tempo,
       },
     },
   })
@@ -99,20 +91,35 @@ function mountLane(
   })
   const capture = installTempoPointerCapture(plot)
   async function syncProjection() {
-    const update = wrapper.setProps({ tempoEvents: session.value.getSnapshot().tempoEvents })
-    projectedRevision.value = session.value.modelRevision
-    await update
+    fixture.project()
+    await nextTick()
+  }
+  /** Changes what the page shows, as a commit or a selection elsewhere would. */
+  async function change(next: {
+    readonly editingDisabled?: boolean
+    readonly events?: readonly TempoEventRecord[]
+    readonly projectId?: string
+    readonly selectedEventId?: TempoEventRecord['id'] | null
+  }) {
+    if (next.events !== undefined) fixture.events.value = next.events
+    if (next.selectedEventId !== undefined) fixture.selectedEventId.value = next.selectedEventId
+    if (next.editingDisabled !== undefined) fixture.editingDisabled.value = next.editingDisabled
+    await wrapper.setProps(next.projectId === undefined ? {} : { projectId: next.projectId })
   }
   return {
-    interaction,
+    interaction: fixture.preview,
     plot,
     wrapper,
     keyboard,
-    remove,
-    commitDrag,
-    session,
-    projectedRevision,
+    remove: fixture.remove,
+    commitDrag: fixture.commitDrag,
+    select: fixture.select,
+    add: fixture.add,
+    beginEdit: fixture.beginEdit,
+    session: fixture.session,
+    projectedRevision: fixture.projectedRevision,
     capture,
+    change,
     syncProjection,
     toasts,
   }
@@ -248,13 +255,13 @@ describe('TempoTrackLane', () => {
 
   it.each(['timeline', 'loading', 'selection'] as const)(
     'invalidates the frozen target on %s changes',
-    async (change) => {
-      const { plot, wrapper, interaction, capture, commitDrag } = mountLane()
+    async (invalidation) => {
+      const { plot, wrapper, interaction, capture, commitDrag, change } = mountLane()
       dispatchTempoPointer(wrapper.findAll('.tempo-track-lane__point')[1]!.element, 'pointerdown')
       dispatchTempoPointer(plot, 'pointermove', { x: 600 })
-      if (change === 'timeline') await wrapper.setProps({ timelineEndTick: parseTick(7_680) })
-      else if (change === 'loading') await wrapper.setProps({ editingDisabled: true })
-      else await wrapper.setProps({ selectedTempoEventId: INITIAL_EVENT.id })
+      if (invalidation === 'timeline') await wrapper.setProps({ timelineEndTick: parseTick(7_680) })
+      else if (invalidation === 'loading') await change({ editingDisabled: true })
+      else await change({ selectedEventId: INITIAL_EVENT.id })
       dispatchTempoPointer(plot, 'pointerup', { x: 600 })
       expect(interaction.preview.value).toBeNull()
       expect(capture.captures.size).toBe(0)
@@ -323,7 +330,9 @@ describe('TempoTrackLane', () => {
   })
 
   it('uses focused Tempo selection instead of a previous Note target and never treats focus as selection', async () => {
-    const { keyboard, remove, wrapper } = mountLane({ selectedTempoEventId: LATER_EVENT.id })
+    const { keyboard, remove, wrapper, change, select } = mountLane({
+      selectedTempoEventId: LATER_EVENT.id,
+    })
     const removeNotes = vi.fn<() => StudioActionCompletion>(() => STUDIO_ACTION_COMPLETED)
     keyboard.runtime.contexts.bind(EDITOR_SELECTION_CONTEXT, {
       isFocused: () => true,
@@ -336,11 +345,11 @@ describe('TempoTrackLane', () => {
     expect(keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(true)
     expect(remove).toHaveBeenCalledExactlyOnceWith(LATER_EVENT.id)
     expect(removeNotes).not.toHaveBeenCalled()
-    await wrapper.setProps({ selectedTempoEventId: INITIAL_EVENT.id })
+    await change({ selectedEventId: INITIAL_EVENT.id })
     expect(keyboard.bindingRegistry.dispatch('Delete').defaultPrevented).toBe(false)
     expect(remove).toHaveBeenCalledOnce()
     expect(removeNotes).not.toHaveBeenCalled()
-    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(select).not.toHaveBeenCalled()
     expect(keyboard.bindingRegistry.dispatch('Escape').defaultPrevented).toBe(false)
   })
 
@@ -363,7 +372,7 @@ describe('TempoTrackLane', () => {
   })
 
   it('selects the owning Event from horizontal and vertical Step contour hits', async () => {
-    const { wrapper } = mountLane()
+    const { wrapper, select, add } = mountLane()
     const segments = wrapper.findAll('.tempo-track-lane__segment')
     const transition = wrapper.get('.tempo-track-lane__transition')
 
@@ -371,14 +380,14 @@ describe('TempoTrackLane', () => {
     await transition.trigger('click')
     await transition.trigger('dblclick')
 
-    expect(wrapper.emitted('select')).toEqual([[INITIAL_EVENT.id], [LATER_EVENT.id]])
-    expect(wrapper.emitted('add')).toBeUndefined()
+    expect(select.mock.calls).toEqual([[INITIAL_EVENT.id], [LATER_EVENT.id]])
+    expect(add).not.toHaveBeenCalled()
   })
 
   it('resolves a dense overlap by geometry instead of DOM paint order', async () => {
     const denseEarlier = tempoEvent('tempo-track-lane-dense-earlier', 960, 100)
     const denseLater = tempoEvent('tempo-track-lane-dense-later', 980, 102)
-    const { wrapper } = mountLane({
+    const { wrapper, select } = mountLane({
       editingDisabled: true,
       tempoEvents: Object.freeze([INITIAL_EVENT, denseEarlier, denseLater]),
     })
@@ -390,29 +399,29 @@ describe('TempoTrackLane', () => {
       pointerId: 6,
     })
 
-    expect(wrapper.emitted('select')).toEqual([[denseLater.id]])
+    expect(select.mock.calls).toEqual([[denseLater.id]])
   })
 
   it('keeps an expanded view stable within one Project and resets it for another Project', async () => {
     const extremeEvent = tempoEvent('tempo-track-lane-extreme', 1_920, 999)
-    const { wrapper } = mountLane()
+    const { wrapper, change } = mountLane()
 
-    await wrapper.setProps({ tempoEvents: Object.freeze([INITIAL_EVENT, extremeEvent]) })
+    await change({ events: Object.freeze([INITIAL_EVENT, extremeEvent]) })
     expect(wrapper.get('.tempo-track-lane__scale--maximum').text()).toBe('999')
 
-    await wrapper.setProps({ tempoEvents: Object.freeze([INITIAL_EVENT, LATER_EVENT]) })
+    await change({ events: Object.freeze([INITIAL_EVENT, LATER_EVENT]) })
     expect(wrapper.get('.tempo-track-lane__scale--maximum').text()).toBe('999')
 
-    await wrapper.setProps({
+    await change({
       projectId: 'tempo-track-other-project',
-      tempoEvents: Object.freeze([INITIAL_EVENT, LATER_EVENT]),
+      events: Object.freeze([INITIAL_EVENT, LATER_EVENT]),
     })
     expect(wrapper.get('.tempo-track-lane__scale--maximum').text()).toBe('240')
     expect(wrapper.get('.tempo-track-lane__scale--minimum').text()).toBe('40')
   })
 
   it('maps a blank-lane double-click to one Add intent', async () => {
-    const { plot, wrapper } = mountLane()
+    const { plot, add } = mountLane()
     plot.dispatchEvent(
       new MouseEvent('dblclick', {
         bubbles: true,
@@ -424,11 +433,11 @@ describe('TempoTrackLane', () => {
     )
     await Promise.resolve()
 
-    expect(wrapper.emitted('add')).toEqual([[{ bpm: parseTempoBpm(140), tick: parseTick(1_920) }]])
+    expect(add.mock.calls).toEqual([[parseTempoBpm(140), parseTick(1_920)]])
   })
 
   it('selects rather than adds when a double-click lands inside an existing point hit radius', async () => {
-    const { plot, wrapper } = mountLane()
+    const { plot, select, add } = mountLane()
     plot.dispatchEvent(
       new MouseEvent('dblclick', {
         bubbles: true,
@@ -440,12 +449,13 @@ describe('TempoTrackLane', () => {
     )
     await Promise.resolve()
 
-    expect(wrapper.emitted('select')).toEqual([[LATER_EVENT.id]])
-    expect(wrapper.emitted('add')).toBeUndefined()
+    expect(select.mock.calls).toEqual([[LATER_EVENT.id]])
+    expect(add).not.toHaveBeenCalled()
   })
 
   it('locks horizontal drag, commits once and keeps the preview until facts are projected', async () => {
-    const { interaction, wrapper, commitDrag, session, syncProjection } = mountLane()
+    const { interaction, wrapper, commitDrag, session, syncProjection, select, beginEdit } =
+      mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -459,8 +469,8 @@ describe('TempoTrackLane', () => {
       pointerId: 7,
     })
 
-    expect(wrapper.emitted('select')).toEqual([[LATER_EVENT.id]])
-    expect(wrapper.emitted('editStart')).toHaveLength(1)
+    expect(select.mock.calls).toEqual([[LATER_EVENT.id]])
+    expect(beginEdit).toHaveBeenCalledOnce()
     expect(commitDrag).not.toHaveBeenCalled()
     expect(interaction.preview.value).toEqual({
       bpm: LATER_EVENT.bpm,
@@ -572,7 +582,7 @@ describe('TempoTrackLane', () => {
   })
 
   it('keeps selection available but suppresses mutations while editing is disabled', async () => {
-    const { plot, wrapper } = mountLane({ editingDisabled: true })
+    const { plot, wrapper, select, add, beginEdit } = mountLane({ editingDisabled: true })
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!
 
     await dispatchPointer(point.element, 'pointerdown', {
@@ -590,8 +600,8 @@ describe('TempoTrackLane', () => {
     )
     await Promise.resolve()
 
-    expect(wrapper.emitted('select')).toEqual([[LATER_EVENT.id]])
-    expect(wrapper.emitted('add')).toBeUndefined()
-    expect(wrapper.emitted('editStart')).toBeUndefined()
+    expect(select.mock.calls).toEqual([[LATER_EVENT.id]])
+    expect(add).not.toHaveBeenCalled()
+    expect(beginEdit).not.toHaveBeenCalled()
   })
 })

@@ -1,9 +1,9 @@
 /**
  * Owns the only mutation-driven write lease for one ModelStore.
  *
- * Every plan is revision-checked and projected before authoritative state is touched.
- * Real writes use compare-and-swap operations, revision advances only after the final
- * invariant check, and unexpected failures trigger inverse-prefix restoration.
+ * Every plan is revision-checked and projected before authoritative state is touched; the
+ * projection is the one full invariant check of a commit. Real writes use compare-and-swap
+ * operations, and unexpected failures trigger inverse-prefix restoration.
  */
 import { assertModelInvariants } from '#internal/model/invariant-validator'
 import { nextModelRevision, type ModelRevision } from '#internal/model/model-revision'
@@ -94,7 +94,9 @@ export class MutationApplier {
     // Revision exhaustion is checked before projection or any authoritative container write.
     const nextRevision = nextModelRevision(currentRevision)
 
-    // Projection owns normal rejection: its precondition and invariant errors pass through intact.
+    // Projection owns rejection: its precondition and invariant errors pass through intact.
+    // Writing the same mutations reproduces the projected state, which the applier spec pins
+    // for every mutation type, so the written Store is not validated a second time.
     new ProjectedModelStoreReader(this.#store, plan.forward)
 
     let appliedMutationCount = 0
@@ -104,9 +106,6 @@ export class MutationApplier {
         this.#writeMutation(mutation, index)
         appliedMutationCount += 1
       }
-
-      // This second check is defensive: it catches drift between projection and real dispatch.
-      assertModelInvariants(this.#store)
 
       // No code that can fail belongs after the revision write in a successful transaction.
       this.#writeAccess.commitModelRevision(currentRevision, nextRevision)

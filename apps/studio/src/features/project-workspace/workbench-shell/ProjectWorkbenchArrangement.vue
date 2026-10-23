@@ -1,90 +1,40 @@
 <script setup lang="ts">
+import { parseTick, type Tick, type TrackId } from '@seele-daw/project-core'
 import ChevronDownIcon from '~icons/fluent/chevron-down-16-regular'
 import ChevronRightIcon from '~icons/fluent/chevron-right-16-regular'
-
-import { useTempoLaneLayout } from './arrangement/hooks/use-tempo-lane-layout'
-import { formatProjectTempoBpm } from '@/features/project-workspace/tempo/tempo-control'
-
-import type {
-  ProjectTempoEventPositionDraft,
-  ProjectTempoEventNavigationDirection,
-} from '@/features/project-workspace/tempo-track/types/tempo-track'
-import {
-  STUDIO_ACTION_COMPLETED,
-  STUDIO_ACTION_NOT_APPLIED,
-  type StudioActionCompletion,
-} from '@/workbench/actions/studio-action'
-import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
-import {
-  parseTick,
-  type TempoEventId,
-  type TempoEventRecord,
-  type Tick,
-  type TrackId,
-} from '@seele-daw/project-core'
-import { ARRANGEMENT_BAR_CONTEXT } from '@/features/project-workspace/actions/arrangement-keyboard-actions'
-import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
-import { useTimelineLocate } from '@/features/project-workspace/workbench-shell/arrangement/hooks/use-timeline-locate'
 import GridIcon from '~icons/fluent/grid-20-regular'
-import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MidiIcon from '~icons/fluent/midi-20-regular'
+import MoreIcon from '~icons/fluent/more-horizontal-20-regular'
 import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  onUnmounted,
-  shallowRef,
-  type StyleValue,
-  watch,
-} from 'vue'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, shallowRef, type StyleValue } from 'vue'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
+import { useTempoSelection } from '@/features/project-workspace/tempo-track/hooks/use-tempo-selection'
 import { useTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
-import {
-  createProjectTempoEventLocationPresentation,
-  orderProjectTempoEvents,
-  parseProjectTempoEventPositionInput,
-} from '@/features/project-workspace/tempo-track/tempo-track'
+import { describeProjectTempoAt } from '@/features/project-workspace/tempo-track/tempo-track'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'
-import {
-  resolveCenteredTimelineScrollLeft,
-  resolvePagedFollowScrollLeft,
-  timelinePositionRatio,
-} from '@/features/project-workspace/timeline/layout'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
 import ArrangementPlayhead from '@/features/project-workspace/workbench-shell/arrangement/ArrangementPlayhead.vue'
 import LocatePreview from '@/features/project-workspace/workbench-shell/arrangement/LocatePreview.vue'
-import {
-  PROJECT_ADD_TRACK_TYPE,
-  type ProjectAddTrackType,
-} from '@/features/project-workspace/workbench-shell/project-add-track-option'
-import UiIcon from '@/ui/components/UiIcon.vue'
+import { useArrangementEdits } from '@/features/project-workspace/workbench-shell/arrangement/hooks/use-arrangement-edits'
+import { useArrangementViewport } from '@/features/project-workspace/workbench-shell/arrangement/hooks/use-arrangement-viewport'
+import { useTempoLaneLayout } from '@/features/project-workspace/workbench-shell/arrangement/hooks/use-tempo-lane-layout'
 import UiButton from '@/ui/components/UiButton.vue'
+import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
-import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
-import { useStudio } from '@/workbench/studio-services'
+import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
+import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 
-const WHEEL_DELTA_MODE_LINE = 1
-const WHEEL_DELTA_MODE_PAGE = 2
-const WHEEL_LINE_BLOCK_SIZE_PX = 16
 const EMPTY_CLIPS: readonly ProjectMidiClipPresentation[] = Object.freeze([])
-interface TimelineBarPresentation {
-  readonly number: number
-  readonly startTick: Tick
-  readonly style: StyleValue
-}
 
 const props = defineProps<{
   readonly barSpanTick: Tick
@@ -99,147 +49,49 @@ const emit = defineEmits<{
   openMidiClip: []
 }>()
 
-const { clips: clipEdits, tracks: trackEdits } = useStudio().edits
-const {
-  projectPlayback,
-  state: playbackState,
-  visualPosition: playbackVisualPosition,
-} = useStudio().playback
+const { actions } = useStudioActions()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
-const toasts = useUiToastStore()
 const arrangementElement = shallowRef<HTMLElement | null>(null)
 const trackPanelElement = shallowRef<HTMLElement | null>(null)
 const tempoLayout = useTempoLaneLayout(arrangementElement, trackPanelElement)
 onMounted(tempoLayout.mount)
 onBeforeUnmount(tempoLayout.dispose)
-const arrangementViewportElement = shallowRef<HTMLElement | null>(null)
-const trackViewportElement = shallowRef<HTMLElement | null>(null)
-const trackFollowerElement = shallowRef<HTMLElement | null>(null)
-const isTimelineFollowSuspended = shallowRef(false)
-const tempo = useTempoEditing()
+
 const {
-  editingDisabled: tempoEditingDisabled,
-  events: tempoEvents,
-  presentedEvents: presentedTempoEvents,
-  selectedEventId: selectedTempoEventId,
-} = tempo
-let observedArrangementScrollLeft = 0
+  viewportElement,
+  trackViewportElement,
+  trackFollowerElement,
+  locateSurface,
+  isCurrentProjectPlaying,
+  isFollowActive,
+  followLabel,
+  locatePreviewTick,
+  rulerPositionTick,
+  suspendFollow,
+  toggleFollow,
+  revealTick,
+  handleViewportScroll,
+  handleViewportWheel,
+  handleTimelinePointerDown,
+  handleRulerKeydown,
+  handleTrackWheel,
+  handleTrackFocusIn,
+} = useArrangementViewport(props)
+const { addTrack, bindBarTarget, createClipFromBar, createClipHint, selectClip, selectTrack } =
+  useArrangementEdits(props, { suspendFollow, openClip: () => emit('openMidiClip') })
 
-const { actions, contexts, keyboard } = useStudioActions()
-let releaseBarTarget: (() => void) | null = null
-function bindBarTarget(track: ProjectTrackPresentation, tick: Tick, event: Event): void {
-  const element = event.currentTarget
-  if (!(element instanceof HTMLElement)) return
-  releaseBarTarget?.()
-  releaseBarTarget = contexts.bind(ARRANGEMENT_BAR_CONTEXT, {
-    isFocused: () => element === document.activeElement && element.isConnected,
-    execute: () => {
-      const currentTrack = props.tracks.find(({ id }) => id === track.id)
-      return currentTrack && tick < props.timelineEndTick
-        ? createEmptyMidiClip(currentTrack, tick)
-        : STUDIO_ACTION_NOT_APPLIED
-    },
-  })
-}
-function createClipFromBar(track: ProjectTrackPresentation, tick: Tick, event: MouseEvent): void {
-  bindBarTarget(track, tick, event)
-  actions.invoke('arrangement.clip.create', 'toolbar')
-}
-watch(
-  () => props.projectId,
-  () => {
-    releaseBarTarget?.()
-    releaseBarTarget = null
-  },
-  { flush: 'sync' },
+const tempo = useTempoEditing()
+const tempoEditingDisabled = tempo.editingDisabled
+const tempoSelection = useTempoSelection(props, revealTick)
+const tempoSummary = computed(() =>
+  describeProjectTempoAt(tempo.presentedEvents.value, rulerPositionTick.value),
 )
-onBeforeUnmount(() => releaseBarTarget?.())
-const createClipHint = computed(() => {
-  const bindings = keyboard.displayBindingsFor('arrangement.clip.create').join(' / ')
-  return `Double-click${bindings ? ` or press ${bindings}` : ''} to create a MIDI clip`
+onUnmounted(() => {
+  tempo.preview.cancelPreview()
 })
 
-const isCurrentProjectPlaying = computed(
-  () =>
-    playbackState.value.phase === PROJECT_PLAYBACK_PHASE.PLAYING &&
-    playbackState.value.projectId === props.projectId,
-)
-const isTimelineFollowActive = computed(
-  () => isCurrentProjectPlaying.value && !isTimelineFollowSuspended.value,
-)
-const timelineFollowLabel = computed(() => {
-  if (!isCurrentProjectPlaying.value) return 'Timeline follow — starts with playback'
-  return isTimelineFollowSuspended.value ? 'Resume timeline follow' : 'Pause timeline follow'
-})
-const currentPlaybackPositionTick = computed(() =>
-  playbackVisualPosition.value.projectId === props.projectId
-    ? playbackVisualPosition.value.positionTick
-    : 0,
-)
-const locateSurface = shallowRef<HTMLElement | null>(null)
-const { previewTick: locatePreviewTick } = useTimelineLocate({
-  surface: locateSurface,
-  viewport: arrangementViewportElement,
-  projectPlayback,
-  getProjectId: () => props.projectId,
-  getTimelineEndTick: () => props.timelineEndTick,
-  isPlaying: isCurrentProjectPlaying,
-  followSuspended: isTimelineFollowSuspended,
-  setScrollLeft: setArrangementScrollLeft,
-  followPlayback: followCurrentPlaybackPosition,
-  reportFailure: (cause) =>
-    toasts.danger(
-      'Timeline locate could not complete',
-      cause instanceof Error ? cause.message : 'Please try the gesture again.',
-    ),
-})
-const rulerPositionTick = computed(() =>
-  Math.round(
-    Math.min(
-      props.timelineEndTick,
-      Math.max(0, locatePreviewTick.value ?? currentPlaybackPositionTick.value),
-    ),
-  ),
-)
-const selectedTempoEvent = computed(
-  () => presentedTempoEvents.value.find(({ id }) => id === selectedTempoEventId.value) ?? null,
-)
-const tempoPreviewHasPositionConflict = computed(() => {
-  const preview = tempo.preview.preview.value
-  return (
-    preview !== null &&
-    tempoEvents.value.some(({ id, tick }) => id !== preview.tempoEventId && tick === preview.tick)
-  )
-})
-const selectedTempoEventIsInitial = computed(
-  () => tempoEvents.value.find(({ id }) => id === selectedTempoEventId.value)?.tick === 0,
-)
-const orderedTempoEvents = computed(() => orderProjectTempoEvents(tempoEvents.value))
-const selectedTempoEventIndex = computed(() =>
-  orderedTempoEvents.value.findIndex(({ id }) => id === selectedTempoEventId.value),
-)
-const selectedTempoEventLocation = computed(() => {
-  const tempoEvent = selectedTempoEvent.value
-  if (tempoEvent === null) return null
-
-  return createProjectTempoEventLocationPresentation({
-    barSpanTick: props.barSpanTick,
-    projectTimeUnavailable: tempoPreviewHasPositionConflict.value,
-    tempoEvent,
-    tempoEvents: presentedTempoEvents.value,
-    timeSignatureNumerator: props.timeSignatureNumerator,
-  })
-})
-const canNavigateToPreviousTempoEvent = computed(() => selectedTempoEventIndex.value > 0)
-const canNavigateToNextTempoEvent = computed(
-  () =>
-    selectedTempoEventIndex.value >= 0 &&
-    selectedTempoEventIndex.value < orderedTempoEvents.value.length - 1,
-)
-
-const timelineBars = computed((): readonly TimelineBarPresentation[] => {
+const timelineBars = computed(() => {
   const barCount = Math.ceil(props.timelineEndTick / props.barSpanTick)
-
   return Object.freeze(
     Array.from({ length: barCount }, (_, barIndex) => {
       const startTick = parseTick(barIndex * props.barSpanTick)
@@ -266,355 +118,22 @@ const timelineStyle = computed(
 )
 const visibleClipsByTrack = computed(() => {
   const clipsByTrack = new Map<TrackId, ProjectMidiClipPresentation[]>()
-
   for (const clip of props.clips) {
     if (clip.startTick >= props.timelineEndTick) continue
-
     const clips = clipsByTrack.get(clip.trackId)
-    if (clips === undefined) {
-      clipsByTrack.set(clip.trackId, [clip])
-    } else {
-      clips.push(clip)
-    }
+    if (clips === undefined) clipsByTrack.set(clip.trackId, [clip])
+    else clips.push(clip)
   }
-
   return clipsByTrack
 })
-
-const UNAVAILABLE_TRACK_LABELS: Readonly<
-  Record<Exclude<ProjectAddTrackType, 'instrument'>, string>
-> = Object.freeze({
-  [PROJECT_ADD_TRACK_TYPE.AUDIO]: 'Voice / audio',
-  [PROJECT_ADD_TRACK_TYPE.BASS]: 'Bass',
-  [PROJECT_ADD_TRACK_TYPE.DRUM_MACHINE]: 'Drum machine',
-  [PROJECT_ADD_TRACK_TYPE.GUITAR]: 'Guitar',
-  [PROJECT_ADD_TRACK_TYPE.SAMPLER]: 'Sampler',
-})
-
-function handleTrackTypeSelection(trackType: ProjectAddTrackType): void {
-  if (trackType !== PROJECT_ADD_TRACK_TYPE.INSTRUMENT) {
-    toasts.info(
-      `${UNAVAILABLE_TRACK_LABELS[trackType]} is in development`,
-      'This track type will become available in a later product slice.',
-    )
-    return
-  }
-
-  try {
-    const result = trackEdits.addInstrumentTrack()
-    workbenchSelection.selectTrack(result.trackId)
-  } catch (cause) {
-    toasts.danger(
-      'Instrument track could not be added',
-      cause instanceof Error && cause.message.trim().length > 0
-        ? cause.message
-        : 'The Project rejected the Track command. Please try again.',
-    )
-  }
-}
-
-function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
-  return {
-    '--project-track-color': track.color ?? 'var(--sd-color-border-focus)',
-  }
-}
-
-function selectTrack(track: ProjectTrackPresentation): void {
-  suspendTimelineFollow()
-  workbenchSelection.selectTrack(track.id)
-}
 
 function clipsForTrack(trackId: TrackId): readonly ProjectMidiClipPresentation[] {
   return visibleClipsByTrack.value.get(trackId) ?? EMPTY_CLIPS
 }
 
-function createEmptyMidiClip(
-  track: ProjectTrackPresentation,
-  targetTick: Tick,
-): StudioActionCompletion {
-  try {
-    const result = clipEdits.addEmpty({
-      targetTick,
-      trackId: track.id,
-    })
-    workbenchSelection.selectClip(result.trackId, result.clipId)
-    suspendTimelineFollow()
-    emit('openMidiClip')
-    return STUDIO_ACTION_COMPLETED
-  } catch (cause) {
-    toasts.danger(
-      'MIDI clip could not be added',
-      cause instanceof Error && cause.message.trim().length > 0
-        ? cause.message
-        : 'The Project rejected the Clip command. Please try again.',
-    )
-    return { status: 'failed', cause, reported: true }
-  }
+function createTrackStyle(track: ProjectTrackPresentation): StyleValue {
+  return { '--project-track-color': track.color ?? 'var(--sd-color-border-focus)' }
 }
-
-function selectClip(clip: ProjectMidiClipPresentation): void {
-  suspendTimelineFollow()
-  workbenchSelection.selectClip(clip.trackId, clip.id)
-}
-
-// Arrangement owns the only scroll position. Track controls mirror its vertical offset on a
-// clipped compositor layer so the native horizontal scrollbar stays inside the Timeline column.
-function synchronizeTrackFollower(scrollTop: number): void {
-  trackFollowerElement.value?.style.setProperty(
-    '--project-workbench-track-scroll-offset',
-    `${-scrollTop}px`,
-  )
-}
-
-function maximumArrangementScrollTop(viewport: HTMLElement): number {
-  return Math.max(0, viewport.scrollHeight - viewport.clientHeight)
-}
-
-function setArrangementScrollTop(nextScrollTop: number): void {
-  const viewport = arrangementViewportElement.value
-  if (viewport === null) return
-
-  viewport.scrollTop = Math.min(maximumArrangementScrollTop(viewport), Math.max(0, nextScrollTop))
-  synchronizeTrackFollower(viewport.scrollTop)
-}
-
-function handleArrangementScroll(event: Event): void {
-  const viewport = event.currentTarget as HTMLElement
-  synchronizeTrackFollower(viewport.scrollTop)
-  if (viewport.scrollLeft === observedArrangementScrollLeft) return
-
-  observedArrangementScrollLeft = viewport.scrollLeft
-  suspendTimelineFollow()
-}
-
-function setArrangementScrollLeft(nextScrollLeft: number): boolean {
-  const viewport = arrangementViewportElement.value
-  if (viewport === null) return false
-
-  const maximumScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
-  const previousScrollLeft = viewport.scrollLeft
-  viewport.scrollLeft = Math.min(maximumScrollLeft, Math.max(0, nextScrollLeft))
-  // Consume the ensuing native scroll event as this page jump, not as user navigation.
-  observedArrangementScrollLeft = viewport.scrollLeft
-  return viewport.scrollLeft !== previousScrollLeft
-}
-
-function revealTempoEvent(tempoEvent: TempoEventRecord): void {
-  const viewport = arrangementViewportElement.value
-  if (viewport === null) return
-
-  suspendTimelineFollow()
-  setArrangementScrollLeft(
-    resolveCenteredTimelineScrollLeft({
-      clientWidth: viewport.clientWidth,
-      positionRatio: timelinePositionRatio(tempoEvent.tick, props.timelineEndTick),
-      scrollWidth: viewport.scrollWidth,
-    }),
-  )
-}
-
-function revealSelectedTempoEvent(): void {
-  const tempoEvent = selectedTempoEvent.value
-  if (tempoEvent !== null) revealTempoEvent(tempoEvent)
-}
-
-function navigateSelectedTempoEvent(direction: ProjectTempoEventNavigationDirection): void {
-  const currentIndex = selectedTempoEventIndex.value
-  if (currentIndex < 0) return
-  const targetIndex = direction === 'previous' ? currentIndex - 1 : currentIndex + 1
-  const targetEvent = orderedTempoEvents.value[targetIndex]
-  if (targetEvent === undefined) return
-
-  tempo.select(targetEvent.id)
-  revealTempoEvent(targetEvent)
-}
-
-function commitSelectedTempoEventPosition(
-  tempoEventId: TempoEventId,
-  position: ProjectTempoEventPositionDraft,
-): void {
-  const result = parseProjectTempoEventPositionInput({
-    barSpanTick: props.barSpanTick,
-    position,
-    timelineEndTick: props.timelineEndTick,
-    timeSignatureNumerator: props.timeSignatureNumerator,
-  })
-  if (result.status === 'rejected') {
-    toasts.warning('Tempo Event was not moved', result.message)
-    return
-  }
-
-  const tempoEvent = tempoEvents.value.find(({ id }) => id === tempoEventId)
-  if (tempoEvent === undefined || tempoEvent.tick === result.tick) return
-  tempo.move(tempoEventId, result.tick)
-}
-
-function followCurrentPlaybackPosition(): void {
-  const viewport = arrangementViewportElement.value
-  if (viewport === null || !isTimelineFollowActive.value) return
-
-  setArrangementScrollLeft(
-    resolvePagedFollowScrollLeft({
-      clientWidth: viewport.clientWidth,
-      positionRatio: timelinePositionRatio(
-        currentPlaybackPositionTick.value,
-        props.timelineEndTick,
-      ),
-      scrollLeft: viewport.scrollLeft,
-      scrollWidth: viewport.scrollWidth,
-    }),
-  )
-}
-
-function suspendTimelineFollow(): void {
-  if (isCurrentProjectPlaying.value) isTimelineFollowSuspended.value = true
-}
-
-function toggleTimelineFollow(): void {
-  if (!isCurrentProjectPlaying.value) return
-
-  isTimelineFollowSuspended.value = !isTimelineFollowSuspended.value
-  if (!isTimelineFollowSuspended.value) void nextTick(followCurrentPlaybackPosition)
-}
-
-function isFollowControlTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && target.closest('.project-workbench__follow-control') !== null
-}
-
-function isTimelineLocateTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element && target.closest('.project-workbench__ruler-locate-surface') !== null
-  )
-}
-
-function handleTimelinePointerDown(event: PointerEvent): void {
-  if (!isFollowControlTarget(event.target) && !isTimelineLocateTarget(event.target)) {
-    suspendTimelineFollow()
-  }
-}
-
-function handleRulerKeydown(event: KeyboardEvent): void {
-  const currentTick = Math.round(currentPlaybackPositionTick.value)
-  const beatSpanTick = Math.max(1, Math.round(props.barSpanTick / props.timeSignatureNumerator))
-  let targetTick: number
-
-  switch (event.key) {
-    case 'ArrowLeft':
-      targetTick = currentTick - beatSpanTick
-      break
-    case 'ArrowRight':
-      targetTick = currentTick + beatSpanTick
-      break
-    case 'End':
-      targetTick = props.timelineEndTick
-      break
-    case 'Home':
-      targetTick = 0
-      break
-    case 'PageDown':
-      targetTick = currentTick + props.barSpanTick
-      break
-    case 'PageUp':
-      targetTick = currentTick - props.barSpanTick
-      break
-    default:
-      return
-  }
-
-  const startedWhilePlaying = isCurrentProjectPlaying.value
-  const located = projectPlayback.locateAtTick(
-    parseTick(Math.min(props.timelineEndTick, Math.max(0, targetTick))),
-  )
-  if (located && startedWhilePlaying) {
-    isTimelineFollowSuspended.value = false
-    void nextTick(followCurrentPlaybackPosition)
-  }
-  event.preventDefault()
-  event.stopPropagation()
-}
-
-function handleArrangementWheel(event: WheelEvent): void {
-  if (event.deltaX !== 0 || (event.shiftKey && event.deltaY !== 0)) {
-    suspendTimelineFollow()
-  }
-}
-
-function wheelBlockDelta(event: WheelEvent, viewport: HTMLElement): number {
-  if (event.deltaMode === WHEEL_DELTA_MODE_LINE) {
-    return event.deltaY * WHEEL_LINE_BLOCK_SIZE_PX
-  }
-  if (event.deltaMode === WHEEL_DELTA_MODE_PAGE) return event.deltaY * viewport.clientHeight
-  return event.deltaY
-}
-
-function handleTrackWheel(event: WheelEvent): void {
-  const viewport = arrangementViewportElement.value
-  if (viewport === null) return
-
-  const currentScrollTop = viewport.scrollTop
-  const nextScrollTop = Math.min(
-    maximumArrangementScrollTop(viewport),
-    Math.max(0, currentScrollTop + wheelBlockDelta(event, viewport)),
-  )
-  if (nextScrollTop === currentScrollTop) return
-
-  setArrangementScrollTop(nextScrollTop)
-  event.preventDefault()
-}
-
-function handleTrackFocusIn(event: FocusEvent): void {
-  const target = event.target
-  const trackViewport = trackViewportElement.value
-  const arrangementViewport = arrangementViewportElement.value
-  if (!(target instanceof Element) || trackViewport === null || arrangementViewport === null) {
-    return
-  }
-
-  const trackRow = target.closest<HTMLElement>('.project-workbench__track-row-slot')
-  if (trackRow === null) return
-
-  const trackViewportBounds = trackViewport.getBoundingClientRect()
-  const trackRowBounds = trackRow.getBoundingClientRect()
-  if (trackRowBounds.top < trackViewportBounds.top) {
-    setArrangementScrollTop(
-      arrangementViewport.scrollTop + trackRowBounds.top - trackViewportBounds.top,
-    )
-  } else if (trackRowBounds.bottom > trackViewportBounds.bottom) {
-    setArrangementScrollTop(
-      arrangementViewport.scrollTop + trackRowBounds.bottom - trackViewportBounds.bottom,
-    )
-  }
-}
-
-watch(
-  () => props.tracks.length,
-  async () => {
-    await nextTick()
-    const viewport = arrangementViewportElement.value
-    if (viewport !== null) setArrangementScrollTop(viewport.scrollTop)
-  },
-)
-
-watch(currentPlaybackPositionTick, followCurrentPlaybackPosition, { flush: 'post' })
-
-watch(
-  () => props.timelineEndTick,
-  () => void nextTick(followCurrentPlaybackPosition),
-)
-
-onUnmounted(() => {
-  tempo.preview.cancelPreview()
-})
-const tempoSummary = computed(() => {
-  const events = orderProjectTempoEvents(presentedTempoEvents.value)
-  let current = events[0]
-  for (const event of events) {
-    if (event.tick > rulerPositionTick.value) break
-    current = event
-  }
-  const bpm = current ? `${formatProjectTempoBpm(current.bpm)} BPM` : 'No tempo events'
-  return `${bpm} · ${events.length} ${events.length === 1 ? 'event' : 'events'}`
-})
 </script>
 
 <template>
@@ -637,7 +156,7 @@ const tempoSummary = computed(() => {
           />
         </header>
         <div class="project-workbench__track-actions">
-          <ProjectAddTrackMenu @select="handleTrackTypeSelection" />
+          <ProjectAddTrackMenu @select="addTrack" />
         </div>
       </div>
       <section class="project-workbench__tempo-section" aria-label="Tempo controls">
@@ -670,18 +189,18 @@ const tempoSummary = computed(() => {
         </div>
         <TempoTrackControl
           v-if="tempoLayout.expanded.value"
-          :can-navigate-to-next="canNavigateToNextTempoEvent"
-          :can-navigate-to-previous="canNavigateToPreviousTempoEvent"
+          :can-navigate-to-next="tempoSelection.canNavigateNext.value"
+          :can-navigate-to-previous="tempoSelection.canNavigatePrevious.value"
           :editing-disabled="tempoEditingDisabled"
-          :selected-tempo-event="selectedTempoEvent"
-          :selected-tempo-event-is-initial="selectedTempoEventIsInitial"
-          :selected-tempo-event-location="selectedTempoEventLocation"
+          :selected-tempo-event="tempoSelection.event.value"
+          :selected-tempo-event-is-initial="tempoSelection.isInitial.value"
+          :selected-tempo-event-location="tempoSelection.location.value"
           @bpm-commit="tempo.commitBpmInput"
           @edit-start="tempo.beginEdit"
-          @navigate="navigateSelectedTempoEvent"
-          @position-commit="commitSelectedTempoEventPosition"
+          @navigate="tempoSelection.navigate"
+          @position-commit="tempoSelection.commitPosition"
           @remove="tempo.remove"
-          @reveal="revealSelectedTempoEvent"
+          @reveal="tempoSelection.reveal"
         />
       </section>
       <div
@@ -722,13 +241,13 @@ const tempoSummary = computed(() => {
     </aside>
 
     <section
-      ref="arrangementViewportElement"
+      ref="viewportElement"
       class="project-workbench__arrangement-scroll-viewport"
       aria-label="Timeline"
       tabindex="0"
       @pointerdown.capture="handleTimelinePointerDown"
-      @scroll.passive="handleArrangementScroll"
-      @wheel.passive="handleArrangementWheel"
+      @scroll.passive="handleViewportScroll"
+      @wheel.passive="handleViewportWheel"
     >
       <div class="project-workbench__arrangement-content">
         <div class="project-workbench__arrangement">
@@ -761,10 +280,10 @@ const tempoSummary = computed(() => {
                 class="project-workbench__follow-control"
                 :disabled="!isCurrentProjectPlaying"
                 :icon="TargetArrowIcon"
-                :label="timelineFollowLabel"
-                :pressed="isTimelineFollowActive"
+                :label="followLabel"
+                :pressed="isFollowActive"
                 size="small"
-                @click="toggleTimelineFollow"
+                @click="toggleFollow"
               />
               <UiIconButton
                 disabled

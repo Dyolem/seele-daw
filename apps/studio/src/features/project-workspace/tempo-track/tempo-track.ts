@@ -16,7 +16,10 @@ import {
 } from '@seele-daw/project-core'
 import { resolveProjectSecondAtTick } from '@seele-daw/playback'
 
-import { roundProjectTempoBpmForEditing } from '@/features/project-workspace/tempo/tempo-control'
+import {
+  formatProjectTempoBpm,
+  roundProjectTempoBpmForEditing,
+} from '@/features/project-workspace/tempo/tempo-control'
 import {
   describeProjectTimelineMusicalPosition,
   formatProjectTimelineMusicalPosition,
@@ -116,6 +119,21 @@ export function orderProjectTempoEvents(
       return 0
     }),
   )
+}
+
+/** The tempo in effect at `tick` and the event count, e.g. "120 BPM · 3 events". */
+export function describeProjectTempoAt(
+  tempoEvents: readonly TempoEventRecord[],
+  tick: number,
+): string {
+  const events = orderProjectTempoEvents(tempoEvents)
+  let current = events[0]
+  for (const event of events) {
+    if (event.tick > tick) break
+    current = event
+  }
+  const bpm = current ? `${formatProjectTempoBpm(current.bpm)} BPM` : 'No tempo events'
+  return `${bpm} · ${events.length} ${events.length === 1 ? 'event' : 'events'}`
 }
 
 /** Projects a selected Tempo Event through the Arrangement grid and Playback's precise TempoMap. */

@@ -11,6 +11,7 @@ import {
   createAudibleMidiTransport,
   parsePlaybackClockDurationSecond,
   parsePlaybackClockSecond,
+  type AudibleMidiOccurrenceChange,
   type AudibleMidiProjectPlan,
   type AudibleMidiReconciliationPlan,
   type AudibleMidiSchedulerPlanner,
@@ -23,10 +24,8 @@ import {
 } from '@seele-daw/playback'
 import {
   PROJECT_CHANGE_TYPE,
-  PROJECT_COMMAND_TYPE,
   type ModelRevision,
   type ProjectCommit,
-  type ProjectCommandType,
   type ProjectId,
   type ProjectSession,
   type Tick,
@@ -308,45 +307,12 @@ function isPlayablePlan(plan: AudibleMidiProjectPlan): boolean {
   )
 }
 
-function supportsSelectiveReconciliation(commit: ProjectCommit): boolean {
-  switch (commit.origin.commandType) {
-    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD:
-    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE:
-    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE:
-    case PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM:
-      return false
-    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
-    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE:
-    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE:
-    case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
-    case PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE:
-    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD:
-    case PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION:
-    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD:
-    case PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE:
-    case PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE:
-    case PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD:
-    case PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE:
-    case PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE:
-    case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
-      return true
-  }
-}
-
-function reschedulesActiveVoiceRelease(commandTypes: readonly ProjectCommandType[]): boolean {
-  return commandTypes.some((commandType) => {
-    switch (commandType) {
-      case PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE:
-      case PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE:
-      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD:
-      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE:
-      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE:
-      case PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE:
-        return true
-      default:
-        return false
-    }
-  })
+/**
+ * A sounding voice survives an edit only when its note now ends or releases at another tick, as a
+ * resize, a sustain pedal edit or a clip extension does. Any other change needs a new voice.
+ */
+function onlyReleaseChanged(change: AudibleMidiOccurrenceChange): boolean {
+  return change.changedFields.every((field) => field === 'endTick' || field === 'releaseTick')
 }
 
 /** Routes command and History commits by their semantic Tempo Delta, not their origin label. */
@@ -1246,10 +1212,8 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       this.#preparedRuntime !== null &&
       this.#transport !== null &&
       this.#scheduler !== null
-    const supportedCommits = this.#pendingCommits.every(supportsSelectiveReconciliation)
     if (
       !canContinueRuntime ||
-      !supportedCommits ||
       reconciliation.scope !== AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE
     ) {
       this.#installStoppedPlan(event, nextPlan)
@@ -1298,18 +1262,8 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
           entry.handle.cancel(now)
           continue
         }
-        if (
-          change.kind === AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.REMOVED ||
-          change.commandTypes.includes(PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE)
-        ) {
+        if (change.after === null || !onlyReleaseChanged(change)) {
           entry.handle.cancel(now)
-          continue
-        }
-        if (
-          change.kind !== AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED ||
-          change.after === null ||
-          !reschedulesActiveVoiceRelease(change.commandTypes)
-        ) {
           continue
         }
         if (this.#state.phase !== PROJECT_PLAYBACK_PHASE.PLAYING) {

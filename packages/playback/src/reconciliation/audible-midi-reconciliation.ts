@@ -1,10 +1,4 @@
-import {
-  PROJECT_COMMAND_TYPE,
-  type ModelRevision,
-  type ProjectCommandType,
-  type ProjectCommit,
-  type TrackId,
-} from '@seele-daw/project-core'
+import type { ModelRevision, ProjectCommit, TrackId } from '@seele-daw/project-core'
 
 import {
   AUDIBLE_MIDI_PLAN_STATUS,
@@ -76,7 +70,6 @@ export interface AudibleMidiOccurrenceChange {
   readonly before: MidiNoteSpanPlan | null
   readonly after: MidiNoteSpanPlan | null
   readonly changedFields: readonly AudibleMidiOccurrenceField[]
-  readonly commandTypes: readonly ProjectCommandType[]
 }
 
 export interface AudibleMidiTrackChange {
@@ -85,7 +78,6 @@ export interface AudibleMidiTrackChange {
   readonly before: TrackPlaybackPlan | null
   readonly after: TrackPlaybackPlan | null
   readonly changedFields: readonly AudibleMidiTrackField[]
-  readonly commandTypes: readonly ProjectCommandType[]
 }
 
 export interface AudibleMidiReconciliationPlan {
@@ -188,92 +180,9 @@ function commitsFormContinuousChain(
   return expectedBaseRevision === toModelRevision
 }
 
-function commandTypesForOccurrence(
-  commits: readonly ProjectCommit[],
-  before: MidiNoteSpanPlan | null,
-  after: MidiNoteSpanPlan | null,
-): readonly ProjectCommandType[] {
-  const sourceId = after?.sourceId ?? before?.sourceId
-  const noteId = after?.noteId ?? before?.noteId
-  const clipId = after?.clipId ?? before?.clipId
-  const trackId = after?.trackId ?? before?.trackId
-  const commandTypes = new Set<ProjectCommandType>()
-
-  for (const commit of commits) {
-    if (
-      commit.delta.changes.some((change) => {
-        switch (change.type) {
-          case 'midi-note.added':
-          case 'midi-note.removed':
-          case 'midi-note.updated':
-            return change.sourceId === sourceId && change.noteId === noteId
-          case 'midi-sustain-pedal-event.added':
-          case 'midi-sustain-pedal-event.removed':
-          case 'midi-sustain-pedal-event.updated':
-            return change.sourceId === sourceId
-          case 'midi-clip.added':
-          case 'midi-clip.removed':
-          case 'midi-clip.updated':
-            return change.clipId === clipId
-          case 'instrument-device.updated':
-          case 'instrument-track.added':
-          case 'instrument-track.removed':
-            return change.trackId === trackId
-          case 'tempo-event.added':
-          case 'tempo-event.removed':
-          case 'tempo-event.updated':
-            return false
-        }
-      })
-    ) {
-      commandTypes.add(commit.origin.commandType)
-    }
-  }
-
-  return Object.freeze([...commandTypes].sort(compareStrings))
-}
-
-function commandTypesForTrack(
-  commits: readonly ProjectCommit[],
-  trackId: TrackId,
-): readonly ProjectCommandType[] {
-  const commandTypes = new Set<ProjectCommandType>()
-
-  for (const commit of commits) {
-    if (
-      commit.delta.changes.some((change) => {
-        switch (change.type) {
-          case 'instrument-device.updated':
-          case 'instrument-track.added':
-          case 'instrument-track.removed':
-          case 'midi-clip.added':
-          case 'midi-clip.removed':
-          case 'midi-clip.updated':
-            return change.trackId === trackId
-          case 'midi-note.added':
-          case 'midi-note.removed':
-          case 'midi-note.updated':
-          case 'midi-sustain-pedal-event.added':
-          case 'midi-sustain-pedal-event.removed':
-          case 'midi-sustain-pedal-event.updated':
-          case 'tempo-event.added':
-          case 'tempo-event.removed':
-          case 'tempo-event.updated':
-            return false
-        }
-      })
-    ) {
-      commandTypes.add(commit.origin.commandType)
-    }
-  }
-
-  return Object.freeze([...commandTypes].sort(compareStrings))
-}
-
 function createOccurrenceChanges(
   previousPlan: AudibleMidiProjectPlan,
   nextPlan: AudibleMidiProjectPlan,
-  commits: readonly ProjectCommit[],
 ): readonly AudibleMidiOccurrenceChange[] {
   const previous = createOccurrenceIndex(previousPlan.midiNoteSpans)
   const next = createOccurrenceIndex(nextPlan.midiNoteSpans)
@@ -289,7 +198,6 @@ function createOccurrenceChanges(
           after,
           before,
           changedFields: Object.freeze([]),
-          commandTypes: commandTypesForOccurrence(commits, before, after),
           kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
           occurrenceKey,
         }),
@@ -302,7 +210,6 @@ function createOccurrenceChanges(
           after,
           before,
           changedFields: Object.freeze([]),
-          commandTypes: commandTypesForOccurrence(commits, before, after),
           kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.REMOVED,
           occurrenceKey,
         }),
@@ -317,7 +224,6 @@ function createOccurrenceChanges(
         after,
         before,
         changedFields,
-        commandTypes: commandTypesForOccurrence(commits, before, after),
         kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
         occurrenceKey,
       }),
@@ -330,7 +236,6 @@ function createOccurrenceChanges(
 function createTrackChanges(
   previousPlan: AudibleMidiProjectPlan,
   nextPlan: AudibleMidiProjectPlan,
-  commits: readonly ProjectCommit[],
 ): readonly AudibleMidiTrackChange[] {
   const previous = createTrackIndex(previousPlan.tracks)
   const next = createTrackIndex(nextPlan.tracks)
@@ -346,7 +251,6 @@ function createTrackChanges(
           after,
           before,
           changedFields: Object.freeze([]),
-          commandTypes: commandTypesForTrack(commits, trackId),
           kind: AUDIBLE_MIDI_TRACK_CHANGE_KIND.ADDED,
           trackId,
         }),
@@ -359,7 +263,6 @@ function createTrackChanges(
           after,
           before,
           changedFields: Object.freeze([]),
-          commandTypes: commandTypesForTrack(commits, trackId),
           kind: AUDIBLE_MIDI_TRACK_CHANGE_KIND.REMOVED,
           trackId,
         }),
@@ -374,7 +277,6 @@ function createTrackChanges(
         after,
         before,
         changedFields,
-        commandTypes: commandTypesForTrack(commits, trackId),
         kind: AUDIBLE_MIDI_TRACK_CHANGE_KIND.UPDATED,
         trackId,
       }),
@@ -450,8 +352,8 @@ export function createAudibleMidiReconciliationPlan(
     )
   }
 
-  const occurrenceChanges = createOccurrenceChanges(previousPlan, nextPlan, commits)
-  const trackChanges = createTrackChanges(previousPlan, nextPlan, commits)
+  const occurrenceChanges = createOccurrenceChanges(previousPlan, nextPlan)
+  const trackChanges = createTrackChanges(previousPlan, nextPlan)
   const affectedTrackIds = new Set<TrackId>(trackChanges.map(({ trackId }) => trackId))
   for (const change of occurrenceChanges) {
     if (change.before !== null) affectedTrackIds.add(change.before.trackId)
@@ -503,11 +405,3 @@ export function createAudibleMidiReconciliationPlan(
     unchangedOccurrenceKeys: Object.freeze(unchangedOccurrenceKeys),
   })
 }
-
-/** Current Note commands whose active-voice behavior is intentionally operation-specific. */
-export const AUDIBLE_MIDI_NOTE_RECONCILIATION_COMMAND_TYPES = Object.freeze([
-  PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
-  PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE,
-  PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
-  PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
-] as const)

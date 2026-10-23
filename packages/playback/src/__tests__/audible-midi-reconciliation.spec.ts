@@ -1,6 +1,5 @@
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
-  PROJECT_COMMAND_TYPE,
   createAddInstrumentTrackCommand,
   createAddMidiClipCommand,
   createAddMidiClipWithNoteCommand,
@@ -158,7 +157,6 @@ describe('Audible MIDI reconciliation', () => {
     expect(plan.occurrenceChanges).toHaveLength(1)
     expect(plan.occurrenceChanges[0]).toMatchObject({
       changedFields: ['startTick', 'endTick', 'releaseTick', 'pitch'],
-      commandTypes: [PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE],
       kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
     })
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([
@@ -193,7 +191,6 @@ describe('Audible MIDI reconciliation', () => {
 
     expect(plan.occurrenceChanges).toHaveLength(1)
     expect(plan.occurrenceChanges[0]).toMatchObject({
-      commandTypes: [PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD],
       kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
     })
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([])
@@ -238,7 +235,6 @@ describe('Audible MIDI reconciliation', () => {
     expect(plan.occurrenceChanges).toEqual([
       expect.objectContaining({
         after: expect.objectContaining({ noteId: addedNoteId }),
-        commandTypes: [PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE],
         kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
       }),
     ])
@@ -278,13 +274,11 @@ describe('Audible MIDI reconciliation', () => {
       expect.arrayContaining([
         expect.objectContaining({
           after: expect.objectContaining({ noteId: addedNoteId }),
-          commandTypes: [PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE],
           kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
         }),
         expect.objectContaining({
           after: expect.objectContaining({ endTick: 2_400, noteId: NOTE_ID }),
           changedFields: ['endTick', 'releaseTick'],
-          commandTypes: [PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE],
           kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
         }),
       ]),
@@ -317,7 +311,6 @@ describe('Audible MIDI reconciliation', () => {
     expect(plan.trackChanges).toEqual([
       expect.objectContaining({
         changedFields: ['soundbankId'],
-        commandTypes: [PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE],
         kind: AUDIBLE_MIDI_TRACK_CHANGE_KIND.UPDATED,
         trackId: TRACK_ID,
       }),
@@ -353,7 +346,6 @@ describe('Audible MIDI reconciliation', () => {
     expect(plan.occurrenceChanges).toEqual([
       expect.objectContaining({
         changedFields: ['releaseTick'],
-        commandTypes: [PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD],
         kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
         before: expect.objectContaining({ endTick: 1_200, releaseTick: 1_200 }),
         after: expect.objectContaining({ endTick: 1_200, releaseTick: 1_920 }),

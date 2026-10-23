@@ -235,21 +235,14 @@ describe('ProjectSnapshot public contract', () => {
     expect(reversedSession.getSnapshot()).toEqual(naturalSession.getSnapshot())
   })
 
-  it('creates fresh containers for repeated snapshots without cloning unchanged Records', () => {
-    const { fixture, session } = createFixtureProjectSession()
+  it('shares one frozen snapshot per revision', () => {
+    const { session } = createFixtureProjectSession()
     const first = session.getSnapshot()
-    const second = session.getSnapshot()
 
-    expect(second).not.toBe(first)
-    expect(second.trackOrder).not.toBe(first.trackOrder)
-    expect(second.tracks).not.toBe(first.tracks)
-    expect(second.midiNotePartitions).not.toBe(first.midiNotePartitions)
-    expect(second.midiSustainPedalEventPartitions).not.toBe(first.midiSustainPedalEventPartitions)
-    expect(second.project).toBe(first.project)
-    expect(second.tracks.find((track) => track.id === fixture.records.instrumentTrack.id)).toBe(
-      first.tracks.find((track) => track.id === fixture.records.instrumentTrack.id),
-    )
-    expect(second.modelRevision).toBe(first.modelRevision)
+    expect(session.getSnapshot()).toBe(first)
+    expect(Object.isFrozen(first)).toBe(true)
+    expect(Object.isFrozen(first.tracks)).toBe(true)
+    expect(Object.isFrozen(first.midiNotePartitions)).toBe(true)
   })
 })
 

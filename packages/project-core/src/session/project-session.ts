@@ -70,6 +70,7 @@ class ProjectSessionImpl implements ProjectSession {
   readonly #history = new HistoryController()
   readonly #queryIndex: QueryIndex
   readonly #changePublisher = new ChangePublisher()
+  #snapshot: ProjectSnapshot | null = null
 
   constructor(store: ModelStore) {
     this.#store = store
@@ -96,7 +97,11 @@ class ProjectSessionImpl implements ProjectSession {
   }
 
   getSnapshot(): ProjectSnapshot {
-    return createProjectSnapshot(this.#store)
+    // Snapshots are immutable and only a committed revision changes Store content.
+    if (this.#snapshot?.modelRevision !== this.#store.modelRevision) {
+      this.#snapshot = createProjectSnapshot(this.#store)
+    }
+    return this.#snapshot
   }
 
   query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query> {

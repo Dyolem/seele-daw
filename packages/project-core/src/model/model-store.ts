@@ -73,74 +73,60 @@ function writeEntityRecord<Id extends string, RecordType extends IdentifiedRecor
   }
 }
 
-function createMidiNoteTable(notes: readonly MidiNoteRecord[]): Map<NoteId, MidiNoteRecord> {
-  const noteTable = new Map<NoteId, MidiNoteRecord>()
-
-  for (const note of notes) {
-    if (noteTable.has(note.id)) {
-      rejectStoreWrite(`MIDI Note partition contains duplicate Note ID ${note.id}`)
-    }
-
-    noteTable.set(note.id, note)
-  }
-
-  return noteTable
-}
-
-function midiNotePartitionMatches(
-  noteTable: ReadonlyMap<NoteId, MidiNoteRecord>,
-  expectedNotes: readonly MidiNoteRecord[],
+function partitionMatches<Id, RecordType extends { readonly id: Id }>(
+  table: ReadonlyMap<Id, RecordType>,
+  expected: readonly RecordType[],
 ): boolean {
-  if (noteTable.size !== expectedNotes.length) {
-    return false
+  if (table.size !== expected.length) return false
+  const expectedById = new Map(expected.map((record) => [record.id, record] as const))
+  if (expectedById.size !== expected.length) return false
+  for (const [id, record] of table) {
+    if (expectedById.get(id) !== record) return false
   }
-
-  const expectedById = new Map(expectedNotes.map((note) => [note.id, note] as const))
-
-  if (expectedById.size !== expectedNotes.length) {
-    return false
-  }
-
-  for (const [noteId, note] of noteTable) {
-    if (expectedById.get(noteId) !== note) {
-      return false
-    }
-  }
-
   return true
 }
 
-function createMidiSustainPedalEventTable(
-  events: readonly MidiSustainPedalEventRecord[],
-): Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord> {
-  const eventTable = new Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>()
-
-  for (const event of events) {
-    if (eventTable.has(event.id)) {
-      rejectStoreWrite(`MIDI Sustain Pedal Event partition contains duplicate Event ID ${event.id}`)
-    }
-
-    eventTable.set(event.id, event)
+/** Writes to records partitioned by MIDI Source, such as Notes or CC64 events. */
+function partitionWriter<Id extends string, RecordType extends { readonly id: Id }>(
+  partitions: Map<MidiSourceId, Map<Id, RecordType>>,
+  entity: string,
+  idLabel: string,
+) {
+  function requirePartition(sourceId: MidiSourceId): Map<Id, RecordType> {
+    const table = partitions.get(sourceId)
+    if (table === undefined) rejectStoreWrite(`${entity} partition ${sourceId} does not exist`)
+    return table
   }
 
-  return eventTable
-}
-
-function midiSustainPedalEventPartitionMatches(
-  eventTable: ReadonlyMap<MidiSustainPedalEventId, MidiSustainPedalEventRecord>,
-  expectedEvents: readonly MidiSustainPedalEventRecord[],
-): boolean {
-  if (eventTable.size !== expectedEvents.length) return false
-
-  const expectedById = new Map(expectedEvents.map((event) => [event.id, event] as const))
-
-  if (expectedById.size !== expectedEvents.length) return false
-
-  for (const [eventId, event] of eventTable) {
-    if (expectedById.get(eventId) !== event) return false
+  return {
+    insert(sourceId: MidiSourceId, records: readonly RecordType[]): void {
+      if (partitions.has(sourceId))
+        rejectStoreWrite(`${entity} partition ${sourceId} already exists`)
+      // Build first so duplicate IDs or allocation failures cannot leave a partial partition.
+      const table = new Map<Id, RecordType>()
+      for (const record of records) {
+        if (table.has(record.id)) {
+          rejectStoreWrite(`${entity} partition contains duplicate ${idLabel} ${record.id}`)
+        }
+        table.set(record.id, record)
+      }
+      partitions.set(sourceId, table)
+    },
+    remove(sourceId: MidiSourceId, expected: readonly RecordType[]): void {
+      if (!partitionMatches(requirePartition(sourceId), expected)) {
+        rejectStoreWrite(`${entity} partition ${sourceId} no longer matches the expected records`)
+      }
+      partitions.delete(sourceId)
+    },
+    write(sourceId: MidiSourceId, expected: RecordType | undefined, next: RecordType | undefined) {
+      writeEntityRecord(
+        requirePartition(sourceId),
+        `${entity} in partition ${sourceId}`,
+        expected,
+        next,
+      )
+    },
   }
-
-  return true
 }
 
 export interface ModelStoreSeed {
@@ -250,6 +236,13 @@ export class ModelStore implements ModelStoreReader {
     this.#devices = new Map(seed.devices)
     this.#master = seed.master
 
+    const notes = partitionWriter(this.#midiNotesBySource, 'MIDI Note', 'Note ID')
+    const sustainPedalEvents = partitionWriter(
+      this.#midiSustainPedalEventsBySource,
+      'MIDI Sustain Pedal Event',
+      'Event ID',
+    )
+
     // The closures retain #private access while the registry hands them to one applier only.
     registerModelStoreWriteAccess(this, {
       writeProject: (expected, next) => {
@@ -308,75 +301,12 @@ export class ModelStore implements ModelStoreReader {
 
         this.#trackOrder.splice(index, 1)
       },
-      insertMidiNotePartition: (sourceId, notes) => {
-        if (this.#midiNotesBySource.has(sourceId)) {
-          rejectStoreWrite(`MIDI Note partition ${sourceId} already exists`)
-        }
-
-        // Build first so duplicate IDs or allocation failures cannot leave a partial partition.
-        const noteTable = createMidiNoteTable(notes)
-
-        this.#midiNotesBySource.set(sourceId, noteTable)
-      },
-      removeMidiNotePartition: (sourceId, expectedNotes) => {
-        const noteTable = this.#midiNotesBySource.get(sourceId)
-
-        if (noteTable === undefined) {
-          rejectStoreWrite(`MIDI Note partition ${sourceId} does not exist`)
-        }
-
-        if (!midiNotePartitionMatches(noteTable, expectedNotes)) {
-          rejectStoreWrite(`MIDI Note partition ${sourceId} no longer matches the expected records`)
-        }
-
-        this.#midiNotesBySource.delete(sourceId)
-      },
-      writeMidiNote: (sourceId, expected, next) => {
-        const noteTable = this.#midiNotesBySource.get(sourceId)
-
-        if (noteTable === undefined) {
-          rejectStoreWrite(`MIDI Note partition ${sourceId} does not exist`)
-        }
-
-        writeEntityRecord(noteTable, `MIDI Note in partition ${sourceId}`, expected, next)
-      },
-      insertMidiSustainPedalEventPartition: (sourceId, events) => {
-        if (this.#midiSustainPedalEventsBySource.has(sourceId)) {
-          rejectStoreWrite(`MIDI Sustain Pedal Event partition ${sourceId} already exists`)
-        }
-
-        const eventTable = createMidiSustainPedalEventTable(events)
-        this.#midiSustainPedalEventsBySource.set(sourceId, eventTable)
-      },
-      removeMidiSustainPedalEventPartition: (sourceId, expectedEvents) => {
-        const eventTable = this.#midiSustainPedalEventsBySource.get(sourceId)
-
-        if (eventTable === undefined) {
-          rejectStoreWrite(`MIDI Sustain Pedal Event partition ${sourceId} does not exist`)
-        }
-
-        if (!midiSustainPedalEventPartitionMatches(eventTable, expectedEvents)) {
-          rejectStoreWrite(
-            `MIDI Sustain Pedal Event partition ${sourceId} no longer matches the expected records`,
-          )
-        }
-
-        this.#midiSustainPedalEventsBySource.delete(sourceId)
-      },
-      writeMidiSustainPedalEvent: (sourceId, expected, next) => {
-        const eventTable = this.#midiSustainPedalEventsBySource.get(sourceId)
-
-        if (eventTable === undefined) {
-          rejectStoreWrite(`MIDI Sustain Pedal Event partition ${sourceId} does not exist`)
-        }
-
-        writeEntityRecord(
-          eventTable,
-          `MIDI Sustain Pedal Event in partition ${sourceId}`,
-          expected,
-          next,
-        )
-      },
+      insertMidiNotePartition: notes.insert,
+      removeMidiNotePartition: notes.remove,
+      writeMidiNote: notes.write,
+      insertMidiSustainPedalEventPartition: sustainPedalEvents.insert,
+      removeMidiSustainPedalEventPartition: sustainPedalEvents.remove,
+      writeMidiSustainPedalEvent: sustainPedalEvents.write,
       commitModelRevision: (expected, next) => {
         if (this.#modelRevision !== expected) {
           rejectStoreWrite(

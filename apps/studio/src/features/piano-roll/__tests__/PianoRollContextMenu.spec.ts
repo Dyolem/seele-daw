@@ -1,4 +1,4 @@
-import { STUDIO_ACTION_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { HotkeyManager } from '@tanstack/hotkeys'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ContextMenuRoot } from 'reka-ui'
@@ -63,9 +63,7 @@ function mountMenu(runtime: StudioActionRuntime) {
     {
       attachTo: document.body,
       global: {
-        provide: {
-          [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime,
-        },
+        provide: provideTestStudioServices({ actions: runtime }),
       },
     },
   )

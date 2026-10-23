@@ -1,6 +1,5 @@
-import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/symbols'
 import { parseProjectId, type ProjectContentStateId } from '@seele-daw/project-core'
-import { createApp, isProxy, isReadonly, isShallow } from 'vue'
+import { isProxy, isReadonly, isShallow } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { ACTIVE_PROJECT_SAVE_STATUS } from '@/workbench/project/active-project-state'
 import {
@@ -8,9 +7,7 @@ import {
   PROJECT_NAVIGATION_INTENT_KIND,
   type ProjectNavigationDecisionRequest,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { useProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
 import { createProjectNavigationDecisionVueBinding } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
-import { ProjectNavigationDecisionVueError } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-error'
 
 function createDecisionRequest(suffix: string): ProjectNavigationDecisionRequest {
   return Object.freeze({
@@ -104,24 +101,5 @@ describe('ProjectNavigationDecisionVueBinding', () => {
       name: 'ProjectNavigationDecisionVueError',
       code: 'binding-disposed',
     })
-  })
-
-  it('provides a scoped Context and reports a missing Provider explicitly', () => {
-    const binding = createProjectNavigationDecisionVueBinding()
-    const providedApp = createApp({ render: () => null })
-    providedApp.provide(PROJECT_NAVIGATION_DECISION_CONTEXT_KEY, binding.context)
-    const missingApp = createApp({ render: () => null })
-
-    expect(providedApp.runWithContext(() => useProjectNavigationDecision())).toBe(binding.context)
-    expect(() => missingApp.runWithContext(() => useProjectNavigationDecision())).toThrowError(
-      expect.objectContaining({
-        name: 'ProjectNavigationDecisionVueError',
-        code: 'missing-context',
-      }),
-    )
-    expect(() => missingApp.runWithContext(() => useProjectNavigationDecision())).toThrow(
-      ProjectNavigationDecisionVueError,
-    )
-    binding.dispose()
   })
 })

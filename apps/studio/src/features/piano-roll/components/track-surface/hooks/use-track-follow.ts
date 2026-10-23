@@ -5,7 +5,7 @@ import {
   timelinePositionRatio,
 } from '@/features/project-workspace/timeline/layout'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
-import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
+import { useStudio } from '@/workbench/studio-services'
 
 export function useTrackFollow({
   scrollViewport,
@@ -16,7 +16,7 @@ export function useTrackFollow({
   readonly getProjectId: () => ProjectId
   readonly getTimelineEndTick: () => Tick
 }) {
-  const { state: playbackState, visualPosition: playbackVisualPosition } = useProjectPlayback()
+  const { state: playbackState, visualPosition: playbackVisualPosition } = useStudio().playback
   const isTimelineFollowSuspended = shallowRef(false)
   let observedScrollLeft = 0
   let disposed = false

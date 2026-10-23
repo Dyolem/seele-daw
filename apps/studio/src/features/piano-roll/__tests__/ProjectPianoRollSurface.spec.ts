@@ -1,5 +1,5 @@
 import { installPianoRollResizeObserver } from '@/features/piano-roll/__tests__/support/piano-roll-resize-observer-test-support'
-import { PROJECT_MIDI_NOTE_CONTEXT_KEY, PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import {
   getPianoRollContextMenu,
   getPianoRollContextMenuItem,
@@ -39,28 +39,26 @@ import {
 import { createProjectPianoRollPresentation } from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import type {
-  AddMidiNoteInput,
-  MoveMidiNotesInput,
-  PlaceMidiNoteOnTrackInput,
-  ProjectMidiNoteCoordinator,
-  RemoveMidiNotesInput,
-  ResizeMidiNoteInput,
-} from '@/workbench/project/midi-note/project-midi-note-coordinator'
-import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
-import { type ProjectMidiNoteVueContext } from '@/workbench/project/midi-note/vue/project-midi-note-context'
 import {
-  createProjectMidiSustainPedalCoordinator,
-  type ProjectMidiSustainPedalCoordinator,
-} from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
-import { type ProjectMidiSustainPedalVueContext } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
+  createNoteEdits,
+  type AddNoteInput,
+  type MoveNotesInput,
+  type NoteEdits,
+  type PlaceNoteOnTrackInput,
+  type RemoveNotesInput,
+  type ResizeNoteInput,
+} from '@/workbench/edits/note-edits'
+import {
+  createSustainPedalEdits,
+  type SustainPedalEdits,
+} from '@/workbench/edits/sustain-pedal-edits'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import { createClipEdits } from '@/workbench/edits/clip-edits'
+import { createTrackEdits } from '@/workbench/edits/track-edits'
 
 const THEME_TOKENS = [
   '--sd-color-surface-canvas',
@@ -157,16 +155,16 @@ function createInteractiveFixture(identity: string) {
   })
   const readyState = createReadyState(session)
   const trackIds = [`${identity}-track`, `${identity}-device`]
-  const track = createProjectTrackCoordinator({
+  const track = createTrackEdits({
     activeProject: { state: readyState },
-    createRandomValue: () => 0,
-    createUniqueId: () => trackIds.shift() ?? `${identity}-unused-track-id`,
+    random: () => 0,
+    createId: () => trackIds.shift() ?? `${identity}-unused-track-id`,
   }).addInstrumentTrack()
   const clipIds = [`${identity}-clip`, `${identity}-source`]
-  const clip = createProjectClipCoordinator({
+  const clip = createClipEdits({
     activeProject: { state: readyState },
-    createUniqueId: () => clipIds.shift() ?? `${identity}-unused-clip-id`,
-  }).addEmptyMidiClip({
+    createId: () => clipIds.shift() ?? `${identity}-unused-clip-id`,
+  }).addEmpty({
     targetTick: parseTick(0),
     trackId: track.trackId,
   })
@@ -176,13 +174,13 @@ function createInteractiveFixture(identity: string) {
   }
 
   const noteIds = [`${identity}-note-1`, `${identity}-note-2`]
-  const projectMidiNotes = createProjectMidiNoteCoordinator({
+  const notes = createNoteEdits({
     activeProject: { state: readyState },
-    createUniqueId: () => noteIds.shift() ?? `${identity}-unused-note-id`,
+    createId: () => noteIds.shift() ?? `${identity}-unused-note-id`,
   })
-  const projectMidiSustainPedal = createProjectMidiSustainPedalCoordinator({
+  const sustainPedal = createSustainPedalEdits({
     activeProject: { state: readyState },
-    createUniqueId: (() => {
+    createId: (() => {
       let index = 0
       return () => `${identity}-sustain-pedal-event-${++index}`
     })(),
@@ -190,25 +188,31 @@ function createInteractiveFixture(identity: string) {
 
   return Object.freeze({
     presentation,
-    projectMidiNotes,
-    projectMidiSustainPedal,
+    notes,
+    sustainPedal,
     session,
   })
 }
 
-function createUnavailableSustainPedalContext(): ProjectMidiSustainPedalVueContext {
+function createUnavailableSustainPedal(): SustainPedalEdits {
   const unavailable = (): never => {
     throw new Error('Unexpected Sustain Pedal command in this test')
   }
-  return Object.freeze({
-    projectMidiSustainPedal: Object.freeze<ProjectMidiSustainPedalCoordinator>({
-      moveEvents: unavailable,
-      placeInClip: unavailable,
-      placeOnTrack: unavailable,
-      removeEvents: unavailable,
-      replaceEventValue: unavailable,
-    }),
-  })
+  return {
+    move: unavailable,
+    placeInClip: unavailable,
+    placeOnTrack: unavailable,
+    remove: unavailable,
+    replaceValue: unavailable,
+  }
+}
+
+function provideSurfaceServices(
+  keyboard: ReturnType<typeof createTestStudioActionRuntime>,
+  notes: NoteEdits,
+  sustainPedal: SustainPedalEdits = createUnavailableSustainPedal(),
+) {
+  return provideTestStudioServices({ actions: keyboard.runtime, edits: { notes, sustainPedal } })
 }
 
 interface DispatchPointerInput {
@@ -287,7 +291,7 @@ function mountSelectionMenuFixture(identity: string) {
   const fixture = createInteractiveFixture(identity)
   const noteIds = [480, 960].map(
     (tick) =>
-      fixture.projectMidiNotes.addMidiNote({
+      fixture.notes.add({
         expectedSession: fixture.session,
         baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
@@ -298,7 +302,7 @@ function mountSelectionMenuFixture(identity: string) {
   )
   const eventIds = [480, 960].map(
     (tick) =>
-      fixture.projectMidiSustainPedal.placeInClip({
+      fixture.sustainPedal.placeInClip({
         baseRevision: fixture.session.modelRevision,
         channel: parseMidiChannel(0),
         clipId: fixture.presentation.clipId,
@@ -327,13 +331,7 @@ function mountSelectionMenuFixture(identity: string) {
     },
     global: {
       plugins: [pinia],
-      provide: {
-        ...keyboard.provide,
-        [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: { projectMidiNotes: fixture.projectMidiNotes },
-        [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: {
-          projectMidiSustainPedal: fixture.projectMidiSustainPedal,
-        },
-      },
+      provide: provideSurfaceServices(keyboard, fixture.notes, fixture.sustainPedal),
     },
   })
   menuFixtureCleanups.push(() => wrapper.unmount())
@@ -354,17 +352,11 @@ function mountSelectionMenuFixture(identity: string) {
 
 beforeEach(() => {
   config.global.stubs.PianoRollPlayhead = true
-  Reflect.set(
-    config.global.provide,
-    PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
-    createUnavailableSustainPedalContext(),
-  )
 })
 
 afterEach(() => {
   for (const cleanup of menuFixtureCleanups.splice(0)) cleanup()
   Reflect.deleteProperty(config.global.stubs, 'PianoRollPlayhead')
-  Reflect.deleteProperty(config.global.provide, PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol)
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   restorePrototypeProperty('hasPointerCapture')
@@ -704,30 +696,28 @@ describe('ProjectPianoRollSurface', () => {
       subscribe: subscribe as unknown as ProjectSession['subscribe'],
     }
     const keyboard = createTestStudioActionRuntime()
-    const addMidiNote = vi.fn<ProjectMidiNoteCoordinator['addMidiNote']>(() => {
+    const addMidiNote = vi.fn<NoteEdits['add']>(() => {
       throw new Error('The Cursor test must not add a MIDI Note')
     })
-    const removeMidiNotes = vi.fn<ProjectMidiNoteCoordinator['removeMidiNotes']>(() => {
+    const removeMidiNotes = vi.fn<NoteEdits['remove']>(() => {
       throw new Error('The selection-only Cursor test must not remove MIDI Notes')
     })
-    const moveMidiNotes = vi.fn<ProjectMidiNoteCoordinator['moveMidiNotes']>(() => {
+    const moveMidiNotes = vi.fn<NoteEdits['move']>(() => {
       throw new Error('The selection-only Cursor test must not move MIDI Notes')
     })
-    const resizeMidiNote = vi.fn<ProjectMidiNoteCoordinator['resizeMidiNote']>(() => {
+    const resizeMidiNote = vi.fn<NoteEdits['resize']>(() => {
       throw new Error('The selection-only Cursor test must not resize a MIDI Note')
     })
-    const placeMidiNoteOnTrack = vi.fn<ProjectMidiNoteCoordinator['placeMidiNoteOnTrack']>(() => {
+    const placeMidiNoteOnTrack = vi.fn<NoteEdits['placeOnTrack']>(() => {
       throw new Error('The Clip surface test must not place a Track MIDI Note')
     })
-    const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
-      projectMidiNotes: Object.freeze({
-        addMidiNote,
-        moveMidiNotes,
-        placeMidiNoteOnTrack,
-        removeMidiNotes,
-        resizeMidiNote,
-      }),
-    })
+    const notes: NoteEdits = {
+      add: addMidiNote,
+      move: moveMidiNotes,
+      placeOnTrack: placeMidiNoteOnTrack,
+      remove: removeMidiNotes,
+      resize: resizeMidiNote,
+    }
     const pinia = createPinia()
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
     const wrapper = mount(ProjectPianoRollSurface, {
@@ -740,10 +730,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, notes),
       },
     })
     await nextTick()
@@ -921,7 +908,7 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move')
     const noteIds = [
-      fixture.projectMidiNotes.addMidiNote({
+      fixture.notes.add({
         expectedSession: fixture.session,
         baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
@@ -929,7 +916,7 @@ describe('ProjectPianoRollSurface', () => {
         pitch: parseMidiPitch(60),
         requestedDurationTick: parsePositiveTick(240),
       }).noteId,
-      fixture.projectMidiNotes.addMidiNote({
+      fixture.notes.add({
         expectedSession: fixture.session,
         baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
@@ -952,12 +939,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes),
       },
     })
     await nextTick()
@@ -1048,7 +1030,7 @@ describe('ProjectPianoRollSurface', () => {
   it('cancels an active Note move with Escape without writing the Project', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move-cancel')
-    const noteId = fixture.projectMidiNotes.addMidiNote({
+    const noteId = fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -1069,12 +1051,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes),
       },
     })
     await nextTick()
@@ -1117,7 +1094,7 @@ describe('ProjectPianoRollSurface', () => {
   it('updates the Note move Snap preview when Alt changes during the gesture', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move-live-alt')
-    const noteId = fixture.projectMidiNotes.addMidiNote({
+    const noteId = fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -1138,12 +1115,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes),
       },
     })
     await nextTick()
@@ -1186,7 +1158,7 @@ describe('ProjectPianoRollSurface', () => {
   it('cancels an active Note move on Window blur without committing Pointer Up', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-move-window-blur')
-    const noteId = fixture.projectMidiNotes.addMidiNote({
+    const noteId = fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -1207,12 +1179,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes),
       },
     })
     await nextTick()
@@ -1251,7 +1218,7 @@ describe('ProjectPianoRollSurface', () => {
   it('previews and commits a Pencil right-edge Resize as one Project revision', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-resize-pencil')
-    const noteId = fixture.projectMidiNotes.addMidiNote({
+    const noteId = fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -1272,12 +1239,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes),
       },
     })
     await nextTick()
@@ -1343,7 +1305,7 @@ describe('ProjectPianoRollSurface', () => {
   it('preserves Project, Selection and Cursor when a left-edge Resize is rejected', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-resize-failure')
-    const noteId = fixture.projectMidiNotes.addMidiNote({
+    const noteId = fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -1356,14 +1318,12 @@ describe('ProjectPianoRollSurface', () => {
     const preferences = usePianoRollPreferencesStore(pinia)
     const toasts = useUiToastStore(pinia)
     preferences.activateTool(PIANO_ROLL_TOOL.CURSOR)
-    const rejectedCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
-      addMidiNote: (input: AddMidiNoteInput) => fixture.projectMidiNotes.addMidiNote(input),
-      moveMidiNotes: (input: MoveMidiNotesInput) => fixture.projectMidiNotes.moveMidiNotes(input),
-      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
-        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
-      removeMidiNotes: (input: RemoveMidiNotesInput) =>
-        fixture.projectMidiNotes.removeMidiNotes(input),
-      resizeMidiNote: () => {
+    const rejectedCoordinator: NoteEdits = Object.freeze({
+      add: (input: AddNoteInput) => fixture.notes.add(input),
+      move: (input: MoveNotesInput) => fixture.notes.move(input),
+      placeOnTrack: (input: PlaceNoteOnTrackInput) => fixture.notes.placeOnTrack(input),
+      remove: (input: RemoveNotesInput) => fixture.notes.remove(input),
+      resize: () => {
         throw new Error('Test Project rejected the Note resize')
       },
     })
@@ -1377,12 +1337,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: rejectedCoordinator,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, rejectedCoordinator),
       },
     })
     await nextTick()
@@ -1458,12 +1413,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes),
       },
     })
     await nextTick()
@@ -1581,15 +1531,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [createPinia()],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiSustainPedal: fixture.projectMidiSustainPedal,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes, fixture.sustainPedal),
       },
     })
     await nextTick()
@@ -1651,7 +1593,7 @@ describe('ProjectPianoRollSurface', () => {
   it('moves, replaces and removes one selected CC64 event through focused Studio actions', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-sustain-pedal-edit')
-    const noteId = fixture.projectMidiNotes.addMidiNote({
+    const noteId = fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -1659,7 +1601,7 @@ describe('ProjectPianoRollSurface', () => {
       pitch: parseMidiPitch(60),
       requestedDurationTick: parsePositiveTick(240),
     }).noteId
-    const placed = fixture.projectMidiSustainPedal.placeInClip({
+    const placed = fixture.sustainPedal.placeInClip({
       baseRevision: fixture.session.modelRevision,
       channel: parseMidiChannel(0),
       clipId: fixture.presentation.clipId,
@@ -1686,15 +1628,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiSustainPedal: fixture.projectMidiSustainPedal,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes, fixture.sustainPedal),
       },
     })
     await nextTick()
@@ -1828,7 +1762,7 @@ describe('ProjectPianoRollSurface', () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-remove')
     const noteIds = [
-      fixture.projectMidiNotes.addMidiNote({
+      fixture.notes.add({
         expectedSession: fixture.session,
         baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
@@ -1836,7 +1770,7 @@ describe('ProjectPianoRollSurface', () => {
         pitch: parseMidiPitch(60),
         requestedDurationTick: parsePositiveTick(240),
       }).noteId,
-      fixture.projectMidiNotes.addMidiNote({
+      fixture.notes.add({
         expectedSession: fixture.session,
         baseRevision: fixture.session.modelRevision,
         clipId: fixture.presentation.clipId,
@@ -1858,12 +1792,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: fixture.projectMidiNotes,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, fixture.notes),
       },
     })
     await nextTick()
@@ -1925,7 +1854,7 @@ describe('ProjectPianoRollSurface', () => {
   it('keeps the selection and reports a handled failure when Note removal is rejected', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-remove-failure')
-    fixture.projectMidiNotes.addMidiNote({
+    fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -1937,16 +1866,14 @@ describe('ProjectPianoRollSurface', () => {
     const pinia = createPinia()
     const toasts = useUiToastStore(pinia)
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
-    const rejectedCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
-      addMidiNote: (input: AddMidiNoteInput) => fixture.projectMidiNotes.addMidiNote(input),
-      moveMidiNotes: (input: MoveMidiNotesInput) => fixture.projectMidiNotes.moveMidiNotes(input),
-      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
-        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
-      removeMidiNotes: () => {
+    const rejectedCoordinator: NoteEdits = Object.freeze({
+      add: (input: AddNoteInput) => fixture.notes.add(input),
+      move: (input: MoveNotesInput) => fixture.notes.move(input),
+      placeOnTrack: (input: PlaceNoteOnTrackInput) => fixture.notes.placeOnTrack(input),
+      remove: () => {
         throw new Error('Test Project rejected the Note removal')
       },
-      resizeMidiNote: (input: ResizeMidiNoteInput) =>
-        fixture.projectMidiNotes.resizeMidiNote(input),
+      resize: (input: ResizeNoteInput) => fixture.notes.resize(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
@@ -1958,12 +1885,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: rejectedCoordinator,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, rejectedCoordinator),
       },
     })
     await nextTick()
@@ -1994,7 +1916,7 @@ describe('ProjectPianoRollSurface', () => {
   it('keeps selection and reports a visible failure when Pencil creation is rejected', async () => {
     installSurfaceEnvironment()
     const fixture = createInteractiveFixture('surface-failure')
-    fixture.projectMidiNotes.addMidiNote({
+    fixture.notes.add({
       expectedSession: fixture.session,
       baseRevision: fixture.session.modelRevision,
       clipId: fixture.presentation.clipId,
@@ -2006,17 +1928,14 @@ describe('ProjectPianoRollSurface', () => {
     const pinia = createPinia()
     const toasts = useUiToastStore(pinia)
     usePianoRollPreferencesStore(pinia).activateTool(PIANO_ROLL_TOOL.CURSOR)
-    const rejectedCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
-      addMidiNote: () => {
+    const rejectedCoordinator: NoteEdits = Object.freeze({
+      add: () => {
         throw new Error('Test Project rejected the Note')
       },
-      moveMidiNotes: (input: MoveMidiNotesInput) => fixture.projectMidiNotes.moveMidiNotes(input),
-      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
-        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
-      removeMidiNotes: (input: RemoveMidiNotesInput) =>
-        fixture.projectMidiNotes.removeMidiNotes(input),
-      resizeMidiNote: (input: ResizeMidiNoteInput) =>
-        fixture.projectMidiNotes.resizeMidiNote(input),
+      move: (input: MoveNotesInput) => fixture.notes.move(input),
+      placeOnTrack: (input: PlaceNoteOnTrackInput) => fixture.notes.placeOnTrack(input),
+      remove: (input: RemoveNotesInput) => fixture.notes.remove(input),
+      resize: (input: ResizeNoteInput) => fixture.notes.resize(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
@@ -2028,12 +1947,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: rejectedCoordinator,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, rejectedCoordinator),
       },
     })
     await nextTick()
@@ -2080,21 +1994,18 @@ describe('ProjectPianoRollSurface', () => {
     const keyboard = createTestStudioActionRuntime()
     const pinia = createPinia()
     const toasts = useUiToastStore(pinia)
-    const selectionFailureCoordinator: ProjectMidiNoteCoordinator = Object.freeze({
-      addMidiNote: (input: AddMidiNoteInput) => {
-        const result = fixture.projectMidiNotes.addMidiNote(input)
+    const selectionFailureCoordinator: NoteEdits = Object.freeze({
+      add: (input: AddNoteInput) => {
+        const result = fixture.notes.add(input)
         return Object.freeze({
           ...result,
           noteId: parseNoteId('surface-selection-failure-missing-note'),
         })
       },
-      moveMidiNotes: (input: MoveMidiNotesInput) => fixture.projectMidiNotes.moveMidiNotes(input),
-      placeMidiNoteOnTrack: (input: PlaceMidiNoteOnTrackInput) =>
-        fixture.projectMidiNotes.placeMidiNoteOnTrack(input),
-      removeMidiNotes: (input: RemoveMidiNotesInput) =>
-        fixture.projectMidiNotes.removeMidiNotes(input),
-      resizeMidiNote: (input: ResizeMidiNoteInput) =>
-        fixture.projectMidiNotes.resizeMidiNote(input),
+      move: (input: MoveNotesInput) => fixture.notes.move(input),
+      placeOnTrack: (input: PlaceNoteOnTrackInput) => fixture.notes.placeOnTrack(input),
+      remove: (input: RemoveNotesInput) => fixture.notes.remove(input),
+      resize: (input: ResizeNoteInput) => fixture.notes.resize(input),
     })
     const wrapper = mount(ProjectPianoRollSurface, {
       attachTo: document.body,
@@ -2106,12 +2017,7 @@ describe('ProjectPianoRollSurface', () => {
       },
       global: {
         plugins: [pinia],
-        provide: {
-          [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: Object.freeze({
-            projectMidiNotes: selectionFailureCoordinator,
-          }),
-          ...keyboard.provide,
-        },
+        provide: provideSurfaceServices(keyboard, selectionFailureCoordinator),
       },
     })
     await nextTick()

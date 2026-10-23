@@ -1,12 +1,5 @@
-import {
-  ARRANGEMENT_ACTION_TARGETS_KEY,
-  PIANO_ROLL_TOOL_ACTION_TARGET_KEY,
-  PROJECT_WORKBENCH_ACTION_TARGET_KEY,
-  STUDIO_ACTION_CONTEXT_KEY,
-  STUDIO_EDITOR_ACTION_CONTEXT_KEY,
-  STUDIO_INTERFACE_ACTION_TARGET_KEY,
-} from '@/symbols'
 import { onTestFinished } from 'vitest'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import {
   createStudioActionRuntime,
   type StudioActionRuntimeOptions,
@@ -38,13 +31,7 @@ export function createTestStudioActionRuntime(
     storage,
     runtime,
     failures,
-    provide: {
-      [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime,
-      [PIANO_ROLL_TOOL_ACTION_TARGET_KEY as symbol]: runtime.pianoRollToolTarget,
-      [STUDIO_EDITOR_ACTION_CONTEXT_KEY as symbol]: runtime,
-      [STUDIO_INTERFACE_ACTION_TARGET_KEY as symbol]: runtime.interfaceTarget,
-      [ARRANGEMENT_ACTION_TARGETS_KEY as symbol]: runtime,
-      [PROJECT_WORKBENCH_ACTION_TARGET_KEY as symbol]: runtime.workbenchTarget,
-    },
+    /** Provides only the action services; tests needing more call `provideTestStudioServices`. */
+    provide: provideTestStudioServices({ actions: runtime }),
   }
 }

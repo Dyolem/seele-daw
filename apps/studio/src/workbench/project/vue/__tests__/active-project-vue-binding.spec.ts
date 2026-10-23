@@ -1,13 +1,10 @@
-import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/symbols'
-import { createApp, isProxy, isReadonly, isShallow } from 'vue'
+import { isProxy, isReadonly, isShallow } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createActiveProjectService,
   type ActiveProjectService,
 } from '@/workbench/project/active-project-service'
-import { useActiveProject } from '@/workbench/project/vue/active-project-context'
 import { createActiveProjectVueBinding } from '@/workbench/project/vue/active-project-vue-binding'
-import { ActiveProjectVueError } from '@/workbench/project/vue/active-project-vue-error'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
@@ -69,7 +66,6 @@ describe('ActiveProjectVueBinding', () => {
     expect(isShallow(state)).toBe(true)
     expect(isReadonly(state)).toBe(true)
     expect(isProxy(state.value)).toBe(false)
-    expect(binding.stateDeliveryFailure.value).toBeNull()
 
     const creating = activeProject.create()
     expect(state.value).toBe(activeProject.state)
@@ -124,26 +120,6 @@ describe('ActiveProjectVueBinding', () => {
     activeProject.dispose()
   })
 
-  it('provides the same scoped Context and reports a missing Provider explicitly', () => {
-    const { activeProject } = createServiceFixture()
-    const binding = createActiveProjectVueBinding(activeProject)
-    const providedApp = createApp({ render: () => null })
-    providedApp.provide(ACTIVE_PROJECT_CONTEXT_KEY, binding.context)
-    const missingApp = createApp({ render: () => null })
-
-    expect(providedApp.runWithContext(() => useActiveProject())).toBe(binding.context)
-    expect(() => missingApp.runWithContext(() => useActiveProject())).toThrowError(
-      expect.objectContaining({
-        name: 'ActiveProjectVueError',
-        code: 'missing-context',
-      }),
-    )
-    expect(() => missingApp.runWithContext(() => useActiveProject())).toThrow(ActiveProjectVueError)
-
-    binding.dispose()
-    activeProject.dispose()
-  })
-
   it('stops observing without disposing the Active Project Service', async () => {
     const firstProjectId = createTestProjectId('vue-dispose-first')
     const secondProjectId = createTestProjectId('vue-dispose-second')
@@ -162,7 +138,8 @@ describe('ActiveProjectVueBinding', () => {
     activeProject.dispose()
   })
 
-  it('exposes an explicit state delivery failure channel', () => {
+  it('reports a state delivery failure instead of dropping it', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const state = Object.freeze<ActiveProjectState>({ phase: ACTIVE_PROJECT_PHASE.IDLE })
     const failure = Object.freeze<ActiveProjectStateDeliveryFailure>({
       state,
@@ -185,9 +162,7 @@ describe('ActiveProjectVueBinding', () => {
 
     const binding = createActiveProjectVueBinding(activeProject)
 
-    expect(binding.stateDeliveryFailure.value).toBe(failure)
-    expect(isShallow(binding.stateDeliveryFailure)).toBe(true)
-    expect(isReadonly(binding.stateDeliveryFailure)).toBe(true)
+    expect(consoleError).toHaveBeenCalledWith(expect.any(String), failure)
     binding.dispose()
     expect(unsubscribe).toHaveBeenCalledOnce()
   })

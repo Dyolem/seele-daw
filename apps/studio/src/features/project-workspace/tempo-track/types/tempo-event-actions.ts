@@ -1,6 +1,6 @@
 import type {
   ModelRevision,
-  ProjectCommandExecutionResult,
+  ProjectCommit,
   ProjectSession,
   TempoEventId,
 } from '@seele-daw/project-core'
@@ -11,6 +11,6 @@ import type { TempoTrackDragIntent } from './tempo-track-drag'
 export interface TempoEventActionContext {
   readonly session: ProjectSession | null
   readonly projectedRevision: ModelRevision | null
-  commitDrag(intent: TempoTrackDragIntent): ProjectCommandExecutionResult
+  commitDrag(intent: TempoTrackDragIntent): ProjectCommit | null
   removeTempoEvent(tempoEventId: TempoEventId): StudioActionCompletion
 }

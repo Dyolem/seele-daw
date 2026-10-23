@@ -1,5 +1,4 @@
-import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/symbols'
-import { createApp, isProxy, isReadonly, isShallow } from 'vue'
+import { isProxy, isReadonly, isShallow } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
@@ -13,7 +12,6 @@ import type {
   ProjectPlaybackVisualFramePort,
   ProjectPlaybackVisualPosition,
 } from '@/workbench/project/playback/project-playback-visual-position'
-import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
 import { createProjectPlaybackVueBinding } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 
 const INITIAL_STATE = Object.freeze<ProjectPlaybackState>({
@@ -135,14 +133,6 @@ describe('ProjectPlaybackVueBinding', () => {
     expect(binding.context.visualPosition.value).toBe(resumedPosition)
     expect(visualFrame.callbacks.size).toBe(1)
 
-    const app = createApp({ render: () => null })
-    app.provide(PROJECT_PLAYBACK_CONTEXT_KEY, binding.context)
-    expect(app.runWithContext(() => useProjectPlayback())).toBe(binding.context)
-    const missingApp = createApp({ render: () => null })
-    expect(() => missingApp.runWithContext(() => useProjectPlayback())).toThrowError(
-      expect.objectContaining({ code: 'missing-context', name: 'ProjectPlaybackError' }),
-    )
-
     binding.dispose()
     binding.dispose()
     expect(visualFrame.callbacks.size).toBe(0)
@@ -249,7 +239,8 @@ describe('ProjectPlaybackVueBinding', () => {
     binding.dispose()
   })
 
-  it('exposes observer delivery failures without replacing playback state', () => {
+  it('reports observer delivery failures without replacing playback state', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const fixture = createCoordinatorFixture()
     const binding = createProjectPlaybackVueBinding(
       fixture.coordinator,
@@ -262,9 +253,7 @@ describe('ProjectPlaybackVueBinding', () => {
 
     fixture.publishFailure(failure)
 
-    expect(binding.stateDeliveryFailure.value).toBe(failure)
-    expect(isShallow(binding.stateDeliveryFailure)).toBe(true)
-    expect(isReadonly(binding.stateDeliveryFailure)).toBe(true)
+    expect(consoleError).toHaveBeenCalledWith(expect.any(String), failure)
     expect(binding.context.state.value).toBe(INITIAL_STATE)
     binding.dispose()
   })

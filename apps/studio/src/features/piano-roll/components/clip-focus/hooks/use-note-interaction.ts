@@ -29,7 +29,7 @@ import {
   STUDIO_ACTION_NOT_APPLIED,
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
-import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { useStudio } from '@/workbench/studio-services'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 
 /** Owns browser capture and forwards neutral input to the Editor interaction authority. */
@@ -52,7 +52,7 @@ export function useNoteInteraction({
 }): PianoRollNoteInteraction {
   const { canvasHost, surfaceElement } = elements
   const { noteState } = model
-  const { projectMidiNotes } = useProjectMidiNotes()
+  const { notes } = useStudio().edits
   const pianoRollPreferences = usePianoRollPreferencesStore()
   const toasts = useUiToastStore()
   const interactionState = shallowRef<PianoRollInteractionState>(interactionSession.state)
@@ -64,7 +64,7 @@ export function useNoteInteraction({
     getSession: () => props.session,
     getEditorSession: () => model.editorSession,
     interactionSession,
-    projectMidiNotes,
+    notes,
     reportDanger: (title, description) => toasts.danger(title, description),
     reportWarning: (title, description) => toasts.warning(title, description),
     setFailureMessage: (message) => {

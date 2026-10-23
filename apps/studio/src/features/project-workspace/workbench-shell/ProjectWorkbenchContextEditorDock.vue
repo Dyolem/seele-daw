@@ -34,7 +34,7 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import type { RuntimeUnavailableBuiltInInstrumentPreset } from '@/workbench/instrument/built-in-instrument-catalogue'
-import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
+import { useStudio } from '@/workbench/studio-services'
 
 interface ProjectWorkbenchContextEditorDockProps {
   readonly barSpanTick: Tick
@@ -50,7 +50,7 @@ interface ProjectWorkbenchContextEditorDockProps {
 }
 
 const props = defineProps<ProjectWorkbenchContextEditorDockProps>()
-const { projectTracks } = useProjectTracks()
+const { tracks: trackEdits } = useStudio().edits
 const pianoRollPreferences = usePianoRollPreferencesStore()
 const toasts = useUiToastStore()
 const emit = defineEmits<{
@@ -101,7 +101,7 @@ function selectBuiltInInstrument(soundbankIdInput: unknown): void {
   }
 
   try {
-    projectTracks.selectBuiltInInstrument(track.id, parseSoundbankId(soundbankIdInput))
+    trackEdits.selectBuiltInInstrument(track.id, parseSoundbankId(soundbankIdInput))
   } catch (cause) {
     toasts.danger(
       'Instrument could not be selected',

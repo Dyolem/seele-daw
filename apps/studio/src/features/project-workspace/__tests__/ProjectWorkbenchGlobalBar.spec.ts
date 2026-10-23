@@ -1,4 +1,4 @@
-import { STUDIO_ACTION_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { HotkeyManager } from '@tanstack/hotkeys'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -37,7 +37,7 @@ describe('Workbench menu keyboard ownership', () => {
     runtime.interactionTarget.bind({ isActive: () => true, cancel })
     const wrapper = mount(ProjectAddTrackMenu, {
       attachTo: document.body,
-      global: { provide: { [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime } },
+      global: { provide: provideTestStudioServices({ actions: runtime }) },
     })
     onTestFinished(() => {
       wrapper.unmount()
@@ -159,7 +159,7 @@ describe('Workbench menu keyboard ownership', () => {
       },
       {
         attachTo: document.body,
-        global: { provide: { [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime } },
+        global: { provide: provideTestStudioServices({ actions: runtime }) },
       },
     )
     onTestFinished(() => {
@@ -242,7 +242,7 @@ describe('Workbench menu keyboard ownership', () => {
         },
         {
           attachTo: document.body,
-          global: { provide: { [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime } },
+          global: { provide: provideTestStudioServices({ actions: runtime }) },
         },
       )
       onTestFinished(() => {
@@ -312,7 +312,7 @@ describe('Workbench menu keyboard ownership', () => {
         actionControls: presentProjectWorkbenchActions(runtime.actions, runtime.keyboard),
         saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
       },
-      global: { provide: { [STUDIO_ACTION_CONTEXT_KEY as symbol]: runtime } },
+      global: { provide: provideTestStudioServices({ actions: runtime }) },
     })
     onTestFinished(() => {
       wrapper.unmount()

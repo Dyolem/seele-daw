@@ -1,4 +1,5 @@
 import {
+  PROJECT_COMMAND_EXECUTION_STATUS,
   createAddTempoEventCommand,
   createInitialProjectSession,
   createMoveTempoEventCommand,
@@ -50,7 +51,7 @@ export function createTempoTrackTestActions(
   const projectedRevision = shallowRef(session.value.modelRevision)
   const commitDrag = vi.fn<TempoEventActionContext['commitDrag']>((intent) => {
     if (session.value !== intent.target.expectedSession) throw new Error('Stale Tempo target')
-    return session.value.execute(
+    const result = session.value.execute(
       intent.axis === 'tick'
         ? createMoveTempoEventCommand({
             baseRevision: intent.target.baseRevision,
@@ -63,6 +64,7 @@ export function createTempoTrackTestActions(
             bpm: intent.bpm,
           }),
     )
+    return result.status === PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED ? result.commit : null
   })
   const remove = vi.fn<TempoEventActionContext['removeTempoEvent']>(() => STUDIO_ACTION_COMPLETED)
   const context: TempoEventActionContext = {

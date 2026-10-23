@@ -1,3 +1,4 @@
+import { parseDeviceTypeId } from '@seele-daw/project-core'
 import { parseSoundbankId, type SoundbankId } from '@seele-daw/playback'
 
 import presetSourceSnapshot from './built-in-instrument-preset-source-snapshot.json'
@@ -552,3 +553,6 @@ export function findGeneralMidiProgramRoute(
   }
   return GENERAL_MIDI_PROGRAM_ROUTES[programNumberInput] ?? null
 }
+
+/** Device type of the empty instrument slot that early projects stored before built-ins existed. */
+export const INSTRUMENT_SLOT_DEVICE_TYPE_ID = parseDeviceTypeId('seele.instrument-slot')

@@ -10,8 +10,8 @@ import type {
   ProjectSession,
   MidiSustainPedalEventId,
 } from '@seele-daw/project-core'
-import type { ProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
-import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import type { NoteEdits } from '@/workbench/edits/note-edits'
+import type { SustainPedalEdits } from '@/workbench/edits/sustain-pedal-edits'
 
 export interface ProjectPianoRollIntentHandlerDependencies {
   readonly getAuthorityRevision: () => ModelRevision | null
@@ -21,7 +21,7 @@ export interface ProjectPianoRollIntentHandlerDependencies {
     PianoRollInteractionSession,
     'claimCompletion' | 'resolveCommit' | 'finish'
   >
-  readonly projectMidiNotes: ProjectMidiNoteCoordinator
+  readonly notes: NoteEdits
   readonly reportDanger: (title: string, description: string) => void
   readonly reportWarning: (title: string, description: string) => void
   readonly setFailureMessage: (message: string | null) => void
@@ -35,7 +35,7 @@ export interface ProjectPianoRollSustainPedalIntentHandlerDependencies {
     PianoRollSustainPedalInteractionSession,
     'claimCompletion' | 'resolveCommit' | 'finish'
   >
-  readonly projectMidiSustainPedal: ProjectMidiSustainPedalCoordinator
+  readonly sustainPedal: SustainPedalEdits
   readonly reportFailure: (cause: unknown, committed?: boolean) => void
   readonly reportSuccess: () => void
   readonly setSelectedEventIds: (eventIds: readonly MidiSustainPedalEventId[]) => void

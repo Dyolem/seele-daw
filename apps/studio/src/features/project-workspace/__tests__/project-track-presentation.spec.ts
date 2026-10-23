@@ -30,7 +30,7 @@ import {
   MIDI_PROGRAM_PLACEHOLDER_DEVICE_DEFINITION,
   createMidiProgramPlaceholderDeviceDescriptor,
 } from '@/workbench/instrument/midi-import-instrument-policy'
-import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/project/track/project-track-coordinator'
+import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/instrument/built-in-instrument-catalogue'
 
 function createSession(): ProjectSession {
   return createInitialProjectSession({

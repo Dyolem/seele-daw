@@ -22,7 +22,7 @@ import {
   useStudioEditorSelectionTarget,
   useStudioInteractionTarget,
 } from '@/workbench/actions/vue/studio-editor-action-context'
-import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { useStudio } from '@/workbench/studio-services'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 
 /** Routes context menus and shared Actions to the most recently focused editing target. */
@@ -44,7 +44,7 @@ export function useEditingActions({
   const { surfaceElement, canvasHost, sustainPedalLane } = elements
   const { editorState } = model
   const interactionState = interaction.state
-  const { projectMidiNotes } = useProjectMidiNotes()
+  const { notes } = useStudio().edits
   const pianoRollPreferences = usePianoRollPreferencesStore()
   const toasts = useUiToastStore()
   function isPianoRollFocused(): boolean {
@@ -100,7 +100,7 @@ export function useEditingActions({
     const selectedNoteIds = editorState.value?.selectedNoteIds ?? []
     if (selectedNoteIds.length === 0) return STUDIO_ACTION_NOT_APPLIED
     try {
-      projectMidiNotes.removeMidiNotes({
+      notes.remove({
         clipId: props.presentation.context.clipId,
         noteIds: selectedNoteIds,
       })

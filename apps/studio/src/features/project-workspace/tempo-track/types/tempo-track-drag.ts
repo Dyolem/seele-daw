@@ -6,7 +6,7 @@ import type {
   TempoEventId,
   Tick,
 } from '@seele-daw/project-core'
-import type { ProjectTempoEventEditTarget } from '@/workbench/project/tempo-event/types/tempo-event-edit'
+import type { TempoEditTarget } from '@/workbench/edits/tempo-edits'
 import type { ProjectTempoTrackDragAxis, ProjectTempoTrackScale } from './tempo-track'
 
 export interface TempoTrackEventPreview {
@@ -37,7 +37,7 @@ export type TempoTrackDragResult =
 export type TempoTrackDragIntent = TempoTrackDragResult &
   Readonly<{
     interactionId: InteractionId
-    target: ProjectTempoEventEditTarget
+    target: TempoEditTarget
   }>
 
 export interface TempoTrackDragPreview extends TempoTrackEventPreview {

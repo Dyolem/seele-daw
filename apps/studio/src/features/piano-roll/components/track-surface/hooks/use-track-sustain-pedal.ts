@@ -3,7 +3,7 @@ import { createPianoRollTrackSustainPedalLaneReadModel } from '@seele-daw/editor
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
-import { ProjectMidiSustainPedalError } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-error'
+import { ProjectEditError } from '@/workbench/edits/edit-session'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 
 export function useTrackSustainPedal({
@@ -34,10 +34,8 @@ export function useTrackSustainPedal({
       return
     }
     if (
-      cause instanceof ProjectMidiSustainPedalError &&
-      ['target-clip-looped', 'timeline-tick-outside-clip', 'track-active-clip-required'].includes(
-        cause.code,
-      )
+      cause instanceof ProjectEditError &&
+      (cause.code === 'unsupported' || cause.code === 'not-placeable')
     ) {
       toasts.warning('Sustain Pedal edit needs attention', message)
       return

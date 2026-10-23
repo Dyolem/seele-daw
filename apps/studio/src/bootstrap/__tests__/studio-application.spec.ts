@@ -5,7 +5,7 @@ import {
 } from '@seele-daw/midi-file'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
 import { defineStore } from 'pinia'
-import { defineComponent, h, onUnmounted } from 'vue'
+import { createApp, defineComponent, h, onUnmounted } from 'vue'
 import { createMemoryHistory, createRouter, useRouter, type Router } from 'vue-router'
 import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
 import { decodeSampleInstrumentDeviceState } from '@seele-daw/playback'
@@ -14,10 +14,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import { composeStudioApplication } from '@/bootstrap/studio-application'
-import {
-  useStudioActions,
-  type StudioActionVueContext,
-} from '@/workbench/actions/vue/studio-action-context'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import { decodeMidiProgramPlaceholderDeviceState } from '@/workbench/instrument/midi-import-instrument-policy'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
@@ -27,47 +23,20 @@ import {
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
 import type { BrowserActiveProjectRuntime } from '@/workbench/project/browser-active-project-runtime'
-import {
-  useProjectClips,
-  type ProjectClipVueContext,
-} from '@/workbench/project/clip/vue/project-clip-context'
 import { PROJECT_ENTRY_RESOLUTION_KIND } from '@/workbench/project/entry/project-entry-coordinator'
-import {
-  useProjectEntry,
-  type ProjectEntryVueContext,
-} from '@/workbench/project/entry/vue/project-entry-context'
-import {
-  useProjectMidiNotes,
-  type ProjectMidiNoteVueContext,
-} from '@/workbench/project/midi-note/vue/project-midi-note-context'
-import {
-  useProjectMidiImport,
-  type ProjectMidiImportVueContext,
-} from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import type {
   ProjectPlaybackRuntimePort,
   ProjectPlaybackTimerPort,
 } from '@/workbench/project/playback/project-playback-coordinator'
 import type { ProjectPlaybackVisualFramePort } from '@/workbench/project/playback/project-playback-visual-position'
 import {
-  useProjectPlayback,
-  type ProjectPlaybackVueContext,
-} from '@/workbench/project/playback/vue/project-playback-context'
-import {
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
   PROJECT_NAVIGATION_DECISION,
   PROJECT_NAVIGATION_INTENT_KIND,
   PROJECT_NAVIGATION_PROCEED_REASON,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import {
-  useProjectNavigationDecision,
-  type ProjectNavigationDecisionVueContext,
-} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
-import {
-  useProjectTracks,
-  type ProjectTrackVueContext,
-} from '@/workbench/project/track/vue/project-track-context'
-import { useActiveProject } from '@/workbench/project/vue/active-project-context'
+import type { ProjectNavigationDecisionVueContext } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
+import { useStudio, type StudioServices } from '@/workbench/studio-services'
 
 interface RuntimeFixture {
   readonly createFromSession: ReturnType<typeof vi.fn<ActiveProjectService['createFromSession']>>
@@ -176,55 +145,9 @@ function requireNavigationDecisionContext(
   return context
 }
 
-function requireProjectEntryContext(
-  context: ProjectEntryVueContext | null,
-): ProjectEntryVueContext {
-  if (context === null) throw new Error('Expected the Project Entry Context')
-  return context
-}
-
-function requireProjectTrackContext(
-  context: ProjectTrackVueContext | null,
-): ProjectTrackVueContext {
-  if (context === null) throw new Error('Expected the Project Track Context')
-  return context
-}
-
-function requireProjectClipContext(context: ProjectClipVueContext | null): ProjectClipVueContext {
-  if (context === null) throw new Error('Expected the Project Clip Context')
-  return context
-}
-
-function requireProjectMidiNoteContext(
-  context: ProjectMidiNoteVueContext | null,
-): ProjectMidiNoteVueContext {
-  if (context === null) {
-    throw new Error('Expected the Project MIDI Note Context')
-  }
-  return context
-}
-
-function requireProjectMidiImportContext(
-  context: ProjectMidiImportVueContext | null,
-): ProjectMidiImportVueContext {
-  if (context === null) {
-    throw new Error('Expected the Project MIDI Import Context')
-  }
-  return context
-}
-
-function requireActionContext(context: StudioActionVueContext | null): StudioActionVueContext {
-  if (context === null) {
-    throw new Error('Expected the Studio Action Context')
-  }
-  return context
-}
-
-function requireProjectPlaybackContext(
-  context: ProjectPlaybackVueContext | null,
-): ProjectPlaybackVueContext {
-  if (context === null) throw new Error('Expected the Project Playback Context')
-  return context
+function requireServices(services: StudioServices | null): StudioServices {
+  if (services === null) throw new Error('Expected the provided Studio services')
+  return services
 }
 
 function createCompositionOptions() {
@@ -243,37 +166,24 @@ function createTrackedPlaybackRuntime(order: string[]): ProjectPlaybackRuntimePo
 }
 
 describe('StudioApplication', () => {
-  it('installs Pinia and Router while providing the owned Active Project Context', () => {
+  it('installs Pinia and Router while providing the owned Studio services', () => {
     const fixture = createRuntimeFixture()
     const router = createTestRouter()
     const useCompositionStore = defineStore('studio-composition-root', {
       state: () => ({ label: 'pinia' }),
     })
-    let projectEntryContext: ProjectEntryVueContext | null = null
-    let projectClipContext: ProjectClipVueContext | null = null
-    let projectMidiImportContext: ProjectMidiImportVueContext | null = null
-    let projectMidiNoteContext: ProjectMidiNoteVueContext | null = null
-    let projectTrackContext: ProjectTrackVueContext | null = null
-    let actionContext: StudioActionVueContext | null = null
-    let projectPlaybackContext: ProjectPlaybackVueContext | null = null
+    let services: StudioServices | null = null
     const rootComponent = defineComponent({
       setup() {
-        const activeProject = useActiveProject()
-        projectEntryContext = useProjectEntry()
-        projectClipContext = useProjectClips()
-        projectMidiImportContext = useProjectMidiImport()
-        projectMidiNoteContext = useProjectMidiNotes()
-        projectTrackContext = useProjectTracks()
-        actionContext = useStudioActions()
-        projectPlaybackContext = useProjectPlayback()
-        const projectNavigationDecision = useProjectNavigationDecision()
+        const studio = useStudio()
+        services = studio
         const installedRouter = useRouter()
         const store = useCompositionStore()
 
         return () =>
           h(
             'p',
-            `${activeProject.state.value.phase}|${projectNavigationDecision.pendingDecision.value === null}|${store.label}|${installedRouter === router}`,
+            `${studio.project.state.value.phase}|${studio.navigation.pendingDecision.value === null}|${store.label}|${installedRouter === router}`,
           )
       },
     })
@@ -290,24 +200,25 @@ describe('StudioApplication', () => {
     application.mount(container)
 
     expect(container.textContent).toBe('idle|true|pinia|true')
-    expect(requireProjectEntryContext(projectEntryContext).projectEntry).toBe(
-      application.projectEntry,
-    )
-    expect(Object.isFrozen(requireProjectClipContext(projectClipContext).projectClips)).toBe(true)
-    expect(requireProjectMidiImportContext(projectMidiImportContext).projectMidiImport).toBe(
-      application.projectMidiImport,
-    )
-    expect(
-      Object.isFrozen(requireProjectMidiNoteContext(projectMidiNoteContext).projectMidiNotes),
-    ).toBe(true)
-    expect(Object.isFrozen(requireProjectTrackContext(projectTrackContext).projectTracks)).toBe(
-      true,
-    )
-    expect(requireActionContext(actionContext).actions.catalogue).toHaveLength(19)
-    expect(requireProjectPlaybackContext(projectPlaybackContext).state.value.phase).toBe(
-      'unavailable',
-    )
+    const provided = requireServices(services)
+    expect(provided.projectEntry).toBe(application.projectEntry)
+    expect(provided.midiImport).toBe(application.projectMidiImport)
+    expect(Object.keys(provided.edits).sort()).toEqual([
+      'clips',
+      'notes',
+      'sustainPedal',
+      'tempo',
+      'tracks',
+    ])
+    expect(provided.actions.actions.catalogue).toHaveLength(19)
+    expect(provided.playback.state.value.phase).toBe('unavailable')
     application.dispose()
+  })
+
+  it('rejects components that look for Studio services outside the application', () => {
+    expect(() => createApp({ render: () => null }).runWithContext(() => useStudio())).toThrow(
+      'Studio services have not been provided',
+    )
   })
 
   it('wires Project Navigation Confirmation to the provided Vue decision channel', async () => {
@@ -317,7 +228,7 @@ describe('StudioApplication', () => {
     const application = composeStudioApplication({
       rootComponent: defineComponent({
         setup() {
-          decisionContext = useProjectNavigationDecision()
+          decisionContext = useStudio().navigation
           return () => null
         },
       }),
@@ -368,7 +279,7 @@ describe('StudioApplication', () => {
     const application = composeStudioApplication({
       rootComponent: defineComponent({
         setup() {
-          decisionContext = useProjectNavigationDecision()
+          decisionContext = useStudio().navigation
           return () => null
         },
       }),
@@ -401,7 +312,7 @@ describe('StudioApplication', () => {
     const application = composeStudioApplication({
       rootComponent: defineComponent({
         setup() {
-          decisionContext = useProjectNavigationDecision()
+          decisionContext = useStudio().navigation
           return () => null
         },
       }),

@@ -1,5 +1,4 @@
-import { STUDIO_EDITOR_ACTION_CONTEXT_KEY } from '@/symbols'
-import { inject, onBeforeUnmount, watch, type WatchSource } from 'vue'
+import { onBeforeUnmount, watch, type WatchSource } from 'vue'
 import type {
   StudioEditorSelectionTarget,
   StudioInteractionTarget,
@@ -8,6 +7,7 @@ import type {
   StudioActionTargetBinding,
   StudioActionTargetSlot,
 } from '@/workbench/actions/studio-action-target'
+import { useStudio } from '@/workbench/studio-services'
 
 export interface StudioEditorActionContext {
   readonly selectionTarget: StudioActionTargetSlot<StudioEditorSelectionTarget>
@@ -15,9 +15,7 @@ export interface StudioEditorActionContext {
 }
 
 export function useStudioEditorActionTargets(): StudioEditorActionContext {
-  const targets = inject(STUDIO_EDITOR_ACTION_CONTEXT_KEY, null)
-  if (targets === null) throw new Error('Studio editor Action targets have not been provided')
-  return targets
+  return useStudio().actions
 }
 
 /** Focus selects a capability. Mounting another surface never steals that selection target. */

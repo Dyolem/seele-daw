@@ -96,7 +96,7 @@ function handleAddNoteIntent(
 
   let addedNoteId: NoteId
   try {
-    const result = dependencies.projectMidiNotes.addMidiNote({
+    const result = dependencies.notes.add({
       expectedSession: intent.target.session,
       baseRevision: intent.target.baseRevision,
       clipId: intent.target.context.clipId,
@@ -142,10 +142,10 @@ function handleMoveNotesIntent(
 
   try {
     const preview = intent.preview
-    const result =
+    const commit =
       preview.deltaTick === 0 && preview.deltaPitch === 0
         ? null
-        : dependencies.projectMidiNotes.moveMidiNotes({
+        : dependencies.notes.move({
             baseRevision: intent.target.baseRevision,
             expectedSession: intent.target.session,
             clipId: intent.target.context.clipId,
@@ -154,8 +154,8 @@ function handleMoveNotesIntent(
             noteIds: preview.movedNoteIds,
           })
 
-    if (result !== null) {
-      if (!acknowledgeCommit(dependencies, intent, result.commit.modelRevision)) return
+    if (commit !== null) {
+      if (!acknowledgeCommit(dependencies, intent, commit.modelRevision)) return
       if (
         intent.gesture.selectOnlyOnCommit &&
         !selectOnlyCommittedNote(
@@ -190,7 +190,7 @@ function handleResizeNoteIntent(
   }
 
   try {
-    const result = dependencies.projectMidiNotes.resizeMidiNote({
+    const commit = dependencies.notes.resize({
       baseRevision: intent.target.baseRevision,
       expectedSession: intent.target.session,
       clipId: intent.target.context.clipId,
@@ -199,8 +199,8 @@ function handleResizeNoteIntent(
       sourceStartTick: intent.preview.sourceStartTick,
     })
 
-    if (result !== null) {
-      if (!acknowledgeCommit(dependencies, intent, result.commit.modelRevision)) return
+    if (commit !== null) {
+      if (!acknowledgeCommit(dependencies, intent, commit.modelRevision)) return
       if (
         intent.gesture.selectOnlyOnCommit &&
         !selectOnlyCommittedNote(

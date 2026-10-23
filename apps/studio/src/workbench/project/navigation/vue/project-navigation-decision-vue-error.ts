@@ -1,13 +1,6 @@
-export type ProjectNavigationDecisionVueErrorCode =
-  | 'binding-disposed'
-  | 'invalid-decision'
-  | 'missing-context'
+export type ProjectNavigationDecisionVueErrorCode = 'binding-disposed' | 'invalid-decision'
 
-export interface ProjectNavigationDecisionVueErrorDetails {
-  readonly decision?: unknown
-}
-
-/** Stable Vue adapter failures that do not redefine navigation confirmation outcomes. */
+/** Misuse of the dialog decision channel; navigation outcomes themselves are not errors. */
 export class ProjectNavigationDecisionVueError extends Error {
   readonly code: ProjectNavigationDecisionVueErrorCode
   readonly decision?: unknown
@@ -15,7 +8,7 @@ export class ProjectNavigationDecisionVueError extends Error {
   constructor(
     code: ProjectNavigationDecisionVueErrorCode,
     message: string,
-    details: ProjectNavigationDecisionVueErrorDetails = {},
+    details: { readonly decision?: unknown } = {},
   ) {
     super(message)
     this.name = 'ProjectNavigationDecisionVueError'

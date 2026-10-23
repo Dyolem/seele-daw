@@ -53,19 +53,16 @@ import {
 } from '@/workbench/actions/studio-action'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 import { useProjectWorkbenchActionTarget } from '@/features/project-workspace/actions/project-workbench-action-context'
-import { createProjectClipBarRange } from '@/workbench/project/clip/project-clip-bar-range'
+import { resolveInitialBarRange } from '@/workbench/edits/bar-range'
+import { staleEdit } from '@/workbench/edits/edit-session'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   type FailedProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
-import { useProjectTempoEvents } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
-import { ProjectTempoEventError } from '@/workbench/project/tempo-event/project-tempo-event-error'
 import type { TempoTrackDragIntent } from '@/features/project-workspace/tempo-track/types/tempo-track-drag'
-import { useActiveProject } from '@/workbench/project/vue/active-project-context'
+import { useStudio } from '@/workbench/studio-services'
 
 const props = defineProps<{
   readonly projectId: string
@@ -91,16 +88,17 @@ const DEFAULT_TEMPO_CONTROL_PRESENTATION = Object.freeze<ProjectTempoControlPres
   mode: PROJECT_TEMPO_CONTROL_MODE.SINGLE,
 })
 
-const { activeProject, state } = useActiveProject()
-const { projectEntry } = useProjectEntry()
-const { projectTempoEvents } = useProjectTempoEvents()
+const studio = useStudio()
+const { activeProject, state } = studio.project
+const { projectEntry } = studio
+const tempoEdits = studio.edits.tempo
 const { actions, keyboard } = useStudioActions()
 const workbenchActionTarget = useProjectWorkbenchActionTarget()
 const {
   projectPlayback,
   state: playbackState,
   visualPosition: playbackVisualPosition,
-} = useProjectPlayback()
+} = studio.playback
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const toasts = useUiToastStore()
 const router = useRouter()
@@ -308,7 +306,7 @@ function replaceSingleTempoBpm(bpm: TempoBpm): void {
     return
   }
 
-  projectTempoEvents.replaceTempoEventBpm({ bpm, tempoEventId: tempoEvent.id })
+  tempoEdits.replaceBpm({ bpm, tempoEventId: tempoEvent.id })
 }
 
 function commitTempoInput(input: string): void {
@@ -346,7 +344,7 @@ function addTempoEvent(bpm: TempoBpm, tick: Tick): void {
   const failureTitle = 'Tempo Event could not be added'
   if (!prepareTempoEventCommand(failureTitle)) return
   try {
-    const result = projectTempoEvents.addTempoEvent({ bpm, tick })
+    const result = tempoEdits.add({ bpm, tick })
     selectedTempoEventId.value = result.tempoEventId
   } catch (cause) {
     toasts.danger(failureTitle, describeTempoEditFailure(cause))
@@ -357,7 +355,7 @@ function moveTempoEvent(tempoEventId: TempoEventId, tick: Tick): void {
   const failureTitle = 'Tempo Event could not be moved'
   if (!prepareTempoEventCommand(failureTitle)) return
   try {
-    projectTempoEvents.moveTempoEvent({ tempoEventId, tick })
+    tempoEdits.move({ tempoEventId, tick })
   } catch (cause) {
     toasts.danger(failureTitle, describeTempoEditFailure(cause))
   }
@@ -369,7 +367,7 @@ function replaceTempoEventBpm(tempoEventId: TempoEventId, bpm: TempoBpm): void {
   const failureTitle = 'Tempo Event BPM could not be changed'
   if (!prepareTempoEventCommand(failureTitle)) return
   try {
-    projectTempoEvents.replaceTempoEventBpm({ bpm, tempoEventId })
+    tempoEdits.replaceBpm({ bpm, tempoEventId })
   } catch (cause) {
     toasts.danger(failureTitle, describeTempoEditFailure(cause))
   }
@@ -408,20 +406,17 @@ provide(TEMPO_EVENT_ACTION_CONTEXT_KEY, {
 
 function commitTempoDrag(intent: TempoTrackDragIntent) {
   if (readyProject.value?.session !== intent.target.expectedSession) {
-    throw new ProjectTempoEventError(
-      'tempo-event-edit-target-stale',
-      'The Tempo editing target changed. Try the gesture again.',
-    )
+    throw staleEdit()
   }
   if (!ensureTempoPlaybackIsInactive()) throw new Error('Playback could not be paused safely.')
   // The coordinator validates the captured Session again after playback preparation.
   return intent.axis === 'tick'
-    ? projectTempoEvents.moveTempoEvent({
+    ? tempoEdits.move({
         target: intent.target,
         tempoEventId: intent.tempoEventId,
         tick: intent.tick,
       })
-    : projectTempoEvents.replaceTempoEventBpm({
+    : tempoEdits.replaceBpm({
         target: intent.target,
         tempoEventId: intent.tempoEventId,
         bpm: intent.bpm,
@@ -432,7 +427,7 @@ function removeTempoEvent(tempoEventId: TempoEventId): StudioActionCompletion {
   const failureTitle = 'Tempo Event could not be removed'
   if (!prepareTempoEventCommand(failureTitle)) return STUDIO_ACTION_NOT_APPLIED
   try {
-    projectTempoEvents.removeTempoEvent(tempoEventId)
+    tempoEdits.remove(tempoEventId)
     if (selectedTempoEventId.value === tempoEventId) selectedTempoEventId.value = null
     return STUDIO_ACTION_COMPLETED
   } catch (cause) {
@@ -528,7 +523,7 @@ watch(
     const snapshot = ready.session.getSnapshot()
     const timeSignature = snapshot.timeSignatureEvents[0]
     projectPresentation.value = {
-      barSpanTick: createProjectClipBarRange(snapshot, ZERO_TICK).spanTick,
+      barSpanTick: resolveInitialBarRange(snapshot, ZERO_TICK).spanTick,
       projectId,
       projectName: snapshot.project.name,
       timeSignatureDenominator: timeSignature?.denominator ?? 4,

@@ -4,9 +4,9 @@ import { useRouter } from 'vue-router'
 
 import { createProjectEntryLocation, createProjectWorkspaceLocation } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
-import { useActiveProject } from '@/workbench/project/vue/active-project-context'
+import { useStudio } from '@/workbench/studio-services'
 
-const { activeProject } = useActiveProject()
+const { activeProject } = useStudio().project
 const router = useRouter()
 const failureMessage = shallowRef<string | null>(null)
 const isCreating = shallowRef(false)

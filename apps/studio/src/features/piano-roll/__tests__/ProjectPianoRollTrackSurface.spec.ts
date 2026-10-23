@@ -1,10 +1,5 @@
 import { installPianoRollResizeObserver } from '@/features/piano-roll/__tests__/support/piano-roll-resize-observer-test-support'
-import {
-  PROJECT_MIDI_NOTE_CONTEXT_KEY,
-  PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY,
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  PROJECT_TRACK_CONTEXT_KEY,
-} from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import {
   getPianoRollContextMenuItem,
   requestPianoRollContextMenu,
@@ -46,20 +41,18 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
+import { createClipEdits } from '@/workbench/edits/clip-edits'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import { createProjectMidiNoteCoordinator } from '@/workbench/project/midi-note/project-midi-note-coordinator'
-import { type ProjectMidiNoteVueContext } from '@/workbench/project/midi-note/vue/project-midi-note-context'
-import { createProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
-import { type ProjectMidiSustainPedalVueContext } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
+import { createNoteEdits } from '@/workbench/edits/note-edits'
+import { createSustainPedalEdits } from '@/workbench/edits/sustain-pedal-edits'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
-import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
+import { createTrackEdits } from '@/workbench/edits/track-edits'
 
 const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
   hasPointerCapture: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hasPointerCapture'),
@@ -208,16 +201,16 @@ function createSurfaceFixture(linkedClipStarts: readonly number[] = []) {
   })
   markRaw(session)
   const readyState = createReadyState(session)
-  const projectTracks = createProjectTrackCoordinator({
+  const tracks = createTrackEdits({
     activeProject: { state: readyState },
-    createRandomValue: () => 0,
-    createUniqueId: createIdentitySource('track-surface-track', 'track-surface-device'),
+    random: () => 0,
+    createId: createIdentitySource('track-surface-track', 'track-surface-device'),
   })
-  const track = projectTracks.addInstrumentTrack()
-  const clip = createProjectClipCoordinator({
+  const track = tracks.addInstrumentTrack()
+  const clip = createClipEdits({
     activeProject: { state: readyState },
-    createUniqueId: createIdentitySource('track-surface-clip', 'track-surface-source'),
-  }).addEmptyMidiClip({
+    createId: createIdentitySource('track-surface-clip', 'track-surface-source'),
+  }).addEmpty({
     targetTick: parseTick(0),
     trackId: track.trackId,
   })
@@ -272,26 +265,20 @@ function createSurfaceFixture(linkedClipStarts: readonly number[] = []) {
     throw new Error('Expected a ready Track Piano Roll presentation')
   }
 
-  const projectMidiNotes = createProjectMidiNoteCoordinator({
+  const notes = createNoteEdits({
     activeProject: { state: readyState },
-    createUniqueId: createIdentitySource(
+    createId: createIdentitySource(
       'track-surface-note',
       'track-surface-new-clip',
       'track-surface-new-source',
     ),
   })
-  const midiNoteContext: ProjectMidiNoteVueContext = Object.freeze({
-    projectMidiNotes,
-  })
-  const projectMidiSustainPedal = createProjectMidiSustainPedalCoordinator({
+  const sustainPedal = createSustainPedalEdits({
     activeProject: { state: readyState },
-    createUniqueId: createIdentitySource(
+    createId: createIdentitySource(
       'track-surface-sustain-pedal-event',
       'track-surface-later-event',
     ),
-  })
-  const midiSustainPedalContext: ProjectMidiSustainPedalVueContext = Object.freeze({
-    projectMidiSustainPedal,
   })
   const playbackState = shallowRef<ProjectPlaybackState>(
     Object.freeze({
@@ -339,13 +326,11 @@ function createSurfaceFixture(linkedClipStarts: readonly number[] = []) {
   selection.selectClip(track.trackId, clip.clipId)
   const global = {
     plugins: [pinia],
-    provide: {
-      [PROJECT_MIDI_NOTE_CONTEXT_KEY as symbol]: midiNoteContext,
-      [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: midiSustainPedalContext,
-      [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
-      [PROJECT_TRACK_CONTEXT_KEY as symbol]: { projectTracks },
-      ...keyboard.provide,
-    },
+    provide: provideTestStudioServices({
+      actions: keyboard.runtime,
+      edits: { notes, sustainPedal, tracks },
+      playback: playbackContext,
+    }),
   }
   const wrapper = mount(ProjectPianoRollTrackSurface, {
     attachTo: document.body,
@@ -368,7 +353,7 @@ function createSurfaceFixture(linkedClipStarts: readonly number[] = []) {
     playbackVisualPosition,
     presentation,
     projectionSnapshot,
-    projectMidiSustainPedal,
+    sustainPedal,
     selection,
     session,
     wrapper,
@@ -606,10 +591,10 @@ describe('ProjectPianoRollTrackSurface', () => {
 
   it('routes Pencil placement to the Header-selected Clip in a real overlapping Project', async () => {
     const { wrapper, session, selection, presentation, clip } = createSurfaceFixture()
-    const overlapping = createProjectClipCoordinator({
+    const overlapping = createClipEdits({
       activeProject: { state: createReadyState(session) },
-      createUniqueId: createIdentitySource('overlapping-clip', 'overlapping-source'),
-    }).addEmptyMidiClip({ targetTick: parseTick(0), trackId: presentation.trackId })
+      createId: createIdentitySource('overlapping-clip', 'overlapping-source'),
+    }).addEmpty({ targetTick: parseTick(0), trackId: presentation.trackId })
     const before = session.getSnapshot()
     const initial = createProjectPianoRollTrackPresentation(
       before,
@@ -1170,7 +1155,7 @@ describe('ProjectPianoRollTrackSurface', () => {
   it('selects an unselected Active Clip event from its context menu and deletes one History step', async () => {
     const fixture = createSurfaceFixture()
     const { clip, presentation, session, wrapper } = fixture
-    const event = fixture.projectMidiSustainPedal.placeInClip({
+    const event = fixture.sustainPedal.placeInClip({
       baseRevision: session.modelRevision,
       channel: parseMidiChannel(0),
       clipId: clip.clipId,
@@ -1206,12 +1191,12 @@ describe('ProjectPianoRollTrackSurface', () => {
   it('rejects inactive and mismatched Clip occurrences and closes when Active Clip is cleared', async () => {
     const fixture = createSurfaceFixture()
     const { clip, presentation, session, wrapper } = fixture
-    const laterClip = createProjectClipCoordinator({
+    const laterClip = createClipEdits({
       activeProject: { state: createReadyState(session) },
-      createUniqueId: createIdentitySource('context-later-clip', 'context-later-source'),
-    }).addEmptyMidiClip({ targetTick: parseTick(7680), trackId: presentation.trackId })
+      createId: createIdentitySource('context-later-clip', 'context-later-source'),
+    }).addEmpty({ targetTick: parseTick(7680), trackId: presentation.trackId })
     const placed = [clip, laterClip].map((target) =>
-      fixture.projectMidiSustainPedal.placeInClip({
+      fixture.sustainPedal.placeInClip({
         baseRevision: session.modelRevision,
         channel: parseMidiChannel(0),
         clipId: target.clipId,
@@ -1264,7 +1249,7 @@ describe('ProjectPianoRollTrackSurface', () => {
   it('prevents an old Track menu from retargeting after Clip Focus mounts before Track teardown', async () => {
     const fixture = createSurfaceFixture()
     const { clip, presentation, session, wrapper } = fixture
-    fixture.projectMidiSustainPedal.placeInClip({
+    fixture.sustainPedal.placeInClip({
       baseRevision: session.modelRevision,
       channel: parseMidiChannel(0),
       clipId: clip.clipId,

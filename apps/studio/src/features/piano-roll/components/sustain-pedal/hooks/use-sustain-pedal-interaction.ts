@@ -22,7 +22,7 @@ import {
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
 import { createProjectPianoRollSustainPedalIntentHandler } from '@/features/piano-roll/interaction/project-piano-roll-sustain-pedal-intent-handler'
-import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import type { SustainPedalEdits } from '@/workbench/edits/sustain-pedal-edits'
 import type { SustainPedalLaneReadModel } from '@/features/piano-roll/components/sustain-pedal/types/sustain-pedal-lane'
 
 export function useSustainPedalInteraction({
@@ -36,7 +36,7 @@ export function useSustainPedalInteraction({
   getSelectedEventIds,
   setSelectedEventIds,
   resolveEditingScope,
-  projectMidiSustainPedal,
+  sustainPedal,
   reportFailure,
   reportSuccess,
   requestFocus,
@@ -51,7 +51,7 @@ export function useSustainPedalInteraction({
   readonly getSelectedEventIds: () => readonly MidiSustainPedalEventId[]
   readonly setSelectedEventIds: (ids: readonly MidiSustainPedalEventId[]) => void
   readonly resolveEditingScope: () => PianoRollSustainPedalEditingScope | null
-  readonly projectMidiSustainPedal: ProjectMidiSustainPedalCoordinator
+  readonly sustainPedal: SustainPedalEdits
   readonly reportFailure: (cause: unknown, committed?: boolean) => void
   readonly reportSuccess: () => void
   readonly requestFocus: () => void
@@ -68,7 +68,7 @@ export function useSustainPedalInteraction({
   const handleInteractionIntent = createProjectPianoRollSustainPedalIntentHandler({
     getAuthorityRevision: () => projectedRevision,
     interactionSession,
-    projectMidiSustainPedal,
+    sustainPedal,
     reportFailure: (cause, committed) => reportFailure(cause, committed),
     reportSuccess: () => reportSuccess(),
     setSelectedEventIds,

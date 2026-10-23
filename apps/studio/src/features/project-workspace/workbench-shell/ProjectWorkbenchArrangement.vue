@@ -77,10 +77,8 @@ import UiIcon from '@/ui/components/UiIcon.vue'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import { useProjectClips } from '@/workbench/project/clip/vue/project-clip-context'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
-import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
-import { useProjectTracks } from '@/workbench/project/track/vue/project-track-context'
+import { useStudio } from '@/workbench/studio-services'
 
 const WHEEL_DELTA_MODE_LINE = 1
 const WHEEL_DELTA_MODE_PAGE = 2
@@ -122,13 +120,12 @@ const emit = defineEmits<{
   tempoEventSelect: [tempoEventId: TempoEventId]
 }>()
 
-const { projectClips } = useProjectClips()
+const { clips: clipEdits, tracks: trackEdits } = useStudio().edits
 const {
   projectPlayback,
   state: playbackState,
   visualPosition: playbackVisualPosition,
-} = useProjectPlayback()
-const { projectTracks } = useProjectTracks()
+} = useStudio().playback
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 const toasts = useUiToastStore()
 const arrangementElement = shallowRef<HTMLElement | null>(null)
@@ -332,7 +329,7 @@ function handleTrackTypeSelection(trackType: ProjectAddTrackType): void {
   }
 
   try {
-    const result = projectTracks.addInstrumentTrack()
+    const result = trackEdits.addInstrumentTrack()
     workbenchSelection.selectTrack(result.trackId)
   } catch (cause) {
     toasts.danger(
@@ -364,7 +361,7 @@ function createEmptyMidiClip(
   targetTick: Tick,
 ): StudioActionCompletion {
   try {
-    const result = projectClips.addEmptyMidiClip({
+    const result = clipEdits.addEmpty({
       targetTick,
       trackId: track.id,
     })

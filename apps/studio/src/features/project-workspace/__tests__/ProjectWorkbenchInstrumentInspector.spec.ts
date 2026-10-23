@@ -1,4 +1,4 @@
-import { PROJECT_TRACK_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import {
   parseClipId,
   parseDeviceTypeId,
@@ -27,8 +27,7 @@ import {
   findAvailableBuiltInInstrumentPreset,
 } from '@/workbench/instrument/built-in-instrument-catalogue'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
-import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
+import type { TrackEdits } from '@/workbench/edits/track-edits'
 
 const mountedWrappers: VueWrapper[] = []
 const TRACK_ID = parseTrackId('track-instrument-inspector')
@@ -43,23 +42,19 @@ function mountInspector(options: MountInspectorOptions) {
   const pinia = createPinia()
   const pianoRollPreferences = usePianoRollPreferencesStore(pinia)
   const toasts = useUiToastStore(pinia)
-  const selectBuiltInInstrument = vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>()
+  const selectBuiltInInstrument = vi.fn<TrackEdits['selectBuiltInInstrument']>()
   if (options.selectionFailure !== undefined) {
     selectBuiltInInstrument.mockImplementation(() => {
       throw options.selectionFailure
     })
   }
-  const context: ProjectTrackVueContext = Object.freeze({
-    projectTracks: Object.freeze({
-      addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
-        Object.freeze({
-          commit: Object.freeze({}) as ProjectCommit,
-          trackId: TRACK_ID,
-        }),
-      ),
-      selectBuiltInInstrument,
-    }),
-  })
+  const tracks: TrackEdits = {
+    addInstrumentTrack: vi.fn<TrackEdits['addInstrumentTrack']>(() => ({
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: TRACK_ID,
+    })),
+    selectBuiltInInstrument,
+  }
   const projectSession = createTestSession(parseProjectId('project-instrument-inspector'))
   const wrapper = mount(ProjectWorkbenchContextEditorDock, {
     props: {
@@ -76,9 +71,7 @@ function mountInspector(options: MountInspectorOptions) {
     },
     global: {
       plugins: [pinia],
-      provide: {
-        [PROJECT_TRACK_CONTEXT_KEY as symbol]: context,
-      },
+      provide: provideTestStudioServices({ edits: { tracks } }),
     },
   })
   mountedWrappers.push(wrapper)

@@ -13,8 +13,8 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import { createClipEdits } from '@/workbench/edits/clip-edits'
+import { createTrackEdits } from '@/workbench/edits/track-edits'
 
 describe('createProjectMidiClipPresentations', () => {
   it('sorts MIDI Clips by timeline position and resolves inherited Track color', () => {
@@ -38,17 +38,17 @@ describe('createProjectMidiClipPresentations', () => {
       saveFailure: null,
       recoveryFailures: Object.freeze([]),
     })
-    const track = createProjectTrackCoordinator({
+    const track = createTrackEdits({
       activeProject: { state: activeState },
-      createRandomValue: () => 0,
-      createUniqueId: (() => {
+      random: () => 0,
+      createId: (() => {
         const identities = ['clip-presentation-track', 'clip-presentation-device']
         return () => identities.shift() ?? 'unused-clip-presentation-track-id'
       })(),
     }).addInstrumentTrack()
-    const clips = createProjectClipCoordinator({
+    const clips = createClipEdits({
       activeProject: { state: activeState },
-      createUniqueId: (() => {
+      createId: (() => {
         const identities = [
           'clip-presentation-later',
           'clip-presentation-later-source',
@@ -59,8 +59,8 @@ describe('createProjectMidiClipPresentations', () => {
       })(),
     })
 
-    clips.addEmptyMidiClip({ targetTick: parseTick(3_840), trackId: track.trackId })
-    clips.addEmptyMidiClip({ targetTick: parseTick(0), trackId: track.trackId })
+    clips.addEmpty({ targetTick: parseTick(3_840), trackId: track.trackId })
+    clips.addEmpty({ targetTick: parseTick(0), trackId: track.trackId })
 
     const snapshot = session.getSnapshot()
     const presentations = createProjectMidiClipPresentations(snapshot)

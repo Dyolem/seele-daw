@@ -4,7 +4,7 @@ import { computed, type StyleValue } from 'vue'
 
 import { projectPianoRollPlayheadCssPixel } from '@/features/piano-roll/playhead/playhead-projection'
 import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
-import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
+import { useStudio } from '@/workbench/studio-services'
 
 const props = defineProps<{
   readonly presentation: Pick<
@@ -13,7 +13,7 @@ const props = defineProps<{
   >
   readonly viewport: PianoRollViewport
 }>()
-const { visualPosition } = useProjectPlayback()
+const { visualPosition } = useStudio().playback
 
 const playheadStyle = computed((): StyleValue | null => {
   if (visualPosition.value.projectId !== props.presentation.projectId) return null

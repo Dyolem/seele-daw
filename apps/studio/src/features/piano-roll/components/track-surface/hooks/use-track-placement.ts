@@ -27,7 +27,7 @@ import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-ro
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
-import { useProjectMidiNotes } from '@/workbench/project/midi-note/vue/project-midi-note-context'
+import { useStudio } from '@/workbench/studio-services'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 
 export function useTrackPlacement({
@@ -55,7 +55,7 @@ export function useTrackPlacement({
   readonly activateClip: (clipId: ClipId) => void
   readonly failureMessage: ShallowRef<string | null>
 }) {
-  const { projectMidiNotes } = useProjectMidiNotes()
+  const { notes } = useStudio().edits
   const pianoRollPreferences = usePianoRollPreferencesStore()
   const toasts = useUiToastStore()
   const placementPreview = shallowRef<TrackPlacementPreview | null>(null)
@@ -155,7 +155,7 @@ export function useTrackPlacement({
         toasts.warning('MIDI note placement needs attention', preview.placement.message)
         return
       }
-      const result = projectMidiNotes.placeMidiNoteOnTrack({
+      const result = notes.placeOnTrack({
         expectedSession: target.session,
         activeClipId: target.readModel.activeClipId,
         barSpanTick: target.barSpanTick,

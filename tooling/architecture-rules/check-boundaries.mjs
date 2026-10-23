@@ -122,10 +122,14 @@ function workspacePackageOf(specifier) {
   return match ? { name: match[1], deepPath: match[2] } : undefined
 }
 
-function importsTestCodeFromProduction(file, target, workspaceDirectory) {
-  const testDirectory = path.join(workspaceDirectory, 'src', '__tests__')
+function isTestPath(workspaceDirectory, target) {
+  const relative = path.relative(path.join(workspaceDirectory, 'src'), target)
+  return relative.split(path.sep).includes('__tests__')
+}
 
-  return !isInside(testDirectory, file) && isInside(testDirectory, target)
+/** Any `__tests__` directory holds test code; only files outside them are production code. */
+function importsTestCodeFromProduction(file, target, workspaceDirectory) {
+  return !isTestPath(workspaceDirectory, file) && isTestPath(workspaceDirectory, target)
 }
 
 function withoutSourceExtension(specifier) {

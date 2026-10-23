@@ -16,7 +16,7 @@ import {
   reportProjectMidiImportSuccess,
   reportProjectMidiTrackImportSuccess,
 } from '@/workbench/project/midi-import/project-midi-import-feedback'
-import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
+import { useStudio } from '@/workbench/studio-services'
 
 type MidiImportDestination =
   | { readonly target: 'new-project' }
@@ -33,7 +33,7 @@ export function useProjectWorkbenchMidiImport(options: {
   getReadyProject(): ReadyActiveProjectState | null
   getPlacementTick(): Tick
 }) {
-  const { projectMidiImport } = useProjectMidiImport()
+  const { midiImport: projectMidiImport } = useStudio()
   const selection = useProjectWorkbenchSelectionStore()
   const toasts = useUiToastStore()
   const router = useRouter()

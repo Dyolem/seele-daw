@@ -5,7 +5,7 @@ import {
   type InteractionId,
 } from '@seele-daw/editor'
 import { createAllProjectCommitsSubscription, type ModelRevision } from '@seele-daw/project-core'
-import type { ProjectTempoEventEditTarget } from '@/workbench/project/tempo-event/types/tempo-event-edit'
+import type { TempoEditTarget } from '@/workbench/edits/tempo-edits'
 import type {
   TempoTrackDragConfiguration,
   TempoTrackDragIntent,
@@ -27,7 +27,7 @@ interface ActiveTempoDrag {
   readonly interactionId: InteractionId
   readonly captureId: symbol
   readonly pointerId: number
-  readonly target: ProjectTempoEventEditTarget
+  readonly target: TempoEditTarget
 }
 
 /** Tempo specialization of the shared lifecycle; owns no Vue or browser resources. */

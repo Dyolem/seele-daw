@@ -1,13 +1,4 @@
-import {
-  ACTIVE_PROJECT_CONTEXT_KEY,
-  PROJECT_CLIP_CONTEXT_KEY,
-  PROJECT_ENTRY_CONTEXT_KEY,
-  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
-  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
-  PROJECT_TRACK_CONTEXT_KEY,
-} from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import {
   parseClipId,
   parseProjectId,
@@ -31,28 +22,24 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
+import type { ClipEdits } from '@/workbench/edits/clip-edits'
+import type { TrackEdits } from '@/workbench/edits/track-edits'
 import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   PROJECT_ENTRY_SELECTION_REASON,
   type ProjectEntryCoordinator,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import { type ProjectEntryVueContext } from '@/workbench/project/entry/vue/project-entry-context'
 import type { ProjectMidiImportCoordinator } from '@/workbench/project/midi-import/project-midi-import-coordinator'
-import { type ProjectMidiImportVueContext } from '@/workbench/project/midi-import/vue/project-midi-import-context'
-import { type ProjectNavigationDecisionVueContext } from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import { type ProjectNavigationDecisionVueContext } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
-import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
-import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
-import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
+import { createTempoEdits } from '@/workbench/edits/tempo-edits'
+import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-vue-binding'
 
 function createActiveProjectContext(state: ActiveProjectState): ActiveProjectVueContext {
   const stateRef = shallowRef(state)
@@ -72,37 +59,32 @@ function createActiveProjectContext(state: ActiveProjectState): ActiveProjectVue
   return Object.freeze({ activeProject, state: shallowReadonly(stateRef) })
 }
 
-function createProjectEntryContext(readyProjectId: ProjectId | null): ProjectEntryVueContext {
+function createProjectEntry(readyProjectId: ProjectId | null): ProjectEntryCoordinator {
   return Object.freeze({
-    projectEntry: Object.freeze({
-      resolve: vi.fn<ProjectEntryCoordinator['resolve']>(async (requestedProjectId) => {
-        if (requestedProjectId !== null && requestedProjectId === readyProjectId) {
-          return Object.freeze({
-            kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
-            projectId: requestedProjectId,
-          })
-        }
-
+    resolve: vi.fn<ProjectEntryCoordinator['resolve']>(async (requestedProjectId) => {
+      if (requestedProjectId !== null && requestedProjectId === readyProjectId) {
         return Object.freeze({
-          kind: PROJECT_ENTRY_RESOLUTION_KIND.SELECTION_REQUIRED,
-          reason: PROJECT_ENTRY_SELECTION_REASON.NO_REQUESTED_PROJECT,
-          requestedProjectId: null,
-          recentProjects: Object.freeze([]),
+          kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE,
+          projectId: requestedProjectId,
         })
-      }),
+      }
+
+      return Object.freeze({
+        kind: PROJECT_ENTRY_RESOLUTION_KIND.SELECTION_REQUIRED,
+        reason: PROJECT_ENTRY_SELECTION_REASON.NO_REQUESTED_PROJECT,
+        requestedProjectId: null,
+        recentProjects: Object.freeze([]),
+      })
     }),
   })
 }
 
-function createProjectMidiImportContext(): ProjectMidiImportVueContext {
+function createProjectMidiImport(): ProjectMidiImportCoordinator {
   return Object.freeze({
-    projectMidiImport: Object.freeze({
-      importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
-      importLocalFileAsNewTracks:
-        vi.fn<ProjectMidiImportCoordinator['importLocalFileAsNewTracks']>(),
-      importLocalFileReplacingActiveProject:
-        vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>(),
-    }),
+    importLocalFile: vi.fn<ProjectMidiImportCoordinator['importLocalFile']>(),
+    importLocalFileAsNewTracks: vi.fn<ProjectMidiImportCoordinator['importLocalFileAsNewTracks']>(),
+    importLocalFileReplacingActiveProject:
+      vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>(),
   })
 }
 
@@ -115,32 +97,24 @@ function createProjectNavigationDecisionContext(): ProjectNavigationDecisionVueC
   })
 }
 
-function createProjectTrackContext(): ProjectTrackVueContext {
-  return Object.freeze({
-    projectTracks: Object.freeze({
-      addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
-        Object.freeze({
-          commit: Object.freeze({}) as ProjectCommit,
-          trackId: parseTrackId('app-created-track'),
-        }),
-      ),
-      selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
-    }),
-  })
+function createFakeTrackEdits(): TrackEdits {
+  return {
+    addInstrumentTrack: vi.fn<TrackEdits['addInstrumentTrack']>(() => ({
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: parseTrackId('app-created-track'),
+    })),
+    selectBuiltInInstrument: vi.fn<TrackEdits['selectBuiltInInstrument']>(),
+  }
 }
 
-function createProjectClipContext(): ProjectClipVueContext {
-  return Object.freeze({
-    projectClips: Object.freeze({
-      addEmptyMidiClip: vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) =>
-        Object.freeze({
-          clipId: parseClipId('app-created-clip'),
-          commit: Object.freeze({}) as ProjectCommit,
-          trackId: input.trackId,
-        }),
-      ),
-    }),
-  })
+function createFakeClipEdits(): ClipEdits {
+  return {
+    addEmpty: vi.fn<ClipEdits['addEmpty']>((input) => ({
+      clipId: parseClipId('app-created-clip'),
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: input.trackId,
+    })),
+  }
 }
 
 function createProjectPlaybackContext(): ProjectPlaybackVueContext {
@@ -201,23 +175,22 @@ async function mountApp(state: ActiveProjectState, projectId: ProjectId | null =
   const wrapper = mount(App, {
     global: {
       plugins: [createPinia(), router],
-      provide: {
-        [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: activeProjectContext,
-        [PROJECT_CLIP_CONTEXT_KEY as symbol]: createProjectClipContext(),
-        [PROJECT_ENTRY_CONTEXT_KEY as symbol]: createProjectEntryContext(projectId),
-        [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: createProjectMidiImportContext(),
-        [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]:
-          createProjectNavigationDecisionContext(),
-        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: createProjectPlaybackContext(),
-        [PROJECT_TEMPO_EVENT_CONTEXT_KEY as symbol]: Object.freeze({
-          projectTempoEvents: createProjectTempoEventCoordinator({
+      provide: provideTestStudioServices({
+        actions: createTestStudioActionRuntime().runtime,
+        edits: {
+          clips: createFakeClipEdits(),
+          tempo: createTempoEdits({
             activeProject: activeProjectContext.activeProject,
-            createUniqueId: () => `app-tempo-event-${++tempoEventIdentity}`,
+            createId: () => `app-tempo-event-${++tempoEventIdentity}`,
           }),
-        }),
-        [PROJECT_TRACK_CONTEXT_KEY as symbol]: createProjectTrackContext(),
-        ...createTestStudioActionRuntime().provide,
-      },
+          tracks: createFakeTrackEdits(),
+        },
+        midiImport: createProjectMidiImport(),
+        navigation: createProjectNavigationDecisionContext(),
+        playback: createProjectPlaybackContext(),
+        project: activeProjectContext,
+        projectEntry: createProjectEntry(projectId),
+      }),
     },
   })
   await flushPromises()

@@ -7,7 +7,7 @@ import { useSustainPedalSelection } from '@/features/piano-roll/components/susta
 import { useSustainPedalInteraction } from '@/features/piano-roll/components/sustain-pedal/hooks/use-sustain-pedal-interaction'
 import { useSustainPedalProjection } from '@/features/piano-roll/components/sustain-pedal/hooks/use-sustain-pedal-projection'
 import { useSustainPedalActions } from '@/features/piano-roll/components/sustain-pedal/hooks/use-sustain-pedal-actions'
-import { useProjectMidiSustainPedal } from '@/workbench/project/midi-sustain-pedal/vue/project-midi-sustain-pedal-context'
+import { useStudio } from '@/workbench/studio-services'
 
 const props = defineProps<PianoRollSustainPedalLaneProps>()
 const emit = defineEmits<{
@@ -15,7 +15,7 @@ const emit = defineEmits<{
   failure: [cause: unknown, committed?: boolean]
   requestFocus: []
 }>()
-const { projectMidiSustainPedal } = useProjectMidiSustainPedal()
+const { sustainPedal } = useStudio().edits
 const laneSurface = useTemplateRef<HTMLElement>('laneSurface')
 const reportFailure = (cause: unknown, committed?: boolean) => {
   if (committed) emit('failure', cause, true)
@@ -45,7 +45,7 @@ const interaction = useSustainPedalInteraction({
   getSelectedEventIds: () => selection.selectedEventIds.value,
   setSelectedEventIds: selection.setSelectedEventIds,
   resolveEditingScope: selection.resolveEditingScope,
-  projectMidiSustainPedal,
+  sustainPedal,
   reportFailure,
   reportSuccess,
   requestFocus,
@@ -67,7 +67,7 @@ const actions = useSustainPedalActions({
   resolveEditingScope: selection.resolveEditingScope,
   hasCancellableInteraction: interaction.hasCancellableInteraction,
   cancelInteraction: interaction.cancelInteraction,
-  projectMidiSustainPedal,
+  sustainPedal,
   reportFailure,
   reportSuccess,
   requestFocus,

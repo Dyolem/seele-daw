@@ -19,8 +19,8 @@ import {
   ACTIVE_PROJECT_SAVE_STATUS,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { createProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import { createClipEdits } from '@/workbench/edits/clip-edits'
+import { createTrackEdits } from '@/workbench/edits/track-edits'
 
 function createFixture() {
   const projectId = parseProjectId('piano-roll-presentation-project')
@@ -43,21 +43,21 @@ function createFixture() {
     saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
     session,
   })
-  const track = createProjectTrackCoordinator({
+  const track = createTrackEdits({
     activeProject: { state: activeState },
-    createRandomValue: () => 0,
-    createUniqueId: (() => {
+    random: () => 0,
+    createId: (() => {
       const ids = ['piano-roll-presentation-track', 'piano-roll-presentation-device']
       return () => ids.shift() ?? 'unused-piano-roll-presentation-track-id'
     })(),
   }).addInstrumentTrack()
-  const clip = createProjectClipCoordinator({
+  const clip = createClipEdits({
     activeProject: { state: activeState },
-    createUniqueId: (() => {
+    createId: (() => {
       const ids = ['piano-roll-presentation-clip', 'piano-roll-presentation-source']
       return () => ids.shift() ?? 'unused-piano-roll-presentation-clip-id'
     })(),
-  }).addEmptyMidiClip({
+  }).addEmpty({
     targetTick: parseTick(3_840),
     trackId: track.trackId,
   })

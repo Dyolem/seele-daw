@@ -1,5 +1,4 @@
 import { installPianoRollResizeObserver } from '@/features/piano-roll/__tests__/support/piano-roll-resize-observer-test-support'
-import { PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY } from '@/symbols'
 import {
   createPianoRollGrid,
   type PianoRollClipContext,
@@ -23,7 +22,8 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PianoRollSustainPedalLane from '@/features/piano-roll/components/sustain-pedal/PianoRollSustainPedalLane.vue'
-import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import type { SustainPedalEdits } from '@/workbench/edits/sustain-pedal-edits'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 
 const ORIGINAL_POINTER_CAPTURE_DESCRIPTORS = Object.freeze({
   hasPointerCapture: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hasPointerCapture'),
@@ -133,16 +133,16 @@ function createClipContext(): PianoRollClipContext {
   })
 }
 
-function createUnavailableCoordinator(): ProjectMidiSustainPedalCoordinator {
+function createUnavailableCoordinator(): SustainPedalEdits {
   const unavailable = vi.fn<() => never>((): never => {
     throw new Error('Unexpected Sustain Pedal Project command in presentation-only test')
   })
   return Object.freeze({
-    moveEvents: unavailable,
+    move: unavailable,
     placeInClip: unavailable,
     placeOnTrack: unavailable,
-    removeEvents: unavailable,
-    replaceEventValue: unavailable,
+    remove: unavailable,
+    replaceValue: unavailable,
   })
 }
 
@@ -172,11 +172,9 @@ function mountLane(coordinator = createUnavailableCoordinator()) {
       visibleStartTick: ZERO_TICK,
     },
     global: {
-      provide: {
-        [PROJECT_MIDI_SUSTAIN_PEDAL_CONTEXT_KEY as symbol]: Object.freeze({
-          projectMidiSustainPedal: coordinator,
-        }),
-      },
+      provide: provideTestStudioServices({
+        edits: { sustainPedal: coordinator },
+      }),
     },
   })
   return { wrapper, coordinator }

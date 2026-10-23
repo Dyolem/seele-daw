@@ -3,16 +3,7 @@ import {
   dispatchTempoPointer,
   installTempoPointerCapture,
 } from './support/tempo-track-test-support'
-import {
-  ACTIVE_PROJECT_CONTEXT_KEY,
-  PROJECT_CLIP_CONTEXT_KEY,
-  PROJECT_ENTRY_CONTEXT_KEY,
-  PROJECT_MIDI_IMPORT_CONTEXT_KEY,
-  PROJECT_NAVIGATION_DECISION_CONTEXT_KEY,
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  PROJECT_TEMPO_EVENT_CONTEXT_KEY,
-  PROJECT_TRACK_CONTEXT_KEY,
-} from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { createDeferredActionResult } from '@/workbench/actions/__tests__/support/deferred-action-test-support'
 import { createStandardMidiFileSourceEnvelope, type MidiFileDocument } from '@seele-daw/midi-file'
 import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
@@ -62,11 +53,7 @@ import {
   type ActiveProjectState,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import {
-  createProjectClipCoordinator,
-  type ProjectClipCoordinator,
-} from '@/workbench/project/clip/project-clip-coordinator'
-import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
+import { createClipEdits, type ClipEdits } from '@/workbench/edits/clip-edits'
 import {
   PROJECT_ENTRY_FAILURE_OPERATION,
   PROJECT_ENTRY_RESOLUTION_KIND,
@@ -74,13 +61,11 @@ import {
   type ProjectEntryCoordinator,
   type ProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import { type ProjectEntryVueContext } from '@/workbench/project/entry/vue/project-entry-context'
 import type {
   ProjectMidiImportCoordinator,
   ProjectMidiImportResult,
   ProjectMidiTrackImportResult,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
-import { type ProjectMidiImportVueContext } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
   NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
@@ -92,20 +77,17 @@ import {
 import {
   type PendingProjectNavigationDecision,
   type ProjectNavigationDecisionVueContext,
-} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+} from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
-import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-context'
-import { createProjectTempoEventCoordinator } from '@/workbench/project/tempo-event/project-tempo-event-coordinator'
-import { type ProjectTempoEventVueContext } from '@/workbench/project/tempo-event/vue/project-tempo-event-context'
-import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
+import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-vue-binding'
+import { createTempoEdits } from '@/workbench/edits/tempo-edits'
+import { createTrackEdits, type TrackEdits } from '@/workbench/edits/track-edits'
 
 interface PageFixture {
   readonly activeProjectContext: ActiveProjectVueContext
@@ -115,10 +97,10 @@ interface PageFixture {
   readonly importLocalFileReplacingActiveProject: ReturnType<
     typeof vi.fn<ProjectMidiImportCoordinator['importLocalFileReplacingActiveProject']>
   >
-  readonly projectMidiImportContext: ProjectMidiImportVueContext
+  readonly projectMidiImportContext: { readonly projectMidiImport: ProjectMidiImportCoordinator }
   readonly resolve: ReturnType<typeof vi.fn<ProjectEntryCoordinator['resolve']>>
   readonly save: ReturnType<typeof vi.fn<ActiveProjectService['save']>>
-  readonly projectEntryContext: ProjectEntryVueContext
+  readonly projectEntryContext: { readonly projectEntry: ProjectEntryCoordinator }
   readonly state: ShallowRef<ActiveProjectState>
 }
 
@@ -235,32 +217,24 @@ async function mountPage(
   const pinia = createPinia()
   await router.push(createProjectWorkspaceLocation(projectId))
   await router.isReady()
-  const projectClips: ProjectClipCoordinator = Object.freeze({
-    addEmptyMidiClip: vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) =>
-      Object.freeze({
-        clipId: parseClipId('workspace-page-created-clip'),
-        commit: Object.freeze({}) as ProjectCommit,
-        trackId: input.trackId,
-      }),
-    ),
-  })
-  const projectTracks: ProjectTrackCoordinator = Object.freeze({
-    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
-      Object.freeze({
-        commit: Object.freeze({}) as ProjectCommit,
-        trackId: parseTrackId('workspace-page-created-track'),
-      }),
-    ),
-    selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
-  })
-  const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
-  const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
+  const clips: ClipEdits = {
+    addEmpty: vi.fn<ClipEdits['addEmpty']>((input) => ({
+      clipId: parseClipId('workspace-page-created-clip'),
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: input.trackId,
+    })),
+  }
+  const tracks: TrackEdits = {
+    addInstrumentTrack: vi.fn<TrackEdits['addInstrumentTrack']>(() => ({
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: parseTrackId('workspace-page-created-track'),
+    })),
+    selectBuiltInInstrument: vi.fn<TrackEdits['selectBuiltInInstrument']>(),
+  }
   let tempoEventIdentity = 0
-  const projectTempoEventContext: ProjectTempoEventVueContext = Object.freeze({
-    projectTempoEvents: createProjectTempoEventCoordinator({
-      activeProject: fixture.activeProjectContext.activeProject,
-      createUniqueId: () => `workspace-page-tempo-event-${++tempoEventIdentity}`,
-    }),
+  const tempo = createTempoEdits({
+    activeProject: fixture.activeProjectContext.activeProject,
+    createId: () => `workspace-page-tempo-event-${++tempoEventIdentity}`,
   })
   const playbackState = shallowRef(STOPPED_PLAYBACK_STATE)
   const playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
@@ -316,17 +290,15 @@ async function mountPage(
       stubs: {
         ProjectPianoRollTrackSurface: true,
       },
-      provide: {
-        [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: fixture.activeProjectContext,
-        [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
-        [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
-        [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: fixture.projectMidiImportContext,
-        [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]: projectNavigationDecisionContext,
-        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: projectPlaybackContext,
-        [PROJECT_TEMPO_EVENT_CONTEXT_KEY as symbol]: projectTempoEventContext,
-        [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
-        ...actionFixture.provide,
-      },
+      provide: provideTestStudioServices({
+        actions: actionFixture.runtime,
+        edits: { clips, tempo, tracks },
+        midiImport: fixture.projectMidiImportContext.projectMidiImport,
+        navigation: projectNavigationDecisionContext,
+        playback: projectPlaybackContext,
+        project: fixture.activeProjectContext,
+        projectEntry: fixture.projectEntryContext.projectEntry,
+      }),
     },
   })
 
@@ -1827,13 +1799,13 @@ describe('ProjectWorkspacePage', () => {
       timeSignatureEventId: parseTimeSignatureEventId('meter-history-shortcuts'),
     })
     const ready = createReadyState(projectId, session)
-    createProjectTrackCoordinator({
+    createTrackEdits({
       activeProject: { state: ready },
-      createUniqueId: (() => {
+      createId: (() => {
         const identities = ['history-shortcut-track', 'history-shortcut-device']
         return () => identities.shift() ?? 'unused-history-shortcut-id'
       })(),
-      createRandomValue: () => 0,
+      random: () => 0,
     }).addInstrumentTrack()
     const fixture = createFixture(
       async () =>
@@ -2014,21 +1986,21 @@ describe('ProjectWorkspacePage', () => {
       timeSignatureEventId: parseTimeSignatureEventId('meter-workspace-clip-selection'),
     })
     const initialReadyState = createReadyState(projectId, session)
-    const track = createProjectTrackCoordinator({
+    const track = createTrackEdits({
       activeProject: { state: initialReadyState },
-      createUniqueId: (() => {
+      createId: (() => {
         const identities = ['track-workspace-clip', 'device-workspace-clip']
         return () => identities.shift() ?? 'unused-workspace-track-id'
       })(),
-      createRandomValue: () => 0,
+      random: () => 0,
     }).addInstrumentTrack()
-    const clip = createProjectClipCoordinator({
+    const clip = createClipEdits({
       activeProject: { state: initialReadyState },
-      createUniqueId: (() => {
+      createId: (() => {
         const identities = ['clip-workspace-selection', 'source-workspace-selection']
         return () => identities.shift() ?? 'unused-workspace-clip-id'
       })(),
-    }).addEmptyMidiClip({
+    }).addEmpty({
       trackId: track.trackId,
       targetTick: parseTick(0),
     })

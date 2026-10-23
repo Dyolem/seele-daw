@@ -1,4 +1,3 @@
-import { ACTIVE_PROJECT_CONTEXT_KEY } from '@/symbols'
 import { parseProjectId, type ProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
 import { shallowReadonly, shallowRef } from 'vue'
@@ -12,7 +11,8 @@ import {
   ACTIVE_PROJECT_PHASE,
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-context'
+import { type ActiveProjectVueContext } from '@/workbench/project/vue/active-project-vue-binding'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 
 interface Deferred<T> {
   readonly promise: Promise<T>
@@ -61,9 +61,7 @@ async function mountPage(create: ActiveProjectService['create']) {
   const wrapper = mount(ProjectCreationPage, {
     global: {
       plugins: [router],
-      provide: {
-        [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(create),
-      },
+      provide: provideTestStudioServices({ project: createActiveProjectContext(create) }),
     },
   })
 
@@ -132,9 +130,7 @@ describe('ProjectCreationPage', () => {
     const wrapper = mount(RouterView, {
       global: {
         plugins: [router],
-        provide: {
-          [ACTIVE_PROJECT_CONTEXT_KEY as symbol]: createActiveProjectContext(create),
-        },
+        provide: provideTestStudioServices({ project: createActiveProjectContext(create) }),
       },
     })
     await vi.waitFor(() => expect(create).toHaveBeenCalledOnce())

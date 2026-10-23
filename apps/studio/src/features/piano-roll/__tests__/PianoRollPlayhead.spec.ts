@@ -1,4 +1,3 @@
-import { PROJECT_PLAYBACK_CONTEXT_KEY } from '@/symbols'
 import { createInitialPianoRollViewport, createPianoRollClipContext } from '@seele-daw/editor'
 import {
   createMidiClipRecord,
@@ -23,7 +22,8 @@ import {
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 
 const PROJECT_ID = parseProjectId('piano-roll-playhead-project')
 const OTHER_PROJECT_ID = parseProjectId('piano-roll-playhead-other-project')
@@ -107,9 +107,7 @@ function createFixture() {
   const wrapper = mount(PianoRollPlayhead, {
     props: { presentation, viewport },
     global: {
-      provide: {
-        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: context,
-      },
+      provide: provideTestStudioServices({ playback: context }),
     },
   })
 

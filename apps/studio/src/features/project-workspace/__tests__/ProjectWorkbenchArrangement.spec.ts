@@ -2,13 +2,12 @@ import {
   createTempoTrackTestActions,
   installTempoPointerCapture,
 } from './support/tempo-track-test-support'
-import { createReplaceTempoEventBpmCommand } from '@seele-daw/project-core'
 import {
-  PROJECT_CLIP_CONTEXT_KEY,
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  PROJECT_TRACK_CONTEXT_KEY,
-  TEMPO_EVENT_ACTION_CONTEXT_KEY,
-} from '@/symbols'
+  PROJECT_COMMAND_EXECUTION_STATUS,
+  createReplaceTempoEventBpmCommand,
+} from '@seele-daw/project-core'
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { STUDIO_ACTION, createStudioActionPresentation } from '@/workbench/actions/studio-action'
 import {
@@ -38,8 +37,8 @@ import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-
 import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
-import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
+import type { ClipEdits } from '@/workbench/edits/clip-edits'
+import type { TrackEdits } from '@/workbench/edits/track-edits'
 import type {
   ProjectPlaybackCoordinator,
   ProjectPlaybackLocateSession,
@@ -49,9 +48,7 @@ import {
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
-import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 
 const mountedWrappers: VueWrapper[] = []
 const STUDIO_GRAND_INSTRUMENT = Object.freeze({
@@ -64,10 +61,8 @@ const STUDIO_GRAND_INSTRUMENT = Object.freeze({
 interface ArrangementFixture {
   readonly tempoActions: ReturnType<typeof createTempoTrackTestActions>
   readonly keyboard: ReturnType<typeof createTestStudioActionRuntime>
-  readonly addEmptyMidiClip: ReturnType<typeof vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>>
-  readonly addInstrumentTrack: ReturnType<
-    typeof vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>
-  >
+  readonly addEmptyMidiClip: ReturnType<typeof vi.fn<ClipEdits['addEmpty']>>
+  readonly addInstrumentTrack: ReturnType<typeof vi.fn<TrackEdits['addInstrumentTrack']>>
   readonly selection: ReturnType<typeof useProjectWorkbenchSelectionStore>
   readonly toasts: ReturnType<typeof useUiToastStore>
   readonly playbackState: ShallowRef<ProjectPlaybackState>
@@ -97,13 +92,14 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   tempoActions.commitDrag.mockImplementation(() => {
     const current = tempoActions.session.value
     const initial = current.getSnapshot().tempoEvents[0]!
-    return current.execute(
+    const result = current.execute(
       createReplaceTempoEventBpmCommand({
         baseRevision: current.modelRevision,
         tempoEventId: initial.id,
         bpm: initial.bpm,
       }),
     )
+    return result.status === PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED ? result.commit : null
   })
   const keyboard = createTestStudioActionRuntime()
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
@@ -116,7 +112,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
   const toasts = useUiToastStore(pinia)
   const projectId = parseProjectId('arrangement-selection-project')
   selection.activateProject(projectId)
-  const addEmptyMidiClip = vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) => {
+  const addEmptyMidiClip = vi.fn<ClipEdits['addEmpty']>((input) => {
     if (options.createClipFailure !== undefined) throw options.createClipFailure
 
     return Object.freeze({
@@ -125,21 +121,17 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
       trackId: input.trackId,
     })
   })
-  const addInstrumentTrack = vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
+  const addInstrumentTrack = vi.fn<TrackEdits['addInstrumentTrack']>(() =>
     Object.freeze({
       commit: Object.freeze({}) as ProjectCommit,
       trackId: parseTrackId('track-created-from-menu'),
     }),
   )
-  const context: ProjectTrackVueContext = Object.freeze({
-    projectTracks: Object.freeze({
-      addInstrumentTrack,
-      selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
-    }),
-  })
-  const clipContext: ProjectClipVueContext = Object.freeze({
-    projectClips: Object.freeze({ addEmptyMidiClip }),
-  })
+  const tracks: TrackEdits = {
+    addInstrumentTrack,
+    selectBuiltInInstrument: vi.fn<TrackEdits['selectBuiltInInstrument']>(),
+  }
+  const clips: ClipEdits = { addEmpty: addEmptyMidiClip }
   const playbackState = shallowRef<ProjectPlaybackState>(
     Object.freeze({
       diagnostics: Object.freeze([]),
@@ -211,11 +203,12 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     global: {
       plugins: [pinia],
       provide: {
-        ...keyboard.provide,
         [TEMPO_EVENT_ACTION_CONTEXT_KEY as symbol]: tempoActions.context,
-        [PROJECT_CLIP_CONTEXT_KEY as symbol]: clipContext,
-        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
-        [PROJECT_TRACK_CONTEXT_KEY as symbol]: context,
+        ...provideTestStudioServices({
+          actions: keyboard.runtime,
+          edits: { clips, tracks },
+          playback: playbackContext,
+        }),
       },
     },
   })

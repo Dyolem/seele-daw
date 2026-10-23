@@ -50,8 +50,8 @@ import {
   PROJECT_NAVIGATION_PROCEED_REASON,
   type ProjectNavigationConfirmationCoordinator,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { PROJECT_TRACK_PALETTE } from '@/workbench/project/track/project-track-palette'
-import { createProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
+import { PROJECT_TRACK_PALETTE } from '@/workbench/edits/track-palette'
+import { createTrackEdits } from '@/workbench/edits/track-edits'
 
 function createMidiDocument(overrides: Partial<MidiFileDocument> = {}): MidiFileDocument {
   return {
@@ -391,7 +391,7 @@ describe('ProjectMidiImportCoordinator', () => {
         ],
       }),
     )
-    const existingTrack = createProjectTrackCoordinator({
+    const existingTrack = createTrackEdits({
       activeProject: {
         get state() {
           return {
@@ -409,8 +409,8 @@ describe('ProjectMidiImportCoordinator', () => {
           }
         },
       },
-      createRandomValue: () => 0,
-      createUniqueId: (() => {
+      random: () => 0,
+      createId: (() => {
         const ids = ['existing-track', 'existing-device']
         return () => ids.shift() ?? 'unused-existing-id'
       })(),

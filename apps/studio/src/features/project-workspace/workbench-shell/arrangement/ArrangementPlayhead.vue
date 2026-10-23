@@ -4,14 +4,14 @@ import { computed, type StyleValue } from 'vue'
 
 import { timelinePositionRatio } from '@/features/project-workspace/timeline/layout'
 import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
-import { useProjectPlayback } from '@/workbench/project/playback/vue/project-playback-context'
+import { useStudio } from '@/workbench/studio-services'
 
 const props = defineProps<{
   readonly barSpanTick: Tick
   readonly projectId: string
   readonly timelineEndTick: Tick
 }>()
-const { visualPosition } = useProjectPlayback()
+const { visualPosition } = useStudio().playback
 
 const playheadStyle = computed((): StyleValue => {
   const positionTick =

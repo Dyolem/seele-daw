@@ -3,12 +3,7 @@ import {
   createEditorPointerInputAdapter,
   type EditorPointerInputAdapter,
 } from '@seele-daw/editor'
-import {
-  PROJECT_COMMAND_EXECUTION_STATUS,
-  type TempoEventId,
-  type TempoEventRecord,
-  type Tick,
-} from '@seele-daw/project-core'
+import { type TempoEventId, type TempoEventRecord, type Tick } from '@seele-daw/project-core'
 import { shallowRef, watch, type ShallowRef } from 'vue'
 import { TempoTrackDragSession } from '@/features/project-workspace/tempo-track/interaction/tempo-track-drag-session'
 import { useTempoEventActions } from '@/features/project-workspace/tempo-track/tempo-event-action-context'
@@ -126,12 +121,12 @@ export function useTempoTrackDrag({
     let committed = false
     try {
       if (actions.session !== intent.target.expectedSession || props.editingDisabled) return
-      const result = actions.commitDrag(intent)
-      if (result.status === PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      const commit = actions.commitDrag(intent)
+      if (commit !== null) {
         committed = true
         session.resolveCommit(
           intent.interactionId,
-          result.commit.modelRevision,
+          commit.modelRevision,
           projectedRevision ?? intent.target.baseRevision,
         )
       }

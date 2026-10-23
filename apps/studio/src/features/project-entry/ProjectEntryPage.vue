@@ -27,9 +27,8 @@ import {
   PROJECT_ENTRY_RESOLUTION_KIND,
   type ProjectSelectionRequiredResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import { useProjectEntry } from '@/workbench/project/entry/vue/project-entry-context'
+import { useStudio } from '@/workbench/studio-services'
 import { reportProjectMidiImportSuccess } from '@/workbench/project/midi-import/project-midi-import-feedback'
-import { useProjectMidiImport } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import type { RecentProjectSummary } from '@/workbench/project/project-catalog-reader'
 
 type ProjectEntryAction =
@@ -42,8 +41,7 @@ const { actions, keyboard } = useStudioActions()
 const shortcutsControl = computed(() =>
   presentStudioAction(actions, keyboard, STUDIO_ACTION.SHORTCUTS_SHOW),
 )
-const { projectEntry } = useProjectEntry()
-const { projectMidiImport } = useProjectMidiImport()
+const { projectEntry, midiImport: projectMidiImport } = useStudio()
 const route = useRoute()
 const router = useRouter()
 const toasts = useUiToastStore()

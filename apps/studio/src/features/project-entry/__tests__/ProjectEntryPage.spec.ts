@@ -1,4 +1,4 @@
-import { PROJECT_ENTRY_CONTEXT_KEY, PROJECT_MIDI_IMPORT_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { parseProjectId } from '@seele-daw/project-core'
 import { flushPromises, mount } from '@vue/test-utils'
@@ -15,12 +15,10 @@ import {
   type ProjectEntryCoordinator,
   type ProjectEntryResolution,
 } from '@/workbench/project/entry/project-entry-coordinator'
-import { type ProjectEntryVueContext } from '@/workbench/project/entry/vue/project-entry-context'
 import type {
   ProjectMidiImportCoordinator,
   ProjectMidiImportResult,
 } from '@/workbench/project/midi-import/project-midi-import-coordinator'
-import { type ProjectMidiImportVueContext } from '@/workbench/project/midi-import/vue/project-midi-import-context'
 import {
   NO_MODE_DECLARATION_MIDI_SOURCE_ENVELOPE,
   NO_MODE_DECLARATION_PROJECT_MIDI_SEMANTIC_BINDING,
@@ -31,8 +29,8 @@ interface PageFixture {
   readonly importLocalFile: ReturnType<
     typeof vi.fn<ProjectMidiImportCoordinator['importLocalFile']>
   >
-  readonly projectEntryContext: ProjectEntryVueContext
-  readonly projectMidiImportContext: ProjectMidiImportVueContext
+  readonly projectEntryContext: { readonly projectEntry: ProjectEntryCoordinator }
+  readonly projectMidiImportContext: { readonly projectMidiImport: ProjectMidiImportCoordinator }
   readonly resolve: ReturnType<typeof vi.fn<ProjectEntryCoordinator['resolve']>>
 }
 
@@ -130,11 +128,11 @@ async function mountPage(fixture: PageFixture, initialLocation = '/') {
   const wrapper = mount(ProjectEntryPage, {
     global: {
       plugins: [pinia, router],
-      provide: {
-        ...createTestStudioActionRuntime().provide,
-        [PROJECT_ENTRY_CONTEXT_KEY as symbol]: fixture.projectEntryContext,
-        [PROJECT_MIDI_IMPORT_CONTEXT_KEY as symbol]: fixture.projectMidiImportContext,
-      },
+      provide: provideTestStudioServices({
+        actions: createTestStudioActionRuntime().runtime,
+        midiImport: fixture.projectMidiImportContext.projectMidiImport,
+        projectEntry: fixture.projectEntryContext.projectEntry,
+      }),
     },
   })
 

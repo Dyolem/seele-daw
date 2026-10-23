@@ -10,7 +10,7 @@ import { decodeSampleInstrumentDeviceState, type SoundbankId } from '@seele-daw/
 
 import { findBuiltInInstrumentCatalogueEntry } from '@/workbench/instrument/built-in-instrument-catalogue'
 import { decodeMidiProgramPlaceholderDeviceState } from '@/workbench/instrument/midi-import-instrument-policy'
-import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/project/track/project-track-coordinator'
+import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/instrument/built-in-instrument-catalogue'
 
 export const PROJECT_TRACK_INSTRUMENT_STATUS = Object.freeze({
   EMPTY: 'empty',

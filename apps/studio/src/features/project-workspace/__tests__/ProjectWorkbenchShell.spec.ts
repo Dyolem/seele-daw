@@ -1,9 +1,5 @@
-import {
-  PROJECT_CLIP_CONTEXT_KEY,
-  PROJECT_PLAYBACK_CONTEXT_KEY,
-  PROJECT_TRACK_CONTEXT_KEY,
-  TEMPO_EVENT_ACTION_CONTEXT_KEY,
-} from '@/symbols'
+import { TEMPO_EVENT_ACTION_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { STUDIO_ACTION_COMPLETED } from '@/workbench/actions/studio-action'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
@@ -43,17 +39,15 @@ import {
   type ActiveProjectSaveStatus,
 } from '@/workbench/project/active-project-state'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
-import type { ProjectClipCoordinator } from '@/workbench/project/clip/project-clip-coordinator'
-import { type ProjectClipVueContext } from '@/workbench/project/clip/vue/project-clip-context'
+import type { ClipEdits } from '@/workbench/edits/clip-edits'
+import type { TrackEdits } from '@/workbench/edits/track-edits'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
-import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-context'
-import type { ProjectTrackCoordinator } from '@/workbench/project/track/project-track-coordinator'
-import { type ProjectTrackVueContext } from '@/workbench/project/track/vue/project-track-context'
+import { type ProjectPlaybackVueContext } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(640)
@@ -89,26 +83,20 @@ function mountShell(options: MountShellOptions = {}) {
   } else if (options.selectedTrackId) {
     selection.selectTrack(options.selectedTrackId)
   }
-  const projectClips: ProjectClipCoordinator = Object.freeze({
-    addEmptyMidiClip: vi.fn<ProjectClipCoordinator['addEmptyMidiClip']>((input) =>
-      Object.freeze({
-        clipId: parseClipId('shell-created-clip'),
-        commit: Object.freeze({}) as ProjectCommit,
-        trackId: input.trackId,
-      }),
-    ),
-  })
-  const projectTracks: ProjectTrackCoordinator = Object.freeze({
-    addInstrumentTrack: vi.fn<ProjectTrackCoordinator['addInstrumentTrack']>(() =>
-      Object.freeze({
-        commit: Object.freeze({}) as ProjectCommit,
-        trackId: parseTrackId('shell-created-track'),
-      }),
-    ),
-    selectBuiltInInstrument: vi.fn<ProjectTrackCoordinator['selectBuiltInInstrument']>(),
-  })
-  const projectClipContext: ProjectClipVueContext = Object.freeze({ projectClips })
-  const projectTrackContext: ProjectTrackVueContext = Object.freeze({ projectTracks })
+  const clips: ClipEdits = {
+    addEmpty: vi.fn<ClipEdits['addEmpty']>((input) => ({
+      clipId: parseClipId('shell-created-clip'),
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: input.trackId,
+    })),
+  }
+  const tracks: TrackEdits = {
+    addInstrumentTrack: vi.fn<TrackEdits['addInstrumentTrack']>(() => ({
+      commit: Object.freeze({}) as ProjectCommit,
+      trackId: parseTrackId('shell-created-track'),
+    })),
+    selectBuiltInInstrument: vi.fn<TrackEdits['selectBuiltInInstrument']>(),
+  }
   const playbackState = shallowRef<ProjectPlaybackState>(
     Object.freeze({
       diagnostics: Object.freeze([]),
@@ -206,10 +194,11 @@ function mountShell(options: MountShellOptions = {}) {
           projectedRevision: null,
           removeTempoEvent: () => STUDIO_ACTION_COMPLETED,
         },
-        ...actionFixture.provide,
-        [PROJECT_CLIP_CONTEXT_KEY as symbol]: projectClipContext,
-        [PROJECT_PLAYBACK_CONTEXT_KEY as symbol]: playbackContext,
-        [PROJECT_TRACK_CONTEXT_KEY as symbol]: projectTrackContext,
+        ...provideTestStudioServices({
+          actions: actionFixture.runtime,
+          edits: { clips, tracks },
+          playback: playbackContext,
+        }),
       },
     },
   })

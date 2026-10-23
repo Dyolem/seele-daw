@@ -1,4 +1,4 @@
-import { PROJECT_NAVIGATION_DECISION_CONTEXT_KEY } from '@/symbols'
+import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { parseProjectId, type ProjectContentStateId, type ProjectId } from '@seele-daw/project-core'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
@@ -57,9 +57,7 @@ function mountDialog(): DialogFixture {
   const wrapper = mount(ProjectNavigationDecisionDialog, {
     attachTo: document.body,
     global: {
-      provide: {
-        [PROJECT_NAVIGATION_DECISION_CONTEXT_KEY as symbol]: binding.context,
-      },
+      provide: provideTestStudioServices({ navigation: binding.context }),
     },
   })
   const fixture = { binding, wrapper }

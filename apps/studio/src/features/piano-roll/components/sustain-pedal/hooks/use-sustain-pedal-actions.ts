@@ -10,7 +10,7 @@ import {
   STUDIO_ACTION_NOT_APPLIED,
   type StudioActionCompletion,
 } from '@/workbench/actions/studio-action'
-import type { ProjectMidiSustainPedalCoordinator } from '@/workbench/project/midi-sustain-pedal/project-midi-sustain-pedal-coordinator'
+import type { SustainPedalEdits } from '@/workbench/edits/sustain-pedal-edits'
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 
 export function useSustainPedalActions({
@@ -20,7 +20,7 @@ export function useSustainPedalActions({
   resolveEditingScope,
   hasCancellableInteraction,
   cancelInteraction,
-  projectMidiSustainPedal,
+  sustainPedal,
   reportFailure,
   reportSuccess,
   requestFocus,
@@ -31,7 +31,7 @@ export function useSustainPedalActions({
   readonly resolveEditingScope: () => PianoRollSustainPedalEditingScope | null
   readonly hasCancellableInteraction: () => boolean
   readonly cancelInteraction: () => StudioActionCompletion
-  readonly projectMidiSustainPedal: Pick<ProjectMidiSustainPedalCoordinator, 'removeEvents'>
+  readonly sustainPedal: Pick<SustainPedalEdits, 'remove'>
   readonly reportFailure: (cause: unknown) => void
   readonly reportSuccess: () => void
   readonly requestFocus: () => void
@@ -58,7 +58,7 @@ export function useSustainPedalActions({
     if (removal === null) return STUDIO_ACTION_NOT_APPLIED
 
     try {
-      projectMidiSustainPedal.removeEvents({
+      sustainPedal.remove({
         baseRevision: removal.baseRevision,
         clipId: removal.clipId,
         eventIds: removal.eventIds,

@@ -8,12 +8,10 @@ import {
   PROJECT_NAVIGATION_INTENT_KIND,
   type ProjectNavigationDecision,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import {
-  useProjectNavigationDecision,
-  type PendingProjectNavigationDecision,
-} from '@/workbench/project/navigation/vue/project-navigation-decision-context'
+import type { PendingProjectNavigationDecision } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
+import { useStudio } from '@/workbench/studio-services'
 
-const decisionContext = useProjectNavigationDecision()
+const decisionContext = useStudio().navigation
 const renderedPending = shallowRef<PendingProjectNavigationDecision | null>(
   decisionContext.pendingDecision.value,
 )

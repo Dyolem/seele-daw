@@ -7,8 +7,8 @@
 本文冻结 AQ0 的输入、历史行为基线、测量方法和后续验收规则，并追加使用生产 Runtime 取得的
 AQ1、AQ2 与 AQ3 证据。术语解释见
 [V1A 术语表](./audio-quality-foundation-v1a-glossary.md)，完整阶段边界见
-[V1A 阶段计划](../../../docs/archive/audio-web/audio-quality-foundation-v1a-phase-plan.md)，最终状态汇总见
-[V1A 收口报告](../../../docs/archive/audio-web/audio-quality-foundation-v1a-closure-report.md)。
+[V1A 阶段计划](./audio-quality-foundation-v1a-phase-plan.md)，最终状态汇总见
+[V1A 收口报告](./audio-quality-foundation-v1a-closure-report.md)。
 
 ## 1. AQ0 的完成定义
 

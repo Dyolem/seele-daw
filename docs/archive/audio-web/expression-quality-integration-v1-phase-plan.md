@@ -10,7 +10,7 @@ Expression Quality Integration V1 是 CC64 基础播放完成后、WAV Offline E
 它不重新打开已经冻结的 V1A Velocity、增益、Envelope、Loop 或复音预算，而是验证踏板保持进入
 同一 Sample Voice Runtime 后的组合行为，并只在真实问题需要时形成新的可听政策。
 
-本文沿用 [Audio Quality Foundation V1A 术语表](../../../packages/audio-web/docs/audio-quality-foundation-v1a-glossary.md)。
+本文沿用 [Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。
 CC64 的 Project、导入和 Playback 时间语义见
 [MIDI Sustain Pedal CC64 Playback V1](../../../packages/playback/docs/midi-sustain-pedal-cc64-playback-v1.md)。
 

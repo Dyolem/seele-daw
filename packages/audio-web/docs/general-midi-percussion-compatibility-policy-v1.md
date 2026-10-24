@@ -9,9 +9,9 @@
 > Channel 10 import routing by MI3A
 
 本文记录 `general-midi-percussion-v1` 的来源约束、Manifest 转换和用户预期听觉。相关基础术语见
-[多乐器总谱发声 V1 术语表](./built-in-multi-instrument-score-playback-v1-glossary.md)，通用
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)，通用
 One-shot / Exclusive Group 执行语义见
-[Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。
+[Audio Quality Foundation V1A 术语表](../../../docs/archive/audio-web/audio-quality-foundation-v1a-glossary.md)。
 
 ## 1. 为什么需要专用政策
 

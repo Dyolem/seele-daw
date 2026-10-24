@@ -8,12 +8,12 @@
 本文收口从 Standard MIDI File 到真实多 Soundbank PCM 的首个总谱验证闭环。它证明既有多乐器
 路由、控制语义、资源准备与 Sample Voice Runtime 能在同一份可复现总谱中协作；它不把自动数值
 等同于主观音质优秀，也不扩张为完整 General MIDI、管弦乐演奏法或可分发音源承诺。相关术语见
-[多乐器总谱发声 V1 术语表](../../../packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)和
-[Audio Quality Foundation V1A 术语表](../../../packages/audio-web/docs/audio-quality-foundation-v1a-glossary.md)。
+[多乐器总谱发声 V1 术语表](./built-in-multi-instrument-score-playback-v1-glossary.md)和
+[Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。
 
 真实用户总谱随后暴露的“单个合法 Pitch 无匹配 Zone 会阻断整份计划”问题，不回写本报告的 MI5
 PCM 结论；它作为增量兼容批次记录在
-[MIDI Note Coverage Isolation V1](../../../packages/audio-web/docs/midi-note-coverage-isolation-v1.md)。
+[MIDI Note Coverage Isolation V1](./midi-note-coverage-isolation-v1.md)。
 
 ## 1. 最小总谱与真实执行路径
 

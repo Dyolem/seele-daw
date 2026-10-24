@@ -20,9 +20,9 @@ Audio Quality Foundation V1A 是“MIDI 音质、表现力与编辑基础”大�
 ```
 
 本文使用的音频和 MIDI 行业词汇统一收录在
-[Audio Quality Foundation V1A 术语表](../../../packages/audio-web/docs/audio-quality-foundation-v1a-glossary.md)。AQ0 的 fixture、
+[Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。AQ0 的 fixture、
 测量窗口、报告结构和验收方式见
-[AQ0 基线与质量契约](../../../packages/audio-web/docs/audio-quality-foundation-v1a-aq0-quality-contract.md)。
+[AQ0 基线与质量契约](./audio-quality-foundation-v1a-aq0-quality-contract.md)。
 最终阶段证据汇总见
 [Audio Quality Foundation V1A 收口报告](./audio-quality-foundation-v1a-closure-report.md)。
 

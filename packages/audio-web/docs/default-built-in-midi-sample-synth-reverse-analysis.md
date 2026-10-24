@@ -11,7 +11,7 @@
 Seele 的规范规则另见
 [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](./seele-supported-sfz-profile-v1.md)。
 当前快照的来源、指纹和不可分发边界见
-[Studio Grand 本地验证资产记录](./studio-grand-local-validation-assets.md)。
+[Studio Grand 本地验证资产记录](../../../docs/archive/audio-web/studio-grand-local-validation-assets.md)。
 
 ## 1. 逆向分析结论
 
@@ -339,7 +339,7 @@ trim；在未证明 M4A 解码后 frame 与 loop 对齐前，不能把 WAV 的�
 
 ZIP entry 安全、大小预算、checksum、取消和产品 Bundle 形状不属于本逆向分析。当前开发期
 资源边界与生成结果见
-[Studio Grand 本地验证资产记录](./studio-grand-local-validation-assets.md)。
+[Studio Grand 本地验证资产记录](../../../docs/archive/audio-web/studio-grand-local-validation-assets.md)。
 
 ## 9. 仍未解决的逆向问题
 

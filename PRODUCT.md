@@ -1409,7 +1409,7 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   dispose。Audio Web 23 个测试文件 / 158 项、Studio 64 / 415、两个受影响包 Type Check、根级
   `pnpm lint`、Studio Production Build 与 soundbank dist boundary 已通过；本地测量复跑保持
   `current`。详细证据见
-  [Multi-Soundbank Runtime Resource Gate V1](packages/audio-web/docs/multi-soundbank-runtime-resource-gate-v1.md)；
+  [Multi-Soundbank Runtime Resource Gate V1](./docs/archive/audio-web/multi-soundbank-runtime-resource-gate-v1.md)；
   MI5 已继续执行真实混合门禁。
 
 - Built-in Multi-Instrument Score Playback MI5 已通过审核并提交为 `5c541dc`：原创 `747` bytes Type 1 MIDI 经
@@ -1431,7 +1431,7 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   schema 不变；未来语义恢复必须走版本化 `MIDI Semantic Binding` 证据，不能从 Pitch 猜
   Keyswitch。最终 `pnpm check` 已通过 157 个测试文件 / 1,370 项测试、全工作区 Type Check、
   Studio Production Build 与 soundbank dist boundary。详细边界与术语见
-  [MIDI Note Coverage Isolation V1](packages/audio-web/docs/midi-note-coverage-isolation-v1.md)。
+  [MIDI Note Coverage Isolation V1](./docs/archive/audio-web/midi-note-coverage-isolation-v1.md)。
 
 - MIDI Source Envelope MI6B 已通过审核并提交为 `40ce3f3`：`midi-file` 为 Type 0 / 1 PPQ 文件建立深度冻结的 SMF、
   MIDI 1.0 与 `profile-declarations-not-inspected` 证据；`project-midi` 在写入任何 Project Fact 前

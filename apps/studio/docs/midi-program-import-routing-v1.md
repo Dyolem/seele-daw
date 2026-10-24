@@ -9,7 +9,7 @@
 
 本文记录 Standard MIDI File 的 Program 与 Channel 10 如何在导入时成为明确的 Project
 Instrument Device。Program、Channel 10、精确映射、近似映射与不可用占位等术语见
-[多乐器总谱发声 V1 术语表](../../../packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)。
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户可见行为
 

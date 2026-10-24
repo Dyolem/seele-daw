@@ -11,7 +11,7 @@
 控制文件语义与资源预算。术语见
 [多乐器总谱发声 V1 术语表](./built-in-multi-instrument-score-playback-v1-glossary.md)，阶段顺序与失败
 政策见
-[Built-in Multi-Instrument Score Playback V1 阶段计划](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-phase-plan.md)。
+[Built-in Multi-Instrument Score Playback V1 阶段计划](./built-in-multi-instrument-score-playback-v1-phase-plan.md)。
 
 本文件只证明本地资产可以被确定性规范化，不单独证明 Studio 选择、Program 导入路由或产品分发。
 MI2 / MI3A 已分别接入 Studio 手动选择与导入路由；本批生成的 Manifest/WAV 和库存 JSON 全部位于
@@ -135,7 +135,7 @@ MiB；Manifest 使用 KiB。
 - General MIDI Percussion 的来源 Mapping 仍被标记为普通 instrument；MI1C 的命名政策已经在严格
   来源身份与 47 个 exact-key 前置条件后，将全部 Zone 转为 one-shot，并只给 MIDI `42 / 44 / 46`
   增加对称 fast Hi-hat Choke。政策与证据见
-  [General MIDI Percussion Compatibility Policy V1](./general-midi-percussion-compatibility-policy-v1.md)。
+  [General MIDI Percussion Compatibility Policy V1](../../../packages/audio-web/docs/general-midi-percussion-compatibility-policy-v1.md)。
   该资产转换本身不等于 Studio Catalogue 或 Channel 10 产品路由；两者分别由 MI2 与 MI3A 接入。
 - MI5 已对七个代表 Soundbank 的真实多声部混合执行 PCM 峰值、尾窗、路由、Loop / Choke 选择和
   生命周期自动门禁；22 音色人工听测仍为 `not-run`。音色审美、极端移调、可闻 Loop 接缝和声部
@@ -153,4 +153,4 @@ Manifest/WAV 规范化、资源统计和幂等发布门禁；当时 Studio Grand
 Percussion 的 one-shot / choke 兼容转换；MI2 / MI3A 随后用 Studio Catalogue、可见 Instrument
 选择器与导入路由消费这些已审核身份。MI4 已提交多 Soundbank Runtime 资源门禁；MI5 自动总谱
 PCM 已通过，人工听测仍记录为 `not-run`。完整证据见
-[Built-in Multi-Instrument Score Playback V1 收口报告](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-closure-report.md)。
+[Built-in Multi-Instrument Score Playback V1 收口报告](./built-in-multi-instrument-score-playback-v1-closure-report.md)。

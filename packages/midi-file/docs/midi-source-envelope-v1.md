@@ -11,7 +11,7 @@ Keyswitch、Articulation Map、MIDI 2.0 或 MIDI-CI，而是让后续代码能�
 “尚未检查的语义声明”，不再只凭 Pitch、Program 或未覆盖结果猜用途。
 
 相关采样、协议与语义术语见
-[多乐器总谱发声 V1 术语表](../../audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)。
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 当前可证明的来源事实
 

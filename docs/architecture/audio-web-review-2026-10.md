@@ -255,7 +255,7 @@ createWebAudioPlaybackRuntime({
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3.1 | 完成。audio-web 的 `createWebAudioPlaybackRuntime` 直接实现端口，使用 playback 的类型与常量；Studio 的 `browser-runtime.ts` 删除，只留 26 行的 `built-in-sample-assets.ts`。公开入口只剩这个函数。                                      |
 | 3.2 | 完成，范围比提案大，见下。                                                                                                                                                                                                              |
-| 3.3 | 部分完成：README 改成一页；`docs/` 里的阶段报告与审计还没有归档。                                                                                                                                                                       |
+| 3.3 | 完成：README 改成一页；阶段报告、审计、术语表与本地资产记录移入 `docs/archive/audio-web/`。`docs/` 只留 SFZ Profile 与 Manifest 契约、来源控制文件逆向分析和 GM 打击乐兼容政策，脚本仍按它们实现。                                      |
 | 3.4 | 运行路径完成：Voice Plan、Plan 路由、音高、力度、主音量和每个音符的 Zone 时长都不再复查；运行时不再读 WAV 头；缓存、Context、Voice Runtime 与资源准备抛普通 `Error`，中止是 `AbortError`。Manifest 校验器与资源键的错误类留给脚本共用。 |
 | 3.5 | 部分完成：Mapping Adapter 与受限 ZIP 移进 `scripts/`，`fflate` 改为 devDependency；测量移到 `development/`；抄写的读取函数与 Zone 匹配删除。开发报告页与离线渲染的 Proxy 仍在，去留待决。                                               |
 | 3.6 | 完成：三种结束都经过一个 `#endSourcesAt`；running 检查集中到 output 的 `isRunning()`，离线渲染的 Proxy 删除。AQ0 合成 PCM 报告与改动前逐项一致（38 项检查通过）；真实音源的人工试听仍是 not-run。                                       |

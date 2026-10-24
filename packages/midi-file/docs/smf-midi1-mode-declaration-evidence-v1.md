@@ -11,7 +11,7 @@
 Keyswitch、Drum Map、Bank、Articulation 或合成能力。
 
 相关基础术语见
-[多乐器总谱发声 V1 术语表](../../audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)，
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)，
 Source Envelope 的分层和生命周期见
 [MIDI Source Envelope V1](./midi-source-envelope-v1.md)。
 

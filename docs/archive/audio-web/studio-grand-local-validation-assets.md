@@ -75,7 +75,7 @@ catalog/selected-soundbanks.json
 ```
 
 Studio Grand 与其余 288 个 MIDISampleSynth 的 Mapping / Archive 全量字段盘点与兼容性推断见
-[默认内置 MIDISampleSynth 控制文件逆向分析](./default-built-in-midi-sample-synth-reverse-analysis.md)。
+[默认内置 MIDISampleSynth 控制文件逆向分析](../../../packages/audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)。
 
 ## 已核验指纹
 
@@ -148,7 +148,7 @@ apps/studio/public/soundbanks/generated/studio-grand/
 该 Manifest 哈希在 MI5 中因全部规范化 WAV 改用确定性 URL 安全资源名而刷新；30 枚 WAV
 内容哈希、Zone 选择、Envelope 与声音数据均未变化。单音源 preparation report schema version 2
 保留原始 Archive Key，完整修正见
-[Built-in Multi-Instrument Score Playback V1 收口报告](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-closure-report.md)。
+[Built-in Multi-Instrument Score Playback V1 收口报告](./built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
 首次执行通过同目录 staging 后原子发布。若目标目录已存在，工具只接受目录集合、文件集合与
 全部内容哈希完全一致的结果；缺失、额外或漂移文件都会失败，不自动覆盖。相同输入重复执行已经

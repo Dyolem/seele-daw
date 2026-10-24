@@ -6,8 +6,8 @@
 
 本文汇总 Audio Quality Foundation V1A 的最终产品行为、自动门禁、听测状态、兼容边界与后续
 依赖。指标定义见
-[AQ0 基线与质量契约](../../../packages/audio-web/docs/audio-quality-foundation-v1a-aq0-quality-contract.md)，行业词汇见
-[V1A 术语表](../../../packages/audio-web/docs/audio-quality-foundation-v1a-glossary.md)。
+[AQ0 基线与质量契约](./audio-quality-foundation-v1a-aq0-quality-contract.md)，行业词汇见
+[V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。
 
 ## 1. 收口结论
 

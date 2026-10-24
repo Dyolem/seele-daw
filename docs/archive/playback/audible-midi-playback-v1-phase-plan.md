@@ -130,7 +130,7 @@ Gate C.1b 已把 Catalog / Indexes 的本地定位、stable `studio-grand` 到�
 安全预算、固定输入指纹与输出校验报告落实为开发工具。可分发 Manifest / Bundle 仍只能在替代
 资产或再分发范围另行确认后进入产品资源。
 Gate C.2 的客观数据、浏览器 smoke、加载建议和人工试听清单见
-[Studio Grand 加载测量与听觉 Gate](../../../packages/audio-web/docs/studio-grand-loading-and-listening-gate.md)。
+[Studio Grand 加载测量与听觉 Gate](../audio-web/studio-grand-loading-and-listening-gate.md)。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
@@ -565,7 +565,7 @@ Zone，WAV ZIP 内含 30 个 WAV 与一份上游 JSON。Batch 4A.1b 已另行生
 因此当前资产被明确分类为 **developer-local validation fixture**：Seele 不声称拥有再分发权，
 不提交、打包、部署或自动下载它；同时也不要求先取得书面再分发授权才开始本机发声验证。
 来源链、输入指纹和产品边界记录在
-[Studio Grand 本地验证资产记录](../../../packages/audio-web/docs/studio-grand-local-validation-assets.md)。若
+[Studio Grand 本地验证资产记录](../audio-web/studio-grand-local-validation-assets.md)。若
 以后需要发布自带 Studio Grand 的构建，必须先换用明确可分发的替代资源，或取得覆盖该产品
 用法的授权，不能仅改 URL、文件名或显示名称继续使用当前采样。
 

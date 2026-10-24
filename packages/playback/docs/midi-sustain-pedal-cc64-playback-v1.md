@@ -11,7 +11,7 @@ Lane、半踏板、钢琴共鸣与额外松键采样不属于本批次。
 Project Core 的事实与命令契约见
 [MIDI Sustain Pedal CC64 Project Fact V1](../../project-core/docs/midi-sustain-pedal-cc64-project-fact-v1.md)；
 音频行业词汇的集中解释见
-[Audio Quality Foundation V1A 术语表](../../audio-web/docs/audio-quality-foundation-v1a-glossary.md)。
+[Audio Quality Foundation V1A 术语表](../../../docs/archive/audio-web/audio-quality-foundation-v1a-glossary.md)。
 
 ## 术语与时间边界
 

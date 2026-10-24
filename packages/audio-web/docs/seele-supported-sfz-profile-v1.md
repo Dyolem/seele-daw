@@ -231,7 +231,7 @@ Batch 4A.1b 不改变本文的发声语义，而是在 Manifest 外建立资源�
 通用 ZIP Adapter 不把来源、可信摘要或媒体规则硬编码进容器实现；这些由调用方提供和验证。
 Manifest 只保存 Runtime 所需的稳定资源 key，不保存 ZIP entry、Catalog、远程 URL 或文件系统
 路径。详细预算与真实输出见
-[Studio Grand 本地验证资产记录](./studio-grand-local-validation-assets.md)。
+[Studio Grand 本地验证资产记录](../../../docs/archive/audio-web/studio-grand-local-validation-assets.md)。
 
 ## 6. 明确延期
 

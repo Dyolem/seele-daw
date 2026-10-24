@@ -48,7 +48,7 @@ Event Selection / Move / Replace Value / Remove 的 Editor Foundation 已建立�
 | 半踏板       | Half-pedal                     | 连续解释 CC64 中间值；V1 仅保留原值，不实现连续制音模型。       |
 
 音质阶段更完整的双语术语见
-[Audio Quality Foundation V1A Glossary](../../audio-web/docs/audio-quality-foundation-v1a-glossary.md)。
+[Audio Quality Foundation V1A Glossary](../../../docs/archive/audio-web/audio-quality-foundation-v1a-glossary.md)。
 
 ## 为什么是专用 CC64 事实，而不是通用 Automation
 

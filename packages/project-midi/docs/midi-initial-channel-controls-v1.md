@@ -8,7 +8,7 @@
 
 本文记录 Standard MIDI File 中初始 Channel Volume（CC7）与 Pan（CC10）如何变成 Seele Track
 Channel Facts。CC、Linear Gain、Pan、Automation 等术语见
-[多乐器总谱发声 V1 术语表](../../audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)。
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户预期听觉
 

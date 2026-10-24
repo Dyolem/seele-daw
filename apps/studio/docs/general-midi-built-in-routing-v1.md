@@ -10,7 +10,7 @@
 本文记录 Studio 如何同时处理两类容易混淆、但用途不同的目录：用户手动浏览的是来源提供的完整
 Preset 目录；Standard MIDI File 导入查询的是固定 128 项 General MIDI（GM）Program 路由。相关
 MIDI、Program、Preset、Soundbank、控制文件与精确 / 近似映射等术语见
-[多乐器总谱发声 V1 术语表](../../../packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)。
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户可见结果
 

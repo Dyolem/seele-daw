@@ -12,7 +12,7 @@ Evidence 分类为“可绑定、未绑定、未解析或冲突”，但不据�
 来源字节证据仍由
 [SMF MIDI 1.0 Mode Declaration Evidence V1](../../midi-file/docs/smf-midi1-mode-declaration-evidence-v1.md)
 拥有；常用中英术语见
-[多乐器总谱发声 V1 术语表](../../audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)。
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户可见行为
 

@@ -10,7 +10,7 @@
 
 本文记录 Studio 如何把 MI1B / MI1C 已审核的开发者本地 Soundbank 变成可见、可保存的 Track
 Instrument 选择。MIDI、Soundbank、Catalogue 与 Missing Instrument 等术语见
-[多乐器总谱发声 V1 术语表](../../../packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)。
+[多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户可见行为
 

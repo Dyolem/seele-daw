@@ -17,10 +17,8 @@ import {
   parseTick,
   parseTickDelta,
   parseTimeSignatureEventId,
-  type MidiNotePartitionSnapshot,
   type MidiSourceId,
   type MidiSustainPedalEventId,
-  type MidiSustainPedalEventPartitionSnapshot,
   type NoteId,
   type ProjectSnapshot,
 } from '#internal/index'
@@ -43,32 +41,24 @@ function compareTimelineRecords(
   return compareIds(left, right)
 }
 
-function findPartition(
-  snapshot: ProjectSnapshot,
-  sourceId: MidiSourceId,
-): MidiNotePartitionSnapshot {
-  const partition = snapshot.midiNotePartitions.find((candidate) => candidate.sourceId === sourceId)
+function notesOf(snapshot: ProjectSnapshot, sourceId: MidiSourceId) {
+  const notes = snapshot.midiNotes[sourceId]
 
-  if (partition === undefined) throw new Error(`Snapshot has no partition for Source ${sourceId}`)
-  return partition
+  if (notes === undefined) throw new Error(`Snapshot has no partition for Source ${sourceId}`)
+  return notes
 }
 
 function findNote(snapshot: ProjectSnapshot, sourceId: MidiSourceId, noteId: NoteId) {
-  return findPartition(snapshot, sourceId).notes.find((note) => note.id === noteId)
+  return notesOf(snapshot, sourceId).find((note) => note.id === noteId)
 }
 
-function findSustainPedalEventPartition(
-  snapshot: ProjectSnapshot,
-  sourceId: MidiSourceId,
-): MidiSustainPedalEventPartitionSnapshot {
-  const partition = snapshot.midiSustainPedalEventPartitions.find(
-    (candidate) => candidate.sourceId === sourceId,
-  )
+function sustainPedalEventsOf(snapshot: ProjectSnapshot, sourceId: MidiSourceId) {
+  const events = snapshot.midiSustainPedalEvents[sourceId]
 
-  if (partition === undefined) {
+  if (events === undefined) {
     throw new Error(`Snapshot has no Sustain Pedal Event partition for Source ${sourceId}`)
   }
-  return partition
+  return events
 }
 
 function findSustainPedalEvent(
@@ -76,9 +66,7 @@ function findSustainPedalEvent(
   sourceId: MidiSourceId,
   eventId: MidiSustainPedalEventId,
 ) {
-  return findSustainPedalEventPartition(snapshot, sourceId).events.find(
-    (event) => event.id === eventId,
-  )
+  return sustainPedalEventsOf(snapshot, sourceId).find((event) => event.id === eventId)
 }
 
 function reverseMap<Key, Value>(source: ReadonlyMap<Key, Value>): ReadonlyMap<Key, Value> {
@@ -128,8 +116,8 @@ describe('ProjectSnapshot public contract', () => {
       tracks: [],
       clips: [],
       midiSources: [],
-      midiNotePartitions: [],
-      midiSustainPedalEventPartitions: [],
+      midiNotes: {},
+      midiSustainPedalEvents: {},
       devices: [],
     })
     expect(snapshot.tempoEvents).toHaveLength(1)
@@ -141,11 +129,8 @@ describe('ProjectSnapshot public contract', () => {
   it('copies and freezes every public container while sharing domain Records', () => {
     const { fixture, session } = createFixtureProjectSession()
     const snapshot = session.getSnapshot()
-    const partition = findPartition(snapshot, fixture.records.nonLoopSource.id)
-    const sustainPedalEventPartition = findSustainPedalEventPartition(
-      snapshot,
-      fixture.records.nonLoopSource.id,
-    )
+    const notes = notesOf(snapshot, fixture.records.nonLoopSource.id)
+    const sustainPedalEvents = sustainPedalEventsOf(snapshot, fixture.records.nonLoopSource.id)
 
     expect(snapshot.project).toBe(fixture.records.project)
     expect(snapshot.master).toBe(fixture.records.master)
@@ -158,7 +143,7 @@ describe('ProjectSnapshot public contract', () => {
     expect(
       snapshot.midiSources.find((source) => source.id === fixture.records.nonLoopSource.id),
     ).toBe(fixture.records.nonLoopSource)
-    expect(partition.notes.find((note) => note.id === fixture.records.nonLoopNote.id)).toBe(
+    expect(notes.find((note) => note.id === fixture.records.nonLoopNote.id)).toBe(
       fixture.records.nonLoopNote,
     )
     expect(
@@ -175,18 +160,17 @@ describe('ProjectSnapshot public contract', () => {
     expect(Object.isFrozen(snapshot.tracks)).toBe(true)
     expect(Object.isFrozen(snapshot.clips)).toBe(true)
     expect(Object.isFrozen(snapshot.midiSources)).toBe(true)
-    expect(Object.isFrozen(snapshot.midiNotePartitions)).toBe(true)
-    expect(Object.isFrozen(snapshot.midiSustainPedalEventPartitions)).toBe(true)
+    expect(Object.isFrozen(snapshot.midiNotes)).toBe(true)
+    expect(Object.isFrozen(snapshot.midiSustainPedalEvents)).toBe(true)
     expect(Object.isFrozen(snapshot.tempoEvents)).toBe(true)
     expect(Object.isFrozen(snapshot.timeSignatureEvents)).toBe(true)
     expect(Object.isFrozen(snapshot.devices)).toBe(true)
-    expect(Object.isFrozen(partition)).toBe(true)
-    expect(Object.isFrozen(partition.notes)).toBe(true)
-    expect(Object.isFrozen(sustainPedalEventPartition)).toBe(true)
-    expect(Object.isFrozen(sustainPedalEventPartition.events)).toBe(true)
+    expect(Object.isFrozen(notes)).toBe(true)
+    expect(Object.isFrozen(sustainPedalEvents)).toBe(true)
     expect(snapshot.tracks).not.toBeInstanceOf(Map)
-    expect(snapshot.midiNotePartitions).not.toBeInstanceOf(Map)
-    expect(snapshot.midiSustainPedalEventPartitions).not.toBeInstanceOf(Map)
+    // Partitions have no prototype, so a Source ID such as "constructor" finds nothing inherited.
+    expect(Object.getPrototypeOf(snapshot.midiNotes)).toBeNull()
+    expect(Object.getPrototypeOf(snapshot.midiSustainPedalEvents)).toBeNull()
   })
 
   it('uses explicit Track order and deterministic entity and Timeline order', () => {
@@ -204,23 +188,17 @@ describe('ProjectSnapshot public contract', () => {
     expect(snapshot.timeSignatureEvents).toEqual(
       [...fixture.seed.timeSignatureEvents.values()].sort(compareTimelineRecords),
     )
-    expect(snapshot.midiNotePartitions.map((partition) => partition.sourceId)).toEqual(
-      [...fixture.seed.midiNotes.keys()].sort(),
-    )
-    expect(snapshot.midiSustainPedalEventPartitions.map((partition) => partition.sourceId)).toEqual(
+    expect(Object.keys(snapshot.midiNotes)).toEqual([...fixture.seed.midiNotes.keys()].sort())
+    expect(Object.keys(snapshot.midiSustainPedalEvents)).toEqual(
       [...fixture.seed.midiSustainPedalEvents.keys()].sort(),
     )
 
-    for (const partition of snapshot.midiNotePartitions) {
-      expect(partition.notes).toEqual(
-        [...fixture.seed.midiNotes.get(partition.sourceId)!.values()].sort(compareIds),
-      )
+    for (const [sourceId, partition] of fixture.seed.midiNotes) {
+      expect(notesOf(snapshot, sourceId)).toEqual([...partition.values()].sort(compareIds))
     }
-    for (const partition of snapshot.midiSustainPedalEventPartitions) {
-      expect(partition.events).toEqual(
-        [...fixture.seed.midiSustainPedalEvents.get(partition.sourceId)!.values()].sort(
-          compareTimelineRecords,
-        ),
+    for (const [sourceId, partition] of fixture.seed.midiSustainPedalEvents) {
+      expect(sustainPedalEventsOf(snapshot, sourceId)).toEqual(
+        [...partition.values()].sort(compareTimelineRecords),
       )
     }
   })
@@ -242,7 +220,7 @@ describe('ProjectSnapshot public contract', () => {
     expect(session.getSnapshot()).toBe(first)
     expect(Object.isFrozen(first)).toBe(true)
     expect(Object.isFrozen(first.tracks)).toBe(true)
-    expect(Object.isFrozen(first.midiNotePartitions)).toBe(true)
+    expect(Object.isFrozen(first.midiNotes)).toBe(true)
   })
 })
 

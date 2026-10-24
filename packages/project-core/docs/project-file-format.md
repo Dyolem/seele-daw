@@ -1,7 +1,7 @@
 # Seele 项目文件格式
 
-当前版本是 `formatVersion: 3`。项目文件就是 ModelStore 的表：每条记录原样写出，不含
-revision、History 与索引。读取只接受这一个版本。格式改变时版本号加一，旧文件会被明确拒绝，
+当前版本是 `formatVersion: 3`。项目文件就是去掉 `modelRevision` 的 Snapshot：两者共用
+`ProjectTables` 这个形状，记录原样写出，不含 History 与索引。读取只接受这一个版本。格式改变时版本号加一，旧文件会被明确拒绝，
 不做迁移（[ADR-005](../../../docs/adr/ADR-005-persistence-stores-the-tables.md)）。
 
 完整样例是 [`project-file.json`](../src/__tests__/fixtures/project-file.json)；测试要求 writer

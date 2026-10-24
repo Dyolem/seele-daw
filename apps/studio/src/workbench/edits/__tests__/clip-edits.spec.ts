@@ -54,7 +54,7 @@ describe('clip edits', () => {
       loop: null,
     })
     expect(snapshot.midiSources[0]).toEqual({ id: 'source-defaults', lengthTick: 3_840 })
-    expect(snapshot.midiNotePartitions[0]).toEqual({ sourceId: 'source-defaults', notes: [] })
+    expect(snapshot.midiNotes).toEqual({ 'source-defaults': [] })
     expect(session.canUndo).toBe(true)
   })
 

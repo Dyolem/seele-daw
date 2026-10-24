@@ -56,8 +56,8 @@ describe('MI5 built-in multi-instrument score quality fixture', () => {
     expect(fixture.decodedDocument.tracks).toHaveLength(8)
     expect(fixture.snapshot.tracks).toHaveLength(8)
     expect(
-      fixture.snapshot.midiNotePartitions.reduce(
-        (noteCount, partition) => noteCount + partition.notes.length,
+      Object.values(fixture.snapshot.midiNotes).reduce(
+        (noteCount, notes) => noteCount + notes.length,
         0,
       ),
     ).toBe(26)

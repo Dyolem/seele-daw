@@ -69,19 +69,17 @@ describe('writing a project file', () => {
     expect(asJson(createProjectFile(session.getSnapshot()))).toEqual(golden)
   })
 
-  it('shares the Snapshot records and freezes only its own containers', () => {
+  it('is the Snapshot without its revision, sharing every table', () => {
     const { session } = createFixtureProjectSession()
     const snapshot = session.getSnapshot()
+    const { modelRevision, ...tables } = snapshot
     const file = createProjectFile(snapshot)
-    const notePartition = snapshot.midiNotePartitions.find(
-      ({ sourceId }) => sourceId === 'source-non-loop',
-    )
 
-    expect(file.project).toBe(snapshot.project)
+    expect(modelRevision).toBe(0)
+    expect(file).toEqual({ formatVersion: PROJECT_FILE_FORMAT_VERSION, ...tables })
     expect(file.tracks).toBe(snapshot.tracks)
-    expect(file.midiNotes[parseMidiSourceId('source-non-loop')]).toBe(notePartition?.notes)
+    expect(file.midiNotes).toBe(snapshot.midiNotes)
     expect(Object.isFrozen(file)).toBe(true)
-    expect(Object.isFrozen(file.midiNotes)).toBe(true)
   })
 
   it('stays as written while the Session keeps changing', () => {
@@ -129,7 +127,7 @@ describe('loading a project file', () => {
     const parameters = file.devices[0]?.parameters
 
     expect(file.midiSources.map(({ id }) => id)).toEqual(['__proto__', 'source-looping'])
-    expect(Object.getPrototypeOf(file.midiNotes)).toBe(Object.prototype)
+    expect(Object.getPrototypeOf(file.midiNotes)).toBeNull()
     expect(asJson(file.midiNotes)).toEqual(data.midiNotes)
     expect(Object.getPrototypeOf(parameters)).toBe(Object.prototype)
     expect(asJson(parameters)).toEqual(data.devices[0]?.parameters)

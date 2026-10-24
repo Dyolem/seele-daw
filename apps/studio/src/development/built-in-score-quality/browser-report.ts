@@ -441,8 +441,8 @@ export async function runBuiltInScoreQualityBrowserReport(
       }),
       fixture: Object.freeze({
         encodedMidiByteLength: fixture.encodedMidiBytes.byteLength,
-        importedNoteCount: fixture.snapshot.midiNotePartitions.reduce(
-          (noteCount, partition) => noteCount + partition.notes.length,
+        importedNoteCount: Object.values(fixture.snapshot.midiNotes).reduce(
+          (noteCount, notes) => noteCount + notes.length,
           0,
         ),
         importedTrackCount: fixture.snapshot.tracks.length,

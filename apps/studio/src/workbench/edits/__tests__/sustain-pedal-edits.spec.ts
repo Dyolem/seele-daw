@@ -66,7 +66,7 @@ function createFixture(name: string, looped = false): PedalFixture {
 }
 
 function eventsOf(session: ProjectSession) {
-  return session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events)
+  return Object.values(session.getSnapshot().midiSustainPedalEvents).flat()
 }
 
 function placeInClip(fixture: PedalFixture, clipTick: number, value: number) {

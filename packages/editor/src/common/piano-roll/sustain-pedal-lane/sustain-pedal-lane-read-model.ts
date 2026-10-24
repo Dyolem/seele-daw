@@ -181,16 +181,14 @@ function requireSustainPedalEvents(
   snapshot: ProjectSnapshot,
   sourceId: MidiSourceId,
 ): readonly MidiSustainPedalEventRecord[] {
-  const partition = snapshot.midiSustainPedalEventPartitions.find(
-    (candidate) => candidate.sourceId === sourceId,
-  )
-  if (partition === undefined) {
+  const events = snapshot.midiSustainPedalEvents[sourceId]
+  if (events === undefined) {
     throw new PianoRollError(
       'sustain-pedal-partition-missing',
       `Piano Roll references missing Sustain Pedal Event partition ${sourceId}`,
     )
   }
-  return partition.events
+  return events
 }
 
 /** Projects one non-looped Clip's selected-channel CC64 facts into Clip-local time. */

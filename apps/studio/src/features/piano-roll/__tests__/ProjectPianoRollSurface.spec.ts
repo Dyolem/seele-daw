@@ -343,8 +343,8 @@ function mountSelectionMenuFixture(identity: string) {
   function records(kind: 'notes' | 'sustain-pedal') {
     const snapshot = fixture.session.getSnapshot()
     return kind === 'notes'
-      ? snapshot.midiNotePartitions.flatMap(({ notes }) => notes)
-      : snapshot.midiSustainPedalEventPartitions.flatMap(({ events }) => events)
+      ? Object.values(snapshot.midiNotes).flat()
+      : Object.values(snapshot.midiSustainPedalEvents).flat()
   }
   return { ...fixture, keyboard, invoke, preferences, wrapper, markers, records }
 }
@@ -392,9 +392,8 @@ describe('ProjectPianoRollSurface', () => {
     dispatchPointer(host, 'pointerdown', { clientX: 240, clientY: 125, pointerId: 2 })
     dispatchPointer(host, 'pointerup', { clientX: 240, clientY: 125, pointerId: 2 })
     await flushPromises()
-    const note = fixture.session
-      .getSnapshot()
-      .midiNotePartitions.flatMap(({ notes }) => notes)
+    const note = Object.values(fixture.session.getSnapshot().midiNotes)
+      .flat()
       .find((note) => note.pitch === 36)
     expect(note).toBeDefined()
     expect(
@@ -953,9 +952,8 @@ describe('ProjectPianoRollSurface', () => {
 
     const revisionBeforeMove = fixture.session.modelRevision
     const positionsBeforeMove = new Map(
-      fixture.session
-        .getSnapshot()
-        .midiNotePartitions.flatMap(({ notes }) => notes)
+      Object.values(fixture.session.getSnapshot().midiNotes)
+        .flat()
         .map((note) => [note.id, note] as const),
     )
     const dragDistanceCssPixel =
@@ -992,9 +990,8 @@ describe('ProjectPianoRollSurface', () => {
 
     expect(fixture.session.modelRevision).toBe(revisionBeforeMove + 1)
     const positionsAfterMove = new Map(
-      fixture.session
-        .getSnapshot()
-        .midiNotePartitions.flatMap(({ notes }) => notes)
+      Object.values(fixture.session.getSnapshot().midiNotes)
+        .flat()
         .map((note) => [note.id, note] as const),
     )
     for (const noteId of noteIds) {
@@ -1007,9 +1004,8 @@ describe('ProjectPianoRollSurface', () => {
 
     fixture.session.undo()
     expect(
-      fixture.session
-        .getSnapshot()
-        .midiNotePartitions.flatMap(({ notes }) => notes)
+      Object.values(fixture.session.getSnapshot().midiNotes)
+        .flat()
         .map(({ startTick, pitch }) => ({ pitch, startTick })),
     ).toEqual([
       { pitch: 60, startTick: 960 },
@@ -1076,9 +1072,10 @@ describe('ProjectPianoRollSurface', () => {
     expect(escapeEvent.defaultPrevented).toBe(true)
     expect(fixture.session.modelRevision).toBe(revisionBeforeMove)
     expect(wrapper.get('.project-piano-roll').attributes('data-moving-notes')).toBe('false')
-    expect(
-      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)[0],
-    ).toMatchObject({ pitch: 60, startTick: 960 })
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()[0]).toMatchObject({
+      pitch: 60,
+      startTick: 960,
+    })
 
     wrapper.unmount()
     keyboard.runtime.dispose()
@@ -1273,9 +1270,7 @@ describe('ProjectPianoRollSurface', () => {
     await nextTick()
 
     expect(fixture.session.modelRevision).toBe(revisionBeforeResize + 1)
-    expect(
-      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)[0],
-    ).toMatchObject({
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()[0]).toMatchObject({
       durationTick: 480,
       id: noteId,
       startTick: 960,
@@ -1287,9 +1282,10 @@ describe('ProjectPianoRollSurface', () => {
     expect(wrapper.get('button[aria-label="Pencil tool"]').attributes('aria-pressed')).toBe('true')
 
     fixture.session.undo()
-    expect(
-      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)[0],
-    ).toMatchObject({ durationTick: 240, startTick: 960 })
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()[0]).toMatchObject({
+      durationTick: 240,
+      startTick: 960,
+    })
 
     wrapper.unmount()
     keyboard.runtime.dispose()
@@ -1369,9 +1365,7 @@ describe('ProjectPianoRollSurface', () => {
     await nextTick()
 
     expect(fixture.session.modelRevision).toBe(revisionBeforeResize)
-    expect(
-      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)[0],
-    ).toMatchObject({
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()[0]).toMatchObject({
       durationTick: 240,
       id: noteId,
       startTick: 960,
@@ -1431,7 +1425,7 @@ describe('ProjectPianoRollSurface', () => {
     await Promise.resolve()
     await nextTick()
 
-    expect(fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toEqual([
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()).toEqual([
       {
         channel: 0,
         durationTick: 240,
@@ -1450,9 +1444,7 @@ describe('ProjectPianoRollSurface', () => {
     fixture.session.undo()
     await Promise.resolve()
     await nextTick()
-    expect(fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toEqual(
-      [],
-    )
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()).toEqual([])
     expect(wrapper.find('[data-piano-roll-note-id="surface-pencil-note-1"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('0 selected')
 
@@ -1473,9 +1465,7 @@ describe('ProjectPianoRollSurface', () => {
     dispatchPointer(restoredNote.element, 'pointerdown', { pointerId: 13 })
     dispatchPointer(restoredNote.element, 'pointerup', { pointerId: 13 })
     await nextTick()
-    expect(
-      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes),
-    ).toHaveLength(1)
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()).toHaveLength(1)
     expect(wrapper.text()).toContain('1 selected')
 
     await wrapper.get('button[aria-label="Snap to 1/16 grid — on"]').trigger('click')
@@ -1495,9 +1485,8 @@ describe('ProjectPianoRollSurface', () => {
     await Promise.resolve()
     await nextTick()
     expect(
-      fixture.session
-        .getSnapshot()
-        .midiNotePartitions.flatMap(({ notes }) => notes)
+      Object.values(fixture.session.getSnapshot().midiNotes)
+        .flat()
         .find(({ id }) => id === 'surface-pencil-note-2'),
     ).toMatchObject({
       durationTick: 240,
@@ -1547,9 +1536,7 @@ describe('ProjectPianoRollSurface', () => {
     dispatchPointer(lane.element, 'pointerup', { clientX: 240, clientY: 125, pointerId: 71 })
     await nextTick()
 
-    expect(
-      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toEqual([
+    expect(Object.values(fixture.session.getSnapshot().midiSustainPedalEvents).flat()).toEqual([
       {
         channel: 2,
         id: 'surface-sustain-pedal-sustain-pedal-event-1',
@@ -1575,9 +1562,7 @@ describe('ProjectPianoRollSurface', () => {
     ).toBe(true)
 
     fixture.session.undo()
-    expect(
-      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toEqual([])
+    expect(Object.values(fixture.session.getSnapshot().midiSustainPedalEvents).flat()).toEqual([])
 
     wrapper.unmount()
     keyboard.runtime.dispose()
@@ -1637,9 +1622,9 @@ describe('ProjectPianoRollSurface', () => {
     const horizontalDeltaTick = 960
     const originX = (960 / presentation.context.clipSpanTick) * 960
     const horizontalDeltaX = (horizontalDeltaTick / presentation.context.clipSpanTick) * 960
-    const beforeMove = fixture.session
-      .getSnapshot()
-      .midiSustainPedalEventPartitions.flatMap(({ events }) => events)[0]!
+    const beforeMove = Object.values(
+      fixture.session.getSnapshot().midiSustainPedalEvents,
+    ).flat()[0]!
     const revisionBeforeMove = fixture.session.modelRevision
 
     dispatchPointer(marker.element, 'pointerdown', {
@@ -1663,7 +1648,7 @@ describe('ProjectPianoRollSurface', () => {
 
     expect(fixture.session.modelRevision).toBe(revisionBeforeMove + 1)
     expect(
-      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+      Object.values(fixture.session.getSnapshot().midiSustainPedalEvents).flat(),
     ).toContainEqual({ ...beforeMove, tick: beforeMove.tick + horizontalDeltaTick })
     expect(lane.attributes('data-interaction-phase')).toBe('awaiting-authority')
     expect(marker.classes()).toContain('piano-roll-sustain-pedal-lane__event--selected')
@@ -1703,7 +1688,7 @@ describe('ProjectPianoRollSurface', () => {
 
     expect(fixture.session.modelRevision).toBe(revisionBeforeValue + 1)
     expect(
-      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+      Object.values(fixture.session.getSnapshot().midiSustainPedalEvents).flat(),
     ).toContainEqual({
       ...beforeMove,
       tick: beforeMove.tick + horizontalDeltaTick,
@@ -1731,16 +1716,14 @@ describe('ProjectPianoRollSurface', () => {
     const removeEvent = keyboard.bindingRegistry.dispatch('Delete')
     expect(removeEvent.defaultPrevented).toBe(true)
     expect(fixture.session.modelRevision).toBe(revisionBeforeRemove + 1)
-    expect(
-      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toEqual([])
+    expect(Object.values(fixture.session.getSnapshot().midiSustainPedalEvents).flat()).toEqual([])
     expect(wrapper.get(`[data-piano-roll-note-id="${noteId}"]`).classes()).toContain(
       'sd-piano-roll-dom-note--selected',
     )
 
     fixture.session.undo()
     expect(
-      fixture.session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
+      Object.values(fixture.session.getSnapshot().midiSustainPedalEvents).flat(),
     ).toContainEqual({
       ...beforeMove,
       tick: beforeMove.tick + horizontalDeltaTick,
@@ -1812,9 +1795,7 @@ describe('ProjectPianoRollSurface', () => {
 
     expect(removeEvent.defaultPrevented).toBe(true)
     expect(fixture.session.modelRevision).toBe(revisionBeforeRemove + 1)
-    expect(fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toEqual(
-      [],
-    )
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()).toEqual([])
     expect(wrapper.text()).toContain('0 selected')
     expect(wrapper.find(`[data-piano-roll-note-id="${noteIds[0]}"]`).exists()).toBe(false)
     expect(wrapper.find(`[data-piano-roll-note-id="${noteIds[1]}"]`).exists()).toBe(false)
@@ -1823,9 +1804,8 @@ describe('ProjectPianoRollSurface', () => {
     await Promise.resolve()
     await nextTick()
     expect(
-      fixture.session
-        .getSnapshot()
-        .midiNotePartitions.flatMap(({ notes }) => notes)
+      Object.values(fixture.session.getSnapshot().midiNotes)
+        .flat()
         .map(({ id }) => id)
         .sort(),
     ).toEqual([...noteIds].sort())
@@ -1834,9 +1814,7 @@ describe('ProjectPianoRollSurface', () => {
     fixture.session.redo()
     await Promise.resolve()
     await nextTick()
-    expect(fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toEqual(
-      [],
-    )
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()).toEqual([])
 
     wrapper.unmount()
     expect(keyboard.bindingRegistry.dispatch('Backspace').defaultPrevented).toBe(false)
@@ -1973,9 +1951,7 @@ describe('ProjectPianoRollSurface', () => {
       title: 'MIDI note could not be added',
       tone: 'danger',
     })
-    expect(
-      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes),
-    ).toHaveLength(1)
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()).toHaveLength(1)
 
     wrapper.unmount()
     keyboard.runtime.dispose()
@@ -2029,9 +2005,7 @@ describe('ProjectPianoRollSurface', () => {
     await Promise.resolve()
     await nextTick()
 
-    expect(
-      fixture.session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes),
-    ).toHaveLength(1)
+    expect(Object.values(fixture.session.getSnapshot().midiNotes).flat()).toHaveLength(1)
     expect(wrapper.text()).not.toContain('1 selected')
     expect(toasts.message).toMatchObject({
       title: 'MIDI note was added but could not be selected',

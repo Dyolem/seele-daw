@@ -108,17 +108,15 @@ function createClipReadModel(
     return Object.freeze({ clip: projection, notes: Object.freeze([]) })
   }
 
-  const partition = input.snapshot.midiNotePartitions.find(
-    (candidate) => candidate.sourceId === clip.sourceId,
-  )
-  if (partition === undefined) {
+  const sourceNotes = input.snapshot.midiNotes[clip.sourceId]
+  if (sourceNotes === undefined) {
     throw new PianoRollError(
       'track-clip-note-partition-missing',
       `Piano Roll Track Clip ${clip.id} references missing Note partition ${clip.sourceId}`,
     )
   }
 
-  const notes = partition.notes.flatMap((note) => {
+  const notes = sourceNotes.flatMap((note) => {
     const noteProjection = createNoteProjection(projection, note)
     return noteProjection === null ? [] : [noteProjection]
   })

@@ -64,7 +64,7 @@ function createClipFixture(name: string, options: { readonly looped?: boolean } 
 }
 
 function notesOf(session: ProjectSession) {
-  return session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)
+  return Object.values(session.getSnapshot().midiNotes).flat()
 }
 
 /** Adds a 240-tick note at a Clip-local tick against the current revision. */

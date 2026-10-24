@@ -180,12 +180,16 @@ describe('Audible MIDI Compiler', () => {
     const reversedSnapshot = replaceCompilerFixtureSnapshot(snapshot, {
       clips: [...snapshot.clips].reverse(),
       devices: [...snapshot.devices].reverse(),
-      midiNotePartitions: [...snapshot.midiNotePartitions]
-        .reverse()
-        .map((partition) => ({ ...partition, notes: [...partition.notes].reverse() })),
-      midiSustainPedalEventPartitions: [...snapshot.midiSustainPedalEventPartitions]
-        .reverse()
-        .map((partition) => ({ ...partition, events: [...partition.events].reverse() })),
+      midiNotes: Object.fromEntries(
+        Object.entries(snapshot.midiNotes)
+          .reverse()
+          .map(([sourceId, notes]) => [sourceId, [...notes].reverse()]),
+      ),
+      midiSustainPedalEvents: Object.fromEntries(
+        Object.entries(snapshot.midiSustainPedalEvents)
+          .reverse()
+          .map(([sourceId, events]) => [sourceId, [...events].reverse()]),
+      ),
       midiSources: [...snapshot.midiSources].reverse(),
       tracks: [...snapshot.tracks].reverse(),
     })
@@ -278,14 +282,8 @@ describe('Audible MIDI Compiler', () => {
       replaceCompilerFixtureSnapshot(snapshot, {
         clips: [...snapshot.clips, overlappingClip],
         midiSources: [...snapshot.midiSources, overlappingSource],
-        midiNotePartitions: [
-          ...snapshot.midiNotePartitions,
-          Object.freeze({ sourceId: overlappingSource.id, notes: [overlappingNote] }),
-        ],
-        midiSustainPedalEventPartitions: [
-          ...snapshot.midiSustainPedalEventPartitions,
-          Object.freeze({ sourceId: overlappingSource.id, events: [] }),
-        ],
+        midiNotes: { ...snapshot.midiNotes, [overlappingSource.id]: [overlappingNote] },
+        midiSustainPedalEvents: { ...snapshot.midiSustainPedalEvents, [overlappingSource.id]: [] },
       }),
     )
     const overlappingSpans = plan.midiNoteSpans.filter(
@@ -325,11 +323,10 @@ describe('Audible MIDI Compiler', () => {
     ]
     const plan = compileAudibleMidiProject(
       replaceCompilerFixtureSnapshot(snapshot, {
-        midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map((partition) =>
-          partition.sourceId === records.pianoSource.id
-            ? Object.freeze({ sourceId: partition.sourceId, events: pedalEvents })
-            : partition,
-        ),
+        midiSustainPedalEvents: {
+          ...snapshot.midiSustainPedalEvents,
+          [records.pianoSource.id]: pedalEvents,
+        },
       }),
     )
     const primary = plan.midiNoteSpans.find(({ noteId }) => noteId === records.pianoNotes[1]?.id)
@@ -359,11 +356,10 @@ describe('Audible MIDI Compiler', () => {
     })
     const plan = compileAudibleMidiProject(
       replaceCompilerFixtureSnapshot(snapshot, {
-        midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map((partition) =>
-          partition.sourceId === records.pianoSource.id
-            ? Object.freeze({ sourceId: partition.sourceId, events: [sameTickDown] })
-            : partition,
-        ),
+        midiSustainPedalEvents: {
+          ...snapshot.midiSustainPedalEvents,
+          [records.pianoSource.id]: [sameTickDown],
+        },
       }),
     )
 
@@ -394,12 +390,10 @@ describe('Audible MIDI Compiler', () => {
     expect(() =>
       compileAudibleMidiProject(
         replaceCompilerFixtureSnapshot(snapshot, {
-          midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map(
-            (partition) =>
-              partition.sourceId === records.pianoSource.id
-                ? Object.freeze({ sourceId: partition.sourceId, events: duplicatePositionEvents })
-                : partition,
-          ),
+          midiSustainPedalEvents: {
+            ...snapshot.midiSustainPedalEvents,
+            [records.pianoSource.id]: duplicatePositionEvents,
+          },
         }),
       ),
     ).toThrow(expect.objectContaining({ code: 'duplicate-snapshot-entity' }))
@@ -544,8 +538,8 @@ describe('Audible MIDI Compiler', () => {
       replaceCompilerFixtureSnapshot(snapshot, {
         clips: [],
         midiSources: [],
-        midiNotePartitions: [],
-        midiSustainPedalEventPartitions: [],
+        midiNotes: {},
+        midiSustainPedalEvents: {},
       }),
     )
 
@@ -619,10 +613,8 @@ describe('Audible MIDI Compiler', () => {
       tracks: [track],
       clips: [clip],
       midiSources: [source],
-      midiNotePartitions: [Object.freeze({ sourceId: source.id, notes })],
-      midiSustainPedalEventPartitions: [
-        Object.freeze({ sourceId: source.id, events: Object.freeze([]) }),
-      ],
+      midiNotes: { [source.id]: notes },
+      midiSustainPedalEvents: { [source.id]: [] },
       devices: [device],
     })
 

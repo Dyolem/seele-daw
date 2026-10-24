@@ -378,8 +378,8 @@ describe('ProjectPianoRollTrackSurface', () => {
     const probe = installPianoRollResizeObserver()
     const { wrapper, session, presentation, projectionSnapshot, clip, pinia } =
       createSurfaceFixture()
-    const partition = projectionSnapshot.midiNotePartitions[0]
-    if (partition === undefined) throw new Error('Expected Note partition')
+    const [sourceId] = Object.keys(projectionSnapshot.midiNotes)
+    if (sourceId === undefined) throw new Error('Expected Note partition')
     const longSnapshot = {
       ...projectionSnapshot,
       clips: projectionSnapshot.clips.map((entry) => ({ ...entry, spanTick: parseTick(576_000) })),
@@ -387,31 +387,28 @@ describe('ProjectPianoRollTrackSurface', () => {
         ...source,
         lengthTick: parseTick(576_000),
       })),
-      midiNotePartitions: [
-        {
-          ...partition,
-          notes: [
-            ...Array.from({ length: 3000 }, (_, index) =>
-              createMidiNoteRecord({
-                id: parseNoteId(`long-note-${index}`),
-                startTick: parseTick(index * 192),
-                durationTick: parseTick(96),
-                channel: parseMidiChannel(0),
-                pitch: parseMidiPitch(60),
-                velocity: parseMidiVelocity(100),
-              }),
-            ),
+      midiNotes: {
+        [sourceId]: [
+          ...Array.from({ length: 3000 }, (_, index) =>
             createMidiNoteRecord({
-              id: parseNoteId('spanning-note'),
-              startTick: parseTick(0),
-              durationTick: parseTick(576_000),
+              id: parseNoteId(`long-note-${index}`),
+              startTick: parseTick(index * 192),
+              durationTick: parseTick(96),
               channel: parseMidiChannel(0),
               pitch: parseMidiPitch(60),
               velocity: parseMidiVelocity(100),
             }),
-          ],
-        },
-      ],
+          ),
+          createMidiNoteRecord({
+            id: parseNoteId('spanning-note'),
+            startTick: parseTick(0),
+            durationTick: parseTick(576_000),
+            channel: parseMidiChannel(0),
+            pitch: parseMidiPitch(60),
+            velocity: parseMidiVelocity(100),
+          }),
+        ],
+      },
     }
     const longPresentation = createProjectPianoRollTrackPresentation(
       longSnapshot,
@@ -622,12 +619,13 @@ describe('ProjectPianoRollTrackSurface', () => {
     const host = wrapper.get('.project-piano-roll-track__canvas-host').element
     dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
     dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
-    const changed = session.getSnapshot().midiNotePartitions.filter(({ notes }) => notes.length > 0)
-    expect(changed).toHaveLength(1)
-    expect(changed[0]?.sourceId).toBe('overlapping-source')
+    const changed = Object.entries(session.getSnapshot().midiNotes).filter(
+      ([, notes]) => notes.length > 0,
+    )
+    expect(changed.map(([changedSourceId]) => changedSourceId)).toEqual(['overlapping-source'])
     expect(session.modelRevision).toBe(before.modelRevision + 1)
     session.undo()
-    expect(session.getSnapshot().midiNotePartitions).toEqual(before.midiNotePartitions)
+    expect(session.getSnapshot().midiNotes).toEqual(before.midiNotes)
     wrapper.unmount()
   })
 
@@ -653,9 +651,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125, pointerId: 2 })
     dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125, pointerId: 2 })
     await nextTick()
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)[0]?.pitch).toBe(
-      84,
-    )
+    expect(Object.values(session.getSnapshot().midiNotes).flat()[0]?.pitch).toBe(84)
     wrapper.unmount()
   })
 
@@ -807,9 +803,9 @@ describe('ProjectPianoRollTrackSurface', () => {
     expect(newHost.hasPointerCapture(2)).toBe(true)
     dispatchPointer(newHost, 'pointerup', { clientX: 240, clientY: 125, pointerId: 2 })
     expect(session.modelRevision).toBe(revision + 1)
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(1)
+    expect(Object.values(session.getSnapshot().midiNotes).flat()).toHaveLength(1)
     session.undo()
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
+    expect(Object.values(session.getSnapshot().midiNotes).flat()).toHaveLength(0)
     clip.unmount()
   })
 
@@ -968,7 +964,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     dispatchPointer(host.element, 'pointerup', { clientX: 10, clientY: 125 })
     await nextTick()
 
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toContainEqual(
+    expect(Object.values(session.getSnapshot().midiNotes).flat()).toContainEqual(
       expect.objectContaining({
         id: 'track-surface-note',
         pitch: 60,
@@ -1072,9 +1068,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     dispatchPointer(lane.element, 'pointerup', { clientX: 10, clientY: 125 })
     await nextTick()
 
-    expect(
-      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toEqual([
+    expect(Object.values(session.getSnapshot().midiSustainPedalEvents).flat()).toEqual([
       {
         channel: 0,
         id: 'track-surface-sustain-pedal-event',
@@ -1148,14 +1142,10 @@ describe('ProjectPianoRollTrackSurface', () => {
     const removeEvent = keyboard.bindingRegistry.dispatch('Backspace')
     expect(removeEvent.defaultPrevented).toBe(true)
     expect(session.modelRevision).toBe(revisionBeforeRemove + 1)
-    expect(
-      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toEqual([])
+    expect(Object.values(session.getSnapshot().midiSustainPedalEvents).flat()).toEqual([])
 
     session.undo()
-    expect(
-      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toHaveLength(1)
+    expect(Object.values(session.getSnapshot().midiSustainPedalEvents).flat()).toHaveLength(1)
 
     wrapper.unmount()
   })
@@ -1186,13 +1176,9 @@ describe('ProjectPianoRollTrackSurface', () => {
     await getPianoRollContextMenuItem('Delete selection — Sustain Pedal events').trigger('click')
     await flushPromises()
     expect(session.modelRevision).toBe(revision + 1)
-    expect(
-      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toEqual([])
+    expect(Object.values(session.getSnapshot().midiSustainPedalEvents).flat()).toEqual([])
     session.undo()
-    expect(
-      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toHaveLength(1)
+    expect(Object.values(session.getSnapshot().midiSustainPedalEvents).flat()).toHaveLength(1)
     wrapper.unmount()
   })
 
@@ -1324,9 +1310,7 @@ describe('ProjectPianoRollTrackSurface', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('Choose an Active Clip before adding Sustain Pedal events')
-    expect(
-      session.getSnapshot().midiSustainPedalEventPartitions.flatMap(({ events }) => events),
-    ).toEqual([])
+    expect(Object.values(session.getSnapshot().midiSustainPedalEvents).flat()).toEqual([])
 
     wrapper.unmount()
   })
@@ -1339,9 +1323,9 @@ describe('ProjectPianoRollTrackSurface', () => {
     await wrapper.get('button[aria-label="Cursor tool"]').trigger('click')
     dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
     expect(session.modelRevision).toBe(presentation.readModel.modelRevision + 1)
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(1)
+    expect(Object.values(session.getSnapshot().midiNotes).flat()).toHaveLength(1)
     session.undo()
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
+    expect(Object.values(session.getSnapshot().midiNotes).flat()).toHaveLength(0)
     wrapper.unmount()
   })
 
@@ -1368,7 +1352,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       const revision = session.modelRevision
       dispatchPointer(host, 'pointerup', { clientX: 10, clientY: 125 })
       expect(session.modelRevision).toBe(revision)
-      expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
+      expect(Object.values(session.getSnapshot().midiNotes).flat()).toHaveLength(0)
       expect(host.hasPointerCapture(1)).toBe(false)
       wrapper.unmount()
     },
@@ -1386,10 +1370,10 @@ describe('ProjectPianoRollTrackSurface', () => {
       .clips.find(({ id }) => !before.clips.some((clip) => clip.id === id))
     expect(created).toBeDefined()
     expect(selection.selectedClipId).toBe(created?.id)
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(1)
+    expect(Object.values(session.getSnapshot().midiNotes).flat()).toHaveLength(1)
     session.undo()
     expect(session.getSnapshot().clips).toEqual(before.clips)
-    expect(session.getSnapshot().midiNotePartitions.flatMap(({ notes }) => notes)).toHaveLength(0)
+    expect(Object.values(session.getSnapshot().midiNotes).flat()).toHaveLength(0)
     wrapper.unmount()
   })
 })

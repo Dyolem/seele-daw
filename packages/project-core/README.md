@@ -15,7 +15,7 @@
 | `session.undo()` / `session.redo()`                                  | 重放 History；栈空时返回 `null`                                              |
 | `session.query(query)`                                               | 按 revision 一致地读取 MIDI Note（按 ID 或按区间）                           |
 | `session.subscribe(subscription, observer)`                          | 在微任务中收到提交：全部提交，或按 Source / Note / Tick 区间过滤的 Note 变化 |
-| `session.getSnapshot()`                                              | 当前 revision 的冻结快照；同一 revision 内返回同一个对象                     |
+| `session.getSnapshot()`                                              | 当前 revision 的全部表（`ProjectTables`），同一 revision 内返回同一个对象    |
 | `createProjectFileDTO`、`decodeProjectFileDTO`                       | 项目文件的写出与严格读取                                                     |
 | `saveProjectCheckpoint`、`restoreProjectCheckpoint`                  | 应用内保存与恢复；存储端口由调用方实现                                       |
 
@@ -71,8 +71,9 @@ execute(command)
 
 ## 持久化
 
-项目文件就是 ModelStore 的表（`formatVersion: 3`）：记录原样写出，revision、History 与索引
-不进入文件。读取先把输入复制成被动 JSON 数据，按每张表的字段表检查结构，再把记录交给记录
+Snapshot 与项目文件共用一个形状 `ProjectTables`：记录表是数组，分区表是“MIDI Source ID →
+记录数组”的无原型对象。项目文件（`formatVersion: 3`）就是去掉 `modelRevision` 的 Snapshot，
+History 与索引都不进入文件。读取先把输入复制成被动 JSON 数据，按每张表的字段表检查结构，再把记录交给记录
 工厂校验，最后建立 Store 并做一次不变量校验。只读当前版本，不做迁移（ADR-005）。失败统一为
 带 `code` 与 `path` 的 `ProjectFileError`。格式见 [项目文件格式](./docs/project-file-format.md)。
 

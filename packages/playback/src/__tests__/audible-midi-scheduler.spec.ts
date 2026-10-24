@@ -217,27 +217,23 @@ describe('Audible MIDI Scheduler Planner', () => {
     const { records, snapshot } = createAudibleMidiProjectFixture()
     const plan = compileAudibleMidiProject(
       replaceCompilerFixtureSnapshot(snapshot, {
-        midiSustainPedalEventPartitions: snapshot.midiSustainPedalEventPartitions.map((partition) =>
-          partition.sourceId === records.pianoSource.id
-            ? Object.freeze({
-                sourceId: partition.sourceId,
-                events: [
-                  createMidiSustainPedalEventRecord({
-                    id: parseMidiSustainPedalEventId('pedal-scheduler-down'),
-                    tick: parseTick(120),
-                    value: parseMidiControlValue(127),
-                    channel: parseMidiChannel(0),
-                  }),
-                  createMidiSustainPedalEventRecord({
-                    id: parseMidiSustainPedalEventId('pedal-scheduler-up'),
-                    tick: parseTick(900),
-                    value: parseMidiControlValue(0),
-                    channel: parseMidiChannel(0),
-                  }),
-                ],
-              })
-            : partition,
-        ),
+        midiSustainPedalEvents: {
+          ...snapshot.midiSustainPedalEvents,
+          [records.pianoSource.id]: [
+            createMidiSustainPedalEventRecord({
+              id: parseMidiSustainPedalEventId('pedal-scheduler-down'),
+              tick: parseTick(120),
+              value: parseMidiControlValue(127),
+              channel: parseMidiChannel(0),
+            }),
+            createMidiSustainPedalEventRecord({
+              id: parseMidiSustainPedalEventId('pedal-scheduler-up'),
+              tick: parseTick(900),
+              value: parseMidiControlValue(0),
+              channel: parseMidiChannel(0),
+            }),
+          ],
+        },
       }),
     )
     const clock = new ManualPlaybackClock(10)

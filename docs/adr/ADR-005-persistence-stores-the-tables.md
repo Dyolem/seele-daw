@@ -20,7 +20,8 @@ Checkpoint 的解码器和四个错误类，持久化约 3,000 行，几乎都�
 
 1. 文件就是 ModelStore 的表（`formatVersion: 3`）。记录表写成记录数组，分区表写成
    “MIDI Source ID → 记录数组”，另有 `project`、`master` 与 `trackOrder`。记录的字段与运行时
-   记录相同，writer 直接引用 Snapshot 中的记录，不复制。
+   记录相同。随后 Snapshot 也改用同一形状 `ProjectTables`，文件就是去掉 `modelRevision` 的
+   Snapshot，writer 不复制任何东西。
 2. 读取先把输入复制成被动 JSON 数据（复用 `parseJsonValue`），再按每张表的字段表检查结构，
    然后把记录交给它的工厂。工厂是值的唯一校验者；结构检查只管字段、数组与嵌套对象。
 3. 只读当前版本。格式改变时版本号加一，旧文件以 `unsupported-format-version` 被拒绝，不写

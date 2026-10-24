@@ -176,7 +176,7 @@ describe('Piano Roll Sustain Pedal Clip Lane Read Model', () => {
     const snapshot = fixture.session.getSnapshot()
     const forgedSnapshot: ProjectSnapshot = Object.freeze({
       ...snapshot,
-      midiSustainPedalEventPartitions: Object.freeze([]),
+      midiSustainPedalEvents: Object.freeze({}),
     })
 
     expect(

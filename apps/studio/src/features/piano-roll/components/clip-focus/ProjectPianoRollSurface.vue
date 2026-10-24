@@ -52,12 +52,9 @@ const pitchView = usePitchViewport(canvasHost)
 const controllerLane = useControllerLaneLayout(surfaceElement)
 const fitPitches = computed(() => {
   const context = props.presentation.context
-  const partition = props.presentation.snapshot.midiNotePartitions.find(
-    ({ sourceId }) => sourceId === context.sourceId,
-  )
   return (
-    partition?.notes
-      .filter(
+    props.presentation.snapshot.midiNotes[context.sourceId]
+      ?.filter(
         (note) =>
           note.startTick < context.sourceEndTick &&
           note.startTick + note.durationTick > context.sourceStartTick,

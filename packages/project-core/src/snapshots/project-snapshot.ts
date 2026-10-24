@@ -1,51 +1,39 @@
 import type { MasterChannelRecord } from '#internal/model/channel'
-import type { DeviceDescriptor } from '#internal/model/device'
 import type { MidiSourceId, TrackId } from '#internal/model/ids'
-import type { ClipRecord } from '#internal/model/midi-clip'
-import type { MidiNoteRecord } from '#internal/model/midi-note'
-import type { MidiSourceRecord } from '#internal/model/midi-source'
-import type { MidiSustainPedalEventRecord } from '#internal/model/midi-sustain-pedal-event'
 import type { ModelRevision } from '#internal/model/model-revision'
 import type { ModelStoreReader } from '#internal/model/model-store'
+import type {
+  PartitionedRecordOf,
+  PartitionedTableName,
+  PartitionedTableView,
+  RecordOf,
+  RecordTableName,
+  StoredRecord,
+} from '#internal/model/model-tables'
 import type { ProjectRecord } from '#internal/model/project'
-import type { TrackRecord } from '#internal/model/track'
-import type { TempoEventRecord } from '#internal/time/tempo-event'
 import type { Tick } from '#internal/time/tick'
-import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 
-interface IdentifiedRecord {
-  readonly id: string
-}
-
-interface TimelineRecord extends IdentifiedRecord {
+interface TimelineRecord extends StoredRecord {
   readonly tick: Tick
 }
 
-export interface MidiNotePartitionSnapshot {
-  readonly sourceId: MidiSourceId
-  readonly notes: readonly MidiNoteRecord[]
-}
+/** Each MIDI Source's records, keyed by its ID. The object has no prototype, so any ID is safe. */
+export type MidiSourcePartitions<RecordType> = Readonly<Record<MidiSourceId, readonly RecordType[]>>
 
-export interface MidiSustainPedalEventPartitionSnapshot {
-  readonly sourceId: MidiSourceId
-  readonly events: readonly MidiSustainPedalEventRecord[]
-}
-
-/** Complete read-only project facts captured at one ModelStore revision. */
-export interface ProjectSnapshot {
-  readonly modelRevision: ModelRevision
+/**
+ * The project's tables as a Snapshot holds them and a project file stores them. Record tables
+ * are arrays in canonical order: by ID, or by Tick for timeline events.
+ */
+export type ProjectTables = {
   readonly project: ProjectRecord
   readonly master: MasterChannelRecord
   readonly trackOrder: readonly TrackId[]
-  readonly tracks: readonly TrackRecord[]
-  readonly clips: readonly ClipRecord[]
-  readonly midiSources: readonly MidiSourceRecord[]
-  readonly midiNotePartitions: readonly MidiNotePartitionSnapshot[]
-  readonly midiSustainPedalEventPartitions: readonly MidiSustainPedalEventPartitionSnapshot[]
-  readonly tempoEvents: readonly TempoEventRecord[]
-  readonly timeSignatureEvents: readonly TimeSignatureEventRecord[]
-  readonly devices: readonly DeviceDescriptor[]
+} & { readonly [Name in RecordTableName]: readonly RecordOf<Name>[] } & {
+  readonly [Name in PartitionedTableName]: MidiSourcePartitions<PartitionedRecordOf<Name>>
 }
+
+/** Every project fact at one ModelStore revision. */
+export type ProjectSnapshot = ProjectTables & { readonly modelRevision: ModelRevision }
 
 function compareStrings(left: string, right: string): number {
   if (left < right) return -1
@@ -53,20 +41,11 @@ function compareStrings(left: string, right: string): number {
   return 0
 }
 
-function compareIdentifiedRecords(left: IdentifiedRecord, right: IdentifiedRecord): number {
-  return compareStrings(left.id, right.id)
-}
-
-function compareTimelineRecords(left: TimelineRecord, right: TimelineRecord): number {
-  if (left.tick !== right.tick) return left.tick - right.tick
-  return compareStrings(left.id, right.id)
-}
-
-function copySortedRecords<RecordType extends IdentifiedRecord>(
+function copySortedRecords<RecordType extends StoredRecord>(
   entries: Iterable<readonly [string, RecordType]>,
 ): readonly RecordType[] {
   const records = Array.from(entries, ([, record]) => record)
-  records.sort(compareIdentifiedRecords)
+  records.sort((left, right) => compareStrings(left.id, right.id))
   return Object.freeze(records)
 }
 
@@ -74,39 +53,31 @@ function copySortedTimelineRecords<RecordType extends TimelineRecord>(
   entries: Iterable<readonly [string, RecordType]>,
 ): readonly RecordType[] {
   const records = Array.from(entries, ([, record]) => record)
-  records.sort(compareTimelineRecords)
+  records.sort((left, right) => left.tick - right.tick || compareStrings(left.id, right.id))
   return Object.freeze(records)
 }
 
-function createMidiNotePartitionSnapshots(
-  reader: ModelStoreReader,
-): readonly MidiNotePartitionSnapshot[] {
-  const sourceIds = [...reader.midiNotePartitionIds()].sort(compareStrings)
-  const partitions = sourceIds.map((sourceId) =>
-    Object.freeze<MidiNotePartitionSnapshot>({
-      sourceId,
-      notes: copySortedRecords(reader.midiNoteEntries(sourceId)),
-    }),
-  )
-
-  return Object.freeze(partitions)
+/** @internal Freezes partitions into a prototype-free object, in the order given. */
+export function freezePartitions<RecordType>(
+  partitions: Iterable<readonly [MidiSourceId, readonly RecordType[]]>,
+): MidiSourcePartitions<RecordType> {
+  const frozen = Object.create(null) as Record<MidiSourceId, readonly RecordType[]>
+  for (const [sourceId, records] of partitions) frozen[sourceId] = records
+  return Object.freeze(frozen)
 }
 
-function createMidiSustainPedalEventPartitionSnapshots(
-  reader: ModelStoreReader,
-): readonly MidiSustainPedalEventPartitionSnapshot[] {
-  const sourceIds = [...reader.midiSustainPedalEventPartitionIds()].sort(compareStrings)
-  const partitions = sourceIds.map((sourceId) =>
-    Object.freeze<MidiSustainPedalEventPartitionSnapshot>({
-      sourceId,
-      events: copySortedTimelineRecords(reader.midiSustainPedalEventEntries(sourceId)),
-    }),
+function copyPartitions<RecordType extends StoredRecord>(
+  table: PartitionedTableView<RecordType>,
+  copyRecords: (entries: Iterable<readonly [string, RecordType]>) => readonly RecordType[],
+): MidiSourcePartitions<RecordType> {
+  return freezePartitions(
+    [...table.partitionIds()]
+      .sort(compareStrings)
+      .map((sourceId) => [sourceId, copyRecords(table.entries(sourceId))] as const),
   )
-
-  return Object.freeze(partitions)
 }
 
-/** @internal Creates a low-frequency stable projection without exposing Store containers. */
+/** @internal Copies the Store's tables once; records are shared, containers are frozen. */
 export function createProjectSnapshot(reader: ModelStoreReader): ProjectSnapshot {
   return Object.freeze({
     modelRevision: reader.modelRevision,
@@ -116,10 +87,13 @@ export function createProjectSnapshot(reader: ModelStoreReader): ProjectSnapshot
     tracks: copySortedRecords(reader.trackEntries()),
     clips: copySortedRecords(reader.clipEntries()),
     midiSources: copySortedRecords(reader.midiSourceEntries()),
-    midiNotePartitions: createMidiNotePartitionSnapshots(reader),
-    midiSustainPedalEventPartitions: createMidiSustainPedalEventPartitionSnapshots(reader),
     tempoEvents: copySortedTimelineRecords(reader.tempoEventEntries()),
     timeSignatureEvents: copySortedTimelineRecords(reader.timeSignatureEventEntries()),
     devices: copySortedRecords(reader.deviceEntries()),
+    midiNotes: copyPartitions(reader.partitionedTable('midiNotes'), copySortedRecords),
+    midiSustainPedalEvents: copyPartitions(
+      reader.partitionedTable('midiSustainPedalEvents'),
+      copySortedTimelineRecords,
+    ),
   })
 }

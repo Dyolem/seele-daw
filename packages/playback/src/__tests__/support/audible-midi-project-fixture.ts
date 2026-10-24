@@ -175,14 +175,11 @@ export function createAudibleMidiProjectFixture() {
     tracks: Object.freeze([pianoTrack, alternateTrack]),
     clips: Object.freeze([pianoClip, alternateClip]),
     midiSources: Object.freeze([pianoSource, alternateSource]),
-    midiNotePartitions: Object.freeze([
-      Object.freeze({ sourceId: pianoSource.id, notes: pianoNotes }),
-      Object.freeze({ sourceId: alternateSource.id, notes: alternateNotes }),
-    ]),
-    midiSustainPedalEventPartitions: Object.freeze([
-      Object.freeze({ sourceId: pianoSource.id, events: Object.freeze([]) }),
-      Object.freeze({ sourceId: alternateSource.id, events: Object.freeze([]) }),
-    ]),
+    midiNotes: Object.freeze({
+      [pianoSource.id]: pianoNotes,
+      [alternateSource.id]: alternateNotes,
+    }),
+    midiSustainPedalEvents: Object.freeze({ [pianoSource.id]: [], [alternateSource.id]: [] }),
     devices: Object.freeze([pianoDevice, alternateDevice]),
   })
 

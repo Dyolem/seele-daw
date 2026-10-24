@@ -136,9 +136,9 @@ export type {
 } from './subscriptions/project-subscription-error'
 
 export type {
-  MidiNotePartitionSnapshot,
-  MidiSustainPedalEventPartitionSnapshot,
+  MidiSourcePartitions,
   ProjectSnapshot,
+  ProjectTables,
 } from './snapshots/project-snapshot'
 
 export {

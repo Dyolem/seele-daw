@@ -52,15 +52,25 @@ describe('Editor Interaction boundaries', () => {
   })
 
   it('rejects DOM types and globals in Common while permitting the Browser adapter', () => {
-    for (const code of [
-      'const target: HTMLElement = surface',
-      'window.addEventListener("blur", cancel)',
-      'function update(input: PointerEvent) {}',
-    ])
-      assert.match(
-        editorInteractionFileViolation(root, path.join(root, common, 'session.ts'), code),
-        /DOM/,
-      )
+    for (const file of [
+      `${common}/session.ts`,
+      'packages/editor/src/common/piano-roll/piano-roll-scene.ts',
+    ]) {
+      for (const code of [
+        'const target: HTMLElement = surface',
+        'window.addEventListener("blur", cancel)',
+        'function update(input: PointerEvent) {}',
+      ])
+        assert.match(editorInteractionFileViolation(root, path.join(root, file), code), /DOM/)
+    }
+    assert.equal(
+      editorInteractionFileViolation(
+        root,
+        path.join(root, 'packages/editor/src/common/__tests__/scene.spec.ts'),
+        'document.body.append(surface)',
+      ),
+      null,
+    )
     assert.equal(
       editorInteractionFileViolation(
         root,

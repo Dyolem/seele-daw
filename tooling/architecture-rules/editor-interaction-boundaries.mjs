@@ -1,6 +1,7 @@
 import path from 'node:path'
 
-const common = 'packages/editor/src/common/interaction/'
+const editorCommon = 'packages/editor/src/common/'
+const common = `${editorCommon}interaction/`
 const browser = 'packages/editor/src/browser/interaction/'
 const relative = (root, file) => path.relative(root, file).split(path.sep).join('/')
 
@@ -14,10 +15,12 @@ export function editorInteractionImportViolation(root, file, target, specifier) 
   return 'Editor Interaction 中立层只能依赖自身；Browser Input 可单向依赖 Common Interaction'
 }
 
+/** All of editor `common/` stays platform-free; the DOM belongs to `browser/`. */
 export function editorInteractionFileViolation(root, file, source) {
-  if (!relative(root, file).startsWith(common)) return null
+  const path = relative(root, file)
+  if (!path.startsWith(editorCommon) || path.includes('/__tests__/')) return null
   const code = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')
   if (/\b(?:window|document|HTMLElement|PointerEvent|KeyboardEvent|MouseEvent)\b/.test(code))
-    return 'Common Interaction 禁止使用 DOM 事件或浏览器对象'
+    return 'Editor common 禁止使用 DOM 事件或浏览器对象；浏览器适配放在 browser/'
   return null
 }

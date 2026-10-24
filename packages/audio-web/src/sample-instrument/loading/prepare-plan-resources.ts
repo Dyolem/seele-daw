@@ -8,15 +8,12 @@ import {
   type UnsupportedNoteOccurrence,
 } from '@seele-daw/playback'
 
-import type {
-  SampleInstrumentAssetLocation,
-  SampleInstrumentResourceCache,
-} from '#internal/sample-instrument/loading/resource-cache'
+import type { SampleInstrumentResourceCache } from '#internal/sample-instrument/loading/resource-cache'
 import { findSampleInstrumentZoneForPitch } from '#internal/sample-instrument/loading/zone-selection'
 import type { SampleInstrument } from '#internal/sample-instrument/voice/voice-runtime'
 
 /** Where a Soundbank's assets are served from; null when this build has none for it. */
-export type SampleAssetBaseUrl = (soundbankId: SoundbankId) => string | URL | null
+export type SampleAssetBaseUrl = (soundbankId: SoundbankId) => URL | null
 
 /** The instruments loaded for one plan revision, and what of the plan they cannot play. */
 export interface PreparedSampleResources {
@@ -63,12 +60,12 @@ function groupSpansBySoundbank(
 
 async function prepareInstrument(
   cache: SampleInstrumentResourceCache,
-  location: SampleInstrumentAssetLocation,
+  baseUrl: URL,
+  soundbankId: SoundbankId,
   spans: readonly MidiNoteSpanPlan[],
   signal: AbortSignal | undefined,
 ): Promise<PreparedInstrument> {
-  const { soundbankId } = location
-  const manifest = await cache.loadManifest(location, signal)
+  const manifest = await cache.loadManifest(baseUrl, soundbankId, signal)
   const resourceKeys = new Set<string>()
   const unsupportedNoteOccurrences: UnsupportedNoteOccurrence[] = []
 
@@ -89,12 +86,9 @@ async function prepareInstrument(
     )
   }
 
-  const prepared = await cache.prepare(location, [...resourceKeys], signal)
+  const resources = await cache.loadResources(baseUrl, resourceKeys, signal)
   return Object.freeze({
-    instrument: Object.freeze({
-      manifest: prepared.manifest,
-      resources: new Map(prepared.resources.map((resource) => [resource.key, resource])),
-    }),
+    instrument: Object.freeze({ manifest, resources }),
     soundbankId,
     unsupportedNoteOccurrences: Object.freeze(unsupportedNoteOccurrences),
   })
@@ -117,7 +111,7 @@ export async function prepareSampleResources(
       try {
         const baseUrl = assetBaseUrl(soundbankId)
         if (baseUrl === null) throw new Error(`No sample assets are available for ${soundbankId}`)
-        return await prepareInstrument(cache, { assetBaseUrl: baseUrl, soundbankId }, spans, signal)
+        return await prepareInstrument(cache, baseUrl, soundbankId, spans, signal)
       } catch (cause) {
         if (
           signal?.aborted === true ||

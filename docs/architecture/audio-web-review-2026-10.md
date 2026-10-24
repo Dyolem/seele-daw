@@ -251,15 +251,15 @@ createWebAudioPlaybackRuntime({
 
 ## 7. 实施结果（2026-10-24）
 
-| 节  | 状态                                                                                                                                                                                               |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3.1 | 完成。audio-web 的 `createWebAudioPlaybackRuntime` 直接实现端口，使用 playback 的类型与常量；Studio 的 `browser-runtime.ts` 删除，只留 26 行的 `built-in-sample-assets.ts`。公开入口只剩这个函数。 |
-| 3.2 | 完成，范围比提案大，见下。                                                                                                                                                                         |
-| 3.3 | 部分完成：README 改成一页；`docs/` 里的阶段报告与审计还没有归档。                                                                                                                                  |
-| 3.4 | 部分完成：`validateVoicePlan`、Plan 路由复查，以及 Voice Runtime 与资源准备的错误类删除。每个音符的 Zone 时长核对、运行时读 WAV 头，以及缓存、Manifest 与 Context 的错误类仍在。                   |
-| 3.5 | 未开始。                                                                                                                                                                                           |
-| 3.6 | 未开始。                                                                                                                                                                                           |
-| 3.7 | 部分完成：locator 换成 `assetBaseUrl(soundbankId)`；`expectedOrigin` 与 URL 规范化仍在。                                                                                                           |
+| 节  | 状态                                                                                                                                                                                                                                    |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.1 | 完成。audio-web 的 `createWebAudioPlaybackRuntime` 直接实现端口，使用 playback 的类型与常量；Studio 的 `browser-runtime.ts` 删除，只留 26 行的 `built-in-sample-assets.ts`。公开入口只剩这个函数。                                      |
+| 3.2 | 完成，范围比提案大，见下。                                                                                                                                                                                                              |
+| 3.3 | 部分完成：README 改成一页；`docs/` 里的阶段报告与审计还没有归档。                                                                                                                                                                       |
+| 3.4 | 运行路径完成：Voice Plan、Plan 路由、音高、力度、主音量和每个音符的 Zone 时长都不再复查；运行时不再读 WAV 头；缓存、Context、Voice Runtime 与资源准备抛普通 `Error`，中止是 `AbortError`。Manifest 校验器与资源键的错误类留给脚本共用。 |
+| 3.5 | 未开始。                                                                                                                                                                                                                                |
+| 3.6 | 未开始。                                                                                                                                                                                                                                |
+| 3.7 | 完成：缓存按 URL 作键，调用方传入 `assetBaseUrl(soundbankId)`；`expectedOrigin`、URL 规范化、配置复查与 `clearDecodedResources` 删除。                                                                                                  |
 
 与提案的偏差：
 

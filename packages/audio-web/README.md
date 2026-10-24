@@ -10,7 +10,6 @@
 ```ts
 createWebAudioPlaybackRuntime({
   assetBaseUrl, // (soundbankId) => 该 Soundbank 资产目录的 URL；没有时返回 null
-  expectedOrigin, // 资产必须来自的 origin
   limits, // Manifest、单个 WAV 与解码缓存的字节预算
 }): PlaybackRuntimePort
 ```
@@ -25,7 +24,7 @@ createWebAudioPlaybackRuntime({
 prepare(plan)
   按 Soundbank 分组音符 → 取 Manifest（缓存）→ 为每个音符找 Zone
   → 没有 Zone 的音符报告为 no-matching-zone
-  → 取 WAV，检查文件头，解码，放进 LRU 缓存
+  → 取 WAV，解码，放进 LRU 缓存（按 URL 作键）
   → PreparedPlaybackPlan：乐器表与报告
 schedule(voicePlan)
   找 Zone → 复音准入，必要时偷一个 Voice

@@ -816,23 +816,13 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(runtime.statistics).toEqual(EMPTY_STATISTICS)
   })
 
-  it.each([
-    {
-      failure: 'a decoded resource shorter than its Zone timing',
-      instrument: createInstrument(createVoiceZones(), createFakeAudioBuffer(0.1)),
-      message: 'range timing is outside decoded resource samples/range.wav',
-      plan: createPlan('duration-mismatch', 50),
-    },
-    {
-      failure: 'a Zone without its loaded resource',
-      instrument: Object.freeze({ ...createInstrument(), resources: new Map() }),
-      message: 'fixture-voice-bank has no loaded resource samples/exact.wav',
-      plan: createPlan('missing-resource', 60),
-    },
-  ])('rejects $failure before retaining a Voice', ({ instrument, message, plan }) => {
+  it('rejects a Zone without its loaded resource before retaining a Voice', () => {
     const { runtime } = createRuntime()
+    const instrument = Object.freeze({ ...createInstrument(), resources: new Map() })
 
-    expect(() => runtime.schedule(plan, instrument)).toThrow(message)
+    expect(() => runtime.schedule(createPlan('missing-resource', 60), instrument)).toThrow(
+      'fixture-voice-bank has no loaded resource samples/exact.wav',
+    )
     expect(runtime.statistics.activeVoiceCount).toBe(0)
   })
 })

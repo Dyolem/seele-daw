@@ -34,7 +34,7 @@
 4. 没有 generation，也没有 token。handoff 时，引擎只取消或改期需要改的 Voice，其余的自然结束。
    引擎只记住自己还在跟踪的 Voice；一个都没有时，`allNotesOff` 不调用输出。Voice Plan 不再携带
    `engineGeneration`；Transport 的 generation 只供 Scheduler 识别映射变化。
-5. audio-web 自己实现端口。`createWebAudioPlaybackRuntime({ assetBaseUrl, expectedOrigin, limits })`
+5. audio-web 自己实现端口。`createWebAudioPlaybackRuntime({ assetBaseUrl, limits })`
    是包里唯一公开的函数。Studio 的适配层删除，Studio 只提供目录给出的资产地址与资源预算
    （`workbench/instrument/built-in-sample-assets.ts`）。
 

@@ -27,7 +27,7 @@ const SECOND_ASSET_BASE = 'https://studio.test/assets/fixture-strings/'
 const { FAIL_PLAN, SKIP_UNAVAILABLE_INSTRUMENTS } = PLAYBACK_INSTRUMENT_FAILURE_MODE
 
 function assetBases(entries: readonly (readonly [SoundbankId, string])[]): SampleAssetBaseUrl {
-  const bases = new Map(entries)
+  const bases = new Map(entries.map(([soundbankId, base]) => [soundbankId, new URL(base)]))
   return (soundbankId) => bases.get(soundbankId) ?? null
 }
 
@@ -156,7 +156,6 @@ function createCache(
 ) {
   return new SampleInstrumentResourceCache({
     audioContext: context as unknown as BaseAudioContext,
-    expectedOrigin: 'https://studio.test',
     fetch: fetchImplementation,
     limits: {
       maximumDecodedFloat32ByteLength: 4 * 1_024 * 1_024,
@@ -294,7 +293,7 @@ describe('Sample resource preparation', () => {
     await vi.waitFor(() => expect(resourceSignals).toHaveLength(2))
     controller.abort()
 
-    await expect(preparation).rejects.toEqual(expect.objectContaining({ code: 'aborted' }))
+    await expect(preparation).rejects.toMatchObject({ name: 'AbortError' })
     expect(resourceSignals.every(({ aborted }) => aborted)).toBe(true)
     await vi.waitFor(() => expect(cache.statistics.activeRequestCount).toBe(0))
     expect(cache.statistics).toMatchObject({

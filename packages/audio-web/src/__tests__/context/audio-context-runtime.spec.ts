@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import {
-  WebAudioContextRuntime,
-  type WebAudioContextRuntimeError,
-} from '#internal/context/audio-context-runtime'
+import { WebAudioContextRuntime } from '#internal/context/audio-context-runtime'
 import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
 import { FakeAudioContext, FakeGainNode } from '#internal/__tests__/support/fake-web-audio'
 
@@ -49,7 +46,7 @@ describe('Web Audio context runtime', () => {
     })
   })
 
-  it('schedules validated master gain no earlier than current context time', async () => {
+  it('schedules master gain no earlier than current context time', async () => {
     const context = new FakeAudioContext({ currentTime: 5 })
     const output = await new WebAudioContextRuntime({
       audioContextFactory: () => context.asAudioContext(),
@@ -62,16 +59,6 @@ describe('Web Audio context runtime', () => {
       { kind: 'set', time: 5, value: 0.75 },
       { kind: 'set', time: 8, value: 1.25 },
     ])
-    expect(() => output.setMasterGainAtTime(5, 8)).toThrowError(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({
-        code: 'invalid-master-gain',
-      }),
-    )
-    expect(() => output.setMasterGainAtTime(1, Number.NaN)).toThrowError(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({
-        code: 'invalid-schedule-time',
-      }),
-    )
   })
 
   it.each(['closed', 'unknown'] as const)(
@@ -82,24 +69,18 @@ describe('Web Audio context runtime', () => {
         audioContextFactory: () => context.asAudioContext(),
       })
 
-      await expect(runtime.activate()).rejects.toEqual(
-        expect.objectContaining<Partial<WebAudioContextRuntimeError>>({
-          code: 'audio-context-unavailable',
-        }),
-      )
+      await expect(runtime.activate()).rejects.toThrow(`AudioContext is ${state}`)
     },
   )
 
-  it('reports context creation, graph creation, and resume failures with stable codes', async () => {
+  it('reports context creation, graph creation, and resume failures', async () => {
     const createFailure = new WebAudioContextRuntime({
       audioContextFactory: () => {
         throw new TypeError('fixture create failure')
       },
     })
-    await expect(createFailure.activate()).rejects.toEqual(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({
-        code: 'audio-context-create-failed',
-      }),
+    await expect(createFailure.activate()).rejects.toThrow(
+      'AudioContext creation failed: fixture create failure',
     )
 
     const rejectedMaster = new FakeGainNode()
@@ -115,11 +96,7 @@ describe('Web Audio context runtime', () => {
       new WebAudioContextRuntime({
         audioContextFactory: () => graphContext.asAudioContext(),
       }).activate(),
-    ).rejects.toEqual(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({
-        code: 'audio-graph-create-failed',
-      }),
-    )
+    ).rejects.toThrow('Master output creation failed: fixture graph failure')
     expect(graphGainCreationCount).toBe(2)
     expect(rejectedMaster.disconnectCallCount).toBe(1)
     expect(graphContext.closeCallCount).toBe(1)
@@ -135,20 +112,14 @@ describe('Web Audio context runtime', () => {
       new WebAudioContextRuntime({
         audioContextFactory: () => resumeContext.asAudioContext(),
       }).activate(),
-    ).rejects.toEqual(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({
-        code: 'audio-context-resume-failed',
-      }),
-    )
+    ).rejects.toThrow('AudioContext resume failed: fixture resume failure')
   })
 
   it('uses the platform factory lazily and reports an unavailable AudioContext', async () => {
     const runtime = new WebAudioContextRuntime()
 
-    await expect(runtime.activate()).rejects.toEqual(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({
-        code: 'audio-context-unavailable',
-      }),
+    await expect(runtime.activate()).rejects.toThrow(
+      'AudioContext creation failed: Web Audio is unavailable',
     )
     expect(runtime.statistics.state).toBe('dormant')
   })
@@ -175,12 +146,8 @@ describe('Web Audio context runtime', () => {
       outputCalibrationNodeCount: 0,
       state: 'disposed',
     })
-    await expect(runtime.activate()).rejects.toEqual(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({ code: 'disposed' }),
-    )
-    expect(() => output.setMasterGainAtTime(1, 0)).toThrowError(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({ code: 'disposed' }),
-    )
+    await expect(runtime.activate()).rejects.toThrow('The audio output is disposed')
+    expect(() => output.setMasterGainAtTime(1, 0)).toThrow('The audio output is disposed')
   })
 
   it('closes immediately when disposed during a pending resume', async () => {
@@ -205,8 +172,6 @@ describe('Web Audio context runtime', () => {
 
     finishResume?.()
 
-    await expect(activation).rejects.toEqual(
-      expect.objectContaining<Partial<WebAudioContextRuntimeError>>({ code: 'disposed' }),
-    )
+    await expect(activation).rejects.toThrow('The audio output is disposed')
   })
 })

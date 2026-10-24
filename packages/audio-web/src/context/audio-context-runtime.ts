@@ -26,30 +26,6 @@ export interface WebAudioContextRuntimeOptions {
   readonly audioContextFactory?: () => AudioContext
 }
 
-export type WebAudioContextRuntimeErrorCode =
-  | 'audio-context-close-failed'
-  | 'audio-context-create-failed'
-  | 'audio-context-resume-failed'
-  | 'audio-context-unavailable'
-  | 'audio-graph-create-failed'
-  | 'disposed'
-  | 'invalid-master-gain'
-  | 'invalid-schedule-time'
-
-export class WebAudioContextRuntimeError extends Error {
-  readonly code: WebAudioContextRuntimeErrorCode
-
-  constructor(code: WebAudioContextRuntimeErrorCode, message: string) {
-    super(message)
-    this.name = 'WebAudioContextRuntimeError'
-    this.code = code
-  }
-}
-
-function fail(code: WebAudioContextRuntimeErrorCode, message: string): never {
-  throw new WebAudioContextRuntimeError(code, message)
-}
-
 function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown failure'
 }
@@ -69,9 +45,7 @@ function readContextState(context: AudioContext): WebAudioContextRuntimeState {
 
 function createDefaultAudioContext(): AudioContext {
   const AudioContextConstructor = globalThis.AudioContext
-  if (AudioContextConstructor === undefined) {
-    fail('audio-context-unavailable', 'Web Audio AudioContext is unavailable')
-  }
+  if (AudioContextConstructor === undefined) throw new Error('Web Audio is unavailable')
   return new AudioContextConstructor()
 }
 
@@ -139,13 +113,13 @@ export class WebAudioContextRuntime {
       try {
         await context.close()
       } catch (error) {
-        fail('audio-context-close-failed', `AudioContext close failed: ${errorDetail(error)}`)
+        throw new Error(`AudioContext close failed: ${errorDetail(error)}`, { cause: error })
       }
     }
   }
 
   #assertUsable(): void {
-    if (this.#disposed) fail('disposed', 'Web Audio context runtime is disposed')
+    if (this.#disposed) throw new Error('The audio output is disposed')
   }
 
   async #activate(): Promise<ActiveWebAudioOutput> {
@@ -154,8 +128,7 @@ export class WebAudioContextRuntime {
       try {
         context = this.#audioContextFactory()
       } catch (error) {
-        if (error instanceof WebAudioContextRuntimeError) throw error
-        fail('audio-context-create-failed', `AudioContext creation failed: ${errorDetail(error)}`)
+        throw new Error(`AudioContext creation failed: ${errorDetail(error)}`, { cause: error })
       }
       this.#audioContext = context
       let masterGain: GainNode | null = null
@@ -195,7 +168,7 @@ export class WebAudioContextRuntime {
         } catch {
           // Graph creation is the primary failure; the rejected context is no longer retained.
         }
-        fail('audio-graph-create-failed', `Master output creation failed: ${errorDetail(error)}`)
+        throw new Error(`Master output creation failed: ${errorDetail(error)}`, { cause: error })
       }
     }
 
@@ -206,33 +179,19 @@ export class WebAudioContextRuntime {
       try {
         await context.resume()
       } catch (error) {
-        fail('audio-context-resume-failed', `AudioContext resume failed: ${errorDetail(error)}`)
+        throw new Error(`AudioContext resume failed: ${errorDetail(error)}`, { cause: error })
       }
       this.#assertUsable()
       state = readContextState(context)
     }
-    if (state !== 'running') {
-      fail('audio-context-unavailable', `AudioContext is ${state}`)
-    }
-
-    const output = this.#output
-    if (output === null) fail('audio-graph-create-failed', 'Master output is unavailable')
-    return output
+    if (state !== 'running') throw new Error(`AudioContext is ${state}`)
+    return this.#output!
   }
 
   #setMasterGainAtTime(gain: number, audioContextSecond: number): void {
-    this.#assertUsable()
-    if (!Number.isFinite(gain) || gain < 0 || gain > 4) {
-      fail('invalid-master-gain', 'Master gain must be finite and from 0 through 4')
-    }
-    if (!Number.isFinite(audioContextSecond) || audioContextSecond < 0) {
-      fail('invalid-schedule-time', 'Master gain time must be a finite non-negative second')
-    }
     const context = this.#audioContext
     const masterGain = this.#masterGain
-    if (context === null || masterGain === null || readContextState(context) !== 'running') {
-      fail('audio-context-unavailable', 'Master gain requires a running AudioContext')
-    }
+    if (context === null || masterGain === null) throw new Error('The audio output is disposed')
     masterGain.gain.setValueAtTime(gain, Math.max(audioContextSecond, context.currentTime))
   }
 }

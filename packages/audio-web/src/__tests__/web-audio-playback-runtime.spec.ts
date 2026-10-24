@@ -177,9 +177,11 @@ function createRuntime(
   limits = LIMITS,
 ) {
   return createWebAudioPlaybackRuntime({
-    assetBaseUrl: (soundbankId: SoundbankId) => ASSET_BASES.get(soundbankId) ?? null,
+    assetBaseUrl: (soundbankId: SoundbankId) => {
+      const base = ASSET_BASES.get(soundbankId)
+      return base === undefined ? null : new URL(base)
+    },
     audioContextFactory: () => context.asAudioContext(),
-    expectedOrigin: 'https://studio.example.test',
     fetch,
     limits,
   })
@@ -317,19 +319,17 @@ describe('Web Audio playback runtime', () => {
       runtime.prepare(plan, new AbortController().signal, {
         instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
       }),
-    ).rejects.toEqual(
-      expect.objectContaining({ code: 'manifest-load-failed', soundbankId: SECOND_SOUNDBANK_ID }),
-    )
+    ).rejects.toThrow('The fixture-strings Manifest could not be loaded: HTTP 503')
     await vi.waitFor(() => expect(context.decodeAudioData).toHaveBeenCalledOnce())
 
     const selective = await runtime.prepare(plan, new AbortController().signal, {
       instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
     })
     expect(selective.preparationFailures).toEqual([
-      expect.objectContaining({
-        cause: expect.objectContaining({ code: 'manifest-load-failed' }),
+      {
+        cause: new Error('The fixture-strings Manifest could not be loaded: HTTP 503'),
         soundbankId: SECOND_SOUNDBANK_ID,
-      }),
+      },
     ])
 
     const retried = await runtime.prepare(plan, new AbortController().signal, {
@@ -366,7 +366,7 @@ describe('Web Audio playback runtime', () => {
     runtime.dispose()
 
     expect(manifestSignals[0]?.aborted).toBe(true)
-    await expect(preparation).rejects.toEqual(expect.objectContaining({ code: 'aborted' }))
+    await expect(preparation).rejects.toMatchObject({ name: 'AbortError' })
     expect(context.closeCallCount).toBe(1)
   })
 })

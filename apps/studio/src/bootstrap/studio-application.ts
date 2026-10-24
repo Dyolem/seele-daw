@@ -110,7 +110,6 @@ export function composeStudioApplication(
       composition.projectPlaybackRuntime ??
       createWebAudioPlaybackRuntime({
         assetBaseUrl: builtInSampleAssetBaseUrl(location.origin),
-        expectedOrigin: location.origin,
         limits: DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
       })
     let projectPlayback: ProjectPlaybackCoordinator

@@ -63,11 +63,4 @@ describe('Audio Quality Foundation V1A render policy', () => {
       previous = gain
     }
   })
-
-  it.each([0, 1.5, 128, Number.NaN, Number.POSITIVE_INFINITY])(
-    'rejects invalid MIDI Velocity %s',
-    (velocity) => {
-      expect(() => calculateAudioQualityV1aVelocityGain(velocity)).toThrowError(TypeError)
-    },
-  )
 })

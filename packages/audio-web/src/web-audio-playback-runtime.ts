@@ -22,8 +22,6 @@ import { SampleInstrumentVoiceRuntime } from '#internal/sample-instrument/voice/
 export interface WebAudioPlaybackRuntimeOptions {
   /** Where each Soundbank's assets are served from; null when this build has none for it. */
   readonly assetBaseUrl: SampleAssetBaseUrl
-  /** The origin every asset must be served from. */
-  readonly expectedOrigin: string
   readonly limits: SampleInstrumentResourceCacheLimits
   readonly audioContextFactory?: () => AudioContext
   readonly fetch?: typeof globalThis.fetch
@@ -107,7 +105,6 @@ class WebAudioPlaybackRuntime implements PlaybackRuntimePort {
       audioContext: output.audioContext,
       cache: new SampleInstrumentResourceCache({
         audioContext: output.audioContext,
-        expectedOrigin: this.#options.expectedOrigin,
         fetch: this.#options.fetch,
         limits: this.#options.limits,
       }),

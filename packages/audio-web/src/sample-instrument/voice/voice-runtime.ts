@@ -95,22 +95,6 @@ function calculatePlaybackRate(zone: SampleInstrumentZoneV1, pitch: number): num
   return 2 ** ((pitch - zone.rootMidiPitch + zone.tuneCent / 100) / 12)
 }
 
-function assertZoneMatchesResource(
-  zone: SampleInstrumentZoneV1,
-  resource: LoadedSampleInstrumentResource,
-): void {
-  const duration = resource.audioBuffer.duration
-  if (
-    !Number.isFinite(duration) ||
-    duration <= 0 ||
-    zone.startOffsetSecond >= duration ||
-    (zone.loop.kind !== 'none' &&
-      (zone.loop.endSecond > duration || zone.startOffsetSecond >= zone.loop.endSecond))
-  ) {
-    throw new Error(`${zone.zoneId} timing is outside decoded resource ${resource.key}`)
-  }
-}
-
 function calculateSustainReleaseOffset(
   zone: SampleInstrumentZoneV1,
   playbackRate: number,
@@ -268,7 +252,6 @@ export class SampleInstrumentVoiceRuntime {
     if (resource === undefined) {
       throw new Error(`${plan.soundbankId} has no loaded resource ${zone.resource.key}`)
     }
-    assertZoneMatchesResource(zone, resource)
 
     const startTime = Math.max(plan.startPlaybackClockSecond, context.currentTime)
     const playbackRate = calculatePlaybackRate(zone, plan.pitch)

@@ -337,7 +337,6 @@ export async function runBuiltInScoreQualityBrowserReport(
       createPreparedResources: async (context) => {
         const cache = new SampleInstrumentResourceCache({
           audioContext: context,
-          expectedOrigin: options.expectedOrigin,
           ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
           limits: DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
         })

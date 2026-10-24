@@ -2,11 +2,7 @@ import {
   type SampleInstrumentManifestV1,
   type SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import {
-  SampleInstrumentZoneSelectionError,
-  collectSampleInstrumentResourceKeysForPitches,
-  findSampleInstrumentZoneForPitch,
-} from '#internal/sample-instrument/loading/zone-selection'
+import { findSampleInstrumentZoneForPitch } from '#internal/sample-instrument/loading/zone-selection'
 
 const FLOAT32_SAMPLE_BYTE_LENGTH = 4
 
@@ -38,7 +34,6 @@ export interface SampleInstrumentPitchAuditionMeasurement {
 
 export type SampleInstrumentLoadingMeasurementErrorCode =
   | 'duplicate-resource'
-  | 'invalid-pitch'
   | 'invalid-resource-measurement'
   | 'missing-resource'
   | 'unsupported-pitch'
@@ -108,24 +103,30 @@ function indexResourceMeasurements(
   return byKey
 }
 
+/** The resource keys the given pitches play, sorted; every pitch must have a Zone. */
+export function collectSampleInstrumentResourceKeysForPitches(
+  manifest: SampleInstrumentManifestV1,
+  pitches: readonly number[],
+): readonly string[] {
+  const keys = new Set<string>()
+  for (const pitch of pitches) {
+    const zone = findSampleInstrumentZoneForPitch(manifest, pitch)
+    if (zone === null) fail('unsupported-pitch', `Manifest does not cover MIDI pitch ${pitch}`)
+    keys.add(zone.resource.key)
+  }
+  return Object.freeze([...keys].sort())
+}
+
 export function estimateSampleInstrumentLoading(
   manifest: SampleInstrumentManifestV1,
   resources: readonly SampleInstrumentResourceMeasurement[],
   pitches: readonly number[] | null = null,
 ): SampleInstrumentLoadingEstimate {
   const resourcesByKey = indexResourceMeasurements(resources)
-  let resourceKeys: readonly string[]
-  try {
-    resourceKeys =
-      pitches === null
-        ? Object.freeze([...new Set(manifest.zones.map(({ resource }) => resource.key))].sort())
-        : collectSampleInstrumentResourceKeysForPitches(manifest, pitches)
-  } catch (error) {
-    if (error instanceof SampleInstrumentZoneSelectionError) {
-      fail(error.code, error.message)
-    }
-    throw error
-  }
+  const resourceKeys =
+    pitches === null
+      ? Object.freeze([...new Set(manifest.zones.map(({ resource }) => resource.key))].sort())
+      : collectSampleInstrumentResourceKeysForPitches(manifest, pitches)
   let encodedByteLength = 0
   let decodedFloat32ByteLength = 0
   let minimumSourceDurationSecond = Number.POSITIVE_INFINITY
@@ -166,13 +167,7 @@ export function measureSampleInstrumentPitchForAudition(
   resources: readonly SampleInstrumentResourceMeasurement[],
   pitch: number,
 ): SampleInstrumentPitchAuditionMeasurement {
-  let zone: SampleInstrumentZoneV1 | null
-  try {
-    zone = findSampleInstrumentZoneForPitch(manifest, pitch)
-  } catch (error) {
-    if (error instanceof SampleInstrumentZoneSelectionError) fail(error.code, error.message)
-    throw error
-  }
+  const zone = findSampleInstrumentZoneForPitch(manifest, pitch)
   if (zone === null) fail('unsupported-pitch', `Manifest does not cover MIDI pitch ${pitch}`)
   const resource = indexResourceMeasurements(resources).get(zone.resource.key)
   if (resource === undefined) {

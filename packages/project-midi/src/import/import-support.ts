@@ -81,19 +81,6 @@ export class ImportIdAllocator {
   }
 }
 
-export function createRecordTable<Value>(): Record<string, Value> {
-  return Object.create(null) as Record<string, Value>
-}
-
-export function setRecord<Value>(table: Record<string, Value>, id: string, value: Value): void {
-  Object.defineProperty(table, id, {
-    configurable: true,
-    enumerable: true,
-    value,
-    writable: true,
-  })
-}
-
 export function createDiagnostic(input: ProjectMidiImportDiagnostic): ProjectMidiImportDiagnostic {
   return Object.freeze({
     ...input,

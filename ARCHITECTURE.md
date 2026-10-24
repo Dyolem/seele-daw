@@ -129,16 +129,18 @@ category, keywords, keys, resolve })`。新建 actions 文件时，再把它加�
 
 ### 加一种实体（例如 Automation 点）
 
-存储层只需声明，不用写分支（见 ADR-003、ADR-004）：
+存储与持久化只需声明，不用写分支（见 ADR-003 至 ADR-005）：
 
-1. `model/model-tables.ts`：加一张表，按 ID 存储或按 MIDI Source 分区。`ModelStoreSeed` 随之多出
-   一个必填字段，类型检查会指出初始化器、项目文件归一化和测试夹具里要补的地方。这张表的变化
-   （`table.op`）、反转、投影与写入随即可用。
-2. 需要类型化访问器时，在 `ModelStoreReader` 中写一次；也可以直接用 `reader.recordTable('…')`。
-3. `__tests__/mutation-plan.spec.ts` 会要求为新表的每种操作补一个变化例子。
+1. `model/model-tables.ts`：加一张表，按 ID 存储或按 MIDI Source 分区。`ModelStoreSeed` 与
+   `ProjectFile` 随之多出一个必填字段，类型检查会指出初始化器、项目文件读写和测试夹具里要补的
+   地方。这张表的变化（`table.op`）、反转、投影与写入随即可用。
+2. `persistence/record-decoders.ts`：为新记录写字段表与解码器，缺了会编译失败；项目文件的
+   `formatVersion` 加一，并更新 `__tests__/fixtures/project-file.json`。
+3. 需要类型化访问器时，在 `ModelStoreReader` 中写一次；也可以直接用 `reader.recordTable('…')`。
+4. `__tests__/mutation-plan.spec.ts` 会要求为新表的每种操作补一个变化例子。
 
 其余是领域本身，仍要逐项编写：记录类型与 ID、`model/invariant-validator.ts` 中的不变量、
-Snapshot 字段、`persistence/` 中的项目文件协议与版本迁移，以及命令（见上）。
+Snapshot 字段，以及命令（见上）。
 
 ## 6. 检查
 

@@ -2,22 +2,18 @@ import { parseProjectId, type ProjectId } from '#internal/model/ids'
 import type { ModelRevision } from '#internal/model/model-revision'
 import {
   createProjectCheckpoint,
+  decodeProjectCheckpoint,
   type CreateProjectCheckpointInput,
   type ProjectCheckpoint,
   type ProjectCheckpointId,
+  type ProjectCheckpointStore,
 } from '#internal/persistence/checkpoint/project-checkpoint'
 import {
-  decodeProjectCheckpoint,
-  rejectProjectCheckpointRequestMismatch,
-} from '#internal/persistence/checkpoint/project-checkpoint-decoder'
-import {
-  ProjectCheckpointOperationError,
-  ProjectCheckpointValidationError,
+  ProjectCheckpointError,
   type ProjectCheckpointCandidateFailure,
 } from '#internal/persistence/checkpoint/project-checkpoint-error'
-import type { ProjectCheckpointStore } from '#internal/persistence/checkpoint/project-checkpoint-store'
-import { ProjectFileLoadError } from '#internal/persistence/project-file-load-error'
-import { createProjectSessionFromDecodedProjectFile } from '#internal/persistence/project-file-loader'
+import { ProjectFileError } from '#internal/persistence/project-file-error'
+import { createSessionFromProjectFile } from '#internal/persistence/project-file-loader'
 import type { ProjectSession } from '#internal/session/project-session'
 import type { ProjectContentStateId } from '#internal/session/project-content-state-id'
 
@@ -36,31 +32,6 @@ export interface ProjectCheckpointRestoreResult {
   readonly rejectedCandidates: readonly ProjectCheckpointCandidateFailure[]
 }
 
-function createSaveReceipt(
-  checkpoint: ProjectCheckpoint,
-  sourceContentStateId: ProjectContentStateId,
-): ProjectCheckpointSaveReceipt {
-  return Object.freeze({
-    checkpointId: checkpoint.checkpointId,
-    projectId: checkpoint.projectId,
-    sourceModelRevision: checkpoint.sourceModelRevision,
-    sourceContentStateId,
-  })
-}
-
-function createCandidateFailure(
-  candidateIndex: number,
-  failureCause: unknown,
-): ProjectCheckpointCandidateFailure {
-  return Object.freeze({ candidateIndex, failureCause })
-}
-
-function isRecoverableCandidateFailure(
-  error: unknown,
-): error is ProjectCheckpointValidationError | ProjectFileLoadError {
-  return error instanceof ProjectCheckpointValidationError || error instanceof ProjectFileLoadError
-}
-
 /** Captures and saves exactly one Session revision without entering the commit path. */
 export async function saveProjectCheckpoint(
   store: ProjectCheckpointStore,
@@ -73,17 +44,39 @@ export async function saveProjectCheckpoint(
   try {
     await store.save(checkpoint)
   } catch (cause) {
-    throw new ProjectCheckpointOperationError(
+    throw new ProjectCheckpointError(
       'store-write-failed',
       `Could not save Project Checkpoint ${checkpoint.checkpointId}`,
       { cause },
     )
   }
 
-  return createSaveReceipt(checkpoint, sourceContentStateId)
+  return Object.freeze({
+    checkpointId: checkpoint.checkpointId,
+    projectId: checkpoint.projectId,
+    sourceModelRevision: checkpoint.sourceModelRevision,
+    sourceContentStateId,
+  })
 }
 
-/** Restores the first fully valid candidate as a fresh Session. */
+function restoreCandidate(
+  candidate: unknown,
+  projectId: ProjectId,
+): Omit<ProjectCheckpointRestoreResult, 'rejectedCandidates'> {
+  const checkpoint = decodeProjectCheckpoint(candidate)
+
+  if (checkpoint.projectId !== projectId) {
+    throw new ProjectFileError(
+      'project-id-mismatch',
+      `Checkpoint ${checkpoint.checkpointId} belongs to project ${checkpoint.projectId}, not ${projectId}`,
+      ['projectId'],
+    )
+  }
+
+  return { checkpoint, session: createSessionFromProjectFile(checkpoint.projectFile) }
+}
+
+/** Restores the first candidate that is a valid project, as a fresh Session. */
 export async function restoreProjectCheckpoint(
   store: ProjectCheckpointStore,
   projectId: ProjectId,
@@ -94,7 +87,7 @@ export async function restoreProjectCheckpoint(
   try {
     candidates = Object.freeze([...(await store.readCandidates(expectedProjectId))])
   } catch (cause) {
-    throw new ProjectCheckpointOperationError(
+    throw new ProjectCheckpointError(
       'store-read-failed',
       `Could not read Project Checkpoints for ${expectedProjectId}`,
       { cause },
@@ -107,26 +100,17 @@ export async function restoreProjectCheckpoint(
 
   for (const [candidateIndex, candidate] of candidates.entries()) {
     try {
-      const checkpoint = decodeProjectCheckpoint(candidate)
-
-      if (checkpoint.projectId !== expectedProjectId) {
-        rejectProjectCheckpointRequestMismatch(checkpoint.projectId, expectedProjectId)
-      }
-
-      const session = createProjectSessionFromDecodedProjectFile(checkpoint.projectFile)
-
       return Object.freeze({
-        checkpoint,
-        session,
+        ...restoreCandidate(candidate, expectedProjectId),
         rejectedCandidates: Object.freeze([...rejectedCandidates]),
       })
     } catch (error) {
-      if (!isRecoverableCandidateFailure(error)) throw error
-      rejectedCandidates.push(createCandidateFailure(candidateIndex, error))
+      if (!(error instanceof ProjectFileError)) throw error
+      rejectedCandidates.push(Object.freeze({ candidateIndex, failureCause: error }))
     }
   }
 
-  throw new ProjectCheckpointOperationError(
+  throw new ProjectCheckpointError(
     'no-valid-checkpoint',
     `No valid Project Checkpoint could restore ${expectedProjectId}`,
     { candidateFailures: rejectedCandidates },

@@ -19,7 +19,7 @@ import {
   readRawCheckpoint,
 } from '#internal/__tests__/support/indexed-db-test-support'
 import {
-  ProjectCheckpointOperationError,
+  ProjectCheckpointError,
   createInitialProjectSession,
   createProjectCheckpoint,
   parseProjectCheckpointId,
@@ -321,10 +321,10 @@ describe('Checkpoint recovery candidates', () => {
     })
 
     const coreFailure = restoreProjectCheckpoint(store, projectId)
-    await expect(coreFailure).rejects.toBeInstanceOf(ProjectCheckpointOperationError)
+    await expect(coreFailure).rejects.toBeInstanceOf(ProjectCheckpointError)
     await expect(coreFailure).rejects.toMatchObject({
       code: 'store-read-failed',
-      failureCause: expect.objectContaining({ code: 'invalid-record' }),
+      cause: expect.objectContaining({ code: 'invalid-record' }),
     })
   })
 })

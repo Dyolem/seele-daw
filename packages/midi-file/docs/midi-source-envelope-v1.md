@@ -46,7 +46,7 @@ SMF bytes
 
 Source Envelope 是导入来源证据，不是音乐创作事实：
 
-- 不写入 Project Snapshot、Project File V2、History、dirty 或 Playback Plan；
+- 不写入 Project Snapshot、项目文件、History、dirty 或 Playback Plan；
 - 不改变 Note、CC64、Program、Track 或 Device Descriptor；
 - Studio 当前只转交摘要，不依据它自动改变音色或事件语义；
 - 导入完成后若未来产品需要让用户查看、修改或长期保存 Interpretation Profile，应另行设计明确、

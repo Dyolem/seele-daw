@@ -9,7 +9,7 @@ import {
   createExtendMidiClipWithNoteCommand,
   createMidiNoteByIdQuery,
   createMidiNoteChangesSubscription,
-  createProjectFileDTO,
+  createProjectFile,
   parseClipId,
   parseMidiChannel,
   parseMidiPitch,
@@ -462,9 +462,13 @@ describe('MIDI Clip with Note commit, consumers, and History', () => {
       ).note,
     ).toBe(addedNotes[0])
 
-    const dto = createProjectFileDTO(session.getSnapshot())
-    expect(dto.clips[command.clip.id]).toMatchObject({ spanTick: command.clip.spanTick })
-    expect(dto.midiSources[command.source.id]?.notes[command.note.id]).toMatchObject({
+    const file = createProjectFile(session.getSnapshot())
+    expect(file.clips.find(({ id }) => id === command.clip.id)).toMatchObject({
+      spanTick: command.clip.spanTick,
+    })
+    expect(
+      file.midiNotes[command.source.id]?.find(({ id }) => id === command.note.id),
+    ).toMatchObject({
       startTick: command.note.startTick,
       durationTick: command.note.durationTick,
     })
@@ -520,12 +524,11 @@ describe('MIDI Clip with Note commit, consumers, and History', () => {
       ).note,
     ).toBe(added.after)
 
-    const dto = createProjectFileDTO(session.getSnapshot())
-    expect(dto.clips[fixture.records.nonLoopClip.id]?.spanTick).toBe(1_920)
-    expect(dto.midiSources[fixture.records.nonLoopSource.id]?.lengthTick).toBe(2_160)
-    expect(dto.midiSources[fixture.records.nonLoopSource.id]?.notes[command.note.id]?.id).toBe(
-      command.note.id,
-    )
+    const file = createProjectFile(session.getSnapshot())
+    const sourceId = fixture.records.nonLoopSource.id
+    expect(file.clips.find(({ id }) => id === fixture.records.nonLoopClip.id)?.spanTick).toBe(1_920)
+    expect(file.midiSources.find(({ id }) => id === sourceId)?.lengthTick).toBe(2_160)
+    expect(file.midiNotes[sourceId]?.some(({ id }) => id === command.note.id)).toBe(true)
 
     const undoCommit = session.undo()
     expect(describeChanges(undoCommit)).toEqual([

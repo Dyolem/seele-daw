@@ -144,6 +144,7 @@ export type {
 export {
   PROJECT_CHECKPOINT_FORMAT_VERSION,
   createProjectCheckpoint,
+  decodeProjectCheckpoint,
   parseProjectCheckpointId,
 } from './persistence/checkpoint/project-checkpoint'
 export type {
@@ -151,6 +152,7 @@ export type {
   ProjectCheckpoint,
   ProjectCheckpointFormatVersion,
   ProjectCheckpointId,
+  ProjectCheckpointStore,
 } from './persistence/checkpoint/project-checkpoint'
 export {
   restoreProjectCheckpoint,
@@ -161,60 +163,22 @@ export type {
   ProjectCheckpointSaveReceipt,
   SaveProjectCheckpointInput,
 } from './persistence/checkpoint/project-checkpoint-coordinator'
-export { decodeProjectCheckpoint } from './persistence/checkpoint/project-checkpoint-decoder'
-export {
-  ProjectCheckpointOperationError,
-  ProjectCheckpointValidationError,
-} from './persistence/checkpoint/project-checkpoint-error'
+export { ProjectCheckpointError } from './persistence/checkpoint/project-checkpoint-error'
 export type {
   ProjectCheckpointCandidateFailure,
-  ProjectCheckpointOperationErrorCode,
-  ProjectCheckpointOperationErrorDetails,
-  ProjectCheckpointValidationErrorCode,
-  ProjectCheckpointValidationErrorDetails,
-  ProjectCheckpointValidationPathSegment,
+  ProjectCheckpointErrorCode,
+  ProjectCheckpointErrorDetails,
 } from './persistence/checkpoint/project-checkpoint-error'
-export type { ProjectCheckpointStore } from './persistence/checkpoint/project-checkpoint-store'
 
-export { PROJECT_FILE_FORMAT_VERSION } from './persistence/project-file-dto'
-export type {
-  AudioTrackDTO,
-  ChannelStripDTO,
-  ClipDTO,
-  DeviceDTO,
-  InstrumentTrackDTO,
-  MasterChannelDTO,
-  MidiClipDTO,
-  MidiLoopDTO,
-  MidiNoteDTO,
-  MidiSourceDTO,
-  MidiSustainPedalEventDTO,
-  ProjectFileDTO,
-  ProjectFileFormatVersion,
-  TempoEventDTO,
-  TimeSignatureEventDTO,
-  TrackDTO,
-} from './persistence/project-file-dto'
-export { decodeProjectFileDTO } from './persistence/project-file-decoder'
-export { ProjectFileLoadError } from './persistence/project-file-load-error'
-export type {
-  ProjectFileLoadErrorCode,
-  ProjectFileLoadErrorDetails,
-  ProjectFileLoadPathSegment,
-} from './persistence/project-file-load-error'
+export {
+  PROJECT_FILE_FORMAT_VERSION,
+  createProjectFile,
+  decodeProjectFile,
+} from './persistence/project-file'
+export type { ProjectFile } from './persistence/project-file'
+export { ProjectFileError } from './persistence/project-file-error'
+export type { ProjectFileErrorCode, ProjectFilePathSegment } from './persistence/project-file-error'
 export { createProjectSessionFromProjectFile } from './persistence/project-file-loader'
-export { ProjectFileProjectionError } from './persistence/project-file-projection-error'
-export type {
-  ProjectFileProjectionErrorCode,
-  ProjectFileProjectionErrorDetails,
-} from './persistence/project-file-projection-error'
-export { createProjectFileDTO } from './persistence/project-file-projector'
-export { ProjectFileValidationError } from './persistence/project-file-validation-error'
-export type {
-  ProjectFileValidationErrorCode,
-  ProjectFileValidationErrorDetails,
-  ProjectFileValidationPathSegment,
-} from './persistence/project-file-validation-error'
 
 export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'
 export type {

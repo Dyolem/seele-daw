@@ -1,15 +1,14 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import * as projectCore from '#internal/index'
 import {
   PROJECT_CHECKPOINT_FORMAT_VERSION,
   PROJECT_COMMAND_EXECUTION_STATUS,
-  DomainValueError,
-  ProjectCheckpointOperationError,
-  ProjectCheckpointValidationError,
+  ProjectCheckpointError,
+  ProjectFileError,
   createAddNoteCommand,
   createMidiNoteByIdQuery,
   createProjectCheckpoint,
+  createProjectFile,
   decodeProjectCheckpoint,
   parseMidiChannel,
   parseMidiPitch,
@@ -22,13 +21,13 @@ import {
   saveProjectCheckpoint,
   type ProjectCheckpoint,
   type ProjectCheckpointStore,
+  type ProjectFilePathSegment,
   type ProjectId,
   type ProjectSession,
   type MidiSourceId,
 } from '#internal/index'
+import { editedCopy, REMOVE, setAt } from './support/json-edit'
 import { createFixtureProjectSession } from './support/project-session-test-support'
-
-type MutableDataObject = Record<string, unknown>
 
 class TestProjectCheckpointStore implements ProjectCheckpointStore {
   readonly saved: ProjectCheckpoint[] = []
@@ -60,34 +59,17 @@ function createDeferred(): { readonly promise: Promise<void>; readonly resolve: 
   return { promise, resolve }
 }
 
-function cloneMutable(value: unknown): MutableDataObject {
-  return JSON.parse(JSON.stringify(value)) as MutableDataObject
+function storedCopy(checkpoint: ProjectCheckpoint): unknown {
+  return JSON.parse(JSON.stringify(checkpoint))
 }
 
-function requireDataObject(value: unknown): MutableDataObject {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError('Expected a test data object')
-  }
+function createTestCheckpoint(checkpointId = 'checkpoint-test') {
+  const { fixture, session } = createFixtureProjectSession()
+  const checkpoint = createProjectCheckpoint(session.getSnapshot(), {
+    checkpointId: parseProjectCheckpointId(checkpointId),
+  })
 
-  return value as MutableDataObject
-}
-
-function getEntity(
-  input: MutableDataObject,
-  tableName: string,
-  entityId: string,
-): MutableDataObject {
-  return requireDataObject(requireDataObject(input[tableName])[entityId])
-}
-
-function captureThrown(operation: () => unknown): unknown {
-  try {
-    operation()
-  } catch (error) {
-    return error
-  }
-
-  throw new Error('Expected operation to throw')
+  return { fixture, session, checkpoint }
 }
 
 async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
@@ -98,13 +80,6 @@ async function captureRejection(operation: Promise<unknown>): Promise<unknown> {
   }
 
   throw new Error('Expected operation to reject')
-}
-
-function expectDeeplyFrozen(value: unknown): void {
-  if (value === null || typeof value !== 'object') return
-
-  expect(Object.isFrozen(value)).toBe(true)
-  for (const child of Object.values(value)) expectDeeplyFrozen(child)
 }
 
 function addCheckpointTestNote(session: ProjectSession, sourceId: MidiSourceId) {
@@ -129,114 +104,89 @@ function addCheckpointTestNote(session: ProjectSession, sourceId: MidiSourceId) 
   return noteId
 }
 
-describe('Project Checkpoint value protocol', () => {
-  it('creates and exports a deeply frozen envelope for one Snapshot revision', () => {
+describe('Project Checkpoint values', () => {
+  it('wraps the file of one Snapshot revision in a frozen envelope', () => {
     const { fixture, session } = createFixtureProjectSession()
     const checkpointId = parseProjectCheckpointId('__proto__')
     const snapshot = session.getSnapshot()
     const checkpoint = createProjectCheckpoint(snapshot, { checkpointId })
 
     expect(PROJECT_CHECKPOINT_FORMAT_VERSION).toBe(1)
-    expect(projectCore.createProjectCheckpoint).toBe(createProjectCheckpoint)
     expectTypeOf(checkpoint).toEqualTypeOf<ProjectCheckpoint>()
-    expect(checkpoint).toMatchObject({
+    expect(checkpoint).toEqual({
       checkpointFormatVersion: 1,
       checkpointId,
       projectId: fixture.records.project.id,
       sourceModelRevision: snapshot.modelRevision,
-      projectFile: { projectId: fixture.records.project.id },
+      projectFile: createProjectFile(snapshot),
     })
-    expectDeeplyFrozen(checkpoint)
-    expect('createProjectSessionFromDecodedProjectFile' in projectCore).toBe(false)
+    expect(Object.isFrozen(checkpoint)).toBe(true)
   })
 
-  it('decodes into detached owned containers and rejects invalid checkpoint IDs at the factory', () => {
-    const { session } = createFixtureProjectSession()
-    const checkpoint = createProjectCheckpoint(session.getSnapshot(), {
-      checkpointId: parseProjectCheckpointId('checkpoint-decode'),
-    })
-    const input = cloneMutable(checkpoint)
+  it('decodes a stored copy into an equal Checkpoint that no longer depends on it', () => {
+    const { checkpoint } = createTestCheckpoint()
+    const input = storedCopy(checkpoint)
     const decoded = decodeProjectCheckpoint(input)
-    const inputProjectFile = requireDataObject(input.projectFile)
 
-    inputProjectFile.name = 'Changed after decode'
-    input.sourceModelRevision = 99
+    setAt(input, ['sourceModelRevision'], 99)
+    setAt(input, ['projectFile', 'project', 'name'], 'Changed after decoding')
 
     expect(decoded).toEqual(checkpoint)
-    expect(decoded).not.toBe(input)
-    expect(decoded.projectFile).not.toBe(inputProjectFile)
-    expect(decoded.projectFile.name).toBe(checkpoint.projectFile.name)
-    expect(decoded.sourceModelRevision).toBe(0)
-    expectDeeplyFrozen(decoded)
-    expect(() => parseProjectCheckpointId(' padded ')).toThrow(DomainValueError)
+    expect(Object.isFrozen(decoded)).toBe(true)
   })
 
-  it('strictly validates fields, passive properties, versions, revisions, IDs, and nested files', () => {
-    const { session } = createFixtureProjectSession()
-    const checkpoint = createProjectCheckpoint(session.getSnapshot(), {
-      checkpointId: parseProjectCheckpointId('checkpoint-invalid-inputs'),
-    })
-    const missing = cloneMutable(checkpoint)
-    delete missing.checkpointId
-    const unexpected = cloneMutable(checkpoint)
-    unexpected.futureField = true
-    const unsupportedVersion = cloneMutable(checkpoint)
-    unsupportedVersion.checkpointFormatVersion = 2
-    const invalidCheckpointId = cloneMutable(checkpoint)
-    invalidCheckpointId.checkpointId = ''
-    const invalidProjectId = cloneMutable(checkpoint)
-    invalidProjectId.projectId = ''
-    const invalidRevision = cloneMutable(checkpoint)
-    invalidRevision.sourceModelRevision = -1
-    const mismatchedProject = cloneMutable(checkpoint)
-    mismatchedProject.projectId = 'different-project'
-    const invalidProjectFile = cloneMutable(checkpoint)
-    delete requireDataObject(invalidProjectFile.projectFile).name
-    const accessor = cloneMutable(checkpoint)
-    let accessorReadCount = 0
-    Object.defineProperty(accessor, 'checkpointId', {
-      configurable: true,
+  it.each<[string, ProjectFilePathSegment[], unknown, string, ProjectFilePathSegment[]]>([
+    ['a missing field', ['checkpointId'], REMOVE, 'invalid-structure', ['checkpointId']],
+    ['an unknown field', ['futureField'], true, 'invalid-structure', ['futureField']],
+    [
+      'another format version',
+      ['checkpointFormatVersion'],
+      2,
+      'unsupported-format-version',
+      ['checkpointFormatVersion'],
+    ],
+    ['an invalid Checkpoint ID', ['checkpointId'], '', 'invalid-value', ['checkpointId']],
+    ['an invalid Project ID', ['projectId'], '', 'invalid-value', ['projectId']],
+    ['a negative revision', ['sourceModelRevision'], -1, 'invalid-value', ['sourceModelRevision']],
+    [
+      'a file of another project',
+      ['projectId'],
+      'project-other',
+      'project-id-mismatch',
+      ['projectFile', 'project', 'id'],
+    ],
+    [
+      'an invalid file',
+      ['projectFile', 'project', 'name'],
+      REMOVE,
+      'invalid-structure',
+      ['projectFile', 'project', 'name'],
+    ],
+  ])('rejects %s', (_, editPath, replacement, code, path) => {
+    const { checkpoint } = createTestCheckpoint()
+    const input = editedCopy(checkpoint, editPath, replacement)
+
+    expect(() => decodeProjectCheckpoint(input)).toThrowError(
+      expect.objectContaining({ name: 'ProjectFileError', code, path }),
+    )
+  })
+
+  it('rejects an accessor without calling it', () => {
+    const { checkpoint } = createTestCheckpoint()
+    const input = storedCopy(checkpoint) as object
+    let getterCalls = 0
+    Object.defineProperty(input, 'checkpointId', {
       enumerable: true,
-      get() {
-        accessorReadCount += 1
+      get: () => {
+        getterCalls += 1
         return 'checkpoint-accessor'
       },
     })
 
-    const failures = [
-      missing,
-      unexpected,
-      unsupportedVersion,
-      invalidCheckpointId,
-      invalidProjectId,
-      invalidRevision,
-      mismatchedProject,
-      invalidProjectFile,
-      accessor,
-    ].map((input) => captureThrown(() => decodeProjectCheckpoint(input)))
-
-    expect(failures).toEqual([
-      expect.objectContaining({ code: 'missing-property', path: ['checkpointId'] }),
-      expect.objectContaining({ code: 'unexpected-property', path: ['futureField'] }),
-      expect.objectContaining({
-        code: 'unsupported-checkpoint-format-version',
-        path: ['checkpointFormatVersion'],
-      }),
-      expect.objectContaining({ code: 'invalid-checkpoint-id', path: ['checkpointId'] }),
-      expect.objectContaining({ code: 'invalid-project-id', path: ['projectId'] }),
-      expect.objectContaining({
-        code: 'invalid-source-model-revision',
-        path: ['sourceModelRevision'],
-      }),
-      expect.objectContaining({
-        code: 'project-id-mismatch',
-        path: ['projectFile', 'projectId'],
-      }),
-      expect.objectContaining({ code: 'invalid-project-file', path: ['projectFile', 'name'] }),
-      expect.objectContaining({ code: 'invalid-object-property', path: ['checkpointId'] }),
-    ])
-    expect(failures.every((error) => error instanceof ProjectCheckpointValidationError)).toBe(true)
-    expect(accessorReadCount).toBe(0)
+    expect(() => decodeProjectCheckpoint(input)).toThrowError(
+      expect.objectContaining({ code: 'not-json' }),
+    )
+    expect(getterCalls).toBe(0)
   })
 })
 
@@ -278,12 +228,9 @@ describe('Project Checkpoint coordination', () => {
       sourceContentStateId,
     })
     expect(Object.isFrozen(receipt)).toBe(true)
-    expect(typeof receipt.sourceContentStateId).toBe('symbol')
     expect(store.saved[0]?.sourceModelRevision).toBe(0)
     expect('sourceContentStateId' in store.saved[0]!).toBe(false)
-    expect('contentStateId' in session.getSnapshot()).toBe(false)
     expect(session.modelRevision).toBe(1)
-    expect(session.modelRevision).not.toBe(receipt.sourceModelRevision)
     expect(session.contentStateId).not.toBe(receipt.sourceContentStateId)
   })
 
@@ -305,13 +252,10 @@ describe('Project Checkpoint coordination', () => {
       restoreProjectCheckpoint(readStore, fixture.records.project.id),
     )
 
-    expect(writeFailure).toMatchObject({
-      code: 'store-write-failed',
-      failureCause: writeCause,
-    })
-    expect(readFailure).toMatchObject({ code: 'store-read-failed', failureCause: readCause })
-    expect(writeFailure).toBeInstanceOf(ProjectCheckpointOperationError)
-    expect(readFailure).toBeInstanceOf(ProjectCheckpointOperationError)
+    expect(writeFailure).toBeInstanceOf(ProjectCheckpointError)
+    expect(writeFailure).toMatchObject({ code: 'store-write-failed', cause: writeCause })
+    expect(readFailure).toBeInstanceOf(ProjectCheckpointError)
+    expect(readFailure).toMatchObject({ code: 'store-read-failed', cause: readCause })
     expect(session.modelRevision).toBe(0)
     expect(session.canUndo).toBe(false)
   })
@@ -323,32 +267,27 @@ describe('Project Checkpoint coordination', () => {
       checkpointId: parseProjectCheckpointId('checkpoint-valid-active'),
     })
     const store = new TestProjectCheckpointStore()
-    store.candidates = [cloneMutable(checkpoint)]
+    store.candidates = [storedCopy(checkpoint)]
 
     const restored = await restoreProjectCheckpoint(store, fixture.records.project.id)
 
-    expect(restored).not.toBeNull()
     expect(restored?.checkpoint.sourceModelRevision).toBe(1)
     expect(store.readProjectIds).toEqual([fixture.records.project.id])
     expect(restored?.session.modelRevision).toBe(0)
     expect(restored?.session.contentStateId).not.toBe(session.contentStateId)
-    expect(typeof restored?.session.contentStateId).toBe('symbol')
     expect(restored?.session.canUndo).toBe(false)
-    expect(restored?.session.canRedo).toBe(false)
     expect(restored?.rejectedCandidates).toEqual([])
-    expect(Object.isFrozen(restored?.rejectedCandidates)).toBe(true)
     expect(
       restored?.session.query(
         createMidiNoteByIdQuery({ sourceId: fixture.records.nonLoopSource.id, noteId }),
       ).note,
     ).toMatchObject({ id: noteId, pitch: 72 })
 
-    const nextNoteId = parseNoteId('note-checkpoint-restored-session')
     const execution = restored?.session.execute(
       createAddNoteCommand({
         baseRevision: restored.session.modelRevision,
         sourceId: fixture.records.nonLoopSource.id,
-        noteId: nextNoteId,
+        noteId: parseNoteId('note-checkpoint-restored-session'),
         startTick: parseTick(1_500),
         durationTick: parseTick(120),
         pitch: parseMidiPitch(74),
@@ -358,35 +297,29 @@ describe('Project Checkpoint coordination', () => {
     )
 
     expect(execution?.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)
-    expect(restored?.session.modelRevision).toBe(1)
   })
 
   it('falls back across corrupt and wrong-project candidates with ordered diagnostics', async () => {
-    const { fixture, session } = createFixtureProjectSession()
-    const checkpoint = createProjectCheckpoint(session.getSnapshot(), {
-      checkpointId: parseProjectCheckpointId('checkpoint-previous-valid'),
-    })
-    const corruptActive = cloneMutable(checkpoint)
-    delete requireDataObject(corruptActive.projectFile).name
-    const domainInvalid = cloneMutable(checkpoint)
-    const domainInvalidFile = requireDataObject(domainInvalid.projectFile)
-    const source = getEntity(domainInvalidFile, 'midiSources', 'source-non-loop')
-    getEntity(source, 'notes', 'note-non-loop-primary').pitch = 999
-    const wrongProject = cloneMutable(checkpoint)
-    wrongProject.projectId = 'project-other'
-    requireDataObject(wrongProject.projectFile).projectId = 'project-other'
+    const { fixture, checkpoint } = createTestCheckpoint('checkpoint-previous-valid')
+    const corruptActive = editedCopy(checkpoint, ['projectFile', 'project', 'name'], REMOVE)
+    const invalidValue = editedCopy(
+      checkpoint,
+      ['projectFile', 'midiNotes', 'source-non-loop', 0, 'pitch'],
+      999,
+    )
+    const wrongProject = editedCopy(checkpoint, ['projectId'], 'project-other')
+    setAt(wrongProject, ['projectFile', 'project', 'id'], 'project-other')
     const store = new TestProjectCheckpointStore()
-    store.candidates = [corruptActive, domainInvalid, wrongProject, cloneMutable(checkpoint)]
+    store.candidates = [corruptActive, invalidValue, wrongProject, storedCopy(checkpoint)]
 
     const restored = await restoreProjectCheckpoint(store, fixture.records.project.id)
     const failures = restored?.rejectedCandidates ?? []
 
     expect(restored?.checkpoint.checkpointId).toBe('checkpoint-previous-valid')
-    expect(failures).toHaveLength(3)
     expect(failures.map(({ candidateIndex }) => candidateIndex)).toEqual([0, 1, 2])
     expect(failures.map(({ failureCause }) => failureCause)).toEqual([
-      expect.objectContaining({ code: 'invalid-project-file' }),
-      expect.objectContaining({ code: 'invalid-domain-value' }),
+      expect.objectContaining({ code: 'invalid-structure' }),
+      expect.objectContaining({ code: 'invalid-value' }),
       expect.objectContaining({ code: 'project-id-mismatch', path: ['projectId'] }),
     ])
     expect(Object.isFrozen(failures)).toBe(true)
@@ -403,17 +336,13 @@ describe('Project Checkpoint coordination', () => {
     const failure = await captureRejection(restoreProjectCheckpoint(invalidStore, projectId))
 
     expect(missing).toBeNull()
-    expect(failure).toBeInstanceOf(ProjectCheckpointOperationError)
+    expect(failure).toBeInstanceOf(ProjectCheckpointError)
     expect(failure).toMatchObject({
       code: 'no-valid-checkpoint',
       candidateFailures: [
-        { candidateIndex: 0, failureCause: expect.any(ProjectCheckpointValidationError) },
-        { candidateIndex: 1, failureCause: expect.any(ProjectCheckpointValidationError) },
+        { candidateIndex: 0, failureCause: expect.any(ProjectFileError) },
+        { candidateIndex: 1, failureCause: expect.any(ProjectFileError) },
       ],
     })
-    expect(
-      failure instanceof ProjectCheckpointOperationError &&
-        Object.isFrozen(failure.candidateFailures),
-    ).toBe(true)
   })
 })

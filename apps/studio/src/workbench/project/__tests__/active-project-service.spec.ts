@@ -1,4 +1,4 @@
-import { ProjectCheckpointOperationError, type ProjectId } from '@seele-daw/project-core'
+import { ProjectCheckpointError, type ProjectId } from '@seele-daw/project-core'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ActiveProjectError } from '@/workbench/project/active-project-error'
@@ -133,13 +133,13 @@ describe('ActiveProjectService creation and opening', () => {
 
     await expect(service.createFromSession(createTestSession(projectId))).rejects.toMatchObject({
       code: 'store-write-failed',
-      failureCause: cause,
+      cause,
     })
 
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ failureCause: cause }),
+      failureCause: expect.objectContaining({ cause }),
     })
   })
 
@@ -190,7 +190,10 @@ describe('ActiveProjectService creation and opening', () => {
     const state = requireReady(service.state)
     expect(state.isDirty).toBe(false)
     expect(state.recoveryFailures).toEqual([
-      { candidateIndex: 0, failureCause: expect.objectContaining({ code: 'missing-property' }) },
+      {
+        candidateIndex: 0,
+        failureCause: expect.objectContaining({ code: 'unsupported-format-version' }),
+      },
     ])
     expect(Object.isFrozen(state.recoveryFailures[0])).toBe(true)
   })
@@ -201,7 +204,7 @@ describe('ActiveProjectService creation and opening', () => {
     store.candidatesByProject.set(projectId, [{}, { checkpointFormatVersion: 99 }])
     const { createNewSession, service } = createServiceFixture(store)
 
-    await expect(service.open(projectId)).rejects.toBeInstanceOf(ProjectCheckpointOperationError)
+    await expect(service.open(projectId)).rejects.toBeInstanceOf(ProjectCheckpointError)
 
     expect(createNewSession).not.toHaveBeenCalled()
     expect(service.state).toMatchObject({
@@ -211,7 +214,7 @@ describe('ActiveProjectService creation and opening', () => {
     })
     if (
       service.state.phase !== ACTIVE_PROJECT_PHASE.OPEN_FAILED ||
-      !(service.state.failureCause instanceof ProjectCheckpointOperationError)
+      !(service.state.failureCause instanceof ProjectCheckpointError)
     ) {
       throw new Error('Expected a Checkpoint operation failure')
     }
@@ -268,13 +271,13 @@ describe('ActiveProjectService creation and opening', () => {
 
     await expect(service.open(projectId)).rejects.toMatchObject({
       code: 'store-read-failed',
-      failureCause: cause,
+      cause,
     })
 
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.OPEN_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ failureCause: cause }),
+      failureCause: expect.objectContaining({ cause }),
     })
   })
 
@@ -287,13 +290,13 @@ describe('ActiveProjectService creation and opening', () => {
 
     await expect(service.create()).rejects.toMatchObject({
       code: 'store-read-failed',
-      failureCause: cause,
+      cause,
     })
 
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ failureCause: cause }),
+      failureCause: expect.objectContaining({ cause }),
     })
   })
 
@@ -379,12 +382,12 @@ describe('ActiveProjectService creation and opening', () => {
 
     await expect(service.create()).rejects.toMatchObject({
       code: 'store-write-failed',
-      failureCause: cause,
+      cause,
     })
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ failureCause: cause }),
+      failureCause: expect.objectContaining({ cause }),
     })
   })
 })
@@ -554,7 +557,7 @@ describe('ActiveProjectService saving and dirty state', () => {
 
     await expect(service.save()).rejects.toMatchObject({
       code: 'store-write-failed',
-      failureCause: cause,
+      cause,
     })
 
     expect(requireReady(service.state)).toMatchObject({
@@ -562,7 +565,7 @@ describe('ActiveProjectService saving and dirty state', () => {
       savedRevision: 0,
       isDirty: false,
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.FAILED,
-      saveFailure: expect.objectContaining({ failureCause: cause }),
+      saveFailure: expect.objectContaining({ cause }),
     })
 
     store.saveFailure = undefined

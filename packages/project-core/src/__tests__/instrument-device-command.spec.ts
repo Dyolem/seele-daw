@@ -10,7 +10,7 @@ import {
   createMidiNoteByIdQuery,
   createMidiNoteChangesSubscription,
   createProjectCheckpoint,
-  createProjectFileDTO,
+  createProjectFile,
   createProjectSessionFromProjectFile,
   createReplaceInstrumentDeviceCommand,
   parseDeviceId,
@@ -423,17 +423,17 @@ describe('Instrument Device consumer and persistence compatibility', () => {
     const result = session.execute(command)
     expect(result.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)
 
-    const projectFile = createProjectFileDTO(session.getSnapshot())
-    const projectedDevice = projectFile.devices[fixture.records.instrumentDevice.id]
-    expect(projectedDevice).toEqual(command.instrumentDevice)
+    const deviceId = fixture.records.instrumentDevice.id
+    const projectFile = createProjectFile(session.getSnapshot())
+    expect(projectFile.devices.find(({ id }) => id === deviceId)).toEqual(command.instrumentDevice)
 
     const loadedSession = createProjectSessionFromProjectFile(projectFile)
-    expect(createProjectFileDTO(loadedSession.getSnapshot())).toEqual(projectFile)
+    expect(createProjectFile(loadedSession.getSnapshot())).toEqual(projectFile)
 
     const checkpoint = createProjectCheckpoint(session.getSnapshot(), {
       checkpointId: parseProjectCheckpointId('checkpoint-instrument-device-replace'),
     })
-    expect(checkpoint.projectFile.devices[fixture.records.instrumentDevice.id]).toEqual(
+    expect(checkpoint.projectFile.devices.find(({ id }) => id === deviceId)).toEqual(
       command.instrumentDevice,
     )
   })

@@ -73,7 +73,7 @@ export function createProjectCatalogRecord(
   return {
     catalogRecordVersion: PROJECT_CATALOG_RECORD_VERSION,
     projectId,
-    name: parseEntityName(checkpoint.projectFile.name),
+    name: parseEntityName(checkpoint.projectFile.project.name),
     lastCheckpointSavedAt: parseTimestamp(currentTime),
   }
 }

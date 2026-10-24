@@ -12,7 +12,7 @@ Event Selection / Move / Replace Value / Remove 的 Editor Foundation 已建立�
 - `MidiSustainPedalEventRecord`、Source 所有权分区与全局不变量；
 - Add、批量 Move、批量 Remove、Replace Value Project Command；
 - 存储变化、History、Undo / Redo 与 Snapshot；
-- Project File V2 写出、严格读取，以及 V1 到 V2 的无损迁移；
+- 项目文件的写出与严格读取；
 - 新建 MIDI Clip 与整轨集合导入命令所需的完整所有权图；
 - Standard MIDI File CC64 导入、PPQ 碰撞诊断与原始 Value / Channel 保留；
 - 非循环 Clip 的 Playback 状态追赶、最终 Gate Release 推导与确定性同 Tick 排序；
@@ -162,16 +162,12 @@ Event 的增、删、改是 `midiSustainPedalEvents` 表上的 `insert`、`remov
 MIDI Note QueryIndex 不索引 CC64，因此只推进 revision 而不重建 Note 索引；MIDI Note 局部
 订阅也不接收只含 CC64 变化的 Commit。`project-commit.all` 仍接收全部合法提交。
 
-## Project File V2
+## 项目文件
 
-Project File V2 在每个 `MidiSourceDTO` 中新增必填 `sustainPedalEvents` entity table。V1 reader
-保持严格：V1 文件不能提前带有该字段。已校验 V1 文件通过纯迁移为 V2，并为每个 Source 创建
-空踏板表；迁移不会伪造 Pedal Up Event，也不会修改 Note Duration。
-
-V2 writer 保留原始 ID、Tick、Value 和 Channel。结构 decoder 负责 JSON 形状与 table key / ID，
-领域工厂负责值域，InvariantValidator 负责 Source 所有权、全局 ID、范围和位置唯一性。
-
-完整文件协议见 [Seele Project File Format V2](./project-file-format-v2.md)。
+CC64 Event 存在 `midiSustainPedalEvents` 分区表中，按 Source ID 分组；没有踏板事件的 Source
+也有一个空分区。文件保留原始 ID、Tick、Value 和 Channel：结构检查负责字段，记录工厂负责
+值域，InvariantValidator 负责 Source 所有权、全局 ID、范围和位置唯一性。格式见
+[项目文件格式](./project-file-format.md)。
 
 ## 与音源控制文件的边界
 

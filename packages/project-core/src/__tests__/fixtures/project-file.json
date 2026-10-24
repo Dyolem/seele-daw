@@ -1,13 +1,18 @@
 {
-  "formatVersion": 2,
-  "requiredFeatures": [],
-  "projectId": "project-complete-fixture",
-  "name": "Complete Project Fixture",
+  "formatVersion": 3,
+  "project": {
+    "id": "project-complete-fixture",
+    "name": "Complete Project Fixture"
+  },
+  "master": {
+    "gain": 1,
+    "muted": false,
+    "audioEffectIds": ["device-master-effect"]
+  },
   "trackOrder": ["track-instrument", "track-audio"],
-  "tracks": {
-    "track-audio": {
+  "tracks": [
+    {
       "id": "track-audio",
-      "kind": "audio",
       "name": "Fixture Audio",
       "color": null,
       "channel": {
@@ -16,11 +21,11 @@
         "muted": false,
         "soloed": false
       },
-      "audioEffectIds": ["device-audio-track-effect"]
+      "audioEffectIds": ["device-audio-track-effect"],
+      "kind": "audio"
     },
-    "track-instrument": {
+    {
       "id": "track-instrument",
-      "kind": "instrument",
       "name": "Fixture Instrument",
       "color": null,
       "channel": {
@@ -30,12 +35,13 @@
         "soloed": false
       },
       "audioEffectIds": ["device-instrument-audio-effect"],
+      "kind": "instrument",
       "midiEffectIds": ["device-instrument-midi-effect"],
       "instrumentDeviceId": "device-instrument"
     }
-  },
-  "clips": {
-    "clip-looping": {
+  ],
+  "clips": [
+    {
       "id": "clip-looping",
       "kind": "midi",
       "trackId": "track-instrument",
@@ -51,7 +57,7 @@
         "sourceSpanTick": 960
       }
     },
-    "clip-non-loop": {
+    {
       "id": "clip-non-loop",
       "kind": "midi",
       "trackId": "track-instrument",
@@ -64,109 +70,45 @@
       "sourceOffsetTick": 240,
       "loop": null
     }
-  },
-  "midiSources": {
-    "source-looping": {
+  ],
+  "midiSources": [
+    {
       "id": "source-looping",
-      "lengthTick": 1920,
-      "notes": {
-        "note-looping-harmony": {
-          "id": "note-looping-harmony",
-          "startTick": 480,
-          "durationTick": 480,
-          "pitch": 71,
-          "velocity": 92,
-          "channel": 1
-        },
-        "note-looping-primary": {
-          "id": "note-looping-primary",
-          "startTick": 0,
-          "durationTick": 480,
-          "pitch": 67,
-          "velocity": 108,
-          "channel": 1
-        }
-      },
-      "sustainPedalEvents": {
-        "sustain-looping-down": {
-          "id": "sustain-looping-down",
-          "tick": 120,
-          "value": 100,
-          "channel": 1
-        },
-        "sustain-looping-up": {
-          "id": "sustain-looping-up",
-          "tick": 840,
-          "value": 32,
-          "channel": 1
-        }
-      }
+      "lengthTick": 1920
     },
-    "source-non-loop": {
+    {
       "id": "source-non-loop",
-      "lengthTick": 1920,
-      "notes": {
-        "note-non-loop-harmony": {
-          "id": "note-non-loop-harmony",
-          "startTick": 720,
-          "durationTick": 240,
-          "pitch": 64,
-          "velocity": 96,
-          "channel": 0
-        },
-        "note-non-loop-primary": {
-          "id": "note-non-loop-primary",
-          "startTick": 240,
-          "durationTick": 480,
-          "pitch": 60,
-          "velocity": 100,
-          "channel": 0
-        }
-      },
-      "sustainPedalEvents": {
-        "sustain-non-loop-down": {
-          "id": "sustain-non-loop-down",
-          "tick": 360,
-          "value": 127,
-          "channel": 0
-        },
-        "sustain-non-loop-up": {
-          "id": "sustain-non-loop-up",
-          "tick": 900,
-          "value": 0,
-          "channel": 0
-        }
-      }
+      "lengthTick": 1920
     }
-  },
-  "tempoEvents": {
-    "tempo-initial": {
+  ],
+  "tempoEvents": [
+    {
       "id": "tempo-initial",
       "tick": 0,
       "bpm": 120
     },
-    "tempo-later": {
+    {
       "id": "tempo-later",
       "tick": 3840,
       "bpm": 128
     }
-  },
-  "timeSignatureEvents": {
-    "time-signature-initial": {
+  ],
+  "timeSignatureEvents": [
+    {
       "id": "time-signature-initial",
       "tick": 0,
       "numerator": 4,
       "denominator": 4
     },
-    "time-signature-later": {
+    {
       "id": "time-signature-later",
       "tick": 7680,
       "numerator": 3,
       "denominator": 4
     }
-  },
-  "devices": {
-    "device-audio-track-effect": {
+  ],
+  "devices": [
+    {
       "id": "device-audio-track-effect",
       "typeId": "seele.fixture.audio-effect",
       "definitionVersion": 1,
@@ -174,7 +116,7 @@
       "parameters": {},
       "opaqueState": null
     },
-    "device-instrument": {
+    {
       "id": "device-instrument",
       "typeId": "seele.fixture.instrument",
       "definitionVersion": 1,
@@ -182,7 +124,7 @@
       "parameters": {},
       "opaqueState": null
     },
-    "device-instrument-audio-effect": {
+    {
       "id": "device-instrument-audio-effect",
       "typeId": "seele.fixture.audio-effect",
       "definitionVersion": 1,
@@ -190,7 +132,7 @@
       "parameters": {},
       "opaqueState": null
     },
-    "device-instrument-midi-effect": {
+    {
       "id": "device-instrument-midi-effect",
       "typeId": "seele.fixture.midi-effect",
       "definitionVersion": 1,
@@ -198,7 +140,7 @@
       "parameters": {},
       "opaqueState": null
     },
-    "device-master-effect": {
+    {
       "id": "device-master-effect",
       "typeId": "seele.fixture.audio-effect",
       "definitionVersion": 1,
@@ -206,10 +148,73 @@
       "parameters": {},
       "opaqueState": null
     }
+  ],
+  "midiNotes": {
+    "source-looping": [
+      {
+        "id": "note-looping-harmony",
+        "startTick": 480,
+        "durationTick": 480,
+        "pitch": 71,
+        "velocity": 92,
+        "channel": 1
+      },
+      {
+        "id": "note-looping-primary",
+        "startTick": 0,
+        "durationTick": 480,
+        "pitch": 67,
+        "velocity": 108,
+        "channel": 1
+      }
+    ],
+    "source-non-loop": [
+      {
+        "id": "note-non-loop-harmony",
+        "startTick": 720,
+        "durationTick": 240,
+        "pitch": 64,
+        "velocity": 96,
+        "channel": 0
+      },
+      {
+        "id": "note-non-loop-primary",
+        "startTick": 240,
+        "durationTick": 480,
+        "pitch": 60,
+        "velocity": 100,
+        "channel": 0
+      }
+    ]
   },
-  "master": {
-    "gain": 1,
-    "muted": false,
-    "audioEffectIds": ["device-master-effect"]
+  "midiSustainPedalEvents": {
+    "source-looping": [
+      {
+        "id": "sustain-looping-down",
+        "tick": 120,
+        "value": 100,
+        "channel": 1
+      },
+      {
+        "id": "sustain-looping-up",
+        "tick": 840,
+        "value": 32,
+        "channel": 1
+      }
+    ],
+    "source-non-loop": [
+      {
+        "id": "sustain-non-loop-down",
+        "tick": 360,
+        "value": 127,
+        "channel": 0
+      },
+      {
+        "id": "sustain-non-loop-up",
+        "tick": 900,
+        "value": 0,
+        "channel": 0
+      }
+    ]
   }
 }

@@ -15,7 +15,7 @@ external unknown
 
 本阶段不创建领域 Record、ModelStore 或 ProjectSession，也不把结构校验误当成跨实体语义校验。
 
-本计划描述统一 [Seele Project File Format V1](../../../packages/project-core/docs/project-file-format-v1.md) 的 reader 分支。Decoder 与 Snapshot projector 共享一份方向无关的持久化协议，不把导入实现当成第二份文件格式。
+本计划描述统一 [Seele Project File Format V1](./project-file-format-v1.md) 的 reader 分支。Decoder 与 Snapshot projector 共享一份方向无关的持久化协议，不把导入实现当成第二份文件格式。
 
 ## 边界分层
 
@@ -137,7 +137,7 @@ ModelStore seed normalizer、Session loader、migration runner、JSON text codec
 本阶段已于 2026-07-21 按上述边界完成：
 
 - package root 已公开 `decodeProjectFileDTO(input: unknown)`、`ProjectFileValidationError` 及错误协议类型；
-- 已建立规范性 [Seele Project File Format V1](../../../packages/project-core/docs/project-file-format-v1.md)，持久化 property、JSON 类型、数值单位、跨实体关系和版本演进不再依赖当前运行时命名；
+- 已建立规范性 [Seele Project File Format V1](./project-file-format-v1.md)，持久化 property、JSON 类型、数值单位、跨实体关系和版本演进不再依赖当前运行时命名；
 - 包内 `PROJECT_FILE_V1_PROTOCOL` 通过 exact mapped field map 与每个 DTO interface 对齐，decoder 直接消费该运行时协议；
 - 静态 complete-project V1 golden JSON 不由当前 projector 动态生成，并在测试中同时校准 reader 和 writer；
 - 解码器以 `formatVersion` 优先分流，对 V1 执行严格字段、判别联合、有限数 / 安全整数、entity key / ID 和 required feature 校验；

@@ -9,8 +9,16 @@ import {
   TIME_SIGNATURE_DENOMINATORS,
   TIME_SIGNATURE_NUMERATOR_MAX,
   TIME_SIGNATURE_NUMERATOR_MIN,
-  type TempoEventDTO,
-  type TimeSignatureEventDTO,
+  createTempoEventRecord,
+  createTimeSignatureEventRecord,
+  parseTempoBpm,
+  parseTempoEventId,
+  parseTick,
+  parseTimeSignatureDenominator,
+  parseTimeSignatureEventId,
+  parseTimeSignatureNumerator,
+  type TempoEventRecord,
+  type TimeSignatureEventRecord,
 } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
@@ -18,12 +26,7 @@ import {
   type ProjectMidiImportDiagnostic,
 } from '#internal/import/project-midi-import-contract'
 import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
-import {
-  createDiagnostic,
-  createRecordTable,
-  type ImportIdAllocator,
-  setRecord,
-} from '#internal/import/import-support'
+import { createDiagnostic, type ImportIdAllocator } from '#internal/import/import-support'
 import { convertMidiTickToProjectTick } from '#internal/import/ppq-converter'
 
 const DEFAULT_TEMPO_BPM = 120
@@ -70,7 +73,7 @@ export function createTempoEvents(
   document: MidiFileDocument,
   allocator: ImportIdAllocator,
   diagnostics: ProjectMidiImportDiagnostic[],
-): Record<string, TempoEventDTO> {
+): readonly TempoEventRecord[] {
   const groups = groupMappedTimelineEvents<MidiFileTempoEvent>(
     document.tempos,
     document.ppq,
@@ -93,33 +96,36 @@ export function createTempoEvents(
   }
   if (!effectiveEvents.has(0)) effectiveEvents.set(0, { tick: 0, bpm: DEFAULT_TEMPO_BPM })
 
-  const table = createRecordTable<TempoEventDTO>()
-  for (const [tick, event] of [...effectiveEvents].sort(([left], [right]) => left - right)) {
-    if (!Number.isFinite(event.bpm) || event.bpm <= 0) {
-      throw new ProjectMidiImportError(
-        'invalid-midi-document',
-        `MIDI tempo at tick ${event.tick} must have a finite positive BPM.`,
-        { sourceTick: event.tick, value: event.bpm },
-      )
-    }
-    if (event.bpm < TEMPO_BPM_MIN || event.bpm > TEMPO_BPM_MAX) {
-      throw new ProjectMidiImportError(
-        'unsupported-tempo',
-        `MIDI tempo ${event.bpm} BPM is outside the Project range ${TEMPO_BPM_MIN}..${TEMPO_BPM_MAX}.`,
-        { sourceTick: event.tick, value: event.bpm },
-      )
-    }
-    const id = allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.TEMPO_EVENT)
-    setRecord(table, id, { id, tick, bpm: event.bpm })
-  }
-  return table
+  return [...effectiveEvents]
+    .sort(([left], [right]) => left - right)
+    .map(([tick, event]) => {
+      if (!Number.isFinite(event.bpm) || event.bpm <= 0) {
+        throw new ProjectMidiImportError(
+          'invalid-midi-document',
+          `MIDI tempo at tick ${event.tick} must have a finite positive BPM.`,
+          { sourceTick: event.tick, value: event.bpm },
+        )
+      }
+      if (event.bpm < TEMPO_BPM_MIN || event.bpm > TEMPO_BPM_MAX) {
+        throw new ProjectMidiImportError(
+          'unsupported-tempo',
+          `MIDI tempo ${event.bpm} BPM is outside the Project range ${TEMPO_BPM_MIN}..${TEMPO_BPM_MAX}.`,
+          { sourceTick: event.tick, value: event.bpm },
+        )
+      }
+      return createTempoEventRecord({
+        id: parseTempoEventId(allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.TEMPO_EVENT)),
+        tick: parseTick(tick),
+        bpm: parseTempoBpm(event.bpm),
+      })
+    })
 }
 
 export function createTimeSignatureEvents(
   document: MidiFileDocument,
   allocator: ImportIdAllocator,
   diagnostics: ProjectMidiImportDiagnostic[],
-): Record<string, TimeSignatureEventDTO> {
+): readonly TimeSignatureEventRecord[] {
   const groups = groupMappedTimelineEvents<MidiFileTimeSignatureEvent>(
     document.timeSignatures,
     document.ppq,
@@ -148,31 +154,32 @@ export function createTimeSignatureEvents(
     })
   }
 
-  const table = createRecordTable<TimeSignatureEventDTO>()
-  for (const [tick, event] of [...effectiveEvents].sort(([left], [right]) => left - right)) {
-    const supportedNumerator =
-      Number.isInteger(event.numerator) &&
-      event.numerator >= TIME_SIGNATURE_NUMERATOR_MIN &&
-      event.numerator <= TIME_SIGNATURE_NUMERATOR_MAX
-    const supportedDenominator = TIME_SIGNATURE_DENOMINATORS.some(
-      (denominator) => denominator === event.denominator,
-    )
-    if (!supportedNumerator || !supportedDenominator) {
-      throw new ProjectMidiImportError(
-        'unsupported-time-signature',
-        `MIDI time signature ${event.numerator}/${event.denominator} cannot be represented by the current Project model.`,
-        { sourceTick: event.tick, value: `${event.numerator}/${event.denominator}` },
+  return [...effectiveEvents]
+    .sort(([left], [right]) => left - right)
+    .map(([tick, event]) => {
+      const supportedNumerator =
+        Number.isInteger(event.numerator) &&
+        event.numerator >= TIME_SIGNATURE_NUMERATOR_MIN &&
+        event.numerator <= TIME_SIGNATURE_NUMERATOR_MAX
+      const supportedDenominator = TIME_SIGNATURE_DENOMINATORS.some(
+        (denominator) => denominator === event.denominator,
       )
-    }
-    const id = allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.TIME_SIGNATURE_EVENT)
-    setRecord(table, id, {
-      id,
-      tick,
-      numerator: event.numerator,
-      denominator: event.denominator,
+      if (!supportedNumerator || !supportedDenominator) {
+        throw new ProjectMidiImportError(
+          'unsupported-time-signature',
+          `MIDI time signature ${event.numerator}/${event.denominator} cannot be represented by the current Project model.`,
+          { sourceTick: event.tick, value: `${event.numerator}/${event.denominator}` },
+        )
+      }
+      return createTimeSignatureEventRecord({
+        id: parseTimeSignatureEventId(
+          allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.TIME_SIGNATURE_EVENT),
+        ),
+        tick: parseTick(tick),
+        numerator: parseTimeSignatureNumerator(event.numerator),
+        denominator: parseTimeSignatureDenominator(event.denominator),
+      })
     })
-  }
-  return table
 }
 
 export function addGlobalUnsupportedFactDiagnostics(

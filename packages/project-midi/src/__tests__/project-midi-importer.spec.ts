@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createStandardMidiFileSourceEnvelopeWithEvidence } from '@seele-daw/midi-file'
 import {
-  createProjectFileDTO,
+  createProjectFile,
   createProjectSessionFromProjectFile,
   parseProjectColor,
-  type ProjectFileDTO,
 } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_INSTRUMENT_MAPPING_KIND,
@@ -23,8 +22,37 @@ import {
   createTestInstrumentDevice,
 } from '#internal/__tests__/support/project-midi-import-test-support'
 
-function projectFileFor(input: Parameters<typeof createProjectMidiImportDraft>[0]): ProjectFileDTO {
-  return createProjectFileDTO(createProjectMidiImportDraft(input).session.getSnapshot())
+function byId<RecordType extends { readonly id: string }>(records: readonly RecordType[]) {
+  return Object.fromEntries(records.map((record) => [record.id, record]))
+}
+
+/** The imported project's file, keyed by ID with each Source's events under it, for assertions. */
+function projectView(draft: ReturnType<typeof createProjectMidiImportDraft>) {
+  const file = createProjectFile(draft.session.getSnapshot())
+
+  return {
+    name: file.project.name,
+    trackOrder: file.trackOrder,
+    tracks: byId(file.tracks),
+    clips: byId(file.clips),
+    midiSources: Object.fromEntries(
+      file.midiSources.map((source) => [
+        source.id,
+        {
+          ...source,
+          notes: byId(file.midiNotes[source.id] ?? []),
+          sustainPedalEvents: byId(file.midiSustainPedalEvents[source.id] ?? []),
+        },
+      ]),
+    ),
+    tempoEvents: byId(file.tempoEvents),
+    timeSignatureEvents: byId(file.timeSignatureEvents),
+    devices: byId(file.devices),
+  }
+}
+
+function projectFileFor(input: Parameters<typeof createProjectMidiImportDraft>[0]) {
+  return projectView(createProjectMidiImportDraft(input))
 }
 
 function findDiagnostic(
@@ -80,7 +108,7 @@ describe('createProjectMidiImportDraft', () => {
         createTrackColor,
       }),
     )
-    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const projectFile = projectView(draft)
 
     expect(draft.summary).toEqual({
       sourceFormat: 1,
@@ -180,7 +208,9 @@ describe('createProjectMidiImportDraft', () => {
         importedTrackIndex: 0,
       }),
     )
-    expect(() => createProjectSessionFromProjectFile(projectFile)).not.toThrow()
+    expect(() =>
+      createProjectSessionFromProjectFile(createProjectFile(draft.session.getSnapshot())),
+    ).not.toThrow()
   })
 
   it('skips empty conductor tracks and supplies tick-zero timeline defaults', () => {
@@ -198,7 +228,7 @@ describe('createProjectMidiImportDraft', () => {
         { createInstrumentDevice },
       ),
     )
-    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const projectFile = projectView(draft)
 
     expect(draft.summary.importedTrackCount).toBe(0)
     expect(projectFile.trackOrder).toEqual([])
@@ -256,7 +286,7 @@ describe('createProjectMidiImportDraft', () => {
         }),
       ),
     )
-    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const projectFile = projectView(draft)
 
     expect(Object.values(projectFile.tempoEvents)).toEqual([
       expect.objectContaining({ tick: 0, bpm: 120 }),
@@ -304,7 +334,7 @@ describe('createProjectMidiImportDraft', () => {
         }),
       ),
     )
-    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const projectFile = projectView(draft)
 
     expect(projectFile.midiSources['midi-source-0']?.notes['midi-note-0']?.durationTick).toBe(480)
     expect(projectFile.midiSources['midi-source-0']?.sustainPedalEvents).toEqual({
@@ -374,7 +404,7 @@ describe('createProjectMidiImportDraft', () => {
         }),
       ),
     )
-    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const projectFile = projectView(draft)
     const channels = projectFile.trackOrder.map((trackId) => projectFile.tracks[trackId]?.channel)
 
     expect(channels).toEqual([
@@ -411,7 +441,7 @@ describe('createProjectMidiImportDraft', () => {
         }),
       ),
     )
-    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const projectFile = projectView(draft)
     const channel = projectFile.tracks['track-0']?.channel
 
     expect(channel?.gain).toBeCloseTo(80 / 127, 12)
@@ -497,7 +527,7 @@ describe('createProjectMidiImportDraft', () => {
         },
       ),
     )
-    const projectFile = createProjectFileDTO(draft.session.getSnapshot())
+    const projectFile = projectView(draft)
 
     expect(projectFile.clips['clip-0']).toMatchObject({ startTick: 1, spanTick: 959 })
     expect(projectFile.midiSources['midi-source-0']).toMatchObject({

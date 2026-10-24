@@ -71,10 +71,10 @@ execute(command)
 
 ## 持久化
 
-项目文件是 `formatVersion: 2` 的 JSON 友好 DTO，Note 与 CC64 事件嵌套在所属 Source 下；
-revision、History 与索引不进入文件。`decodeProjectFileDTO` 严格校验不可信输入（V1 文件会迁移
-到 V2），`createProjectSessionFromProjectFile` 再经过记录工厂与不变量校验，得到一个 revision
-从 0 开始的新 Session。格式定义见 [Project File Format V2](./docs/project-file-format-v2.md)。
+项目文件就是 ModelStore 的表（`formatVersion: 3`）：记录原样写出，revision、History 与索引
+不进入文件。读取先把输入复制成被动 JSON 数据，按每张表的字段表检查结构，再把记录交给记录
+工厂校验，最后建立 Store 并做一次不变量校验。只读当前版本，不做迁移（ADR-005）。失败统一为
+带 `code` 与 `path` 的 `ProjectFileError`。格式见 [项目文件格式](./docs/project-file-format.md)。
 
 Checkpoint 把项目文件包在带来源 revision 的信封里。`ProjectCheckpointStore` 只定义保存与
 “按恢复优先级读取候选”两个操作；浏览器实现（IndexedDB，保留 active 与 previous 两份）在
@@ -94,7 +94,7 @@ src/
 ├── queries/        QueryIndex 与查询
 ├── subscriptions/  ChangePublisher 与订阅过滤
 ├── snapshots/      Snapshot
-├── persistence/    项目文件与 Checkpoint
+├── persistence/    项目文件（字段表与解码器）与 Checkpoint
 └── index.ts        唯一公开入口
 ```
 

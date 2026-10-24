@@ -1,7 +1,7 @@
 import {
   PROJECT_COMMAND_TYPE,
   createAddInstrumentTrackCommand,
-  createProjectFileDTO,
+  createProjectFile,
   createProjectSessionFromProjectFile,
   parseBipolarValue,
   parseDeviceId,
@@ -143,9 +143,7 @@ describe('track edits', () => {
       { op: 'replace', table: 'devices', after: { id: deviceId } },
     ])
     expect(deviceState(session)).toEqual({ soundbankId: 'solo-violin' })
-    const reloaded = createProjectSessionFromProjectFile(
-      createProjectFileDTO(session.getSnapshot()),
-    )
+    const reloaded = createProjectSessionFromProjectFile(createProjectFile(session.getSnapshot()))
     expect(deviceState(reloaded)).toEqual({ soundbankId: 'solo-violin' })
     session.undo()
     expect(session.getSnapshot().devices[0]).toMatchObject({

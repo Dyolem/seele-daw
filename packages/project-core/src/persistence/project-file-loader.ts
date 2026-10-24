@@ -1,37 +1,69 @@
+import type { MidiSourceId } from '#internal/model/ids'
 import { assertModelInvariants, ModelInvariantError } from '#internal/model/invariant-validator'
 import { ModelStore } from '#internal/model/model-store'
-import { decodeProjectFileDTO } from '#internal/persistence/project-file-decoder'
-import { ProjectFileLoadError } from '#internal/persistence/project-file-load-error'
-import { normalizeProjectFileDTO } from '#internal/persistence/project-file-normalizer'
+import type { StoredRecord } from '#internal/model/model-tables'
 import { createProjectSession, type ProjectSession } from '#internal/session/project-session'
+import { decodeProjectFile, type ProjectFile } from './project-file'
+import { rejectData, type DataPath } from './stored-data'
 
-/**
- * Creates a fresh in-memory Session from one structured project-file value.
- * Transport decoding, migration, storage, and history restoration are separate concerns.
- */
-export function createProjectSessionFromProjectFile(input: unknown): ProjectSession {
-  const dto = decodeProjectFileDTO(input)
+function indexById<RecordType extends StoredRecord>(
+  records: readonly RecordType[],
+  path: DataPath,
+): Map<RecordType['id'], RecordType> {
+  const indexed = new Map<RecordType['id'], RecordType>()
 
-  return createProjectSessionFromDecodedProjectFile(dto)
+  records.forEach((record, index) => {
+    if (indexed.has(record.id)) {
+      rejectData('duplicate-id', `Duplicate ID ${JSON.stringify(record.id)}`, [...path, index])
+    }
+
+    indexed.set(record.id, record)
+  })
+
+  return indexed
 }
 
-/** @internal Composes a Session after an owning decoder has already validated the DTO. */
-export function createProjectSessionFromDecodedProjectFile(
-  dto: ReturnType<typeof decodeProjectFileDTO>,
-): ProjectSession {
-  const store = new ModelStore(normalizeProjectFileDTO(dto))
+function indexPartitions<RecordType extends StoredRecord>(
+  partitions: Readonly<Record<string, readonly RecordType[]>>,
+  path: DataPath,
+): Map<MidiSourceId, Map<RecordType['id'], RecordType>> {
+  return new Map(
+    Object.entries(partitions).map(([sourceId, records]) => [
+      sourceId as MidiSourceId,
+      indexById(records, [...path, sourceId]),
+    ]),
+  )
+}
+
+/** @internal Builds a fresh Session from an already decoded file, e.g. one inside a Checkpoint. */
+export function createSessionFromProjectFile(file: ProjectFile): ProjectSession {
+  const store = new ModelStore({
+    project: file.project,
+    master: file.master,
+    trackOrder: file.trackOrder,
+    tracks: indexById(file.tracks, ['tracks']),
+    clips: indexById(file.clips, ['clips']),
+    midiSources: indexById(file.midiSources, ['midiSources']),
+    tempoEvents: indexById(file.tempoEvents, ['tempoEvents']),
+    timeSignatureEvents: indexById(file.timeSignatureEvents, ['timeSignatureEvents']),
+    devices: indexById(file.devices, ['devices']),
+    midiNotes: indexPartitions(file.midiNotes, ['midiNotes']),
+    midiSustainPedalEvents: indexPartitions(file.midiSustainPedalEvents, [
+      'midiSustainPedalEvents',
+    ]),
+  })
 
   try {
     assertModelInvariants(store)
   } catch (error) {
     if (!(error instanceof ModelInvariantError)) throw error
-
-    throw new ProjectFileLoadError(
-      'model-invariants-violated',
-      'Project file cannot form a valid runtime model',
-      { cause: error },
-    )
+    rejectData('invalid-model', 'The file does not form a valid project', [], error)
   }
 
   return createProjectSession(store)
+}
+
+/** Creates a fresh Session, at revision 0 with empty History, from untrusted file data. */
+export function createProjectSessionFromProjectFile(input: unknown): ProjectSession {
+  return createSessionFromProjectFile(decodeProjectFile(input))
 }

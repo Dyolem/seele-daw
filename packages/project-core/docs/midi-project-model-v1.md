@@ -31,7 +31,7 @@ V1 数据模型需要支持以下闭环：
 - MIDI Loop 的存储语义；
 - Tempo 和 Time Signature；
 - 最小 Device descriptor 和 Channel Strip；
-- 运行时实体表、可重建索引与 ProjectFileDTO 边界。
+- 运行时实体表、可重建索引与项目文件边界。
 
 当前不纳入模型：
 
@@ -44,25 +44,15 @@ V1 数据模型需要支持以下闭环：
 - 通用 Clip Move / Resize、跨 Source Note Move、Split 的边界算法；
 - Loop 边界事件排序。
 
-这些能力不提前创建空表或占位抽象，在对应产品语义确定后通过新字段、联合类型分支和 schema migration 加入。
+这些能力不提前创建空表或占位抽象，在对应产品语义确定后通过新字段、联合类型分支和新的文件格式版本加入。
 
 ## 已确定的设计原则
 
-### 内存与文件使用不同物理结构
+### 内存与文件存同样的记录
 
-规范化描述的是关系与事实源，不要求运行时和 JSON 使用同一种容器：
-
-```text
-运行时 ModelStore
-  私有 Map + 有序 ID 集合
-  适合高频查找、插入和删除
-
-ProjectFileDTO
-  Record<string, DTO> + JSON 数组
-  适合校验、迁移、序列化和第三方边界
-```
-
-完整 Snapshot 本来就必须遍历全部实体，因此 Map 到 DTO 的 O(n) 转换不是额外的复杂度等级。第三方库通过专用 Adapter DTO 或 Read Model 接入，不能直接取得 ModelStore。
+运行时 ModelStore 用私有 Map 与有序 ID 集合，适合高频查找、插入和删除；项目文件把同样的
+记录写成 JSON 数组，分区表按 Source ID 分组。两者只有容器不同，记录本身一致。第三方库通过
+Read Model 或专门的导出格式接入，不能直接取得 ModelStore。
 
 ### 关系只保留一个权威方向
 
@@ -552,7 +542,7 @@ interface InternalModelStore {
 }
 ```
 
-ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只读 ID 集合表达已经规范化的输入，但不等同于外部 `ProjectFileDTO`，也不表示跨实体不变量已经通过验证。
+ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只读 ID 集合表达已经规范化的输入，但不等同于外部项目文件，也不表示跨实体不变量已经通过验证。
 
 构造器复制 `trackOrder`、每张顶层 Map，以及两个 Source 内容分区中的每张 Event Map，取得
 所有可变容器的独占所有权；已经由领域工厂创建的只读实体 Record 保持原引用。调用方在构造
@@ -571,8 +561,8 @@ ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只�
 - Map 中的实体是只读记录，字段改变时创建新记录并替换表项；
 - 一次原子事务只让 `modelRevision` 增加一次；
 - revision 是成功事务的最后一次写入；失败回滚不改变 revision，Undo 则是产生新 revision 的新事务；
-- `modelRevision` 是运行时并发与订阅版本，不进入 ProjectFileDTO；
-- `ProjectContentStateId` 是 Session History 位置的 opaque 会话身份，用于 Undo / Redo 保存点判断，同样不进入 ModelStore、Snapshot 或 ProjectFileDTO；
+- `modelRevision` 是运行时并发与订阅版本，不进入项目文件；
+- `ProjectContentStateId` 是 Session History 位置的 opaque 会话身份，用于 Undo / Redo 保存点判断，同样不进入 ModelStore、Snapshot 或项目文件；
 - 包外不能取得内部 Map、可变数组或可写实体引用。
 
 Map insertion order 不表达实体表的领域顺序。防御性回滚或 Undo 中的 remove → insert 可以让键移动到 Map 尾部，但必须恢复相同实体引用、所有权关系和显式 ID 顺序。持久化 DTO 若需要确定性顺序，应在投影边界稳定排序。
@@ -619,72 +609,25 @@ interface QueryIndexes {
 - 索引不持久化、不进入 Undo、不成为第二份关系事实；
 - 重建后的查询结果必须与直接扫描权威实体表一致。
 
-## ProjectFileDTO
+## 项目文件
 
-项目文件使用 JSON 友好的普通对象。外部 DTO 是不可信、版本化的数据，不直接充当 ModelStore。
+项目文件是 ModelStore 表的 JSON 形式（`formatVersion: 3`）：记录表是记录数组，Note 与 Sustain
+Pedal Event 按 Source ID 分组，另有 `project`、`master` 与 `trackOrder`。本地 `modelRevision`、
+History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelStore)`，而是从 Snapshot 写出。
 
-```ts
-interface ProjectFileDTO {
-  readonly formatVersion: number
-  readonly requiredFeatures: readonly string[]
-
-  readonly projectId: string
-  readonly name: string
-
-  readonly trackOrder: readonly string[]
-  readonly tracks: Record<string, TrackDTO>
-  readonly clips: Record<string, MidiClipDTO>
-
-  readonly midiSources: Record<string, MidiSourceDTO>
-  readonly tempoEvents: Record<string, TempoEventDTO>
-  readonly timeSignatureEvents: Record<string, TimeSignatureEventDTO>
-
-  readonly devices: Record<string, DeviceDTO>
-  readonly master: MasterChannelDTO
-}
-
-interface MidiSourceDTO {
-  readonly id: string
-  readonly lengthTick: number
-  readonly notes: Record<string, MidiNoteDTO>
-  readonly sustainPedalEvents: Record<string, MidiSustainPedalEventDTO>
-}
-```
-
-Note 与 Sustain Pedal Event 在 DTO 中嵌套于 MidiSource，加载后再规范化为各自的 Source
-分区。这只是文件结构，不改变运行时所有权。
-
-所有外部数据必须经过：
+外部文件是不可信数据，加载时依次：
 
 ```text
-parse
--> schema validate
--> ordered migrations
--> semantic validate
--> normalize
--> create ModelStore
--> rebuild QueryIndex
+复制为被动 JSON 数据
+-> 检查版本与结构
+-> 记录工厂校验每条记录
+-> 建立 ModelStore 并校验跨实体不变量
+-> 重建 QueryIndex，得到 revision 0 的新 Session
 ```
 
-保存时执行相反方向的显式投影，不调用 `JSON.stringify(ModelStore)`。
-
-当前 writer 输出 `formatVersion: 2`：`ProjectSnapshot -> ProjectFileDTO` 投影会把 Note 与 Sustain
-Pedal Event 嵌入所属 MidiSource，复制并冻结全部 DTO 容器、深复制 Device JsonValue，并省略
-本地 `modelRevision`。Reader 对 V1 与 V2 分别执行严格字段解码；合法 V1 通过纯迁移为 V2，并
-为每个 Source 添加空 `sustainPedalEvents` 表，不伪造 Pedal Up 或修改 Note Duration。随后领域
-normalizer 调用当前 parser 与 Record factory，并在完整 Store 上验证跨实体不变量。加载成功
-创建 revision `0`、空 History、重建 QueryIndex 的 fresh Session。静态 V1 golden 保护历史
-读取与迁移，静态 V2 golden 校准当前 reader 与 writer。
-
-当前也已实现独立版本的 storage-neutral `ProjectCheckpoint` envelope、`ProjectCheckpointStore`
-端口、单 Snapshot 保存 receipt 和按优先级候选恢复。Checkpoint 保存来源 `modelRevision` 但
-恢复时不写回该 revision；active 候选损坏时由核心校验边界尝试 previous。IndexedDB adapter、
-JSON codec 与 Journal 仍是后续独立边界。规范性协议见历史
-[Seele Project File Format V1](./project-file-format-v1.md) 与当前
-[Seele Project File Format V2](./project-file-format-v2.md)；V1 实施决策仍见
-[ProjectFileDTO V1 写出边界计划](../../../docs/archive/project-core/project-file-dto-v1-write-plan.md)、
-[ProjectFileDTO V1 读取校验计划](../../../docs/archive/project-core/project-file-dto-v1-read-validation-plan.md)、
-[Project File V1 Session 加载计划](../../../docs/archive/project-core/project-file-v1-session-load-plan.md) 与
+只读当前版本，不做迁移。字段、错误码与 Checkpoint 信封见
+[项目文件格式](./project-file-format.md)；早先的 V1 / V2 协议与实施计划已归档，见
+[Project File Format V1](../../../docs/archive/project-core/project-file-format-v1.md) 与
 [Project Checkpoint 基础协议与存储端口计划](../../../docs/archive/project-core/project-checkpoint-foundation-plan.md)。
 
 ## 跨实体不变量
@@ -707,7 +650,7 @@ JSON codec 与 Journal 仍是后续独立边界。规范性协议见历史
 12. 不存在孤立 Source、Device 或悬空外键。
 13. QueryIndex 可以从当前 ModelStore 丢弃并得到等价重建结果。
 
-单实体的 Tick、MIDI 数值、gain、pan、BPM 和拍号值域由 parser 与 Record 工厂保证；`InvariantValidator` 不为每次全局扫描重复执行全部本地解析。外部 DTO 必须先经过 schema 校验、迁移和领域工厂，形成 ModelStore 后再检查跨实体规则。
+单实体的 Tick、MIDI 数值、gain、pan、BPM 和拍号值域由 parser 与 Record 工厂保证；`InvariantValidator` 不为每次全局扫描重复执行全部本地解析。外部文件必须先经过结构检查和记录工厂，形成 ModelStore 后再检查跨实体规则。
 
 结构 Validator 接受 `ModelStoreReader`，聚合所有违规并返回稳定排序的 `ModelInvariantViolation`。`assertModelInvariants` 在需要强制合法状态的边界抛出携带完整违规列表的 `ModelInvariantError`。它不修改或自动修复 Store，也不把 Map 插入顺序当作项目语义。
 

@@ -35,6 +35,9 @@ schedule(voicePlan)
 同一资源的并发请求共享一次 fetch 与解码；某个等待者取消不影响其他等待者，最后一个离开才取消底层
 请求；失败的请求不留在缓存里。Studio 默认的解码预算是 192 MiB。
 
+播放中的每次编辑都会重新准备整个计划。乐器都已缓存时，剩下的是逐个音符找 Zone：每个 Manifest
+第一次被用到时建一张按音高的表。基准：`pnpm --filter @seele-daw/audio-web bench`。
+
 ## 发声规则
 
 常数集中在 `audio-quality/render-policy.ts`：

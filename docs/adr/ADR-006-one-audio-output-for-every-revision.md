@@ -48,8 +48,8 @@
 - handoff 前后的 Voice 共用 128 个发声槽和 16 个退场尾音，偷 Voice 可能偷走旧 revision 仍在响的尾音。
   这才是复音预算本来的含义。
 - 主音量只在 Voice Plan 带来不同的值时设置一次，不再每个音符设置一次。
-- 播放中每次编辑仍会重新 prepare 整个 Plan。乐器已经缓存，剩下的成本是逐个音符找 Zone，大项目下
-  还没有测过。
+- 播放中每次编辑仍会重新 prepare 整个 Plan。乐器已缓存时，16 轨 × 5,000 音符约 6.5 ms
+  （`pnpm --filter @seele-daw/audio-web bench`）：Zone 按音高查表，只排序要报告的音符。
 - 引擎的行为测试随后移进 playback 的 `playback-engine.spec`，用 project-core 的真实 Session 驱动
   引擎；Studio 的 coordinator spec 只测它自己加上的东西：跟随 Active Project、Project 身份与提示文案。
 

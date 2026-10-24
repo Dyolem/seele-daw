@@ -35,7 +35,7 @@ function compareStrings(left: string, right: string): number {
   return 0
 }
 
-/** The plan's note spans grouped by the Soundbank their Track plays, in a stable order. */
+/** The plan's note spans grouped by the Soundbank their Track plays, Soundbanks in ID order. */
 function groupSpansBySoundbank(
   plan: AudibleMidiProjectPlan,
 ): readonly (readonly [SoundbankId, readonly MidiNoteSpanPlan[]])[] {
@@ -50,12 +50,7 @@ function groupSpansBySoundbank(
     spans.push(span)
     grouped.set(soundbankId, spans)
   }
-  return [...grouped]
-    .sort(([left], [right]) => compareStrings(left, right))
-    .map(([soundbankId, spans]) => [
-      soundbankId,
-      spans.sort((left, right) => compareStrings(left.occurrenceKey, right.occurrenceKey)),
-    ])
+  return [...grouped].sort(([left], [right]) => compareStrings(left, right))
 }
 
 async function prepareInstrument(
@@ -90,7 +85,12 @@ async function prepareInstrument(
   return Object.freeze({
     instrument: Object.freeze({ manifest, resources }),
     soundbankId,
-    unsupportedNoteOccurrences: Object.freeze(unsupportedNoteOccurrences),
+    // Only the reported notes are sorted; sorting every span on every edit costs milliseconds.
+    unsupportedNoteOccurrences: Object.freeze(
+      unsupportedNoteOccurrences.sort((left, right) =>
+        compareStrings(left.occurrenceKey, right.occurrenceKey),
+      ),
+    ),
   })
 }
 

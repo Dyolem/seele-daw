@@ -270,7 +270,9 @@ createWebAudioPlaybackRuntime({
 
 第 6 节待决事项：
 
-- 播放中每次编辑仍会重新 prepare 整个 Plan，但不再新建 Voice Runtime；逐个音符找 Zone 的成本仍未测量。
+- 播放中每次编辑仍会重新 prepare 整个 Plan，但不再新建 Voice Runtime。16 轨 × 5,000 音符、乐器已缓存时
+  原来约 17 ms；Zone 改为每个 Manifest 一张按音高的表、只排序要报告的音符之后约 6.5 ms，见
+  `packages/audio-web/src/__tests__/prepare-plan-resources.bench.ts`。
 - 删除 `advanceGeneration`：已与 3.2 一起完成。
 - 3.6 与开发报告页的去留：仍待决。
 

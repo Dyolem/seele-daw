@@ -76,6 +76,7 @@ function createRuntime() {
   )
   const output: ActiveWebAudioOutput = Object.freeze({
     audioContext: context.asAudioContext(),
+    isRunning: () => context.state === 'running',
     masterInput: master as unknown as AudioNode,
     setMasterGainAtTime,
   })

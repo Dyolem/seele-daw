@@ -38,11 +38,6 @@ export interface AudioQualityOfflineRenderOptions {
   readonly renderDurationSecond: number
 }
 
-interface OfflineRuntimeContextAdapter {
-  readonly audioContext: AudioContext
-  finishScheduling(): void
-}
-
 function requireOfflineAudioContextConstructor(): typeof OfflineAudioContext {
   const Constructor = globalThis.OfflineAudioContext
   if (Constructor === undefined) {
@@ -51,31 +46,7 @@ function requireOfflineAudioContextConstructor(): typeof OfflineAudioContext {
   return Constructor
 }
 
-function createOfflineRuntimeContextAdapter(
-  context: OfflineAudioContext,
-): OfflineRuntimeContextAdapter {
-  // OfflineAudioContext is suspended before startRendering(); only its scheduling view is adapted.
-  // Native node creation, automation, rendering, and the resulting PCM stay on the real context.
-  let scheduling = true
-  const audioContext = new Proxy(context, {
-    get(target, property) {
-      if (property === 'state' && scheduling) return 'running'
-      const value: unknown = Reflect.get(target, property, target)
-      return typeof value === 'function' ? value.bind(target) : value
-    },
-  }) as unknown as AudioContext
-  return Object.freeze({
-    audioContext,
-    finishScheduling: () => {
-      scheduling = false
-    },
-  })
-}
-
-function createOutput(
-  context: OfflineAudioContext,
-  runtimeAudioContext: AudioContext,
-): ActiveWebAudioOutput {
+function createOutput(context: OfflineAudioContext): ActiveWebAudioOutput {
   const projectMaster = context.createGain()
   const outputCalibration = context.createGain()
   projectMaster.gain.setValueAtTime(1, 0)
@@ -83,7 +54,9 @@ function createOutput(
   projectMaster.connect(outputCalibration)
   outputCalibration.connect(context.destination)
   return Object.freeze({
-    audioContext: runtimeAudioContext,
+    audioContext: context,
+    // An OfflineAudioContext stays suspended until startRendering(), yet renders what was scheduled.
+    isRunning: () => true,
     masterInput: projectMaster,
     setMasterGainAtTime: (gain: number, audioContextSecond: number) => {
       projectMaster.gain.setValueAtTime(gain, audioContextSecond)
@@ -113,14 +86,13 @@ export async function renderAudioQualityPlans(
     audioQualitySecondToFrame(options.renderDurationSecond),
     AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ,
   )
-  const contextAdapter = createOfflineRuntimeContextAdapter(context)
   let runtime: SampleInstrumentVoiceRuntime | null = null
   try {
     // Real developer-local Soundbanks require asynchronous Fetch/decode before scheduling.
     // The same production Runtime and output calibration remain authoritative after preparation.
     const prepared = await options.createPreparedResources(context)
     const voiceRuntime = new SampleInstrumentVoiceRuntime({
-      output: createOutput(context, contextAdapter.audioContext),
+      output: createOutput(context),
     })
     runtime = voiceRuntime
     const voices = Object.freeze(
@@ -139,9 +111,7 @@ export async function renderAudioQualityPlans(
     options.onScheduled?.(voices)
     const polyphonyStatisticsAfterSchedule = runtime.polyphonyStatistics
 
-    const renderRequest = context.startRendering()
-    contextAdapter.finishScheduling()
-    const rendered = await renderRequest
+    const rendered = await context.startRendering()
     await Promise.resolve()
     const polyphonyStatisticsAfterRender = runtime.polyphonyStatistics
     const runtimeStatisticsAfterRender = runtime.statistics
@@ -156,7 +126,6 @@ export async function renderAudioQualityPlans(
       voices,
     })
   } catch (error) {
-    contextAdapter.finishScheduling()
     runtime?.dispose()
     throw error
   }

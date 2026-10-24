@@ -200,6 +200,7 @@ function createRuntime(
     )
   const output: ActiveWebAudioOutput = Object.freeze({
     audioContext: context.asAudioContext(),
+    isRunning: () => context.state === 'running',
     masterInput: master as unknown as AudioNode,
     setMasterGainAtTime,
   })
@@ -576,8 +577,13 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources).toHaveLength(4)
     expect(context.bufferSources[0]).toMatchObject({ loop: true })
     expect(context.bufferSources[0]?.stops.at(-1)).toBe(4)
-    expect(context.bufferSources[1]).toMatchObject({ loop: false })
-    expect(context.bufferSources[1]?.stops.at(-1)).toBe(4)
+    // The tail planned for the old Note's release at 10 is dropped before it can start.
+    expect(context.bufferSources[1]).toMatchObject({
+      disconnectCallCount: 1,
+      loop: false,
+      starts: [{ duration: null, offset: 1, when: 10 }],
+    })
+    expect(context.bufferSources[1]?.stops.at(-1)).toBe(0)
     expect(context.bufferSources[3]).toMatchObject({
       loop: false,
       starts: [{ duration: null, offset: 1, when: 4 }],

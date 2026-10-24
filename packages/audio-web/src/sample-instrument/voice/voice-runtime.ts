@@ -40,9 +40,13 @@ export interface SampleInstrumentVoicePolyphonyStatistics {
 }
 
 export interface SampleInstrumentVoiceRuntimeOptions {
-  readonly fastReleaseSecond?: number
   readonly output: ActiveWebAudioOutput
 }
+
+const FAST_RELEASE = Object.freeze<SampleInstrumentEnvelopeSegmentV1>({
+  curve: null,
+  durationSecond: AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond,
+})
 
 interface ActiveSampleVoice {
   readonly audioBuffer: AudioBuffer
@@ -83,14 +87,6 @@ function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown failure'
 }
 
-function requireRunningContext(output: ActiveWebAudioOutput): AudioContext {
-  const context = output.audioContext
-  if (String(context.state) !== 'running') {
-    throw new Error('Sample voices need a running AudioContext')
-  }
-  return context
-}
-
 function calculatePlaybackRate(zone: SampleInstrumentZoneV1, pitch: number): number {
   return 2 ** ((pitch - zone.rootMidiPitch + zone.tuneCent / 100) / 12)
 }
@@ -124,8 +120,9 @@ function calculatePlannedGainAtTime(voice: ActiveSampleVoice, time: number): num
         )
 
   if (voice.zone.triggerMode === 'gated' && time >= voice.releasePlaybackClockSecond) {
-    const release = voice.zone.amplitudeEnvelope.release
-    if (release === null || release.durationSecond === 0) return 0
+    // A gated zone always has a release; the Manifest validator rejects one without.
+    const release = voice.zone.amplitudeEnvelope.release!
+    if (release.durationSecond === 0) return 0
     const attackAtRelease = calculatePlannedGainAtTimeBeforeRelease(
       voice,
       voice.releasePlaybackClockSecond,
@@ -194,7 +191,6 @@ function calculatePolyphonyPriorityGain(voice: ActiveSampleVoice, time: number):
  * instrument's Manifest, schedules its own native graph, and disconnects it once it has ended.
  */
 export class SampleInstrumentVoiceRuntime {
-  readonly #fastRelease: SampleInstrumentEnvelopeSegmentV1
   readonly #output: ActiveWebAudioOutput
   readonly #voices = new Set<ActiveSampleVoice>()
   #masterGain: number | null = null
@@ -204,13 +200,7 @@ export class SampleInstrumentVoiceRuntime {
   #voiceStealCount = 0
 
   constructor(options: SampleInstrumentVoiceRuntimeOptions) {
-    const fastReleaseSecond =
-      options.fastReleaseSecond ?? AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
-    if (!Number.isFinite(fastReleaseSecond) || fastReleaseSecond <= 0 || fastReleaseSecond > 0.1) {
-      throw new RangeError('fastReleaseSecond must be greater than 0 through 0.1 seconds')
-    }
     this.#output = options.output
-    this.#fastRelease = Object.freeze({ curve: null, durationSecond: fastReleaseSecond })
   }
 
   get statistics(): SampleInstrumentVoiceRuntimeStatistics {
@@ -243,7 +233,7 @@ export class SampleInstrumentVoiceRuntime {
    */
   schedule(plan: ScheduledSampleVoicePlan, instrument: SampleInstrument): PlaybackVoice | null {
     if (this.#disposed) throw new Error('Sample voices are disposed')
-    const context = requireRunningContext(this.#output)
+    const context = this.#runningContext()
     if (plan.releasePlaybackClockSecond <= context.currentTime) return null
 
     const zone = findSampleInstrumentZoneForPitch(instrument.manifest, plan.pitch)
@@ -343,7 +333,7 @@ export class SampleInstrumentVoiceRuntime {
     if (!this.#voices.has(voice) || voice.zone.triggerMode === 'one-shot') return
     if (releasePlaybackClockSecond === voice.releasePlaybackClockSecond) return
 
-    const context = requireRunningContext(this.#output)
+    const context = this.#runningContext()
     if (voice.forcedRelease !== null || context.currentTime >= voice.releasePlaybackClockSecond) {
       return
     }
@@ -376,7 +366,12 @@ export class SampleInstrumentVoiceRuntime {
         nextReleasePlaybackClockSecond,
         release,
       )
-      this.#rescheduleSourceRelease(voice, nextReleasePlaybackClockSecond, release.durationSecond)
+      this.#endSourcesAt(
+        voice,
+        nextReleasePlaybackClockSecond,
+        release.durationSecond,
+        voice.zone.loop.kind === 'sustain',
+      )
       voice.releasePlaybackClockSecond = nextReleasePlaybackClockSecond
     } catch (error) {
       this.#stopAndDisconnectVoice(voice)
@@ -407,39 +402,33 @@ export class SampleInstrumentVoiceRuntime {
     }
   }
 
-  #rescheduleSourceRelease(
+  /**
+   * Stops the voice's sources once a release of `durationSecond` from `time` has ended. With
+   * `leaveSustainLoop`, a sustain loop instead leaves its loop at `time`: an unlooped tail source
+   * continues from the same position, and a tail planned for a later release never starts.
+   */
+  #endSourcesAt(
     voice: ActiveSampleVoice,
-    releaseTime: number,
-    releaseDurationSecond: number,
+    time: number,
+    durationSecond: number,
+    leaveSustainLoop: boolean,
   ): void {
-    const stopTime =
-      releaseTime + releaseDurationSecond + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
-    if (voice.zone.loop.kind !== 'sustain' || releaseDurationSecond === 0) {
+    const stopTime = time + durationSecond + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
+    if (!leaveSustainLoop || durationSecond === 0) {
       // Web Audio applies the latest stop() call while an earlier scheduled stop has not fired.
       for (const source of voice.sources) source.node.stop(stopTime)
       return
     }
-
-    const sourcesBeforeReplacement = Array.from(voice.sources)
-    for (const source of sourcesBeforeReplacement) {
-      if (source.kind === 'release') {
-        this.#discardSource(voice, source)
-      } else {
-        source.node.stop(releaseTime)
-      }
+    for (const source of voice.sources) {
+      if (source.kind === 'release') this.#discardSource(voice, source)
+      else source.node.stop(time)
     }
-    const releaseSource = this.#createSource(
-      voice,
-      voice.audioBuffer,
-      false,
-      releaseTime,
-      'release',
+    const tail = this.#createSource(voice, voice.audioBuffer, false, time, 'release')
+    tail.start(
+      time,
+      calculateSustainReleaseOffset(voice.zone, voice.playbackRate, voice.startTime, time),
     )
-    releaseSource.start(
-      releaseTime,
-      calculateSustainReleaseOffset(voice.zone, voice.playbackRate, voice.startTime, releaseTime),
-    )
-    releaseSource.stop(stopTime)
+    tail.stop(stopTime)
   }
 
   #discardSource(voice: ActiveSampleVoice, source: ActiveSampleSource): void {
@@ -476,33 +465,17 @@ export class SampleInstrumentVoiceRuntime {
       zone.amplitudeEnvelope.attack,
       attackLimit,
     )
-    const release = zone.amplitudeEnvelope.release
-    if (zone.triggerMode === 'gated' && release !== null) {
+    // One-shot zones ignore the Note length: they end with their sample or a forced release.
+    const release = zone.triggerMode === 'gated' ? zone.amplitudeEnvelope.release! : null
+    if (release !== null) {
       scheduleSampleInstrumentEnvelopeTransition(gain.gain, gainAtRelease, 0, releaseTime, release)
     }
 
     const source = this.#createSource(voice, resource.audioBuffer)
     source.start(startTime, zone.startOffsetSecond)
-
-    if (zone.triggerMode === 'one-shot' || release === null) return
-    const releaseEndTime = releaseTime + release.durationSecond
-    if (zone.loop.kind === 'sustain' && release.durationSecond > 0) {
-      source.stop(releaseTime)
-      const releaseSource = this.#createSource(
-        voice,
-        resource.audioBuffer,
-        false,
-        releaseTime,
-        'release',
-      )
-      releaseSource.start(
-        releaseTime,
-        calculateSustainReleaseOffset(zone, voice.playbackRate, startTime, releaseTime),
-      )
-      releaseSource.stop(releaseEndTime + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond)
-      return
+    if (release !== null) {
+      this.#endSourcesAt(voice, releaseTime, release.durationSecond, zone.loop.kind === 'sustain')
     }
-    source.stop(releaseEndTime + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond)
   }
 
   #createSource(
@@ -537,7 +510,7 @@ export class SampleInstrumentVoiceRuntime {
     return source
   }
 
-  #createVoiceOutput(context: AudioContext, pan: number, startTime: number): AudioNode {
+  #createVoiceOutput(context: BaseAudioContext, pan: number, startTime: number): AudioNode {
     if (typeof context.createStereoPanner === 'function') {
       const panner = context.createStereoPanner()
       panner.pan.setValueAtTime(pan, startTime)
@@ -549,7 +522,7 @@ export class SampleInstrumentVoiceRuntime {
   }
 
   #createVoiceGainAndOutput(
-    context: AudioContext,
+    context: BaseAudioContext,
     plan: ScheduledSampleVoicePlan,
     startTime: number,
   ): { readonly gain: GainNode; readonly output: AudioNode } {
@@ -628,28 +601,24 @@ export class SampleInstrumentVoiceRuntime {
     }
   }
 
-  /** Starts a forced release; returns false when an earlier one already covers it. */
-  #releaseVoice(voice: ActiveSampleVoice, requestedTime: number, mode: 'fast' | 'normal'): boolean {
-    const context = this.#output.audioContext
-    if (String(context.state) !== 'running') {
+  /** Starts a forced release, unless an earlier one already covers it. */
+  #releaseVoice(voice: ActiveSampleVoice, requestedTime: number, mode: 'fast' | 'normal'): void {
+    if (!this.#output.isRunning()) {
       this.#stopAndDisconnectVoice(voice)
-      return true
+      return
     }
-    const releaseTime = Math.max(requestedTime, context.currentTime)
-    const normalRelease = voice.zone.amplitudeEnvelope.release
-    let releaseMode: ActiveSampleVoiceForcedRelease['mode'] = 'fast'
-    let release = this.#fastRelease
-    if (mode === 'normal' && normalRelease !== null) {
-      releaseMode = 'normal'
-      release = normalRelease
-    }
+    const releaseTime = Math.max(requestedTime, this.#output.audioContext.currentTime)
+    const normalRelease = mode === 'normal' ? voice.zone.amplitudeEnvelope.release : null
+    const releaseMode: ActiveSampleVoiceForcedRelease['mode'] =
+      normalRelease === null ? 'fast' : 'normal'
+    const release = normalRelease ?? FAST_RELEASE
     const previousForcedRelease = voice.forcedRelease
     if (
       previousForcedRelease !== null &&
       releaseTime >= previousForcedRelease.startTime &&
       !(releaseMode === 'fast' && previousForcedRelease.mode === 'normal')
     ) {
-      return false
+      return
     }
 
     const startGain = calculateEffectiveGainAtTime(voice, releaseTime)
@@ -662,39 +631,16 @@ export class SampleInstrumentVoiceRuntime {
         releaseTime,
         release,
       )
-      const stopTime =
-        releaseTime +
-        release.durationSecond +
-        AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
-      if (
+      // Only the zone's own release of a voice still in its sustain loop moves to the tail.
+      this.#endSourcesAt(
+        voice,
+        releaseTime,
+        release.durationSecond,
         releaseMode === 'normal' &&
-        voice.zone.loop.kind === 'sustain' &&
-        release.durationSecond > 0 &&
-        releaseTime >= voice.startTime &&
-        releaseTime < voice.releasePlaybackClockSecond
-      ) {
-        const sourcesBeforeRelease = [...voice.sources]
-        for (const source of sourcesBeforeRelease) source.node.stop(releaseTime)
-        const releaseSource = this.#createSource(
-          voice,
-          voice.audioBuffer,
-          false,
-          releaseTime,
-          'release',
-        )
-        releaseSource.start(
-          releaseTime,
-          calculateSustainReleaseOffset(
-            voice.zone,
-            voice.playbackRate,
-            voice.startTime,
-            releaseTime,
-          ),
-        )
-        releaseSource.stop(stopTime)
-      } else {
-        for (const source of voice.sources) source.node.stop(stopTime)
-      }
+          voice.zone.loop.kind === 'sustain' &&
+          releaseTime >= voice.startTime &&
+          releaseTime < voice.releasePlaybackClockSecond,
+      )
     } catch (error) {
       this.#stopAndDisconnectVoice(voice)
       throw new Error(
@@ -708,7 +654,11 @@ export class SampleInstrumentVoiceRuntime {
       startGain,
       startTime: releaseTime,
     })
-    return true
+  }
+
+  #runningContext(): BaseAudioContext {
+    if (!this.#output.isRunning()) throw new Error('Sample voices need a running audio output')
+    return this.#output.audioContext
   }
 
   #disconnectVoice(voice: ActiveSampleVoice): void {

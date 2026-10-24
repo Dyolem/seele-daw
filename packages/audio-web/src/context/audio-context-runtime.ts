@@ -17,8 +17,10 @@ export interface WebAudioContextRuntimeStatistics {
 }
 
 export interface ActiveWebAudioOutput {
-  readonly audioContext: AudioContext
+  readonly audioContext: BaseAudioContext
   readonly masterInput: AudioNode
+  /** Whether scheduled nodes and automation will play; voices are only started when they will. */
+  isRunning(): boolean
   setMasterGainAtTime(gain: number, audioContextSecond: number): void
 }
 
@@ -145,8 +147,10 @@ export class WebAudioContextRuntime {
         outputCalibrationGain.connect(context.destination)
         this.#masterGain = masterGain
         this.#outputCalibrationGain = outputCalibrationGain
+        const runningContext = context
         this.#output = Object.freeze({
           audioContext: context,
+          isRunning: () => readContextState(runningContext) === 'running',
           masterInput: masterGain,
           setMasterGainAtTime: (gain: number, audioContextSecond: number) =>
             this.#setMasterGainAtTime(gain, audioContextSecond),

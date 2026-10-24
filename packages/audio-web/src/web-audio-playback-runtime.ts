@@ -28,7 +28,7 @@ export interface WebAudioPlaybackRuntimeOptions {
 }
 
 interface ActiveOutput {
-  readonly audioContext: AudioContext
+  readonly audioContext: BaseAudioContext
   readonly cache: SampleInstrumentResourceCache
   readonly voices: SampleInstrumentVoiceRuntime
 }

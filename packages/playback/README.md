@@ -227,7 +227,7 @@ Runtime。
 下图描述长期方向；当前 V1 不输出 GraphPlan 或 RuntimeDelta。
 
 ```text
-ProjectSnapshot + ProjectDelta
+ProjectSnapshot + ProjectCommit.changes
 -> Playback Model
 -> GraphPlan + TimelineIndex + AutomationPlan
 -> RuntimeDelta(engineGeneration)
@@ -242,7 +242,7 @@ Audio Runtime 不读取完整 ProjectModel；所有项目语义都必须先在�
 
 | 领域              | 规划职责                                                  |
 | ----------------- | --------------------------------------------------------- |
-| PlaybackCompiler  | 全量编译与按 ProjectDelta 增量失效                        |
+| PlaybackCompiler  | 全量编译与按提交的存储变化增量失效                        |
 | TempoMap          | Tick、ProjectSecond 与播放时间的确定性转换                |
 | Transport         | stopped/playing/paused/recording、anchor、loop、seek 语义 |
 | TimelineIndex     | Clip 窗口、循环展开、Note/Automation 范围查询             |

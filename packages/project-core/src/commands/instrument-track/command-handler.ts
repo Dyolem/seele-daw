@@ -3,7 +3,6 @@ import type { AddInstrumentTrackCommand } from '#internal/commands/protocol/proj
 import type { ReadyProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 
 function commandDetails(command: AddInstrumentTrackCommand) {
   return {
@@ -72,15 +71,18 @@ export function prepareAddInstrumentTrackCommand(
     command,
     plan: createMutationPlan(command.baseRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.INSERT,
+        op: 'insert',
+        table: 'devices',
         after: command.instrumentDevice,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+        op: 'insert',
+        table: 'tracks',
         after: command.track,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+        op: 'insert',
+        table: 'trackOrder',
         index: command.insertAt,
         trackId: command.track.id,
       },

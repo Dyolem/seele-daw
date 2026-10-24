@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { createStandardMidiFileSourceEnvelope } from '@seele-daw/midi-file'
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_HISTORY_DIRECTION,
   createInitialProjectSession,
@@ -238,9 +237,14 @@ describe('createProjectMidiTrackImportDraft', () => {
     expect(after.tempoEvents).toEqual(before.tempoEvents)
     expect(after.timeSignatureEvents).toEqual(before.timeSignatureEvents)
     expect(after.trackOrder).toEqual(draft.importedTrackIds)
-    expect(result.commit.delta.changes.map((change) => change.type)).toEqual([
-      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED,
-      PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED,
+    expect(result.commit.changes.map(({ table, op }) => `${table}.${op}`)).toEqual([
+      'devices.insert',
+      'tracks.insert',
+      'trackOrder.insert',
+      'midiSources.insert',
+      'midiNotes.insert-partition',
+      'midiSustainPedalEvents.insert-partition',
+      'clips.insert',
     ])
 
     const undo = session.undo()

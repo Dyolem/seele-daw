@@ -12,7 +12,6 @@ import type {
 } from '#internal/commands/preparation/project-command-preparation'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createTempoEventRecord, type TempoEventRecord } from '#internal/time/tempo-event'
 import { ZERO_TICK, type Tick } from '#internal/time/tick'
 
@@ -80,7 +79,8 @@ export function prepareAddTempoEventCommand(
     command,
     plan: createMutationPlan(command.baseRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT,
+        op: 'insert',
+        table: 'tempoEvents',
         after: tempoEvent,
       },
     ]),
@@ -138,7 +138,8 @@ export function prepareMoveTempoEventCommand(
     command,
     plan: createMutationPlan(command.baseRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
+        op: 'replace',
+        table: 'tempoEvents',
         before,
         after,
       },
@@ -182,7 +183,8 @@ export function prepareRemoveTempoEventCommand(
     command,
     plan: createMutationPlan(command.baseRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE,
+        op: 'remove',
+        table: 'tempoEvents',
         before,
       },
     ]),
@@ -221,7 +223,8 @@ export function prepareReplaceTempoEventBpmCommand(
     command,
     plan: createMutationPlan(command.baseRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
+        op: 'replace',
+        table: 'tempoEvents',
         before,
         after,
       },

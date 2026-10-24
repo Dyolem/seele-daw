@@ -1,5 +1,4 @@
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_TYPE,
   createAddInstrumentTrackCommand,
   createProjectFileDTO,
@@ -71,8 +70,10 @@ describe('track edits', () => {
       kind: 'command',
       commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD,
     })
-    expect(result.commit.delta.changes.map(({ type }) => type)).toEqual([
-      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED,
+    expect(result.commit.changes.map(({ table, op }) => `${table}.${op}`)).toEqual([
+      'devices.insert',
+      'tracks.insert',
+      'trackOrder.insert',
     ])
     expect(snapshot.trackOrder).toEqual(['track-defaults'])
     expect(snapshot.tracks[0]).toMatchObject({
@@ -138,12 +139,8 @@ describe('track edits', () => {
       parseSoundbankId('solo-violin'),
     )
 
-    expect(commit?.delta.changes).toEqual([
-      expect.objectContaining({
-        type: PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED,
-        trackId,
-        deviceId,
-      }),
+    expect(commit?.changes).toMatchObject([
+      { op: 'replace', table: 'devices', after: { id: deviceId } },
     ])
     expect(deviceState(session)).toEqual({ soundbankId: 'solo-violin' })
     const reloaded = createProjectSessionFromProjectFile(

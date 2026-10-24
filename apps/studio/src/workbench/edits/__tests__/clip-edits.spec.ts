@@ -1,5 +1,4 @@
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_TYPE,
   ProjectCommandError,
   parseTick,
@@ -38,7 +37,9 @@ describe('clip edits', () => {
       trackId: track.trackId,
       commit: { origin: { kind: 'command', commandType: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD } },
     })
-    expect(result.commit.delta.changes[0]?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED)
+    expect(result.commit.changes).toContainEqual(
+      expect.objectContaining({ op: 'insert', table: 'clips' }),
+    )
     expect(snapshot.clips[0]).toEqual({
       id: 'clip-defaults',
       kind: 'midi',

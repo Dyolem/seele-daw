@@ -48,7 +48,7 @@ describe('QueryIndex lifecycle', () => {
     })
     const preparation = requireReady(command, store)
     const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
-    const transition = index.prepare(store, commit.delta)
+    const transition = index.prepare(store, commit)
 
     expect(index.modelRevision).toBe(0)
     transition.stage()
@@ -102,12 +102,12 @@ describe('QueryIndex lifecycle', () => {
 
   it('rebuilds the current Store once before retrying a drifted incremental partition', () => {
     const fixture = createCompleteProjectFixture()
-    const driftedPartitions = new Map(fixture.seed.midiNotesBySource)
+    const driftedPartitions = new Map(fixture.seed.midiNotes)
     driftedPartitions.delete(fixture.records.nonLoopSource.id)
 
     const driftedStore = new ModelStore({
       ...fixture.seed,
-      midiNotesBySource: driftedPartitions,
+      midiNotes: driftedPartitions,
     })
     const store = new ModelStore(fixture.seed)
     const index = new QueryIndex(driftedStore)
@@ -125,7 +125,7 @@ describe('QueryIndex lifecycle', () => {
     })
     const preparation = requireReady(command, store)
     const commit = createProjectCommitCandidate(preparation.command, preparation.plan)
-    const transition = index.prepare(store, commit.delta)
+    const transition = index.prepare(store, commit)
 
     transition.stage()
     applier.apply(preparation.plan)

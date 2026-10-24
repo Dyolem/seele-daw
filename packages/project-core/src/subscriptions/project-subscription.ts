@@ -1,9 +1,14 @@
-import type { AffectedTickRange } from '#internal/commit/project-change'
 import type { ProjectCommit } from '#internal/commit/project-commit'
 import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '#internal/model/ids'
 import { ProjectSubscriptionError } from '#internal/subscriptions/project-subscription-error'
-import { parseTick } from '#internal/time/tick'
+import { parseTick, type Tick } from '#internal/time/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
+
+/** A half-open timeline interval, e.g. the span a subscriber cares about. */
+export interface AffectedTickRange {
+  readonly startTick: Tick
+  readonly endTick: Tick
+}
 
 /** Canonical runtime discriminants for commit subscriptions. */
 export const PROJECT_SUBSCRIPTION_TYPE = {

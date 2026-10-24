@@ -13,8 +13,7 @@ import { createMidiClipRecord, type MidiClipRecord } from '#internal/model/midi-
 import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import type { ProjectMutation } from '#internal/mutation/project-mutation'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import { addTicks, parseTick, type Tick } from '#internal/time/tick'
 
 function requireExtensionClip(
@@ -244,22 +243,25 @@ export function prepareExtendMidiClipWithNoteCommand(
   assertMidiNoteWithinSource(context, effectiveSource, command.note)
   assertNoteWithinClipWindow(command, afterClip, command.note)
 
-  const mutations: ProjectMutation[] = []
+  const changes: ProjectChange[] = []
   if (afterSource !== null) {
-    mutations.push({
-      type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE,
+    changes.push({
+      op: 'replace',
+      table: 'midiSources',
       before: beforeSource,
       after: afterSource,
     })
   }
-  mutations.push(
+  changes.push(
     {
-      type: PROJECT_MUTATION_TYPE.CLIP.REPLACE,
+      op: 'replace',
+      table: 'clips',
       before: beforeClip,
       after: afterClip,
     },
     {
-      type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+      op: 'insert',
+      table: 'midiNotes',
       sourceId: beforeSource.id,
       after: command.note,
     },
@@ -268,6 +270,6 @@ export function prepareExtendMidiClipWithNoteCommand(
   return {
     status: 'ready',
     command,
-    plan: createMutationPlan(command.baseRevision, mutations),
+    plan: createMutationPlan(command.baseRevision, changes),
   }
 }

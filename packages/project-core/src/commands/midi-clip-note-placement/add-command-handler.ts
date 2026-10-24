@@ -11,7 +11,6 @@ import {
 } from '#internal/commands/midi-note/command-validation'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 
 export function prepareAddMidiClipWithNoteCommand(
   reader: ModelStoreReader,
@@ -29,21 +28,25 @@ export function prepareAddMidiClipWithNoteCommand(
     command,
     plan: createMutationPlan(command.baseRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
+        op: 'insert',
+        table: 'midiSources',
         after: command.source,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiNotes',
         sourceId: command.source.id,
-        after: [command.note],
+        records: [command.note],
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiSustainPedalEvents',
         sourceId: command.source.id,
-        after: [],
+        records: [],
       },
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
+        op: 'insert',
+        table: 'clips',
         after: command.clip,
       },
     ]),

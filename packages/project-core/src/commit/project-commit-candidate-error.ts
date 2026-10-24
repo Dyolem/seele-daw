@@ -1,31 +1,20 @@
 import type { ProjectCommandType } from '#internal/commands/protocol/project-command'
-import type { ProjectMutationType } from '#internal/mutation/mutation-type'
 
-export type ProjectCommitCandidateErrorCode = 'base-revision-mismatch' | 'unsupported-mutation-type'
+export type ProjectCommitCandidateErrorCode = 'base-revision-mismatch'
 
-export interface ProjectCommitCandidateErrorDetails {
-  readonly commandType?: ProjectCommandType
-  readonly mutationIndex?: number
-  readonly mutationType?: ProjectMutationType | string
-}
-
-/** Raised when a write-free candidate cannot truthfully describe its Command and plan. */
+/** Raised when a Command and the plan prepared for it disagree about their base revision. */
 export class ProjectCommitCandidateError extends Error {
   readonly code: ProjectCommitCandidateErrorCode
-  readonly commandType?: ProjectCommandType
-  readonly mutationIndex?: number
-  readonly mutationType?: ProjectMutationType | string
+  readonly commandType: ProjectCommandType
 
   constructor(
     code: ProjectCommitCandidateErrorCode,
     message: string,
-    details: ProjectCommitCandidateErrorDetails = {},
+    commandType: ProjectCommandType,
   ) {
     super(message)
     this.name = 'ProjectCommitCandidateError'
     this.code = code
-    this.commandType = details.commandType
-    this.mutationIndex = details.mutationIndex
-    this.mutationType = details.mutationType
+    this.commandType = commandType
   }
 }

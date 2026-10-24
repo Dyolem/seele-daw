@@ -17,8 +17,7 @@ import type {
 } from '#internal/model/ids'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import type { ProjectMutation } from '#internal/mutation/project-mutation'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import { addTicks } from '#internal/time/tick'
 
 function commandDetails(
@@ -264,53 +263,60 @@ function assertCollectionGraphCanBeAdded(
   }
 }
 
-function createCollectionMutations(
+function createCollectionChanges(
   command: AddInstrumentTrackCollectionCommand,
-): readonly ProjectMutation[] {
-  const mutations: ProjectMutation[] = []
+): readonly ProjectChange[] {
+  const changes: ProjectChange[] = []
 
   command.entries.forEach((entry, trackIndex) => {
-    mutations.push(
+    changes.push(
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.INSERT,
+        op: 'insert',
+        table: 'devices',
         after: entry.instrumentDevice,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+        op: 'insert',
+        table: 'tracks',
         after: entry.track,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+        op: 'insert',
+        table: 'trackOrder',
         index: command.insertAt + trackIndex,
         trackId: entry.track.id,
       },
     )
 
     for (const clipGraph of entry.clips) {
-      mutations.push(
+      changes.push(
         {
-          type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
+          op: 'insert',
+          table: 'midiSources',
           after: clipGraph.source,
         },
         {
-          type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+          op: 'insert-partition',
+          table: 'midiNotes',
           sourceId: clipGraph.source.id,
-          after: clipGraph.notes,
+          records: clipGraph.notes,
         },
         {
-          type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+          op: 'insert-partition',
+          table: 'midiSustainPedalEvents',
           sourceId: clipGraph.source.id,
-          after: clipGraph.sustainPedalEvents,
+          records: clipGraph.sustainPedalEvents,
         },
         {
-          type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
+          op: 'insert',
+          table: 'clips',
           after: clipGraph.clip,
         },
       )
     }
   })
 
-  return mutations
+  return changes
 }
 
 /**
@@ -326,6 +332,6 @@ export function prepareAddInstrumentTrackCollectionCommand(
   return {
     status: 'ready',
     command,
-    plan: createMutationPlan(command.baseRevision, createCollectionMutations(command)),
+    plan: createMutationPlan(command.baseRevision, createCollectionChanges(command)),
   }
 }

@@ -39,10 +39,10 @@ describe('ModelStore ownership boundary', () => {
     containers.midiSources.clear()
     containers.nonLoopNotePartition.clear()
     containers.loopingNotePartition.clear()
-    containers.midiNotesBySource.clear()
+    containers.midiNotes.clear()
     containers.nonLoopSustainPedalEventPartition.clear()
     containers.loopingSustainPedalEventPartition.clear()
-    containers.midiSustainPedalEventsBySource.clear()
+    containers.midiSustainPedalEvents.clear()
     containers.tempoEvents.clear()
     containers.timeSignatureEvents.clear()
     containers.devices.clear()
@@ -91,8 +91,8 @@ describe('ModelStore ownership boundary', () => {
       'tracks',
       'clips',
       'midiSources',
-      'midiNotesBySource',
-      'midiSustainPedalEventsBySource',
+      'midiNotes',
+      'midiSustainPedalEvents',
       'tempoEvents',
       'timeSignatureEvents',
       'devices',
@@ -100,8 +100,8 @@ describe('ModelStore ownership boundary', () => {
       '#tracks',
       '#clips',
       '#midiSources',
-      '#midiNotesBySource',
-      '#midiSustainPedalEventsBySource',
+      '#midiNotes',
+      '#midiSustainPedalEvents',
       '#tempoEvents',
       '#timeSignatureEvents',
       '#devices',
@@ -116,7 +116,7 @@ describe('ModelStore ownership boundary', () => {
   it('hands out frozen read-only table views rather than its containers', () => {
     const store = new ModelStore(createCompleteProjectFixture().seed)
 
-    for (const view of [store.recordTable('tracks'), store.partitionedTable('midiNotesBySource')]) {
+    for (const view of [store.recordTable('tracks'), store.partitionedTable('midiNotes')]) {
       expect(view).not.toBeInstanceOf(Map)
       expect(view).not.toHaveProperty('set')
       expect(view).not.toHaveProperty('delete')
@@ -225,7 +225,7 @@ describe('ModelStoreReader', () => {
   it('distinguishes an existing empty note partition from a missing partition', () => {
     const { seed } = createCompleteProjectFixture()
     const emptySourceId = parseMidiSourceId('empty-source')
-    seed.midiNotesBySource.set(emptySourceId, new Map())
+    seed.midiNotes.set(emptySourceId, new Map())
 
     const reader: ModelStoreReader = new ModelStore(seed)
 
@@ -242,7 +242,7 @@ describe('ModelStoreReader', () => {
   it('distinguishes an existing empty Sustain Pedal Event partition from a missing one', () => {
     const { seed } = createCompleteProjectFixture()
     const emptySourceId = parseMidiSourceId('empty-sustain-pedal-source')
-    seed.midiSustainPedalEventsBySource.set(emptySourceId, new Map())
+    seed.midiSustainPedalEvents.set(emptySourceId, new Map())
 
     const reader: ModelStoreReader = new ModelStore(seed)
 

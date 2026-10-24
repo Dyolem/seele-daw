@@ -257,7 +257,7 @@ export function createCompleteProjectFixture() {
     [loopingNote.id, loopingNote],
     [loopingHarmonyNote.id, loopingHarmonyNote],
   ])
-  const midiNotesBySource = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>([
+  const midiNotes = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>([
     [nonLoopSource.id, nonLoopNotePartition],
     [loopingSource.id, loopingNotePartition],
   ])
@@ -275,7 +275,7 @@ export function createCompleteProjectFixture() {
     [loopingPedalDown.id, loopingPedalDown],
     [loopingPedalUp.id, loopingPedalUp],
   ])
-  const midiSustainPedalEventsBySource = new Map<
+  const midiSustainPedalEvents = new Map<
     MidiSourceId,
     Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
   >([
@@ -304,8 +304,8 @@ export function createCompleteProjectFixture() {
     tracks,
     clips,
     midiSources,
-    midiNotesBySource,
-    midiSustainPedalEventsBySource,
+    midiNotes,
+    midiSustainPedalEvents,
     tempoEvents,
     timeSignatureEvents,
     devices,
@@ -348,10 +348,10 @@ export function createCompleteProjectFixture() {
       midiSources,
       nonLoopNotePartition,
       loopingNotePartition,
-      midiNotesBySource,
+      midiNotes,
       nonLoopSustainPedalEventPartition,
       loopingSustainPedalEventPartition,
-      midiSustainPedalEventsBySource,
+      midiSustainPedalEvents,
       tempoEvents,
       timeSignatureEvents,
       devices,

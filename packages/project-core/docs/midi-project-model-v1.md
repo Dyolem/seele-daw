@@ -473,7 +473,7 @@ interface TimeSignatureEventRecord {
 - `ReplaceTempoEventBpmCommand` 只替换已存在 Event 的 BPM，保留其 ID 与 Tick，并支持精确
   Undo / Redo；是否允许当前 UI 编辑由 Tempo Map 与 Transport 产品状态决定；
 - 上述每个 Tempo Event 意图各形成一个 Project Command / History 步骤，并分别发布
-  `tempo-event.added`、`tempo-event.updated` 或 `tempo-event.removed` 语义 Change；
+  `tempoEvents` 表上的 `insert`、`replace` 或 `remove` 变化；
 - TempoMap 的有序段、累计秒数和查找缓存是 QueryIndex，不进入项目文件。
 
 Timeline 当前不是包含事件数组的大型 Record。两类事件分别进入规范化实体表，时间顺序由 `tick` 派生；项目不保存重复的事件顺序数组或固定的 Timeline 结束 Tick。
@@ -615,7 +615,7 @@ interface QueryIndexes {
 - `clipsByTrack` 按 `[startTick, clipId]` 稳定排序；
 - Track 到 Clip 的正常查询使用索引，不在每次查询时扫描整张 Clip 表；
 - 时间范围 Clip 索引与 Note 的 tick/pitch 索引按产品规模逐步实现；
-- 索引由 MutationApplier 在提交期间同步更新，失败时从 ModelStore 全量重建；
+- 索引在写入前按提交的变化增量准备，失败时从 ModelStore 全量重建；
 - 索引不持久化、不进入 Undo、不成为第二份关系事实；
 - 重建后的查询结果必须与直接扫描权威实体表一致。
 

@@ -1,709 +1,119 @@
 # @seele-daw/project-core
 
-`project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
+项目内核：持有 Web DAW 唯一的创作事实，把每次编辑变成一次原子、可撤销、可订阅的提交。
+不依赖框架、DOM 或浏览器存储，测试在 Node 中运行。分层与依赖规则见
+[ARCHITECTURE](../../ARCHITECTURE.md)，设计取舍见 [ADR](../../docs/adr/README.md)。
 
-> 已实现：MIDI 领域记录与全局不变量、ModelStore 与原子 MutationApplier、18 种 Project Command
-> （Instrument Track / Device、Tempo、MIDI Clip / Note、Sustain Pedal CC64）、ProjectCommit /
-> ProjectDelta、History / Undo / Redo、QueryIndex、ChangePublisher、Snapshot、Project File V2
-> 往返与 V1 迁移，以及 Checkpoint 协议。尚未开始：JSON codec 与 Journal。
+## 对外接口
 
-## 包定位
+一切从 `@seele-daw/project-core` 根入口导入。
 
-本包是依赖图最内层的业务包，只对纯编译期的 `@seele-daw/type-utils` 建立 package 依赖。Track、Clip、Note、Tempo、Device 等可保存、可撤销的数据只能由这里的 Project Model 持有。Vue、Canvas、AudioNode、Selection、波形缓存和播放头都不是项目事实源。
+| 接口                                                                 | 作用                                                                         |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `createInitialProjectSession`、`createProjectSessionFromProjectFile` | 新建项目，或从项目文件加载                                                   |
+| `session.execute(command)`                                           | 执行命令，返回 `committed`（带 `ProjectCommit`）或 `no-change`               |
+| `session.undo()` / `session.redo()`                                  | 重放 History；栈空时返回 `null`                                              |
+| `session.query(query)`                                               | 按 revision 一致地读取 MIDI Note（按 ID 或按区间）                           |
+| `session.subscribe(subscription, observer)`                          | 在微任务中收到提交：全部提交，或按 Source / Note / Tick 区间过滤的 Note 变化 |
+| `session.getSnapshot()`                                              | 当前 revision 的冻结快照；同一 revision 内返回同一个对象                     |
+| `createProjectFileDTO`、`decodeProjectFileDTO`                       | 项目文件的写出与严格读取                                                     |
+| `saveProjectCheckpoint`、`restoreProjectCheckpoint`                  | 应用内保存与恢复；存储端口由调用方实现                                       |
 
-```text
-Editor / Workbench
--> ProjectCommand
--> Project Kernel
--> ProjectCommit
-   ├── Editor Read Model
-   ├── Playback Compiler
-   ├── Persistence
-   └── Diagnostics
-```
+命令共 18 种，由 `PROJECT_COMMAND_TYPE` 列出：替换 Instrument Device；新增 Instrument Track
+（单条或批量导入）；新增 MIDI Clip（空 Clip、带第一枚 Note，或向右扩展并加 Note）；MIDI Note
+的增、删、移动与调整长度；Sustain Pedal（CC64）事件的增、删、移动与改值；Tempo 事件的增、删、
+移动与改 BPM。命令携带完整参数和 `baseRevision`，不读取编辑器状态；违反业务规则时抛
+`ProjectCommandError`。
 
-Project Kernel 只有一个写入者。Editor、Playback、Persistence 和 Vue 都是项目提交的消费者，不能绕过内核修改项目。
-
-## 核心存储策略
-
-本项目选择：
-
-> 私有的受控可变实体表 + 不可变实体记录 + 提交级不可变外部语义。
-
-这不是允许任意对象原地修改。可变性被限制在 `ModelStore` 的表容器和唯一的 `MutationApplier` 内；实体记录使用只读对象，每次修改以新记录替换旧记录；包外代码只能观察 Snapshot、Query Result、ProjectCommit 和 ProjectDelta。
+## 一次提交
 
 ```text
-内部
-  ModelStore
-    Map / ordered ID collections   受控可变，不对外暴露
-    Entity records                 readonly，修改时整体替换
-  QueryIndex                       可变的派生缓存，可重建
-
-边界
-  MutationApplier                  唯一写入口
-
-外部
-  ProjectSnapshot                  稳定、带 revision 的不可变快照
-  Query Result / Read Model        只读投影
-  ProjectCommit / ProjectDelta     不可变提交结果
+execute(command)
+→ prepareProjectCommand   normalize；检查 baseRevision；handler 读取当前记录，产出 MutationPlan
+                          （forward 变化与工厂生成的 inverse），或 no-change
+→ commit candidate        下一个 revision、origin，changes 即 plan.forward
+→ History、QueryIndex、ChangePublisher 预备
+→ MutationApplier         在写时复制的投影上检查每条变化的前置条件，做一次全量不变量校验
+                          （ADR-001），再写入；revision 最后写
+→ 返回结果；订阅者在微任务中收到 Commit
 ```
 
-### 为什么不采用普通的纯不可变 Map 更新
+写入中途出现程序错误时，Applier 只回滚已完成的前缀，并重新校验；回滚也失败就锁存为 faulted，
+拒绝之后的写入。业务失败不会留下部分模型、History 项或通知。Undo / Redo 走同一条管线，Plan
+由 History 中保存的变化重建。
 
-纯不可变模型具有清晰的旧状态保留能力，但 JavaScript 中常见的写法会在单实体编辑时复制整张表：
+## 存储与变化
 
-```ts
-const nextNotes = new Map(previousNotes)
-nextNotes.set(noteId, changedNote)
-```
+表在 `model/model-tables.ts` 中声明一次：
 
-当一个项目包含十万级 Note、千级 Clip 和多个派生索引时，这种复制成本会进入常规编辑路径。引入 HAMT、Immer 或自研持久化结构可以改变复杂度，但会提前增加依赖、调试成本和数据结构约束，而且仍需另外生成 Query invalidation 与 Playback delta。
+- 按 ID 存储的记录表：`tracks`、`clips`、`midiSources`、`tempoEvents`、`timeSignatureEvents`、
+  `devices`；
+- 按 MIDI Source 分区的表：`midiNotes`、`midiSustainPedalEvents`；
+- 另有单条的 `project` 与 `master`，以及有序的 `trackOrder`。
 
-受控可变表更符合本项目的访问模式：
+`ModelStore` 把容器留在私有闭包里，只有 `MutationApplier` 能领取一次写能力。记录是只读值对象，
+修改即整体替换，所以未变化的记录在 Snapshot 与 Query 结果中保持引用相等。
 
-- 大多数 Project Command 只修改少量已知实体；
-- 批量编辑可以在一个 MutationPlan 中一次应用；
-- Undo / Redo 已计划保存 forward/inverse mutations，而不是整棵旧状态；
-- QueryIndex、Renderer 和 Playback 都需要精确的增量信息；
-- 拖拽预览不逐帧写入项目，真正提交频率是事务级；
-- Project Kernel 是单写者，不需要多个线程共享可写模型。
+每一次写入是一条存储变化 `ProjectChange`，形如 `{ op, table, ... }`：
 
-如果基准测试证明某张表需要持久化结构或分块存储，可以在 `ModelStore` 内替换实现，而不改变 Command、Commit、Query 和 Snapshot 契约。
+| op                                      | 适用的表                                         | 携带                                            |
+| --------------------------------------- | ------------------------------------------------ | ----------------------------------------------- |
+| `insert` / `remove` / `replace`         | 记录表、分区表；`project`、`master` 只有 replace | `after`、`before` 或两者；分区表另带 `sourceId` |
+| `insert-partition` / `remove-partition` | 分区表                                           | `sourceId` 与分区中的全部记录                   |
+| `insert` / `remove`                     | `trackOrder`                                     | `index` 与 `trackId`                            |
 
-## 状态分层
+命令产出这些变化，History 重放它们的反转，Commit 原样发布写入的那些（ADR-004）。消费者按表
+读取：播放看有没有 `tempoEvents` 变化，QueryIndex 与 Note 订阅只读 `midiNotes`。新增一张表时，
+变化词汇、反转、投影与写入都随表定义生效（ADR-003）。
 
-| 层级            | 是否权威                 | 是否可变       | 说明                                           |
-| --------------- | ------------------------ | -------------- | ---------------------------------------------- |
-| ModelStore      | 是                       | 仅内核受控可变 | 保存实体表、有序关系和当前 `modelRevision`     |
-| Entity Record   | 是                       | 否             | 只读值对象；修改时创建新记录并替换表项         |
-| QueryIndex      | 否                       | 受控可变       | 从 ModelStore 派生，失败后可以全量重建         |
-| ProjectSnapshot | 某一 revision 的稳定视图 | 否             | 用于首次编译、保存、Worker 和诊断              |
-| ProjectCommit   | 否                       | 否             | 一次提交的结果、版本和元数据                   |
-| ProjectDelta    | 否                       | 否             | 告知消费者哪些语义范围失效                     |
-| History         | 否                       | 受控维护       | 保存可逆 mutation 与内容状态身份，不是项目文件 |
-| Journal         | 否                       | 外部持久化     | 用于崩溃恢复，不等于 Undo History              |
+跨实体规则（外键、唯一所有权、Source 范围、Timeline 初始事件、Device 拓扑）只由
+`model/invariant-validator.ts` 判断；单条记录的值域由各自的记录工厂判断。
 
-只有 ModelStore 中的项目实体是当前创作事实。Snapshot 是某一 revision 的固定观察结果，QueryIndex 和 Delta 都可以丢弃并重新生成。
+## 持久化
 
-## ModelStore 组织原则
+项目文件是 `formatVersion: 2` 的 JSON 友好 DTO，Note 与 CC64 事件嵌套在所属 Source 下；
+revision、History 与索引不进入文件。`decodeProjectFileDTO` 严格校验不可信输入（V1 文件会迁移
+到 V2），`createProjectSessionFromProjectFile` 再经过记录工厂与不变量校验，得到一个 revision
+从 0 开始的新 Session。格式定义见 [Project File Format V2](./docs/project-file-format-v2.md)。
 
-Project Model 使用规范化实体表，而不是深层可变对象树：
+Checkpoint 把项目文件包在带来源 revision 的信封里。`ProjectCheckpointStore` 只定义保存与
+“按恢复优先级读取候选”两个操作；浏览器实现（IndexedDB，保留 active 与 previous 两份）在
+`platform-browser` 中。
 
-```text
-ModelStore
-├── project metadata
-├── trackOrder: TrackId[]
-├── tracks: Map<TrackId, Track>
-├── clips: Map<ClipId, Clip>
-├── midiSources: Map<MidiSourceId, MidiSource>
-├── note storage: 按 MidiSource 所有权组织
-├── sustain pedal event storage: 按 MidiSource 所有权组织
-├── devices: Map<DeviceId, Device>
-└── current modelRevision
-```
-
-`ModelStore` 是包内 Class，不从 `@seele-daw/project-core` 的公共入口导出。表在 `model/model-tables.ts` 中声明一次：按 ID 存储的记录表，以及按 MIDI Source 分区的表。Store 把容器留在私有闭包里；内部消费者通过 `ModelStoreReader` 的类型化查找和迭代方法，或 `recordTable(name)` / `partitionedTable(name)` 返回的冻结只读视图读取记录，不能取得 `Map`、`ReadonlyMap` 或 `trackOrder` 的数组引用。
-
-构造输入使用已经规范化为实体表的 `ModelStoreSeed`，它不是外部 DTO。构造器复制
-`trackOrder`、所有顶层 Map，以及每张 MIDI Note 和 Sustain Pedal Event 分区 Map，从而取得
-容器所有权；表中的只读 Record 保持原引用，避免为大型项目重新创建全部实体并保留引用相等
-语义。
-
-ModelStore 构造器只取得存储容器所有权并注册内部 write lease，不验证或修复跨实体关系。Seed 是否满足 Track 顺序、外键、Source 所有权、Timeline 初始事件和 Device 所有权等全局规则，由 `InvariantValidator` 判断。新 Store 的 `modelRevision` 固定从 `0` 开始；构造器向包内 `WeakMap` 注册一组按表名指定目标的写闭包（`writeRecord`、`insertPartition`、`removePartition`、`writePartitionRecord` 等），只有 `MutationApplier` 可以一次性领取这份 lease。同一个 Store 不能创建第二个写入者，也不能从 Store 实例取得 Map、数组、通用 setter 或任意 patch 能力。
-
-写闭包使用 compare-and-swap 语义：entity write 携带 expected / next Record，顺序 write 携带
-index / ID，Source 内容分区删除携带完整 expected Record 集合。每个 primitive 必须先完成全部
-检查和临时结构准备，最后只执行一次权威容器修改。这样真实写入与投影之间一旦出现程序错误，
-MutationApplier 能准确知道哪些 forward mutation 已经完整完成。
-
-这里描述的是组织原则。具体字段、所有权、运行时索引、持久化 DTO 和跨实体不变量以 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 为当前实现基线。
-
-该基线已经确定：
-
-- 运行时使用私有 Map，项目文件使用 JSON 友好的 Record DTO；
-- 所有 Clip 位于统一表中，并通过 `trackId` 单向引用 Track；
-- Track 到 Clip 的反向查询由可重建索引提供；
-- 一个 MidiClip 独占一个 MidiSource，普通复制会深复制 Source、Note 和 Sustain Pedal Event；
-- Note 与 Sustain Pedal Event 分别按 MidiSource 分区存储，不在事件中重复保存 `sourceId`；
-- Add / Resize Note 与同一 MidiSource 内 Move Note 的严格边界已经确定；Clip Move、跨 Source Note Move 与 Split 留到对应命令实现前单独讨论。
-
-必须遵守：
-
-- 实体 ID 是不可变 opaque string，不包含数组下标或父级路径；
-- 有序关系保存 ID 序列，实体内容保存在表中；
-- 所有时间区间使用半开区间 `[start, end)`；
-- 子实体拥有明确的所有者和删除语义；
-- 不向包外返回内部 Map、可变数组或可写实体引用；
-- 不通过任意 JSON path 修改领域对象；
-- 不建立一份供 Vue 修改、另一份供 Audio 修改的双写状态。
-
-### 为什么实体记录本身保持不可变
-
-表容器允许 `set/delete/splice`，但表中的 `Track`、`Clip`、`Note` 等记录不直接修改字段：
-
-```ts
-const before = notes.get(noteId)
-const after = { ...before, startTick: nextStartTick }
-notes.set(noteId, after)
-```
-
-这样可以：
-
-- 让 `before` 安全地用于 inverse mutation；
-- 避免 Query consumer 持有的对象在背后改变；
-- 让 selector 通过引用相等快速判断实体是否变化；
-- 在开发模式冻结实体，尽早发现越权写入；
-- 保留将单张表替换为其他存储实现的空间。
-
-### 跨实体不变量验证
-
-`InvariantValidator` 是接受 `ModelStoreReader` 的无状态纯函数模块，不持有 Store，也不使用只有静态方法的 Class。它返回带稳定错误码、诊断信息和相关实体引用的完整违规集合；需要强制合法状态的边界再通过 `assertModelInvariants` 抛出包含全部违规的 `ModelInvariantError`。
-
-实体工厂负责名称、Tick、MIDI 值、gain、BPM 等单记录值域，InvariantValidator 负责必须同时观察多个实体或容器才能判断的顺序、外键、唯一所有权、Source 范围、Timeline 初始事件和设备拓扑规则。Validator 不修复模型，也不依赖 Map 插入顺序；违规列表按稳定诊断键排序。
-
-Note 与 Sustain Pedal Event 虽然按 MidiSource 分区存储，其 ID 仍分别在整个项目内保持唯一；
-Address 用于直接定位分区而不是定义局部身份。同一 Source、Channel、Tick 最多一枚 CC64
-Event。Device 角色兼容性需要尚未实现的 Device Definition Catalog；当前只验证 Descriptor
-存在且恰好拥有一个拓扑位置，未知实现仍可被完整保留。
-
-### 合法项目初始化
-
-`createInitialModelStore` 是包内的新项目初始化入口。调用方提供 Project、Tempo Event 和 Time Signature Event 的 opaque ID 以及项目名称；内核不调用 `crypto.randomUUID()`，因此初始化过程保持确定性并且不依赖浏览器或 Node 环境。
-
-初始模型包含 Tick 0 的 120 BPM Tempo、Tick 0 的 4/4 Time Signature、unity gain 且未静音的
-空 Master，以及空的 Track、Clip、MidiSource、Note 分区、Sustain Pedal Event 分区和 Device
-表。初始化完成后必须通过 `assertModelInvariants`，从而在未来增加新不变量时让过期的初始化
-逻辑立即失败，而不是发布非法 Store。
-
-内核不会自动创建默认 Track。Instrument Track 需要明确的 Device Definition 和 Device ID，“新建项目时出现哪些轨道与设备”属于 Studio 产品模板。完整测试 fixture 也不等于产品默认项目：它只用于覆盖所有当前实体关系和拓扑位置。
-
-底层初始化器不从 package root 导出，因为它返回包内私有的 `ModelStore`；公开 `createInitialProjectSession` 已经包装该流程。`ModelStore` 构造器仍保持低层职责，只复制已经规范化的 Seed，不自动验证或修复外部加载结果。
-
-## ProjectSession 与内部组件
-
-`ProjectSession` 是供上层使用的门面，不是管理所有系统的 God Object：
-
-```text
-ProjectSession
-├── CommandProcessor       路由命令、检查 baseRevision
-├── CommandHandlers        读取模型并生成 MutationPlan
-├── InvariantValidator     验证跨实体和时间不变量
-├── MutationApplier        唯一允许修改 ModelStore 的组件
-├── ModelStore             保存实体表和 revision
-├── HistoryController      forward/inverse、Undo/Redo 双栈
-├── QueryIndex             派生索引和局部查询
-├── SnapshotFactory        生成 revision-consistent snapshot
-└── ChangePublisher        在成功提交后发布 ProjectCommit
-```
-
-Durability 和 Playback 通过端口或订阅接收结果。Project commit 不等待磁盘、音频设备或 Worker；外部失败不能回滚已经合法的创作事实。
-
-当前 `ProjectSession` 已经公开 `modelRevision`、会话级 `contentStateId`、`canUndo`、`canRedo`、同步 `getSnapshot()`、`query(query)`、`subscribe(subscription, observer)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex、ChangePublisher、Snapshot 生成器和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History / QueryIndex transition 与 gated publication，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry、内容状态身份、索引 root 或通知。空 History 的 Undo / Redo 返回 `null`，实际重放则恢复 before / after content identity、返回并异步发布新的 ProjectCommit。显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](../../docs/archive/project-core/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](../../docs/archive/project-core/project-history-foundation-plan.md)、[Project Content State Identity 与精确保存点计划](../../docs/archive/project-core/project-content-state-identity-plan.md)、[ProjectQuery / MIDI Note QueryIndex 基础层计划](../../docs/archive/project-core/project-query-index-foundation-plan.md)、[ChangePublisher / 局部订阅基础层计划](../../docs/archive/project-core/project-change-publisher-foundation-plan.md) 与 [ProjectSnapshot 基础层计划](../../docs/archive/project-core/project-snapshot-foundation-plan.md)。
-
-## 命令与原子提交管线
-
-一次写入严格经过：
-
-```text
-ProjectCommand
--> resolve handler
--> validate command and baseRevision
--> read current entity records
--> build forward mutations
--> return the normalized Command with a closed MutationPlan and generated inverse mutations
--> prepare immutable ProjectCommit + ProjectDelta candidate
--> freeze committed execute result
--> prepare and stage History + QueryIndex transitions
--> prepare a gated ChangePublisher microtask
--> MutationApplier projects and validates the plan, then applies mutations
--> modelRevision + 1
--> return the already prepared result
--> deliver the committed ProjectCommit asynchronously
-```
-
-`ready` preparation 中的规范化 Command 与计划共享聚合 Record 引用。运行时不再校验 Command 与
-Plan 是否对应：消费者只读 Delta，不依赖命令类型；每种命令的语义由
-`__tests__/command-properties.spec.ts` 固定（见 [ADR-002](../../docs/adr/ADR-002-consumers-read-changes-not-command-types.md)）。
-
-History、MIDI Note QueryIndex 与 ChangePublisher 已接入同一提交边界：普通 committed Command 进入 undo 栈，Undo / Redo 从当前 revision 重新建立 MutationPlan；Session 在模型写入前暂存新的 History 双栈头和 QueryIndex root，并注册可取消的发布 microtask。apply 失败时先取消发布，再恢复 History 与 QueryIndex；成功的 revision 写入后仍然直接返回，listener 只在当前同步栈结束后运行。Durability 和 Playback 尚未接入；它们必须延续相同原则，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
-
-### MIDI Note Command 纵向切片
-
-当前已经实现 `AddNoteCommand`、`ResizeNoteCommand`，以及面向同一 MidiSource 的
-`MoveNotesCommand` 和 `RemoveNotesCommand`。单 Note Move / Remove 同样使用仅含一个
-`NoteId` 的集合 Command，不维护语义完全被覆盖的平行单 Note API。公开 Command 使用稳定判别
-字段、完整领域参数和 `baseRevision`；包内 preparer 重新验证 Command、拒绝陈旧
-revision，并通过无状态 handler 读取 `ModelStoreReader`、创建一条或多条 Note mutation，
-最终形成 MutationPlan。
-
-两个集合 Command 都拒绝空列表与重复 ID，并在建立计划前验证全部目标；任一 Note 缺失或
-Move 结果越界时不会产生部分写入。`MoveNotesCommand` 使用共享的 `deltaTick` /
-`deltaPitch`，保持全部 Note 的相对位置；两个 Delta 同时为零时返回包内 `no-change`。多个
-Replace / Remove Mutation 仍只形成一个 Commit、一次 revision 推进和一个 History 步骤，
-Undo / Redo 原子恢复或重放完整集合。
-
-`ResizeNoteCommand` 只表达一个明确 Note 的最终 `startTick` 与 `durationTick`，不编码左边缘、
-右边缘、Pointer 或 Snap。目标几何必须保持正 Duration 且完全位于 Source 内；几何未变化时
-返回 `no-change`，合法变化只替换 Start / Duration，并保留 Note ID、Pitch、Velocity 与
-Channel。多 Note Resize 的共享 Anchor 或比例语义尚未定义，因此不提前泛化为集合协议。
-
-普通 Add、Resize 和同一 MidiSource 内的 Move 使用严格 Source 与 MIDI Pitch 边界，不由 Core
-clamp、wrap 或隐式扩展 Source / Clip。只有明确的 `ExtendMidiClipWithNoteCommand` 才能把右扩
-Clip、按需增长 Source 与添加 Note 表达成一个产品意图。Editor 可以在 Preview 阶段约束几何或
-Delta，Core 仍基于提交时的权威 Record 完整复核。Command preparer 与 handler 不从 package
-root 导出；ProjectSession 是正式执行入口。完整规则和实现边界见
-[MIDI Note Command 层执行计划](../../docs/archive/project-core/midi-note-command-layer-plan.md)。
-
-Command 的单数或复数不由 Mutation 数量决定：Command 表达一次完整产品意图，Mutation
-表达最小项目事实变化，MutationPlan / Commit 提供全有或全无的事务边界。不得用多次
-`ProjectSession.execute()` 或 `Promise.all` 模拟一个集合事务。具体判断标准、当前
-Remove / Add / Move / Resize 决定及未来迁移条件见
-[Project Command 集合与事务语义](./docs/project-command-collection-semantics.md)。
-
-### MIDI Sustain Pedal CC64 Project Fact 纵向切片
-
-当前已经实现 Source-owned `MidiSustainPedalEventRecord`，以及 Add、共享 Tick Delta 的集合 Move、
-集合 Remove 和 Replace Value Command。Event 保存原始 `0..127` Value 与 MIDI Channel；
-`>= 64` 派生为 Pedal Down，`< 64` 派生为 Pedal Up，但原值不被布尔化。同一 Source、Channel、
-Tick 最多一枚 Event，Event ID 在项目内唯一，合法 Tick 范围为 `0..source.lengthTick`。
-
-CC64 不被烘焙进 Note Duration。每个集合意图只形成一个 Commit、一次 revision 与一个 History
-步骤；Delta 使用 `affectedFromTick`，因为控制器状态会向后持续。MIDI Note QueryIndex 和 Note
-局部订阅不把 CC64 当作 Note 变化，`project-commit.all` 仍会收到提交。
-
-这一批不读取 Soundbank 或控制文件，也不改变 Sample Loop、Envelope、Trigger、Mutex、
-Velocity Range 或 Release 参数。当前 Studio Grand 没有 Sample Loop 只是该资产的事实；其他
-乐器仍可按各自控制数据声明 Continuous / Sustain Loop、One-shot 或不同包络。Standard MIDI
-File 映射、Playback pedal chase / voice lifetime、Audio Runtime 和 Studio Controller Lane 属于
-后续批次。完整契约与双语术语见
-[MIDI Sustain Pedal CC64 Project Fact V1](./docs/midi-sustain-pedal-cc64-project-fact-v1.md)。
-
-### Add Instrument Track 纵向切片
-
-`AddInstrumentTrackCommand` 把一条空白乐器音轨、它唯一的初始 Instrument Slot Device 和 Track Order 位置作为一个完整产品意图。Handler 原子准备 `DEVICE.INSERT`、`TRACK.INSERT` 与 `TRACK_ORDER.INSERT`，其 inverse 按相反顺序撤销；成功提交、Undo 和 Redo 都只发布一条聚合的 `instrument-track.added` 或 `instrument-track.removed` change。
-
-Project Core 不生成 Track ID、默认名称或随机颜色，也不选择 Soundbank。调用方必须提供已确定的名称、颜色、Channel Strip、Device 和插入位置；新音轨不自动创建 Clip、MidiSource 或 Note。完整边界见 [Add Instrument Track Command 实施计划](../../docs/archive/project-core/add-instrument-track-command-plan.md)。
-
-### Replace Instrument Device 纵向切片
-
-`ReplaceInstrumentDeviceCommand` 表达一次 Instrument Track 音源事实替换。公开 Command 使用 `instrument-device.replace` 判别字段，并携带 `baseRevision`、目标 `trackId` 和完整 replacement `DeviceDescriptor`；handler 从权威 Track 重新解析当前 Instrument Device，只允许保持原 Device ID 的一条 `DEVICE.REPLACE`，不会替换 Track Record 或改变 Track 拓扑。
-
-成功执行发布一条 `instrument-device.updated` change，携带 Track / Device 身份与 before / after Descriptor，只形成一次 revision、内容状态和 History 推进。Undo / Redo 复用相同 Record 与 Device ID；目标 Descriptor 深层值相等时返回 `no-change`，不产生 Commit、History、QueryIndex root 或通知。MIDI Note QueryIndex 只推进 revision，MIDI Note 局部订阅不接收该 change，`project-commit.all` 仍会收到提交。
-
-Project Core 继续只验证通用 Device 外壳，不识别 `Studio Grand`、`soundbankId` 或浏览器资产。
-未知合法 Descriptor 会通过 Snapshot、当前 Project File V2 与 Checkpoint 完整往返。新 Track
-默认选择什么声音、旧空 Slot 的可见修复入口以及内置 Device Definition 所有权属于 Studio /
-Playback；完整阶段边界见
-[Audible MIDI Playback V1 第六阶段计划](../../docs/archive/playback/audible-midi-playback-v1-phase-plan.md)。
-
-### Tempo Event 生命周期纵向切片
-
-`AddTempoEventCommand` 在未占用的绝对 Tick 创建一个 ID 唯一的 step Event；
-`MoveTempoEventCommand` 保留 ID 与 BPM 并移至未占用 Tick；`RemoveTempoEventCommand` 删除一个
-非初始 Event；`ReplaceTempoEventBpmCommand` 保留 ID 与 Tick，只替换经过领域范围验证的完整
-精度 BPM。Tick 0 的初始 Event 不可移走或删除，相同目标 Tick 的 Move 与相同目标 BPM 的 Replace
-返回 `no-change`。
-
-成功执行分别发布 `tempo-event.added`、`tempo-event.updated` 或 `tempo-event.removed` Change，
-每个意图只形成一次 revision、内容状态与 History 推进。Undo / Redo 复用精确 Record；MIDI Note
-QueryIndex 只推进 revision，MIDI Note 局部订阅不接收这些 Change，`project-commit.all` 仍会收到
-提交。身份生成、显示舍入、Tempo Track 交互和播放状态协调属于 Studio / Playback，不进入
-Project Core。
-
-### Add MIDI Clip 纵向切片
-
-`AddMidiClipCommand` 把一个 MidiClip、它独占的 MidiSource、空 Note Partition 和空 Sustain
-Pedal Event Partition 作为一个完整产品意图。Handler 原子准备完整所有权图，其 inverse 按相反
-顺序撤销；成功提交、Undo 和 Redo 都只发布一条聚合的 `midi-clip.added` 或
-`midi-clip.removed` change。
-
-Project Core 验证目标 Instrument Track、Clip / Source / Partition 身份和 Source 读取范围，但不决定双击手势、按小节吸附、默认长度、名称或颜色。MIDI Clip change 携带完整 ownership placement 与时间线受影响范围；QueryIndex 同步增加或移除对应 Note Partition，使新 Clip 可以立即接收现有 Note Command。完整边界见 [Add MIDI Clip Command 实施计划](../../docs/archive/project-core/add-midi-clip-command-plan.md)。
-
-### MIDI Clip / Note 原子放置纵向切片
-
-`AddMidiClipWithNoteCommand` 在同一计划中创建非循环 Clip、独占 Source、包含第一枚 Note 的
-Partition 和空 Sustain Pedal Event Partition；`ExtendMidiClipWithNoteCommand` 从权威模型读取已有非循环 Clip，向右替换最终
-`spanTick`、按需增长 Source，并插入导致扩展的 Note。两者都只产生一个 revision、内容状态和
-History 步骤，不允许 Studio 串联多次 Command。
-
-右扩只接受确实越过当前 Clip window、但完全落在目标 window 内的 Note；不能越过同 Track 上
-从当前末端起遇到的下一 Clip，looped Clip 明确不支持。Source 已有容量足够时不会制造等值
-Replace。新建 populated Clip 继续聚合为 `midi-clip.added / removed`；右扩发布
-`midi-clip.updated` 与 `midi-note.added / removed`。完整规则见
-[MIDI Clip / Note 原子放置命令计划](../../docs/archive/project-core/midi-clip-note-placement-command-plan.md)。
-
-### ProjectCommit / ProjectDelta 基础层
-
-当前公开契约能够表达 Instrument Device Update、Instrument Track Add / Remove、MIDI Clip Add /
-Remove / Update、MIDI Note Add / Remove / Update 与 Sustain Pedal Event Add / Remove / Update。
-Track change 聚合 Track Record、Instrument Device Descriptor 和顺序位置；Clip Add / Remove 聚合
-Clip、Source 与两张内容分区；Note change 携带半开区间形式的受影响 Tick 范围，Move 与 Resize
-使用旧、新区间的保守并集；Sustain Pedal Event change 携带 Source / Event 身份、before / after
-Record 和 `affectedFromTick`。Delta 携带提交后的 `modelRevision`，Commit 记录 base / committed
-revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始
-Command 类型。
-
-包内 Commit candidate 工厂在 MutationApplier 写入前推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](../../docs/archive/project-core/project-commit-delta-foundation-plan.md)。
-
-### MutationPlan 的作用
-
-MutationPlan 是结构完整且可逆的变化计划。它只包含：
-
-- 当前 `baseRevision`；
-- 类型化的 forward mutations；
-- 由工厂自动生成、按执行顺序排列的 inverse mutations。
-
-Mutation 使用领域类型表达，例如 entity insert/remove/replace、ordered relation insert/remove，而不是任意 JSON Patch。计划工厂负责拒绝空计划、身份变化、同引用 replace 和无效顺序索引，并冻结自身拥有的 mutation / 数组；包内 `WeakSet` 证明 plan 外壳、mutation 序列和 inverse 由同一个工厂配对，使 Applier 不会信任仅在 TypeScript 结构上相似的对象或 plan Proxy。该证明不会复制或深冻结 payload Record；Record 仍遵守项目既定的运行时共享、逻辑不可变契约。计划工厂不读取 ModelStore，因此仍不声称该计划适用于某个具体 Store。`MutationApplier` 必须先在写时复制投影上验证 revision、当前记录引用、关系位置和最终跨实体不变量，全部通过后才进入真实写入阶段。
-
-所有 mutation 判别名称集中在包内 `PROJECT_MUTATION_TYPE` 常量表中；类型定义、穷尽分支和测试共同引用这份运行时词汇。Mutation 的 payload 结构仍由显式判别联合描述，不从常量表动态生成。
-
-History label、merge key、Editor restore point 和 Delta 提示分别属于后续 History、Command 或 Commit 包装层，不放进底层 MutationPlan。这样回滚机制不会反向依赖界面交互或发布协议。
-
-### 原子性保障
-
-- `MutationApplier` 构造时验证初始 Store，并一次性领取该 Store 的唯一写 lease；第二个 Applier 无法绕过 faulted 状态继续写入；
-- apply 首先拒绝 faulted / reentrant 调用，再精确检查 `baseRevision`，并在任何写入前计算不会溢出的下一 revision；
-- 所有存在性、权限、范围和跨实体不变量在 apply 前验证；
-- `ProjectedModelStoreReader` 通过实体表 overlay、删除标记和按需复制的 Track 顺序 / Note 分区预演完整 forward 序列，不复制整个项目；
-- 每条基础 mutation 只检查当前投影视图上的存在性、`before` 引用和顺序位置，最终投影只执行一次全局 `InvariantValidator`，因此允许级联操作的中间状态暂时不完整；
-- MutationApplier 通过 CAS 写闭包按确定顺序执行已经验证的基础操作。写入后不再做第二次全量
-  校验：写入结果按构造等于投影，由 `mutation-applier.spec` 对每种 Mutation 固定（见
-  [ADR-001](../../docs/adr/ADR-001-validate-each-commit-once.md)）；
-- `modelRevision` 是成功路径的最后一次写入，一份计划只递增一次，失败和回滚都不能递增或倒退 revision；
-- Commit / Delta 候选在写入前完整准备，只有全部成功后才能返回和发布；
-- 业务失败不会产生部分模型、History Entry 或可观察的 Delta；
-- History transition 在模型写入前只替换私有 undo / redo 栈头；apply 失败时恢复旧栈头，成功 revision 写入后不再分配 History 节点；
-- QueryIndex transition 在模型写入前准备受影响 Source 的 copy-on-write 分区并暂存新 root；apply 失败时恢复旧 root，成功时 Index 与 ModelStore revision 一致；
-- 意外程序错误发生在第 `k` 条已完成的 forward 之后时，只执行完整 inverse 数组末尾对应的 `k` 条 mutation；回滚后重新验证不变量和原计划前置条件。这里依赖唯一写 lease 与 CAS primitive 的正确性，不通过每次提交前复制整个 Store 来对抗任意内部实现错误；
-- 如果防御性回滚或恢复验证失败，MutationApplier 立即锁存为 faulted，并同时保留 apply cause 与 rollback cause；未来 Session 在此基础上进入 faulted/read-only 状态。
-
-普通实体表和 Source 内容表的 Map insertion order 不是项目语义。remove 后通过 inverse insert
-会恢复原 Record 引用和项目关系，但键可能追加到 Map 尾部；显式顺序只由 `trackOrder` 等 ID
-序列表达。Snapshot / DTO 在对应边界稳定排序，不能让内部 Map 顺序成为隐藏领域规则。
-
-QueryIndex 不是事实。索引的增量更新失败时，应从已经一致的 ModelStore 重建；不能让模型与索引各自成为一份可写真相。
-
-## Undo、Redo 与 Journal
-
-当前 History 是 `ProjectSession` 私有的会话状态，每个 entry 保存原始 Command 类型和类型化的 forward / inverse mutations：
-
-```text
-HistoryEntry
-├── commandType
-├── forward mutations
-└── inverse mutations
-```
-
-- undo / redo 使用不可变单链栈节点，push / pop 只替换栈头，复杂度为 O(1)；
-- Undo 和 Redo 从当前 revision 创建新的 MutationPlan，仍通过完整提交管线、继续验证不变量并产生新的 ProjectCommit / ProjectDelta；
-- 新的 committed Command 清空 redo 分支；no-change、命令拒绝和 apply 失败保留原分支；
-- 空栈返回 `null`，不推进 revision；
-- History 不直接写入项目文件，也不跨 Session 保留；
-- label、Editor restore point、gesture merge 和容量淘汰需要后续产品规则，本阶段没有猜测默认行为；
-- Journal 用于崩溃恢复，具有独立 sequence、checksum 和持久化格式；
-- 不能把内存 Mutation 对象未经版本化就永久保存为 Journal。
-
-## Query、订阅与 Read Model
-
-外部读取通过 Query 和后续局部订阅完成，禁止取得内部表：
-
-```text
-session.query(query)
-session.query(createMidiNoteByIdQuery(...))
-session.query(createMidiNotesIntersectingRangeQuery(...))
-```
-
-当前 MIDI Note Query 已实现：
-
-- `sourceId + noteId` 单实体查询；
-- `sourceId + [startTick, endTick) + [minimumPitch, maximumPitch]` 区间相交查询；
-- 结果携带 `modelRevision`，范围结果按 `[startTick, pitch, noteId]` 稳定排序；
-- Source 或 Note 不存在属于正常读取结果，分别返回空集合或 `undefined`；
-- Query descriptor、结果外壳和结果数组运行时冻结，Record 保持引用共享。
-
-包内 QueryIndex 为每个 MidiSource 维护 ID Map、startTick 排序数组和 prefix maximum end，从而通过二分边界缩小区间候选。Index 按 ProjectDelta 在写前增量准备，只复制受影响 Source；MIDI Clip Add / Remove 同步增加或移除完整 Source Partition。revision 落后时 Query 使用权威 ModelStore 扫描降级，Index 也可以从 Store 完整 rebuild。扫描与索引结果必须等价，内部结构不进入项目文件、History 或 package root。完整决策见 [ProjectQuery / MIDI Note QueryIndex 基础层计划](../../docs/archive/project-core/project-query-index-foundation-plan.md)。
-
-Track / Clip、Tempo、Device、Asset 和 Automation Query 要等对应 UI 消费出现后再加入，不能因为已有 Command / Delta 就预建一个无业务语义的通用查询语言。
-
-当前局部订阅支持全部 Commit，以及按 MidiSource ID、Note ID 和半开 Tick 区间过滤 MIDI Note changes。多个约束必须在同一条 change 上同时命中，一个 Commit 即使有多条 change 命中也只通知一次。订阅者收到 Commit 后按需重新 Query；不能用单个全局 revision ref 让 Mixer、Piano Roll、Inspector 和 Arrangement 在任意 Note 变化后全部重算。
-
-ChangePublisher 在权威写入前取得匹配订阅快照并注册 gated microtask，失败路径同步取消，成功路径异步按 Commit 和注册顺序通知。取消订阅幂等且会抑制已经排队但尚未调用的 listener；listener 可以发起下一条 Command，新 Commit 排在当前通知批次之后。`onCommit` 抛错时只终止该订阅，通过 frozen failure envelope 调用其 `onError`，其他 listener、ModelStore、History 和 QueryIndex 不受影响。完整规则见 [ChangePublisher / 局部订阅基础层计划](../../docs/archive/project-core/project-change-publisher-foundation-plan.md)。
-
-Query 返回只读投影或稳定实体记录：未变化实体可以保持引用相等，变化实体必须是新引用。大型集合优先返回窗口化、分页或迭代结果，不能把十万 Note 在每次提交后复制给 Vue。
-
-## Snapshot 语义
-
-`ProjectSnapshot` 是某个明确 `modelRevision` 的稳定只读投影，不能只是指向仍会变化的内部 Map。
-
-Snapshot 主要用于：
-
-- 首次 Playback 全量编译；
-- ProjectFileDTO 生成和 checkpoint；
-- 发送到 Worker 的版本化输入；
-- 导出、诊断和测试 fixture。
-
-`ProjectSession.getSnapshot()` 按 `modelRevision` 缓存：同一 revision 内的调用返回同一个 Snapshot，
-提交后的第一次调用才复制并冻结 Track order、实体数组，以及按 Source
-分区的 Note 与 Sustain Pedal Event 数组，记录当前 `modelRevision`，同时共享逻辑不可变的领域
-Record。普通实体按 ID、Timeline 与 CC64 Event 按稳定时间键规范排序，不依赖 Map insertion
-order；后续提交只替换 Record，因此旧 Snapshot 保留原 revision 与 Record 版本。Snapshot 不
-携带 Map、writer lease、History、Index 或 listener，也不直接充当 ProjectFileDTO。
-
-Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playback 全量编译、保存/checkpoint、Worker 或离线任务开始、消费者增量恢复等低频边界显式复制容器；如果大项目复制成本成为瓶颈，再根据 benchmark 引入分块、copy-on-write 或结构共享。优化只能发生在 Snapshot 生成器/ModelStore 内部，不能改变外部稳定语义。完整规则见 [ProjectSnapshot 基础层计划](../../docs/archive/project-core/project-snapshot-foundation-plan.md)。
-
-## 当前 ProjectFileDTO V2 写出边界
-
-`createProjectFileDTO(snapshot)` 把可信运行时 Snapshot 显式投影为 `formatVersion: 2` 的
-JSON-friendly 文件值。DTO 使用无 Brand 的 primitive 和普通 object table，Note 与 Sustain
-Pedal Event 嵌套到所属 MidiSource；本地 `modelRevision`、History、QueryIndex 和订阅状态不会
-进入文件。
-
-投影器重新创建并冻结全部 DTO object、数组和 table，Device parameters / opaque state 经过
-JsonValue 边界深复制与递归冻结，不与 Snapshot 共享复合引用。Entity table 使用安全 own data
-property 保留 `__proto__` 等合法 opaque ID；Snapshot 的规范顺序和递归排序后的 Device JSON
-保证等价事实得到确定性 DTO。当前 V2 `requiredFeatures` 为空，Device type ID 不被误当作文件
-格式 feature。
-
-该 API 只负责可信 Snapshot 的写出，不代表 JSON text 已经过 canonical checksum 编码。V1 写出
-计划仍记录历史基础边界；当前格式扩展见
-[Seele Project File Format V2](./docs/project-file-format-v2.md)。
-
-## ProjectFileDTO V1 / V2 读取与 Session 加载
-
-`decodeProjectFileDTO(input)` 接受来自 JSON parse、IndexedDB structured clone 或 Worker 的不可信
-`unknown`，先按 `formatVersion` 路由，再严格校验 V1 或 V2 object、数组、判别联合、数字形状、
-entity table key / ID 和 Device JsonValue。它不读取 accessor，并安全保留 `__proto__` 等 opaque
-key。
-
-成功输出是深度冻结的当前 V2 DTO，不会被原始输入的后续修改污染。严格 V1 成功后通过纯
-V1-to-V2 migration 为每个 Source 添加空 `sustainPedalEvents` 表；V2 必须显式带该表。迁移不
-伪造 Pedal Up、不修改 Note Duration。结构失败通过带稳定错误码和 frozen 片段路径的
-`ProjectFileValidationError` 报告；其他版本和当前任一非空 `requiredFeatures` 都失败关闭。
-
-解码器分别消费类型校准的包内 V1 / V2 protocol。静态 V1 golden 校准历史读取与迁移，静态
-V2 golden 校准当前 reader / writer；两者都不由测试运行时动态生成。
-
-解码器只完成文件协议结构边界。公开 `createProjectSessionFromProjectFile(input)` 在其后显式执行
-DTO -> 当前领域模型映射：每个 primitive 重新经过 Brand 解析器，每个实体经过 Record factory，
-嵌套 Note 与 Sustain Pedal Event table 被规范化为按 MidiSource 分区的 Store 表，最后由
-`InvariantValidator` 聚合检查外键、唯一所有权、Source 范围、事件位置唯一性、Timeline 初始
-事件和 Device 拓扑。领域失败通过带稳定 path 的 `ProjectFileLoadError` 报告，结构失败仍保持
-原 `ProjectFileValidationError`。
-
-加载成功组合的是 fresh Session：`modelRevision` 从 `0` 开始，History 和 subscriptions 为空，
-QueryIndex 从权威 ModelStore 重建。项目文件不保存进程内 revision、undo / redo 栈、索引或
-listener。normalizer、ModelStoreSeed、ModelStore 和 Session 组合入口继续保持包内私有。
-规范性协议见历史 [Seele Project File Format V1](./docs/project-file-format-v1.md) 与当前
-[Seele Project File Format V2](./docs/project-file-format-v2.md)。
-
-## Project Checkpoint 基础层
-
-`ProjectCheckpoint` 是包裹完整 `ProjectFileDTO` 的 storage-neutral 持久化 envelope，拥有独立 `checkpointFormatVersion`、opaque checkpoint ID、Project ID 和来源 `modelRevision`。来源 revision 用于保存顺序诊断；恢复出的 fresh Session 仍从 revision `0` 开始。
-
-直接按 Project ID 覆盖一份 ProjectFileDTO 足以实现最简浏览器保存；Checkpoint 是为了异步 revision 对账、不可变 active/previous 保存记录、损坏候选回退和独立版本演进。它只属于应用内部持久化，不进入用户导出的项目文件。
-
-`saveProjectCheckpoint(store, session, input)` 只捕获一次 Snapshot，再创建 DTO 和 frozen checkpoint，异步保存完成后返回包含来源 revision 与会话级 `sourceContentStateId` 的 receipt。content identity 不进入持久化 envelope；上层以它精确判断 Undo / Redo 是否回到保存点。存储失败不会回滚或改变 Session。`ProjectCheckpointStore` 只定义保存可信 checkpoint 与读取按恢复优先级排列的 `unknown` candidates，不暴露 IndexedDB、OPFS 或 DOM 类型。
-
-`restoreProjectCheckpoint(store, projectId)` 逐个严格解码候选，验证 envelope、内部 Project File 与请求 Project ID，并只从完整通过领域不变量的 DTO 组合 Session。active 候选结构损坏、领域非法或属于其他项目时会保留 frozen 诊断并继续 previous；空候选返回 `null`，存在候选但全部失败则抛出 `ProjectCheckpointOperationError`。完整决策见 [Project Checkpoint 基础协议与存储端口计划](../../docs/archive/project-core/project-checkpoint-foundation-plan.md)。
-
-## ProjectDelta 与消费者同步
-
-ProjectDelta 描述一次提交造成的语义变化，例如：
-
-```text
-entity changes
-query invalidations
-timeline ranges
-graph invalidations
-asset reference changes
-```
-
-规则：
-
-- Delta 由 MutationPlan 和提交结果直接生成，不通过深比较前后完整模型推断；
-- Delta 携带提交后的 `modelRevision`；
-- Playback 使用自己的 `engineGeneration`，不能复用 modelRevision；
-- Persistence 使用 `journalSequence`，不能复用 modelRevision；
-- Delta 可以丢弃；消费者错过增量后必须能从 Snapshot 全量重建。
-
-当前已实现 Instrument Device Update、Instrument Track Add / Remove、MIDI Clip Add / Remove /
-Update、Note Add / Remove / Update，以及 Sustain Pedal Event Add / Remove / Update 的 change
-映射。Note 使用受影响 Tick 区间，CC64 使用 `affectedFromTick`；query invalidation、graph
-invalidation 与 asset reference change 仍由后续对应模块补充。
-
-## 并发与线程模型
-
-V1 中 Project Kernel 运行在主线程并保持单写者：
-
-- Worker 不共享或直接修改 ModelStore；
-- Worker 接收带 revision 的 Snapshot/DTO，返回带 request ID/revision 的结果；
-- 过期 Worker 结果被丢弃或重新计算；
-- AudioWorklet 只接收 Playback 编译结果，永远不读取 Project 对象；
-- 云同步以后通过稳定 Command/Delta/cloudVersion 边界接入，不提前把模型改造成 CRDT。
-
-## 性能策略
-
-- 单实体编辑只替换目标实体记录，不复制完整实体表；
-- 批量选择、量化和粘贴使用一个 MutationPlan 批量提交；
-- 拖拽、缩放和框选的逐帧 Preview 留在 Editor；
-- QueryIndex 按 Delta 增量维护，并始终提供全量重建路径；
-- Snapshot 和序列化只在明确的低频边界执行；
-- 从 MIDI 纵向切片开始记录 command、validation、apply、index 和 snapshot 时长；
-- 使用 100k Note / 32 Track 固定数据验证 P50/P95，而不是凭感觉引入 Immer、HAMT 或自研结构。
-
-## 主要职责
-
-| 领域     | 规划职责                                                            |
-| -------- | ------------------------------------------------------------------- |
-| 模型     | ProjectModel、受控实体表、有序 ID 集合、跨实体不变量                |
-| 文件边界 | ProjectFileDTO、运行时校验、迁移、normalize；DTO 不直接充当内存模型 |
-| 时间     | branded Tick、PPQ、TempoMap、半开区间 `[start, end)`                |
-| 命令     | 完整参数的 ProjectCommand、baseRevision 校验、MutationPlan          |
-| 提交     | 原子应用、modelRevision、类型化 ProjectDelta、ChangePublisher       |
-| 历史     | Undo / Redo、inverse mutation、gesture merge、EditorRestorePoint    |
-| 查询     | QueryIndex、局部 selector、按 topic/entity/range 订阅、索引重建     |
-| 端口     | Durability、Playback Sync 等外部能力的接口，不包含浏览器实现        |
-
-## 建议的内部模块
-
-目录随第一条 MIDI 纵向切片逐步生长，不预建空泛层级：
+## 目录
 
 ```text
 src/
-├── model/          ModelStore、实体、ID 与不变量
-├── time/           Tick、区间、TempoMap
-├── mutation/       可逆基础变化、MutationPlan 与原子应用
-├── commands/       按共享职责或产品领域分目录
-│   ├── protocol/                  Command 协议与稳定拒绝错误
-│   ├── preparation/               命令注册表：normalize、revision 检查与分派
-│   ├── instrument-device/         Instrument Device 命令实现
-│   ├── instrument-track/          Instrument Track 命令实现
-│   ├── midi-clip/                 基础 MIDI Clip 命令实现
-│   ├── midi-note/                 MIDI Note 命令实现与共享校验
-│   ├── midi-sustain-pedal-event/  Sustain Pedal CC64 Event 命令实现
-│   └── midi-clip-note-placement/  populated Clip Add / Extend 产品命令实现
-├── commit/         ProjectCommit、ProjectDelta 与语义 change
-├── session/        ProjectSession 与提交管线编排
-├── history/        Undo / Redo 与合并策略
-├── queries/        QueryIndex 与只读查询
-├── subscriptions/ ChangePublisher 与局部提交订阅
-├── snapshots/      稳定 Snapshot 生成
-├── persistence/    DTO、迁移与持久化端口
+├── model/          表定义、ModelStore、记录与 ID、不变量
+├── time/           Tick、Tempo 与拍号事件
+├── mutation/       ProjectChange、MutationPlan、投影与 MutationApplier
+├── commands/       protocol/（命令协议）、preparation/（注册表），以及各实体的 handler
+├── commit/         ProjectCommit 与候选
+├── session/        ProjectSession 与提交编排
+├── history/        Undo / Redo
+├── queries/        QueryIndex 与查询
+├── subscriptions/  ChangePublisher 与订阅过滤
+├── snapshots/      Snapshot
+├── persistence/    项目文件与 Checkpoint
 └── index.ts        唯一公开入口
 ```
 
-这些目录对应已经存在的稳定职责。commands 根层不再接收任何 `.ts` 文件；跨命令基础能力进入
-`protocol/` 或 `preparation/`，新增领域命令进入拥有该语义的功能目录。只有产生真实代码和稳定
-职责时才新增目录，不能预建空目录或无职责的层级。
+## 测试
 
-目录归属遵守以下规则：
+测试平铺在 `src/__tests__/*.spec.ts`，共享夹具在 `src/__tests__/support/`，规则见
+[`src/__tests__/README.md`](./src/__tests__/README.md)。三个测试固定了上面的大部分保证：
 
-- 通用规范化实体和所有权结构放在 `model/`；
-- 已经形成独立规则与算法体系的子领域可以提升为顶层模块；
-- 目录位置不决定数据是否持久化，是否进入 `ModelStore` 才决定它是不是项目事实。
+- `command-properties.spec.ts`：每种命令只改自己点名的实体，Undo / Redo 精确往返（ADR-002）；
+- `mutation-applier.spec.ts`：每种表与操作的真实写入等于投影；
+- `mutation-plan.spec.ts`：从表定义生成全部 `table.op`，逐一检查反转。
 
-因此，Timeline 虽然拥有可持久化的 Tempo Event 和 Time Signature Event，仍可以作为 `time/` 顶层子领域组织；其事件进入 `ModelStore` 后依然是权威项目事实。目录表达的是代码职责与领域内聚性，而不是持久化层级。
+提交成本基准：`pnpm --filter @seele-daw/project-core bench`。
 
-## 公开 API 原则
+## 延伸阅读
 
-- 其他包只能从 `@seele-daw/project-core` 公开入口导入，禁止深层路径导入；
-- 不导出内部 Map、可变数组、MutationApplier 或 ModelStore；
-- 包外写入只通过 ProjectSession.execute / undo / redo，不提供直接 plan/apply 入口；
-- 包外读取只通过类型化 ProjectSession.query 和 ProjectSession.getSnapshot，不提供内部 Store / Index 入口；
-- 包外通知只通过类型化 ProjectSession.subscribe，不导出 ChangePublisher 或内部 subscription entry；
-- 命令必须携带稳定实体 ID 和完整参数，不能读取 Editor Selection；
-- 一次用户动作只增加一次 modelRevision，并只产生一个 History Entry；
-- Commit、Delta、Snapshot 和 Query Result 在包外视为不可变；
-- Project commit 不等待 Audio Runtime、IndexedDB、OPFS 或网络；
-- 索引、缓存和运行时计划必须可以从 Snapshot 重建。
-
-## 依赖边界
-
-本包只允许依赖不产生运行时代码的 `@seele-daw/type-utils`；Brand、ValueOf 等跨领域类型工具由该独立包拥有。
-
-本包禁止依赖：
-
-- Vue、Pinia 或任何 UI 框架；
-- DOM、Canvas、Web Audio 或具体 AudioNode；
-- IndexedDB、OPFS、File System API；
-- `apps/studio`、`editor`、`playback`、`audio-web`、`platform-browser`；
-- 无明确领域所有者的 `shared`、`utils` 收容模块。
-
-运行环境仅使用 ECMAScript 能力，核心测试必须能在 Node.js 中执行。
-
-## 分阶段计划
-
-1. 建立 ModelStore、opaque ID、Tick 和只读实体记录约定。
-2. 按 [MIDI Project Model V1](./docs/midi-project-model-v1.md) 定义 Project、Instrument Track、MidiClip、MidiSource、Note、Timeline 和最小 Device Descriptor。
-3. 实现 MutationPlan、MutationApplier 和原子提交骨架。
-4. 实现 `AddMidiClipCommand`、`AddNoteCommand`、`ResizeNoteCommand`，以及支持单个或多个
-   Note 原子操作的 `MoveNotesCommand` / `RemoveNotesCommand`。
-5. 建立 Note 级 ProjectCommit、ProjectDelta 与写前准备边界。
-6. 实现 ProjectSession 最小执行门面和提交发布时机。
-7. 实现 Undo / Redo，并验证一次拖拽只产生一次历史记录。
-8. 建立 MIDI Note ProjectQuery 与可重建 QueryIndex。
-9. 增加 ChangePublisher 与局部订阅。
-10. 定义 ProjectSnapshot、ProjectFileDTO V1 写出边界、严格读取校验、领域 normalize 与 fresh Session 加载。
-11. 定义 storage-neutral Project Checkpoint 协议、Store port、保存 receipt 与候选恢复协调。
-12. 在 `platform-browser` 实现 IndexedDB immutable checkpoint + active/previous 指针事务。（已完成）
-13. 在 Studio 组合根接入保存和刷新恢复，形成第一条浏览器持久化纵向切片。
-14. 实现保持身份与 Track 拓扑的 Instrument Device Replace Command、Delta、No-change、History 与持久化往返。（已完成）
-15. 实现 Track 全局 Piano Roll 所需的 populated Clip Add 与 Clip / Source 右扩加 Note 原子命令。（已完成）
-16. 为 Source-owned Sustain Pedal CC64 Event 建立 Record、分区、不变量、Command、Mutation、
-    Delta、History、Snapshot、Project File V2，以及严格 V1-to-V2 migration。（已完成）
-17. 有真实恢复需求后分别实现 JSON codec 与 Journal；Audio Clip、完整 Device 能力和
-    Automation 只在对应产品阶段加入。
-
-## 测试与验收
-
-当前 Project Core 基线为 32 个测试文件、465 项测试。
-
-测试套件保持在 `src/__tests__/*.spec.ts` 平级组织；复用 fixture、driver 和断言助手统一位于 `src/__tests__/support/`。生产目录不得为白盒测试暴露额外入口，生产源码反向依赖 `__tests__` 会被架构检查拒绝。详细规则见 [`src/__tests__/README.md`](./src/__tests__/README.md)。
-
-- 只有 MutationApplier 可以修改内部表的架构约束测试；
-- 同一个 ModelStore 的 writer lease 只能领取一次；
-- 全部 mutation 分支的真实结果与写时投影一致，成功计划只递增一次 revision；
-- 陈旧计划、重复 apply、revision 溢出和投影验证失败都不会执行真实写入；
-- apply 中部分写入失败时只回滚已经完成的 forward 前缀，成功恢复后 revision 保持不变；
-- rollback 失败时保留双重 cause、锁存 faulted，并永久拒绝后续 apply；
-- 命令成功、拒绝和陈旧 `baseRevision` 的确定性测试；
-- apply 中意外失败时不发布部分 Commit，并能完成防御性回滚；
-- 每种命令的 forward/inverse round trip；
-- 随机命令序列后的模型不变量；
-- 未变化实体保持引用，变化实体产生新只读记录；
-- QueryIndex 与全量扫描结果一致，索引重建结果一致；
-- ChangePublisher 的局部过滤、异步顺序、取消、重入和 listener failure 隔离；
-- Snapshot 使用确定性顺序，并在后续提交后仍保持原 revision、容器和 Record 版本；
-- ProjectFileDTO 的版本、字段完整性、JSON 往返、深度所有权、特殊 ID 和分区失败关闭；
-- ProjectFileDTO 输入的严格字段、版本 / feature 分流、结构化错误路径、安全属性检查和深度隔离；
-- Project File 到 fresh Session 的无损往返、领域错误定位、跨实体拒绝、查询和后续 Command；
-- Checkpoint envelope 严格校验、异步 revision receipt、存储失败隔离与 active/previous 候选回退；
-- snapshot、迁移与 journal replay 的 golden fixtures；
-- 100k Note / 32 Track 下的 command、apply、query 和 snapshot benchmark。
-
-## 架构依据
-
-- [阶段成果：安全模型与原子 Mutation 内核](../../docs/archive/project-core/project-core-transaction-foundation-milestone.md)
-- [Add Instrument Track Command 实施计划](../../docs/archive/project-core/add-instrument-track-command-plan.md)
-- [Add MIDI Clip Command 实施计划](../../docs/archive/project-core/add-midi-clip-command-plan.md)
-- [MIDI Clip / Note 原子放置命令计划](../../docs/archive/project-core/midi-clip-note-placement-command-plan.md)
-- [MIDI Note Command 层执行计划](../../docs/archive/project-core/midi-note-command-layer-plan.md)
+- [MIDI Project Model V1](./docs/midi-project-model-v1.md)：字段、所有权与不变量
+- [Project Command 集合与事务语义](./docs/project-command-collection-semantics.md)
 - [MIDI Sustain Pedal CC64 Project Fact V1](./docs/midi-sustain-pedal-cc64-project-fact-v1.md)
-- [ProjectCommit / ProjectDelta 基础层执行计划](../../docs/archive/project-core/project-commit-delta-foundation-plan.md)
-- [ProjectSession 最小执行门面计划](../../docs/archive/project-core/project-session-execution-foundation-plan.md)
-- [Project History / Undo / Redo 基础层计划](../../docs/archive/project-core/project-history-foundation-plan.md)
-- [Project Content State Identity 与精确保存点计划](../../docs/archive/project-core/project-content-state-identity-plan.md)
-- [ProjectQuery / MIDI Note QueryIndex 基础层计划](../../docs/archive/project-core/project-query-index-foundation-plan.md)
-- [ChangePublisher / 局部订阅基础层计划](../../docs/archive/project-core/project-change-publisher-foundation-plan.md)
-- [ProjectSnapshot 基础层计划](../../docs/archive/project-core/project-snapshot-foundation-plan.md)
-- [Seele Project File Format V1](./docs/project-file-format-v1.md)
-- [Seele Project File Format V2](./docs/project-file-format-v2.md)
-- [ProjectFileDTO V1 写出边界计划](../../docs/archive/project-core/project-file-dto-v1-write-plan.md)
-- [ProjectFileDTO V1 读取校验计划](../../docs/archive/project-core/project-file-dto-v1-read-validation-plan.md)
-- [Project File V1 Session 加载计划](../../docs/archive/project-core/project-file-v1-session-load-plan.md)
-- [Project Checkpoint 基础协议与存储端口计划](../../docs/archive/project-core/project-checkpoint-foundation-plan.md)
-- [MIDI Project Model V1](./docs/midi-project-model-v1.md)
-- [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
-- [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)
-- [Web DAW 简洁架构总纲](../../docs/archive/architecture/web-daw-architecture-brief.md)
-- [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)
+- [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)、
+  [小型实体与模型演进](./docs/small-records-and-model-evolution.md)
+- 已完成阶段的计划与收口报告：[docs/archive](../../docs/archive/README.md)

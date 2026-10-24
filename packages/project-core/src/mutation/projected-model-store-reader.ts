@@ -1,6 +1,6 @@
 /**
- * Builds a copy-on-write ModelStoreReader that previews a complete mutation sequence.
- * Local storage preconditions are checked per mutation; cross-entity invariants are
+ * Builds a copy-on-write ModelStoreReader that previews a complete change sequence.
+ * Local storage preconditions are checked per change; cross-entity invariants are
  * checked once after the final projected state exists. The base reader is never mutated.
  */
 import type { MasterChannelRecord } from '#internal/model/channel'
@@ -23,26 +23,22 @@ import {
   type StoredRecord,
 } from '#internal/model/model-tables'
 import type { ProjectRecord } from '#internal/model/project'
-import { MutationPlanError, type MutationPlanErrorCode } from './mutation-plan-error'
+import { MutationPlanError } from './mutation-plan-error'
 import {
   MutationPreconditionError,
   type MutationPreconditionErrorCode,
 } from './mutation-precondition-error'
-import type { ProjectMutationType } from './mutation-type'
-import {
-  PARTITIONED_MUTATION_TYPES,
-  describeMutation,
-  type ProjectMutation,
-} from './project-mutation'
+import { changeAfter, changeBefore, changeLabel, type ProjectChange } from './project-change'
 
 /** Marks a record or partition the projection deleted. Never a Project fact. */
 const DELETED = Symbol('seele/project-core/projected-deleted')
 
 type EntryPosition = 'append' | 'base'
 
-interface MutationContext {
+interface ChangeContext {
   readonly index: number
-  readonly type: ProjectMutationType
+  /** e.g. "midiNotes.replace" */
+  readonly change: string
 }
 
 interface ProjectedEntry<RecordType> {
@@ -54,10 +50,10 @@ type TablePatch<RecordType> = ProjectedEntry<RecordType> | typeof DELETED
 
 function rejectPrecondition(
   code: MutationPreconditionErrorCode,
-  context: MutationContext,
+  context: ChangeContext,
   detail: string,
 ): never {
-  throw new MutationPreconditionError(code, context.index, context.type, detail)
+  throw new MutationPreconditionError(code, context.index, context.change, detail)
 }
 
 /** A copy-on-write view of one record table. */
@@ -107,14 +103,14 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
   write(
     before: StoredRecord | undefined,
     after: StoredRecord | undefined,
-    context: MutationContext,
+    context: ChangeContext,
   ): void {
     if (before === undefined) this.#insert(after!, context)
     else if (after === undefined) this.#remove(before, context)
     else this.#replace(before, after, context)
   }
 
-  #insert(after: StoredRecord, context: MutationContext): void {
+  #insert(after: StoredRecord, context: ChangeContext): void {
     if (this.get(after.id) !== undefined) {
       rejectPrecondition(
         'insert-target-exists',
@@ -128,7 +124,7 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
     this.#patches.set(after.id, { position: 'append', value: after })
   }
 
-  #remove(before: StoredRecord, context: MutationContext): void {
+  #remove(before: StoredRecord, context: ChangeContext): void {
     this.#requireCurrent(before, 'remove', context)
 
     if (this.#base.get(before.id) === undefined) {
@@ -138,7 +134,7 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
     }
   }
 
-  #replace(before: StoredRecord, after: StoredRecord, context: MutationContext): void {
+  #replace(before: StoredRecord, after: StoredRecord, context: ChangeContext): void {
     this.#requireCurrent(before, 'replace', context)
 
     const patch = this.#patches.get(before.id)
@@ -151,7 +147,7 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
   #requireCurrent(
     before: StoredRecord,
     verb: 'remove' | 'replace',
-    context: MutationContext,
+    context: ChangeContext,
   ): void {
     const current = this.get(before.id)
 
@@ -180,22 +176,15 @@ interface ProjectedPartition {
 
 type PartitionPatch = ProjectedPartition | typeof DELETED
 
-/** How a partitioned table names itself in errors. */
-interface PartitionNames {
-  /** e.g. "MIDI Note" */
-  readonly entity: string
-  readonly duplicateIdCode: MutationPlanErrorCode
-  readonly contentMismatchCode: MutationPreconditionErrorCode
-}
-
 /** A copy-on-write view of records partitioned by MIDI Source, such as Notes or CC64 events. */
 class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
-  readonly #names: PartitionNames
+  /** Names the records in errors, e.g. "MIDI Note". */
+  readonly #entity: string
   readonly #base: PartitionedTableView<StoredRecord>
   readonly #patches = new Map<MidiSourceId, PartitionPatch>()
 
-  constructor(names: PartitionNames, base: PartitionedTableView<StoredRecord>) {
-    this.#names = names
+  constructor(entity: string, base: PartitionedTableView<StoredRecord>) {
+    this.#entity = entity
     this.#base = base
   }
 
@@ -237,9 +226,9 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
   insertPartition(
     partitionId: MidiSourceId,
     records: readonly StoredRecord[],
-    context: MutationContext,
+    context: ChangeContext,
   ): void {
-    const { entity } = this.#names
+    const entity = this.#entity
     if (this.has(partitionId)) {
       rejectPrecondition(
         'insert-target-exists',
@@ -251,8 +240,8 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
     for (const record of records) {
       if (table.has(record.id)) {
         throw new MutationPlanError(
-          this.#names.duplicateIdCode,
-          `Mutation at index ${context.index} contains duplicate ${entity} ID ${record.id}`,
+          'duplicate-id-in-partition',
+          `Change at index ${context.index} contains duplicate ${entity} ID ${record.id}`,
           context.index,
         )
       }
@@ -265,9 +254,9 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
   removePartition(
     partitionId: MidiSourceId,
     before: readonly StoredRecord[],
-    context: MutationContext,
+    context: ChangeContext,
   ): void {
-    const { entity } = this.#names
+    const entity = this.#entity
     if (!this.has(partitionId)) {
       rejectPrecondition(
         'target-missing',
@@ -277,7 +266,7 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
     }
     if (!this.#matches(partitionId, before)) {
       rejectPrecondition(
-        this.#names.contentMismatchCode,
+        'partition-content-mismatch',
         context,
         `${entity} partition ${partitionId} no longer matches the expected before records`,
       )
@@ -291,7 +280,7 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
     partitionId: MidiSourceId,
     before: StoredRecord | undefined,
     after: StoredRecord | undefined,
-    context: MutationContext,
+    context: ChangeContext,
   ): void {
     const table = this.#mutable(partitionId, context)
 
@@ -300,7 +289,7 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
         rejectPrecondition(
           'insert-target-exists',
           context,
-          `cannot insert existing ${this.#names.entity} ${partitionId}/${after!.id}`,
+          `cannot insert existing ${this.#entity} ${partitionId}/${after!.id}`,
         )
       }
       table.set(after!.id, after!)
@@ -323,9 +312,9 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
     partitionId: MidiSourceId,
     before: StoredRecord,
     verb: 'remove' | 'replace',
-    context: MutationContext,
+    context: ChangeContext,
   ): void {
-    const { entity } = this.#names
+    const entity = this.#entity
     const current = table.get(before.id)
     if (current === undefined) {
       rejectPrecondition(
@@ -344,14 +333,14 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
   }
 
   /** The projected records of one partition, copied from the base the first time it is edited. */
-  #mutable(partitionId: MidiSourceId, context: MutationContext): Map<string, StoredRecord> {
+  #mutable(partitionId: MidiSourceId, context: ChangeContext): Map<string, StoredRecord> {
     const patch = this.#patches.get(partitionId)
     if (patch !== undefined && patch !== DELETED) return patch.records
     if (patch === DELETED || !this.#base.has(partitionId)) {
       rejectPrecondition(
         'target-missing',
         context,
-        `${this.#names.entity} partition ${partitionId} does not exist`,
+        `${this.#entity} partition ${partitionId} does not exist`,
       )
     }
     const table = new Map(this.#base.entries(partitionId))
@@ -382,8 +371,8 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
   readonly #recordViews: RecordTableViews
   readonly #partitionedViews: PartitionedTableViews
 
-  /** Mutations must be the normalized forward entries produced by createMutationPlan. */
-  constructor(base: ModelStoreReader, mutations: readonly ProjectMutation[]) {
+  /** Changes must be the normalized forward entries produced by createMutationPlan. */
+  constructor(base: ModelStoreReader, changes: readonly ProjectChange[]) {
     super()
     this.#base = base
     this.#project = base.project
@@ -396,14 +385,7 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
     this.#partitions = mapTables(
       PARTITIONED_TABLE_NAMES,
       (name) =>
-        new ProjectedPartitionedTable(
-          {
-            entity: PARTITIONED_TABLES[name].entity,
-            duplicateIdCode: PARTITIONED_MUTATION_TYPES[name].duplicateIdCode,
-            contentMismatchCode: PARTITIONED_MUTATION_TYPES[name].contentMismatchCode,
-          },
-          base.partitionedTable(name),
-        ),
+        new ProjectedPartitionedTable(PARTITIONED_TABLES[name].entity, base.partitionedTable(name)),
     )
     // Each projected table only ever holds records of the table it projects.
     this.#recordViews = mapTables(
@@ -415,7 +397,7 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
       (name): PartitionedTableView<StoredRecord> => this.#partitions[name],
     ) as PartitionedTableViews
 
-    mutations.forEach((mutation, index) => this.#applyMutation(mutation, index))
+    changes.forEach((change, index) => this.#applyChange(change, index))
 
     // Intermediate steps may be relationally incomplete; only the final view is validated.
     assertModelInvariants(this)
@@ -455,7 +437,7 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
     return this.#trackOrder
   }
 
-  #insertTrackOrder(index: number, trackId: TrackId, context: MutationContext): void {
+  #insertTrackOrder(index: number, trackId: TrackId, context: ChangeContext): void {
     const trackOrder = this.#mutableTrackOrder()
 
     if (!Number.isSafeInteger(index) || index < 0 || index > trackOrder.length) {
@@ -469,7 +451,7 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
     trackOrder.splice(index, 0, trackId)
   }
 
-  #removeTrackOrder(index: number, trackId: TrackId, context: MutationContext): void {
+  #removeTrackOrder(index: number, trackId: TrackId, context: ChangeContext): void {
     const trackOrder = this.#mutableTrackOrder()
 
     if (!Number.isSafeInteger(index) || index < 0 || index >= trackOrder.length) {
@@ -491,53 +473,52 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
     trackOrder.splice(index, 1)
   }
 
-  #applyMutation(mutation: ProjectMutation, index: number): void {
-    const step = describeMutation(mutation, index)
-    const context = { index, type: mutation.type }
+  #applyChange(change: ProjectChange, index: number): void {
+    const context = { index, change: changeLabel(change) }
 
-    switch (step.kind) {
+    switch (change.table) {
       case 'project':
-        if (this.#project !== step.before) {
+        if (this.#project !== change.before) {
           rejectPrecondition(
             'before-reference-mismatch',
             context,
             'Project no longer matches the expected before record',
           )
         }
-        this.#project = step.after
+        this.#project = change.after
         return
 
       case 'master':
-        if (this.#master !== step.before) {
+        if (this.#master !== change.before) {
           rejectPrecondition(
             'before-reference-mismatch',
             context,
             'Master Channel no longer matches the expected before record',
           )
         }
-        this.#master = step.after
+        this.#master = change.after
         return
 
-      case 'track-order':
-        if (step.op === 'insert') this.#insertTrackOrder(step.index, step.trackId, context)
-        else this.#removeTrackOrder(step.index, step.trackId, context)
+      case 'trackOrder':
+        if (change.op === 'insert') this.#insertTrackOrder(change.index, change.trackId, context)
+        else this.#removeTrackOrder(change.index, change.trackId, context)
         return
 
-      case 'record':
-        this.#records[step.table].write(step.before, step.after, context)
-        return
-
-      case 'partition':
-        if (step.op === 'insert') {
-          this.#partitions[step.table].insertPartition(step.sourceId, step.records, context)
+      default:
+        if (!('sourceId' in change)) {
+          this.#records[change.table].write(changeBefore(change), changeAfter(change), context)
+        } else if (change.op === 'insert-partition') {
+          this.#partitions[change.table].insertPartition(change.sourceId, change.records, context)
+        } else if (change.op === 'remove-partition') {
+          this.#partitions[change.table].removePartition(change.sourceId, change.records, context)
         } else {
-          this.#partitions[step.table].removePartition(step.sourceId, step.records, context)
+          this.#partitions[change.table].write(
+            change.sourceId,
+            changeBefore(change),
+            changeAfter(change),
+            context,
+          )
         }
-        return
-
-      case 'partition-record':
-        this.#partitions[step.table].write(step.sourceId, step.before, step.after, context)
-        return
     }
   }
 }

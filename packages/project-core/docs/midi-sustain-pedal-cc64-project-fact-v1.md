@@ -11,7 +11,7 @@ Event Selection / Move / Replace Value / Remove 的 Editor Foundation 已建立�
 
 - `MidiSustainPedalEventRecord`、Source 所有权分区与全局不变量；
 - Add、批量 Move、批量 Remove、Replace Value Project Command；
-- Mutation、ProjectDelta、History、Undo / Redo 与 Snapshot；
+- 存储变化、History、Undo / Redo 与 Snapshot；
 - Project File V2 写出、严格读取，以及 V1 到 V2 的无损迁移；
 - 新建 MIDI Clip 与整轨集合导入命令所需的完整所有权图；
 - Standard MIDI File CC64 导入、PPQ 碰撞诊断与原始 Value / Channel 保留；
@@ -150,23 +150,17 @@ Value 或共享 Delta，Core 再用提交时权威记录复核 ID、Source 边�
 `modelRevision` 推进和一个 History 步骤。任一目标缺失、越界或冲突时整体拒绝，不执行部分
 写入。零 Tick Move 和相同 Value Replace 返回 `no-change`。
 
-## ProjectDelta
+## 提交中的变化
 
-Event Add / Remove / Update 分别发布：
+Event 的增、删、改是 `midiSustainPedalEvents` 表上的 `insert`、`remove` 与 `replace` 变化；
+新建或删除 Source 时，整个踏板分区随 `insert-partition` / `remove-partition` 一起变化。
 
-```text
-midi-sustain-pedal-event.added
-midi-sustain-pedal-event.removed
-midi-sustain-pedal-event.updated
-```
-
-每条 Change 携带 `affectedFromTick`，而不是有限 `AffectedTickRange`。原因是一个 CC64 状态会
-持续到同 Channel 的下一条 CC64；在没有先计算下一状态边界前，保守失效范围必须从旧 Tick
-与新 Tick 的较早者一直向后。Playback 消费者可以通过重新编译更窄窗口优化，但不能假设只需
+变化本身不携带失效范围。一个 CC64 状态会持续到同 Channel 的下一条 CC64；在没有先计算下一
+状态边界前，消费者的保守失效范围必须从旧 Tick 与新 Tick 的较早者一直向后。Playback 消费者可以通过重新编译更窄窗口优化，但不能假设只需
 刷新 Event 所在的一个瞬间。
 
 MIDI Note QueryIndex 不索引 CC64，因此只推进 revision 而不重建 Note 索引；MIDI Note 局部
-订阅也不接收 CC64 Commit。`project-commit.all` 仍接收全部合法提交。
+订阅也不接收只含 CC64 变化的 Commit。`project-commit.all` 仍接收全部合法提交。
 
 ## Project File V2
 

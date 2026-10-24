@@ -8,7 +8,6 @@ import { deviceDescriptorsHaveSameValues, type DeviceDescriptor } from '#interna
 import type { ModelStoreReader } from '#internal/model/model-store'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 
 function commandDetails(command: ReplaceInstrumentDeviceCommand) {
   return {
@@ -91,8 +90,8 @@ export function prepareReplaceInstrumentDeviceCommand(
     command,
     plan: createMutationPlan(command.baseRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
-        trackId: track.id,
+        op: 'replace',
+        table: 'devices',
         before,
         after: command.instrumentDevice,
       },

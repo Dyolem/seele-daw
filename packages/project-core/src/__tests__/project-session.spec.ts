@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import * as projectCore from '#internal/index'
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   ProjectCommandError,
@@ -84,10 +83,7 @@ describe('ProjectSession command execution', () => {
       commit: {
         baseRevision: 0,
         modelRevision: 1,
-        delta: {
-          modelRevision: 1,
-          changes: [{ type: PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED, noteId }],
-        },
+        changes: [{ op: 'insert', table: 'midiNotes', after: { id: noteId } }],
       },
     })
     expect(session.modelRevision).toBe(1)
@@ -108,7 +104,7 @@ describe('ProjectSession command execution', () => {
       commit: {
         baseRevision: 1,
         modelRevision: 2,
-        delta: { changes: [{ type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED, noteId }] },
+        changes: [{ op: 'replace', table: 'midiNotes', after: { id: noteId } }],
       },
     })
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, noteId)).toMatchObject({
@@ -129,7 +125,7 @@ describe('ProjectSession command execution', () => {
       commit: {
         baseRevision: 2,
         modelRevision: 3,
-        delta: { changes: [{ type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED, noteId }] },
+        changes: [{ op: 'remove', table: 'midiNotes', before: { id: noteId } }],
       },
     })
     expect(session.modelRevision).toBe(3)
@@ -158,16 +154,14 @@ describe('ProjectSession command execution', () => {
           kind: 'command',
           commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
         },
-        delta: {
-          changes: [
-            {
-              type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
-              noteId: before.id,
-              before,
-              affected: { startTick: 120, endTick: 720 },
-            },
-          ],
-        },
+        changes: [
+          {
+            op: 'replace',
+            table: 'midiNotes',
+            before,
+            after: { id: before.id, startTick: 120, durationTick: 600 },
+          },
+        ],
       },
     })
     expect(session.modelRevision).toBe(1)
@@ -197,12 +191,10 @@ describe('ProjectSession command execution', () => {
       commit: {
         baseRevision: 0,
         modelRevision: 1,
-        delta: {
-          changes: [
-            { type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED, noteId: first.id },
-            { type: PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED, noteId: second.id },
-          ],
-        },
+        changes: [
+          { op: 'replace', table: 'midiNotes', after: { id: first.id } },
+          { op: 'replace', table: 'midiNotes', after: { id: second.id } },
+        ],
       },
     })
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toMatchObject({
@@ -238,8 +230,7 @@ describe('ProjectSession command execution', () => {
 
     expect(Object.isFrozen(result)).toBe(true)
     expect(Object.isFrozen(result.commit)).toBe(true)
-    expect(Object.isFrozen(result.commit.delta)).toBe(true)
-    expect(Object.isFrozen(result.commit.delta.changes)).toBe(true)
+    expect(Object.isFrozen(result.commit.changes)).toBe(true)
   })
 
   it('removes multiple Notes in one Commit and one reversible History step', () => {
@@ -263,18 +254,10 @@ describe('ProjectSession command execution', () => {
           commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
           kind: 'command',
         },
-        delta: {
-          changes: [
-            {
-              type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
-              noteId: noteIds[0],
-            },
-            {
-              type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
-              noteId: noteIds[1],
-            },
-          ],
-        },
+        changes: [
+          { op: 'remove', table: 'midiNotes', before: { id: noteIds[0] } },
+          { op: 'remove', table: 'midiNotes', before: { id: noteIds[1] } },
+        ],
       },
     })
     expect(session.modelRevision).toBe(1)

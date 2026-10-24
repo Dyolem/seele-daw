@@ -1,15 +1,12 @@
-import {
-  PROJECT_CHANGE_TYPE,
-  type AffectedTickRange,
-  type ProjectChange,
-} from '#internal/commit/project-change'
 import type { ProjectCommit } from '#internal/commit/project-commit'
 import type { MidiSourceId, NoteId } from '#internal/model/ids'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import { ProjectSubscriptionError } from '#internal/subscriptions/project-subscription-error'
 import {
   PROJECT_SUBSCRIPTION_TYPE,
   normalizeProjectSubscription,
+  type AffectedTickRange,
   type MidiNoteChangesSubscription,
   type ProjectSubscription,
   type ProjectSubscriptionDeliveryFailure,
@@ -47,48 +44,43 @@ function matchesMidiNoteAddress(
   )
 }
 
+function noteRange(note: MidiNoteRecord): AffectedTickRange {
+  return { startTick: note.startTick, endTick: addTicks(note.startTick, note.durationTick) }
+}
+
 function matchesPlacedMidiNote(
   subscription: MidiNoteChangesSubscription,
   sourceId: MidiSourceId,
   note: MidiNoteRecord,
 ): boolean {
-  return matchesMidiNoteAddress(subscription, sourceId, note.id, {
-    startTick: note.startTick,
-    endTick: addTicks(note.startTick, note.durationTick),
-  })
+  return matchesMidiNoteAddress(subscription, sourceId, note.id, noteRange(note))
 }
 
 function matchesMidiNoteChange(
   subscription: MidiNoteChangesSubscription,
   change: ProjectChange,
 ): boolean {
-  switch (change.type) {
-    case PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED:
-    case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED:
-    case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
-    case PROJECT_CHANGE_TYPE.MIDI_CLIP.UPDATED:
-    case PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADDED:
-    case PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVED:
-    case PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.UPDATED:
-    case PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED:
-    case PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED:
-    case PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED:
-      return false
+  if (change.table !== 'midiNotes') return false
 
-    case PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED:
-      return change.after.notes.some((note) =>
+  switch (change.op) {
+    case 'insert-partition':
+    case 'remove-partition':
+      return change.records.some((note) =>
         matchesPlacedMidiNote(subscription, change.sourceId, note),
       )
-
-    case PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED:
-      return change.before.notes.some((note) =>
-        matchesPlacedMidiNote(subscription, change.sourceId, note),
-      )
-
-    case PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED:
-    case PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED:
-    case PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED:
-      return matchesMidiNoteAddress(subscription, change.sourceId, change.noteId, change.affected)
+    case 'insert':
+      return matchesPlacedMidiNote(subscription, change.sourceId, change.after)
+    case 'remove':
+      return matchesPlacedMidiNote(subscription, change.sourceId, change.before)
+    case 'replace': {
+      // A moved Note matches anywhere between where it was and where it went.
+      const before = noteRange(change.before)
+      const after = noteRange(change.after)
+      return matchesMidiNoteAddress(subscription, change.sourceId, change.after.id, {
+        startTick: before.startTick < after.startTick ? before.startTick : after.startTick,
+        endTick: before.endTick > after.endTick ? before.endTick : after.endTick,
+      })
+    }
   }
 }
 
@@ -97,7 +89,7 @@ function matchesSubscription(subscription: ProjectSubscription, commit: ProjectC
     case PROJECT_SUBSCRIPTION_TYPE.ALL_COMMITS:
       return true
     case PROJECT_SUBSCRIPTION_TYPE.MIDI_NOTE_CHANGES:
-      return commit.delta.changes.some((change) => matchesMidiNoteChange(subscription, change))
+      return commit.changes.some((change) => matchesMidiNoteChange(subscription, change))
   }
 }
 

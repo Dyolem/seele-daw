@@ -42,7 +42,7 @@ function partitionedTable<RecordType extends StoredRecord>(
 
 /**
  * The tables a ModelStore holds besides the Project, the Master Channel and the Track order.
- * Storage, projection and mutation dispatch are written against these definitions, so a new
+ * Storage, projection and change dispatch are written against these definitions, so a new
  * entity table is added here. Names double as the ModelStoreSeed fields.
  */
 export const RECORD_TABLES = Object.freeze({
@@ -56,8 +56,8 @@ export const RECORD_TABLES = Object.freeze({
 
 /** Records owned by one MIDI Source; a partition exists exactly while its Source does. */
 export const PARTITIONED_TABLES = Object.freeze({
-  midiNotesBySource: partitionedTable<MidiNoteRecord>('MIDI Note', 'Note ID'),
-  midiSustainPedalEventsBySource: partitionedTable<MidiSustainPedalEventRecord>(
+  midiNotes: partitionedTable<MidiNoteRecord>('MIDI Note', 'Note ID'),
+  midiSustainPedalEvents: partitionedTable<MidiSustainPedalEventRecord>(
     'MIDI Sustain Pedal Event',
     'Event ID',
   ),

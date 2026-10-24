@@ -207,40 +207,40 @@ export abstract class ModelStoreReader {
   }
 
   hasMidiNotePartition(sourceId: MidiSourceId): boolean {
-    return this.partitionedTable('midiNotesBySource').has(sourceId)
+    return this.partitionedTable('midiNotes').has(sourceId)
   }
 
   midiNotePartitionIds(): IterableIterator<MidiSourceId> {
-    return this.partitionedTable('midiNotesBySource').partitionIds()
+    return this.partitionedTable('midiNotes').partitionIds()
   }
 
   getMidiNote(sourceId: MidiSourceId, noteId: NoteId): MidiNoteRecord | undefined {
-    return this.partitionedTable('midiNotesBySource').get(sourceId, noteId)
+    return this.partitionedTable('midiNotes').get(sourceId, noteId)
   }
 
   midiNoteEntries(sourceId: MidiSourceId): IterableIterator<readonly [NoteId, MidiNoteRecord]> {
-    return this.partitionedTable('midiNotesBySource').entries(sourceId)
+    return this.partitionedTable('midiNotes').entries(sourceId)
   }
 
   hasMidiSustainPedalEventPartition(sourceId: MidiSourceId): boolean {
-    return this.partitionedTable('midiSustainPedalEventsBySource').has(sourceId)
+    return this.partitionedTable('midiSustainPedalEvents').has(sourceId)
   }
 
   midiSustainPedalEventPartitionIds(): IterableIterator<MidiSourceId> {
-    return this.partitionedTable('midiSustainPedalEventsBySource').partitionIds()
+    return this.partitionedTable('midiSustainPedalEvents').partitionIds()
   }
 
   getMidiSustainPedalEvent(
     sourceId: MidiSourceId,
     eventId: MidiSustainPedalEventId,
   ): MidiSustainPedalEventRecord | undefined {
-    return this.partitionedTable('midiSustainPedalEventsBySource').get(sourceId, eventId)
+    return this.partitionedTable('midiSustainPedalEvents').get(sourceId, eventId)
   }
 
   midiSustainPedalEventEntries(
     sourceId: MidiSourceId,
   ): IterableIterator<readonly [MidiSustainPedalEventId, MidiSustainPedalEventRecord]> {
-    return this.partitionedTable('midiSustainPedalEventsBySource').entries(sourceId)
+    return this.partitionedTable('midiSustainPedalEvents').entries(sourceId)
   }
 
   getTempoEvent(id: TempoEventId): TempoEventRecord | undefined {

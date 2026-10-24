@@ -1,4 +1,4 @@
-import { PROJECT_CHANGE_TYPE, parseTempoBpm, parseTick } from '@seele-daw/project-core'
+import { parseTempoBpm, parseTick } from '@seele-daw/project-core'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ProjectEditError } from '@/workbench/edits/edit-session'
@@ -18,9 +18,7 @@ describe('tempo edits', () => {
 
     const added = tempo.add({ bpm: parseTempoBpm(96.25), tick: parseTick(960) })
     expect(added.tempoEventId).toBe('tempo-event-created')
-    expect(added.commit.delta.changes).toMatchObject([
-      { type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED },
-    ])
+    expect(added.commit.changes).toMatchObject([{ op: 'insert', table: 'tempoEvents' }])
 
     expect(tempo.move({ tempoEventId: added.tempoEventId, tick: parseTick(1_920) })).not.toBeNull()
     expect(

@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_HISTORY_DIRECTION,
@@ -22,13 +21,10 @@ import {
   type ProjectChange,
   type ProjectCommit,
   type RemoveTempoEventCommand,
-  type TempoEventAddedChange,
-  type TempoEventRemovedChange,
-  type TempoEventUpdatedChange,
 } from '#internal/index'
+import { requireChange } from './support/project-change-test-support'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
 import { ModelStore } from '#internal/model/model-store'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
@@ -74,28 +70,16 @@ function createRemoveCommand(
   })
 }
 
-function requireAddedChange(change: ProjectChange | undefined): TempoEventAddedChange {
-  expect(change).toMatchObject({ type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED })
-  if (change?.type !== PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED) {
-    throw new Error('Expected an added Tempo Event change')
-  }
-  return change
+function requireAddedChange(change: ProjectChange | undefined) {
+  return requireChange(change === undefined ? [] : [change], 'tempoEvents', 'insert')
 }
 
-function requireRemovedChange(change: ProjectChange | undefined): TempoEventRemovedChange {
-  expect(change).toMatchObject({ type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED })
-  if (change?.type !== PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED) {
-    throw new Error('Expected a removed Tempo Event change')
-  }
-  return change
+function requireRemovedChange(change: ProjectChange | undefined) {
+  return requireChange(change === undefined ? [] : [change], 'tempoEvents', 'remove')
 }
 
-function requireUpdatedChange(change: ProjectChange | undefined): TempoEventUpdatedChange {
-  expect(change).toMatchObject({ type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED })
-  if (change?.type !== PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED) {
-    throw new Error('Expected an updated Tempo Event change')
-  }
-  return change
+function requireUpdatedChange(change: ProjectChange | undefined) {
+  return requireChange(change === undefined ? [] : [change], 'tempoEvents', 'replace')
 }
 
 describe('Tempo Event lifecycle command public contract', () => {
@@ -145,20 +129,23 @@ describe('AddTempoEventCommand preparation', () => {
     }
     if (
       preparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT
+      plan.forward[0]?.op !== 'insert' ||
+      plan.forward[0].table !== 'tempoEvents'
     ) {
       throw new Error('Expected a normalized Tempo Event insertion')
     }
 
     expect(plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT,
+        op: 'insert',
+        table: 'tempoEvents',
         after: preparation.command.tempoEvent,
       },
     ])
     expect(plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE,
+        op: 'remove',
+        table: 'tempoEvents',
         before: preparation.command.tempoEvent,
       },
     ])
@@ -215,7 +202,8 @@ describe('MoveTempoEventCommand preparation', () => {
     if (
       preparation.status !== 'ready' ||
       preparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE
+      plan.forward[0]?.op !== 'replace' ||
+      plan.forward[0].table !== 'tempoEvents'
     ) {
       throw new Error('Expected a ready Tempo Event move')
     }
@@ -229,7 +217,8 @@ describe('MoveTempoEventCommand preparation', () => {
     expect(forward.after.bpm).toBe(forward.before.bpm)
     expect(plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
+        op: 'replace',
+        table: 'tempoEvents',
         before: forward.after,
         after: fixture.records.laterTempoEvent,
       },
@@ -326,13 +315,15 @@ describe('RemoveTempoEventCommand preparation', () => {
 
     expect(plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE,
+        op: 'remove',
+        table: 'tempoEvents',
         before: fixture.records.laterTempoEvent,
       },
     ])
     expect(plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT,
+        op: 'insert',
+        table: 'tempoEvents',
         after: fixture.records.laterTempoEvent,
       },
     ])
@@ -395,10 +386,10 @@ describe('Tempo Event lifecycle commit and History semantics', () => {
     if (addResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
       throw new Error('Expected Tempo Event insertion to commit')
     }
-    const addedChange = requireAddedChange(addResult.commit.delta.changes[0])
+    const addedChange = requireAddedChange(addResult.commit.changes[0])
     expect(addedChange).toEqual({
-      type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED,
-      tempoEventId: ADDED_TEMPO_EVENT_ID,
+      op: 'insert',
+      table: 'tempoEvents',
       after: {
         id: ADDED_TEMPO_EVENT_ID,
         tick: ADDED_TEMPO_EVENT_TICK,
@@ -412,7 +403,7 @@ describe('Tempo Event lifecycle commit and History semantics', () => {
     if (moveResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
       throw new Error('Expected Tempo Event move to commit')
     }
-    const movedChange = requireUpdatedChange(moveResult.commit.delta.changes[0])
+    const movedChange = requireUpdatedChange(moveResult.commit.changes[0])
     expect(movedChange.before).toBe(addedChange.after)
     expect(movedChange.after).toEqual({ ...addedChange.after, tick: MOVED_TEMPO_EVENT_TICK })
     expect(store.getTempoEvent(ADDED_TEMPO_EVENT_ID)).toBe(movedChange.after)
@@ -427,12 +418,12 @@ describe('Tempo Event lifecycle commit and History semantics', () => {
     if (removeResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
       throw new Error('Expected Tempo Event removal to commit')
     }
-    const removedChange = requireRemovedChange(removeResult.commit.delta.changes[0])
+    const removedChange = requireRemovedChange(removeResult.commit.changes[0])
     expect(removedChange.before).toBe(movedChange.after)
     expect(store.getTempoEvent(ADDED_TEMPO_EVENT_ID)).toBeUndefined()
 
     const undoRemove = session.undo()
-    const undoRemoveChange = requireAddedChange(undoRemove?.delta.changes[0])
+    const undoRemoveChange = requireAddedChange(undoRemove?.changes[0])
     expect(undoRemove?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
@@ -441,7 +432,7 @@ describe('Tempo Event lifecycle commit and History semantics', () => {
     expect(undoRemoveChange.after).toBe(movedChange.after)
 
     const undoMove = session.undo()
-    const undoMoveChange = requireUpdatedChange(undoMove?.delta.changes[0])
+    const undoMoveChange = requireUpdatedChange(undoMove?.changes[0])
     expect(undoMove?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
@@ -451,7 +442,7 @@ describe('Tempo Event lifecycle commit and History semantics', () => {
     expect(undoMoveChange.after).toBe(addedChange.after)
 
     const undoAdd = session.undo()
-    const undoAddChange = requireRemovedChange(undoAdd?.delta.changes[0])
+    const undoAddChange = requireRemovedChange(undoAdd?.changes[0])
     expect(undoAdd?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
@@ -463,9 +454,9 @@ describe('Tempo Event lifecycle commit and History semantics', () => {
     const redoAdd = session.redo()
     const redoMove = session.redo()
     const redoRemove = session.redo()
-    expect(requireAddedChange(redoAdd?.delta.changes[0]).after).toBe(addedChange.after)
-    expect(requireUpdatedChange(redoMove?.delta.changes[0]).after).toBe(movedChange.after)
-    expect(requireRemovedChange(redoRemove?.delta.changes[0]).before).toBe(movedChange.after)
+    expect(requireAddedChange(redoAdd?.changes[0]).after).toBe(addedChange.after)
+    expect(requireUpdatedChange(redoMove?.changes[0]).after).toBe(movedChange.after)
+    expect(requireRemovedChange(redoRemove?.changes[0]).before).toBe(movedChange.after)
     expect(store.getTempoEvent(ADDED_TEMPO_EVENT_ID)).toBeUndefined()
     expect(session.getSnapshot().tempoEvents).toEqual([
       fixture.records.initialTempoEvent,

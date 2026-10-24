@@ -1,16 +1,13 @@
-import {
-  PROJECT_CHANGE_TYPE,
-  type MidiClipAddedChange,
-  type MidiClipRemovedChange,
-  type MidiNoteAddedChange,
-  type MidiNoteRemovedChange,
-  type MidiNoteUpdatedChange,
-} from '#internal/commit/project-change'
-import type { ProjectDelta } from '#internal/commit/project-delta'
+import type { ProjectCommit } from '#internal/commit/project-commit'
 import type { MidiSourceId, NoteId } from '#internal/model/ids'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { ModelRevision } from '#internal/model/model-revision'
 import type { ModelStoreReader } from '#internal/model/model-store'
+import {
+  changeLabel,
+  type PartitionChange,
+  type PartitionRecordChange,
+} from '#internal/mutation/project-change'
 import {
   compareMidiNotesForQuery,
   midiNoteEndTick,
@@ -42,17 +39,16 @@ interface QueryIndexRoot {
 }
 
 type QueryIndexTransitionState = 'prepared' | 'staged' | 'rolled-back'
-type MidiNoteChange = MidiNoteAddedChange | MidiNoteRemovedChange | MidiNoteUpdatedChange
-type MidiClipChange = MidiClipAddedChange | MidiClipRemovedChange
+type MidiNoteChange = PartitionRecordChange<'midiNotes'>
+type MidiNotePartitionChange = PartitionChange<'midiNotes'>
 
 export type QueryIndexErrorCode =
   | 'change-precondition-failed'
-  | 'delta-revision-mismatch'
+  | 'commit-revision-mismatch'
   | 'duplicate-note-id'
   | 'partition-missing'
   | 'transition-stale'
   | 'transition-state-invalid'
-  | 'unsupported-change-type'
 
 /** Internal consistency failure in a rebuildable derived QueryIndex. */
 export class QueryIndexError extends Error {
@@ -175,156 +171,99 @@ function queryPartitionRange(
   return matches
 }
 
+function noteIdOf(change: MidiNoteChange): NoteId {
+  return change.op === 'insert' ? change.after.id : change.before.id
+}
+
 function rejectChangePrecondition(
+  change: MidiNoteChange | MidiNotePartitionChange,
+  changeIndex: number,
+  detail: string,
+): never {
+  throw new QueryIndexError(
+    'change-precondition-failed',
+    `ProjectChange ${changeLabel(change)} at index ${changeIndex} ${detail}`,
+    {
+      changeIndex,
+      sourceId: change.sourceId,
+      noteId: 'records' in change ? undefined : noteIdOf(change),
+    },
+  )
+}
+
+function applyNoteChange(
+  notes: Map<NoteId, MidiNoteRecord>,
   change: MidiNoteChange,
   changeIndex: number,
-  detail: string,
-): never {
-  throw new QueryIndexError(
-    'change-precondition-failed',
-    `ProjectChange ${change.type} at index ${changeIndex} ${detail}`,
-    { changeIndex, sourceId: change.sourceId, noteId: change.noteId },
-  )
-}
-
-function rejectClipChangePrecondition(
-  change: MidiClipChange,
-  changeIndex: number,
-  detail: string,
-): never {
-  throw new QueryIndexError(
-    'change-precondition-failed',
-    `ProjectChange ${change.type} at index ${changeIndex} ${detail}`,
-    { changeIndex, sourceId: change.sourceId },
-  )
-}
-
-function applyAddedNote(
-  notes: Map<NoteId, MidiNoteRecord>,
-  change: MidiNoteAddedChange,
-  changeIndex: number,
 ): void {
-  if (change.after.id !== change.noteId || notes.has(change.noteId)) {
-    rejectChangePrecondition(change, changeIndex, 'does not describe a new Note identity')
-  }
-
-  notes.set(change.noteId, change.after)
-}
-
-function applyRemovedNote(
-  notes: Map<NoteId, MidiNoteRecord>,
-  change: MidiNoteRemovedChange,
-  changeIndex: number,
-): void {
-  if (change.before.id !== change.noteId || notes.get(change.noteId) !== change.before) {
-    rejectChangePrecondition(change, changeIndex, 'does not match the indexed before Record')
-  }
-
-  notes.delete(change.noteId)
-}
-
-function applyUpdatedNote(
-  notes: Map<NoteId, MidiNoteRecord>,
-  change: MidiNoteUpdatedChange,
-  changeIndex: number,
-): void {
-  if (
-    change.before.id !== change.noteId ||
-    change.after.id !== change.noteId ||
-    notes.get(change.noteId) !== change.before
-  ) {
-    rejectChangePrecondition(change, changeIndex, 'does not match the indexed replacement')
-  }
-
-  notes.set(change.noteId, change.after)
-}
-
-function assertClipPlacementAddress(
-  change: MidiClipAddedChange | MidiClipRemovedChange,
-  placement: MidiClipAddedChange['after'] | MidiClipRemovedChange['before'],
-  changeIndex: number,
-): void {
-  if (
-    placement.clip.id !== change.clipId ||
-    placement.clip.trackId !== change.trackId ||
-    placement.clip.sourceId !== change.sourceId ||
-    placement.source.id !== change.sourceId
-  ) {
-    rejectClipChangePrecondition(
-      change,
-      changeIndex,
-      'does not match its MIDI Clip placement address',
-    )
+  switch (change.op) {
+    case 'insert':
+      if (notes.has(change.after.id)) {
+        rejectChangePrecondition(change, changeIndex, 'does not describe a new Note identity')
+      }
+      notes.set(change.after.id, change.after)
+      return
+    case 'remove':
+      if (notes.get(change.before.id) !== change.before) {
+        rejectChangePrecondition(change, changeIndex, 'does not match the indexed before Record')
+      }
+      notes.delete(change.before.id)
+      return
+    case 'replace':
+      if (change.after.id !== change.before.id || notes.get(change.before.id) !== change.before) {
+        rejectChangePrecondition(change, changeIndex, 'does not match the indexed replacement')
+      }
+      notes.set(change.before.id, change.after)
+      return
   }
 }
 
-function applyAddedMidiClip(
+function applyPartitionChange(
   root: QueryIndexRoot,
   workingPartitions: Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>,
   removedPartitionIds: Set<MidiSourceId>,
-  change: MidiClipAddedChange,
+  change: MidiNotePartitionChange,
   changeIndex: number,
 ): void {
-  assertClipPlacementAddress(change, change.after, changeIndex)
+  const { sourceId } = change
+  const removed = removedPartitionIds.has(sourceId)
+  const indexed = removed
+    ? undefined
+    : (workingPartitions.get(sourceId) ?? root.partitions.get(sourceId)?.byId)
 
-  const sourceId = change.sourceId
-  const partitionExists =
-    !removedPartitionIds.has(sourceId) &&
-    (workingPartitions.has(sourceId) || root.partitions.has(sourceId))
-
-  if (partitionExists) {
-    rejectClipChangePrecondition(
-      change,
-      changeIndex,
-      `cannot add an existing MIDI Note partition for Source ${sourceId}`,
-    )
+  if (change.op === 'insert-partition') {
+    if (indexed !== undefined) {
+      rejectChangePrecondition(
+        change,
+        changeIndex,
+        `cannot add an existing MIDI Note partition for Source ${sourceId}`,
+      )
+    }
+    removedPartitionIds.delete(sourceId)
+    workingPartitions.set(sourceId, new Map(change.records.map((note) => [note.id, note])))
+    return
   }
 
-  removedPartitionIds.delete(sourceId)
-  workingPartitions.set(sourceId, new Map(change.after.notes.map((note) => [note.id, note])))
-}
-
-function applyRemovedMidiClip(
-  root: QueryIndexRoot,
-  workingPartitions: Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>,
-  removedPartitionIds: Set<MidiSourceId>,
-  change: MidiClipRemovedChange,
-  changeIndex: number,
-): void {
-  assertClipPlacementAddress(change, change.before, changeIndex)
-
-  const sourceId = change.sourceId
-  const working = workingPartitions.get(sourceId)
-  const indexed = working ?? root.partitions.get(sourceId)?.byId
-
   if (
-    removedPartitionIds.has(sourceId) ||
     indexed === undefined ||
-    indexed.size !== change.before.notes.length ||
-    change.before.notes.some((note) => indexed.get(note.id) !== note)
+    indexed.size !== change.records.length ||
+    change.records.some((note) => indexed.get(note.id) !== note)
   ) {
-    rejectClipChangePrecondition(
+    rejectChangePrecondition(
       change,
       changeIndex,
       `does not match the indexed MIDI Note partition for Source ${sourceId}`,
     )
   }
-
   workingPartitions.delete(sourceId)
   removedPartitionIds.add(sourceId)
 }
 
-function rejectUnsupportedChange(change: never, changeIndex: number): never {
-  const type = (change as { readonly type?: unknown }).type
-
-  throw new QueryIndexError(
-    'unsupported-change-type',
-    `ProjectChange at index ${changeIndex} has no QueryIndex semantics: ${String(type)}`,
-    { changeIndex },
-  )
-}
-
-function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): QueryIndexRoot {
+/** Only MIDI Note changes reach the index; every other table is outside its semantics. */
+function createIncrementalRoot(
+  root: QueryIndexRoot,
+  commit: Pick<ProjectCommit, 'modelRevision' | 'changes'>,
+): QueryIndexRoot {
   const workingPartitions = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>()
   const removedPartitionIds = new Set<MidiSourceId>()
 
@@ -335,21 +274,16 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
     const existing = workingPartitions.get(change.sourceId)
 
     if (existing !== undefined) return existing
-    if (removedPartitionIds.has(change.sourceId)) {
-      throw new QueryIndexError(
-        'partition-missing',
-        `MIDI Note QueryIndex has no partition for Source ${change.sourceId}`,
-        { changeIndex, sourceId: change.sourceId, noteId: change.noteId },
-      )
-    }
 
-    const partition = root.partitions.get(change.sourceId)
+    const partition = removedPartitionIds.has(change.sourceId)
+      ? undefined
+      : root.partitions.get(change.sourceId)
 
     if (partition === undefined) {
       throw new QueryIndexError(
         'partition-missing',
         `MIDI Note QueryIndex has no partition for Source ${change.sourceId}`,
-        { changeIndex, sourceId: change.sourceId, noteId: change.noteId },
+        { changeIndex, sourceId: change.sourceId, noteId: noteIdOf(change) },
       )
     }
 
@@ -358,42 +292,13 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
     return notes
   }
 
-  for (const [changeIndex, change] of delta.changes.entries()) {
-    switch (change.type) {
-      case PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED:
-      case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED:
-      case PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED:
-      case PROJECT_CHANGE_TYPE.MIDI_CLIP.UPDATED:
-      case PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADDED:
-      case PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVED:
-      case PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.UPDATED:
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED:
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED:
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED:
-        break
+  for (const [changeIndex, change] of commit.changes.entries()) {
+    if (change.table !== 'midiNotes') continue
 
-      case PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED:
-        applyAddedMidiClip(root, workingPartitions, removedPartitionIds, change, changeIndex)
-        break
-
-      case PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED:
-        applyRemovedMidiClip(root, workingPartitions, removedPartitionIds, change, changeIndex)
-        break
-
-      case PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED:
-        applyAddedNote(requireWorkingPartition(change, changeIndex), change, changeIndex)
-        break
-
-      case PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED:
-        applyRemovedNote(requireWorkingPartition(change, changeIndex), change, changeIndex)
-        break
-
-      case PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED:
-        applyUpdatedNote(requireWorkingPartition(change, changeIndex), change, changeIndex)
-        break
-
-      default:
-        return rejectUnsupportedChange(change, changeIndex)
+    if (change.op === 'insert-partition' || change.op === 'remove-partition') {
+      applyPartitionChange(root, workingPartitions, removedPartitionIds, change, changeIndex)
+    } else {
+      applyNoteChange(requireWorkingPartition(change, changeIndex), change, changeIndex)
     }
   }
 
@@ -406,7 +311,7 @@ function createIncrementalRoot(root: QueryIndexRoot, delta: ProjectDelta): Query
   }
 
   return Object.freeze({
-    modelRevision: delta.modelRevision,
+    modelRevision: commit.modelRevision,
     partitions: nextPartitions,
   })
 }
@@ -475,15 +380,18 @@ export class QueryIndex {
     return executeIndexedQuery(this.#root, normalizedQuery) as ProjectQueryResultFor<Query>
   }
 
-  prepare(reader: ModelStoreReader, delta: ProjectDelta): PreparedQueryIndexTransition {
+  prepare(
+    reader: ModelStoreReader,
+    commit: Pick<ProjectCommit, 'modelRevision' | 'changes'>,
+  ): PreparedQueryIndexTransition {
     if (this.#root.modelRevision !== reader.modelRevision) this.rebuild(reader)
 
     const expectedModelRevision = nextModelRevision(reader.modelRevision)
 
-    if (delta.modelRevision !== expectedModelRevision) {
+    if (commit.modelRevision !== expectedModelRevision) {
       throw new QueryIndexError(
-        'delta-revision-mismatch',
-        `ProjectDelta revision ${delta.modelRevision} does not follow ModelStore revision ${reader.modelRevision}`,
+        'commit-revision-mismatch',
+        `ProjectCommit revision ${commit.modelRevision} does not follow ModelStore revision ${reader.modelRevision}`,
       )
     }
 
@@ -491,15 +399,15 @@ export class QueryIndex {
     let nextRoot: QueryIndexRoot
 
     try {
-      nextRoot = createIncrementalRoot(expectedRoot, delta)
+      nextRoot = createIncrementalRoot(expectedRoot, commit)
     } catch (error) {
       if (!canRecoverByRebuild(error)) throw error
 
       // A derived-cache mismatch must not become another project truth. Rebuild the
-      // current revision from ModelStore, then retry the still-uncommitted Delta once.
+      // current revision from ModelStore, then retry the still-uncommitted changes once.
       this.rebuild(reader)
       expectedRoot = this.#root
-      nextRoot = createIncrementalRoot(expectedRoot, delta)
+      nextRoot = createIncrementalRoot(expectedRoot, commit)
     }
 
     let state: QueryIndexTransitionState = 'prepared'

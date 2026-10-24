@@ -1,6 +1,5 @@
 import { PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION } from '@seele-daw/editor'
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_TYPE,
   ProjectCommandError,
   createAddMidiClipCommand,
@@ -197,9 +196,9 @@ describe('note edits', () => {
     })
 
     expect(commit).toMatchObject({ baseRevision: revision, modelRevision: revision + 1 })
-    expect(commit?.delta.changes.map(({ type }) => type)).toEqual([
-      PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
-      PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED,
+    expect(commit?.changes).toMatchObject([
+      { op: 'replace', table: 'midiNotes' },
+      { op: 'replace', table: 'midiNotes' },
     ])
     expect(notesOf(fixture.session)).toEqual([
       expect.objectContaining({ id: noteIds[0], pitch: 62, startTick: 720 }),
@@ -324,9 +323,9 @@ describe('note edits', () => {
 
     const commit = edits.remove({ clipId: fixture.clipId, noteIds })
 
-    expect(commit.delta.changes.map(({ type }) => type)).toEqual([
-      PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
-      PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+    expect(commit.changes).toMatchObject([
+      { op: 'remove', table: 'midiNotes' },
+      { op: 'remove', table: 'midiNotes' },
     ])
     expect(notesOf(fixture.session)).toEqual([])
     fixture.session.undo()

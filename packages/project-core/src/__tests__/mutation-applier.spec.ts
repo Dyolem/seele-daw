@@ -28,7 +28,8 @@ import { MutationApplyError, MutationRollbackError } from '#internal/mutation/mu
 import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
 import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
 import { MutationPreconditionError } from '#internal/mutation/mutation-precondition-error'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import { PARTITIONED_TABLE_NAMES, RECORD_TABLE_NAMES } from '#internal/model/model-tables'
+import { changeLabel } from '#internal/mutation/project-change'
 import { ProjectedModelStoreReader } from '#internal/mutation/projected-model-store-reader'
 
 function captureThrown(operation: () => unknown): unknown {
@@ -111,7 +112,8 @@ describe('MutationApplier plan admission and revision checks', () => {
     const replacementProject = createProjectReplacement(fixture)
     const plan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+        op: 'replace',
+        table: 'project',
         before: fixture.records.project,
         after: replacementProject,
       },
@@ -141,14 +143,16 @@ describe('MutationApplier plan admission and revision checks', () => {
     const replacementProject = createProjectReplacement(fixture)
     const winningPlan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+        op: 'replace',
+        table: 'project',
         before: fixture.records.project,
         after: replacementProject,
       },
     ])
     const stalePlan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.MASTER.REPLACE,
+        op: 'replace',
+        table: 'master',
         before: fixture.records.master,
         after: createMasterReplacement(fixture),
       },
@@ -185,19 +189,30 @@ describe('MutationApplier plan admission and revision checks', () => {
 })
 
 describe('MutationApplier complete transaction', () => {
-  it('applies all 32 mutation types exactly like the materialized projection and commits once', () => {
+  it('applies every table operation exactly like the materialized projection and commits once', () => {
     const { fixture, mutations } = createCompleteMutationScenario()
     const store = new ModelStore(fixture.seed)
     const plan = createMutationPlan(store.modelRevision, mutations)
     const projected = new ProjectedModelStoreReader(store, plan.forward)
     const expectedProjection = snapshotModelReader(projected)
     const applier = new MutationApplier(store)
-    const canonicalMutationTypes = Object.values(PROJECT_MUTATION_TYPE).flatMap((typeGroup) =>
-      Object.values(typeGroup),
-    )
+    const everyOperation = [
+      'project.replace',
+      'master.replace',
+      'trackOrder.insert',
+      'trackOrder.remove',
+      ...RECORD_TABLE_NAMES.flatMap((table) =>
+        ['insert', 'remove', 'replace'].map((op) => `${table}.${op}`),
+      ),
+      ...PARTITIONED_TABLE_NAMES.flatMap((table) =>
+        ['insert-partition', 'remove-partition', 'insert', 'remove', 'replace'].map(
+          (op) => `${table}.${op}`,
+        ),
+      ),
+    ]
 
-    expect(plan.forward).toHaveLength(32)
-    expect(new Set(plan.forward.map(({ type }) => type))).toEqual(new Set(canonicalMutationTypes))
+    expect(plan.forward).toHaveLength(everyOperation.length)
+    expect(new Set(plan.forward.map(changeLabel))).toEqual(new Set(everyOperation))
 
     const committedRevision = applier.apply(plan)
     const actual = snapshotModelReader(store)
@@ -244,7 +259,8 @@ describe('MutationApplier validation failures', () => {
     })
     const plan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+        op: 'replace',
+        table: 'tracks',
         before: staleBefore,
         after: replacement,
       },
@@ -256,8 +272,8 @@ describe('MutationApplier validation failures', () => {
     expect(error).toBeInstanceOf(MutationPreconditionError)
     expect(error).toMatchObject({
       code: 'before-reference-mismatch',
-      mutationIndex: 0,
-      mutationType: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+      changeIndex: 0,
+      change: 'tracks.replace',
     })
     expect(error).not.toBeInstanceOf(MutationApplyError)
     expect(snapshotModelReader(store)).toEqual(before)
@@ -269,7 +285,8 @@ describe('MutationApplier validation failures', () => {
     const applier = new MutationApplier(store)
     const plan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+        op: 'remove',
+        table: 'tracks',
         before: fixture.records.instrumentTrack,
       },
     ])
@@ -291,7 +308,8 @@ describe('MutationApplier defensive restoration', () => {
     const replacementTrack = createAudioTrackReplacement(fixture)
     const plan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+        op: 'replace',
+        table: 'tracks',
         before: fixture.records.audioTrack,
         after: replacementTrack,
       },
@@ -311,7 +329,7 @@ describe('MutationApplier defensive restoration', () => {
     )
 
     expect(error).toBeInstanceOf(MutationApplyError)
-    expect(error).toMatchObject({ code: 'write-failed', appliedMutationCount: 0 })
+    expect(error).toMatchObject({ code: 'write-failed', appliedChangeCount: 0 })
     expect(Object.hasOwn(error as object, 'failureCause')).toBe(true)
     expect((error as MutationApplyError).failureCause).toBe(injectedFailure)
     expect(snapshotModelReader(store)).toEqual(before)
@@ -326,17 +344,20 @@ describe('MutationApplier defensive restoration', () => {
     const replacementMaster = createMasterReplacement(fixture)
     const plan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+        op: 'replace',
+        table: 'project',
         before: fixture.records.project,
         after: replacementProject,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+        op: 'replace',
+        table: 'tracks',
         before: fixture.records.audioTrack,
         after: replacementTrack,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MASTER.REPLACE,
+        op: 'replace',
+        table: 'master',
         before: fixture.records.master,
         after: replacementMaster,
       },
@@ -356,7 +377,7 @@ describe('MutationApplier defensive restoration', () => {
     )
 
     expect(error).toBeInstanceOf(MutationApplyError)
-    expect(error).toMatchObject({ code: 'write-failed', appliedMutationCount: 1 })
+    expect(error).toMatchObject({ code: 'write-failed', appliedChangeCount: 1 })
     expect((error as MutationApplyError).cause).toBe(injectedFailure)
     expect((error as MutationApplyError).failureCause).toBe(injectedFailure)
     expect(store.modelRevision).toBe(INITIAL_MODEL_REVISION)
@@ -376,19 +397,22 @@ describe('MutationApplier defensive restoration', () => {
     })
     const plan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+        op: 'replace',
+        table: 'tracks',
         before: fixture.records.audioTrack,
         after: replacementTrack,
       },
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.REPLACE,
+        op: 'replace',
+        table: 'clips',
         before: fixture.records.nonLoopClip,
         after: replacementClip,
       },
     ])
     const retryPlan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+        op: 'replace',
+        table: 'project',
         before: fixture.records.project,
         after: createProjectReplacement(fixture),
       },
@@ -420,7 +444,7 @@ describe('MutationApplier defensive restoration', () => {
     expect(fatalError).toBeInstanceOf(MutationRollbackError)
     expect(fatalError).toMatchObject({
       code: 'rollback-failed',
-      appliedMutationCount: 1,
+      appliedChangeCount: 1,
       applyCause,
       rollbackCause,
     })
@@ -443,14 +467,16 @@ describe('MutationApplier defensive restoration', () => {
     const replacementTrack = createAudioTrackReplacement(fixture)
     const outerPlan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+        op: 'replace',
+        table: 'tracks',
         before: fixture.records.audioTrack,
         after: replacementTrack,
       },
     ])
     const innerPlan = createMutationPlan(store.modelRevision, [
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+        op: 'replace',
+        table: 'project',
         before: fixture.records.project,
         after: createProjectReplacement(fixture),
       },

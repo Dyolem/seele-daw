@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_HISTORY_DIRECTION,
@@ -26,14 +25,12 @@ import {
   type ReplaceInstrumentDeviceCommand,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import { createHistoryProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import {
   createCompleteProjectFixture,
   type CompleteProjectFixture,
 } from './support/complete-project-fixture'
+import { requireChange } from './support/project-change-test-support'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
@@ -142,7 +139,8 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     if (
       preparation.status !== 'ready' ||
       preparation.command.type !== PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.DEVICE.REPLACE
+      plan.forward[0]?.op !== 'replace' ||
+      plan.forward[0].table !== 'devices'
     ) {
       throw new Error('Expected a ready Instrument Device replacement')
     }
@@ -151,8 +149,8 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
 
     expect(plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
-        trackId: fixture.records.instrumentTrack.id,
+        op: 'replace',
+        table: 'devices',
         before: fixture.records.instrumentDevice,
         after: expect.objectContaining({
           id: fixture.records.instrumentDevice.id,
@@ -163,8 +161,8 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     ])
     expect(plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
-        trackId: fixture.records.instrumentTrack.id,
+        op: 'replace',
+        table: 'devices',
         before: forwardMutation.after,
         after: fixture.records.instrumentDevice,
       },
@@ -249,38 +247,6 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
       trackId: fixture.records.instrumentTrack.id,
     })
   })
-
-  it('fails closed for an unowned raw Device replacement', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const preparation = prepareProjectCommand(store, createCommand(store, fixture))
-    const plan = requireReadyProjectCommandPlan(preparation)
-
-    if (
-      preparation.status !== 'ready' ||
-      preparation.command.type !== PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.DEVICE.REPLACE
-    ) {
-      throw new Error('Expected a ready Instrument Device replacement')
-    }
-
-    const unownedPlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
-        before: fixture.records.instrumentDevice,
-        after: preparation.command.instrumentDevice,
-      },
-    ])
-    expect(() =>
-      createHistoryProjectCommitCandidate(
-        {
-          direction: PROJECT_HISTORY_DIRECTION.REDO,
-          commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE,
-        },
-        unownedPlan,
-      ),
-    ).toThrowError(expect.objectContaining({ code: 'unsupported-mutation-type' }))
-  })
 })
 
 describe('Instrument Device commit and History semantics', () => {
@@ -294,7 +260,7 @@ describe('Instrument Device commit and History semantics', () => {
       throw new Error('Expected Instrument Device replacement to commit')
     }
 
-    const change = result.commit.delta.changes[0]
+    const change = requireChange(result.commit, 'devices', 'replace')
     expect(result.commit).toMatchObject({
       baseRevision: 0,
       modelRevision: 1,
@@ -303,15 +269,9 @@ describe('Instrument Device commit and History semantics', () => {
         commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE,
       },
     })
-    expect(result.commit.delta.changes).toHaveLength(1)
-    expect(change?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED)
-    if (change?.type !== PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED) {
-      throw new Error('Expected an updated Instrument Device change')
-    }
+    expect(result.commit.changes).toHaveLength(1)
 
     expect(change).toMatchObject({
-      trackId: fixture.records.instrumentTrack.id,
-      deviceId: fixture.records.instrumentDevice.id,
       before: fixture.records.instrumentDevice,
       after: {
         id: fixture.records.instrumentDevice.id,
@@ -324,16 +284,12 @@ describe('Instrument Device commit and History semantics', () => {
     expect(store.getDevice(fixture.records.instrumentDevice.id)).toBe(change.after)
 
     const undoCommit = session.undo()
-    const undoChange = undoCommit?.delta.changes[0]
+    const undoChange = requireChange(undoCommit, 'devices', 'replace')
     expect(undoCommit?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
       commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE,
     })
-    expect(undoChange?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED)
-    if (undoChange?.type !== PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED) {
-      throw new Error('Expected an undone Instrument Device update')
-    }
     expect(undoChange.before).toBe(change.after)
     expect(undoChange.after).toBe(fixture.records.instrumentDevice)
     expect(store.getDevice(fixture.records.instrumentDevice.id)).toBe(
@@ -341,16 +297,12 @@ describe('Instrument Device commit and History semantics', () => {
     )
 
     const redoCommit = session.redo()
-    const redoChange = redoCommit?.delta.changes[0]
+    const redoChange = requireChange(redoCommit, 'devices', 'replace')
     expect(redoCommit?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.REDO,
       commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE,
     })
-    expect(redoChange?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED)
-    if (redoChange?.type !== PROJECT_CHANGE_TYPE.INSTRUMENT_DEVICE.UPDATED) {
-      throw new Error('Expected a redone Instrument Device update')
-    }
     expect(redoChange.before).toBe(fixture.records.instrumentDevice)
     expect(redoChange.after).toBe(change.after)
     expect(store.getDevice(fixture.records.instrumentDevice.id)).toBe(change.after)

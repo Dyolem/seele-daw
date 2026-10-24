@@ -299,8 +299,8 @@ export function normalizeProjectFileDTO(dto: ProjectFileDTO): ModelStoreSeed {
     normalizeMidiClip,
   )
   const midiSources = new Map<MidiSourceId, MidiSourceRecord>()
-  const midiNotesBySource = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>()
-  const midiSustainPedalEventsBySource = new Map<
+  const midiNotes = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>()
+  const midiSustainPedalEvents = new Map<
     MidiSourceId,
     Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
   >()
@@ -330,8 +330,8 @@ export function normalizeProjectFileDTO(dto: ProjectFileDTO): ModelStoreSeed {
     )
 
     midiSources.set(source.id, source)
-    midiNotesBySource.set(source.id, notes)
-    midiSustainPedalEventsBySource.set(source.id, sustainPedalEvents)
+    midiNotes.set(source.id, notes)
+    midiSustainPedalEvents.set(source.id, sustainPedalEvents)
   }
 
   const tempoEvents = createEntityMap<
@@ -378,8 +378,8 @@ export function normalizeProjectFileDTO(dto: ProjectFileDTO): ModelStoreSeed {
     tracks,
     clips,
     midiSources,
-    midiNotesBySource,
-    midiSustainPedalEventsBySource,
+    midiNotes,
+    midiSustainPedalEvents,
     tempoEvents,
     timeSignatureEvents,
     devices,

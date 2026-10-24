@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_HISTORY_DIRECTION,
@@ -33,13 +32,27 @@ import {
   type InstrumentTrackCollectionEntry,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import { changeLabel } from '#internal/mutation/project-change'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
+import type { ChangeOf } from './support/project-change-test-support'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
+
+/** One imported Track graph, in the order the command plans it. */
+const TRACK_GRAPH_INSERTS = [
+  'devices.insert',
+  'tracks.insert',
+  'trackOrder.insert',
+  'midiSources.insert',
+  'midiNotes.insert-partition',
+  'midiSustainPedalEvents.insert-partition',
+  'clips.insert',
+]
+
+function removalsOf(labels: readonly string[]): string[] {
+  return [...labels].reverse().map((label) => label.replace('insert', 'remove'))
+}
 
 function createEntry(
   suffix: string,
@@ -200,54 +213,20 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
     const plan = requireReadyProjectCommandPlan(preparation)
     const [first, second] = command.entries
 
-    expect(plan.forward.map((mutation) => mutation.type)).toEqual([
-      PROJECT_MUTATION_TYPE.DEVICE.INSERT,
-      PROJECT_MUTATION_TYPE.TRACK.INSERT,
-      PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
-      PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
-      PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
-      PROJECT_MUTATION_TYPE.CLIP.INSERT,
-      PROJECT_MUTATION_TYPE.DEVICE.INSERT,
-      PROJECT_MUTATION_TYPE.TRACK.INSERT,
-      PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
-      PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
-      PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
-      PROJECT_MUTATION_TYPE.CLIP.INSERT,
-    ])
+    expect(plan.forward.map(changeLabel)).toEqual([...TRACK_GRAPH_INSERTS, ...TRACK_GRAPH_INSERTS])
     expect(plan.forward[2]).toEqual({
-      type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+      op: 'insert',
+      table: 'trackOrder',
       index: 1,
       trackId: first?.track.id,
     })
     expect(plan.forward[9]).toEqual({
-      type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+      op: 'insert',
+      table: 'trackOrder',
       index: 2,
       trackId: second?.track.id,
     })
-    expect(plan.inverse.map((mutation) => mutation.type)).toEqual(
-      [...plan.forward].reverse().map((mutation) => {
-        switch (mutation.type) {
-          case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
-            return PROJECT_MUTATION_TYPE.DEVICE.REMOVE
-          case PROJECT_MUTATION_TYPE.TRACK.INSERT:
-            return PROJECT_MUTATION_TYPE.TRACK.REMOVE
-          case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-            return PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE
-          case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
-            return PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE
-          case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-            return PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE
-          case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-            return PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE
-          case PROJECT_MUTATION_TYPE.CLIP.INSERT:
-            return PROJECT_MUTATION_TYPE.CLIP.REMOVE
-          default:
-            throw new Error(`Unexpected mutation ${mutation.type}`)
-        }
-      }),
-    )
+    expect(plan.inverse.map(changeLabel)).toEqual(removalsOf(plan.forward.map(changeLabel)))
   })
 
   it('rejects duplicate identities and invalid ownership before any write', () => {
@@ -297,24 +276,6 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
     ).toBe('track-id-already-exists')
     expect(store.modelRevision).toBe(before)
   })
-
-  it('rejects an aggregate plan that misses part of the Track graph', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const preparation = prepareProjectCommand(store, createCommand(store))
-
-    if (preparation.status !== 'ready') throw new Error('Expected ready collection command')
-
-    expect(() => createProjectCommitCandidate(preparation.command, preparation.plan)).not.toThrow()
-
-    const incompletePlan = createMutationPlan(
-      store.modelRevision,
-      preparation.plan.forward.slice(0, -1),
-    )
-    expect(() => createProjectCommitCandidate(preparation.command, incompletePlan)).toThrowError(
-      expect.objectContaining({ code: 'unsupported-mutation-type' }),
-    )
-  })
 })
 
 describe('Instrument Track collection commit and History semantics', () => {
@@ -330,11 +291,9 @@ describe('Instrument Track collection commit and History semantics', () => {
     }
 
     expect(session.modelRevision).toBe(initialRevision + 1)
-    expect(result.commit.delta.changes.map((change) => change.type)).toEqual([
-      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED,
-      PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED,
-      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED,
-      PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED,
+    expect(result.commit.changes.map(changeLabel)).toEqual([
+      ...TRACK_GRAPH_INSERTS,
+      ...TRACK_GRAPH_INSERTS,
     ])
     expect(session.canUndo).toBe(true)
     expect(session.canRedo).toBe(false)
@@ -349,9 +308,10 @@ describe('Instrument Track collection commit and History semantics', () => {
       const clipGraph = entry.clips[0]
       const note = clipGraph?.notes[0]
       if (clipGraph === undefined || note === undefined) throw new Error('Missing test Note graph')
-      const clipChange = result.commit.delta.changes.find(
-        (change) =>
-          change.type === PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED &&
+      const pedalPartition = result.commit.changes.find(
+        (change): change is ChangeOf<'midiSustainPedalEvents', 'insert-partition'> =>
+          change.op === 'insert-partition' &&
+          change.table === 'midiSustainPedalEvents' &&
           change.sourceId === clipGraph.source.id,
       )
 
@@ -359,11 +319,7 @@ describe('Instrument Track collection commit and History semantics', () => {
         session.query(createMidiNoteByIdQuery({ sourceId: clipGraph.source.id, noteId: note.id }))
           .note,
       ).toEqual(note)
-      expect(clipChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED)
-      if (clipChange?.type !== PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED) {
-        throw new Error('Missing imported MIDI Clip change')
-      }
-      expect(clipChange.after.sustainPedalEvents).toEqual(clipGraph.sustainPedalEvents)
+      expect(pedalPartition?.records).toEqual(clipGraph.sustainPedalEvents)
       expect(
         [...store.midiSustainPedalEventEntries(clipGraph.source.id)].map(([, event]) => event),
       ).toEqual(clipGraph.sustainPedalEvents)
@@ -374,12 +330,9 @@ describe('Instrument Track collection commit and History semantics', () => {
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
       commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION,
     })
-    expect(undoCommit?.delta.changes.map((change) => change.type)).toEqual([
-      PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED,
-      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED,
-      PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED,
-      PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED,
-    ])
+    expect(undoCommit?.changes.map(changeLabel)).toEqual(
+      removalsOf(result.commit.changes.map(changeLabel)),
+    )
     expect(session.getSnapshot().trackOrder).toEqual([
       fixture.records.instrumentTrack.id,
       fixture.records.audioTrack.id,

@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_HISTORY_DIRECTION,
@@ -23,9 +22,6 @@ import {
   type CreateMoveMidiSustainPedalEventsCommandInput,
   type CreateRemoveMidiSustainPedalEventsCommandInput,
   type CreateReplaceMidiSustainPedalEventValueCommandInput,
-  type MidiSustainPedalEventAddedChange,
-  type MidiSustainPedalEventRemovedChange,
-  type MidiSustainPedalEventUpdatedChange,
   type MoveMidiSustainPedalEventsCommand,
   type ProjectChange,
   type ProjectCommit,
@@ -34,8 +30,8 @@ import {
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
 import { ModelStore } from '#internal/model/model-store'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
+import { requireChange } from './support/project-change-test-support'
 import { requireReadyProjectCommandPreparation } from './support/project-command-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
@@ -121,33 +117,19 @@ function captureCommandError(operation: () => unknown): ProjectCommandError {
   return caughtError
 }
 
-function requireAddedChange(change: ProjectChange | undefined): MidiSustainPedalEventAddedChange {
-  expect(change?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADDED)
-  if (change?.type !== PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADDED) {
-    throw new Error('Expected an added MIDI Sustain Pedal Event change')
-  }
-  return change
+function requireEventChange<Operation extends 'insert' | 'remove' | 'replace'>(
+  change: ProjectChange | undefined,
+  op: Operation,
+) {
+  return requireChange(change === undefined ? [] : [change], 'midiSustainPedalEvents', op)
 }
 
-function requireRemovedChange(
-  change: ProjectChange | undefined,
-): MidiSustainPedalEventRemovedChange {
-  expect(change?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVED)
-  if (change?.type !== PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVED) {
-    throw new Error('Expected a removed MIDI Sustain Pedal Event change')
-  }
-  return change
-}
-
-function requireUpdatedChange(
-  change: ProjectChange | undefined,
-): MidiSustainPedalEventUpdatedChange {
-  expect(change?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.UPDATED)
-  if (change?.type !== PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.UPDATED) {
-    throw new Error('Expected an updated MIDI Sustain Pedal Event change')
-  }
-  return change
-}
+const requireAddedChange = (change: ProjectChange | undefined) =>
+  requireEventChange(change, 'insert')
+const requireRemovedChange = (change: ProjectChange | undefined) =>
+  requireEventChange(change, 'remove')
+const requireUpdatedChange = (change: ProjectChange | undefined) =>
+  requireEventChange(change, 'replace')
 
 describe('MIDI Sustain Pedal Event command public contract', () => {
   it('normalizes Add, collection Move / Remove, and Value Replace intents', () => {
@@ -222,14 +204,16 @@ describe('Add MIDI Sustain Pedal Event preparation', () => {
     expect(preparation.command).not.toBe(command)
     expect(preparation.plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+        op: 'insert',
+        table: 'midiSustainPedalEvents',
         sourceId: command.sourceId,
         after: preparation.command.event,
       },
     ])
     expect(preparation.plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+        op: 'remove',
+        table: 'midiSustainPedalEvents',
         sourceId: command.sourceId,
         before: preparation.command.event,
       },
@@ -308,7 +292,7 @@ describe('Add MIDI Sustain Pedal Event preparation', () => {
     ).toBe('sustain-pedal-event-out-of-source-range')
 
     const missingPartitionFixture = createCompleteProjectFixture()
-    missingPartitionFixture.containers.midiSustainPedalEventsBySource.delete(
+    missingPartitionFixture.containers.midiSustainPedalEvents.delete(
       missingPartitionFixture.records.nonLoopSource.id,
     )
     const missingPartitionStore = new ModelStore(missingPartitionFixture.seed)
@@ -330,21 +314,23 @@ describe('Move, Remove, and Value Replace preparation', () => {
     expect(preparation.plan.forward).toHaveLength(2)
     expect(preparation.plan.forward).toMatchObject([
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        op: 'replace',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopPedalDown,
         after: { ...fixture.records.nonLoopPedalDown, tick: 480 },
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        op: 'replace',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopPedalUp,
         after: { ...fixture.records.nonLoopPedalUp, tick: 1_020 },
       },
     ])
-    expect(preparation.plan.inverse.map(({ type }) => type)).toEqual([
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+    expect(preparation.plan.inverse.map(({ table, op }) => `${table}.${op}`)).toEqual([
+      'midiSustainPedalEvents.replace',
+      'midiSustainPedalEvents.replace',
     ])
   })
 
@@ -383,7 +369,8 @@ describe('Move, Remove, and Value Replace preparation', () => {
 
     expect(replacePreparation.plan.forward).toMatchObject([
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        op: 'replace',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopPedalDown,
         after: {
@@ -394,12 +381,14 @@ describe('Move, Remove, and Value Replace preparation', () => {
     ])
     expect(removePreparation.plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+        op: 'remove',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopPedalDown,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+        op: 'remove',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopPedalUp,
       },
@@ -477,17 +466,15 @@ describe('MIDI Sustain Pedal Event commit and History semantics', () => {
     if (addResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
       throw new Error('Expected Sustain Pedal Event Add to commit')
     }
-    const added = requireAddedChange(addResult.commit.delta.changes[0])
-    expect(added.affectedFromTick).toBe(ADDED_EVENT_TICK)
-    expect(store.getMidiSustainPedalEvent(added.sourceId, added.sustainPedalEventId)).toBe(
-      added.after,
-    )
+    const added = requireAddedChange(addResult.commit.changes[0])
+    expect(added.after.tick).toBe(ADDED_EVENT_TICK)
+    expect(store.getMidiSustainPedalEvent(added.sourceId, added.after.id)).toBe(added.after)
 
     const moveResult = session.execute(
       createMoveMidiSustainPedalEventsCommand({
         baseRevision: session.modelRevision,
         sourceId: added.sourceId,
-        eventIds: [added.sustainPedalEventId],
+        eventIds: [added.after.id],
         deltaTick: parseTickDelta(120),
       }),
     )
@@ -495,16 +482,16 @@ describe('MIDI Sustain Pedal Event commit and History semantics', () => {
     if (moveResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
       throw new Error('Expected Sustain Pedal Event Move to commit')
     }
-    const moved = requireUpdatedChange(moveResult.commit.delta.changes[0])
+    const moved = requireUpdatedChange(moveResult.commit.changes[0])
     expect(moved.before).toBe(added.after)
     expect(moved.after.tick).toBe(1_320)
-    expect(moved.affectedFromTick).toBe(1_200)
+    expect(moved.before.tick).toBe(1_200)
 
     const replaceResult = session.execute(
       createReplaceMidiSustainPedalEventValueCommand({
         baseRevision: session.modelRevision,
         sourceId: moved.sourceId,
-        eventId: moved.sustainPedalEventId,
+        eventId: moved.after.id,
         value: parseMidiControlValue(0),
       }),
     )
@@ -512,43 +499,41 @@ describe('MIDI Sustain Pedal Event commit and History semantics', () => {
     if (replaceResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
       throw new Error('Expected Sustain Pedal Event Value Replace to commit')
     }
-    const replaced = requireUpdatedChange(replaceResult.commit.delta.changes[0])
+    const replaced = requireUpdatedChange(replaceResult.commit.changes[0])
     expect(replaced.before).toBe(moved.after)
     expect(replaced.after.value).toBe(0)
-    expect(replaced.affectedFromTick).toBe(1_320)
+    expect(replaced.after.tick).toBe(1_320)
 
     const removeResult = session.execute(
       createRemoveMidiSustainPedalEventsCommand({
         baseRevision: session.modelRevision,
         sourceId: replaced.sourceId,
-        eventIds: [replaced.sustainPedalEventId],
+        eventIds: [replaced.after.id],
       }),
     )
     expect(removeResult.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)
     if (removeResult.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
       throw new Error('Expected Sustain Pedal Event Remove to commit')
     }
-    const removed = requireRemovedChange(removeResult.commit.delta.changes[0])
+    const removed = requireRemovedChange(removeResult.commit.changes[0])
     expect(removed.before).toBe(replaced.after)
-    expect(removed.affectedFromTick).toBe(1_320)
-    expect(
-      store.getMidiSustainPedalEvent(removed.sourceId, removed.sustainPedalEventId),
-    ).toBeUndefined()
+    expect(removed.before.tick).toBe(1_320)
+    expect(store.getMidiSustainPedalEvent(removed.sourceId, removed.before.id)).toBeUndefined()
 
     const undoRemove = session.undo()
     const undoReplace = session.undo()
     const undoMove = session.undo()
     const undoAdd = session.undo()
-    expect(requireAddedChange(undoRemove?.delta.changes[0]).after).toBe(replaced.after)
-    expect(requireUpdatedChange(undoReplace?.delta.changes[0])).toMatchObject({
+    expect(requireAddedChange(undoRemove?.changes[0]).after).toBe(replaced.after)
+    expect(requireUpdatedChange(undoReplace?.changes[0])).toMatchObject({
       before: replaced.after,
       after: moved.after,
     })
-    expect(requireUpdatedChange(undoMove?.delta.changes[0])).toMatchObject({
+    expect(requireUpdatedChange(undoMove?.changes[0])).toMatchObject({
       before: moved.after,
       after: added.after,
     })
-    expect(requireRemovedChange(undoAdd?.delta.changes[0]).before).toBe(added.after)
+    expect(requireRemovedChange(undoAdd?.changes[0]).before).toBe(added.after)
     expect(undoAdd?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
@@ -559,13 +544,11 @@ describe('MIDI Sustain Pedal Event commit and History semantics', () => {
     const redoMove = session.redo()
     const redoReplace = session.redo()
     const redoRemove = session.redo()
-    expect(requireAddedChange(redoAdd?.delta.changes[0]).after).toBe(added.after)
-    expect(requireUpdatedChange(redoMove?.delta.changes[0]).after).toBe(moved.after)
-    expect(requireUpdatedChange(redoReplace?.delta.changes[0]).after).toBe(replaced.after)
-    expect(requireRemovedChange(redoRemove?.delta.changes[0]).before).toBe(replaced.after)
-    expect(
-      store.getMidiSustainPedalEvent(added.sourceId, added.sustainPedalEventId),
-    ).toBeUndefined()
+    expect(requireAddedChange(redoAdd?.changes[0]).after).toBe(added.after)
+    expect(requireUpdatedChange(redoMove?.changes[0]).after).toBe(moved.after)
+    expect(requireUpdatedChange(redoReplace?.changes[0]).after).toBe(replaced.after)
+    expect(requireRemovedChange(redoRemove?.changes[0]).before).toBe(replaced.after)
+    expect(store.getMidiSustainPedalEvent(added.sourceId, added.after.id)).toBeUndefined()
 
     await Promise.resolve()
     expect(allCommits).toEqual([

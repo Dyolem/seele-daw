@@ -86,13 +86,13 @@ function reverseMap<Key, Value>(source: ReadonlyMap<Key, Value>): ReadonlyMap<Ke
 }
 
 function reverseSeedInsertionOrder(seed: ModelStoreSeed): ModelStoreSeed {
-  const midiNotesBySource = new Map(
-    [...seed.midiNotesBySource]
+  const midiNotes = new Map(
+    [...seed.midiNotes]
       .reverse()
       .map(([sourceId, notes]) => [sourceId, reverseMap(notes)] as const),
   )
-  const midiSustainPedalEventsBySource = new Map(
-    [...seed.midiSustainPedalEventsBySource]
+  const midiSustainPedalEvents = new Map(
+    [...seed.midiSustainPedalEvents]
       .reverse()
       .map(([sourceId, events]) => [sourceId, reverseMap(events)] as const),
   )
@@ -102,8 +102,8 @@ function reverseSeedInsertionOrder(seed: ModelStoreSeed): ModelStoreSeed {
     tracks: reverseMap(seed.tracks),
     clips: reverseMap(seed.clips),
     midiSources: reverseMap(seed.midiSources),
-    midiNotesBySource,
-    midiSustainPedalEventsBySource,
+    midiNotes,
+    midiSustainPedalEvents,
     tempoEvents: reverseMap(seed.tempoEvents),
     timeSignatureEvents: reverseMap(seed.timeSignatureEvents),
     devices: reverseMap(seed.devices),
@@ -205,20 +205,20 @@ describe('ProjectSnapshot public contract', () => {
       [...fixture.seed.timeSignatureEvents.values()].sort(compareTimelineRecords),
     )
     expect(snapshot.midiNotePartitions.map((partition) => partition.sourceId)).toEqual(
-      [...fixture.seed.midiNotesBySource.keys()].sort(),
+      [...fixture.seed.midiNotes.keys()].sort(),
     )
     expect(snapshot.midiSustainPedalEventPartitions.map((partition) => partition.sourceId)).toEqual(
-      [...fixture.seed.midiSustainPedalEventsBySource.keys()].sort(),
+      [...fixture.seed.midiSustainPedalEvents.keys()].sort(),
     )
 
     for (const partition of snapshot.midiNotePartitions) {
       expect(partition.notes).toEqual(
-        [...fixture.seed.midiNotesBySource.get(partition.sourceId)!.values()].sort(compareIds),
+        [...fixture.seed.midiNotes.get(partition.sourceId)!.values()].sort(compareIds),
       )
     }
     for (const partition of snapshot.midiSustainPedalEventPartitions) {
       expect(partition.events).toEqual(
-        [...fixture.seed.midiSustainPedalEventsBySource.get(partition.sourceId)!.values()].sort(
+        [...fixture.seed.midiSustainPedalEvents.get(partition.sourceId)!.values()].sort(
           compareTimelineRecords,
         ),
       )

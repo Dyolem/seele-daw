@@ -168,12 +168,7 @@ function commitsFormContinuousChain(
   let expectedBaseRevision = fromModelRevision
 
   for (const commit of commits) {
-    if (
-      commit.baseRevision !== expectedBaseRevision ||
-      commit.delta.modelRevision !== commit.modelRevision
-    ) {
-      return false
-    }
+    if (commit.baseRevision !== expectedBaseRevision) return false
     expectedBaseRevision = commit.modelRevision
   }
 

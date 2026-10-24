@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import * as projectCore from '#internal/index'
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMIT_ORIGIN_KIND,
   PROJECT_HISTORY_DIRECTION,
@@ -308,6 +307,41 @@ describe('ProjectSession commit publication', () => {
     })
   })
 
+  it('matches a moved Note anywhere between where it was and where it went', async () => {
+    const { fixture, session } = createFixtureProjectSession()
+    const counts = { between: 0, beyond: 0 }
+
+    // The fixture Note spans [240, 720); moving it by 960 lands it on [1200, 1680).
+    session.subscribe(
+      createMidiNoteChangesSubscription({
+        affected: { startTick: parseTick(720), endTick: parseTick(1_200) },
+      }),
+      createObserver(() => {
+        counts.between += 1
+      }),
+    )
+    session.subscribe(
+      createMidiNoteChangesSubscription({
+        affected: { startTick: parseTick(1_680), endTick: parseTick(1_920) },
+      }),
+      createObserver(() => {
+        counts.beyond += 1
+      }),
+    )
+    session.execute(
+      createMoveNotesCommand({
+        baseRevision: session.modelRevision,
+        sourceId: fixture.records.nonLoopSource.id,
+        noteIds: [fixture.records.nonLoopNote.id],
+        deltaTick: parseTickDelta(960),
+        deltaPitch: parseMidiPitchDelta(0),
+      }),
+    )
+    await flushCommitDeliveries()
+
+    expect(counts).toEqual({ between: 1, beyond: 0 })
+  })
+
   it('matches constraints on the same change and calls once for a multi-change Commit', async () => {
     const { fixture, session } = createFixtureProjectSession()
     const firstCommit = executeAddNote(
@@ -320,22 +354,21 @@ describe('ProjectSession commit publication', () => {
       fixture.records.loopingSource.id,
       parseNoteId('note-subscription-multi-change-second'),
     )
-    const firstChange = firstCommit.delta.changes[0]!
-    const secondChange = secondCommit.delta.changes[0]!
+    const firstChange = firstCommit.changes[0]!
+    const secondChange = secondCommit.changes[0]!
     const syntheticCommit = Object.freeze<ProjectCommit>({
       ...secondCommit,
-      delta: Object.freeze({
-        modelRevision: secondCommit.modelRevision,
-        changes: Object.freeze([firstChange, secondChange]),
-      }),
+      changes: Object.freeze([firstChange, secondChange]),
     })
     const publisher = new ChangePublisher()
     const received: ProjectCommit[] = []
     const crossedConstraints: ProjectCommit[] = []
 
     if (
-      firstChange.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED ||
-      secondChange.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED
+      firstChange.table !== 'midiNotes' ||
+      firstChange.op !== 'insert' ||
+      secondChange.table !== 'midiNotes' ||
+      secondChange.op !== 'insert'
     ) {
       throw new Error('Expected synthetic MIDI Note changes')
     }
@@ -349,7 +382,7 @@ describe('ProjectSession commit publication', () => {
     publisher.subscribe(
       createMidiNoteChangesSubscription({
         sourceIds: [firstChange.sourceId],
-        noteIds: [secondChange.noteId],
+        noteIds: [secondChange.after.id],
       }),
       createObserver((published) => crossedConstraints.push(published)),
     )

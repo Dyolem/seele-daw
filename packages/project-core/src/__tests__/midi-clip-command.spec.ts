@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_HISTORY_DIRECTION,
@@ -25,11 +24,9 @@ import {
   type ProjectCommit,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
+import { describeChanges, requireChange } from './support/project-change-test-support'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
@@ -77,19 +74,6 @@ function captureCommandError(operation: () => unknown): ProjectCommandError {
   }
 
   return caughtError
-}
-
-function requireAddedMidiClipChange(commit: ProjectCommit) {
-  const change = commit.delta.changes[0]
-
-  expect(commit.delta.changes).toHaveLength(1)
-  expect(change?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED)
-
-  if (change?.type !== PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED) {
-    throw new Error('Expected an added MIDI Clip change')
-  }
-
-  return change
 }
 
 describe('AddMidiClipCommand public contract', () => {
@@ -149,41 +133,49 @@ describe('AddMidiClipCommand preparation', () => {
 
     expect(plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
+        op: 'insert',
+        table: 'midiSources',
         after: command.source,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiNotes',
         sourceId: command.source.id,
-        after: [],
+        records: [],
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiSustainPedalEvents',
         sourceId: command.source.id,
-        after: [],
+        records: [],
       },
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
+        op: 'insert',
+        table: 'clips',
         after: command.clip,
       },
     ])
     expect(plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.REMOVE,
+        op: 'remove',
+        table: 'clips',
         before: command.clip,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiSustainPedalEvents',
         sourceId: command.source.id,
-        before: [],
+        records: [],
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiNotes',
         sourceId: command.source.id,
-        before: [],
+        records: [],
       },
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE,
+        op: 'remove',
+        table: 'midiSources',
         before: command.source,
       },
     ])
@@ -191,8 +183,10 @@ describe('AddMidiClipCommand preparation', () => {
     if (
       preparation.status !== 'ready' ||
       preparation.command.type !== PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT ||
-      plan.forward[3]?.type !== PROJECT_MUTATION_TYPE.CLIP.INSERT
+      plan.forward[0]?.op !== 'insert' ||
+      plan.forward[0].table !== 'midiSources' ||
+      plan.forward[3]?.op !== 'insert' ||
+      plan.forward[3].table !== 'clips'
     ) {
       throw new Error('Expected a ready MIDI Clip graph insertion')
     }
@@ -253,7 +247,7 @@ describe('AddMidiClipCommand preparation', () => {
 
     const duplicatePartitionFixture = createCompleteProjectFixture()
     const partitionSourceId = parseMidiSourceId('source-command-partition-only')
-    duplicatePartitionFixture.containers.midiNotesBySource.set(partitionSourceId, new Map())
+    duplicatePartitionFixture.containers.midiNotes.set(partitionSourceId, new Map())
     const duplicatePartitionStore = new ModelStore(duplicatePartitionFixture.seed)
     const duplicatePartition = captureCommandError(() =>
       prepareProjectCommand(
@@ -266,7 +260,7 @@ describe('AddMidiClipCommand preparation', () => {
     const sustainPartitionSourceId = parseMidiSourceId(
       'source-command-sustain-pedal-partition-only',
     )
-    duplicateSustainPartitionFixture.containers.midiSustainPedalEventsBySource.set(
+    duplicateSustainPartitionFixture.containers.midiSustainPedalEvents.set(
       sustainPartitionSourceId,
       new Map(),
     )
@@ -318,7 +312,7 @@ describe('AddMidiClipCommand preparation', () => {
 })
 
 describe('MIDI Clip commit and History semantics', () => {
-  it('commits one aggregate change and restores the complete ownership graph', () => {
+  it('commits the Source, its partitions and the Clip, and replays them exactly', () => {
     const { store, session } = createFixtureProjectSession()
     const command = createCommand(store)
     const result = session.execute(command)
@@ -328,84 +322,52 @@ describe('MIDI Clip commit and History semantics', () => {
       throw new Error('Expected AddMidiClip to commit')
     }
 
-    const change = requireAddedMidiClipChange(result.commit)
+    expect(describeChanges(result.commit)).toEqual([
+      `midiSources.insert ${command.source.id}`,
+      `midiNotes.insert-partition ${command.source.id}`,
+      `midiSustainPedalEvents.insert-partition ${command.source.id}`,
+      `clips.insert ${command.clip.id}`,
+    ])
+    const clipInsert = requireChange(result.commit, 'clips', 'insert')
+    const sourceInsert = requireChange(result.commit, 'midiSources', 'insert')
 
-    expect(change).toMatchObject({
-      clipId: command.clip.id,
-      sourceId: command.source.id,
-      trackId: command.clip.trackId,
-      affected: {
-        startTick: command.clip.startTick,
-        endTick: parseTick(7_680),
-      },
-      after: {
-        clip: command.clip,
-        source: command.source,
-        notes: [],
-        sustainPedalEvents: [],
-      },
-    })
-    expect(Object.isFrozen(change)).toBe(true)
-    expect(Object.isFrozen(change.affected)).toBe(true)
-    expect(Object.isFrozen(change.after)).toBe(true)
-    expect(Object.isFrozen(change.after.notes)).toBe(true)
-    expect(Object.isFrozen(change.after.sustainPedalEvents)).toBe(true)
-    expect(store.getClip(command.clip.id)).toBe(change.after.clip)
-    expect(store.getMidiSource(command.source.id)).toBe(change.after.source)
+    expect(clipInsert.after).toEqual(command.clip)
+    expect(sourceInsert.after).toEqual(command.source)
+    expect(Object.isFrozen(clipInsert)).toBe(true)
+    expect(store.getClip(command.clip.id)).toBe(clipInsert.after)
+    expect(store.getMidiSource(command.source.id)).toBe(sourceInsert.after)
     expect(store.hasMidiNotePartition(command.source.id)).toBe(true)
     expect([...store.midiNoteEntries(command.source.id)]).toEqual([])
     expect(store.hasMidiSustainPedalEventPartition(command.source.id)).toBe(true)
     expect([...store.midiSustainPedalEventEntries(command.source.id)]).toEqual([])
 
     const undoCommit = session.undo()
-    const undoChange = undoCommit?.delta.changes[0]
 
     expect(undoCommit?.origin).toMatchObject({
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
       commandType: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD,
     })
-    expect(undoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED)
-    if (undoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_CLIP.REMOVED) {
-      throw new Error('Expected a removed MIDI Clip change')
-    }
-    expect(undoChange.before.clip).toBe(change.after.clip)
-    expect(undoChange.before.source).toBe(change.after.source)
-    expect(undoChange.before.notes).toEqual([])
-    expect(undoChange.before.sustainPedalEvents).toEqual([])
+    expect(describeChanges(undoCommit)).toEqual([
+      `clips.remove ${command.clip.id}`,
+      `midiSustainPedalEvents.remove-partition ${command.source.id}`,
+      `midiNotes.remove-partition ${command.source.id}`,
+      `midiSources.remove ${command.source.id}`,
+    ])
+    expect(requireChange(undoCommit, 'clips', 'remove').before).toBe(clipInsert.after)
+    expect(requireChange(undoCommit, 'midiSources', 'remove').before).toBe(sourceInsert.after)
     expect(store.getClip(command.clip.id)).toBeUndefined()
     expect(store.getMidiSource(command.source.id)).toBeUndefined()
     expect(store.hasMidiNotePartition(command.source.id)).toBe(false)
     expect(store.hasMidiSustainPedalEventPartition(command.source.id)).toBe(false)
 
     const redoCommit = session.redo()
-    const redoChange = redoCommit?.delta.changes[0]
 
-    expect(redoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED)
-    if (redoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_CLIP.ADDED) {
-      throw new Error('Expected a restored MIDI Clip change')
-    }
-    expect(redoChange.after.clip).toBe(change.after.clip)
-    expect(redoChange.after.source).toBe(change.after.source)
-    expect(store.getClip(command.clip.id)).toBe(change.after.clip)
-    expect(store.getMidiSource(command.source.id)).toBe(change.after.source)
+    expect(requireChange(redoCommit, 'clips', 'insert').after).toBe(clipInsert.after)
+    expect(requireChange(redoCommit, 'midiSources', 'insert').after).toBe(sourceInsert.after)
+    expect(store.getClip(command.clip.id)).toBe(clipInsert.after)
+    expect(store.getMidiSource(command.source.id)).toBe(sourceInsert.after)
     expect(store.hasMidiNotePartition(command.source.id)).toBe(true)
     expect(store.hasMidiSustainPedalEventPartition(command.source.id)).toBe(true)
-  })
-
-  it('fails closed when a MIDI Clip graph is incomplete', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = createCommand(store)
-    const incompletePlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
-        after: command.source,
-      },
-    ])
-
-    expect(() => createProjectCommitCandidate(command, incompletePlan)).toThrowError(
-      expect.objectContaining({ code: 'unsupported-mutation-type' }),
-    )
   })
 })
 

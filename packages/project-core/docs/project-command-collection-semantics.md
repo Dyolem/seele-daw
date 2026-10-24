@@ -14,10 +14,10 @@ Command。
 
 核心决定是：
 
-> Project Command 表达一次完整的产品意图；Project Mutation 表达最小项目事实变化；
+> Project Command 表达一次完整的产品意图；存储变化（`ProjectChange`）表达最小项目事实变化；
 > MutationPlan 与 Commit 提供一次产品意图的全有或全无事务边界。
 
-Command 的单数或复数由产品语义决定，不由“一个 Command 最多只能包含一条 Mutation”决定。
+Command 的单数或复数由产品语义决定，不由“一个 Command 最多只能包含一条变化”决定。
 
 ## 1. 分层与原子性
 
@@ -25,7 +25,7 @@ Command 的单数或复数由产品语义决定，不由“一个 Command 最多
 Editor / Studio interaction policy
 -> one complete Project Command
 -> authoritative preparation
--> one or more Project Mutations
+-> one or more ProjectChanges
 -> one closed MutationPlan
 -> one Commit / ModelRevision / History step
 ```
@@ -37,12 +37,12 @@ Editor / Studio interaction policy
 | Editor / Studio        | Selection、Pointer、Snap、Preview、面向用户的 Clamp 或拒绝策略 | 直接修改 Project Facts      |
 | Project Command        | 描述一次完整产品意图及调用方观察到的 `baseRevision`            | UI 状态、异步 I/O、逐步提交 |
 | Command Preparer       | 从权威模型重新读取目标、验证全部前置条件并建立封闭计划         | 获得写权限、发布 Commit     |
-| Project Mutation       | 描述一个最小规范化存储变化，例如插入、替换或删除一个 Note      | 独立 History、产品交互策略  |
+| ProjectChange          | 描述一个最小规范化存储变化，例如插入、替换或删除一个 Note      | 独立 History、产品交互策略  |
 | MutationPlan / Applier | 预投影完整结果、全有或全无应用、失败回滚、只推进一次 revision  | 猜测用户意图                |
-| Project Commit         | 记录一次已经成功的产品事务及其 Delta                           | 表示尚未提交的 Preview      |
+| Project Commit         | 记录一次已经成功的产品事务及其写入的变化                       | 表示尚未提交的 Preview      |
 
-“单 Note 删除”可以是一条 `NOTE.REMOVE` Mutation；“删除当前 Selection”则可以是一个包含
-N 条 `NOTE.REMOVE` Mutation 的 Command。后者仍然是原子的，因为任何目标失败都不会产生
+“单 Note 删除”可以是一条 `midiNotes.remove` 变化；“删除当前 Selection”则可以是一个包含
+N 条 `midiNotes.remove` 变化的 Command。后者仍然是原子的，因为任何目标失败都不会产生
 部分 Commit。
 
 ## 2. 不使用多次 Execute 模拟批量事务
@@ -84,7 +84,7 @@ Promise.all(
 
 只有同时满足以下条件时，集合 Command 才应替代单实体公共 Command：
 
-1. 一元素集合的验证、成功结果、失败语义、Delta 和 History 与单实体行为完全一致；
+1. 一元素集合的验证、成功结果、失败语义、变化和 History 与单实体行为完全一致；
 2. 集合版本没有引入会改变单实体含义的共同 Anchor、排序或部分成功策略；
 3. 所有正式消费者都可以迁移到集合协议；
 4. 迁移后单实体公共 API 不再承载独立产品语义。
@@ -94,11 +94,11 @@ Promise.all(
 集合 Command 不应把所有实体规则复制到一个巨大函数中。推荐结构是：
 
 ```ts
-function prepareOneEntityMutation(/* authoritative inputs */): ProjectMutation
+function prepareOneEntityChange(/* authoritative inputs */): ProjectChange
 
 function prepareCollectionCommand(/* ... */): MutationPlan {
-  const mutations = entityIds.map(prepareOneEntityMutation)
-  return createMutationPlan(baseRevision, mutations)
+  const changes = entityIds.map(prepareOneEntityChange)
+  return createMutationPlan(baseRevision, changes)
 }
 ```
 
@@ -184,7 +184,7 @@ Selection：
 
 Editor 使用该范围产生一致 Preview；Project Core 在提交时仍需基于 `baseRevision` 重新读取
 全部 Note 并验证最终结果。一个合法命令建立按 `noteIds` 顺序排列的多个
-`NOTE.REPLACE` Mutation，但只产生一个 Commit、一次 revision 推进和一个 History 步骤。
+`midiNotes.replace` 变化，但只产生一个 Commit、一次 revision 推进和一个 History 步骤。
 
 ### 5.4 Resize Note
 

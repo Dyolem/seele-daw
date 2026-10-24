@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_HISTORY_DIRECTION,
@@ -13,17 +12,15 @@ import {
   parseTempoEventId,
   type CreateReplaceTempoEventBpmCommandInput,
   type ProjectCommit,
-  type ProjectChange,
   type ReplaceTempoEventBpmCommand,
-  type TempoEventUpdatedChange,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
 import { ModelStore } from '#internal/model/model-store'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import {
   createCompleteProjectFixture,
   type CompleteProjectFixture,
 } from './support/complete-project-fixture'
+import { requireChange } from './support/project-change-test-support'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
@@ -46,14 +43,6 @@ function createCommand(
   overrides: Partial<CreateReplaceTempoEventBpmCommandInput> = {},
 ): ReplaceTempoEventBpmCommand {
   return createReplaceTempoEventBpmCommand(createCommandInput(store, fixture, overrides))
-}
-
-function requireTempoEventChange(change: ProjectChange | undefined): TempoEventUpdatedChange {
-  expect(change).toMatchObject({ type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED })
-  if (change?.type !== PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED) {
-    throw new Error('Expected an updated Tempo Event change')
-  }
-  return change
 }
 
 describe('ReplaceTempoEventBpmCommand public contract', () => {
@@ -83,13 +72,12 @@ describe('ReplaceTempoEventBpmCommand preparation', () => {
 
     if (
       preparation.status !== 'ready' ||
-      preparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE
+      preparation.command.type !== PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM
     ) {
       throw new Error('Expected a ready Tempo Event BPM replacement')
     }
 
-    const forward = plan.forward[0]
+    const forward = requireChange(plan.forward, 'tempoEvents', 'replace')
     expect(forward.before).toBe(fixture.records.initialTempoEvent)
     expect(forward.after).toEqual({
       ...fixture.records.initialTempoEvent,
@@ -99,7 +87,8 @@ describe('ReplaceTempoEventBpmCommand preparation', () => {
     expect(forward.after.tick).toBe(forward.before.tick)
     expect(plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
+        op: 'replace',
+        table: 'tempoEvents',
         before: forward.after,
         after: fixture.records.initialTempoEvent,
       },
@@ -165,7 +154,7 @@ describe('Tempo Event BPM commit and History semantics', () => {
       throw new Error('Expected Tempo Event BPM replacement to commit')
     }
 
-    const change = requireTempoEventChange(result.commit.delta.changes[0])
+    const change = requireChange(result.commit, 'tempoEvents', 'replace')
     expect(result.commit).toMatchObject({
       baseRevision: 0,
       modelRevision: 1,
@@ -174,10 +163,10 @@ describe('Tempo Event BPM commit and History semantics', () => {
         commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM,
       },
     })
-    expect(result.commit.delta.changes).toHaveLength(1)
+    expect(result.commit.changes).toHaveLength(1)
     expect(change).toEqual({
-      type: PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED,
-      tempoEventId: original.id,
+      op: 'replace',
+      table: 'tempoEvents',
       before: original,
       after: {
         ...original,
@@ -188,7 +177,7 @@ describe('Tempo Event BPM commit and History semantics', () => {
     expect(store.getTempoEvent(original.id)).toBe(change.after)
 
     const undoCommit = session.undo()
-    const undoChange = requireTempoEventChange(undoCommit?.delta.changes[0])
+    const undoChange = requireChange(undoCommit, 'tempoEvents', 'replace')
     expect(undoCommit?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
@@ -199,7 +188,7 @@ describe('Tempo Event BPM commit and History semantics', () => {
     expect(store.getTempoEvent(original.id)).toBe(original)
 
     const redoCommit = session.redo()
-    const redoChange = requireTempoEventChange(redoCommit?.delta.changes[0])
+    const redoChange = requireChange(redoCommit, 'tempoEvents', 'replace')
     expect(redoCommit?.origin).toEqual({
       kind: 'history',
       direction: PROJECT_HISTORY_DIRECTION.REDO,

@@ -131,7 +131,7 @@ class ProjectSessionImpl implements ProjectSession {
       commit.origin.commandType,
       preparation.plan,
     )
-    const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
+    const queryTransition = this.#queryIndex.prepare(this.#store, commit)
 
     return this.#applySessionTransition(historyTransition, queryTransition, commit, result)
   }
@@ -148,7 +148,7 @@ class ProjectSessionImpl implements ProjectSession {
       },
       historyTransition.plan,
     )
-    const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
+    const queryTransition = this.#queryIndex.prepare(this.#store, commit)
 
     return this.#applySessionTransition(historyTransition, queryTransition, commit, commit)
   }
@@ -165,7 +165,7 @@ class ProjectSessionImpl implements ProjectSession {
       },
       historyTransition.plan,
     )
-    const queryTransition = this.#queryIndex.prepare(this.#store, commit.delta)
+    const queryTransition = this.#queryIndex.prepare(this.#store, commit)
 
     return this.#applySessionTransition(historyTransition, queryTransition, commit, commit)
   }

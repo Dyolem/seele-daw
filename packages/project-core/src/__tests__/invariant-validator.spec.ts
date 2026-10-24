@@ -304,7 +304,7 @@ describe('MIDI Note partition invariants', () => {
   it('rejects a MIDI Source without a Note partition', () => {
     const fixture = createCompleteProjectFixture()
 
-    fixture.containers.midiNotesBySource.delete(fixture.records.nonLoopSource.id)
+    fixture.containers.midiNotes.delete(fixture.records.nonLoopSource.id)
 
     expect(codesFor(fixture.seed)).toContain('midi-source-missing-note-partition')
   })
@@ -312,7 +312,7 @@ describe('MIDI Note partition invariants', () => {
   it('rejects a Note partition without a MIDI Source', () => {
     const fixture = createCompleteProjectFixture()
 
-    fixture.containers.midiNotesBySource.set(parseMidiSourceId('missing-source'), new Map())
+    fixture.containers.midiNotes.set(parseMidiSourceId('missing-source'), new Map())
 
     expect(codesFor(fixture.seed)).toContain('note-partition-missing-midi-source')
   })
@@ -347,7 +347,7 @@ describe('MIDI Sustain Pedal Event partition invariants', () => {
   it('rejects a MIDI Source without a Sustain Pedal Event partition', () => {
     const fixture = createCompleteProjectFixture()
 
-    fixture.containers.midiSustainPedalEventsBySource.delete(fixture.records.nonLoopSource.id)
+    fixture.containers.midiSustainPedalEvents.delete(fixture.records.nonLoopSource.id)
 
     expect(codesFor(fixture.seed)).toContain('midi-source-missing-sustain-pedal-event-partition')
   })
@@ -355,7 +355,7 @@ describe('MIDI Sustain Pedal Event partition invariants', () => {
   it('rejects a Sustain Pedal Event partition without a MIDI Source', () => {
     const fixture = createCompleteProjectFixture()
 
-    fixture.containers.midiSustainPedalEventsBySource.set(
+    fixture.containers.midiSustainPedalEvents.set(
       parseMidiSourceId('missing-sustain-pedal-source'),
       new Map(),
     )

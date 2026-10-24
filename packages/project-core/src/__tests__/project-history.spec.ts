@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import * as projectCore from '#internal/index'
 import {
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_COMMIT_ORIGIN_KIND,
@@ -26,6 +25,7 @@ import {
 } from '#internal/index'
 import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
+import { requireChange } from './support/project-change-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
 function requireCommitted(result: ProjectCommandExecutionResult): ProjectCommit {
@@ -150,7 +150,7 @@ describe('ProjectSession Undo / Redo', () => {
         direction: PROJECT_HISTORY_DIRECTION.UNDO,
         commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
       },
-      delta: { changes: [{ type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED, before: addedRecord }] },
+      changes: [{ op: 'remove', table: 'midiNotes', before: addedRecord }],
     })
     expect(store.getMidiNote(command.sourceId, noteId)).toBeUndefined()
     expect(session.canUndo).toBe(false)
@@ -166,7 +166,7 @@ describe('ProjectSession Undo / Redo', () => {
         direction: PROJECT_HISTORY_DIRECTION.REDO,
         commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
       },
-      delta: { changes: [{ type: PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED, after: addedRecord }] },
+      changes: [{ op: 'insert', table: 'midiNotes', after: addedRecord }],
     })
     expect(store.getMidiNote(command.sourceId, noteId)).toBe(addedRecord)
     expect(redoCommit).not.toBe(originalCommit)
@@ -185,12 +185,7 @@ describe('ProjectSession Undo / Redo', () => {
       parseTick(960),
       parseMidiPitch(67),
     )
-    const moveChange = moveCommit.delta.changes[0]
-
-    expect(moveChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
-    if (moveChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
-      throw new Error('Expected MoveNote to produce a moved Note change')
-    }
+    const moveChange = requireChange(moveCommit, 'midiNotes', 'replace')
 
     const after = moveChange.after
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
@@ -203,12 +198,12 @@ describe('ProjectSession Undo / Redo', () => {
       commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE,
     })
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
-    expect(undoCommit?.delta.changes[0]).toMatchObject({ before: after, after: before })
+    expect(undoCommit?.changes[0]).toMatchObject({ before: after, after: before })
 
     const redoCommit = session.redo()
 
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
-    expect(redoCommit?.delta.changes[0]).toMatchObject({ before, after })
+    expect(redoCommit?.changes[0]).toMatchObject({ before, after })
   })
 
   it('restores exact before and after Record references across ResizeNote Undo / Redo', () => {
@@ -225,12 +220,7 @@ describe('ProjectSession Undo / Redo', () => {
         }),
       ),
     )
-    const resizeChange = resizeCommit.delta.changes[0]
-
-    expect(resizeChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
-    if (resizeChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
-      throw new Error('Expected ResizeNote to produce an updated Note change')
-    }
+    const resizeChange = requireChange(resizeCommit, 'midiNotes', 'replace')
 
     const after = resizeChange.after
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
@@ -265,14 +255,16 @@ describe('ProjectSession Undo / Redo', () => {
     )
 
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBeUndefined()
-    expect(session.undo()?.delta.changes[0]).toMatchObject({
-      type: PROJECT_CHANGE_TYPE.MIDI_NOTE.ADDED,
+    expect(session.undo()?.changes[0]).toMatchObject({
+      op: 'insert',
+      table: 'midiNotes',
       after: before,
     })
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
 
-    expect(session.redo()?.delta.changes[0]).toMatchObject({
-      type: PROJECT_CHANGE_TYPE.MIDI_NOTE.REMOVED,
+    expect(session.redo()?.changes[0]).toMatchObject({
+      op: 'remove',
+      table: 'midiNotes',
       before,
     })
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBeUndefined()
@@ -298,35 +290,19 @@ describe('ProjectSession Undo / Redo', () => {
       parseMidiPitch(65),
     )
 
-    const secondUndoChange = session.undo()?.delta.changes[0]
-    expect(secondUndoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
-    if (secondUndoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
-      throw new Error('Expected the second MoveNote undo change')
-    }
-    expect(secondUndoChange.noteId).toBe(second.id)
+    const secondUndoChange = requireChange(session.undo(), 'midiNotes', 'replace')
+    expect(secondUndoChange.after.id).toBe(second.id)
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, second.id)).toBe(second)
-    const firstUndoChange = session.undo()?.delta.changes[0]
-    expect(firstUndoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
-    if (firstUndoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
-      throw new Error('Expected the first MoveNote undo change')
-    }
-    expect(firstUndoChange.noteId).toBe(first.id)
+    const firstUndoChange = requireChange(session.undo(), 'midiNotes', 'replace')
+    expect(firstUndoChange.after.id).toBe(first.id)
     expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toBe(first)
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
-    const firstRedoChange = session.redo()?.delta.changes[0]
-    expect(firstRedoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
-    if (firstRedoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
-      throw new Error('Expected the first MoveNote redo change')
-    }
-    expect(firstRedoChange.noteId).toBe(first.id)
-    const secondRedoChange = session.redo()?.delta.changes[0]
-    expect(secondRedoChange?.type).toBe(PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED)
-    if (secondRedoChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
-      throw new Error('Expected the second MoveNote redo change')
-    }
-    expect(secondRedoChange.noteId).toBe(second.id)
+    const firstRedoChange = requireChange(session.redo(), 'midiNotes', 'replace')
+    expect(firstRedoChange.after.id).toBe(first.id)
+    const secondRedoChange = requireChange(session.redo(), 'midiNotes', 'replace')
+    expect(secondRedoChange.after.id).toBe(second.id)
     expect(session.canRedo).toBe(false)
     expect(session.modelRevision).toBe(6)
   })
@@ -477,11 +453,7 @@ describe('ProjectSession Undo / Redo', () => {
       parseTick(960),
       parseMidiPitch(67),
     )
-    const moveChange = moveCommit.delta.changes[0]
-
-    if (moveChange?.type !== PROJECT_CHANGE_TYPE.MIDI_NOTE.UPDATED) {
-      throw new Error('Expected MoveNote to produce an updated Note change')
-    }
+    const moveChange = requireChange(moveCommit, 'midiNotes', 'replace')
 
     const after = moveChange.after
     const afterContentStateId = session.contentStateId

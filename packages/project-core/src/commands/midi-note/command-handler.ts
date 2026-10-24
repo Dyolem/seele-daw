@@ -20,8 +20,7 @@ import { MIDI_PITCH_MAX, MIDI_PITCH_MIN, parseMidiPitch } from '#internal/model/
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
-import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import { parseTick } from '#internal/time/tick'
 
 type MidiNoteCommand = AddNoteCommand | MoveNotesCommand | RemoveNotesCommand | ResizeNoteCommand
@@ -97,12 +96,12 @@ function validationContext(
 
 function ready(
   command: MidiNoteCommand,
-  mutations: readonly ProjectMutation[],
+  changes: readonly ProjectChange[],
 ): ReadyProjectCommandPreparation {
   return {
     status: 'ready',
     command,
-    plan: createMutationPlan(command.baseRevision, mutations),
+    plan: createMutationPlan(command.baseRevision, changes),
   }
 }
 
@@ -127,7 +126,8 @@ export function prepareAddNoteCommand(
 
   return ready(command, [
     {
-      type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+      op: 'insert',
+      table: 'midiNotes',
       sourceId: command.sourceId,
       after: note,
     },
@@ -141,13 +141,14 @@ export function prepareRemoveNotesCommand(
   requireMidiSource(reader, command)
   assertNotePartitionExists(reader, command)
 
-  const mutations = command.noteIds.map<ProjectMutation>((noteId) => ({
-    type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+  const changes = command.noteIds.map<ProjectChange>((noteId) => ({
+    op: 'remove',
+    table: 'midiNotes',
     sourceId: command.sourceId,
     before: requireMidiNote(reader, command, noteId),
   }))
 
-  return ready(command, mutations)
+  return ready(command, changes)
 }
 
 function createMovedNote(command: MoveNotesCommand, before: MidiNoteRecord): MidiNoteRecord {
@@ -204,19 +205,20 @@ export function prepareMoveNotesCommand(
     }
   }
 
-  const mutations = notes.map<ProjectMutation>((before) => {
+  const changes = notes.map<ProjectChange>((before) => {
     const after = createMovedNote(command, before)
     assertMidiNoteWithinSource(validationContext(command, before.id), source, after)
 
     return {
-      type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+      op: 'replace',
+      table: 'midiNotes',
       sourceId: command.sourceId,
       before,
       after,
     }
   })
 
-  return ready(command, mutations)
+  return ready(command, changes)
 }
 
 export function prepareResizeNoteCommand(
@@ -244,7 +246,8 @@ export function prepareResizeNoteCommand(
 
   return ready(command, [
     {
-      type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+      op: 'replace',
+      table: 'midiNotes',
       sourceId: command.sourceId,
       before,
       after,

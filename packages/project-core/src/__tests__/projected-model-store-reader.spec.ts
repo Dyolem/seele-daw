@@ -29,8 +29,7 @@ import { ModelInvariantError } from '#internal/model/invariant-validator'
 import { ModelStore, type ModelStoreReader } from '#internal/model/model-store'
 import { MutationPreconditionError } from '#internal/mutation/mutation-precondition-error'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
-import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import { ProjectedModelStoreReader } from '#internal/mutation/projected-model-store-reader'
 
 function snapshotReader(reader: ModelStoreReader) {
@@ -60,7 +59,7 @@ function snapshotReader(reader: ModelStoreReader) {
 
 function createProjection(
   base: ModelStoreReader,
-  mutations: readonly ProjectMutation[],
+  mutations: readonly ProjectChange[],
 ): ProjectedModelStoreReader {
   const plan = createMutationPlan(base.modelRevision, mutations)
 
@@ -153,153 +152,185 @@ describe('ProjectedModelStoreReader complete projection', () => {
       fixture.records.nonLoopPedalDown,
       fixture.records.nonLoopPedalUp,
     ]
-    const mutations: readonly ProjectMutation[] = [
+    const mutations: readonly ProjectChange[] = [
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+        op: 'replace',
+        table: 'project',
         before: fixture.records.project,
         after: replacement.project,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MASTER.REPLACE,
+        op: 'replace',
+        table: 'master',
         before: fixture.records.master,
         after: replacement.master,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+        op: 'remove',
+        table: 'tracks',
         before: fixture.records.audioTrack,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+        op: 'insert',
+        table: 'tracks',
         after: fixture.records.audioTrack,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+        op: 'replace',
+        table: 'tracks',
         before: fixture.records.audioTrack,
         after: replacement.track,
       },
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.REMOVE,
+        op: 'remove',
+        table: 'clips',
         before: fixture.records.nonLoopClip,
       },
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
+        op: 'insert',
+        table: 'clips',
         after: fixture.records.nonLoopClip,
       },
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.REPLACE,
+        op: 'replace',
+        table: 'clips',
         before: fixture.records.nonLoopClip,
         after: replacement.clip,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE,
+        op: 'remove',
+        table: 'midiSources',
         before: fixture.records.nonLoopSource,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
+        op: 'insert',
+        table: 'midiSources',
         after: fixture.records.nonLoopSource,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE,
+        op: 'replace',
+        table: 'midiSources',
         before: fixture.records.nonLoopSource,
         after: replacement.source,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE,
+        op: 'remove',
+        table: 'tempoEvents',
         before: fixture.records.laterTempoEvent,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT,
+        op: 'insert',
+        table: 'tempoEvents',
         after: fixture.records.laterTempoEvent,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
+        op: 'replace',
+        table: 'tempoEvents',
         before: fixture.records.laterTempoEvent,
         after: replacement.tempoEvent,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE,
+        op: 'remove',
+        table: 'timeSignatureEvents',
         before: fixture.records.laterTimeSignatureEvent,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT,
+        op: 'insert',
+        table: 'timeSignatureEvents',
         after: fixture.records.laterTimeSignatureEvent,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE,
+        op: 'replace',
+        table: 'timeSignatureEvents',
         before: fixture.records.laterTimeSignatureEvent,
         after: replacement.timeSignatureEvent,
       },
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REMOVE,
+        op: 'remove',
+        table: 'devices',
         before: fixture.records.instrumentDevice,
       },
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.INSERT,
+        op: 'insert',
+        table: 'devices',
         after: fixture.records.instrumentDevice,
       },
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
+        op: 'replace',
+        table: 'devices',
         before: fixture.records.instrumentDevice,
         after: replacement.device,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
+        op: 'remove',
+        table: 'trackOrder',
         index: 0,
         trackId: fixture.records.instrumentTrack.id,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+        op: 'insert',
+        table: 'trackOrder',
         index: 0,
         trackId: fixture.records.instrumentTrack.id,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        before: partitionBefore,
+        records: partitionBefore,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        after: partitionAfter,
+        records: partitionAfter,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+        op: 'remove',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopNote,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+        op: 'insert',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
         after: fixture.records.nonLoopNote,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        op: 'replace',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopNote,
         after: replacement.note,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
-        before: sustainPedalEventPartitionBefore,
+        records: sustainPedalEventPartitionBefore,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
-        after: sustainPedalEventPartitionAfter,
+        records: sustainPedalEventPartitionAfter,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+        op: 'remove',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopPedalDown,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+        op: 'insert',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         after: fixture.records.nonLoopPedalDown,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+        op: 'replace',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopPedalDown,
         after: replacement.sustainPedalEvent,
@@ -341,29 +372,35 @@ describe('ProjectedModelStoreReader complete projection', () => {
     const notes = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
     const projected = createProjection(base, [
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.REMOVE,
+        op: 'remove',
+        table: 'clips',
         before: fixture.records.nonLoopClip,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        before: notes,
+        records: notes,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE,
+        op: 'remove',
+        table: 'midiSources',
         before: fixture.records.nonLoopSource,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
+        op: 'insert',
+        table: 'midiSources',
         after: fixture.records.nonLoopSource,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        after: notes,
+        records: notes,
       },
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.INSERT,
+        op: 'insert',
+        table: 'clips',
         after: fixture.records.nonLoopClip,
       },
     ])
@@ -385,7 +422,8 @@ describe('ProjectedModelStoreReader complete projection', () => {
     try {
       createProjection(base, [
         {
-          type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+          op: 'remove',
+          table: 'tracks',
           before: fixture.records.instrumentTrack,
         },
       ])
@@ -413,7 +451,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
     const error = capturePreconditionError(() =>
       createProjection(base, [
         {
-          type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+          op: 'insert',
+          table: 'tracks',
           after: fixture.records.instrumentTrack,
         },
       ]),
@@ -421,8 +460,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
 
     expect(error).toMatchObject({
       code: 'insert-target-exists',
-      mutationIndex: 0,
-      mutationType: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+      changeIndex: 0,
+      change: 'tracks.insert',
     })
   })
 
@@ -433,12 +472,14 @@ describe('ProjectedModelStoreReader local preconditions', () => {
     const error = capturePreconditionError(() =>
       createProjection(base, [
         {
-          type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+          op: 'remove',
+          table: 'midiNotes',
           sourceId: fixture.records.nonLoopSource.id,
           before: fixture.records.nonLoopNote,
         },
         {
-          type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+          op: 'remove',
+          table: 'midiNotes',
           sourceId: fixture.records.nonLoopSource.id,
           before: fixture.records.nonLoopNote,
         },
@@ -447,8 +488,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
 
     expect(error).toMatchObject({
       code: 'target-missing',
-      mutationIndex: 1,
-      mutationType: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+      changeIndex: 1,
+      change: 'midiNotes.remove',
     })
     expect(snapshotReader(base)).toEqual(beforeBase)
   })
@@ -467,7 +508,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
     const error = capturePreconditionError(() =>
       createProjection(base, [
         {
-          type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+          op: 'replace',
+          table: 'project',
           before: staleProject,
           after: nextProject,
         },
@@ -476,8 +518,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
 
     expect(error).toMatchObject({
       code: 'before-reference-mismatch',
-      mutationIndex: 0,
-      mutationType: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
+      changeIndex: 0,
+      change: 'project.replace',
     })
   })
 
@@ -487,7 +529,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
     const error = capturePreconditionError(() =>
       createProjection(base, [
         {
-          type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+          op: 'insert',
+          table: 'trackOrder',
           index: 3,
           trackId: fixture.records.instrumentTrack.id,
         },
@@ -496,8 +539,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
 
     expect(error).toMatchObject({
       code: 'track-order-index-out-of-bounds',
-      mutationIndex: 0,
-      mutationType: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+      changeIndex: 0,
+      change: 'trackOrder.insert',
     })
   })
 
@@ -507,7 +550,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
     const error = capturePreconditionError(() =>
       createProjection(base, [
         {
-          type: PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
+          op: 'remove',
+          table: 'trackOrder',
           index: 0,
           trackId: fixture.records.audioTrack.id,
         },
@@ -516,8 +560,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
 
     expect(error).toMatchObject({
       code: 'track-order-entry-mismatch',
-      mutationIndex: 0,
-      mutationType: PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
+      changeIndex: 0,
+      change: 'trackOrder.remove',
     })
   })
 
@@ -534,17 +578,18 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       const error = capturePreconditionError(() =>
         createProjection(base, [
           {
-            type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+            op: 'remove-partition',
+            table: 'midiNotes',
             sourceId: fixture.records.nonLoopSource.id,
-            before,
+            records: before,
           },
         ]),
       )
 
       expect(error).toMatchObject({
-        code: 'note-partition-content-mismatch',
-        mutationIndex: 0,
-        mutationType: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        code: 'partition-content-mismatch',
+        changeIndex: 0,
+        change: 'midiNotes.remove-partition',
       })
     }
   })
@@ -558,17 +603,18 @@ describe('ProjectedModelStoreReader local preconditions', () => {
     const error = capturePreconditionError(() =>
       createProjection(base, [
         {
-          type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+          op: 'remove-partition',
+          table: 'midiSustainPedalEvents',
           sourceId: fixture.records.nonLoopSource.id,
-          before: [staleEvent, fixture.records.nonLoopPedalUp],
+          records: [staleEvent, fixture.records.nonLoopPedalUp],
         },
       ]),
     )
 
     expect(error).toMatchObject({
-      code: 'sustain-pedal-event-partition-content-mismatch',
-      mutationIndex: 0,
-      mutationType: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+      code: 'partition-content-mismatch',
+      changeIndex: 0,
+      change: 'midiSustainPedalEvents.remove-partition',
     })
   })
 })
@@ -580,14 +626,16 @@ describe('Projected Note partition behavior', () => {
     const reversedBefore = [fixture.records.nonLoopHarmonyNote, fixture.records.nonLoopNote]
     const projected = createProjection(base, [
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        before: reversedBefore,
+        records: reversedBefore,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        after: reversedBefore,
+        records: reversedBefore,
       },
     ])
 
@@ -602,33 +650,39 @@ describe('Projected Note partition behavior', () => {
     const base = new ModelStore(fixture.seed)
     const emptyPartition = createProjection(base, [
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+        op: 'remove',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopNote,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+        op: 'remove',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopHarmonyNote,
       },
     ])
     const missingPartition = createProjection(base, [
       {
-        type: PROJECT_MUTATION_TYPE.CLIP.REMOVE,
+        op: 'remove',
+        table: 'clips',
         before: fixture.records.nonLoopClip,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        before: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
+        records: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiSustainPedalEvents',
         sourceId: fixture.records.nonLoopSource.id,
-        before: [fixture.records.nonLoopPedalDown, fixture.records.nonLoopPedalUp],
+        records: [fixture.records.nonLoopPedalDown, fixture.records.nonLoopPedalUp],
       },
       {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE,
+        op: 'remove',
+        table: 'midiSources',
         before: fixture.records.nonLoopSource,
       },
     ])
@@ -649,7 +703,8 @@ describe('Projected Note partition behavior', () => {
     const baseLoopingNotes = [...base.midiNoteEntries(fixture.records.loopingSource.id)]
     const projected = createProjection(base, [
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        op: 'replace',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopNote,
         after: replacement,
@@ -675,12 +730,14 @@ describe('Projected Note partition behavior', () => {
     const base = new ModelStore(fixture.seed)
     const projected = createProjection(base, [
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+        op: 'remove',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
         before: fixture.records.nonLoopNote,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+        op: 'insert',
+        table: 'midiNotes',
         sourceId: fixture.records.loopingSource.id,
         after: fixture.records.nonLoopNote,
       },
@@ -713,30 +770,36 @@ describe('Projected iterator ordering', () => {
     })
     const projected = createProjection(base, [
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+        op: 'remove',
+        table: 'tracks',
         before: fixture.records.instrumentTrack,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+        op: 'insert',
+        table: 'tracks',
         after: fixture.records.instrumentTrack,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
+        op: 'replace',
+        table: 'tracks',
         before: fixture.records.audioTrack,
         after: replacement.track,
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
+        op: 'remove-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        before: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
+        records: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+        op: 'insert-partition',
+        table: 'midiNotes',
         sourceId: fixture.records.nonLoopSource.id,
-        after: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
+        records: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        op: 'replace',
+        table: 'midiNotes',
         sourceId: fixture.records.loopingSource.id,
         before: fixture.records.loopingNote,
         after: replacementLoopingNote,

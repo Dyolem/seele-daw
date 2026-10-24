@@ -9,7 +9,7 @@ import {
   createMutationPlan,
   type MutationPlan,
 } from '#internal/mutation/mutation-plan'
-import type { ProjectMutation } from '#internal/mutation/project-mutation'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import {
   createProjectContentStateId,
   type ProjectContentStateId,
@@ -17,8 +17,8 @@ import {
 
 interface HistoryEntry {
   readonly commandType: ProjectCommandType
-  readonly forward: readonly ProjectMutation[]
-  readonly inverse: readonly ProjectMutation[]
+  readonly forward: readonly ProjectChange[]
+  readonly inverse: readonly ProjectChange[]
   readonly beforeContentStateId: ProjectContentStateId
   readonly afterContentStateId: ProjectContentStateId
 }

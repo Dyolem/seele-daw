@@ -1,30 +1,28 @@
-import type { ProjectMutationType } from './mutation-type'
-
 export type MutationPreconditionErrorCode =
   | 'before-reference-mismatch'
   | 'insert-target-exists'
-  | 'note-partition-content-mismatch'
-  | 'sustain-pedal-event-partition-content-mismatch'
+  | 'partition-content-mismatch'
   | 'target-missing'
   | 'track-order-entry-mismatch'
   | 'track-order-index-out-of-bounds'
 
-/** Raised when a normalized mutation cannot be applied to the current projected state. */
+/** Raised when a normalized change cannot be applied to the current projected state. */
 export class MutationPreconditionError extends Error {
   readonly code: MutationPreconditionErrorCode
-  readonly mutationIndex: number
-  readonly mutationType: ProjectMutationType
+  readonly changeIndex: number
+  /** e.g. "midiNotes.replace" */
+  readonly change: string
 
   constructor(
     code: MutationPreconditionErrorCode,
-    mutationIndex: number,
-    mutationType: ProjectMutationType,
+    changeIndex: number,
+    change: string,
     detail: string,
   ) {
-    super(`Mutation at index ${mutationIndex} (${mutationType}) ${detail}`)
+    super(`Change at index ${changeIndex} (${change}) ${detail}`)
     this.name = 'MutationPreconditionError'
     this.code = code
-    this.mutationIndex = mutationIndex
-    this.mutationType = mutationType
+    this.changeIndex = changeIndex
+    this.change = change
   }
 }

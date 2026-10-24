@@ -1,5 +1,4 @@
 import {
-  PROJECT_CHANGE_TYPE,
   type ModelRevision,
   type ProjectCommit,
   type ProjectSnapshot,
@@ -210,18 +209,9 @@ function hasCoveredNote(
   return plan.midiNoteSpans.some(({ occurrenceKey }) => !keys.has(occurrenceKey))
 }
 
-/** Tempo is detected from the Delta, so History commits are routed like the commands they undo. */
+/** Tempo is read from the changes, so History commits are routed like the commands they undo. */
 function changesTempoMap(commit: ProjectCommit): boolean {
-  return commit.delta.changes.some((change) => {
-    switch (change.type) {
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.ADDED:
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.REMOVED:
-      case PROJECT_CHANGE_TYPE.TEMPO_EVENT.UPDATED:
-        return true
-      default:
-        return false
-    }
-  })
+  return commit.changes.some((change) => change.table === 'tempoEvents')
 }
 
 /**

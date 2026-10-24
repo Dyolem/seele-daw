@@ -23,8 +23,7 @@ import {
 } from '#internal/model/midi-sustain-pedal-event'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import type { ProjectMutation } from '#internal/mutation/project-mutation'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import { parseTick } from '#internal/time/tick'
 
 type MidiSustainPedalEventCommand =
@@ -115,12 +114,12 @@ function requireEvent(
 
 function ready(
   command: MidiSustainPedalEventCommand,
-  mutations: readonly ProjectMutation[],
+  changes: readonly ProjectChange[],
 ): ReadyProjectCommandPreparation {
   return {
     status: 'ready',
     command,
-    plan: createMutationPlan(command.baseRevision, mutations),
+    plan: createMutationPlan(command.baseRevision, changes),
   }
 }
 
@@ -138,7 +137,8 @@ export function prepareAddMidiSustainPedalEventCommand(
 
   return ready(command, [
     {
-      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
+      op: 'insert',
+      table: 'midiSustainPedalEvents',
       sourceId: command.sourceId,
       after: command.event,
     },
@@ -199,8 +199,9 @@ export function prepareMoveMidiSustainPedalEventsCommand(
 
   return ready(
     command,
-    events.map<ProjectMutation>((before, index) => ({
-      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+    events.map<ProjectChange>((before, index) => ({
+      op: 'replace',
+      table: 'midiSustainPedalEvents',
       sourceId: command.sourceId,
       before,
       after: movedEvents[index]!,
@@ -217,8 +218,9 @@ export function prepareRemoveMidiSustainPedalEventsCommand(
 
   return ready(
     command,
-    command.eventIds.map<ProjectMutation>((eventId) => ({
-      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
+    command.eventIds.map<ProjectChange>((eventId) => ({
+      op: 'remove',
+      table: 'midiSustainPedalEvents',
       sourceId: command.sourceId,
       before: requireEvent(reader, command, eventId),
     })),
@@ -245,7 +247,8 @@ export function prepareReplaceMidiSustainPedalEventValueCommand(
 
   return ready(command, [
     {
-      type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
+      op: 'replace',
+      table: 'midiSustainPedalEvents',
       sourceId: command.sourceId,
       before,
       after,

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   createAddInstrumentTrackCollectionCommand,
@@ -46,12 +45,12 @@ import {
   parseTick,
   parseTickDelta,
   parseTrackId,
-  type ProjectChange,
   type ProjectCommand,
   type ProjectCommandType,
   type ProjectSession,
   type ProjectSnapshot,
 } from '#internal/index'
+import { describeChanges } from './support/project-change-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
 const NON_LOOP_SOURCE = parseMidiSourceId('source-non-loop')
@@ -77,16 +76,6 @@ function note(id: string, startTick: number) {
     noteVelocity: parseMidiVelocity(90),
     noteChannel: parseMidiChannel(0),
   }
-}
-
-/** Accepts changes that carry `key` equal to one of `values`. */
-function names(type: string, key: string, ...values: string[]) {
-  return (change: ProjectChange) =>
-    change.type === type && values.includes(String(Reflect.get(change, key)))
-}
-
-function any(...predicates: ((change: ProjectChange) => boolean)[]) {
-  return (change: ProjectChange) => predicates.some((predicate) => predicate(change))
 }
 
 function collectionEntry() {
@@ -136,13 +125,9 @@ function collectionEntry() {
 interface CommandCase {
   readonly type: ProjectCommandType
   readonly command: (session: ProjectSession) => ProjectCommand
-  /** The only changes the command may make. */
-  readonly touches: (change: ProjectChange) => boolean
+  /** Every storage change the command makes, in order, as "table.op address". */
+  readonly changes: readonly string[]
 }
-
-const { TEMPO_EVENT, INSTRUMENT_DEVICE, INSTRUMENT_TRACK, MIDI_CLIP, MIDI_NOTE } =
-  PROJECT_CHANGE_TYPE
-const SUSTAIN = PROJECT_CHANGE_TYPE.MIDI_SUSTAIN_PEDAL_EVENT
 
 const CASES: readonly CommandCase[] = [
   {
@@ -154,7 +139,7 @@ const CASES: readonly CommandCase[] = [
         tick: parseTick(1_920),
         bpm: parseTempoBpm(96),
       }),
-    touches: names(TEMPO_EVENT.ADDED, 'tempoEventId', 'tempo-added'),
+    changes: ['tempoEvents.insert tempo-added'],
   },
   {
     type: PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE,
@@ -164,7 +149,7 @@ const CASES: readonly CommandCase[] = [
         tempoEventId: parseTempoEventId('tempo-later'),
         tick: parseTick(4_800),
       }),
-    touches: names(TEMPO_EVENT.UPDATED, 'tempoEventId', 'tempo-later'),
+    changes: ['tempoEvents.replace tempo-later'],
   },
   {
     type: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE,
@@ -173,7 +158,7 @@ const CASES: readonly CommandCase[] = [
         baseRevision: modelRevision,
         tempoEventId: parseTempoEventId('tempo-later'),
       }),
-    touches: names(TEMPO_EVENT.REMOVED, 'tempoEventId', 'tempo-later'),
+    changes: ['tempoEvents.remove tempo-later'],
   },
   {
     type: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM,
@@ -183,7 +168,7 @@ const CASES: readonly CommandCase[] = [
         tempoEventId: parseTempoEventId('tempo-initial'),
         bpm: parseTempoBpm(133),
       }),
-    touches: names(TEMPO_EVENT.UPDATED, 'tempoEventId', 'tempo-initial'),
+    changes: ['tempoEvents.replace tempo-initial'],
   },
   {
     type: PROJECT_COMMAND_TYPE.INSTRUMENT_DEVICE.REPLACE,
@@ -193,7 +178,7 @@ const CASES: readonly CommandCase[] = [
         trackId: parseTrackId('track-instrument'),
         instrumentDevice: instrument('device-instrument'),
       }),
-    touches: names(INSTRUMENT_DEVICE.UPDATED, 'trackId', 'track-instrument'),
+    changes: ['devices.replace device-instrument'],
   },
   {
     type: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD,
@@ -207,7 +192,11 @@ const CASES: readonly CommandCase[] = [
         instrumentDevice: instrument('device-added'),
         insertAt: 0,
       }),
-    touches: names(INSTRUMENT_TRACK.ADDED, 'trackId', 'track-added'),
+    changes: [
+      'devices.insert device-added',
+      'tracks.insert track-added',
+      'trackOrder.insert track-added',
+    ],
   },
   {
     type: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD_COLLECTION,
@@ -217,10 +206,15 @@ const CASES: readonly CommandCase[] = [
         entries: [collectionEntry()],
         insertAt: 1,
       }),
-    touches: any(
-      names(INSTRUMENT_TRACK.ADDED, 'trackId', 'track-collection'),
-      names(MIDI_CLIP.ADDED, 'clipId', 'clip-collection'),
-    ),
+    changes: [
+      'devices.insert device-collection',
+      'tracks.insert track-collection',
+      'trackOrder.insert track-collection',
+      'midiSources.insert source-collection',
+      'midiNotes.insert-partition source-collection',
+      'midiSustainPedalEvents.insert-partition source-collection',
+      'clips.insert clip-collection',
+    ],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD,
@@ -239,7 +233,12 @@ const CASES: readonly CommandCase[] = [
         sourceOffsetTick: parseTick(0),
         loop: null,
       }),
-    touches: names(MIDI_CLIP.ADDED, 'clipId', 'clip-added'),
+    changes: [
+      'midiSources.insert source-added',
+      'midiNotes.insert-partition source-added',
+      'midiSustainPedalEvents.insert-partition source-added',
+      'clips.insert clip-added',
+    ],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE,
@@ -259,7 +258,12 @@ const CASES: readonly CommandCase[] = [
         loop: null,
         ...note('note-in-added-clip', 0),
       }),
-    touches: names(MIDI_CLIP.ADDED, 'clipId', 'clip-added-with-note'),
+    changes: [
+      'midiSources.insert source-added-with-note',
+      'midiNotes.insert-partition source-added-with-note',
+      'midiSustainPedalEvents.insert-partition source-added-with-note',
+      'clips.insert clip-added-with-note',
+    ],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE,
@@ -270,10 +274,7 @@ const CASES: readonly CommandCase[] = [
         spanTick: parseTick(1_440),
         ...note('note-in-extension', 1_300),
       }),
-    touches: any(
-      names(MIDI_CLIP.UPDATED, 'clipId', 'clip-non-loop'),
-      names(MIDI_NOTE.ADDED, 'noteId', 'note-in-extension'),
-    ),
+    changes: ['clips.replace clip-non-loop', 'midiNotes.insert note-in-extension'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
@@ -288,7 +289,7 @@ const CASES: readonly CommandCase[] = [
         velocity: parseMidiVelocity(80),
         channel: parseMidiChannel(0),
       }),
-    touches: names(MIDI_NOTE.ADDED, 'noteId', 'note-added'),
+    changes: ['midiNotes.insert note-added'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE,
@@ -300,7 +301,7 @@ const CASES: readonly CommandCase[] = [
         deltaTick: parseTickDelta(10),
         deltaPitch: parseMidiPitchDelta(1),
       }),
-    touches: names(MIDI_NOTE.UPDATED, 'noteId', 'note-non-loop-primary', 'note-non-loop-harmony'),
+    changes: ['midiNotes.replace note-non-loop-primary', 'midiNotes.replace note-non-loop-harmony'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
@@ -310,7 +311,7 @@ const CASES: readonly CommandCase[] = [
         sourceId: NON_LOOP_SOURCE,
         noteIds: [parseNoteId('note-non-loop-harmony')],
       }),
-    touches: names(MIDI_NOTE.REMOVED, 'noteId', 'note-non-loop-harmony'),
+    changes: ['midiNotes.remove note-non-loop-harmony'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
@@ -322,7 +323,7 @@ const CASES: readonly CommandCase[] = [
         startTick: parseTick(240),
         durationTick: parseTick(300),
       }),
-    touches: names(MIDI_NOTE.UPDATED, 'noteId', 'note-non-loop-primary'),
+    changes: ['midiNotes.replace note-non-loop-primary'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD,
@@ -335,7 +336,7 @@ const CASES: readonly CommandCase[] = [
         value: parseMidiControlValue(127),
         channel: parseMidiChannel(0),
       }),
-    touches: names(SUSTAIN.ADDED, 'sustainPedalEventId', 'sustain-added'),
+    changes: ['midiSustainPedalEvents.insert sustain-added'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.MOVE,
@@ -346,7 +347,7 @@ const CASES: readonly CommandCase[] = [
         eventIds: [parseMidiSustainPedalEventId('sustain-non-loop-up')],
         deltaTick: parseTickDelta(10),
       }),
-    touches: names(SUSTAIN.UPDATED, 'sustainPedalEventId', 'sustain-non-loop-up'),
+    changes: ['midiSustainPedalEvents.replace sustain-non-loop-up'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE,
@@ -356,7 +357,7 @@ const CASES: readonly CommandCase[] = [
         sourceId: NON_LOOP_SOURCE,
         eventIds: [parseMidiSustainPedalEventId('sustain-non-loop-up')],
       }),
-    touches: names(SUSTAIN.REMOVED, 'sustainPedalEventId', 'sustain-non-loop-up'),
+    changes: ['midiSustainPedalEvents.remove sustain-non-loop-up'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE,
@@ -367,7 +368,7 @@ const CASES: readonly CommandCase[] = [
         eventId: parseMidiSustainPedalEventId('sustain-non-loop-down'),
         value: parseMidiControlValue(100),
       }),
-    touches: names(SUSTAIN.UPDATED, 'sustainPedalEventId', 'sustain-non-loop-down'),
+    changes: ['midiSustainPedalEvents.replace sustain-non-loop-down'],
   },
 ]
 
@@ -383,25 +384,21 @@ describe('Every Project command', () => {
     expect(CASES.map(({ type }) => type).sort()).toEqual([...types].sort())
   })
 
-  it.each(CASES)(
-    '$type changes only what it names, and undo and redo replay it exactly',
-    (spec) => {
-      const { session } = createFixtureProjectSession()
-      const before = facts(session.getSnapshot())
+  it.each(CASES)('$type makes exactly its changes, and undo and redo replay it exactly', (spec) => {
+    const { session } = createFixtureProjectSession()
+    const before = facts(session.getSnapshot())
 
-      const result = session.execute(spec.command(session))
-      if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
-        throw new Error(`Expected ${spec.type} to commit, got ${result.status}`)
-      }
-      const after = facts(session.getSnapshot())
-      expect(result.commit.delta.changes.length).toBeGreaterThan(0)
-      expect(result.commit.delta.changes.filter((change) => !spec.touches(change))).toEqual([])
-      expect(after).not.toEqual(before)
+    const result = session.execute(spec.command(session))
+    if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      throw new Error(`Expected ${spec.type} to commit, got ${result.status}`)
+    }
+    const after = facts(session.getSnapshot())
+    expect(describeChanges(result.commit)).toEqual(spec.changes)
+    expect(after).not.toEqual(before)
 
-      session.undo()
-      expect(facts(session.getSnapshot())).toEqual(before)
-      session.redo()
-      expect(facts(session.getSnapshot())).toEqual(after)
-    },
-  )
+    session.undo()
+    expect(facts(session.getSnapshot())).toEqual(before)
+    session.redo()
+    expect(facts(session.getSnapshot())).toEqual(after)
+  })
 })

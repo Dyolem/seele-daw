@@ -8,7 +8,7 @@ export type MutationApplyErrorCode =
   | 'write-failed'
 
 export interface MutationApplyErrorDetails {
-  readonly appliedMutationCount?: number
+  readonly appliedChangeCount?: number
   readonly baseRevision?: ModelRevision
   readonly cause?: unknown
   readonly currentRevision?: ModelRevision
@@ -17,7 +17,7 @@ export interface MutationApplyErrorDetails {
 /** Raised when a plan cannot complete as one safe ModelStore transaction. */
 export class MutationApplyError extends Error {
   readonly code: MutationApplyErrorCode
-  readonly appliedMutationCount: number | null
+  readonly appliedChangeCount: number | null
   readonly baseRevision: ModelRevision | null
   readonly currentRevision: ModelRevision | null
   readonly failureCause: unknown
@@ -30,7 +30,7 @@ export class MutationApplyError extends Error {
     super(message, details.cause === undefined ? undefined : { cause: details.cause })
     this.name = 'MutationApplyError'
     this.code = code
-    this.appliedMutationCount = details.appliedMutationCount ?? null
+    this.appliedChangeCount = details.appliedChangeCount ?? null
     this.baseRevision = details.baseRevision ?? null
     this.currentRevision = details.currentRevision ?? null
     // Keep the thrown value even when JavaScript code deliberately throws undefined.
@@ -44,16 +44,16 @@ export class MutationApplyError extends Error {
  */
 export class MutationRollbackError extends Error {
   readonly code = 'rollback-failed' as const
-  readonly appliedMutationCount: number
+  readonly appliedChangeCount: number
   readonly applyCause: unknown
   readonly rollbackCause: unknown
 
-  constructor(appliedMutationCount: number, applyCause: unknown, rollbackCause: unknown) {
-    super(`Failed to restore ModelStore after ${appliedMutationCount} applied mutations`, {
+  constructor(appliedChangeCount: number, applyCause: unknown, rollbackCause: unknown) {
+    super(`Failed to restore ModelStore after ${appliedChangeCount} applied changes`, {
       cause: rollbackCause,
     })
     this.name = 'MutationRollbackError'
-    this.appliedMutationCount = appliedMutationCount
+    this.appliedChangeCount = appliedChangeCount
     this.applyCause = applyCause
     this.rollbackCause = rollbackCause
   }

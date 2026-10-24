@@ -23,11 +23,11 @@ describe('complete project fixture contract', () => {
     expect(first.containers.tracks).not.toBe(second.containers.tracks)
     expect(first.containers.clips).not.toBe(second.containers.clips)
     expect(first.containers.midiSources).not.toBe(second.containers.midiSources)
-    expect(first.containers.midiNotesBySource).not.toBe(second.containers.midiNotesBySource)
+    expect(first.containers.midiNotes).not.toBe(second.containers.midiNotes)
     expect(first.containers.nonLoopNotePartition).not.toBe(second.containers.nonLoopNotePartition)
     expect(first.containers.loopingNotePartition).not.toBe(second.containers.loopingNotePartition)
-    expect(first.containers.midiSustainPedalEventsBySource).not.toBe(
-      second.containers.midiSustainPedalEventsBySource,
+    expect(first.containers.midiSustainPedalEvents).not.toBe(
+      second.containers.midiSustainPedalEvents,
     )
     expect(first.containers.nonLoopSustainPedalEventPartition).not.toBe(
       second.containers.nonLoopSustainPedalEventPartition,

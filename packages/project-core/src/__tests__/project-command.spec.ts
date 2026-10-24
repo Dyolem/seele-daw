@@ -45,7 +45,6 @@ import { prepareProjectCommand } from '#internal/commands/preparation/project-co
 import { ModelStore } from '#internal/model/model-store'
 import { MutationApplier } from '#internal/mutation/mutation-applier'
 import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 
 function captureCommandError(operation: () => unknown): ProjectCommandError {
   let caughtError: unknown
@@ -356,7 +355,7 @@ describe('ProjectCommand preparation boundary', () => {
 
   it('defensively rejects a missing Note partition', () => {
     const fixture = createCompleteProjectFixture()
-    fixture.containers.midiNotesBySource.delete(fixture.records.nonLoopSource.id)
+    fixture.containers.midiNotes.delete(fixture.records.nonLoopSource.id)
     const store = new ModelStore(fixture.seed)
     const command = createAddCommand(store, fixture.records.nonLoopSource.id)
     const error = captureCommandError(() => prepareProjectCommand(store, command))
@@ -380,7 +379,8 @@ describe('AddNoteCommand', () => {
     expect(plan.baseRevision).toBe(store.modelRevision)
     expect(plan.forward).toHaveLength(1)
     expect(mutation).toEqual({
-      type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+      op: 'insert',
+      table: 'midiNotes',
       sourceId: command.sourceId,
       after: {
         id: command.noteId,
@@ -391,11 +391,12 @@ describe('AddNoteCommand', () => {
         channel: command.channel,
       },
     })
-    if (mutation?.type !== PROJECT_MUTATION_TYPE.NOTE.INSERT) {
+    if (mutation?.op !== 'insert' || mutation.table !== 'midiNotes') {
       throw new Error('Expected NOTE.INSERT')
     }
     expect(plan.inverse[0]).toEqual({
-      type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
+      op: 'remove',
+      table: 'midiNotes',
       sourceId: command.sourceId,
       before: mutation.after,
     })
@@ -451,9 +452,7 @@ describe('RemoveNotesCommand', () => {
     )
     const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
     const mutation = plan.forward[0]
-
-    expect(mutation?.type).toBe(PROJECT_MUTATION_TYPE.NOTE.REMOVE)
-    if (mutation?.type !== PROJECT_MUTATION_TYPE.NOTE.REMOVE) {
+    if (mutation?.op !== 'remove' || mutation.table !== 'midiNotes') {
       throw new Error('Expected NOTE.REMOVE')
     }
     expect(mutation.before).toBe(fixture.records.nonLoopNote)
@@ -507,9 +506,7 @@ describe('MoveNotesCommand', () => {
     )
     const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
     const mutation = plan.forward[0]
-
-    expect(mutation?.type).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
-    if (mutation?.type !== PROJECT_MUTATION_TYPE.NOTE.REPLACE) {
+    if (mutation?.op !== 'replace' || mutation.table !== 'midiNotes') {
       throw new Error('Expected NOTE.REPLACE')
     }
     expect(mutation.before).toBe(fixture.records.nonLoopNote)
@@ -536,7 +533,8 @@ describe('MoveNotesCommand', () => {
     expect(plan.forward).toHaveLength(2)
     expect(plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        op: 'replace',
+        table: 'midiNotes',
         sourceId: command.sourceId,
         before: fixture.records.nonLoopNote,
         after: {
@@ -546,7 +544,8 @@ describe('MoveNotesCommand', () => {
         },
       },
       {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+        op: 'replace',
+        table: 'midiNotes',
         sourceId: command.sourceId,
         before: fixture.records.nonLoopHarmonyNote,
         after: {
@@ -665,9 +664,7 @@ describe('ResizeNoteCommand', () => {
     )
     const plan = requireReadyProjectCommandPlan(prepareProjectCommand(store, command))
     const mutation = plan.forward[0]
-
-    expect(mutation?.type).toBe(PROJECT_MUTATION_TYPE.NOTE.REPLACE)
-    if (mutation?.type !== PROJECT_MUTATION_TYPE.NOTE.REPLACE) {
+    if (mutation?.op !== 'replace' || mutation.table !== 'midiNotes') {
       throw new Error('Expected NOTE.REPLACE')
     }
     expect(mutation.before).toBe(fixture.records.nonLoopNote)
@@ -677,7 +674,8 @@ describe('ResizeNoteCommand', () => {
       durationTick: command.durationTick,
     })
     expect(plan.inverse[0]).toEqual({
-      type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
+      op: 'replace',
+      table: 'midiNotes',
       sourceId: command.sourceId,
       before: mutation.after,
       after: mutation.before,

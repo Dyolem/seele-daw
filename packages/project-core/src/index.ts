@@ -68,30 +68,21 @@ export type {
   ProjectCommandErrorDetails,
 } from './commands/protocol/project-command-error'
 
-export { PROJECT_CHANGE_TYPE } from './commit/project-change'
 export type {
-  AffectedTickRange,
-  InstrumentDeviceUpdatedChange,
-  InstrumentTrackAddedChange,
-  InstrumentTrackPlacement,
-  InstrumentTrackRemovedChange,
-  MidiClipAddedChange,
-  MidiClipPlacement,
-  MidiClipRemovedChange,
-  MidiClipSourceUpdate,
-  MidiClipUpdatedChange,
-  MidiNoteAddedChange,
-  MidiNoteRemovedChange,
-  MidiNoteUpdatedChange,
-  MidiSustainPedalEventAddedChange,
-  MidiSustainPedalEventRemovedChange,
-  MidiSustainPedalEventUpdatedChange,
+  MasterReplacement,
+  PartitionChange,
+  PartitionRecordChange,
   ProjectChange,
-  ProjectChangeType,
-  TempoEventAddedChange,
-  TempoEventRemovedChange,
-  TempoEventUpdatedChange,
-} from './commit/project-change'
+  ProjectReplacement,
+  RecordChange,
+  TrackOrderChange,
+} from './mutation/project-change'
+export type {
+  PartitionedRecordOf,
+  PartitionedTableName,
+  RecordOf,
+  RecordTableName,
+} from './model/model-tables'
 export { PROJECT_COMMIT_ORIGIN_KIND, PROJECT_HISTORY_DIRECTION } from './commit/project-commit'
 export type {
   ProjectCommandCommitOrigin,
@@ -101,7 +92,6 @@ export type {
   ProjectHistoryCommitOrigin,
   ProjectHistoryDirection,
 } from './commit/project-commit'
-export type { ProjectDelta } from './commit/project-delta'
 
 export {
   PROJECT_QUERY_TYPE,
@@ -129,6 +119,7 @@ export {
   createMidiNoteChangesSubscription,
 } from './subscriptions/project-subscription'
 export type {
+  AffectedTickRange,
   AllProjectCommitsSubscription,
   CreateMidiNoteChangesSubscriptionInput,
   MidiNoteChangesSubscription,

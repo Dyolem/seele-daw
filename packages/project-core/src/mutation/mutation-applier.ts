@@ -14,7 +14,7 @@ import {
 } from '#internal/model/model-store-write-access'
 import { MutationApplyError, MutationRollbackError } from './mutation-apply-error'
 import { assertCreatedMutationPlan, type MutationPlan } from './mutation-plan'
-import { describeMutation, type ProjectMutation } from './project-mutation'
+import { changeAfter, changeBefore, type ProjectChange } from './project-change'
 import { ProjectedModelStoreReader } from './projected-model-store-reader'
 
 export class MutationApplier {
@@ -83,16 +83,16 @@ export class MutationApplier {
     const nextRevision = nextModelRevision(currentRevision)
 
     // Projection owns rejection: its precondition and invariant errors pass through intact.
-    // Writing the same mutations reproduces the projected state, which the applier spec pins
-    // for every mutation type, so the written Store is not validated a second time.
+    // Writing the same changes reproduces the projected state, which the applier spec pins
+    // for every table and operation, so the written Store is not validated a second time.
     new ProjectedModelStoreReader(this.#store, plan.forward)
 
-    let appliedMutationCount = 0
+    let appliedChangeCount = 0
 
     try {
-      for (const [index, mutation] of plan.forward.entries()) {
-        this.#writeMutation(mutation, index)
-        appliedMutationCount += 1
+      for (const change of plan.forward) {
+        this.#writeChange(change)
+        appliedChangeCount += 1
       }
 
       // No code that can fail belongs after the revision write in a successful transaction.
@@ -100,18 +100,18 @@ export class MutationApplier {
 
       return nextRevision
     } catch (applyCause) {
-      return this.#restoreOrFault(plan, appliedMutationCount, applyCause)
+      return this.#restoreOrFault(plan, appliedChangeCount, applyCause)
     }
   }
 
-  #restoreOrFault(plan: MutationPlan, appliedMutationCount: number, applyCause: unknown): never {
+  #restoreOrFault(plan: MutationPlan, appliedChangeCount: number, applyCause: unknown): never {
     try {
       /**
        * inverse is stored for the entire forward sequence in reverse execution order.
        * If only the first k forward entries completed, their inverses are therefore the
        * final k entries—not the first k entries—of the inverse array.
        */
-      const rollbackStart = plan.inverse.length - appliedMutationCount
+      const rollbackStart = plan.inverse.length - appliedChangeCount
 
       if (rollbackStart < 0) {
         throw new Error('MutationPlan inverse sequence is shorter than the applied prefix')
@@ -122,7 +122,7 @@ export class MutationApplier {
         inverseIndex < plan.inverse.length;
         inverseIndex += 1
       ) {
-        this.#writeMutation(plan.inverse[inverseIndex]!, inverseIndex)
+        this.#writeChange(plan.inverse[inverseIndex]!)
       }
 
       if (this.#store.modelRevision !== plan.baseRevision) {
@@ -137,7 +137,7 @@ export class MutationApplier {
       // required by the original plan are applicable again after restoration.
       new ProjectedModelStoreReader(this.#store, plan.forward)
     } catch (rollbackCause) {
-      const fatalError = new MutationRollbackError(appliedMutationCount, applyCause, rollbackCause)
+      const fatalError = new MutationRollbackError(appliedChangeCount, applyCause, rollbackCause)
 
       this.#fatalError = fatalError
       throw fatalError
@@ -145,9 +145,9 @@ export class MutationApplier {
 
     throw new MutationApplyError(
       'write-failed',
-      `Mutation application failed after ${appliedMutationCount} completed mutations; defensive rollback completed and ModelStore was revalidated`,
+      `Applying the plan failed after ${appliedChangeCount} completed changes; defensive rollback completed and ModelStore was revalidated`,
       {
-        appliedMutationCount,
+        appliedChangeCount,
         baseRevision: plan.baseRevision,
         currentRevision: this.#store.modelRevision,
         cause: applyCause,
@@ -155,33 +155,33 @@ export class MutationApplier {
     )
   }
 
-  #writeMutation(mutation: ProjectMutation, index: number): void {
-    const step = describeMutation(mutation, index)
-
-    switch (step.kind) {
+  #writeChange(change: ProjectChange): void {
+    switch (change.table) {
       case 'project':
-        this.#writeAccess.writeProject(step.before, step.after)
+        this.#writeAccess.writeProject(change.before, change.after)
         return
       case 'master':
-        this.#writeAccess.writeMaster(step.before, step.after)
+        this.#writeAccess.writeMaster(change.before, change.after)
         return
-      case 'track-order':
-        if (step.op === 'insert') this.#writeAccess.insertTrackOrder(step.index, step.trackId)
-        else this.#writeAccess.removeTrackOrder(step.index, step.trackId)
+      case 'trackOrder':
+        if (change.op === 'insert') this.#writeAccess.insertTrackOrder(change.index, change.trackId)
+        else this.#writeAccess.removeTrackOrder(change.index, change.trackId)
         return
-      case 'record':
-        this.#writeAccess.writeRecord(step.table, step.before, step.after)
-        return
-      case 'partition':
-        if (step.op === 'insert') {
-          this.#writeAccess.insertPartition(step.table, step.sourceId, step.records)
+      default:
+        if (!('sourceId' in change)) {
+          this.#writeAccess.writeRecord(change.table, changeBefore(change), changeAfter(change))
+        } else if (change.op === 'insert-partition') {
+          this.#writeAccess.insertPartition(change.table, change.sourceId, change.records)
+        } else if (change.op === 'remove-partition') {
+          this.#writeAccess.removePartition(change.table, change.sourceId, change.records)
         } else {
-          this.#writeAccess.removePartition(step.table, step.sourceId, step.records)
+          this.#writeAccess.writePartitionRecord(
+            change.table,
+            change.sourceId,
+            changeBefore(change),
+            changeAfter(change),
+          )
         }
-        return
-      case 'partition-record':
-        this.#writeAccess.writePartitionRecord(step.table, step.sourceId, step.before, step.after)
-        return
     }
   }
 }

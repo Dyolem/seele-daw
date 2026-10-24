@@ -2,7 +2,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  PROJECT_CHANGE_TYPE,
   PROJECT_COMMAND_EXECUTION_STATUS,
   PROJECT_COMMAND_TYPE,
   PROJECT_HISTORY_DIRECTION,
@@ -28,10 +27,9 @@ import { prepareProjectCommand } from '#internal/commands/preparation/project-co
 import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
 import { MutationApplier } from '#internal/mutation/mutation-applier'
-import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { PROJECT_MUTATION_TYPE } from '#internal/mutation/mutation-type'
 import { QueryIndex } from '#internal/queries/query-index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
+import { describeChanges, requireChange } from './support/project-change-test-support'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
@@ -86,19 +84,6 @@ function captureCommandError(operation: () => unknown): ProjectCommandError {
   }
 
   return caughtError
-}
-
-function requireCommittedTrackChange(commit: ProjectCommit) {
-  const change = commit.delta.changes[0]
-
-  expect(commit.delta.changes).toHaveLength(1)
-  expect(change?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED)
-
-  if (change?.type !== PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED) {
-    throw new Error('Expected an added Instrument Track change')
-  }
-
-  return change
 }
 
 describe('AddInstrumentTrackCommand public contract', () => {
@@ -177,31 +162,37 @@ describe('AddInstrumentTrackCommand preparation', () => {
 
     expect(plan.forward).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.INSERT,
+        op: 'insert',
+        table: 'devices',
         after: command.instrumentDevice,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+        op: 'insert',
+        table: 'tracks',
         after: command.track,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+        op: 'insert',
+        table: 'trackOrder',
         index: command.insertAt,
         trackId: command.track.id,
       },
     ])
     expect(plan.inverse).toEqual([
       {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
+        op: 'remove',
+        table: 'trackOrder',
         index: command.insertAt,
         trackId: command.track.id,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+        op: 'remove',
+        table: 'tracks',
         before: command.track,
       },
       {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REMOVE,
+        op: 'remove',
+        table: 'devices',
         before: command.instrumentDevice,
       },
     ])
@@ -209,8 +200,10 @@ describe('AddInstrumentTrackCommand preparation', () => {
     if (
       preparation.status !== 'ready' ||
       preparation.command.type !== PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD ||
-      plan.forward[0]?.type !== PROJECT_MUTATION_TYPE.DEVICE.INSERT ||
-      plan.forward[1]?.type !== PROJECT_MUTATION_TYPE.TRACK.INSERT
+      plan.forward[0]?.op !== 'insert' ||
+      plan.forward[0].table !== 'devices' ||
+      plan.forward[1]?.op !== 'insert' ||
+      plan.forward[1].table !== 'tracks'
     ) {
       throw new Error('Expected a ready Instrument Track graph insertion')
     }
@@ -263,7 +256,7 @@ describe('AddInstrumentTrackCommand preparation', () => {
 })
 
 describe('Instrument Track commit and History semantics', () => {
-  it('commits one aggregate change and restores the exact placement through Undo / Redo', () => {
+  it('commits the Device, Track and order insertions and replays them exactly', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const command = createCommand(store)
     const result = session.execute(command)
@@ -273,18 +266,20 @@ describe('Instrument Track commit and History semantics', () => {
       throw new Error('Expected AddInstrumentTrack to commit')
     }
 
-    const change = requireCommittedTrackChange(result.commit)
+    expect(describeChanges(result.commit)).toEqual([
+      `devices.insert ${command.instrumentDevice.id}`,
+      `tracks.insert ${command.track.id}`,
+      `trackOrder.insert ${command.track.id}`,
+    ])
+    const trackInsert = requireChange(result.commit, 'tracks', 'insert')
+    const deviceInsert = requireChange(result.commit, 'devices', 'insert')
 
-    expect(change.trackId).toBe(command.track.id)
-    expect(change.after).toEqual({
-      track: command.track,
-      instrumentDevice: command.instrumentDevice,
-      index: command.insertAt,
-    })
-    expect(Object.isFrozen(change)).toBe(true)
-    expect(Object.isFrozen(change.after)).toBe(true)
-    expect(change.after.track).toBe(store.getTrack(command.track.id))
-    expect(change.after.instrumentDevice).toBe(store.getDevice(command.instrumentDevice.id))
+    expect(trackInsert.after).toEqual(command.track)
+    expect(deviceInsert.after).toEqual(command.instrumentDevice)
+    expect(requireChange(result.commit, 'trackOrder', 'insert').index).toBe(command.insertAt)
+    expect(Object.isFrozen(trackInsert)).toBe(true)
+    expect(trackInsert.after).toBe(store.getTrack(command.track.id))
+    expect(deviceInsert.after).toBe(store.getDevice(command.instrumentDevice.id))
     expect([...store.orderedTrackIds()]).toEqual([
       fixture.records.instrumentTrack.id,
       command.track.id,
@@ -292,19 +287,19 @@ describe('Instrument Track commit and History semantics', () => {
     ])
 
     const undoCommit = session.undo()
-    const undoChange = undoCommit?.delta.changes[0]
 
     expect(undoCommit?.origin).toMatchObject({
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
       commandType: PROJECT_COMMAND_TYPE.INSTRUMENT_TRACK.ADD,
     })
-    expect(undoChange?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED)
-    if (undoChange?.type !== PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.REMOVED) {
-      throw new Error('Expected a removed Instrument Track change')
-    }
-    expect(undoChange.before.track).toBe(change.after.track)
-    expect(undoChange.before.instrumentDevice).toBe(change.after.instrumentDevice)
-    expect(undoChange.before.index).toBe(command.insertAt)
+    expect(describeChanges(undoCommit)).toEqual([
+      `trackOrder.remove ${command.track.id}`,
+      `tracks.remove ${command.track.id}`,
+      `devices.remove ${command.instrumentDevice.id}`,
+    ])
+    expect(requireChange(undoCommit, 'tracks', 'remove').before).toBe(trackInsert.after)
+    expect(requireChange(undoCommit, 'devices', 'remove').before).toBe(deviceInsert.after)
+    expect(requireChange(undoCommit, 'trackOrder', 'remove').index).toBe(command.insertAt)
     expect(store.getTrack(command.track.id)).toBeUndefined()
     expect(store.getDevice(command.instrumentDevice.id)).toBeUndefined()
     expect([...store.orderedTrackIds()]).toEqual([
@@ -313,35 +308,14 @@ describe('Instrument Track commit and History semantics', () => {
     ])
 
     const redoCommit = session.redo()
-    const redoChange = redoCommit?.delta.changes[0]
 
-    expect(redoChange?.type).toBe(PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED)
-    if (redoChange?.type !== PROJECT_CHANGE_TYPE.INSTRUMENT_TRACK.ADDED) {
-      throw new Error('Expected a restored Instrument Track change')
-    }
-    expect(redoChange.after.track).toBe(change.after.track)
-    expect(redoChange.after.instrumentDevice).toBe(change.after.instrumentDevice)
+    expect(requireChange(redoCommit, 'tracks', 'insert').after).toBe(trackInsert.after)
+    expect(requireChange(redoCommit, 'devices', 'insert').after).toBe(deviceInsert.after)
     expect([...store.orderedTrackIds()]).toEqual([
       fixture.records.instrumentTrack.id,
       command.track.id,
       fixture.records.audioTrack.id,
     ])
-  })
-
-  it('fails closed when an Instrument Track graph insertion is incomplete', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = createCommand(store)
-    const incompletePlan = createMutationPlan(store.modelRevision, [
-      {
-        type: PROJECT_MUTATION_TYPE.DEVICE.INSERT,
-        after: command.instrumentDevice,
-      },
-    ])
-
-    expect(() => createProjectCommitCandidate(command, incompletePlan)).toThrowError(
-      expect.objectContaining({ code: 'unsupported-mutation-type' }),
-    )
   })
 })
 
@@ -364,7 +338,7 @@ describe('Instrument Track consumer compatibility', () => {
     }
 
     const commit = createProjectCommitCandidate(preparation.command, plan)
-    const transition = index.prepare(store, commit.delta)
+    const transition = index.prepare(store, commit)
 
     transition.stage()
     new MutationApplier(store).apply(plan)

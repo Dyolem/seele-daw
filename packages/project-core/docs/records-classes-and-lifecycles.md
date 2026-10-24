@@ -121,7 +121,7 @@ interface MidiNoteRecord {
 - Playback 和 Editor 开始争夺同一对象的写权限；
 - Worker、JSON 和 Snapshot 需要恢复原型和临时状态。
 
-保持 Record 简单，使其可以被规范化实体表持有，以新记录替换旧记录，并明确地进入 Snapshot、Delta、Undo 和持久化流程。
+保持 Record 简单，使其可以被规范化实体表持有，以新记录替换旧记录，并明确地进入 Snapshot、提交变化、Undo 和持久化流程。
 
 ## 真正适合 Class 的协作者
 
@@ -239,7 +239,7 @@ note.play()
 
 但每个方法实际依赖不同的所有者：
 
-- `moveTo` 需要 Source 边界、Snap 结果、History 和 Delta；
+- `moveTo` 需要 Source 边界、Snap 结果、History 和提交变化；
 - `resize` 需要产品边界算法和跨实体校验；
 - `delete` 需要 Store、Note Table、Selection 清理和原子事务；
 - `select` 只属于 Editor Session；
@@ -323,7 +323,7 @@ Seele DAW 当前选择数据导向的 Project Model，是由具体约束决定�
 
 - Note 数量可能达到十万级；
 - 高频编辑针对规范化实体表中的少量记录；
-- 操作需要同时生成 inverse mutation、Delta 和 query invalidation；
+- 操作需要同时生成反向变化、提交变化和 query invalidation；
 - 项目需要 Snapshot、Journal、Worker 和持久化；
 - UI Preview 与正式提交必须分离；
 - Playback Runtime 不读取 Project 对象实例。
@@ -338,7 +338,7 @@ Seele DAW 当前选择数据导向的 Project Model，是由具体约束决定�
 | ---------------------------------- | ----------------------------- | ---------------------------------- |
 | `ProjectRecord`、Track、Clip、Note | readonly Record               | 可保存事实、按 revision 替换       |
 | `MidiLoop`、Channel Descriptor     | readonly Value Object         | 无独立身份或生命周期               |
-| Command、Mutation、Delta、DTO      | readonly Record / 联合类型    | 需要传输、模式匹配、测试和序列化   |
+| Command、Change、Commit、DTO       | readonly Record / 联合类型    | 需要传输、模式匹配、测试和序列化   |
 | 本地构造与校验                     | 模块纯函数                    | 无跨调用状态、确定性输入输出       |
 | Command handler                    | 函数或注入依赖的 handler 对象 | 行为跨实体，应显式接收上下文       |
 | `ProjectSession`                   | Class                         | 会话生命周期、依赖组合、故障状态   |

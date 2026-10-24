@@ -27,53 +27,48 @@ import {
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import type { ModelRevision } from '#internal/model/model-revision'
 import { INITIAL_MODEL_REVISION } from '#internal/model/model-revision'
+import {
+  PARTITIONED_TABLE_NAMES,
+  RECORD_TABLE_NAMES,
+  type PartitionedTableName,
+  type RecordTableName,
+} from '#internal/model/model-tables'
 import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { invertProjectMutation, type ProjectMutation } from '#internal/mutation/project-mutation'
-import { PROJECT_MUTATION_TYPE, type ProjectMutationType } from '#internal/mutation/mutation-type'
+import {
+  changeLabel,
+  invertProjectChange,
+  type ProjectChange,
+} from '#internal/mutation/project-change'
 
-interface MutationExample {
-  readonly label: string
-  readonly mutation: ProjectMutation
-}
-
-function createMutationExamples(): readonly MutationExample[] {
-  const fixture = createCompleteProjectFixture()
-  const { records } = fixture
-  const replacementProject = createProjectRecord({
-    id: records.project.id,
-    name: 'Updated Project',
-  })
-  const replacementMaster = createMasterChannelRecord({
+/** One change for every table and operation the vocabulary accepts. */
+function createChangeExamples(): readonly ProjectChange[] {
+  const { records } = createCompleteProjectFixture()
+  const sourceId = records.nonLoopSource.id
+  const notes = [records.nonLoopNote, records.nonLoopHarmonyNote]
+  const pedalEvents = [records.nonLoopPedalDown, records.nonLoopPedalUp]
+  const project = createProjectRecord({ id: records.project.id, name: 'Updated Project' })
+  const master = createMasterChannelRecord({
     gain: parseLinearGain(0.75),
     muted: true,
     audioEffectIds: records.master.audioEffectIds,
   })
-  const replacementTrack = createAudioTrackRecord({
+  const track = createAudioTrackRecord({
     id: records.audioTrack.id,
     name: 'Updated Audio Track',
     color: records.audioTrack.color,
     channel: records.audioTrack.channel,
     audioEffectIds: records.audioTrack.audioEffectIds,
   })
-  const replacementClip = createMidiClipRecord({
-    ...records.nonLoopClip,
-    name: 'Updated Clip',
-  })
-  const replacementSource = createMidiSourceRecord({
-    id: records.nonLoopSource.id,
-    lengthTick: parseTick(2_400),
-  })
-  const replacementTempoEvent = createTempoEventRecord({
-    ...records.laterTempoEvent,
-    bpm: parseTempoBpm(132),
-  })
-  const replacementTimeSignatureEvent = createTimeSignatureEventRecord({
+  const clip = createMidiClipRecord({ ...records.nonLoopClip, name: 'Updated Clip' })
+  const source = createMidiSourceRecord({ id: sourceId, lengthTick: parseTick(2_400) })
+  const tempoEvent = createTempoEventRecord({ ...records.laterTempoEvent, bpm: parseTempoBpm(132) })
+  const timeSignatureEvent = createTimeSignatureEventRecord({
     ...records.laterTimeSignatureEvent,
     numerator: parseTimeSignatureNumerator(5),
     denominator: parseTimeSignatureDenominator(4),
   })
-  const replacementDevice = createDeviceDescriptor({
+  const device = createDeviceDescriptor({
     id: records.instrumentDevice.id,
     typeId: records.instrumentDevice.typeId,
     definitionVersion: DEVICE_DEFINITION_VERSION_MIN,
@@ -81,337 +76,88 @@ function createMutationExamples(): readonly MutationExample[] {
     parameters: records.instrumentDevice.parameters,
     opaqueState: records.instrumentDevice.opaqueState,
   })
-  const replacementNote = createMidiNoteRecord({
-    ...records.nonLoopNote,
-    velocity: parseMidiVelocity(112),
-  })
-  const replacementSustainPedalEvent = createMidiSustainPedalEventRecord({
+  const note = createMidiNoteRecord({ ...records.nonLoopNote, velocity: parseMidiVelocity(112) })
+  const pedalEvent = createMidiSustainPedalEventRecord({
     ...records.nonLoopPedalDown,
     value: parseMidiControlValue(96),
   })
-  const partition = [records.nonLoopNote, records.nonLoopHarmonyNote]
-  const sustainPedalEventPartition = [records.nonLoopPedalDown, records.nonLoopPedalUp]
 
   return [
+    { op: 'replace', table: 'project', before: records.project, after: project },
+    { op: 'replace', table: 'master', before: records.master, after: master },
+    { op: 'insert', table: 'tracks', after: records.audioTrack },
+    { op: 'remove', table: 'tracks', before: records.audioTrack },
+    { op: 'replace', table: 'tracks', before: records.audioTrack, after: track },
+    { op: 'insert', table: 'clips', after: records.nonLoopClip },
+    { op: 'remove', table: 'clips', before: records.nonLoopClip },
+    { op: 'replace', table: 'clips', before: records.nonLoopClip, after: clip },
+    { op: 'insert', table: 'midiSources', after: records.nonLoopSource },
+    { op: 'remove', table: 'midiSources', before: records.nonLoopSource },
+    { op: 'replace', table: 'midiSources', before: records.nonLoopSource, after: source },
+    { op: 'insert', table: 'tempoEvents', after: records.laterTempoEvent },
+    { op: 'remove', table: 'tempoEvents', before: records.laterTempoEvent },
+    { op: 'replace', table: 'tempoEvents', before: records.laterTempoEvent, after: tempoEvent },
+    { op: 'insert', table: 'timeSignatureEvents', after: records.laterTimeSignatureEvent },
+    { op: 'remove', table: 'timeSignatureEvents', before: records.laterTimeSignatureEvent },
     {
-      label: 'project replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
-        before: records.project,
-        after: replacementProject,
-      },
+      op: 'replace',
+      table: 'timeSignatureEvents',
+      before: records.laterTimeSignatureEvent,
+      after: timeSignatureEvent,
     },
+    { op: 'insert', table: 'devices', after: records.instrumentDevice },
+    { op: 'remove', table: 'devices', before: records.instrumentDevice },
+    { op: 'replace', table: 'devices', before: records.instrumentDevice, after: device },
+    { op: 'insert', table: 'trackOrder', index: 1, trackId: records.audioTrack.id },
+    { op: 'remove', table: 'trackOrder', index: 1, trackId: records.audioTrack.id },
+    { op: 'insert-partition', table: 'midiNotes', sourceId, records: notes },
+    { op: 'remove-partition', table: 'midiNotes', sourceId, records: notes },
+    { op: 'insert', table: 'midiNotes', sourceId, after: records.nonLoopNote },
+    { op: 'remove', table: 'midiNotes', sourceId, before: records.nonLoopNote },
+    { op: 'replace', table: 'midiNotes', sourceId, before: records.nonLoopNote, after: note },
+    { op: 'insert-partition', table: 'midiSustainPedalEvents', sourceId, records: pedalEvents },
+    { op: 'remove-partition', table: 'midiSustainPedalEvents', sourceId, records: pedalEvents },
+    { op: 'insert', table: 'midiSustainPedalEvents', sourceId, after: records.nonLoopPedalDown },
+    { op: 'remove', table: 'midiSustainPedalEvents', sourceId, before: records.nonLoopPedalDown },
     {
-      label: 'master replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.MASTER.REPLACE,
-        before: records.master,
-        after: replacementMaster,
-      },
-    },
-    {
-      label: 'track insert',
-      mutation: { type: PROJECT_MUTATION_TYPE.TRACK.INSERT, after: records.audioTrack },
-    },
-    {
-      label: 'track remove',
-      mutation: { type: PROJECT_MUTATION_TYPE.TRACK.REMOVE, before: records.audioTrack },
-    },
-    {
-      label: 'track replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
-        before: records.audioTrack,
-        after: replacementTrack,
-      },
-    },
-    {
-      label: 'clip insert',
-      mutation: { type: PROJECT_MUTATION_TYPE.CLIP.INSERT, after: records.nonLoopClip },
-    },
-    {
-      label: 'clip remove',
-      mutation: { type: PROJECT_MUTATION_TYPE.CLIP.REMOVE, before: records.nonLoopClip },
-    },
-    {
-      label: 'clip replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.CLIP.REPLACE,
-        before: records.nonLoopClip,
-        after: replacementClip,
-      },
-    },
-    {
-      label: 'MIDI Source insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
-        after: records.nonLoopSource,
-      },
-    },
-    {
-      label: 'MIDI Source remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE,
-        before: records.nonLoopSource,
-      },
-    },
-    {
-      label: 'MIDI Source replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE,
-        before: records.nonLoopSource,
-        after: replacementSource,
-      },
-    },
-    {
-      label: 'Tempo Event insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT,
-        after: records.laterTempoEvent,
-      },
-    },
-    {
-      label: 'Tempo Event remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE,
-        before: records.laterTempoEvent,
-      },
-    },
-    {
-      label: 'Tempo Event replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
-        before: records.laterTempoEvent,
-        after: replacementTempoEvent,
-      },
-    },
-    {
-      label: 'Time Signature Event insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT,
-        after: records.laterTimeSignatureEvent,
-      },
-    },
-    {
-      label: 'Time Signature Event remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE,
-        before: records.laterTimeSignatureEvent,
-      },
-    },
-    {
-      label: 'Time Signature Event replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE,
-        before: records.laterTimeSignatureEvent,
-        after: replacementTimeSignatureEvent,
-      },
-    },
-    {
-      label: 'Device insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.DEVICE.INSERT,
-        after: records.instrumentDevice,
-      },
-    },
-    {
-      label: 'Device remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REMOVE,
-        before: records.instrumentDevice,
-      },
-    },
-    {
-      label: 'Device replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
-        before: records.instrumentDevice,
-        after: replacementDevice,
-      },
-    },
-    {
-      label: 'track-order insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
-        index: 1,
-        trackId: records.audioTrack.id,
-      },
-    },
-    {
-      label: 'track-order remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
-        index: 1,
-        trackId: records.audioTrack.id,
-      },
-    },
-    {
-      label: 'Note partition insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
-        sourceId: records.nonLoopSource.id,
-        after: partition,
-      },
-    },
-    {
-      label: 'Note partition remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
-        sourceId: records.nonLoopSource.id,
-        before: partition,
-      },
-    },
-    {
-      label: 'Note insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
-        sourceId: records.nonLoopSource.id,
-        after: records.nonLoopNote,
-      },
-    },
-    {
-      label: 'Note remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-        sourceId: records.nonLoopSource.id,
-        before: records.nonLoopNote,
-      },
-    },
-    {
-      label: 'Note replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: records.nonLoopSource.id,
-        before: records.nonLoopNote,
-        after: replacementNote,
-      },
-    },
-    {
-      label: 'Sustain Pedal Event partition insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
-        sourceId: records.nonLoopSource.id,
-        after: sustainPedalEventPartition,
-      },
-    },
-    {
-      label: 'Sustain Pedal Event partition remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
-        sourceId: records.nonLoopSource.id,
-        before: sustainPedalEventPartition,
-      },
-    },
-    {
-      label: 'Sustain Pedal Event insert',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
-        sourceId: records.nonLoopSource.id,
-        after: records.nonLoopPedalDown,
-      },
-    },
-    {
-      label: 'Sustain Pedal Event remove',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
-        sourceId: records.nonLoopSource.id,
-        before: records.nonLoopPedalDown,
-      },
-    },
-    {
-      label: 'Sustain Pedal Event replace',
-      mutation: {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
-        sourceId: records.nonLoopSource.id,
-        before: records.nonLoopPedalDown,
-        after: replacementSustainPedalEvent,
-      },
+      op: 'replace',
+      table: 'midiSustainPedalEvents',
+      sourceId,
+      before: records.nonLoopPedalDown,
+      after: pedalEvent,
     },
   ]
 }
 
-function recordReferences(mutation: ProjectMutation): readonly object[] {
-  switch (mutation.type) {
-    case PROJECT_MUTATION_TYPE.PROJECT.REPLACE:
-    case PROJECT_MUTATION_TYPE.MASTER.REPLACE:
-    case PROJECT_MUTATION_TYPE.TRACK.REPLACE:
-    case PROJECT_MUTATION_TYPE.CLIP.REPLACE:
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE:
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
-    case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
-    case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
-      return [mutation.before, mutation.after]
+const INVERSE_OPERATION = {
+  insert: 'remove',
+  remove: 'insert',
+  replace: 'replace',
+  'insert-partition': 'remove-partition',
+  'remove-partition': 'insert-partition',
+} as const
 
-    case PROJECT_MUTATION_TYPE.TRACK.INSERT:
-    case PROJECT_MUTATION_TYPE.CLIP.INSERT:
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT:
-    case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
-    case PROJECT_MUTATION_TYPE.NOTE.INSERT:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
-      return [mutation.after]
-
-    case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
-    case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE:
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
-    case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
-    case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
-      return [mutation.before]
-
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-      return mutation.after
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
-      return mutation.before
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-      return mutation.after
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
-      return mutation.before
-
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE:
-      return []
-  }
+/** The records a change carries, before first. */
+function recordsOf(change: ProjectChange): readonly object[] {
+  if (change.table === 'trackOrder') return []
+  if (change.op === 'insert-partition' || change.op === 'remove-partition') return change.records
+  return [
+    ...('before' in change ? [change.before] : []),
+    ...('after' in change ? [change.after] : []),
+  ]
 }
 
-function expectSameRecordReferences(actual: ProjectMutation, expected: ProjectMutation): void {
-  const actualReferences = recordReferences(actual)
-  const expectedReferences = recordReferences(expected)
-
-  expect(actualReferences).toHaveLength(expectedReferences.length)
-
-  expectedReferences.forEach((reference, index) => {
-    expect(actualReferences[index]).toBe(reference)
-  })
+/** Where a change writes, apart from the records it carries. */
+function locationOf(change: ProjectChange): Readonly<Record<string, number | string>> {
+  if (change.table === 'trackOrder') return { index: change.index, trackId: change.trackId }
+  return 'sourceId' in change ? { sourceId: change.sourceId } : {}
 }
 
-function mutationLocation(mutation: ProjectMutation): Readonly<Record<string, number | string>> {
-  switch (mutation.type) {
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE:
-      return { index: mutation.index, trackId: mutation.trackId }
+function expectSameRecords(actual: ProjectChange, expected: readonly object[]): void {
+  const records = recordsOf(actual)
 
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
-    case PROJECT_MUTATION_TYPE.NOTE.INSERT:
-    case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
-    case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
-      return { sourceId: mutation.sourceId }
-
-    default:
-      return {}
-  }
+  expect(records).toHaveLength(expected.length)
+  records.forEach((record, index) => expect(record).toBe(expected[index]))
 }
 
 function captureMutationPlanError(operation: () => unknown): MutationPlanError {
@@ -432,265 +178,195 @@ function captureMutationPlanError(operation: () => unknown): MutationPlanError {
   return caughtError
 }
 
-describe('PROJECT_MUTATION_TYPE contract', () => {
-  it('matches the ProjectMutation discriminant union in both type directions', () => {
-    expectTypeOf<ProjectMutation['type']>().toEqualTypeOf<ProjectMutationType>()
+describe('ProjectChange vocabulary', () => {
+  it('names every model table, and each example covers one table and operation', () => {
+    expectTypeOf<ProjectChange['table']>().toEqualTypeOf<
+      'project' | 'master' | 'trackOrder' | RecordTableName | PartitionedTableName
+    >()
+
+    const vocabulary = [
+      'project.replace',
+      'master.replace',
+      'trackOrder.insert',
+      'trackOrder.remove',
+      ...RECORD_TABLE_NAMES.flatMap((table) =>
+        ['insert', 'remove', 'replace'].map((op) => `${table}.${op}`),
+      ),
+      ...PARTITIONED_TABLE_NAMES.flatMap((table) =>
+        ['insert-partition', 'remove-partition', 'insert', 'remove', 'replace'].map(
+          (op) => `${table}.${op}`,
+        ),
+      ),
+    ]
+
+    expect(createChangeExamples().map(changeLabel).sort()).toEqual(vocabulary.sort())
   })
 
-  it('contains exactly 32 unique runtime mutation names', () => {
-    const mutationTypes = Object.values(PROJECT_MUTATION_TYPE).flatMap((group) =>
-      Object.values(group),
+  it.each([
+    ['project', 'insert'],
+    ['master', 'remove'],
+    ['trackOrder', 'replace'],
+    ['tracks', 'insert-partition'],
+    ['future', 'insert'],
+  ])('rejects %s.%s as an unknown change', (table, op) => {
+    const error = captureMutationPlanError(() =>
+      invertProjectChange({ op, table } as unknown as ProjectChange),
     )
-    const exampleTypes = createMutationExamples().map(({ mutation }) => mutation.type)
 
-    expect(mutationTypes).toHaveLength(32)
-    expect(new Set(mutationTypes)).toHaveLength(32)
-    expect(new Set(exampleTypes)).toEqual(new Set(mutationTypes))
+    expect(error.code).toBe('unknown-change')
+    expect(error.changeIndex).toBeNull()
   })
 })
 
-describe('invertProjectMutation', () => {
-  it('inverts Project and Master replacements by swapping the same record references', () => {
-    const [projectExample, masterExample] = createMutationExamples()
+describe('invertProjectChange', () => {
+  it('flips the operation and swaps before and after, keeping every record reference', () => {
+    for (const change of createChangeExamples()) {
+      const label = changeLabel(change)
+      const inverse = invertProjectChange(change)
+      const records = recordsOf(change)
 
-    if (projectExample?.mutation.type !== PROJECT_MUTATION_TYPE.PROJECT.REPLACE) {
-      throw new Error('Expected the Project replacement example first')
-    }
-
-    if (masterExample?.mutation.type !== PROJECT_MUTATION_TYPE.MASTER.REPLACE) {
-      throw new Error('Expected the Master replacement example second')
-    }
-
-    const projectInverse = invertProjectMutation(projectExample.mutation)
-    const masterInverse = invertProjectMutation(masterExample.mutation)
-
-    expect(projectInverse).toEqual({
-      type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
-      before: projectExample.mutation.after,
-      after: projectExample.mutation.before,
-    })
-    expect(masterInverse).toEqual({
-      type: PROJECT_MUTATION_TYPE.MASTER.REPLACE,
-      before: masterExample.mutation.after,
-      after: masterExample.mutation.before,
-    })
-
-    if (
-      projectInverse.type !== PROJECT_MUTATION_TYPE.PROJECT.REPLACE ||
-      masterInverse.type !== PROJECT_MUTATION_TYPE.MASTER.REPLACE
-    ) {
-      throw new Error('Replacement inverses changed mutation kind')
-    }
-
-    expect(projectInverse.before).toBe(projectExample.mutation.after)
-    expect(projectInverse.after).toBe(projectExample.mutation.before)
-    expect(masterInverse.before).toBe(masterExample.mutation.after)
-    expect(masterInverse.after).toBe(masterExample.mutation.before)
-  })
-
-  it('inverts insert, remove, and replace for all six top-level entity tables', () => {
-    const entityExamples = createMutationExamples().slice(2, 20)
-
-    for (const { label, mutation } of entityExamples) {
-      const inverse = invertProjectMutation(mutation)
-      const expectedType = mutation.type.endsWith('.insert')
-        ? mutation.type.replace('.insert', '.remove')
-        : mutation.type.endsWith('.remove')
-          ? mutation.type.replace('.remove', '.insert')
-          : mutation.type
-
-      expect({ label, type: inverse.type }).toEqual({ label, type: expectedType })
-      expect({ label, references: recordReferences(inverse) }).toEqual({
+      expect({ label, inverse: changeLabel(inverse) }).toEqual({
         label,
-        references: [...recordReferences(mutation)].reverse(),
+        inverse: `${change.table}.${INVERSE_OPERATION[change.op]}`,
       })
-      recordReferences(mutation).forEach((reference) => {
-        expect(recordReferences(inverse)).toContain(reference)
+      expect({ label, location: locationOf(inverse) }).toEqual({
+        label,
+        location: locationOf(change),
       })
+      expectSameRecords(inverse, change.op === 'replace' ? [...records].reverse() : records)
+      expect(Object.isFrozen(inverse)).toBe(true)
     }
   })
 
-  it('inverts track-order, Note, and Sustain Pedal Event structural mutations', () => {
-    const structuralExamples = createMutationExamples().slice(20)
-    const expectedTypes = [
-      PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
-      PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
-      PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
-      PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
-      PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-      PROJECT_MUTATION_TYPE.NOTE.INSERT,
-      PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
-      PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
-    ]
+  it('returns the original change after a double inverse', () => {
+    for (const change of createChangeExamples()) {
+      const doubleInverse = invertProjectChange(invertProjectChange(change))
 
-    structuralExamples.forEach(({ label, mutation }, index) => {
-      const inverse = invertProjectMutation(mutation)
-
-      expect({ label, type: inverse.type }).toEqual({ label, type: expectedTypes[index] })
-      expect(mutationLocation(inverse)).toEqual(mutationLocation(mutation))
-
-      const expectedReferences =
-        mutation.type === PROJECT_MUTATION_TYPE.NOTE.REPLACE ||
-        mutation.type === PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE
-          ? [...recordReferences(mutation)].reverse()
-          : recordReferences(mutation)
-
-      expect({ label, references: recordReferences(inverse) }).toEqual({
-        label,
-        references: expectedReferences,
+      expect({ label: changeLabel(change), change: doubleInverse }).toEqual({
+        label: changeLabel(change),
+        change,
       })
-      recordReferences(mutation).forEach((reference) => {
-        expect(recordReferences(inverse)).toContain(reference)
-      })
-    })
-  })
-
-  it('returns the original structure and record references after a double inverse', () => {
-    for (const { label, mutation } of createMutationExamples()) {
-      const doubleInverse = invertProjectMutation(invertProjectMutation(mutation))
-
-      expect({ label, mutation: doubleInverse }).toEqual({ label, mutation })
-      expect(Object.isFrozen(doubleInverse)).toBe(true)
-      expectSameRecordReferences(doubleInverse, mutation)
+      expectSameRecords(doubleInverse, recordsOf(change))
     }
   })
 })
 
 describe('createMutationPlan', () => {
   it('builds inverse entries from the forward entries in reverse execution order', () => {
-    const forward = createMutationExamples().map(({ mutation }) => mutation)
-    const plan = createMutationPlan(INITIAL_MODEL_REVISION, forward)
+    const plan = createMutationPlan(INITIAL_MODEL_REVISION, createChangeExamples())
 
     expect(plan.inverse).toHaveLength(plan.forward.length)
-
     plan.inverse.forEach((inverse, index) => {
-      const forwardIndex = plan.forward.length - 1 - index
-      const sourceMutation = plan.forward[forwardIndex]
+      const expected = invertProjectChange(plan.forward[plan.forward.length - 1 - index]!)
 
-      if (sourceMutation === undefined) {
-        throw new Error('MutationPlan lost a forward entry')
-      }
-
-      const expectedInverse = invertProjectMutation(sourceMutation)
-
-      expect(inverse).toEqual(expectedInverse)
-      expectSameRecordReferences(inverse, expectedInverse)
+      expect(inverse).toEqual(expected)
+      expectSameRecords(inverse, recordsOf(expected))
     })
   })
 
-  it('copies and freezes the plan, wrappers, arrays, and Note partition payload', () => {
+  it('copies and freezes the plan, its changes and partition payloads', () => {
     const fixture = createCompleteProjectFixture()
     const externalPartition = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
-    const partitionMutation = {
-      type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
+    const partitionChange: ProjectChange = {
+      op: 'insert-partition',
+      table: 'midiNotes',
       sourceId: fixture.records.nonLoopSource.id,
-      after: externalPartition,
+      records: externalPartition,
     }
-    const trackOrderMutation = {
-      type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+    const trackOrderChange: ProjectChange = {
+      op: 'insert',
+      table: 'trackOrder',
       index: 1,
       trackId: fixture.records.audioTrack.id,
     }
-    const externalForward: ProjectMutation[] = [partitionMutation, trackOrderMutation]
+    const externalForward: ProjectChange[] = [partitionChange, trackOrderChange]
     const plan = createMutationPlan(INITIAL_MODEL_REVISION, externalForward)
 
     expect(Object.isFrozen(plan)).toBe(true)
     expect(Object.isFrozen(plan.forward)).toBe(true)
     expect(Object.isFrozen(plan.inverse)).toBe(true)
     expect(plan.forward).not.toBe(externalForward)
-    expect(plan.forward[0]).not.toBe(partitionMutation)
-    expect(plan.forward[1]).not.toBe(trackOrderMutation)
+    expect(plan.forward[0]).not.toBe(partitionChange)
+    expect(plan.forward[1]).not.toBe(trackOrderChange)
     expect(plan.forward.every(Object.isFrozen)).toBe(true)
     expect(plan.inverse.every(Object.isFrozen)).toBe(true)
 
     const forwardPartition = plan.forward[0]
     const inversePartition = plan.inverse[1]
 
-    if (forwardPartition?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT) {
-      throw new Error('Expected the copied forward Note partition insertion')
+    if (
+      forwardPartition?.op !== 'insert-partition' ||
+      inversePartition?.op !== 'remove-partition'
+    ) {
+      throw new Error('Expected the copied partition insertion and its inverse')
     }
 
-    if (inversePartition?.type !== PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE) {
-      throw new Error('Expected the inverse Note partition removal')
-    }
-
-    expect(forwardPartition.after).not.toBe(externalPartition)
-    expect(inversePartition.before).not.toBe(externalPartition)
-    expect(Object.isFrozen(forwardPartition.after)).toBe(true)
-    expect(Object.isFrozen(inversePartition.before)).toBe(true)
-    expect(inversePartition.before).toBe(forwardPartition.after)
+    expect(forwardPartition.records).not.toBe(externalPartition)
+    expect(Object.isFrozen(forwardPartition.records)).toBe(true)
+    expect(inversePartition.records).toBe(forwardPartition.records)
 
     externalPartition.push(fixture.records.loopingNote)
     externalForward.push({
-      type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
+      op: 'insert',
+      table: 'midiNotes',
       sourceId: fixture.records.loopingSource.id,
       after: fixture.records.loopingNote,
     })
 
     expect(plan.forward).toHaveLength(2)
-    expect(forwardPartition.after).toEqual([
+    expect(forwardPartition.records).toEqual([
       fixture.records.nonLoopNote,
       fixture.records.nonLoopHarmonyNote,
     ])
   })
 
-  it('canonicalizes structural objects and follows type instead of extra fields', () => {
+  it('drops fields the table and operation do not define', () => {
     const fixture = createCompleteProjectFixture()
     const insertWithExtras = {
-      type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
+      op: 'insert',
+      table: 'tracks',
       after: fixture.records.instrumentTrack,
       before: fixture.records.audioTrack,
       arbitrary: 'ignored insert metadata',
-    }
+    } as const
     const removeWithExtras = {
-      type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
+      op: 'remove',
+      table: 'tracks',
       before: fixture.records.audioTrack,
       after: fixture.records.instrumentTrack,
       arbitrary: 'ignored remove metadata',
-    }
+    } as const
     const plan = createMutationPlan(INITIAL_MODEL_REVISION, [insertWithExtras, removeWithExtras])
 
     expect(plan.forward).toEqual([
-      { type: PROJECT_MUTATION_TYPE.TRACK.INSERT, after: fixture.records.instrumentTrack },
-      { type: PROJECT_MUTATION_TYPE.TRACK.REMOVE, before: fixture.records.audioTrack },
+      { op: 'insert', table: 'tracks', after: fixture.records.instrumentTrack },
+      { op: 'remove', table: 'tracks', before: fixture.records.audioTrack },
     ])
     expect(plan.inverse).toEqual([
-      { type: PROJECT_MUTATION_TYPE.TRACK.INSERT, after: fixture.records.audioTrack },
-      { type: PROJECT_MUTATION_TYPE.TRACK.REMOVE, before: fixture.records.instrumentTrack },
+      { op: 'insert', table: 'tracks', after: fixture.records.audioTrack },
+      { op: 'remove', table: 'tracks', before: fixture.records.instrumentTrack },
     ])
-    expect(plan.forward[0]).not.toHaveProperty('before')
-    expect(plan.forward[1]).not.toHaveProperty('after')
-    expect(plan.forward.every((mutation) => !('arbitrary' in mutation))).toBe(true)
-    expect(plan.inverse.every((mutation) => !('arbitrary' in mutation))).toBe(true)
   })
 })
 
 describe('MutationPlanError', () => {
-  it('rejects an empty forward list without a mutation index', () => {
+  it('rejects an empty forward list without a change index', () => {
     const error = captureMutationPlanError(() => createMutationPlan(INITIAL_MODEL_REVISION, []))
 
     expect(error.code).toBe('empty-forward')
-    expect(error.mutationIndex).toBeNull()
+    expect(error.changeIndex).toBeNull()
   })
 
   it.each([-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
-    'rejects invalid base revision %s without a mutation index',
+    'rejects invalid base revision %s without a change index',
     (value) => {
       const revision = value as unknown as ModelRevision
-      const mutation = createMutationExamples()[0]?.mutation
-
-      if (mutation === undefined) {
-        throw new Error('Expected a valid mutation example')
-      }
-
-      const error = captureMutationPlanError(() => createMutationPlan(revision, [mutation]))
+      const error = captureMutationPlanError(() =>
+        createMutationPlan(revision, createChangeExamples().slice(0, 1)),
+      )
 
       expect(error.code).toBe('invalid-base-revision')
-      expect(error.mutationIndex).toBeNull()
+      expect(error.changeIndex).toBeNull()
     },
   )
 
@@ -700,12 +376,10 @@ describe('MutationPlanError', () => {
       const fixture = createCompleteProjectFixture()
       const error = captureMutationPlanError(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
+          { op: 'insert', table: 'tracks', after: fixture.records.instrumentTrack },
           {
-            type: PROJECT_MUTATION_TYPE.TRACK.INSERT,
-            after: fixture.records.instrumentTrack,
-          },
-          {
-            type: PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
+            op: 'remove',
+            table: 'trackOrder',
             index,
             trackId: fixture.records.instrumentTrack.id,
           },
@@ -713,215 +387,148 @@ describe('MutationPlanError', () => {
       )
 
       expect(error.code).toBe('invalid-track-order-index')
-      expect(error.mutationIndex).toBe(1)
+      expect(error.changeIndex).toBe(1)
     },
   )
 
-  it('rejects same-reference replacements for records and Master', () => {
+  it('rejects same-reference replacements', () => {
     const fixture = createCompleteProjectFixture()
-    const mutations: readonly ProjectMutation[] = [
+    const { records } = fixture
+    const sourceId = records.nonLoopSource.id
+    const changes: readonly ProjectChange[] = [
+      { op: 'replace', table: 'project', before: records.project, after: records.project },
+      { op: 'replace', table: 'master', before: records.master, after: records.master },
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
-        before: fixture.records.project,
-        after: fixture.records.project,
+        op: 'replace',
+        table: 'tracks',
+        before: records.instrumentTrack,
+        after: records.instrumentTrack,
       },
       {
-        type: PROJECT_MUTATION_TYPE.MASTER.REPLACE,
-        before: fixture.records.master,
-        after: fixture.records.master,
+        op: 'replace',
+        table: 'midiNotes',
+        sourceId,
+        before: records.nonLoopNote,
+        after: records.nonLoopNote,
       },
       {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
-        before: fixture.records.instrumentTrack,
-        after: fixture.records.instrumentTrack,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
-        after: fixture.records.nonLoopNote,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
-        after: fixture.records.nonLoopPedalDown,
+        op: 'replace',
+        table: 'midiSustainPedalEvents',
+        sourceId,
+        before: records.nonLoopPedalDown,
+        after: records.nonLoopPedalDown,
       },
     ]
 
-    for (const mutation of mutations) {
+    for (const change of changes) {
       const error = captureMutationPlanError(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
-          {
-            type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
-            index: 0,
-            trackId: fixture.records.instrumentTrack.id,
-          },
-          mutation,
+          { op: 'insert', table: 'trackOrder', index: 0, trackId: records.instrumentTrack.id },
+          change,
         ]),
       )
 
       expect(error.code).toBe('no-op-replace')
-      expect(error.mutationIndex).toBe(1)
+      expect(error.changeIndex).toBe(1)
     }
 
-    const directError = captureMutationPlanError(() => invertProjectMutation(mutations[0]!))
+    const directError = captureMutationPlanError(() => invertProjectChange(changes[0]!))
 
     expect(directError.code).toBe('no-op-replace')
-    expect(directError.mutationIndex).toBeNull()
+    expect(directError.changeIndex).toBeNull()
   })
 
   it('rejects replacement records whose IDs change', () => {
     const fixture = createCompleteProjectFixture()
+    const { records } = fixture
+    const sourceId = records.nonLoopSource.id
     const differentProject = createProjectRecord({
       id: parseProjectId('different-project'),
-      name: fixture.records.project.name,
+      name: records.project.name,
     })
     const differentTrack = createAudioTrackRecord({
-      id: fixture.records.instrumentTrack.id,
+      id: records.audioTrack.id,
       name: 'Temporary Track',
       color: null,
-      channel: fixture.records.instrumentTrack.channel,
+      channel: records.instrumentTrack.channel,
       audioEffectIds: [],
     })
-    const trulyDifferentTrack = createAudioTrackRecord({
-      ...differentTrack,
-      id: fixture.records.audioTrack.id,
-    })
     const differentNote = createMidiNoteRecord({
-      ...fixture.records.nonLoopNote,
+      ...records.nonLoopNote,
       id: parseNoteId('different-note'),
     })
-    const differentSustainPedalEvent = createMidiSustainPedalEventRecord({
-      ...fixture.records.nonLoopPedalDown,
+    const differentPedalEvent = createMidiSustainPedalEventRecord({
+      ...records.nonLoopPedalDown,
       id: parseMidiSustainPedalEventId('different-sustain-pedal-event'),
     })
-    const mutations: readonly ProjectMutation[] = [
+    const changes: readonly ProjectChange[] = [
+      { op: 'replace', table: 'project', before: records.project, after: differentProject },
+      { op: 'replace', table: 'tracks', before: records.instrumentTrack, after: differentTrack },
       {
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
-        before: fixture.records.project,
-        after: differentProject,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
-        before: fixture.records.instrumentTrack,
-        after: trulyDifferentTrack,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
+        op: 'replace',
+        table: 'midiNotes',
+        sourceId,
+        before: records.nonLoopNote,
         after: differentNote,
       },
       {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
-        after: differentSustainPedalEvent,
+        op: 'replace',
+        table: 'midiSustainPedalEvents',
+        sourceId,
+        before: records.nonLoopPedalDown,
+        after: differentPedalEvent,
       },
     ]
 
-    for (const mutation of mutations) {
+    for (const change of changes) {
       const error = captureMutationPlanError(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
-          {
-            type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
-            before: fixture.records.audioTrack,
-          },
-          mutation,
+          { op: 'remove', table: 'tracks', before: records.audioTrack },
+          change,
         ]),
       )
 
       expect(error.code).toBe('record-id-changed')
-      expect(error.mutationIndex).toBe(1)
+      expect(error.changeIndex).toBe(1)
     }
   })
 
-  it('rejects duplicate Note IDs in inserted and removed partition payloads at plan index', () => {
+  it('rejects duplicate record IDs in partition payloads at their plan position', () => {
     const fixture = createCompleteProjectFixture()
-    const duplicateNotes = [fixture.records.nonLoopNote, fixture.records.nonLoopNote]
-    const invalidPartitionMutations: readonly ProjectMutation[] = [
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
-        sourceId: fixture.records.nonLoopSource.id,
-        after: duplicateNotes,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: duplicateNotes,
-      },
+    const { nonLoopNote, nonLoopPedalDown, nonLoopSource, audioTrack } = fixture.records
+    const sourceId = nonLoopSource.id
+    const notes = [nonLoopNote, nonLoopNote]
+    const pedalEvents = [nonLoopPedalDown, nonLoopPedalDown]
+    const changes: readonly ProjectChange[] = [
+      { op: 'insert-partition', table: 'midiNotes', sourceId, records: notes },
+      { op: 'remove-partition', table: 'midiNotes', sourceId, records: notes },
+      { op: 'insert-partition', table: 'midiSustainPedalEvents', sourceId, records: pedalEvents },
+      { op: 'remove-partition', table: 'midiSustainPedalEvents', sourceId, records: pedalEvents },
     ]
 
-    for (const mutation of invalidPartitionMutations) {
+    for (const change of changes) {
       const error = captureMutationPlanError(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
-          {
-            type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
-            before: fixture.records.audioTrack,
-          },
-          mutation,
+          { op: 'remove', table: 'tracks', before: audioTrack },
+          change,
         ]),
       )
 
-      expect(error.code).toBe('duplicate-note-id-in-partition')
-      expect(error.mutationIndex).toBe(1)
+      expect(error.code).toBe('duplicate-id-in-partition')
+      expect(error.changeIndex).toBe(1)
     }
-  })
-
-  it('rejects duplicate Sustain Pedal Event IDs in partition payloads at plan index', () => {
-    const fixture = createCompleteProjectFixture()
-    const duplicateEvents = [fixture.records.nonLoopPedalDown, fixture.records.nonLoopPedalDown]
-    const invalidPartitionMutations: readonly ProjectMutation[] = [
-      {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
-        sourceId: fixture.records.nonLoopSource.id,
-        after: duplicateEvents,
-      },
-      {
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
-        sourceId: fixture.records.nonLoopSource.id,
-        before: duplicateEvents,
-      },
-    ]
-
-    for (const mutation of invalidPartitionMutations) {
-      const error = captureMutationPlanError(() =>
-        createMutationPlan(INITIAL_MODEL_REVISION, [
-          {
-            type: PROJECT_MUTATION_TYPE.TRACK.REMOVE,
-            before: fixture.records.audioTrack,
-          },
-          mutation,
-        ]),
-      )
-
-      expect(error.code).toBe('duplicate-sustain-pedal-event-id-in-partition')
-      expect(error.mutationIndex).toBe(1)
-    }
-  })
-
-  it('rejects unknown mutation types without a mutation index when inverted directly', () => {
-    const unknownMutation = {
-      type: 'future.unsupported',
-      payload: {},
-    } as unknown as ProjectMutation
-    const error = captureMutationPlanError(() => invertProjectMutation(unknownMutation))
-
-    expect(error.code).toBe('unknown-mutation-type')
-    expect(error.mutationIndex).toBeNull()
   })
 })
 
-describe('mutation module boundary', () => {
-  it('does not export mutation APIs from the package root', () => {
+describe('change module boundary', () => {
+  it('does not export plan or change helpers from the package root', () => {
     for (const exportName of [
       'MutationPlanError',
       'createMutationPlan',
-      'invertProjectMutation',
-      'copyProjectMutationForPlan',
-      'invertNormalizedProjectMutation',
-      'PROJECT_MUTATION_TYPE',
+      'changeLabel',
+      'invertProjectChange',
+      'normalizeChangeForPlan',
+      'invertChangeForPlan',
     ]) {
       expect(projectCore).not.toHaveProperty(exportName)
     }

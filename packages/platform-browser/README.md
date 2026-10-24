@@ -44,7 +44,7 @@ Project journal 只能引用 completed blob。显式 Save 只有在待引用资�
 
 Snapshot 采用新记录加 checkpoint 指针切换，不能原地覆盖唯一有效副本；Asset GC 使用 snapshot、checkpoint、journal 和 pending recording 作为 roots 做保守 mark-and-sweep。
 
-首个持久化纵向切片使用轻量 `idb` 包装原生 IndexedDB。`idb` 类型不会进入 Project Core 端口或本包公开 API；真正稳定的是数据库名称、版本、object store、keyPath 和事务协议。当前不建立通用 Repository、CRUD 或查询 DSL，避免在项目内重复实现一套数据访问框架。完整决策与物理格式见 [IndexedDB Project Checkpoint Store 计划](./docs/indexed-db-project-checkpoint-store-plan.md) 与 [IndexedDB Project Catalog V1 计划](./docs/indexed-db-project-catalog-plan.md)。
+首个持久化纵向切片使用轻量 `idb` 包装原生 IndexedDB。`idb` 类型不会进入 Project Core 端口或本包公开 API；真正稳定的是数据库名称、版本、object store、keyPath 和事务协议。当前不建立通用 Repository、CRUD 或查询 DSL，避免在项目内重复实现一套数据访问框架。完整决策与物理格式见 [IndexedDB Project Checkpoint Store 计划](../../docs/archive/platform-browser/indexed-db-project-checkpoint-store-plan.md) 与 [IndexedDB Project Catalog V1 计划](../../docs/archive/platform-browser/indexed-db-project-catalog-plan.md)。
 
 Project Catalog 保存项目名称和最后一次成功 Checkpoint 时间，供 Studio 发现最近项目。它与 Checkpoint / Head 在同一事务内更新，但只是本地导航元数据，不进入 Project Core 或导出文件。数据库尚未产生需要兼容的真实产品数据，因此 Catalog 直接属于首次完整 Physical Schema V1，database version 仍为 `1`，没有伪造 V2 migration。
 
@@ -108,5 +108,5 @@ src/
 
 ## 架构依据
 
-- [Web DAW 简洁架构总纲](../../docs/architecture/web-daw-architecture-brief.md)
+- [Web DAW 简洁架构总纲](../../docs/archive/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)

@@ -1,25 +1,30 @@
 # @seele-daw/playback
 
 `playback` 是浏览器无关的播放编译核心。长期会把项目快照和增量变化解释为图计划、时间线
-事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，但不创建 AudioContext 或
-AudioNode。已完成的首个可听切片只输出阶段计划定义的具体播放计划。
+事件和 RuntimeDelta；它描述“应该播放什么、何时播放”，并由 `PlaybackEngine` 驱动外部运行时
+执行，但不创建 AudioContext 或 AudioNode。
 
-> 当前状态：截至 2026-08-18，Batch 4A.2、Audio Web Batch 4B.1 / Batch 4B.2、Studio Batch
-> 5A、Batch 6A–6F 与 Batch 7A–7F 已通过功能审阅；Audible MIDI Playback V1 已按验收基线
-> `f1d0298` 完成，尚未创建阶段 checkpoint。后续独立的 Manual Timeline Locate V1 已完成四个
-> 主批次与纵向 Playhead UX 修正，并通过统一审核和用户浏览器验证；阶段 checkpoint 为
-> `checkpoint/manual-timeline-locate-2026-08-18`。本包已有通用
-> Sample Instrument Device schema、TempoMap、具体 MIDI Plan Compiler、Transport Mapping、
-> Scheduler Planner、完整 Plan Reconciliation 与原位 Plan handoff。包根只公开 Studio 与 Audio
-> Web 真实消费者所需的最小表面；浏览器 Fetch/decode/Voice 仍完全位于 Audio Web。
-> 2026-08-31 的 CC64 批次已实现并提交非循环 Clip 的 Channel-local 状态追赶、按键释放 / 最终
-> Gate Release 双时间、调度与选择性重协调。2026-09-02 的 EQ3B 进一步冻结 Clip Gate、派生
-> Timeline 与未来 WAV 声音尾部不能混用的边界。长期架构中的名称 `playback-core` 对应当前包。
+## 结构
+
+| 目录                 | 内容                                                                     |
+| -------------------- | ------------------------------------------------------------------------ |
+| `compiler/`          | 从 Project Snapshot 编译播放计划：Note Span、CC64 释放、不支持内容的诊断 |
+| `reconciliation/`    | 比较新旧计划：哪些发声需要切断，哪些只需重排释放，何时必须全量交接       |
+| `time/`、`timeline/` | Tempo Map、Tick 与秒的换算、时间线末端                                   |
+| `transport/`         | 播放位置映射与 Return Anchor                                             |
+| `scheduler/`         | look-ahead 窗口规划                                                      |
+| `engine/`            | `PlaybackEngine`：Transport、调度循环、Voice 账本、资源准备与 Locate     |
+
+`PlaybackEngine` 通过 `PlaybackRuntimePort` 与 `PlaybackTimerPort` 驱动外部运行时，自己不依赖
+DOM。Studio 的 `ProjectPlaybackCoordinator` 只把 Active Project 的 Snapshot 与 Commit 交给引擎，
+再把引擎状态投影到 Vue；Fetch、解码与发声在 Audio Web。引擎按 Change 调和计划，不读命令类型
+（[ADR-002](../../docs/adr/ADR-002-consumers-read-changes-not-command-types.md)）。长期架构中的
+`playback-core` 指的就是本包。
 
 已完成阶段的范围、证据和延期记录见
-[Audible MIDI Playback V1 阶段计划](./docs/audible-midi-playback-v1-phase-plan.md)。
+[Audible MIDI Playback V1 阶段计划](../../docs/archive/playback/audible-midi-playback-v1-phase-plan.md)。
 手动时间线定位的产品语义、实现边界与验收记录见
-[Manual Timeline Locate V1 阶段记录](./docs/manual-timeline-locate-v1-phase-plan.md)。
+[Manual Timeline Locate V1 阶段记录](../../docs/archive/playback/manual-timeline-locate-v1-phase-plan.md)。
 Compiler、Transport 与 Scheduler 的协作和术语另见
 [Audible MIDI Scheduler 工作原理](./docs/audible-midi-scheduler-primer.md)。
 延音踏板的导入、排序、追赶、音源控制文件边界与双语术语见
@@ -43,8 +48,8 @@ late / drop policy、资产加载和首个浏览器听觉验收均已按阶段 D
 包根只公开真实跨包消费者需要的最小播放边界：
 
 - `compileAudibleMidiProject`、`createAudibleMidiTransport` 与
-  `createAudibleMidiSchedulerPlanner` 供 Studio Composition Root 的 Playback Coordinator
-  建立同一份稳定计划、Transport Mapping 与 look-ahead window；
+  `createAudibleMidiSchedulerPlanner` 建立同一份稳定计划、Transport Mapping 与 look-ahead
+  window，由 `createPlaybackEngine` 组合；
 - `AudibleMidiProjectPlan` 与 `ScheduledSampleVoicePlan` 分别供 Audio Web 收集实际需要的
   Soundbank/Pitch，以及让 Voice Runtime 执行已排程事件；
 - Playback Clock parser、Plan / Transport / Scheduler outcome 与对应最小类型随真实 Studio
@@ -132,7 +137,7 @@ Batch 7B 增加了共享时间轴范围派生：
 - 该范围完全派生，不写入 Project File、不触发迁移或 dirty。没有可听 Note Span 的 Empty Plan
   即使拥有时间轴范围也仍不可播放。
 
-Compiler 现在由 Studio 通过 package root 调用；资源准备失败仍属于 Manifest / Audio Runtime
+Compiler 由 `PlaybackEngine` 调用；资源准备失败仍属于 Manifest / Audio Runtime
 边界，不能倒逼 Compiler 按 Soundbank 名称静默丢弃 Track。
 
 Batch 3A 进一步建立了浏览器无关的 Transport Mapping：
@@ -168,12 +173,11 @@ Batch 3B 进一步建立了浏览器无关的 Scheduler Planner：
   的 Span 丢弃，两种情况只输出批级有界计数；
 - 新 generation 从新 Anchor 重置 cursor 与去重集合，不 chase Anchor 之前的长 Note；观察到较新
   generation 后拒绝旧 Snapshot，同一 generation 的 Mapping 变化也失败关闭；
-- Planner 不创建 Cancel、`allNotesOff`、AudioContext、AudioNode 或 UI 状态，这些仍由后续
-  Coordinator 与 Audio Runtime 拥有。
+- Planner 不创建 Cancel、`allNotesOff`、AudioContext、AudioNode 或 UI 状态，这些由
+  `PlaybackEngine` 与 Audio Runtime 拥有。
 
-Transport 与 Scheduler 已由 Studio Batch 5A 的 Coordinator 消费。它们仍不知道 Vue、Timer、
-AudioContext、资源 URL 或 Voice；Studio 决定当前 `25 ms` 唤醒与 `200 ms` look-ahead 产品参数，
-Audio Web 只执行冻结的 Voice Plan。
+Transport 与 Scheduler 由 `PlaybackEngine` 组合。它们不知道 Vue、Timer、AudioContext、资源 URL
+或 Voice；引擎固定 `25 ms` 唤醒与 `200 ms` look-ahead，Audio Web 只执行冻结的 Voice Plan。
 
 Studio Batch 7C 进一步把听觉调度 cadence 与视觉采样解耦：Scheduler 的 `25 ms` Timer 只推进
 look-ahead 计划；应用级视觉位置源通过 Transport / Playback Clock 读取权威 Project Second 与
@@ -205,13 +209,13 @@ Batch 6 进一步建立了浏览器无关的选择性 Reconciliation：
 - Transport `handoffPlan` 保留连续音乐 Tick 与单调 Playback Clock anchor；Tempo Map 变化只会
   重算该 Tick 对应的 ProjectSecond，不会移动 Playhead。handoff 在原位递增 `engineGeneration`，
   不把 generation 变化等同于 `allNotesOff`；
-- Note / Clip / Track / Instrument 的活动 Voice 语义由 Studio 按操作执行；CC64 Add / Move /
-  Remove / Replace Value 可以只重排受影响活动 Voice 的最终 Release。Scheduler 只从新 anchor
+- 正在发声的 Note 若只改了 `endTick` 或 `releaseTick`（Resize、CC64 编辑、Clip 延长露出尾部），
+  引擎只重排它的最终 Release；其他任何变化都切断该 Voice。Scheduler 只从新 anchor
   规划尚未越过起点的事件，不执行 Note Chase；
 - Tempo、Master route、Commit gap 或不可播放目标仍明确要求全局安全兜底。Playback 不拥有
   AudioContext、Voice handle、资源准备或 UI warning。
 
-Studio 根据 Commit Delta 中的 `tempo-event.added`、`tempo-event.updated`、
+引擎根据 Commit Delta 中的 `tempo-event.added`、`tempo-event.updated`、
 `tempo-event.removed` 识别完整 Tempo Map 变化，而不依赖某一个 Command 名称。Add、Move、
 Remove、Replace BPM 及其 Undo / Redo 都使用保留连续 Tick 的完整 Runtime handoff：若 Commit
 到达时仍在 Playing，先停止 Scheduler、释放全部旧 Voice 并进入 Paused；Stopped / Paused 位置也
@@ -304,5 +308,5 @@ src/
 
 ## 架构依据
 
-- [Web DAW 简洁架构总纲](../../docs/architecture/web-daw-architecture-brief.md)
+- [Web DAW 简洁架构总纲](../../docs/archive/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)

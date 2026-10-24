@@ -4,7 +4,7 @@
 >
 > 日期：2026-09-11
 
-当前方案见 [Editor Input Foundation V1 阶段计划](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md)。
+当前方案见 [Editor Input Foundation V1 阶段计划](../studio/editor-input-foundation-v1-phase-plan.md)。
 用户将独立手势架构与统一、可查询、可自定义的快捷键系统提升为下一阶段优先事项。
 
 原草案仅统一 Piano Roll 的 Note、CC64 与 Track Pencil，范围不足；新版使用 Tempo 和

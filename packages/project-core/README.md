@@ -2,7 +2,10 @@
 
 `project-core` 是与框架和浏览器无关的项目内核，拥有 Web DAW 唯一的创作事实，并负责把一次编辑转换为可验证、可撤销、可订阅的原子提交。
 
-> 当前状态：MIDI 领域记录、私有 ModelStore、全局不变量、合法初始化、MutationPlan、写时投影、MutationApplier 原子写入、Instrument Track / Device、Tempo Event、MIDI Clip / Note 与 Sustain Pedal CC64 Event Command、对应 ProjectCommit / ProjectDelta、ProjectSession、带稳定内容状态身份的会话级 History / Undo / Redo、MIDI Note ProjectQuery / QueryIndex、ChangePublisher / 局部订阅、ProjectSnapshot、当前 ProjectFileDTO V2 往返与严格 V1-to-V2 migration，以及 storage-neutral Project Checkpoint 协议与端口已经实现；`platform-browser` 中基于 `idb` 的 IndexedDB adapter 和 Studio Active Project / 保存点接入也已完成。CC64 在本批次只是可保存、可撤销的 Project Fact；Standard MIDI File 映射、Playback / Audio Runtime 和 Studio Controller Lane 尚未接入。JSON codec 与 Journal 尚未开始。
+> 已实现：MIDI 领域记录与全局不变量、ModelStore 与原子 MutationApplier、18 种 Project Command
+> （Instrument Track / Device、Tempo、MIDI Clip / Note、Sustain Pedal CC64）、ProjectCommit /
+> ProjectDelta、History / Undo / Redo、QueryIndex、ChangePublisher、Snapshot、Project File V2
+> 往返与 V1 迁移，以及 Checkpoint 协议。尚未开始：JSON codec 与 Journal。
 
 ## 包定位
 
@@ -195,7 +198,7 @@ ProjectSession
 
 Durability 和 Playback 通过端口或订阅接收结果。Project commit 不等待磁盘、音频设备或 Worker；外部失败不能回滚已经合法的创作事实。
 
-当前 `ProjectSession` 已经公开 `modelRevision`、会话级 `contentStateId`、`canUndo`、`canRedo`、同步 `getSnapshot()`、`query(query)`、`subscribe(subscription, observer)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex、ChangePublisher、Snapshot 生成器和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History / QueryIndex transition 与 gated publication，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry、内容状态身份、索引 root 或通知。空 History 的 Undo / Redo 返回 `null`，实际重放则恢复 before / after content identity、返回并异步发布新的 ProjectCommit。显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)、[Project Content State Identity 与精确保存点计划](./docs/project-content-state-identity-plan.md)、[ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)、[ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md) 与 [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)。
+当前 `ProjectSession` 已经公开 `modelRevision`、会话级 `contentStateId`、`canUndo`、`canRedo`、同步 `getSnapshot()`、`query(query)`、`subscribe(subscription, observer)`、`execute(command)`、`undo()` 和 `redo()`，并由公开 `createInitialProjectSession` 包装合法项目初始化。Session 的实际 Class、ModelStore、MutationApplier、HistoryController、QueryIndex、ChangePublisher、Snapshot 生成器和包内组合入口保持隐藏。`execute` 返回 frozen 的 `committed` / `no-change` 判别联合：ready 分支在写入前构造完整 Commit、结果外壳、History / QueryIndex transition 与 gated publication，apply 成功后直接返回；no-change 不生成计划、Commit、revision、History entry、内容状态身份、索引 root 或通知。空 History 的 Undo / Redo 返回 `null`，实际重放则恢复 before / after content identity、返回并异步发布新的 ProjectCommit。显式故障恢复状态留给后续独立模块。完整边界见 [ProjectSession 最小执行门面计划](../../docs/archive/project-core/project-session-execution-foundation-plan.md)、[Project History / Undo / Redo 基础层计划](../../docs/archive/project-core/project-history-foundation-plan.md)、[Project Content State Identity 与精确保存点计划](../../docs/archive/project-core/project-content-state-identity-plan.md)、[ProjectQuery / MIDI Note QueryIndex 基础层计划](../../docs/archive/project-core/project-query-index-foundation-plan.md)、[ChangePublisher / 局部订阅基础层计划](../../docs/archive/project-core/project-change-publisher-foundation-plan.md) 与 [ProjectSnapshot 基础层计划](../../docs/archive/project-core/project-snapshot-foundation-plan.md)。
 
 ## 命令与原子提交管线
 
@@ -218,9 +221,9 @@ ProjectCommand
 -> deliver the committed ProjectCommit asynchronously
 ```
 
-`ready` preparation 中的规范化 Command 与计划共享聚合 Record 引用。Commit candidate
-通过这些引用和实体所有权关系校验 Command / Plan 对应性，避免为 Track、Device、Clip 或
-Source 再维护一份会随领域类型演进而漏改的逐字段比较清单。
+`ready` preparation 中的规范化 Command 与计划共享聚合 Record 引用。运行时不再校验 Command 与
+Plan 是否对应：消费者只读 Delta，不依赖命令类型；每种命令的语义由
+`__tests__/command-properties.spec.ts` 固定（见 [ADR-002](../../docs/adr/ADR-002-consumers-read-changes-not-command-types.md)）。
 
 History、MIDI Note QueryIndex 与 ChangePublisher 已接入同一提交边界：普通 committed Command 进入 undo 栈，Undo / Redo 从当前 revision 重新建立 MutationPlan；Session 在模型写入前暂存新的 History 双栈头和 QueryIndex root，并注册可取消的发布 microtask。apply 失败时先取消发布，再恢复 History 与 QueryIndex；成功的 revision 写入后仍然直接返回，listener 只在当前同步栈结束后运行。Durability 和 Playback 尚未接入；它们必须延续相同原则，外部 listener 或 I/O 失败不能回滚已经合法的模型提交。
 
@@ -249,7 +252,7 @@ clamp、wrap 或隐式扩展 Source / Clip。只有明确的 `ExtendMidiClipWith
 Clip、按需增长 Source 与添加 Note 表达成一个产品意图。Editor 可以在 Preview 阶段约束几何或
 Delta，Core 仍基于提交时的权威 Record 完整复核。Command preparer 与 handler 不从 package
 root 导出；ProjectSession 是正式执行入口。完整规则和实现边界见
-[MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)。
+[MIDI Note Command 层执行计划](../../docs/archive/project-core/midi-note-command-layer-plan.md)。
 
 Command 的单数或复数不由 Mutation 数量决定：Command 表达一次完整产品意图，Mutation
 表达最小项目事实变化，MutationPlan / Commit 提供全有或全无的事务边界。不得用多次
@@ -279,7 +282,7 @@ File 映射、Playback pedal chase / voice lifetime、Audio Runtime 和 Studio C
 
 `AddInstrumentTrackCommand` 把一条空白乐器音轨、它唯一的初始 Instrument Slot Device 和 Track Order 位置作为一个完整产品意图。Handler 原子准备 `DEVICE.INSERT`、`TRACK.INSERT` 与 `TRACK_ORDER.INSERT`，其 inverse 按相反顺序撤销；成功提交、Undo 和 Redo 都只发布一条聚合的 `instrument-track.added` 或 `instrument-track.removed` change。
 
-Project Core 不生成 Track ID、默认名称或随机颜色，也不选择 Soundbank。调用方必须提供已确定的名称、颜色、Channel Strip、Device 和插入位置；新音轨不自动创建 Clip、MidiSource 或 Note。完整边界见 [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)。
+Project Core 不生成 Track ID、默认名称或随机颜色，也不选择 Soundbank。调用方必须提供已确定的名称、颜色、Channel Strip、Device 和插入位置；新音轨不自动创建 Clip、MidiSource 或 Note。完整边界见 [Add Instrument Track Command 实施计划](../../docs/archive/project-core/add-instrument-track-command-plan.md)。
 
 ### Replace Instrument Device 纵向切片
 
@@ -291,7 +294,7 @@ Project Core 继续只验证通用 Device 外壳，不识别 `Studio Grand`、`s
 未知合法 Descriptor 会通过 Snapshot、当前 Project File V2 与 Checkpoint 完整往返。新 Track
 默认选择什么声音、旧空 Slot 的可见修复入口以及内置 Device Definition 所有权属于 Studio /
 Playback；完整阶段边界见
-[Audible MIDI Playback V1 第六阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
+[Audible MIDI Playback V1 第六阶段计划](../../docs/archive/playback/audible-midi-playback-v1-phase-plan.md)。
 
 ### Tempo Event 生命周期纵向切片
 
@@ -314,7 +317,7 @@ Pedal Event Partition 作为一个完整产品意图。Handler 原子准备完�
 顺序撤销；成功提交、Undo 和 Redo 都只发布一条聚合的 `midi-clip.added` 或
 `midi-clip.removed` change。
 
-Project Core 验证目标 Instrument Track、Clip / Source / Partition 身份和 Source 读取范围，但不决定双击手势、按小节吸附、默认长度、名称或颜色。MIDI Clip change 携带完整 ownership placement 与时间线受影响范围；QueryIndex 同步增加或移除对应 Note Partition，使新 Clip 可以立即接收现有 Note Command。完整边界见 [Add MIDI Clip Command 实施计划](./docs/add-midi-clip-command-plan.md)。
+Project Core 验证目标 Instrument Track、Clip / Source / Partition 身份和 Source 读取范围，但不决定双击手势、按小节吸附、默认长度、名称或颜色。MIDI Clip change 携带完整 ownership placement 与时间线受影响范围；QueryIndex 同步增加或移除对应 Note Partition，使新 Clip 可以立即接收现有 Note Command。完整边界见 [Add MIDI Clip Command 实施计划](../../docs/archive/project-core/add-midi-clip-command-plan.md)。
 
 ### MIDI Clip / Note 原子放置纵向切片
 
@@ -327,7 +330,7 @@ History 步骤，不允许 Studio 串联多次 Command。
 从当前末端起遇到的下一 Clip，looped Clip 明确不支持。Source 已有容量足够时不会制造等值
 Replace。新建 populated Clip 继续聚合为 `midi-clip.added / removed`；右扩发布
 `midi-clip.updated` 与 `midi-note.added / removed`。完整规则见
-[MIDI Clip / Note 原子放置命令计划](./docs/midi-clip-note-placement-command-plan.md)。
+[MIDI Clip / Note 原子放置命令计划](../../docs/archive/project-core/midi-clip-note-placement-command-plan.md)。
 
 ### ProjectCommit / ProjectDelta 基础层
 
@@ -340,7 +343,7 @@ Record 和 `affectedFromTick`。Delta 携带提交后的 `modelRevision`，Commi
 revision，以及 Command 或 History origin；History origin 额外记录 Undo / Redo 方向和原始
 Command 类型。
 
-包内 Commit candidate 工厂在 MutationApplier 写入前验证 Command / Plan 对应关系、推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)。
+包内 Commit candidate 工厂在 MutationApplier 写入前推进 revision 并完成全部 Delta 映射。当前不支持的 mutation 会失败关闭，避免模型变化被静默遗漏；ProjectSession 只在 apply 成功后返回已准备好的候选。Delta 构造不是独立生产入口，也不为白盒测试额外导出。所有结果外壳在运行时冻结，领域 Record 继续保持引用共享。完整边界见 [ProjectCommit / ProjectDelta 基础层执行计划](../../docs/archive/project-core/project-commit-delta-foundation-plan.md)。
 
 ### MutationPlan 的作用
 
@@ -363,7 +366,9 @@ History label、merge key、Editor restore point 和 Delta 提示分别属于后
 - 所有存在性、权限、范围和跨实体不变量在 apply 前验证；
 - `ProjectedModelStoreReader` 通过实体表 overlay、删除标记和按需复制的 Track 顺序 / Note 分区预演完整 forward 序列，不复制整个项目；
 - 每条基础 mutation 只检查当前投影视图上的存在性、`before` 引用和顺序位置，最终投影只执行一次全局 `InvariantValidator`，因此允许级联操作的中间状态暂时不完整；
-- MutationApplier 通过 CAS 写闭包按确定顺序执行已经验证的基础操作，并在真实 Store 上再次执行防御性不变量检查；
+- MutationApplier 通过 CAS 写闭包按确定顺序执行已经验证的基础操作。写入后不再做第二次全量
+  校验：写入结果按构造等于投影，由 `mutation-applier.spec` 对每种 Mutation 固定（见
+  [ADR-001](../../docs/adr/ADR-001-validate-each-commit-once.md)）；
 - `modelRevision` 是成功路径的最后一次写入，一份计划只递增一次，失败和回滚都不能递增或倒退 revision；
 - Commit / Delta 候选在写入前完整准备，只有全部成功后才能返回和发布；
 - 业务失败不会产生部分模型、History Entry 或可观察的 Delta；
@@ -416,13 +421,13 @@ session.query(createMidiNotesIntersectingRangeQuery(...))
 - Source 或 Note 不存在属于正常读取结果，分别返回空集合或 `undefined`；
 - Query descriptor、结果外壳和结果数组运行时冻结，Record 保持引用共享。
 
-包内 QueryIndex 为每个 MidiSource 维护 ID Map、startTick 排序数组和 prefix maximum end，从而通过二分边界缩小区间候选。Index 按 ProjectDelta 在写前增量准备，只复制受影响 Source；MIDI Clip Add / Remove 同步增加或移除完整 Source Partition。revision 落后时 Query 使用权威 ModelStore 扫描降级，Index 也可以从 Store 完整 rebuild。扫描与索引结果必须等价，内部结构不进入项目文件、History 或 package root。完整决策见 [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)。
+包内 QueryIndex 为每个 MidiSource 维护 ID Map、startTick 排序数组和 prefix maximum end，从而通过二分边界缩小区间候选。Index 按 ProjectDelta 在写前增量准备，只复制受影响 Source；MIDI Clip Add / Remove 同步增加或移除完整 Source Partition。revision 落后时 Query 使用权威 ModelStore 扫描降级，Index 也可以从 Store 完整 rebuild。扫描与索引结果必须等价，内部结构不进入项目文件、History 或 package root。完整决策见 [ProjectQuery / MIDI Note QueryIndex 基础层计划](../../docs/archive/project-core/project-query-index-foundation-plan.md)。
 
 Track / Clip、Tempo、Device、Asset 和 Automation Query 要等对应 UI 消费出现后再加入，不能因为已有 Command / Delta 就预建一个无业务语义的通用查询语言。
 
 当前局部订阅支持全部 Commit，以及按 MidiSource ID、Note ID 和半开 Tick 区间过滤 MIDI Note changes。多个约束必须在同一条 change 上同时命中，一个 Commit 即使有多条 change 命中也只通知一次。订阅者收到 Commit 后按需重新 Query；不能用单个全局 revision ref 让 Mixer、Piano Roll、Inspector 和 Arrangement 在任意 Note 变化后全部重算。
 
-ChangePublisher 在权威写入前取得匹配订阅快照并注册 gated microtask，失败路径同步取消，成功路径异步按 Commit 和注册顺序通知。取消订阅幂等且会抑制已经排队但尚未调用的 listener；listener 可以发起下一条 Command，新 Commit 排在当前通知批次之后。`onCommit` 抛错时只终止该订阅，通过 frozen failure envelope 调用其 `onError`，其他 listener、ModelStore、History 和 QueryIndex 不受影响。完整规则见 [ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md)。
+ChangePublisher 在权威写入前取得匹配订阅快照并注册 gated microtask，失败路径同步取消，成功路径异步按 Commit 和注册顺序通知。取消订阅幂等且会抑制已经排队但尚未调用的 listener；listener 可以发起下一条 Command，新 Commit 排在当前通知批次之后。`onCommit` 抛错时只终止该订阅，通过 frozen failure envelope 调用其 `onError`，其他 listener、ModelStore、History 和 QueryIndex 不受影响。完整规则见 [ChangePublisher / 局部订阅基础层计划](../../docs/archive/project-core/project-change-publisher-foundation-plan.md)。
 
 Query 返回只读投影或稳定实体记录：未变化实体可以保持引用相等，变化实体必须是新引用。大型集合优先返回窗口化、分页或迭代结果，不能把十万 Note 在每次提交后复制给 Vue。
 
@@ -437,13 +442,14 @@ Snapshot 主要用于：
 - 发送到 Worker 的版本化输入；
 - 导出、诊断和测试 fixture。
 
-当前 `ProjectSession.getSnapshot()` 在调用时同步复制并冻结 Track order、实体数组，以及按 Source
+`ProjectSession.getSnapshot()` 按 `modelRevision` 缓存：同一 revision 内的调用返回同一个 Snapshot，
+提交后的第一次调用才复制并冻结 Track order、实体数组，以及按 Source
 分区的 Note 与 Sustain Pedal Event 数组，记录当前 `modelRevision`，同时共享逻辑不可变的领域
 Record。普通实体按 ID、Timeline 与 CC64 Event 按稳定时间键规范排序，不依赖 Map insertion
 order；后续提交只替换 Record，因此旧 Snapshot 保留原 revision 与 Record 版本。Snapshot 不
 携带 Map、writer lease、History、Index 或 listener，也不直接充当 ProjectFileDTO。
 
-Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playback 全量编译、保存/checkpoint、Worker 或离线任务开始、消费者增量恢复等低频边界显式复制容器；如果大项目复制成本成为瓶颈，再根据 benchmark 引入分块、copy-on-write 或结构共享。优化只能发生在 Snapshot 生成器/ModelStore 内部，不能改变外部稳定语义。完整规则见 [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)。
+Snapshot 不在每个 pointermove 或普通 selector 中生成。V1 只在 Playback 全量编译、保存/checkpoint、Worker 或离线任务开始、消费者增量恢复等低频边界显式复制容器；如果大项目复制成本成为瓶颈，再根据 benchmark 引入分块、copy-on-write 或结构共享。优化只能发生在 Snapshot 生成器/ModelStore 内部，不能改变外部稳定语义。完整规则见 [ProjectSnapshot 基础层计划](../../docs/archive/project-core/project-snapshot-foundation-plan.md)。
 
 ## 当前 ProjectFileDTO V2 写出边界
 
@@ -498,7 +504,7 @@ listener。normalizer、ModelStoreSeed、ModelStore 和 Session 组合入口继�
 
 `saveProjectCheckpoint(store, session, input)` 只捕获一次 Snapshot，再创建 DTO 和 frozen checkpoint，异步保存完成后返回包含来源 revision 与会话级 `sourceContentStateId` 的 receipt。content identity 不进入持久化 envelope；上层以它精确判断 Undo / Redo 是否回到保存点。存储失败不会回滚或改变 Session。`ProjectCheckpointStore` 只定义保存可信 checkpoint 与读取按恢复优先级排列的 `unknown` candidates，不暴露 IndexedDB、OPFS 或 DOM 类型。
 
-`restoreProjectCheckpoint(store, projectId)` 逐个严格解码候选，验证 envelope、内部 Project File 与请求 Project ID，并只从完整通过领域不变量的 DTO 组合 Session。active 候选结构损坏、领域非法或属于其他项目时会保留 frozen 诊断并继续 previous；空候选返回 `null`，存在候选但全部失败则抛出 `ProjectCheckpointOperationError`。完整决策见 [Project Checkpoint 基础协议与存储端口计划](./docs/project-checkpoint-foundation-plan.md)。
+`restoreProjectCheckpoint(store, projectId)` 逐个严格解码候选，验证 envelope、内部 Project File 与请求 Project ID，并只从完整通过领域不变量的 DTO 组合 Session。active 候选结构损坏、领域非法或属于其他项目时会保留 frozen 诊断并继续 previous；空候选返回 `null`，存在候选但全部失败则抛出 `ProjectCheckpointOperationError`。完整决策见 [Project Checkpoint 基础协议与存储端口计划](../../docs/archive/project-core/project-checkpoint-foundation-plan.md)。
 
 ## ProjectDelta 与消费者同步
 
@@ -567,9 +573,9 @@ src/
 ├── model/          ModelStore、实体、ID 与不变量
 ├── time/           Tick、区间、TempoMap
 ├── mutation/       可逆基础变化、MutationPlan 与原子应用
-├── commands/       根层不放置源码，按共享职责或产品领域分目录
+├── commands/       按共享职责或产品领域分目录
 │   ├── protocol/                  Command 协议与稳定拒绝错误
-│   ├── preparation/               准备结果、revision 检查与穷尽分派
+│   ├── preparation/               命令注册表：normalize、revision 检查与分派
 │   ├── instrument-device/         Instrument Device 命令实现
 │   ├── instrument-track/          Instrument Track 命令实现
 │   ├── midi-clip/                 基础 MIDI Clip 命令实现
@@ -677,27 +683,27 @@ src/
 
 ## 架构依据
 
-- [阶段成果：安全模型与原子 Mutation 内核](./docs/project-core-transaction-foundation-milestone.md)
-- [Add Instrument Track Command 实施计划](./docs/add-instrument-track-command-plan.md)
-- [Add MIDI Clip Command 实施计划](./docs/add-midi-clip-command-plan.md)
-- [MIDI Clip / Note 原子放置命令计划](./docs/midi-clip-note-placement-command-plan.md)
-- [MIDI Note Command 层执行计划](./docs/midi-note-command-layer-plan.md)
+- [阶段成果：安全模型与原子 Mutation 内核](../../docs/archive/project-core/project-core-transaction-foundation-milestone.md)
+- [Add Instrument Track Command 实施计划](../../docs/archive/project-core/add-instrument-track-command-plan.md)
+- [Add MIDI Clip Command 实施计划](../../docs/archive/project-core/add-midi-clip-command-plan.md)
+- [MIDI Clip / Note 原子放置命令计划](../../docs/archive/project-core/midi-clip-note-placement-command-plan.md)
+- [MIDI Note Command 层执行计划](../../docs/archive/project-core/midi-note-command-layer-plan.md)
 - [MIDI Sustain Pedal CC64 Project Fact V1](./docs/midi-sustain-pedal-cc64-project-fact-v1.md)
-- [ProjectCommit / ProjectDelta 基础层执行计划](./docs/project-commit-delta-foundation-plan.md)
-- [ProjectSession 最小执行门面计划](./docs/project-session-execution-foundation-plan.md)
-- [Project History / Undo / Redo 基础层计划](./docs/project-history-foundation-plan.md)
-- [Project Content State Identity 与精确保存点计划](./docs/project-content-state-identity-plan.md)
-- [ProjectQuery / MIDI Note QueryIndex 基础层计划](./docs/project-query-index-foundation-plan.md)
-- [ChangePublisher / 局部订阅基础层计划](./docs/project-change-publisher-foundation-plan.md)
-- [ProjectSnapshot 基础层计划](./docs/project-snapshot-foundation-plan.md)
+- [ProjectCommit / ProjectDelta 基础层执行计划](../../docs/archive/project-core/project-commit-delta-foundation-plan.md)
+- [ProjectSession 最小执行门面计划](../../docs/archive/project-core/project-session-execution-foundation-plan.md)
+- [Project History / Undo / Redo 基础层计划](../../docs/archive/project-core/project-history-foundation-plan.md)
+- [Project Content State Identity 与精确保存点计划](../../docs/archive/project-core/project-content-state-identity-plan.md)
+- [ProjectQuery / MIDI Note QueryIndex 基础层计划](../../docs/archive/project-core/project-query-index-foundation-plan.md)
+- [ChangePublisher / 局部订阅基础层计划](../../docs/archive/project-core/project-change-publisher-foundation-plan.md)
+- [ProjectSnapshot 基础层计划](../../docs/archive/project-core/project-snapshot-foundation-plan.md)
 - [Seele Project File Format V1](./docs/project-file-format-v1.md)
 - [Seele Project File Format V2](./docs/project-file-format-v2.md)
-- [ProjectFileDTO V1 写出边界计划](./docs/project-file-dto-v1-write-plan.md)
-- [ProjectFileDTO V1 读取校验计划](./docs/project-file-dto-v1-read-validation-plan.md)
-- [Project File V1 Session 加载计划](./docs/project-file-v1-session-load-plan.md)
-- [Project Checkpoint 基础协议与存储端口计划](./docs/project-checkpoint-foundation-plan.md)
+- [ProjectFileDTO V1 写出边界计划](../../docs/archive/project-core/project-file-dto-v1-write-plan.md)
+- [ProjectFileDTO V1 读取校验计划](../../docs/archive/project-core/project-file-dto-v1-read-validation-plan.md)
+- [Project File V1 Session 加载计划](../../docs/archive/project-core/project-file-v1-session-load-plan.md)
+- [Project Checkpoint 基础协议与存储端口计划](../../docs/archive/project-core/project-checkpoint-foundation-plan.md)
 - [MIDI Project Model V1](./docs/midi-project-model-v1.md)
 - [Record、Class 与生命周期协作者](./docs/records-classes-and-lifecycles.md)
 - [小型实体、组合边界与模型演进](./docs/small-records-and-model-evolution.md)
-- [Web DAW 简洁架构总纲](../../docs/architecture/web-daw-architecture-brief.md)
+- [Web DAW 简洁架构总纲](../../docs/archive/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)

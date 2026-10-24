@@ -8,7 +8,7 @@
 
 本文面向希望理解 Audible MIDI Playback V1 内部工作原理的产品与工程审阅者。它解释
 Batch 3B 已实现的 Scheduler Planner，但不替代
-[Audible MIDI Playback V1 第六阶段计划](./audible-midi-playback-v1-phase-plan.md) 中的规范契约。
+[Audible MIDI Playback V1 第六阶段计划](../../../docs/archive/playback/audible-midi-playback-v1-phase-plan.md) 中的规范契约。
 后续讨论改变产品规则时，应先修改阶段计划，再同步本文。
 
 ## 1. 一句话理解

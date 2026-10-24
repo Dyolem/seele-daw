@@ -89,7 +89,7 @@ isDirty = savedContentStateId is null
 
 服务订阅 Session 的 all-project-commits。普通 Command、undo 和 redo 都会发布 commit，因此三条编辑路径使用同一个 dirty 规则，不需要 UI 记得在每种操作后手动置脏。
 
-`modelRevision` 仍是递增的提交序号：Undo / Redo 也会产生新 revision，因此不能准确表达“回到保存点”。Project Core History 为每个内容状态提供稳定的会话级 `ProjectContentStateId`；Command 进入新身份，Undo 恢复 before identity，Redo 恢复同一个 after identity。完整协议见 [Project Content State Identity 与精确保存点计划](../../../packages/project-core/docs/project-content-state-identity-plan.md)。
+`modelRevision` 仍是递增的提交序号：Undo / Redo 也会产生新 revision，因此不能准确表达“回到保存点”。Project Core History 为每个内容状态提供稳定的会话级 `ProjectContentStateId`；Command 进入新身份，Undo 恢复 before identity，Redo 恢复同一个 after identity。完整协议见 [Project Content State Identity 与精确保存点计划](../project-core/project-content-state-identity-plan.md)。
 
 Checkpoint 恢复会创建 revision `0`、新初始 content identity 的 fresh Session。恢复成功时 `savedRevision` 取该 Session 的 `0`，`savedContentStateId` 取该 Session 的当前身份；不能复用旧进程 envelope 的 `sourceModelRevision`，也不存在需要持久化的旧 content identity。
 

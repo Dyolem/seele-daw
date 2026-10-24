@@ -87,7 +87,7 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
 
 第五阶段进一步用 Surface-scoped Interaction Session 统一 pressing、drag、commit、cancel
 与 authority handoff。完整决定见
-[Piano Roll Pointer Interaction 状态机决策](./piano-roll-pointer-interaction-state-machine-decision.md)。
+[Piano Roll Pointer Interaction 状态机决策](piano-roll-pointer-interaction-state-machine-decision.md)。
 
 ## Batch 3：Scoped Keyboard Shortcuts
 
@@ -98,7 +98,7 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
 - Seele DAW 自己拥有 Action ID、Scope priority、enabled policy 和 Handler；
 - 通过 Studio 应用级 Action / Keyboard 边界调用，不在组件中散布第三方 composable；
   当前 WA1 已以静态 Action 目录和目标绑定替代旧 Keyboard Coordinator 动态注册，见
-  [Studio Action Architecture](../../../apps/studio/docs/studio-action-architecture.md)；
+  [Studio Action Architecture](../studio/studio-action-architecture.md)；
 - Scope 优先级为 Modal / Dialog → focused Piano Roll → Workbench → Global；
 - IME composing 和普通可编辑元素默认不触发编辑快捷键；
 - 只有 Action 实际处理时才 `preventDefault`；
@@ -130,7 +130,7 @@ Interaction 在 Pointer Up 且未跨越阈值时解释。
   Batch 4 Editor Session 接入，不能提前注册空行为。
 
 完整边界见
-[Studio Keyboard Shortcut Architecture](../../../apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
+[Studio Keyboard Shortcut Architecture](../studio/studio-keyboard-shortcut-architecture.md)。
 
 ## Batch 4：Studio Selection
 

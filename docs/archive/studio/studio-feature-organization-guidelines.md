@@ -150,7 +150,7 @@ Clip Scope 与 Track Scope 共用 Lane，但 Placement 仍交给两种 Surface �
 共享契约不反向依赖组件实现。先只在完成迁移的 Piano Roll 生效，不把旧 feature 立即判为违规。
 文件长度和是否需要提取子组件仍由人工审阅，不用强制数字规则制造碎片。
 
-O1–O3 已全部实现，具体入口与清理顺序见 [Piano Roll README](../src/features/piano-roll/README.md)。
+O1–O3 已全部实现，具体入口与清理顺序见 [Piano Roll README](../../../apps/studio/src/features/piano-roll/README.md)。
 规范由根目录 [`.AGENT`](../../../.AGENT) 引用，其他 feature 在后续业务改动时按根规范演进。
 
 本次同时补齐三块组件的初始化失败回收与过期回调隔离。共享 Tool Controls 不注册 Action，
@@ -173,5 +173,5 @@ O1–O3 已全部实现，具体入口与清理顺序见 [Piano Roll README](../
 
 - [工程代码准则](../../../CODE_GUIDELINES.md)
 - [Vue 状态与依赖组合准则](./vue-state-composition-guidelines.md)
-- [Piano Roll 阅读说明](../src/features/piano-roll/README.md)
+- [Piano Roll 阅读说明](../../../apps/studio/src/features/piano-roll/README.md)
 - [输入基础设施阶段计划](./editor-input-foundation-v1-phase-plan.md)

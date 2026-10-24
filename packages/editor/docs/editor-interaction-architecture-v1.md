@@ -1,10 +1,10 @@
 # Editor Interaction V1：中立生命周期与领域 Operation
 
-> 状态：G1 已审核提交（`2b2d8c6`）；G2 已提交（`c83d906`）；G3 已审核提交（`f65bd17`）；G4 已审核通过，浏览器验证待补。
+> 状态：已实施。2026-10-23 起，编辑项目事实的手势统一由 `GestureSession` 包装（`2183fcd`）。
 >
-> 日期：2026-10-19
+> 日期：2026-10-19，2026-10-23 更新
 >
-> 替代：[Piano Roll Pointer Interaction 状态机决策](./piano-roll-pointer-interaction-state-machine-decision.md)
+> 替代：[Piano Roll Pointer Interaction 状态机决策](../../../docs/archive/editor/piano-roll-pointer-interaction-state-machine-decision.md)
 
 ## 决策与范围
 
@@ -12,8 +12,11 @@
 Move、Resize 完成纵向迁移；没有增加 Clip、Velocity、框选或插件发现 API。
 
 `InteractionSession` 使用拥有私有状态的 class，表达 `idle → active → completing →
-finished / cancelled`。领域 Operation 通过组合接入；事实编辑另行组合 `InteractionCommitHandoff`。
-公共生命周期不包含 Note、Pitch、CC64、ProjectSession、History、DOM 或 Vue。
+finished / cancelled`。领域 Operation 通过组合接入。编辑项目事实的手势由 `GestureSession` 包装：
+它组合 `InteractionSession` 与 `InteractionCommitHandoff`，负责 capture 身份、遇到外来 Commit 即
+失效、只完成一次，以及提交后等到视图看见自己那次 revision 再结束预览；特化只决定按下时如何
+开始。`completeGesture` 统一意图收尾：认领 → 执行 → 确认提交 → 结束。公共生命周期不包含 Note、
+Pitch、CC64、ProjectSession、History、DOM 或 Vue。
 
 选择显式状态协议的依据是当前转换拓扑：Note、Tempo 和 Locate 都需要一次开始、连续更新、
 一次结束；没有必须统一处理的并行状态或嵌套 Actor。原 XState machine 把 Note Move、Resize
@@ -25,16 +28,17 @@ finished / cancelled`。领域 Operation 通过组合接入；事实编辑另行
 
 ## 阅读顺序与职责
 
-| 位置                                                              | 拥有的职责                                                                         | 不承担的职责                        |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
-| `browser/interaction/editor-pointer-input-adapter.ts`             | 单 primary Pointer、capture、4 CSS Pixel 阈值、物理 Modifier、取消、失焦、监听释放 | Note Hit、Project 查询和提交        |
-| `common/interaction/editor-pointer-input.ts`                      | 不依赖 DOM 的输入事实、一次捕获身份                                                | 领域实体和浏览器事件对象            |
-| `common/interaction/interaction-session.ts`                       | Operation、交互身份、Preview、完成领取和终止                                       | Hit Test、Snap、Selection、revision |
-| `common/interaction/interaction-commit-handoff.ts`                | 可选的单次提交 revision 与权威投影交接                                             | Project 写入、History、视图操作     |
-| `common/interaction/interaction-modifiers.ts`                     | `toggleSelection` 取 origin，`bypassSnap` 取 current                               | 用户 Keymap 或控件按键协议          |
-| `common/piano-roll/interaction/piano-roll-note-operation.ts`      | 冻结领域快照，按 Tool / Hit 选择 Note 运算，产生语义结果                           | Command 执行和订阅生命周期          |
-| `common/piano-roll/interaction/piano-roll-interaction-session.ts` | 组合公共协议，映射 Note 状态，订阅失效，选择 Note 的映射政策                       | 第二份可写 Note 数据                |
-| Studio Surface / intent handler / MIDI Note Coordinator           | Surface 映射、当前能力验证、提交一次 Command、回告、Selection 与反馈               | 重新解释 Begin 的目标               |
+| 位置                                                              | 拥有的职责                                                                           | 不承担的职责                        |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------- |
+| `browser/interaction/editor-pointer-input-adapter.ts`             | 单 primary Pointer、capture、4 CSS Pixel 阈值、物理 Modifier、取消、失焦、监听释放   | Note Hit、Project 查询和提交        |
+| `common/interaction/editor-pointer-input.ts`                      | 不依赖 DOM 的输入事实、一次捕获身份                                                  | 领域实体和浏览器事件对象            |
+| `common/interaction/interaction-session.ts`                       | Operation、交互身份、Preview、完成领取和终止                                         | Hit Test、Snap、Selection、revision |
+| `common/interaction/interaction-commit-handoff.ts`                | 可选的单次提交 revision 与权威投影交接                                               | Project 写入、History、视图操作     |
+| `common/interaction/gesture-session.ts`                           | 事实编辑手势的外壳：capture、外来 Commit 失效、一次完成、提交交接；`completeGesture` | 领域运算与命令构造                  |
+| `common/interaction/interaction-modifiers.ts`                     | `toggleSelection` 取 origin，`bypassSnap` 取 current                                 | 用户 Keymap 或控件按键协议          |
+| `common/piano-roll/interaction/piano-roll-note-operation.ts`      | 冻结领域快照，按 Tool / Hit 选择 Note 运算，产生语义结果                             | Command 执行和订阅生命周期          |
+| `common/piano-roll/interaction/piano-roll-interaction-session.ts` | 组合公共协议，映射 Note 状态，订阅失效，选择 Note 的映射政策                         | 第二份可写 Note 数据                |
+| Studio Surface / intent handler / `edits`                         | Surface 映射、当前能力验证、提交一次 Command、回告、Selection 与反馈                 | 重新解释 Begin 的目标               |
 
 Note / CC64 的既有 Browser 工厂现在委托同一中立 Adapter；没有保留两份事件监听实现。
 G3 已将 CC64 的语义 Session、Track Pencil 和 Timeline Locate 接入相同 host，移除被替代的完成路径。
@@ -52,9 +56,8 @@ Studio 的 Clip Focus Surface 已按 Model、Interaction、Rendering、Editing A
 
 ## 身份、冻结与一次执行
 
-- Editor 的 Symbol 创建入口集中在 `common/interaction/interaction-symbols.ts`，工厂每次
-  返回独立身份，不使用 `Symbol.for` 或保留 token 的全局注册表。入口不从 package root
-  导出，Common / Browser 消费相同的内部身份政策。
+- 交互身份与 capture 身份在 `InteractionSession` 和 Pointer Adapter 中每次现场创建独立的
+  `Symbol`，不使用 `Symbol.for`，也不保留 token 的全局注册表。
 - 浏览器 `pointerId` 可以复用；每次 Down 额外生成 `captureId`，贯穿 Begin / Update / End /
   Cancel。旧 capture 的输入不能操作新的手势。
 - Session 为每次 Begin 生成独立 `InteractionId`。完成结果、领取、回告和清理均携带该身份；
@@ -64,7 +67,7 @@ Studio 的 Clip Focus Surface 已按 Model、Interaction、Rendering、Editing A
 - Selection 结果仅包含 `noteId` 与 `toggleSelection`；Move / Resize Resolver 接收
   `bypassSnap`。Studio 不读取原始 Pointer 来决定选择行为，领域 Resolver 不读取 Alt。
 - Move / Resize 拖回原值时返回空结果，立即终止，不发 Command、不增加 History。
-- Add、Move、Resize 均把捕获的 Session 和 revision 送到实际 Coordinator。即使替换后的
+- Add、Move、Resize 均把捕获的 Session 和 revision 送到 Studio 的 `edits`。即使替换后的
   Project、Clip ID 和 revision 数值相同，Session 身份不同也会拒绝；Pencil 不再读取 End
   时的最新 revision 来覆盖过期前置条件。
 
@@ -143,7 +146,7 @@ Preview / Result；`TempoTrackDragSession` 拥有冻结的 Project 目标和 Com
 - Studio Page 通过既有 Typed Context 增加窄的 `commitDrag` 能力，返回真实 Command 结果；
   已移除 Lane → Arrangement → Workspace → Shell 的无回告拖动 Emit 链。数值输入、
   新增和删除继续使用既有业务路径，不建通用参数化 Action Bus。
-- Coordinator 的拖动输入同时携带 `expectedSession` 与 `baseRevision`，在播放准备之后
+- `edits` 的拖动输入同时携带 `expectedSession` 与 `baseRevision`，在播放准备之后
   再验证 Session 身份；Command 验证原 revision。即时数值操作仍可显式省略拖动目标。
 - 共享 Preview 改为仅按 InteractionId 发布 / 清除的展示对象，移除没有真实消费者的
   `bpm-editor / position-editor` 模式及第二套 begin / finish 生命周期。
@@ -160,7 +163,7 @@ Preview / Result；`TempoTrackDragSession` 拥有冻结的 Project 目标和 Com
 - Track Pencil 的 [Session](../../../apps/studio/src/features/piano-roll/components/track-surface/interaction/track-placement-session.ts)
   固定 Begin Read Model 和放置配置；其 Operation 同时处理 Note Hit 对应 Clip 激活。
   Hover 使用实时设置，活动手势使用冻结候选。目标 / 映射变化取消，Tool / Grid / Snap 变化不会
-  把已开始的点击重新解释成其他操作。新增、扩展 Clip 与 Note 仍由原子 Coordinator 用例提交。
+  把已开始的点击重新解释成其他操作。新增、扩展 Clip 与 Note 仍由 `edits` 中的原子用例提交。
 - CC64 与 Track Hook 在 post flush 才确认投影 revision，避免 Command 回告早于 Vue 事实
   投影时提前清除 Preview。CC64 placement 不再通过无返回值 Emit 交给两种 Surface；统一
   Intent Handler 选择 Clip / Track 用例，并明确区分 Command 失败和已提交后的显示失败。
@@ -180,13 +183,14 @@ Preview / Result；`TempoTrackDragSession` 拥有冻结的 Project 目标和 Com
 
 1. 在实际 Feature 定义 Hit、坐标映射与失效政策，明确哪些输入在 Begin 冻结、哪些可持续
    更新。Clip Move / Trim / Stretch 的 Track、Source Offset、Loop 规则仍由 Clip 领域决定。
-2. 用纯 Operation 计算 Preview 与完成结果，组合 `InteractionSession` 表达一次交互。仅在
-   确有事实投影交接时组合 `InteractionCommitHandoff`；视图操作不伪造 Project revision。
+2. 用纯 Operation 计算 Preview 与完成结果。编辑项目事实的手势用 `GestureSession`：`start`
+   返回 `authority`、`operation` 与冻结的 `target`；只改视图的手势（例如 Timeline Locate）直接
+   用 `InteractionSession`，不伪造 Project revision。
 3. 领域 Session 固定目标身份与原 revision，拥有必要的失效订阅；Update、End 和领取结果时
    同步验证，拒绝通知尚未送达的旧版本。通过交互身份隔离完成领取、回告和清理。
 4. Hook 组合公共 Pointer Adapter、当前映射及 `useStudioInteractionTarget`；明确 mount、
    部分失败回滚与幂等 dispose。组件安排资源依赖顺序，不再声明一套 Pointer / Escape 监听。
-5. Studio Handler 领取一次结果，经现有业务 Coordinator 执行原子 Command，把真实结果
+5. Studio Handler 用 `completeGesture` 领取一次结果，经 `edits` 执行原子 Command，把真实结果
    回告给本次 Session；等待对应事实投影后移除 Preview。取消和零变化不产生 History。
 6. 用行为测试验证冻结、切换、旧输入、失败、释放、菜单屏障与一次 Undo；手工验证真实
    浏览器的 Capture、Focus、拖动及滚动。接口须有实际消费者，不先建 Clip 占位协议。
@@ -217,7 +221,7 @@ Cancel 路由、Dock Scope / 最小化 / 关闭、Channel / Active Clip / Sessio
 菜单也屏蔽用户自定义的 Cancel 组合，关闭后恢复输入。
 
 完整门禁与手工验证结果记录在阶段计划的
-[G1](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#14-g1-中立协议与-note-迁移2026-09-29)
-、[G2](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#17-g2tempo-跨域验证2026-09-30)
-、[G3](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#18-g3其余消费者迁移2026-09-30)
-与 [G4](../../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19) 记录。
+[G1](../../../docs/archive/studio/editor-input-foundation-v1-phase-plan.md#14-g1-中立协议与-note-迁移2026-09-29)
+、[G2](../../../docs/archive/studio/editor-input-foundation-v1-phase-plan.md#17-g2tempo-跨域验证2026-09-30)
+、[G3](../../../docs/archive/studio/editor-input-foundation-v1-phase-plan.md#18-g3其余消费者迁移2026-09-30)
+与 [G4](../../../docs/archive/studio/editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19) 记录。

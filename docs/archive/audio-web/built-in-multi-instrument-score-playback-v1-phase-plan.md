@@ -16,9 +16,9 @@
 Studio Grand。
 
 相关术语见
-[多乐器总谱播放 V1 术语表](./built-in-multi-instrument-score-playback-v1-glossary.md)。既有
+[多乐器总谱播放 V1 术语表](../../../packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-glossary.md)。既有
 Velocity、Envelope、Loop、复音和 CC64 术语仍以
-[Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)为准。
+[Audio Quality Foundation V1A 术语表](../../../packages/audio-web/docs/audio-quality-foundation-v1a-glossary.md)为准。
 
 ## 1. 阶段起点事实与问题
 
@@ -163,7 +163,7 @@ MI1A 不增加第二个 Soundbank、不改变 Manifest schema、不修改声音�
   `64 KiB / 4 MiB` 限制，不能按 ZIP 总大小猜测。
 
 MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
-[Built-in Score Core Soundbank Audit](./built-in-score-core-soundbank-audit.md)。本批只建立开发资产，
+[Built-in Score Core Soundbank Audit](../../../packages/audio-web/docs/built-in-score-core-soundbank-audit.md)。本批只建立开发资产，
 不会提前接入 Studio Catalogue；其中 GM Percussion 的原始 gated Manifest 必须等 MI1C 转换后
 才能成为产品候选。
 
@@ -178,7 +178,7 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 - 转换只匹配已记录来源身份和精确 Pitch，不扩大通用 Mapping Adapter 的猜测能力。
 
 实现与本地证据见
-[General MIDI Percussion Compatibility Policy V1](./general-midi-percussion-compatibility-policy-v1.md)。
+[General MIDI Percussion Compatibility Policy V1](../../../packages/audio-web/docs/general-midi-percussion-compatibility-policy-v1.md)。
 本批仍只生成开发者本地 Manifest；Studio Catalogue 与 Channel 10 产品路由分别留给 MI2 / MI3A。
 
 ### MI2 — Studio Catalogue 与 Instrument 选择
@@ -218,7 +218,7 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 - 既有无 Controller 导入结果必须保持 Gain `1`、Pan `0`。
 
 本批的听觉预期、来源 Tick 选择、非对称 Pan 换算、原子事务、动态事件诊断与兼容边界见
-[MIDI Initial Channel Controls V1](../../project-midi/docs/midi-initial-channel-controls-v1.md)。
+[MIDI Initial Channel Controls V1](../../../packages/project-midi/docs/midi-initial-channel-controls-v1.md)。
 
 ### MI4 — 多 Soundbank Runtime、资源与失败门禁
 
@@ -230,7 +230,7 @@ MI1B 的冻结身份、来源角色、逐音源指标和本地库存证据见
 
 本批的真实本地参考集合、`192 MiB` LRU 保留预算、并发 / 重试 / Abort / dispose 自动化证据及精确
 失败矩阵见
-[Multi-Soundbank Runtime Resource Gate V1](./multi-soundbank-runtime-resource-gate-v1.md)。该门禁只
+[Multi-Soundbank Runtime Resource Gate V1](../../../packages/audio-web/docs/multi-soundbank-runtime-resource-gate-v1.md)。该门禁只
 限制历史解码缓存，不把活动 Plan 内存或 MI5 听觉结果伪装成已经受控。
 
 ### MI5 — 总谱音质、听测与阶段收口
@@ -258,7 +258,7 @@ Playback 失败。MI6A 作为收口后的增量加固，只隔离该次 Note Occ
 不变，Audio Web 输出 `no-matching-zone` 结构化记录，Studio 按稳定身份跳过并汇总反馈，底层
 Sample Voice Runtime 继续严格拒绝未覆盖 Pitch。完整行为、失败矩阵、术语和后续
 `MIDI Semantic Binding` 证据顺序见
-[MIDI Note Coverage Isolation V1](./midi-note-coverage-isolation-v1.md)。
+[MIDI Note Coverage Isolation V1](../../../packages/audio-web/docs/midi-note-coverage-isolation-v1.md)。
 
 ## 6. 质量与失败矩阵
 

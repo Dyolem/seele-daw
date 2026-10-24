@@ -102,7 +102,7 @@ Studio。CC64、Track Pencil 与 Timeline Locate 也已接入同一内核；Loca
 重新读取权威结果，不从 Delta 维护第二份 Note 真相。
 
 完整边界见
-[Piano Roll Common Foundation 实施计划](./docs/piano-roll-common-foundation-plan.md)。
+[Piano Roll Common Foundation 实施计划](../../docs/archive/editor/piano-roll-common-foundation-plan.md)。
 
 ## 已实现：Piano Roll Track 全局 Read Model 与放置解析
 
@@ -138,7 +138,7 @@ Playhead / Track Follow；Track Cursor 的完整 Note 编辑尚未实现。
 
 它不保存 `MidiNoteRecord`，不依赖当前可见 Read Model，也不进入 Vue 或 Pinia。Studio
 已经接入 Select Interaction、Keyboard Binding 和 selected Renderer 视觉。完整计划见
-[Piano Roll Interaction 第三阶段计划](./docs/piano-roll-interaction-phase-plan.md)。
+[Piano Roll Interaction 第三阶段计划](../../docs/archive/editor/piano-roll-interaction-phase-plan.md)。
 
 ## 已实现：Timeline Grid Snap 与 Pencil Placement
 
@@ -152,7 +152,7 @@ Editor Common 公开视觉和交互共用的 Timeline Grid，并提供：
 - Clip End 候选限制到仍可创建正 Duration 的内部起点；
 - Drag、已有 Note Hit、Cancel 与不完整 Pointer 生命周期不产生 Placement。
 
-Placement 不读取 Vue、DOM 或 ProjectSession，也不执行 Command。Studio Coordinator 负责
+Placement 不读取 Vue、DOM 或 ProjectSession，也不执行 Command。Studio 的 `edits.notes` 负责
 Active Project、ID、默认 Note Facts 与提交。
 
 ## 已实现：Piano Roll Browser Input
@@ -197,8 +197,8 @@ Add Command 与失败提示。Event 编辑的 Editor 后续基础还提供：
 这一基础仍不执行 Project Command，也不拥有当前 Channel。Studio 负责渲染瞬态 Selection /
 Marker Preview，并把 Move、Replace Value 与 Remove Intent 映射为每手势一个 Project Command；
 完整边界和术语见
-[Piano Roll CC64 Lane Foundation](./docs/piano-roll-sustain-pedal-lane-foundation.md)与
-[Piano Roll CC64 Event Editing Foundation](./docs/piano-roll-sustain-pedal-event-editing-foundation.md)。
+[Piano Roll CC64 Lane Foundation](../../docs/archive/editor/piano-roll-sustain-pedal-lane-foundation.md)与
+[Piano Roll CC64 Event Editing Foundation](../../docs/archive/editor/piano-roll-sustain-pedal-event-editing-foundation.md)。
 
 ## 已实现：Piano Roll Browser Renderer
 
@@ -216,7 +216,7 @@ Marker Preview，并把 Move、Replace Value 与 Remove Intent 映射为每手�
 Renderer 只消费 Common Viewport 与 Note Read Model，既不读取 ProjectSession，也不生成
 ProjectCommand。Studio 负责把选中 Clip、Project Query、主题令牌与所选 Adapter 组合起来。
 完整边界见
-[Piano Roll Browser Renderer 实施计划](./docs/piano-roll-browser-renderer-plan.md)与
+[Piano Roll Browser Renderer 实施计划](../../docs/archive/editor/piano-roll-browser-renderer-plan.md)与
 [Piano Roll Note Renderer 决策](./docs/piano-roll-note-renderer-decision.md)。
 
 ## 依赖边界
@@ -239,7 +239,7 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 4. **已完成**：接入 Pencil Add Note 单次提交手势。
 5. **已完成**：多 Note Remove、Cursor Move 与 Cursor / Pencil 单 Note Resize 已接入
    Studio，完整边界见
-   [Piano Roll Note Editing 第五阶段计划](./docs/piano-roll-note-editing-phase-plan.md)。
+   [Piano Roll Note Editing 第五阶段计划](../../docs/archive/editor/piano-roll-note-editing-phase-plan.md)。
 6. **局部完成**：同一 Project 模型的 Track 全局 / Clip Focus 双 Scope；共享 Track Read Model、
    原子 Clip / Note 放置、可见模式切换与双模式 Playhead / Track Follow 已完成；Track Cursor
    的完整 Note 编辑尚未实现。
@@ -247,7 +247,7 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
    Browser Hit、Pencil Placement、Event Selection、主导轴 Transform 与 Studio 可见写入闭环。
 8. **已实施，G4 已审核通过**：公共 InteractionSession、领域 Operation、可选 Handoff 和
    Pointer Adapter；Note、CC64、Tempo、Track Pencil 与 Timeline Locate 均有真实消费者。
-   G4 自动化与浏览器验证状态见 [阶段计划](../../apps/studio/docs/editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19)。
+   G4 自动化与浏览器验证状态见 [阶段计划](../../docs/archive/studio/editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19)。
 9. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
 10. 扩展 Arrangement Clip、Audio Clip、Automation 等编辑能力。
 
@@ -262,5 +262,5 @@ Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属
 
 ## 架构依据
 
-- [Web DAW 简洁架构总纲](../../docs/architecture/web-daw-architecture-brief.md)
+- [Web DAW 简洁架构总纲](../../docs/archive/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)

@@ -141,7 +141,7 @@
   列表策略保持独立。
 - 长 Clip 按水平页及相邻缓冲窗口绘制 Grid / Note，DOM 保留未退出的节点，仅更新改变的属性。
   完整 Pointer / Preview 坐标不变，资源在失败 / 卸载时释放。实测方法与结果见
-  [长 Clip 滚动排查](./piano-roll-scroll-performance.md)。
+  [长 Clip 滚动排查](../../../apps/studio/docs/piano-roll-scroll-performance.md)。
 - 新增回归覆盖长 Clip 窗口数量、跨页 / 末端 / Resize、长 Note 相交裁剪、绘制与输入坐标分离、
   Observer 创建失败与迟到回调、稳定 DOM 连接及属性更新、Pitch 弹层键盘选择 / Escape / 焦点恢复
   与后台快捷键屏蔽。
@@ -162,4 +162,4 @@
 - 两种 Scope 的时间坐标各自保持现有语义；同一 Surface 的 Ruler、Clip、Note、CC64 和
   Playhead 保持横向对齐，Pitch 滚动不移动 CC64。
 - 遵循 [工程代码准则](../../../CODE_GUIDELINES.md)、[设计规范](../../../DESIGN.md) 与
-  [Piano Roll 模块说明](../src/features/piano-roll/README.md)。
+  [Piano Roll 模块说明](../../../apps/studio/src/features/piano-roll/README.md)。

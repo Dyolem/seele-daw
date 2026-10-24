@@ -220,7 +220,7 @@ Track 全局 Piano Roll 的 `AddMidiClipWithNoteCommand` 与
 Clip、Source 与 Note，因此用一个产品语义命名的 Command 建立封闭 MutationPlan。它们不是
 可嵌套任意 Command 的 Batch / Composite API，也不能由 Studio 串联 Add Clip、Resize Clip 与
 Add Note 模拟。完整约束见
-[MIDI Clip / Note 原子放置命令计划](./midi-clip-note-placement-command-plan.md)。
+[MIDI Clip / Note 原子放置命令计划](../../../docs/archive/project-core/midi-clip-note-placement-command-plan.md)。
 
 ## 6. 新命令审查清单
 

@@ -101,9 +101,9 @@ Batch 1B 落地，Audio Runtime 仍属于后续批次。
   one-shot、loop、tune、attack / release、offset 与 mutex 语义；这些结果是默认内置数据的
   逆向证据，不是 Seele 宿主规则。兼容 Adapter 负责把来源特有推断规范化为显式 Manifest；
   Profile 与 Runtime 不得依赖 Studio Grand 名称或这批 JSON 的隐式默认值。分别见
-  [默认内置 MIDISampleSynth 控制文件逆向分析](../../audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)
+  [默认内置 MIDISampleSynth 控制文件逆向分析](../../../packages/audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)
   与
-  [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../../audio-web/docs/seele-supported-sfz-profile-v1.md)。
+  [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../../../packages/audio-web/docs/seele-supported-sfz-profile-v1.md)。
 - 完整资源集合中的 `FMSynth` 与 `VASynth` 需要各自的 Device / Compiler / Runtime 产品切片，
   不能伪装成 Sample Instrument，也不在本阶段决定使用 Web Audio 原生节点、AudioWorklet
   还是 WASM。
@@ -130,7 +130,7 @@ Gate C.1b 已把 Catalog / Indexes 的本地定位、stable `studio-grand` 到�
 安全预算、固定输入指纹与输出校验报告落实为开发工具。可分发 Manifest / Bundle 仍只能在替代
 资产或再分发范围另行确认后进入产品资源。
 Gate C.2 的客观数据、浏览器 smoke、加载建议和人工试听清单见
-[Studio Grand 加载测量与听觉 Gate](../../audio-web/docs/studio-grand-loading-and-listening-gate.md)。
+[Studio Grand 加载测量与听觉 Gate](../../../packages/audio-web/docs/studio-grand-loading-and-listening-gate.md)。
 
 每个 Gate 必须在其首个生产批次开始前确认，并把结果写回本文。
 
@@ -565,7 +565,7 @@ Zone，WAV ZIP 内含 30 个 WAV 与一份上游 JSON。Batch 4A.1b 已另行生
 因此当前资产被明确分类为 **developer-local validation fixture**：Seele 不声称拥有再分发权，
 不提交、打包、部署或自动下载它；同时也不要求先取得书面再分发授权才开始本机发声验证。
 来源链、输入指纹和产品边界记录在
-[Studio Grand 本地验证资产记录](../../audio-web/docs/studio-grand-local-validation-assets.md)。若
+[Studio Grand 本地验证资产记录](../../../packages/audio-web/docs/studio-grand-local-validation-assets.md)。若
 以后需要发布自带 Studio Grand 的构建，必须先换用明确可分发的替代资源，或取得覆盖该产品
 用法的授权，不能仅改 URL、文件名或显示名称继续使用当前采样。
 
@@ -608,9 +608,9 @@ entry、大小、取消约束的第三方 ZIP 解码，并由调用方负责可�
 ### 6.2 Sample 解析
 
 - 默认内置数据的 Zone、trigger、loop、tune、offset、envelope 与 mutex 证据见
-  [默认内置 MIDISampleSynth 控制文件逆向分析](../../audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
+  [默认内置 MIDISampleSynth 控制文件逆向分析](../../../packages/audio-web/docs/default-built-in-midi-sample-synth-reverse-analysis.md)；
   Seele 的规范输入与 validator 规则见
-  [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../../audio-web/docs/seele-supported-sfz-profile-v1.md)。
+  [Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1](../../../packages/audio-web/docs/seele-supported-sfz-profile-v1.md)。
   Adapter 必须输出显式含义，Audio Runtime 不重新解释 Catalog 或来源默认值；
 - Studio Grand V1 的声明可播放范围为 MIDI Pitch `21...108`；该范围内每个 Pitch 必须落入
   一个明确 Sample Zone，Zone 重叠或空洞由 Manifest 校验拒绝；
@@ -1412,7 +1412,7 @@ Audible MIDI Playback V1 已于 2026-08-17 完成收口，以下条件均已满�
 - Arrangement 单一纵向滚动权威与 Track 从视图、派生时间轴、Arrangement / Track / Clip Focus
   Playhead，以及 Arrangement / Track 各自的分页 Follow 通过 Batch 7 产品验收；
 - [产品功能手册](../../../PRODUCT.md)、[设计语言](../../../DESIGN.md)、
-  [Playback README](../README.md) 与 [Audio Web README](../../audio-web/README.md) 已同步；
+  [Playback README](../../../packages/playback/README.md) 与 [Audio Web README](../../../packages/audio-web/README.md) 已同步；
 - 用户逐批审阅通过；阶段完成不依赖 checkpoint tag，当前未创建新的 tag。
 
 阶段收口记录：
@@ -1430,9 +1430,9 @@ Audible MIDI Playback V1 已于 2026-08-17 完成收口，以下条件均已满�
 
 ## 参考
 
-- [Audible MIDI Scheduler 工作原理](./audible-midi-scheduler-primer.md)
-- [Web DAW 简洁架构总纲](../../../docs/architecture/web-daw-architecture-brief.md)
-- [Web DAW 长期路线与架构设计](../../../docs/architecture/web-daw-long-term-architecture-v3.md)
-- [MIDI Project Model V1](../../project-core/docs/midi-project-model-v1.md)
-- [Piano Roll Note Editing 第五阶段计划](../../editor/docs/piano-roll-note-editing-phase-plan.md)
+- [Audible MIDI Scheduler 工作原理](../../../packages/playback/docs/audible-midi-scheduler-primer.md)
+- [Web DAW 简洁架构总纲](../architecture/web-daw-architecture-brief.md)
+- [Web DAW 长期路线与架构设计](../../architecture/web-daw-long-term-architecture-v3.md)
+- [MIDI Project Model V1](../../../packages/project-core/docs/midi-project-model-v1.md)
+- [Piano Roll Note Editing 第五阶段计划](../editor/piano-roll-note-editing-phase-plan.md)
 - [Seele Studio Design Language](../../../DESIGN.md)

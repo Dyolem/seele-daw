@@ -21,8 +21,8 @@
 ### 0.1 当前实现校准
 
 本文描述长期稳定边界，不是“所有方框均已实现”的状态清单。当前真实能力以
-[产品功能手册](../../PRODUCT.md)为准；已完成的首个 Playback 切片以
-[Audible MIDI Playback V1 阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)
+[产品功能手册](../../../PRODUCT.md)为准；已完成的首个 Playback 切片以
+[Audible MIDI Playback V1 阶段计划](../playback/audible-midi-playback-v1-phase-plan.md)
 为准。这里的 Audible MIDI Playback `V1` 指第一版可听产品纵向切片，不是本总纲或长期
 架构文档的版本号。
 
@@ -36,7 +36,7 @@ Follow；Batch 7F 加固与文档同步也已通过审核。Audible MIDI Playbac
 ACK 和 AudioWorklet 路径仍不能反推为该已完成切片的必做范围。
 
 后续独立的
-[Manual Timeline Locate V1](../../packages/playback/docs/manual-timeline-locate-v1-phase-plan.md)
+[Manual Timeline Locate V1](../playback/manual-timeline-locate-v1-phase-plan.md)
 已完成四个主批次和一个 Playhead 纵向可见性 UX 修正，并通过统一审核与用户浏览器验证：
 Playback Transport 拥有浏览器无关的 Tick Locate 与运行时
 Return Anchor；Studio Coordinator 拥有静默事务、generation / Voice 失效和 Runtime 保留；
@@ -45,7 +45,7 @@ MIDI Playback V1，也不建立 Project Seek Fact、可听 Scrub 或 Note Chase�
 `checkpoint/manual-timeline-locate-2026-08-18`。
 
 随后实施的
-[Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)。
+[Standard MIDI File Import / Export V1](../../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)。
 新建的 `midi-file` 只拥有中立 SMF Document 与可替换 Decoder / Encoder Adapter，不依赖 Project
 Core 或 Browser；`project-midi` 独立拥有 MIDI Document 与 Project Model 的双向映射，不拥有项目
 生命周期或默认音源选择。`ActiveProjectService` 能把调用方验证过的 Session 作为新项目保存并激活，
@@ -61,12 +61,12 @@ Fact，也不改变 Studio-owned Instrument 路由。MIDI Export 仍留在后续
 
 Project Tempo Control V1 已通过
 `checkpoint/project-tempo-control-2026-08-25` 收口。其后的
-[Audio Quality Foundation V1A](../../packages/audio-web/docs/audio-quality-foundation-v1a-phase-plan.md)
+[Audio Quality Foundation V1A](../audio-web/audio-quality-foundation-v1a-phase-plan.md)
 只在现有 Sample Voice 纵向切片内校准 Velocity/输出、Envelope/Loop、重触发与复音：Audio Web
 拥有最终政策和 Web Audio 节点，Playback 继续只传浏览器无关 Voice Plan，Studio 继续是唯一
 Composition Root。该阶段不建立 CC64、Velocity Layer、通用 Graph、AudioWorklet 或 WAV Offline
 Backend。后续 CC64 切片已经建立独立 Project Fact、导入、Playback 最终 Gate Release 与 Piano
-Roll 编辑；当前 [Expression Quality Integration V1](../../packages/audio-web/docs/expression-quality-integration-v1-phase-plan.md)
+Roll 编辑；当前 [Expression Quality Integration V1](../audio-web/expression-quality-integration-v1-phase-plan.md)
 已在 WAV Export 前验证 pedal-held 复音优先级、Pedal Up PCM 与确定性收尾；EQ3B 已冻结编排
 内容、交互时间线与实际声音尾部的共同边界，不把这些能力回写成 V1A 历史事实，也不预建 Offline
 Backend。
@@ -99,7 +99,7 @@ Studio Action 是菜单、按钮和快捷键使用的用户意图与稳定 ID（
 才调用参数完整的 Project Command。键盘输入所有权、Action 接受调用、业务完成是独立边界。
 WA1 的 Save 和既有快捷键、WA2 的其他 Workbench 菜单／按钮均已接入；文件选择器、导航
 等待与 Dock 端口属于当前页面，Project／Playback 权威保持原有归属。详见
-[Studio Action Architecture](../../apps/studio/docs/studio-action-architecture.md)。
+[Studio Action Architecture](../studio/studio-action-architecture.md)。
 
 ## 3. 编辑与播放是项目的两个消费者
 

@@ -73,7 +73,7 @@ Store 或 Context。
 | Navigation Decision | pending binding + resolver        | 一次性异步决策 Port                          |
 | Project Playback    | Coordinator + shallow Vue Binding | 外部音频资源、Transport 命令与可丢弃状态投影 |
 
-所有 Studio `InjectionKey` 统一在 [Symbol 注册文件](../src/symbols.ts) 声明。Provider、Context
+所有 Studio `InjectionKey` 统一在 [Symbol 注册文件](../../../apps/studio/src/symbols.ts) 声明。Provider、Context
 hook 和测试从同一位置导入；注册文件通过 `import type` 引用契约，不加载任何服务或组件的
 运行时实现。稳定的 Context Key 与每次创建的 Keyboard Owner 身份分开登记，详见
 [工程准则](../../../CODE_GUIDELINES.md#symbol-注册与身份)。

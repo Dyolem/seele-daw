@@ -8,7 +8,7 @@
 听测状态，以及未来 WAV Offline Export 必须继承的边界。阶段过程见
 [Expression Quality Integration V1 阶段计划](./expression-quality-integration-v1-phase-plan.md)，
 行业词汇见
-[Audio Quality Foundation V1A 术语表](./audio-quality-foundation-v1a-glossary.md)。
+[Audio Quality Foundation V1A 术语表](../../../packages/audio-web/docs/audio-quality-foundation-v1a-glossary.md)。
 
 ## 1. 收口结论
 

@@ -12,7 +12,7 @@ Studio 的 MIDI Note 与 CC64 编辑入口，遵循根 [工程代码准则](../.
 | `components/pitch-view/`               | 两种 Scope 共用的可见琴键、Pitch 模式控件与独立纵向滚动条                    |
 | `components/PianoRollToolControls.vue` | 两种 Surface 共用的 Pencil / Cursor / Snap 视图                              |
 | `types/`                               | 跨子模块共享的 Presentation、Preference、Intent、Lane Handle 与 Action 契约  |
-| `interaction/`                         | 将 Editor Intent 转成既有 Coordinator 调用，处理提交回告和失败反馈           |
+| `interaction/`                         | 将 Editor Intent 转成 `edits` 调用，处理提交回告和失败反馈                   |
 | `presentation/`                        | Snapshot 投影、Renderer 选择、Theme、Channel 选项和反馈文案                  |
 | `viewport/`                            | Pitch 视口纯计算政策、宿主测量与滚轮的 Vue / Browser 适配                    |
 | `layout/`                              | Controller Lane 高度政策、真实 Surface 测量与有效布局派生                    |
@@ -157,18 +157,17 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
 
 ## 依赖与共享边界
 
-- Project Command 能力来自 `workbench/project/` 的 Typed Context；快捷键与菜单沿统一
-  Studio Action 路由执行。
+- 写项目通过 `useStudio().edits`（[workbench/edits](../../workbench/edits/project-edits.ts)）；
+  快捷键与菜单沿统一的 Studio Action 路由执行。
 - Project Workspace 继续拥有 `project-workbench-selection-store.ts` 的 Arrangement Selection；
   Track 通过该 Store 选择 Active Clip，目录调整不创建第二份 Selection 权威。
 - Timeline 宽度规则与分页计算继续消费 Project Workspace 的 `timeline/scale.ts` 和
   `timeline/layout.ts`，跨 feature 归属治理另行评估。
 - 共享类型直接从 `types/` 导入；局部共享类型进入所属子模块 `types/`，不从 Vue 实例反推。
   有限 discriminator 常量可与契约共置，不加载组件或 hook 的实现。
-- Piano Roll InjectionKey 统一登记在 [Studio Symbols](../../symbols.ts)，Context 只负责类型化
-  注入。Editor 手势身份通过其内部 Symbol 工厂每次创建。
-- 架构检查保护私有 hooks / types、契约依赖方向以及生产代码与测试支持边界；不通过总 barrel
-  隐藏依赖，也不按文件行数机械拆分。
+- 子模块的 `hooks/` 与 `types/` 是私有实现，其他子模块使用组件或 feature 层的共享契约；
+  这一点靠评审维持，架构检查只拦截生产代码导入测试支持。不通过总 barrel 隐藏依赖，也不按
+  文件行数机械拆分。
 
 ## 当前能力
 
@@ -212,15 +211,15 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
   恢复；Follow 状态不进入 Project Fact；
 - Active Clip 下拉选择、Clip window / Note 点击选择，以及 looped Clip 的可见不可编辑状态；
 - Track Pencil Hover Preview：明确显示写入已有 Clip、右扩 Clip、新建 Bar Clip 或 blocked
-  原因；按下时冻结 Active Clip / Tool / Grid / Snap / revision；完成时 Coordinator 对同一 Session 和原 revision 重新验证，并用 Add Note、
+  原因；按下时冻结 Active Clip / Tool / Grid / Snap / revision；完成时 `edits.notes` 对同一 Session 和原 revision 重新验证，并用 Add Note、
   Add Clip With Note 或 Extend Clip With Note 形成一次 Commit / History；
 - Track 与 Clip Focus 共用可调高度、可收起的 CC64 Sustain Pedal Lane：保留原始 `0..127` Value，显示
   Step Segment、`64` Down Threshold、Event Marker 与不影响当前 Clip 播放的右端 Terminal
   Marker；
 - CC64 Channel 以 `1..16` 显示、以 MIDI `0..15` 写入，属于应用生命周期 Preference，不是
   Project Fact；切换 Channel 只重投影 Lane；
-- Clip Focus Pencil 空白 Click 按当前 Grid/Snap 解析 Clip Tick 和原始 Value，并通过独立
-  Coordinator 执行一个 `AddMidiSustainPedalEventCommand`；已有 Marker、Drag、Cursor 不新增；
+- Clip Focus Pencil 空白 Click 按当前 Grid/Snap 解析 Clip Tick 和原始 Value，并通过
+  `edits.sustainPedal` 执行一个 `AddMidiSustainPedalEventCommand`；已有 Marker、Drag、Cursor 不新增；
 - Track Scope 显示全部 Clip 的 CC64 投影并弱化非 Active Clip；Pencil 只允许写入明确选择的
   非循环 Active Clip，Pointer 必须落在其闭合时间窗口内。V1 不为 CC64 自动新建或扩展 Clip，
   无 Active Clip、越界、looped Clip 或 stale revision 都保持事实不变并显示 Toast；

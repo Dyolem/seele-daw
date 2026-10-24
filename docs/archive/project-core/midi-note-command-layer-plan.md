@@ -9,7 +9,7 @@
 > 2026-07-29 校准：单个与多个 Note 删除统一使用 `RemoveNotesCommand`；一元素
 > `noteIds` 是单 Note 删除的规范表达，不再维护平行的单 Note 公共 Command。跨 Command
 > 的数量与事务设计遵循
-> [Project Command 集合与事务语义](./project-command-collection-semantics.md)。
+> [Project Command 集合与事务语义](../../../packages/project-core/docs/project-command-collection-semantics.md)。
 >
 > 2026-07-29 Batch 5.2 校准：单 Note 与 Selection Move 统一使用共享 Tick / Pitch
 > Delta 的 `MoveNotesCommand`；一元素 `noteIds` 是单 Note Move 的规范表达，旧的绝对
@@ -214,7 +214,7 @@ Command、混合类型 Composite Command、跨 MidiSource 批处理或多 Note R
 Store 读取当前 Record，验证 Note 存在、目标完全位于 Source 内，并只替换 Start /
 Duration；ID、Pitch、Velocity 与 Channel 保持不变。Command 不携带左 / 右 Edge，不执行
 Snap 或 Pointer Clamp。完整数量语义见
-[Project Command 集合与事务语义](./project-command-collection-semantics.md)。
+[Project Command 集合与事务语义](../../../packages/project-core/docs/project-command-collection-semantics.md)。
 
 ## 准备结果
 

@@ -51,7 +51,7 @@ URL Map。Project Core 只保存通用 Device Descriptor；Playback 只解码 `s
 
 ```text
 Inspector selection
-  -> ProjectTrackCoordinator
+  -> edits.tracks
   -> ReplaceInstrumentDeviceCommand
   -> Project Snapshot { seele.sample-instrument, soundbankId }
   -> Track presentation <---- Studio Catalogue ----> browser asset location

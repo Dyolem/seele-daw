@@ -113,6 +113,6 @@ sustain loop / one-shot 对最终 Gate Release 的执行。
 为 `f47bf38`、`3c29bc9`，EQ3A 尾音所有权清理已提交为 `5ef34a5`；EQ3B 已冻结
 `arrangementEndTick`、`timelineEndTick` 与音频输出渲染终点的区别。
 该门禁由
-[Expression Quality Integration V1](../../audio-web/docs/expression-quality-integration-v1-phase-plan.md)
+[Expression Quality Integration V1](../../../docs/archive/audio-web/expression-quality-integration-v1-phase-plan.md)
 独立跟踪，集中收口证据见
-[Expression Quality Integration V1 收口报告](../../audio-web/docs/expression-quality-integration-v1-closure-report.md)。
+[Expression Quality Integration V1 收口报告](../../../docs/archive/audio-web/expression-quality-integration-v1-closure-report.md)。

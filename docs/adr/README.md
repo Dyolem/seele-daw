@@ -1,4 +1,12 @@
 # Architecture Decision Records
 
-使用 `ADR-NNN-short-title.md` 命名。每份 ADR 至少记录 Context、Decision、Consequences、
-Validation 与 Revisit Trigger。
+一份 ADR 记录一个长期决定：为什么这样做、代价是什么、什么情况下应该重新考虑。实现细节
+写在代码和 [ARCHITECTURE](../../ARCHITECTURE.md) 里，不写在这里。
+
+命名为 `ADR-NNN-short-title.md`，至少包含 Context、Decision、Consequences、Validation 与
+Revisit Trigger。决定被推翻时，把状态改为 Superseded 并链接到新的 ADR，不删除旧文件。
+
+| ADR                                                          | 决定                                         |
+| ------------------------------------------------------------ | -------------------------------------------- |
+| [001](./ADR-001-validate-each-commit-once.md)                | 每次提交只在投影上做一次全量不变量校验       |
+| [002](./ADR-002-consumers-read-changes-not-command-types.md) | 消费者按 Change 路由；命令语义由属性测试固定 |

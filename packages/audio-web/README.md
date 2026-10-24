@@ -16,7 +16,7 @@ GraphPlan 和调度事件映射为 AudioContext、AudioNode、AudioParam 与 Aud
 > SFZ 文本 parser 与通用 Scheduler Executor 仍未实现。
 
 当前可听 MIDI 阶段见
-[Audible MIDI Playback V1 阶段计划](../playback/docs/audible-midi-playback-v1-phase-plan.md)。
+[Audible MIDI Playback V1 阶段计划](../../docs/archive/playback/audible-midi-playback-v1-phase-plan.md)。
 这里的 `V1` 指第一版可听产品纵向切片，不是架构文档版本。该切片使用主线程原生 Web Audio
 节点执行 Manifest 驱动的 MIDISampleSynth Voice Plan；Studio Grand 是默认音源和首个验收
 资产，不是 Runtime 白名单。通用 Graph Reconciler、RuntimeDelta、AudioWorklet 和跨线程
@@ -24,21 +24,21 @@ generation ACK 均延后。当前采样只作为不可分发的本地验证输�
 规范化 Manifest、加载预算和浏览器矩阵仍须按阶段计划逐批审阅。任何把采样随构建公开交付的
 方案仍必须先解决替代资产或再分发权限。
 
-后续 [Audio Quality Foundation V1A 阶段计划](./docs/audio-quality-foundation-v1a-phase-plan.md)
+后续 [Audio Quality Foundation V1A 阶段计划](../../docs/archive/audio-web/audio-quality-foundation-v1a-phase-plan.md)
 已经收口。AQ0–AQ3 基线、Velocity/输出校准、Envelope/Loop/Trigger 与有界复音政策已审核并提交；
 AQ4 以 `9b4c0c9` 冻结最终政策标识、综合门禁、兼容/失败边界与听测状态。完整证据见
-[V1A 收口报告](./docs/audio-quality-foundation-v1a-closure-report.md)，相关行业词汇见
+[V1A 收口报告](../../docs/archive/audio-web/audio-quality-foundation-v1a-closure-report.md)，相关行业词汇见
 [V1A 术语表](./docs/audio-quality-foundation-v1a-glossary.md)。
 CC64 的按键释放 / 最终 Gate Release、控制器追赶与 Clip 边界见
 [MIDI Sustain Pedal CC64 Playback V1](../playback/docs/midi-sustain-pedal-cc64-playback-v1.md)。
 CC64 后、WAV Export 前的复音优先级、PCM 与收尾门禁见
-[Expression Quality Integration V1](./docs/expression-quality-integration-v1-phase-plan.md)；EQ1 已提交为
+[Expression Quality Integration V1](../../docs/archive/audio-web/expression-quality-integration-v1-phase-plan.md)；EQ1 已提交为
 `f47bf38`，EQ2 的 schema version 5 Chromium 合成 PCM 报告已提交为 `3c29bc9`；EQ3A 已在
 Studio Composition Root 补齐 Paused / Stopped 尾音 Handle 清理，真实 Studio Grand 人工
 听测仍为 `not-run`。EQ3B 的三种终点、实时 / 未来离线共同契约与证据汇总见
-[Expression Quality Integration V1 收口报告](./docs/expression-quality-integration-v1-closure-report.md)。
+[Expression Quality Integration V1 收口报告](../../docs/archive/audio-web/expression-quality-integration-v1-closure-report.md)。
 
-后续 [Built-in Multi-Instrument Score Playback V1](./docs/built-in-multi-instrument-score-playback-v1-phase-plan.md)
+后续 [Built-in Multi-Instrument Score Playback V1](../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-phase-plan.md)
 已获批准，相关 MIDI、采样与资源术语见
 [多乐器总谱发声 V1 术语表](./docs/built-in-multi-instrument-score-playback-v1-glossary.md)。MI0 / MI1A
 已提交为 `f7af1db`，MI1B 已提交为 `7c36a17`，MI1C 已提交为 `fddeb3e`；22 个开发者本地 Score Core Soundbank 的逐音源身份、
@@ -67,7 +67,7 @@ Soundbank 并发、稳定总谱复用、Abort、失败重试、局部失败与�
 Runtime 在 Chromium 离线渲染，18 项路由、控制、Peak、Tail、预算和清理检查通过；同时把来源名
 含 `#` 的本地 WAV 规范化为 URL 安全资源名。人工听测仍为 `not-run`，因此不能把自动门禁冒充
 听觉验收。完整证据见
-[Built-in Multi-Instrument Score Playback V1 收口报告](./docs/built-in-multi-instrument-score-playback-v1-closure-report.md)。
+[Built-in Multi-Instrument Score Playback V1 收口报告](../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
 真实总谱后续发现的合法 MIDI Pitch 无匹配 Manifest Zone 问题由
 [MIDI Note Coverage Isolation V1](./docs/midi-note-coverage-isolation-v1.md) 作为 MI6A 增量批次处理：
@@ -294,5 +294,5 @@ Worklet entry 必须保持独立，只导入实时安全的协议和 DSP 代码�
 
 ## 架构依据
 
-- [Web DAW 简洁架构总纲](../../docs/architecture/web-daw-architecture-brief.md)
+- [Web DAW 简洁架构总纲](../../docs/archive/architecture/web-daw-architecture-brief.md)
 - [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)

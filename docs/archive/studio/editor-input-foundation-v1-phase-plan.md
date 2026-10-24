@@ -12,7 +12,7 @@
 **Editor Interaction Architecture**。先交付能够查询和修改快捷键的完整产品入口，再迁移
 编辑手势基础；共同的输入所有权、取消和作用域规则在第一批确定。
 
-旧的 [Minimal Gesture / Semantic Layer 草案](../../../packages/editor/docs/minimal-gesture-semantic-layer-v1-phase-plan.md)
+旧的 [Minimal Gesture / Semantic Layer 草案](../editor/minimal-gesture-semantic-layer-v1-phase-plan.md)
 被本计划替代。其范围只覆盖 Piano Roll，不能充分验证后续 Arrangement Clip 的复用；提前
 决定删除 XState，以及把所有 Viewport 变化都视为取消，也缺乏跨编辑器依据。这两项决定撤回。
 
@@ -375,7 +375,7 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
   Router.replaceKeymap、用户配置订阅／销毁或 Recorder.dispose。
 - 架构检查约束模块入口和内部依赖，测试允许访问内部实现。新增边界规则回归接入
   `lint:architecture`，验证入口、深层引用、反向依赖、测试支持隔离和明确导出。
-- 新增 [模块导读](../src/workbench/keyboard/README.md)，列出文件地图、依赖矩阵与两条阅读
+- 新增 [模块导读](../../../apps/studio/src/workbench/keyboard/README.md)，列出文件地图、依赖矩阵与两条阅读
   主线；同步原有源码链接。默认键位、版本化存储、Action ID 与交互行为保持不变。
 - 用户进一步批准将 Input Router 与 User Keymap 改为模块内的 class，以私有字段、公开能力
   和私有方法表达状态所有权及生命周期；创建入口与消费者接口保持一致。公开函数保留实例
@@ -425,7 +425,7 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
 - Clip Focus Surface 按 Note Model、Note Interaction、Note Rendering、Editing Actions、Clip
   Sustain Pedal 拆成五个 hook。组件显式协调同步目标失效与资源生命周期；Editor classes
   继续拥有手势状态机和提交交接。两种 Surface 共用 Theme 与固定 Pitch Layout。
-- [Feature README](../src/features/piano-roll/README.md) 给出职责地图、阅读顺序和清理约束。
+- [Feature README](../../../apps/studio/src/features/piano-roll/README.md) 给出职责地图、阅读顺序和清理约束。
 - Clip Focus Surface 脚本从 728 行缩减为 168 行；模板与样式保持一致，Grid 改为共享 computed
   投影。五个 hook 各为 74–193 行，避免把整个脚本搬成单个大 hook。
 - 完整 `pnpm check` 通过：10 项架构规则回归、Lint、Format Check、Type Check、168 个
@@ -445,7 +445,7 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
 - 修复部分初始化失败时的资源回收，Viewport 变更取消捕获，排队回调不能在释放后重建资源。
   Track / CC64 的中立语义协议迁移仍属于 G3；本批没有提前实施 G2–G4。
 - Active Clip 与 Channel 采用现有 UiSelect 的 small 规格。具体结构、入口、外部依赖和清理
-  顺序见 [Piano Roll README](../src/features/piano-roll/README.md)。
+  顺序见 [Piano Roll README](../../../apps/studio/src/features/piano-roll/README.md)。
 - 验证：完整 `pnpm check` 通过（168 个 Vitest 文件 / 1,583 tests，14 项 Node 架构规则）；
   内置浏览器确认工具栏、Channel / Active Clip 菜单和 Scope 切换，临时数据已撤销。
   构建保留既有大 chunk 提示。本批已通过用户审核，按授权提交。
@@ -455,7 +455,7 @@ S1 已于 2026-09-22 通过用户审核，提交为 `40cf076`。Recorder 与冲�
 - 已审核的 Symbol / Piano Roll 组织调整先独立提交为 `c614b9c`，G2 保持为后续独立批次。
 - Lane 复用公共 Pointer Adapter、InteractionSession 与 CommitHandoff。Tempo 专属
   Operation / Session 留在 Studio，Vue Hook 只适配映射监测、Action Cancel 与 Page 提交。
-  阅读入口、职责地图和清理顺序见 [Tempo Track README](../src/features/project-workspace/tempo-track/README.md)。
+  阅读入口、职责地图和清理顺序见 [Tempo Track README](../../../apps/studio/src/features/project-workspace/tempo-track/README.md)。
 - Begin 冻结 Session、TempoEvent、base revision、原值与映射。保留 4 CSS px 主导轴规则、
   tick 0 水平移动 / 删除限制及整数 Tick 编辑，不增加音乐网格 Snap。
 - Update、End、领取同步检查 revision，覆盖 Commit microtask 尚未通知的窗口；实际

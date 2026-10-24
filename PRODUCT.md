@@ -483,7 +483,7 @@ step，清空选择不改 Project。菜单打开期间接管键盘，Escape 关�
 从 Project Menu 离开未保存项目时，Save／Discard／Cancel 确认框继续接管输入；Cancel 或
 Escape 取消后，焦点回到 Project Menu 按钮。WA4 已于 2026-09-11 通过用户审核，包含
 1,476 项全工作区测试和内置浏览器检查；人工 smoke 未单独报告，验证记录详见
-[Workbench Action Catalogue V1 收口报告](./apps/studio/docs/workbench-action-catalogue-v1-closure-report.md)。
+[Workbench Action Catalogue V1 收口报告](./docs/archive/studio/workbench-action-catalogue-v1-closure-report.md)。
 
 Editor Input Foundation S1 已于 2026-09-22 通过用户审核：项目入口的 Keyboard shortcuts 按钮与
 Project Menu → View → Keyboard shortcuts 提供统一设置入口。目录包含 19 个 Action，
@@ -509,7 +509,8 @@ Settings 区分互斥区域共用、明确的优先级和真实冲突；真实�
 S3 后的体验修订已通过用户审核：19 个 Action 均有默认键位，新增 `1` / `8` 工具选择、`J`
 Snap、`P` 打开 MIDI Editor、`Alt+K` 打开快捷键设置、`Home` 返回最后启动位置、`Mod+I`
 导入新轨道、`Mod+Alt+O` 返回 Projects，以及 `Mod+Alt+Shift+M` 从 MIDI 建立新项目。
-既有用户覆盖不会被改写；完整映射与 DAW 参考见快捷键架构文档。
+既有用户覆盖不会被改写。完整映射以应用内的快捷键设置为准；默认键位的 DAW 参考见
+[归档的快捷键架构](docs/archive/studio/studio-keyboard-shortcut-architecture.md)。
 
 设置中的下拉框统一自定义样式，Source 列区分有效的 Default / User 来源。编辑详情与目录
 分离；录制有独立高亮状态，期间禁用会打断录制的编辑操作，Stop recording 与 Cancel editing
@@ -518,10 +519,10 @@ Snap、`P` 打开 MIDI Editor、`Alt+K` 打开快捷键设置、`Home` 返回最
 快捷键，并显示禁用原因；Undo / Redo 仍需当前 Session 存在相应 History。
 
 尚未提供 Sequence 或 Command Palette；独立手势架构的迁移与 G4 收口验证见
-[Editor Input Foundation V1 计划](./apps/studio/docs/editor-input-foundation-v1-phase-plan.md)。
+[Editor Input Foundation V1 计划](./docs/archive/studio/editor-input-foundation-v1-phase-plan.md)。
 
-术语和状态所有权见 [Studio Action Architecture](./apps/studio/docs/studio-action-architecture.md)，
-输入策略见 [Studio Keyboard Shortcut Architecture](./apps/studio/docs/studio-keyboard-shortcut-architecture.md)。
+Action 与上下文的实现见 [Workbench](./apps/studio/src/workbench/README.md)，键盘分派见
+[Keyboard](./apps/studio/src/workbench/keyboard/README.md)。
 
 ### 5.5 `PLAYBACK` 播放与播放中编辑
 
@@ -752,8 +753,7 @@ Selection 是轻量、可重建的 Workbench UI 状态：
 - 不进入 Undo / Redo、Snapshot、Project File、Checkpoint 或 IndexedDB。
 - Project Track 的名称、颜色、类型等事实始终从当前 Session Snapshot 派生，不复制到 Pinia。
 
-Vue 状态选择的完整规则见
-[Vue State Composition Guidelines](apps/studio/docs/vue-state-composition-guidelines.md)。
+Vue 状态的选择规则见[工程代码准则](CODE_GUIDELINES.md)第 9 节。
 
 ## 7. UI 基础与设计语言
 
@@ -812,12 +812,12 @@ Project Core 已实现：
 
 普通 Note Add / Move / Resize 能力需要一个已经存在的 MIDI Clip 与 MIDI Source。两个原子
 Clip / Note 放置 Command 已由 Track 模式 Pencil 使用。Studio 的
-`ProjectMidiNoteCoordinator` 校验 Active Project、Clip、MidiSource 与 Note Partition，把
+`edits.notes` 校验 Active Project 已就绪、手势目标未过期，查找 Clip 与 MidiSource，把
 Clip-local Tick 映射为 Source-local Tick，生成 Note ID，并使用 Velocity 100、UI Channel 1
-执行 Add Note Command。Coordinator 返回 `NoteId + Commit`；尾部剩余时间不足期望 Duration
-时只创建剩余的正 Tick。移动和删除时 Coordinator 对当前 Clip 的同一 MidiSource 分别执行
+执行 Add Note Command，返回 `NoteId + Commit`；尾部剩余时间不足期望 Duration
+时只创建剩余的正 Tick。移动和删除时对当前 Clip 的同一 MidiSource 分别执行
 一个 `MoveNotesCommand` / `RemoveNotesCommand`，全部目标在建立 MutationPlan 前完成验证。
-单 Note Resize 由 Editor Common 解析最终 Source-local Start / Duration，Studio Coordinator
+单 Note Resize 由 Editor Common 解析最终 Source-local Start / Duration，`edits.notes`
 执行一个 `ResizeNoteCommand`。
 
 Add 已由 Piano Roll Pencil 接入，多 Note Move 已由 Cursor Body Drag 接入，多 Note
@@ -1032,7 +1032,7 @@ Scope 一样只属于 Studio 应用生命周期 Preference；切换 Channel 不�
 或 History。
 
 Pencil 只在 Pointer Up、未越过 Drag Threshold 且起点为空白时产生 Add 意图。X 使用当前
-Grid / Snap 的单元左边界，Y 解析为最接近的原始 MIDI Value。Studio Coordinator 在当前
+Grid / Snap 的单元左边界，Y 解析为最接近的原始 MIDI Value。`edits.sustainPedal` 在当前
 Snapshot revision 上重新验证 Clip、MidiSource 与 CC64 Partition，生成 Event ID，并执行一个
 `AddMidiSustainPedalEventCommand`；一次 Click 只形成一个 Commit 和一个 History 步骤，失败不写
 Project 并显示 Toast。
@@ -1107,7 +1107,7 @@ File 导入是独立交换格式入口，不替代 Project File。
   Percussion 来源生成 one-shot 与 Hi-hat Choke Manifest，MI2 已接通 Studio Catalogue、手动选择与
   同源位置派生。当前仍只支持由开发工具规范化后的资源，该镜像不属于产品资源，Vite 生产构建
   禁止把 public 内容复制到 dist。阶段边界见
-  [Built-in Multi-Instrument Score Playback V1](packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-phase-plan.md)。
+  [Built-in Multi-Instrument Score Playback V1](docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-phase-plan.md)。
 - M4A 自动协商、远程 / 安装式 Soundbank 获取与可分发内置资产；当前 Studio 只从本地 Vite dev
   同源路径准备 Manifest/WAV。
 - JSON 合成器定义的解析与 VASynth / FMSynth 合成引擎；完整 Preset 目录中的 139 个 VASynth、
@@ -1289,10 +1289,10 @@ File 导入是独立交换格式入口，不替代 Project File。
 ## 13. 阶段收口与当前验证基线
 
 Audible MIDI Playback V1 已于 2026-08-17 按
-[阶段计划](./packages/playback/docs/audible-midi-playback-v1-phase-plan.md)完成收口，验收基线为
+[阶段计划](./docs/archive/playback/audible-midi-playback-v1-phase-plan.md)完成收口，验收基线为
 `f1d0298`。阶段完成与 Git checkpoint 相互独立；该阶段本身未单独创建 checkpoint tag。
 
-其后的 [Manual Timeline Locate V1](./packages/playback/docs/manual-timeline-locate-v1-phase-plan.md)
+其后的 [Manual Timeline Locate V1](./docs/archive/playback/manual-timeline-locate-v1-phase-plan.md)
 已于 2026-08-18 完成四个独立主批次和一个 Playhead 纵向可见性 UX 修正，并通过用户统一代码
 审核与浏览器功能验证；它不改变 Audible MIDI Playback V1 的已完成状态。阶段 checkpoint 为
 `checkpoint/manual-timeline-locate-2026-08-18`。
@@ -1421,7 +1421,7 @@ Batch 5A 另通过浏览器运行时 smoke，Batch 7B 另通过
   WAV 的内容哈希集合没有变化。人工听测仍为 `not-run`。最终根级门禁已通过 155 个测试文件 /
   1,357 项测试、全工作区 Type Check、Studio Production
   Build 与 soundbank dist boundary。详细证据见
-  [Built-in Multi-Instrument Score Playback V1 收口报告](packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-closure-report.md)。
+  [Built-in Multi-Instrument Score Playback V1 收口报告](docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-closure-report.md)。
 
 - MIDI Note Coverage Isolation MI6A 已通过审核并提交为 `041e945`：Audio Web 按 Soundbank 与 Note
   Occurrence 对严格 Manifest 覆盖进行分区，只准备命中 Zone 的 WAV，并把未命中项记录为客观

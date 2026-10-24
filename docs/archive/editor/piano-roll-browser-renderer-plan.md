@@ -42,7 +42,7 @@ Common 不依赖 DOM、Canvas、Vue 或 Studio。
 
 Studio 默认使用 DOM Note Adapter，以获得 Pointer Event、CSS Motion 与 Focus 的自然入口；
 Canvas Note Adapter 保留为同一 Port 的替代实现和基准对象。完整决策见
-[Piano Roll Note Renderer 决策](./piano-roll-note-renderer-decision.md)。
+[Piano Roll Note Renderer 决策](../../../packages/editor/docs/piano-roll-note-renderer-decision.md)。
 
 ### Studio
 

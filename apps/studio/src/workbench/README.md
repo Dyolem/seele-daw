@@ -1,51 +1,56 @@
 # Workbench
 
-应用外壳、服务装配、命令、上下文、生命周期和 Contribution 注册放在这里。只有 Studio 的
-Composition Root 可以知道并装配全部领域包与浏览器实现。
+Studio 的应用层：写项目的用例、用户动作与键盘、项目生命周期与播放适配。组件通过
+`useStudio()`（[studio-services.ts](./studio-services.ts)）取得这里的服务；服务由
+[组合根](../bootstrap/studio-application.ts)创建和释放。
 
-当前应用级操作能力按以下职责组成：
+| 目录          | 内容                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `edits/`      | 写项目的无状态用例：clips、notes、sustainPedal、tempo、tracks，汇总为 `ProjectEdits` |
+| `actions/`    | Action 与焦点上下文的契约、注册表、Coordinator，以及工作台通用的编辑与界面 Action    |
+| `keyboard/`   | 键位、输入分派、用户 Keymap 与录制，见 [Keyboard](./keyboard/README.md)              |
+| `project/`    | `ActiveProjectService`、项目入口、导航确认、MIDI 导入、播放适配                      |
+| `instrument/` | 内置音色目录与 MIDI 导入时的音色路由                                                 |
 
-- `StudioActionCoordinator` 拥有静态目录、当前能力解析、调用接受与完成结果；
-- `StudioKeyboardInputRouter` 拥有键位、输入上下文和物理 Listener 生命周期；
-- `StudioUserKeymap` 拥有本地用户覆盖记录，协调验证、保存与 Router 替换；Vue Binding 只订阅
-  已提交快照，菜单、按钮和设置共享当前键位；
-- `StudioShortcutRecorder` 封装 TanStack 录制与输入暂停生命周期，只向 Settings 返回草稿；
-  冲突说明与重新分配使用 User Keymap 的统一 Context 分析和原子保存；
-- Composition Root 装配 Feature Action 定义；页面和编辑器只提供临时业务目标；
-- 菜单、按钮和快捷键通过同一个 Action 调用业务权威，Save 与 WA2 Workbench 入口已接入；
-- 文件选择器与导航等待由页面持有；Dock 能力直接读取 Workspace，均不成为应用状态副本；
-- Pinia 不保存 Handler、目标能力、pending resolver 或底层业务对象。
+## Edits
 
-详见 [Studio Action Architecture](../../docs/studio-action-architecture.md) 和
-[Studio Keyboard Shortcut Architecture](../../docs/studio-keyboard-shortcut-architecture.md)。
-Keyboard 的目录职责、公开入口与两条阅读主线见 [Keyboard 模块导读](./keyboard/README.md)；
-功能组件从 `@/workbench/keyboard` 引用，bootstrap 从 `@/workbench/keyboard/setup` 装配。
+每个用例做三件事：用 `requireEditSession` 检查项目已就绪、手势捕获的 Session 与 revision
+没有过期；把界面坐标换成命令参数（例如 Clip 内 Tick 换成 Source Tick）；执行一条 Project
+Command 并返回 Commit。业务不变量交给 project-core 判断；这里的 `ProjectEditError` 只表达应用
+层前置条件。
 
-当前应用级能力还包括 `ProjectPlaybackCoordinator`：
+## Action
 
-- Composition Root 创建唯一 Coordinator、Browser Runtime 与 Timer，并在 Active Project、Vue
-  Binding 和浏览器音频资源之间建立显式生命周期；
-- Coordinator 从稳定 Project Snapshot 编译计划，组合浏览器无关 Transport / Scheduler，再把
-  Voice Plan 交给 Audio Web；它不写 Project Fact，也不进入 Pinia；
-- Vue Context 只暴露命令能力和 shallow frozen playback state，Transport 组件继续通过 Props /
-  Emits 接收展示状态与上报用户意图；
-- 首个 Play 用户手势才激活 AudioContext 和准备当前计划所需的同源 Manifest/WAV；应用退出、
-  项目切换和计划替换都会停止 Timer、使 Voice 失效并释放 Project playback lifetime；
-- Studio-owned Built-in Instrument Catalogue 同时派生 Inspector 显示与 22 个 developer-local
-  asset base，避免名称和 URL Map 漂移；production build 仍不复制 public Soundbank；
-- 两种 Standard MIDI File 导入入口共用 Studio-owned Program / Channel 10 路由；未审核 Program
-  保存无声、可见且可由 Inspector 显式替换的 Placeholder，不回退 Studio Grand；
-- Project MIDI 提供瞬态、版本化的 Mode Semantic Binding；Studio 只在导入反馈中展示 Bound 模式或
-  Unresolved / Conflicted notice，并明确检测不会改变现有 Instrument 路由；
-- Project MIDI 同时把首个 Note 前或同 Tick 最终生效的 CC7 / CC10 写入现有 Track Gain / Pan；
-  后续动态控制保持诊断，不在 Studio 维护第二份 Controller 状态；
-- Soundbank 资源缺失会在播放准备时明确失败，不能回滚已经合法提交的 Instrument Replace。
-- developer-only 音质页由 Studio 组合原创 Type 1 总谱、同一 MIDI Import Factory、Catalogue
-  location、生产资源缓存和 Sample Voice Runtime；它验证真实多音源 PCM，但不会进入 production
-  dist，也不会把自动报告冒充人工听测。
+一个 Action 是一个用户意图。菜单、按钮、右键菜单和快捷键调用同一个 Action。
 
-完整规则见
-[Studio Built-in Instrument Catalogue V1](../../docs/built-in-instrument-catalogue-v1.md)和
-[Studio MIDI Program Import Routing V1](../../docs/midi-program-import-routing-v1.md)。MI5 总谱门禁与
-听测状态见
-[Built-in Multi-Instrument Score Playback V1 收口报告](../../../../packages/audio-web/docs/built-in-multi-instrument-score-playback-v1-closure-report.md)。
+```text
+Menu / Toolbar / Context Menu ─┐
+Keyboard → Input Router ───────┴→ StudioActionCoordinator → 当前上下文的目标 → edits / 服务
+```
+
+- 声明：所属 feature 用 `defineStudioAction` 一次写出 ID、文案、类别、检索词、上下文、默认
+  键位、是否重复触发，以及 `resolve(target)`。[studio-actions.ts](./actions/studio-actions.ts)
+  汇总全部声明，并从中推导 `StudioActionId`。
+- 上下文：`defineStudioContext` 声明 `id`、`label`、`priority`，以及可选的 `overlaps` 与
+  `ownsEnter`。视图挂载或聚焦时调用 `contexts.bind(context, target)`，返回的函数用于释放。
+  重新绑定会让旧目标失效，旧视图延迟执行的释放不会解绑新目标。
+- 调用结果：`unavailable`（没有目标或已禁用，键盘可以回退到更低优先级的上下文）、`failed`
+  （解析目标时出错）、`accepted`。被接受的调用随后以 `completed`、`not-applied`、`failed` 或
+  `cancelled` 结束。目标失效或应用释放时，等待中的调用以 `cancelled` 结束；取消不会撤销已经
+  提交的 Commit。
+- 非预期错误只报告一次（控制台加 Toast），反复读取 Presentation 不会重复弹出。
+
+## Project
+
+- `ActiveProjectService`：当前项目的状态机，负责加载、新建、保存与 dirty。
+- `ProjectEntryCoordinator`、`ProjectNavigationConfirmationCoordinator`、`ProjectMidiImportCoordinator`：
+  分别处理入口决议、离开未保存项目时的确认，以及“解码 → 映射 → 激活”的 MIDI 导入。
+- `ProjectPlaybackCoordinator`：把 Active Project 的 Snapshot 与 Commit 交给
+  `@seele-daw/playback` 的 PlaybackEngine，再把引擎状态投影成 Vue 可读的状态。浏览器时钟与
+  音频运行时由同目录的 `browser-*.ts` 适配。首次播放的用户手势才会创建 AudioContext 并准备
+  音源资源。
+
+内置音色目录与 MIDI 程序路由的产品规则见
+[Built-in Instrument Catalogue V1](../../docs/built-in-instrument-catalogue-v1.md)、
+[General MIDI Built-in Routing V1](../../docs/general-midi-built-in-routing-v1.md) 与
+[MIDI Program Import Routing V1](../../docs/midi-program-import-routing-v1.md)。

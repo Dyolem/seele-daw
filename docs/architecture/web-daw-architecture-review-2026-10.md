@@ -1,7 +1,8 @@
 # Web DAW 架构复盘与精简提案（2026-10）
 
-> 状态：Proposed。本文是一次架构评审的结论与改进提案，不是规范；其中被采纳的部分应先写入
-> ADR 或[工程代码准则](../../CODE_GUIDELINES.md)后再生效。
+> 状态：已实施（2026-10-23）。结果、偏差与复测数字见[第 9 节](#9-实施结果2026-10-23)；现状以
+> [ARCHITECTURE](../../ARCHITECTURE.md) 为准。下文第 1–8 节保留评审时的原文，文中的文件路径
+> 指向基线 `e556d9e`，其中一些文件已被删除。
 >
 > 日期：2026-10-23
 >
@@ -13,7 +14,7 @@
 ## 0. 如何使用本文
 
 本文回答三个问题：当前架构是什么样、哪些设计是冗余的、应该往哪里收敛。它补充而不替代
-[简洁架构总纲](./web-daw-architecture-brief.md)与
+[简洁架构总纲](../archive/architecture/web-daw-architecture-brief.md)与
 [长期路线与架构设计 v3](./web-daw-long-term-architecture-v3.md)，也不修改任何既有规范。
 
 文中的数字均在代码基线上测得，复测方法见文末附录。迁移路线中的每一步都应单独评审、单独
@@ -78,7 +79,7 @@ PointerInputAdapter → PianoRollInteractionSession → InteractionSession → M
 | `ProjectTempoEventCoordinator`                                      | 139       | 4 个方法里有 3 个只是“就绪检查 + execute”，不符合准则 6.3 “Coordinator 不应只是转发一个方法”                               |
 
 配套成本：每个应用能力都要有 coordinator、error、`vue/*-context`、`vue/*-vue-error`、
-[`symbols.ts`](../../apps/studio/src/symbols.ts) 中的一个 key、
+`symbols.ts` 中的一个 key、
 [`studio-application.ts`](../../apps/studio/src/bootstrap/studio-application.ts) 中的构造与
 provide，以及对应测试。具体表现：
 
@@ -97,7 +98,7 @@ provide，以及对应测试。具体表现：
 以 MoveNotes 为例：
 
 1. Studio 协调器检查 Clip、MidiSource、Note partition 是否存在，以及 Session 是否过期
-   （[`project-midi-note-coordinator.ts`](../../apps/studio/src/workbench/project/midi-note/project-midi-note-coordinator.ts)
+   （`project-midi-note-coordinator.ts`
    的 `requireEditableMidiNoteTarget`）；
 2. core handler 再检查 MidiSource、partition、修订号与范围；
 3. [`project-commit-candidate.ts`](../../packages/project-core/src/commit/project-commit-candidate.ts)
@@ -145,9 +146,9 @@ applier、projected reader、change 推导、commit candidate、invariant valida
 ### 3.5 Action 元数据拆成多张平行表
 
 新增一个 Action 依次要改：`STUDIO_ACTION` 加 ID →
-[`studio-action-catalogue.ts`](../../apps/studio/src/workbench/actions/studio-action-catalogue.ts)
+`studio-action-catalogue.ts`
 加文案 →
-[`studio-default-keymap.ts`](../../apps/studio/src/workbench/keyboard/keymap/studio-default-keymap.ts)
+`studio-default-keymap.ts`
 加快捷键策略 → 某个 `create*Actions` 加 `resolve`。
 
 如果需要新的焦点上下文，还要改 `StudioKeyboardContext` 类型、`STUDIO_KEYBOARD_CONTEXTS`、
@@ -174,8 +175,8 @@ target slot 与 `isContextActive` switch、`symbols.ts`、组合根 provide，�
 - 架构规则冻结了目录形状：检查除了守护依赖方向，还规定了 keyboard 的 7 层、piano-roll 的
   `hooks / types` 私有性和 Symbol 集中登记，所以每次重组都要同时改规则。
 - 文档过多过散：有为单个协调器方法写的 phase plan（如
-  [`add-empty-midi-clip-coordinator-plan.md`](../../apps/studio/docs/add-empty-midi-clip-coordinator-plan.md)），
-  [架构总纲](./web-daw-architecture-brief.md)的 0.1 节已经变成变更日志，而
+  [`add-empty-midi-clip-coordinator-plan.md`](../archive/studio/add-empty-midi-clip-coordinator-plan.md)），
+  [架构总纲](../archive/architecture/web-daw-architecture-brief.md)的 0.1 节已经变成变更日志，而
   [ADR 目录](../adr/README.md)仍是空的。知识分散在 114 个文件里，这本身就是项目难以整体
   把握的重要原因。
 
@@ -357,6 +358,67 @@ packages/project-core                    一个命令一个文件；实体表泛
   playback 包的公开 API 能否保持小而完整。
 - 阶段 0 的文档归档是移入 `docs/archive/` 还是直接删除（git 历史保留），需要维护者决定。
 - 5.4 节“现在”一列为估算；每个阶段完成后应按附录方法复测。
+
+## 9. 实施结果（2026-10-23）
+
+第 0–6 阶段全部完成，均直接提交在 `main` 上。自基线以来，生产与测试代码共改动 250 个
+`.ts` / `.vue` 文件，新增 9,496 行、删除 14,100 行。
+
+| 阶段 | 提交                                       | 内容                                                                                     |
+| ---- | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| 1    | `acf3bc1`、`e62cb2b`                       | 编辑协调器改为 `workbench/edits` 中的函数，单一 `useStudio()`；Snapshot 按 revision 缓存 |
+| 2    | `2183fcd`                                  | `GestureSession` 与 `completeGesture`，4 个手势只剩特化                                  |
+| 3    | `8decff6`                                  | `defineStudioAction` 单一声明；焦点上下文注册表                                          |
+| 4    | `85aacf7`、`65763b3`、`4708a75`            | Tempo 注入模型；Arrangement 与 WorkspacePage 拆分                                        |
+| 5    | `9d5579c`、`daba6a1`                       | 播放按变化路由；PlaybackEngine 移入 playback 包                                          |
+| 6    | `91e1fef`、`5f54e36`、`bdfeee8`、`318d508` | 一次校验；属性测试取代 `matchesXxx`；共享分区表；命令注册表                              |
+| 0    | `6537644` 与文档提交                       | 架构规则只管依赖方向；ARCHITECTURE、ADR、归档；提交成本基准                              |
+
+### 复测
+
+| 指标                              | 基线                             | 现在                                            |
+| --------------------------------- | -------------------------------- | ----------------------------------------------- |
+| CC64 涉及的非测试源文件           | 77（Studio 25、project-core 30） | 72（Studio 21、project-core 30）                |
+| 播放协调器                        | Studio 中 1590 行                | Studio 适配器 246 行；playback 包中引擎 1128 行 |
+| 4 个手势 Session                  | 240 / 240 / 311 / 283 行         | 共用 `GestureSession` 349 行，特化 33–70 行     |
+| `ProjectWorkbenchArrangement.vue` | 1334 行                          | 811 行                                          |
+| `ProjectWorkspacePage.vue`        | 722 行                           | 352 行                                          |
+| `project-commit-candidate.ts`     | 1154 行                          | 593 行                                          |
+| 每次提交的全量校验                | 2 次                             | 1 次（ADR-001）                                 |
+| 文档                              | 114 篇，1.65 MB                  | 在用 57 篇，约 0.94 MB；另有 62 篇归档          |
+
+### 改动配方（对照 5.4）
+
+| 改动                 | 目标                | 现在                                                                       |
+| -------------------- | ------------------- | -------------------------------------------------------------------------- |
+| 给已有实体加一条命令 | 3–4                 | 5 个生产文件（协议、handler、注册项、导出、edits）加界面调用方；播放不用改 |
+| 新增一个 Action      | 1 个声明 + 1 处绑定 | 达成                                                                       |
+| 新增一种实体         | 约 6–8              | 未达成，project-core 仍约 30 个文件                                        |
+| 新增一种拖拽手势     | 一个几十行的特化    | 达成                                                                       |
+| 新增一个应用服务     | 2                   | 达成：服务、组合根、`StudioServices` 字段                                  |
+
+### 与提案的偏差
+
+- 没有做“一个命令一个文件”。命令协议仍集中在 `protocol/project-command.ts`，它是公开契约，
+  注册表的穷尽类型也依赖它；三个平行的 `switch` 已合并为一张注册表。
+- 没有把 Mutation 泛化为 `{ table, op, key, before, after }`。Applier 的分派本身很平，改形状
+  会改动大部分 project-core 测试的期望值；只把两种按 Source 分区的实体合并成一套分区表实现。
+  所以“新增一种实体”仍然昂贵，这是剩下最大的一项。建议在加入 Automation 之前完成。
+- PlaybackEngine 保持为一个状态机，没有再拆成 Reconciler、RuntimePreparation 与 LocateSession
+  三个对象：它们共享 Transport、Voice 与请求序号，拆开后同一组不变量会分散到多个对象里。
+  调和决策是 `reconciliation/` 中的纯函数，Voice 跟踪由 `VoiceLedger` 负责。
+- 没有做 `useProjectSnapshot()`：整项目 Snapshot 只有 WorkspacePage 一个读者。
+- 5 个编辑错误类合并为一个 `ProjectEditError`（4 个 code），7 个只含 `missing-context` 的 Vue
+  错误类删除；导航决策的错误类有真实语义，保留。没有引入通用的 `StudioError`。
+
+### 第 8 节待决事项的结论
+
+- 服务注入：单一 `useStudio()`，配套的错误类与 hook 样板全部删除。
+- PlaybackEngine：移入 `packages/playback`，并改用结构化的 abort signal；该包的 tsconfig 不含
+  DOM lib，所以不依赖 DOM 由类型检查保证。
+- 文档归档：移入 `docs/archive/`，不删除。
+- 不变量策略：每次提交在投影上做一次全量校验（ADR-001）。新基准显示，剩余成本的主要部分随
+  被编辑的 MIDI Source 大小增长，而不随项目大小增长。
 
 ## 附录：度量方法
 

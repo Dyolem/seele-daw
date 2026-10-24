@@ -11,7 +11,7 @@
 控制文件语义与资源预算。术语见
 [多乐器总谱发声 V1 术语表](./built-in-multi-instrument-score-playback-v1-glossary.md)，阶段顺序与失败
 政策见
-[Built-in Multi-Instrument Score Playback V1 阶段计划](./built-in-multi-instrument-score-playback-v1-phase-plan.md)。
+[Built-in Multi-Instrument Score Playback V1 阶段计划](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-phase-plan.md)。
 
 本文件只证明本地资产可以被确定性规范化，不单独证明 Studio 选择、Program 导入路由或产品分发。
 MI2 / MI3A 已分别接入 Studio 手动选择与导入路由；本批生成的 Manifest/WAV 和库存 JSON 全部位于
@@ -153,4 +153,4 @@ Manifest/WAV 规范化、资源统计和幂等发布门禁；当时 Studio Grand
 Percussion 的 one-shot / choke 兼容转换；MI2 / MI3A 随后用 Studio Catalogue、可见 Instrument
 选择器与导入路由消费这些已审核身份。MI4 已提交多 Soundbank Runtime 资源门禁；MI5 自动总谱
 PCM 已通过，人工听测仍记录为 `not-run`。完整证据见
-[Built-in Multi-Instrument Score Playback V1 收口报告](./built-in-multi-instrument-score-playback-v1-closure-report.md)。
+[Built-in Multi-Instrument Score Playback V1 收口报告](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-closure-report.md)。

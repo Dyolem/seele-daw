@@ -134,7 +134,7 @@ Move 实现前补齐交互所需的 Snap，而不是一次性建设全部对象 
 Batch 2 已审查并实现 `MoveNotesCommand` 的 Delta、No-change、边界与 Change 协议。
 一元素集合与旧单 Note 行为语义等价，因此集合协议已经取代旧的绝对目标
 `MoveNoteCommand`。通用准则见
-[Project Command 集合与事务语义](../../project-core/docs/project-command-collection-semantics.md)。
+[Project Command 集合与事务语义](../../../packages/project-core/docs/project-command-collection-semantics.md)。
 
 对象边缘、Marker、播放头和 Loop 边界仍不是 Snap Target。
 
@@ -154,7 +154,7 @@ Surface-scoped Interaction Session：
 - Commit 成功后保留 Preview 到权威 Read Model revision，取消后的迟到 Pointer Up 无效。
 
 完整决定见
-[Piano Roll Pointer Interaction 状态机决策](./piano-roll-pointer-interaction-state-machine-decision.md)。
+[Piano Roll Pointer Interaction 状态机决策](piano-roll-pointer-interaction-state-machine-decision.md)。
 
 ## 5. Batch 3：Cursor / Pencil Resize
 

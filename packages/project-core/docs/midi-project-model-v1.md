@@ -355,7 +355,7 @@ clamp、loop wrap 或隐式 MidiSource / Clip 自动扩展。`MoveNotesCommand` 
 velocity 和 channel；两个 Delta 同时为零时返回 `no-change`，不形成空 MutationPlan。
 Snap、量化、像素坐标转换与交互边界 Clamp 由 Editor 在创建 Command 前完成，Core 仍在
 提交时基于权威 Record 复核全部目标。详细执行边界见
-[MIDI Note Command 层执行计划](./midi-note-command-layer-plan.md)。
+[MIDI Note Command 层执行计划](../../../docs/archive/project-core/midi-note-command-layer-plan.md)。
 
 Track 全局 Piano Roll 的 Pencil 放置使用两个显式产品命令，而不是放宽普通 Note Command：
 
@@ -368,7 +368,7 @@ Track 全局 Piano Roll 的 Pencil 放置使用两个显式产品命令，而不
 - 两种命令各自产生一个 Commit、一次 revision 推进和一个 History 步骤。
 
 完整边界见
-[MIDI Clip / Note 原子放置命令计划](./midi-clip-note-placement-command-plan.md)。
+[MIDI Clip / Note 原子放置命令计划](../../../docs/archive/project-core/midi-clip-note-placement-command-plan.md)。
 
 运行时按 Source 分别存储 Note 与 Sustain Pedal Event：
 
@@ -682,10 +682,10 @@ normalizer 调用当前 parser 与 Record factory，并在完整 Store 上验证
 JSON codec 与 Journal 仍是后续独立边界。规范性协议见历史
 [Seele Project File Format V1](./project-file-format-v1.md) 与当前
 [Seele Project File Format V2](./project-file-format-v2.md)；V1 实施决策仍见
-[ProjectFileDTO V1 写出边界计划](./project-file-dto-v1-write-plan.md)、
-[ProjectFileDTO V1 读取校验计划](./project-file-dto-v1-read-validation-plan.md)、
-[Project File V1 Session 加载计划](./project-file-v1-session-load-plan.md) 与
-[Project Checkpoint 基础协议与存储端口计划](./project-checkpoint-foundation-plan.md)。
+[ProjectFileDTO V1 写出边界计划](../../../docs/archive/project-core/project-file-dto-v1-write-plan.md)、
+[ProjectFileDTO V1 读取校验计划](../../../docs/archive/project-core/project-file-dto-v1-read-validation-plan.md)、
+[Project File V1 Session 加载计划](../../../docs/archive/project-core/project-file-v1-session-load-plan.md) 与
+[Project Checkpoint 基础协议与存储端口计划](../../../docs/archive/project-core/project-checkpoint-foundation-plan.md)。
 
 ## 跨实体不变量
 

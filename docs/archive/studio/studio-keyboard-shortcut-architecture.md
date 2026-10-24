@@ -37,7 +37,7 @@ TanStack Adapter 不知道业务 Action、Selection 或 Modal。Router 不执行
 
 架构检查限制外部深层引用、入口通配导出、内部反向引用以及分层依赖；测试仍可访问内部
 实现。具体文件地图、依赖矩阵和按键／改键两条阅读主线见
-[Keyboard 模块导读](../src/workbench/keyboard/README.md)。本批保持 Action ID、默认键位、
+[Keyboard 模块导读](../../../apps/studio/src/workbench/keyboard/README.md)。本批保持 Action ID、默认键位、
 存储 version 1、输入归属与录制语义不变。
 
 ### 1.2 有状态实例的实现

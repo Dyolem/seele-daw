@@ -14,7 +14,7 @@
 
 当前实现已经建立从领域值、规范化存储、跨实体校验到可逆事务写入的最小闭环。它为后续 Command、History、Query、Snapshot 和持久化提供可信的数据内核，但还不是完整的用户编辑管线。
 
-本文是阶段性成果说明，负责把已经实现的模块、数据关系和运行链路连接起来。字段与不变量的详细规范仍以 [MIDI Project Model V1](./midi-project-model-v1.md) 为准；Record 与生命周期对象的取舍见 [Record、Class 与生命周期协作者](./records-classes-and-lifecycles.md)。
+本文是阶段性成果说明，负责把已经实现的模块、数据关系和运行链路连接起来。字段与不变量的详细规范仍以 [MIDI Project Model V1](../../../packages/project-core/docs/midi-project-model-v1.md) 为准；Record 与生命周期对象的取舍见 [Record、Class 与生命周期协作者](../../../packages/project-core/docs/records-classes-and-lifecycles.md)。
 
 ## 阶段结论
 

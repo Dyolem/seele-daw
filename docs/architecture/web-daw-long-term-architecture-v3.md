@@ -7,9 +7,9 @@
 > 最近实现校准：2026-08-26\
 > 状态：Proposed Architecture Baseline v3
 
-> 本文描述长期目标，不是当前实现清单。当前仓库边界见
-> [Web DAW 简洁架构总纲](./web-daw-architecture-brief.md)，已完成的第一版可听产品切片见
-> [Audible MIDI Playback V1 阶段计划](../../packages/playback/docs/audible-midi-playback-v1-phase-plan.md)。
+> 本文描述长期目标，不是当前实现清单。当前实现见 [ARCHITECTURE](../../ARCHITECTURE.md)，两者冲突时以
+> 代码与 ARCHITECTURE 为准。已完成的第一版可听产品切片见
+> [Audible MIDI Playback V1 阶段计划](../archive/playback/audible-midi-playback-v1-phase-plan.md)。
 > 该切片已于 2026-08-17 按验收基线 `f1d0298` 完成，尚未创建阶段 checkpoint tag。后者的 `V1`
 > 不是本文档版本；本文中的通用 Graph、RuntimeDelta、ACK 与 AudioWorklet
 > 仍是长期能力，除非阶段计划明确纳入，否则不能作为首版可听切片的验收要求。
@@ -875,7 +875,7 @@ type EditorInput =
 WA1／WA2 的离散操作通过应用级 Action 目录调用当前业务目标；Action 不是 Project Command，也不
 要求保存、导航等工作台操作生成 EditorIntent。Pointer 编辑继续经过既有 Editor Input / Intent
 链路。组件不得自行实现一套平行的删除、复制或拖拽语义。当前实现见
-[Studio Action Architecture](../../apps/studio/docs/studio-action-architecture.md)。
+[Studio Action Architecture](../archive/studio/studio-action-architecture.md)。
 
 ## 25. Surface、坐标与 Hit Test
 

@@ -112,6 +112,17 @@ describe('ModelStore ownership boundary', () => {
       expect(store).not.toHaveProperty(propertyName)
     }
   })
+
+  it('hands out frozen read-only table views rather than its containers', () => {
+    const store = new ModelStore(createCompleteProjectFixture().seed)
+
+    for (const view of [store.recordTable('tracks'), store.partitionedTable('midiNotesBySource')]) {
+      expect(view).not.toBeInstanceOf(Map)
+      expect(view).not.toHaveProperty('set')
+      expect(view).not.toHaveProperty('delete')
+      expect(Object.isFrozen(view)).toBe(true)
+    }
+  })
 })
 
 describe('ModelStoreReader', () => {

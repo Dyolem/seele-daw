@@ -5,16 +5,21 @@ import type { ClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { MidiSustainPedalEventRecord } from '#internal/model/midi-sustain-pedal-event'
+import {
+  PARTITIONED_TABLES,
+  PARTITIONED_TABLE_NAMES,
+  RECORD_TABLE_NAMES,
+  type PartitionedTableName,
+  type RecordTableName,
+  type StoredRecord,
+} from '#internal/model/model-tables'
 import type { ProjectRecord } from '#internal/model/project'
 import type { TrackRecord } from '#internal/model/track'
 import type { TempoEventRecord } from '#internal/time/tempo-event'
 import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 import { MutationPlanError, type MutationPlanErrorCode } from './mutation-plan-error'
+import type { MutationPreconditionErrorCode } from './mutation-precondition-error'
 import { PROJECT_MUTATION_TYPE, type ProjectMutationType } from './mutation-type'
-
-interface IdentifiedRecord {
-  readonly id: unknown
-}
 
 interface EntityMutationTypeSet {
   readonly INSERT: ProjectMutationType
@@ -22,27 +27,60 @@ interface EntityMutationTypeSet {
   readonly REPLACE: ProjectMutationType
 }
 
+interface PartitionMutationTypeSet {
+  readonly INSERT: ProjectMutationType
+  readonly REMOVE: ProjectMutationType
+}
+
 /**
  * The mutation vocabulary describes normalized storage changes, not user gestures.
  * Records remain immutable values while mutation wrappers carry the before/after
  * references needed for stale-state checks and deterministic inversion.
  */
-export type EntityMutation<
+export type RecordMutation<
   TypeSet extends EntityMutationTypeSet,
-  RecordType extends IdentifiedRecord,
+  RecordType extends StoredRecord,
+> =
+  | { readonly type: TypeSet['INSERT']; readonly after: RecordType }
+  | { readonly type: TypeSet['REMOVE']; readonly before: RecordType }
+  | { readonly type: TypeSet['REPLACE']; readonly before: RecordType; readonly after: RecordType }
+
+/** Inserts, removes or replaces one record inside a MIDI Source partition. */
+export type PartitionRecordMutation<
+  TypeSet extends EntityMutationTypeSet,
+  RecordType extends StoredRecord,
 > =
   | {
       readonly type: TypeSet['INSERT']
+      readonly sourceId: MidiSourceId
       readonly after: RecordType
     }
   | {
       readonly type: TypeSet['REMOVE']
+      readonly sourceId: MidiSourceId
       readonly before: RecordType
     }
   | {
       readonly type: TypeSet['REPLACE']
+      readonly sourceId: MidiSourceId
       readonly before: RecordType
       readonly after: RecordType
+    }
+
+/** Inserts or removes a whole MIDI Source partition together with its records. */
+export type PartitionMutation<
+  TypeSet extends PartitionMutationTypeSet,
+  RecordType extends StoredRecord,
+> =
+  | {
+      readonly type: TypeSet['INSERT']
+      readonly sourceId: MidiSourceId
+      readonly after: readonly RecordType[]
+    }
+  | {
+      readonly type: TypeSet['REMOVE']
+      readonly sourceId: MidiSourceId
+      readonly before: readonly RecordType[]
     }
 
 export interface ProjectReplaceMutation {
@@ -57,29 +95,18 @@ export interface MasterReplaceMutation {
   readonly after: MasterChannelRecord
 }
 
-export type TrackMutation = EntityMutation<typeof PROJECT_MUTATION_TYPE.TRACK, TrackRecord>
-export type ClipMutation = EntityMutation<typeof PROJECT_MUTATION_TYPE.CLIP, ClipRecord>
-export type MidiSourceMutation = EntityMutation<
-  typeof PROJECT_MUTATION_TYPE.MIDI_SOURCE,
-  MidiSourceRecord
->
-export type TempoEventMutation = EntityMutation<
+export interface TrackOrderMutation {
+  readonly type:
+    | typeof PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT
+    | typeof PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE
+  readonly index: number
+  readonly trackId: TrackId
+}
+
+export type TempoEventMutation = RecordMutation<
   typeof PROJECT_MUTATION_TYPE.TEMPO_EVENT,
   TempoEventRecord
 >
-export type TimeSignatureEventMutation = EntityMutation<
-  typeof PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT,
-  TimeSignatureEventRecord
->
-export interface DeviceInsertMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.DEVICE.INSERT
-  readonly after: DeviceDescriptor
-}
-
-export interface DeviceRemoveMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.DEVICE.REMOVE
-  readonly before: DeviceDescriptor
-}
 
 export interface DeviceReplaceMutation {
   readonly type: typeof PROJECT_MUTATION_TYPE.DEVICE.REPLACE
@@ -89,111 +116,163 @@ export interface DeviceReplaceMutation {
   readonly trackId?: TrackId
 }
 
-export type DeviceMutation = DeviceInsertMutation | DeviceRemoveMutation | DeviceReplaceMutation
-
-export interface TrackOrderInsertMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT
-  readonly index: number
-  readonly trackId: TrackId
-}
-
-export interface TrackOrderRemoveMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE
-  readonly index: number
-  readonly trackId: TrackId
-}
-
-export type TrackOrderMutation = TrackOrderInsertMutation | TrackOrderRemoveMutation
-
-export interface NotePartitionInsertMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT
-  readonly sourceId: MidiSourceId
-  readonly after: readonly MidiNoteRecord[]
-}
-
-export interface NotePartitionRemoveMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE
-  readonly sourceId: MidiSourceId
-  readonly before: readonly MidiNoteRecord[]
-}
-
-export type NotePartitionMutation = NotePartitionInsertMutation | NotePartitionRemoveMutation
-
-export interface NoteInsertMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.NOTE.INSERT
-  readonly sourceId: MidiSourceId
-  readonly after: MidiNoteRecord
-}
-
-export interface NoteRemoveMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.NOTE.REMOVE
-  readonly sourceId: MidiSourceId
-  readonly before: MidiNoteRecord
-}
-
-export interface NoteReplaceMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.NOTE.REPLACE
-  readonly sourceId: MidiSourceId
-  readonly before: MidiNoteRecord
-  readonly after: MidiNoteRecord
-}
-
-export type NoteMutation = NoteInsertMutation | NoteRemoveMutation | NoteReplaceMutation
-
-export interface SustainPedalEventPartitionInsertMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT
-  readonly sourceId: MidiSourceId
-  readonly after: readonly MidiSustainPedalEventRecord[]
-}
-
-export interface SustainPedalEventPartitionRemoveMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE
-  readonly sourceId: MidiSourceId
-  readonly before: readonly MidiSustainPedalEventRecord[]
-}
-
-export type SustainPedalEventPartitionMutation =
-  | SustainPedalEventPartitionInsertMutation
-  | SustainPedalEventPartitionRemoveMutation
-
-export interface SustainPedalEventInsertMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT
-  readonly sourceId: MidiSourceId
-  readonly after: MidiSustainPedalEventRecord
-}
-
-export interface SustainPedalEventRemoveMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE
-  readonly sourceId: MidiSourceId
-  readonly before: MidiSustainPedalEventRecord
-}
-
-export interface SustainPedalEventReplaceMutation {
-  readonly type: typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE
-  readonly sourceId: MidiSourceId
-  readonly before: MidiSustainPedalEventRecord
-  readonly after: MidiSustainPedalEventRecord
-}
-
-export type SustainPedalEventMutation =
-  | SustainPedalEventInsertMutation
-  | SustainPedalEventRemoveMutation
-  | SustainPedalEventReplaceMutation
+type DeviceMutation =
+  | Exclude<
+      RecordMutation<typeof PROJECT_MUTATION_TYPE.DEVICE, DeviceDescriptor>,
+      { readonly type: typeof PROJECT_MUTATION_TYPE.DEVICE.REPLACE }
+    >
+  | DeviceReplaceMutation
 
 export type ProjectMutation =
   | ProjectReplaceMutation
   | MasterReplaceMutation
-  | TrackMutation
-  | ClipMutation
-  | MidiSourceMutation
-  | TempoEventMutation
-  | TimeSignatureEventMutation
-  | DeviceMutation
   | TrackOrderMutation
-  | NotePartitionMutation
-  | NoteMutation
-  | SustainPedalEventPartitionMutation
-  | SustainPedalEventMutation
+  | RecordMutation<typeof PROJECT_MUTATION_TYPE.TRACK, TrackRecord>
+  | RecordMutation<typeof PROJECT_MUTATION_TYPE.CLIP, ClipRecord>
+  | RecordMutation<typeof PROJECT_MUTATION_TYPE.MIDI_SOURCE, MidiSourceRecord>
+  | TempoEventMutation
+  | RecordMutation<typeof PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT, TimeSignatureEventRecord>
+  | DeviceMutation
+  | PartitionMutation<typeof PROJECT_MUTATION_TYPE.NOTE_PARTITION, MidiNoteRecord>
+  | PartitionRecordMutation<typeof PROJECT_MUTATION_TYPE.NOTE, MidiNoteRecord>
+  | PartitionMutation<
+      typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION,
+      MidiSustainPedalEventRecord
+    >
+  | PartitionRecordMutation<
+      typeof PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT,
+      MidiSustainPedalEventRecord
+    >
+
+/** The mutation types of each record table. */
+const RECORD_MUTATION_TYPES: { readonly [Name in RecordTableName]: EntityMutationTypeSet } = {
+  tracks: PROJECT_MUTATION_TYPE.TRACK,
+  clips: PROJECT_MUTATION_TYPE.CLIP,
+  midiSources: PROJECT_MUTATION_TYPE.MIDI_SOURCE,
+  tempoEvents: PROJECT_MUTATION_TYPE.TEMPO_EVENT,
+  timeSignatureEvents: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT,
+  devices: PROJECT_MUTATION_TYPE.DEVICE,
+}
+
+export interface PartitionedMutationTypes {
+  readonly partition: PartitionMutationTypeSet
+  readonly record: EntityMutationTypeSet
+  readonly duplicateIdCode: MutationPlanErrorCode
+  readonly contentMismatchCode: MutationPreconditionErrorCode
+}
+
+/** The mutation types and error codes of each partitioned table. */
+export const PARTITIONED_MUTATION_TYPES: {
+  readonly [Name in PartitionedTableName]: PartitionedMutationTypes
+} = {
+  midiNotesBySource: {
+    partition: PROJECT_MUTATION_TYPE.NOTE_PARTITION,
+    record: PROJECT_MUTATION_TYPE.NOTE,
+    duplicateIdCode: 'duplicate-note-id-in-partition',
+    contentMismatchCode: 'note-partition-content-mismatch',
+  },
+  midiSustainPedalEventsBySource: {
+    partition: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION,
+    record: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT,
+    duplicateIdCode: 'duplicate-sustain-pedal-event-id-in-partition',
+    contentMismatchCode: 'sustain-pedal-event-partition-content-mismatch',
+  },
+}
+
+type RecordOperation = 'insert' | 'remove' | 'replace'
+
+/** What one mutation type does, independent of the entity it names. */
+type MutationOperation =
+  | { readonly kind: 'project' | 'master' }
+  | { readonly kind: 'track-order'; readonly op: 'insert' | 'remove' }
+  | { readonly kind: 'record'; readonly table: RecordTableName; readonly op: RecordOperation }
+  | {
+      readonly kind: 'partition'
+      readonly table: PartitionedTableName
+      readonly op: 'insert' | 'remove'
+    }
+  | {
+      readonly kind: 'partition-record'
+      readonly table: PartitionedTableName
+      readonly op: RecordOperation
+    }
+
+type RecordLikeOperation = Extract<
+  MutationOperation,
+  { readonly kind: 'record' | 'partition-record' }
+>
+
+function createMutationOperations(): ReadonlyMap<ProjectMutationType, MutationOperation> {
+  const operations = new Map<ProjectMutationType, MutationOperation>([
+    [PROJECT_MUTATION_TYPE.PROJECT.REPLACE, { kind: 'project' }],
+    [PROJECT_MUTATION_TYPE.MASTER.REPLACE, { kind: 'master' }],
+    [PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT, { kind: 'track-order', op: 'insert' }],
+    [PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE, { kind: 'track-order', op: 'remove' }],
+  ])
+  for (const table of RECORD_TABLE_NAMES) {
+    const types = RECORD_MUTATION_TYPES[table]
+    operations.set(types.INSERT, { kind: 'record', table, op: 'insert' })
+    operations.set(types.REMOVE, { kind: 'record', table, op: 'remove' })
+    operations.set(types.REPLACE, { kind: 'record', table, op: 'replace' })
+  }
+  for (const table of PARTITIONED_TABLE_NAMES) {
+    const { partition, record } = PARTITIONED_MUTATION_TYPES[table]
+    operations.set(partition.INSERT, { kind: 'partition', table, op: 'insert' })
+    operations.set(partition.REMOVE, { kind: 'partition', table, op: 'remove' })
+    operations.set(record.INSERT, { kind: 'partition-record', table, op: 'insert' })
+    operations.set(record.REMOVE, { kind: 'partition-record', table, op: 'remove' })
+    operations.set(record.REPLACE, { kind: 'partition-record', table, op: 'replace' })
+  }
+  return operations
+}
+
+const MUTATION_OPERATIONS = createMutationOperations()
+
+/** The fields any mutation may carry; its operation decides which ones are present. */
+interface MutationFields {
+  readonly type: ProjectMutationType
+  readonly before?: unknown
+  readonly after?: unknown
+  readonly sourceId?: MidiSourceId
+  readonly index?: number
+  readonly trackId?: TrackId
+}
+
+/** What a normalized mutation does to which table, in the form the store writes it. */
+export type MutationStep =
+  | { readonly kind: 'project'; readonly before: ProjectRecord; readonly after: ProjectRecord }
+  | {
+      readonly kind: 'master'
+      readonly before: MasterChannelRecord
+      readonly after: MasterChannelRecord
+    }
+  | {
+      readonly kind: 'track-order'
+      readonly op: 'insert' | 'remove'
+      readonly index: number
+      readonly trackId: TrackId
+    }
+  | {
+      /** No `before` inserts and no `after` removes. */
+      readonly kind: 'record'
+      readonly table: RecordTableName
+      readonly before: StoredRecord | undefined
+      readonly after: StoredRecord | undefined
+    }
+  | {
+      readonly kind: 'partition'
+      readonly table: PartitionedTableName
+      readonly op: 'insert' | 'remove'
+      readonly sourceId: MidiSourceId
+      readonly records: readonly StoredRecord[]
+    }
+  | {
+      readonly kind: 'partition-record'
+      readonly table: PartitionedTableName
+      readonly sourceId: MidiSourceId
+      readonly before: StoredRecord | undefined
+      readonly after: StoredRecord | undefined
+    }
 
 function mutationPosition(index: number | null): string {
   return index === null ? 'Mutation' : `Mutation at index ${index}`
@@ -203,11 +282,18 @@ function rejectMutation(code: MutationPlanErrorCode, detail: string, index: numb
   throw new MutationPlanError(code, `${mutationPosition(index)} ${detail}`, index)
 }
 
-function assertReplacement(
-  before: IdentifiedRecord,
-  after: IdentifiedRecord,
-  index: number | null,
-): void {
+function operationOf(mutation: ProjectMutation, index: number | null): MutationOperation {
+  const type = (mutation as { readonly type?: unknown }).type
+  const operation = MUTATION_OPERATIONS.get(type as ProjectMutationType)
+
+  if (operation === undefined) {
+    return rejectMutation('unknown-mutation-type', `has an unknown type: ${String(type)}`, index)
+  }
+
+  return operation
+}
+
+function assertReplacement(before: StoredRecord, after: StoredRecord, index: number | null): void {
   if (before === after) {
     rejectMutation('no-op-replace', 'must replace a record with a different reference', index)
   }
@@ -217,11 +303,7 @@ function assertReplacement(
   }
 }
 
-function assertMasterReplacement(
-  before: MasterChannelRecord,
-  after: MasterChannelRecord,
-  index: number | null,
-): void {
+function assertMasterReplacement(before: unknown, after: unknown, index: number | null): void {
   if (before === after) {
     rejectMutation('no-op-replace', 'must replace a record with a different reference', index)
   }
@@ -237,464 +319,201 @@ function assertTrackOrderIndex(index: number, mutationIndex: number | null): voi
   }
 }
 
-function assertUniqueNoteIds(notes: readonly MidiNoteRecord[], mutationIndex: number | null): void {
-  const noteIds = new Set<MidiNoteRecord['id']>()
-
-  for (const note of notes) {
-    if (noteIds.has(note.id)) {
-      rejectMutation(
-        'duplicate-note-id-in-partition',
-        `contains duplicate MIDI Note ID ${note.id}`,
-        mutationIndex,
-      )
-    }
-
-    noteIds.add(note.id)
-  }
-}
-
-function assertUniqueSustainPedalEventIds(
-  events: readonly MidiSustainPedalEventRecord[],
+function assertUniquePartitionIds(
+  records: readonly StoredRecord[],
+  table: PartitionedTableName,
   mutationIndex: number | null,
 ): void {
-  const eventIds = new Set<MidiSustainPedalEventRecord['id']>()
+  const ids = new Set<string>()
 
-  for (const event of events) {
-    if (eventIds.has(event.id)) {
+  for (const record of records) {
+    if (ids.has(record.id)) {
       rejectMutation(
-        'duplicate-sustain-pedal-event-id-in-partition',
-        `contains duplicate MIDI Sustain Pedal Event ID ${event.id}`,
+        PARTITIONED_MUTATION_TYPES[table].duplicateIdCode,
+        `contains duplicate ${PARTITIONED_TABLES[table].entity} ID ${record.id}`,
         mutationIndex,
       )
     }
 
-    eventIds.add(event.id)
+    ids.add(record.id)
   }
 }
 
-function assertNeverMutation(mutation: never, index: number | null): never {
-  const type = (mutation as { readonly type?: unknown }).type
-
-  rejectMutation('unknown-mutation-type', `has an unknown type: ${String(type)}`, index)
+/** The operation fixes which fields a type carries, so a rebuilt entry is that mutation. */
+function freezeMutation(fields: MutationFields): ProjectMutation {
+  return Object.freeze(fields) as ProjectMutation
 }
 
-function validateProjectMutation(mutation: ProjectMutation, index: number | null): void {
-  switch (mutation.type) {
-    case PROJECT_MUTATION_TYPE.PROJECT.REPLACE:
-    case PROJECT_MUTATION_TYPE.TRACK.REPLACE:
-    case PROJECT_MUTATION_TYPE.CLIP.REPLACE:
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE:
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
-    case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
-    case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
-      assertReplacement(mutation.before, mutation.after, index)
-      return
+/** Rebuilds a record mutation; a Device replacement keeps the Track it names as its owner. */
+function recordMutation(
+  type: ProjectMutationType,
+  op: RecordOperation,
+  operation: RecordLikeOperation,
+  fields: MutationFields,
+  before: unknown,
+  after: unknown,
+): ProjectMutation {
+  const location = operation.kind === 'partition-record' ? { sourceId: fields.sourceId } : {}
 
-    case PROJECT_MUTATION_TYPE.MASTER.REPLACE:
-      assertMasterReplacement(mutation.before, mutation.after, index)
-      return
-
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE:
-      assertTrackOrderIndex(mutation.index, index)
-      return
-
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-      assertUniqueNoteIds(mutation.after, index)
-      return
-
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
-      assertUniqueNoteIds(mutation.before, index)
-      return
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-      assertUniqueSustainPedalEventIds(mutation.after, index)
-      return
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
-      assertUniqueSustainPedalEventIds(mutation.before, index)
-      return
-
-    case PROJECT_MUTATION_TYPE.TRACK.INSERT:
-    case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
-    case PROJECT_MUTATION_TYPE.CLIP.INSERT:
-    case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE:
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT:
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
-    case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
-    case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
-    case PROJECT_MUTATION_TYPE.NOTE.INSERT:
-    case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
-      return
-
-    default:
-      return assertNeverMutation(mutation, index)
+  switch (op) {
+    case 'insert':
+      return freezeMutation({ type, ...location, after })
+    case 'remove':
+      return freezeMutation({ type, ...location, before })
+    case 'replace': {
+      const owner =
+        operation.kind === 'record' && operation.table === 'devices' && fields.trackId !== undefined
+          ? { trackId: fields.trackId }
+          : {}
+      return freezeMutation({ type, ...location, before, after, ...owner })
+    }
   }
 }
 
 function copyProjectMutation(mutation: ProjectMutation, index: number | null): ProjectMutation {
-  validateProjectMutation(mutation, index)
+  const operation = operationOf(mutation, index)
+  const fields: MutationFields = mutation
+  const { type } = fields
 
-  switch (mutation.type) {
-    case PROJECT_MUTATION_TYPE.PROJECT.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-      })
+  switch (operation.kind) {
+    case 'project':
+      assertReplacement(fields.before as StoredRecord, fields.after as StoredRecord, index)
+      return freezeMutation({ type, before: fields.before, after: fields.after })
 
-    case PROJECT_MUTATION_TYPE.MASTER.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-      })
+    case 'master':
+      assertMasterReplacement(fields.before, fields.after, index)
+      return freezeMutation({ type, before: fields.before, after: fields.after })
 
-    case PROJECT_MUTATION_TYPE.TRACK.INSERT:
-      return Object.freeze({ type: mutation.type, after: mutation.after })
-    case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
-      return Object.freeze({ type: mutation.type, before: mutation.before })
-    case PROJECT_MUTATION_TYPE.TRACK.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-      })
+    case 'track-order':
+      assertTrackOrderIndex(fields.index as number, index)
+      return freezeMutation({ type, index: fields.index, trackId: fields.trackId })
 
-    case PROJECT_MUTATION_TYPE.CLIP.INSERT:
-      return Object.freeze({ type: mutation.type, after: mutation.after })
-    case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
-      return Object.freeze({ type: mutation.type, before: mutation.before })
-    case PROJECT_MUTATION_TYPE.CLIP.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-      })
+    case 'partition': {
+      const records = (
+        operation.op === 'insert' ? fields.after : fields.before
+      ) as readonly StoredRecord[]
+      assertUniquePartitionIds(records, operation.table, index)
+      const copy = Object.freeze([...records])
+      return freezeMutation(
+        operation.op === 'insert'
+          ? { type, sourceId: fields.sourceId, after: copy }
+          : { type, sourceId: fields.sourceId, before: copy },
+      )
+    }
 
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
-      return Object.freeze({ type: mutation.type, after: mutation.after })
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE:
-      return Object.freeze({ type: mutation.type, before: mutation.before })
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
-      return Object.freeze({ type: mutation.type, after: mutation.after })
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
-      return Object.freeze({ type: mutation.type, before: mutation.before })
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT:
-      return Object.freeze({ type: mutation.type, after: mutation.after })
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
-      return Object.freeze({ type: mutation.type, before: mutation.before })
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
-      return Object.freeze({ type: mutation.type, after: mutation.after })
-    case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
-      return Object.freeze({ type: mutation.type, before: mutation.before })
-    case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        before: mutation.before,
-        after: mutation.after,
-        ...(mutation.trackId === undefined ? {} : { trackId: mutation.trackId }),
-      })
-
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE:
-      return Object.freeze({
-        type: mutation.type,
-        index: mutation.index,
-        trackId: mutation.trackId,
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        after: Object.freeze([...mutation.after]),
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        before: Object.freeze([...mutation.before]),
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE.INSERT:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        after: mutation.after,
-      })
-    case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        before: mutation.before,
-      })
-    case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        before: mutation.before,
-        after: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        after: Object.freeze([...mutation.after]),
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        before: Object.freeze([...mutation.before]),
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        after: mutation.after,
-      })
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        before: mutation.before,
-      })
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
-      return Object.freeze({
-        type: mutation.type,
-        sourceId: mutation.sourceId,
-        before: mutation.before,
-        after: mutation.after,
-      })
-
-    default:
-      return assertNeverMutation(mutation, index)
+    case 'record':
+    case 'partition-record':
+      if (operation.op === 'replace') {
+        assertReplacement(fields.before as StoredRecord, fields.after as StoredRecord, index)
+      }
+      return recordMutation(type, operation.op, operation, fields, fields.before, fields.after)
   }
 }
 
 function invertValidatedProjectMutation(mutation: ProjectMutation): ProjectMutation {
-  switch (mutation.type) {
-    case PROJECT_MUTATION_TYPE.PROJECT.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.PROJECT.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
+  const operation = operationOf(mutation, null)
+  const fields: MutationFields = mutation
+
+  switch (operation.kind) {
+    case 'project':
+    case 'master':
+      return freezeMutation({ type: fields.type, before: fields.after, after: fields.before })
+
+    case 'track-order':
+      return freezeMutation({
+        type:
+          operation.op === 'insert'
+            ? PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE
+            : PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
+        index: fields.index,
+        trackId: fields.trackId,
       })
 
-    case PROJECT_MUTATION_TYPE.MASTER.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.MASTER.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
-      })
+    case 'partition': {
+      const types = PARTITIONED_MUTATION_TYPES[operation.table].partition
+      return freezeMutation(
+        operation.op === 'insert'
+          ? { type: types.REMOVE, sourceId: fields.sourceId, before: fields.after }
+          : { type: types.INSERT, sourceId: fields.sourceId, after: fields.before },
+      )
+    }
 
-    case PROJECT_MUTATION_TYPE.TRACK.INSERT:
-      return Object.freeze({ type: PROJECT_MUTATION_TYPE.TRACK.REMOVE, before: mutation.after })
-    case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
-      return Object.freeze({ type: PROJECT_MUTATION_TYPE.TRACK.INSERT, after: mutation.before })
-    case PROJECT_MUTATION_TYPE.TRACK.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TRACK.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
-      })
+    case 'record':
+    case 'partition-record': {
+      const types =
+        operation.kind === 'record'
+          ? RECORD_MUTATION_TYPES[operation.table]
+          : PARTITIONED_MUTATION_TYPES[operation.table].record
 
-    case PROJECT_MUTATION_TYPE.CLIP.INSERT:
-      return Object.freeze({ type: PROJECT_MUTATION_TYPE.CLIP.REMOVE, before: mutation.after })
-    case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
-      return Object.freeze({ type: PROJECT_MUTATION_TYPE.CLIP.INSERT, after: mutation.before })
-    case PROJECT_MUTATION_TYPE.CLIP.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.CLIP.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
-      })
+      switch (operation.op) {
+        case 'insert':
+          return recordMutation(types.REMOVE, 'remove', operation, fields, fields.after, undefined)
+        case 'remove':
+          return recordMutation(types.INSERT, 'insert', operation, fields, undefined, fields.before)
+        case 'replace':
+          return recordMutation(
+            fields.type,
+            'replace',
+            operation,
+            fields,
+            fields.after,
+            fields.before,
+          )
+      }
+    }
+  }
+}
 
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE,
-        before: mutation.after,
-      })
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT,
-        after: mutation.before,
-      })
-    case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
-      })
+/** Reads what a mutation does to which table, independent of the entity it names. */
+export function describeMutation(mutation: ProjectMutation, index: number): MutationStep {
+  const operation = operationOf(mutation, index)
+  const fields: MutationFields = mutation
 
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE,
-        before: mutation.after,
-      })
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT,
-        after: mutation.before,
-      })
-    case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
-      })
-
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE,
-        before: mutation.after,
-      })
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT,
-        after: mutation.before,
-      })
-    case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
-      })
-
-    case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
-      return Object.freeze({ type: PROJECT_MUTATION_TYPE.DEVICE.REMOVE, before: mutation.after })
-    case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
-      return Object.freeze({ type: PROJECT_MUTATION_TYPE.DEVICE.INSERT, after: mutation.before })
-    case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.DEVICE.REPLACE,
-        before: mutation.after,
-        after: mutation.before,
-        ...(mutation.trackId === undefined ? {} : { trackId: mutation.trackId }),
-      })
-
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE,
-        index: mutation.index,
-        trackId: mutation.trackId,
-      })
-
-    case PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT,
-        index: mutation.index,
-        trackId: mutation.trackId,
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE,
-        sourceId: mutation.sourceId,
-        before: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT,
-        sourceId: mutation.sourceId,
-        after: mutation.before,
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.NOTE.REMOVE,
-        sourceId: mutation.sourceId,
-        before: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.NOTE.INSERT,
-        sourceId: mutation.sourceId,
-        after: mutation.before,
-      })
-
-    case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.NOTE.REPLACE,
-        sourceId: mutation.sourceId,
-        before: mutation.after,
-        after: mutation.before,
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE,
-        sourceId: mutation.sourceId,
-        before: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT,
-        sourceId: mutation.sourceId,
-        after: mutation.before,
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE,
-        sourceId: mutation.sourceId,
-        before: mutation.after,
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT,
-        sourceId: mutation.sourceId,
-        after: mutation.before,
-      })
-
-    case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
-      return Object.freeze({
-        type: PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE,
-        sourceId: mutation.sourceId,
-        before: mutation.after,
-        after: mutation.before,
-      })
-
-    default:
-      return assertNeverMutation(mutation, null)
+  switch (operation.kind) {
+    case 'project':
+      return {
+        kind: 'project',
+        before: fields.before as ProjectRecord,
+        after: fields.after as ProjectRecord,
+      }
+    case 'master':
+      return {
+        kind: 'master',
+        before: fields.before as MasterChannelRecord,
+        after: fields.after as MasterChannelRecord,
+      }
+    case 'track-order':
+      return {
+        kind: 'track-order',
+        op: operation.op,
+        index: fields.index as number,
+        trackId: fields.trackId as TrackId,
+      }
+    case 'record':
+      return {
+        kind: 'record',
+        table: operation.table,
+        before: fields.before as StoredRecord | undefined,
+        after: fields.after as StoredRecord | undefined,
+      }
+    case 'partition':
+      return {
+        kind: 'partition',
+        table: operation.table,
+        op: operation.op,
+        sourceId: fields.sourceId as MidiSourceId,
+        records: (operation.op === 'insert'
+          ? fields.after
+          : fields.before) as readonly StoredRecord[],
+      }
+    case 'partition-record':
+      return {
+        kind: 'partition-record',
+        table: operation.table,
+        sourceId: fields.sourceId as MidiSourceId,
+        before: fields.before as StoredRecord | undefined,
+        after: fields.after as StoredRecord | undefined,
+      }
   }
 }
 

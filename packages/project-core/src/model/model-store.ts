@@ -19,14 +19,29 @@ import {
   ModelStoreWriteAccessError,
   registerModelStoreWriteAccess,
 } from './model-store-write-access'
+import {
+  PARTITIONED_TABLES,
+  PARTITIONED_TABLE_NAMES,
+  RECORD_TABLES,
+  RECORD_TABLE_NAMES,
+  mapTables,
+  type PartitionedTableName,
+  type PartitionedTableSeeds,
+  type PartitionedTableView,
+  type PartitionedTableViews,
+  type RecordTableName,
+  type RecordTableSeeds,
+  type RecordTableView,
+  type RecordTableViews,
+  type StoredRecord,
+} from './model-tables'
 import type { ProjectRecord } from './project'
 import type { TrackRecord } from './track'
 import type { TempoEventRecord } from '#internal/time/tempo-event'
 import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 
-interface IdentifiedRecord<Id extends string> {
-  readonly id: Id
-}
+type RecordContainer = Map<string, StoredRecord>
+type PartitionedContainer = Map<MidiSourceId, RecordContainer>
 
 function rejectStoreWrite(detail: string): never {
   throw new ModelStoreWriteAccessError('write-precondition-failed', detail)
@@ -36,11 +51,11 @@ function rejectStoreWrite(detail: string): never {
  * Performs an entity-table compare-and-swap without exposing the table itself.
  * All checks finish before the single set/delete that changes authoritative state.
  */
-function writeEntityRecord<Id extends string, RecordType extends IdentifiedRecord<Id>>(
-  table: Map<Id, RecordType>,
+function writeEntityRecord(
+  table: RecordContainer,
   entityName: string,
-  expected: RecordType | undefined,
-  next: RecordType | undefined,
+  expected: StoredRecord | undefined,
+  next: StoredRecord | undefined,
 ): void {
   if (expected === undefined && next === undefined) {
     rejectStoreWrite(`${entityName} write requires an expected or next record`)
@@ -73,10 +88,7 @@ function writeEntityRecord<Id extends string, RecordType extends IdentifiedRecor
   }
 }
 
-function partitionMatches<Id, RecordType extends { readonly id: Id }>(
-  table: ReadonlyMap<Id, RecordType>,
-  expected: readonly RecordType[],
-): boolean {
+function partitionMatches(table: RecordContainer, expected: readonly StoredRecord[]): boolean {
   if (table.size !== expected.length) return false
   const expectedById = new Map(expected.map((record) => [record.id, record] as const))
   if (expectedById.size !== expected.length) return false
@@ -87,23 +99,19 @@ function partitionMatches<Id, RecordType extends { readonly id: Id }>(
 }
 
 /** Writes to records partitioned by MIDI Source, such as Notes or CC64 events. */
-function partitionWriter<Id extends string, RecordType extends { readonly id: Id }>(
-  partitions: Map<MidiSourceId, Map<Id, RecordType>>,
-  entity: string,
-  idLabel: string,
-) {
-  function requirePartition(sourceId: MidiSourceId): Map<Id, RecordType> {
+function partitionWriter(partitions: PartitionedContainer, entity: string, idLabel: string) {
+  function requirePartition(sourceId: MidiSourceId): RecordContainer {
     const table = partitions.get(sourceId)
     if (table === undefined) rejectStoreWrite(`${entity} partition ${sourceId} does not exist`)
     return table
   }
 
   return {
-    insert(sourceId: MidiSourceId, records: readonly RecordType[]): void {
+    insert(sourceId: MidiSourceId, records: readonly StoredRecord[]): void {
       if (partitions.has(sourceId))
         rejectStoreWrite(`${entity} partition ${sourceId} already exists`)
       // Build first so duplicate IDs or allocation failures cannot leave a partial partition.
-      const table = new Map<Id, RecordType>()
+      const table: RecordContainer = new Map()
       for (const record of records) {
         if (table.has(record.id)) {
           rejectStoreWrite(`${entity} partition contains duplicate ${idLabel} ${record.id}`)
@@ -112,13 +120,17 @@ function partitionWriter<Id extends string, RecordType extends { readonly id: Id
       }
       partitions.set(sourceId, table)
     },
-    remove(sourceId: MidiSourceId, expected: readonly RecordType[]): void {
+    remove(sourceId: MidiSourceId, expected: readonly StoredRecord[]): void {
       if (!partitionMatches(requirePartition(sourceId), expected)) {
         rejectStoreWrite(`${entity} partition ${sourceId} no longer matches the expected records`)
       }
       partitions.delete(sourceId)
     },
-    write(sourceId: MidiSourceId, expected: RecordType | undefined, next: RecordType | undefined) {
+    write(
+      sourceId: MidiSourceId,
+      expected: StoredRecord | undefined,
+      next: StoredRecord | undefined,
+    ) {
       writeEntityRecord(
         requirePartition(sourceId),
         `${entity} in partition ${sourceId}`,
@@ -129,121 +141,178 @@ function partitionWriter<Id extends string, RecordType extends { readonly id: Id
   }
 }
 
-export interface ModelStoreSeed {
+/** Read-only facades, so no reader can reach a mutable container. */
+function recordView(table: RecordContainer): RecordTableView<StoredRecord> {
+  return Object.freeze({
+    get: (id: string) => table.get(id),
+    entries: () => table.entries(),
+  })
+}
+
+function partitionedView(partitions: PartitionedContainer): PartitionedTableView<StoredRecord> {
+  return Object.freeze({
+    has: (sourceId: MidiSourceId) => partitions.has(sourceId),
+    partitionIds: () => partitions.keys(),
+    get: (sourceId: MidiSourceId, id: string) => partitions.get(sourceId)?.get(id),
+    *entries(sourceId: MidiSourceId) {
+      const table = partitions.get(sourceId)
+      if (table !== undefined) yield* table.entries()
+    },
+  })
+}
+
+export interface ModelStoreSeed extends RecordTableSeeds, PartitionedTableSeeds {
   readonly project: ProjectRecord
   readonly trackOrder: readonly TrackId[]
-  readonly tracks: ReadonlyMap<TrackId, TrackRecord>
-  readonly clips: ReadonlyMap<ClipId, ClipRecord>
-  readonly midiSources: ReadonlyMap<MidiSourceId, MidiSourceRecord>
-  readonly midiNotesBySource: ReadonlyMap<MidiSourceId, ReadonlyMap<NoteId, MidiNoteRecord>>
-  readonly midiSustainPedalEventsBySource: ReadonlyMap<
-    MidiSourceId,
-    ReadonlyMap<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
-  >
-  readonly tempoEvents: ReadonlyMap<TempoEventId, TempoEventRecord>
-  readonly timeSignatureEvents: ReadonlyMap<TimeSignatureEventId, TimeSignatureEventRecord>
-  readonly devices: ReadonlyMap<DeviceId, DeviceDescriptor>
   readonly master: MasterChannelRecord
 }
 
-export interface ModelStoreReader {
-  readonly modelRevision: ModelRevision
-  readonly project: ProjectRecord
-  readonly master: MasterChannelRecord
+/**
+ * Read access to project facts, shared by the ModelStore and its projections. Subclasses supply
+ * the singletons, the Track order and the tables; the typed accessors are written once here.
+ */
+export abstract class ModelStoreReader {
+  abstract get modelRevision(): ModelRevision
+  abstract get project(): ProjectRecord
+  abstract get master(): MasterChannelRecord
 
-  orderedTrackIds(): IterableIterator<TrackId>
+  abstract orderedTrackIds(): IterableIterator<TrackId>
+  abstract recordTable<Name extends RecordTableName>(name: Name): RecordTableViews[Name]
+  abstract partitionedTable<Name extends PartitionedTableName>(
+    name: Name,
+  ): PartitionedTableViews[Name]
 
-  getTrack(id: TrackId): TrackRecord | undefined
-  trackEntries(): IterableIterator<readonly [TrackId, TrackRecord]>
+  getTrack(id: TrackId): TrackRecord | undefined {
+    return this.recordTable('tracks').get(id)
+  }
 
-  getClip(id: ClipId): ClipRecord | undefined
-  clipEntries(): IterableIterator<readonly [ClipId, ClipRecord]>
+  trackEntries(): IterableIterator<readonly [TrackId, TrackRecord]> {
+    return this.recordTable('tracks').entries()
+  }
 
-  getMidiSource(id: MidiSourceId): MidiSourceRecord | undefined
-  midiSourceEntries(): IterableIterator<readonly [MidiSourceId, MidiSourceRecord]>
+  getClip(id: ClipId): ClipRecord | undefined {
+    return this.recordTable('clips').get(id)
+  }
 
-  hasMidiNotePartition(sourceId: MidiSourceId): boolean
-  midiNotePartitionIds(): IterableIterator<MidiSourceId>
-  getMidiNote(sourceId: MidiSourceId, noteId: NoteId): MidiNoteRecord | undefined
-  midiNoteEntries(sourceId: MidiSourceId): IterableIterator<readonly [NoteId, MidiNoteRecord]>
+  clipEntries(): IterableIterator<readonly [ClipId, ClipRecord]> {
+    return this.recordTable('clips').entries()
+  }
 
-  hasMidiSustainPedalEventPartition(sourceId: MidiSourceId): boolean
-  midiSustainPedalEventPartitionIds(): IterableIterator<MidiSourceId>
+  getMidiSource(id: MidiSourceId): MidiSourceRecord | undefined {
+    return this.recordTable('midiSources').get(id)
+  }
+
+  midiSourceEntries(): IterableIterator<readonly [MidiSourceId, MidiSourceRecord]> {
+    return this.recordTable('midiSources').entries()
+  }
+
+  hasMidiNotePartition(sourceId: MidiSourceId): boolean {
+    return this.partitionedTable('midiNotesBySource').has(sourceId)
+  }
+
+  midiNotePartitionIds(): IterableIterator<MidiSourceId> {
+    return this.partitionedTable('midiNotesBySource').partitionIds()
+  }
+
+  getMidiNote(sourceId: MidiSourceId, noteId: NoteId): MidiNoteRecord | undefined {
+    return this.partitionedTable('midiNotesBySource').get(sourceId, noteId)
+  }
+
+  midiNoteEntries(sourceId: MidiSourceId): IterableIterator<readonly [NoteId, MidiNoteRecord]> {
+    return this.partitionedTable('midiNotesBySource').entries(sourceId)
+  }
+
+  hasMidiSustainPedalEventPartition(sourceId: MidiSourceId): boolean {
+    return this.partitionedTable('midiSustainPedalEventsBySource').has(sourceId)
+  }
+
+  midiSustainPedalEventPartitionIds(): IterableIterator<MidiSourceId> {
+    return this.partitionedTable('midiSustainPedalEventsBySource').partitionIds()
+  }
+
   getMidiSustainPedalEvent(
     sourceId: MidiSourceId,
     eventId: MidiSustainPedalEventId,
-  ): MidiSustainPedalEventRecord | undefined
+  ): MidiSustainPedalEventRecord | undefined {
+    return this.partitionedTable('midiSustainPedalEventsBySource').get(sourceId, eventId)
+  }
+
   midiSustainPedalEventEntries(
     sourceId: MidiSourceId,
-  ): IterableIterator<readonly [MidiSustainPedalEventId, MidiSustainPedalEventRecord]>
+  ): IterableIterator<readonly [MidiSustainPedalEventId, MidiSustainPedalEventRecord]> {
+    return this.partitionedTable('midiSustainPedalEventsBySource').entries(sourceId)
+  }
 
-  getTempoEvent(id: TempoEventId): TempoEventRecord | undefined
-  tempoEventEntries(): IterableIterator<readonly [TempoEventId, TempoEventRecord]>
+  getTempoEvent(id: TempoEventId): TempoEventRecord | undefined {
+    return this.recordTable('tempoEvents').get(id)
+  }
 
-  getTimeSignatureEvent(id: TimeSignatureEventId): TimeSignatureEventRecord | undefined
+  tempoEventEntries(): IterableIterator<readonly [TempoEventId, TempoEventRecord]> {
+    return this.recordTable('tempoEvents').entries()
+  }
+
+  getTimeSignatureEvent(id: TimeSignatureEventId): TimeSignatureEventRecord | undefined {
+    return this.recordTable('timeSignatureEvents').get(id)
+  }
+
   timeSignatureEventEntries(): IterableIterator<
     readonly [TimeSignatureEventId, TimeSignatureEventRecord]
-  >
+  > {
+    return this.recordTable('timeSignatureEvents').entries()
+  }
 
-  getDevice(id: DeviceId): DeviceDescriptor | undefined
-  deviceEntries(): IterableIterator<readonly [DeviceId, DeviceDescriptor]>
+  getDevice(id: DeviceId): DeviceDescriptor | undefined {
+    return this.recordTable('devices').get(id)
+  }
+
+  deviceEntries(): IterableIterator<readonly [DeviceId, DeviceDescriptor]> {
+    return this.recordTable('devices').entries()
+  }
 }
 
-export class ModelStore implements ModelStoreReader {
+export class ModelStore extends ModelStoreReader {
   #modelRevision: ModelRevision
   #project: ProjectRecord
-  #trackOrder: TrackId[]
-
-  #tracks: Map<TrackId, TrackRecord>
-  #clips: Map<ClipId, ClipRecord>
-
-  #midiSources: Map<MidiSourceId, MidiSourceRecord>
-  #midiNotesBySource: Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>
-  #midiSustainPedalEventsBySource: Map<
-    MidiSourceId,
-    Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
-  >
-
-  #tempoEvents: Map<TempoEventId, TempoEventRecord>
-  #timeSignatureEvents: Map<TimeSignatureEventId, TimeSignatureEventRecord>
-
-  #devices: Map<DeviceId, DeviceDescriptor>
   #master: MasterChannelRecord
+  readonly #trackOrder: TrackId[]
+  readonly #recordViews: RecordTableViews
+  readonly #partitionedViews: PartitionedTableViews
 
   constructor(seed: ModelStoreSeed) {
+    super()
     this.#modelRevision = INITIAL_MODEL_REVISION
     this.#project = seed.project
     this.#trackOrder = [...seed.trackOrder]
-
-    this.#tracks = new Map(seed.tracks)
-    this.#clips = new Map(seed.clips)
-
-    this.#midiSources = new Map(seed.midiSources)
-    this.#midiNotesBySource = new Map()
-
-    for (const [sourceId, noteTable] of seed.midiNotesBySource) {
-      this.#midiNotesBySource.set(sourceId, new Map(noteTable))
-    }
-
-    this.#midiSustainPedalEventsBySource = new Map()
-    for (const [sourceId, eventTable] of seed.midiSustainPedalEventsBySource) {
-      this.#midiSustainPedalEventsBySource.set(sourceId, new Map(eventTable))
-    }
-
-    this.#tempoEvents = new Map(seed.tempoEvents)
-    this.#timeSignatureEvents = new Map(seed.timeSignatureEvents)
-
-    this.#devices = new Map(seed.devices)
     this.#master = seed.master
 
-    const notes = partitionWriter(this.#midiNotesBySource, 'MIDI Note', 'Note ID')
-    const sustainPedalEvents = partitionWriter(
-      this.#midiSustainPedalEventsBySource,
-      'MIDI Sustain Pedal Event',
-      'Event ID',
+    const records = mapTables(
+      RECORD_TABLE_NAMES,
+      (name) => new Map<string, StoredRecord>(seed[name]),
+    )
+    const partitions = mapTables(PARTITIONED_TABLE_NAMES, (name) => {
+      const table: PartitionedContainer = new Map()
+      for (const [sourceId, partition] of seed[name]) {
+        table.set(sourceId, new Map<string, StoredRecord>(partition))
+      }
+      return table
+    })
+    const partitionWriters = mapTables(PARTITIONED_TABLE_NAMES, (name) =>
+      partitionWriter(
+        partitions[name],
+        PARTITIONED_TABLES[name].entity,
+        PARTITIONED_TABLES[name].idLabel,
+      ),
     )
 
-    // The closures retain #private access while the registry hands them to one applier only.
+    // Each container is seeded from, and only ever written with, records of its own table.
+    this.#recordViews = mapTables(RECORD_TABLE_NAMES, (name) =>
+      recordView(records[name]),
+    ) as RecordTableViews
+    this.#partitionedViews = mapTables(PARTITIONED_TABLE_NAMES, (name) =>
+      partitionedView(partitions[name]),
+    ) as PartitionedTableViews
+
+    // The closures keep the containers private while the registry hands them to one applier.
     registerModelStoreWriteAccess(this, {
       writeProject: (expected, next) => {
         if (this.#project !== expected) {
@@ -259,23 +328,8 @@ export class ModelStore implements ModelStoreReader {
 
         this.#master = next
       },
-      writeTrack: (expected, next) => {
-        writeEntityRecord(this.#tracks, 'Track', expected, next)
-      },
-      writeClip: (expected, next) => {
-        writeEntityRecord(this.#clips, 'Clip', expected, next)
-      },
-      writeMidiSource: (expected, next) => {
-        writeEntityRecord(this.#midiSources, 'MIDI Source', expected, next)
-      },
-      writeTempoEvent: (expected, next) => {
-        writeEntityRecord(this.#tempoEvents, 'Tempo Event', expected, next)
-      },
-      writeTimeSignatureEvent: (expected, next) => {
-        writeEntityRecord(this.#timeSignatureEvents, 'Time Signature Event', expected, next)
-      },
-      writeDevice: (expected, next) => {
-        writeEntityRecord(this.#devices, 'Device', expected, next)
+      writeRecord: (table, expected, next) => {
+        writeEntityRecord(records[table], RECORD_TABLES[table].entity, expected, next)
       },
       insertTrackOrder: (index, trackId) => {
         if (!Number.isSafeInteger(index) || index < 0 || index > this.#trackOrder.length) {
@@ -301,12 +355,15 @@ export class ModelStore implements ModelStoreReader {
 
         this.#trackOrder.splice(index, 1)
       },
-      insertMidiNotePartition: notes.insert,
-      removeMidiNotePartition: notes.remove,
-      writeMidiNote: notes.write,
-      insertMidiSustainPedalEventPartition: sustainPedalEvents.insert,
-      removeMidiSustainPedalEventPartition: sustainPedalEvents.remove,
-      writeMidiSustainPedalEvent: sustainPedalEvents.write,
+      insertPartition: (table, sourceId, partitionRecords) => {
+        partitionWriters[table].insert(sourceId, partitionRecords)
+      },
+      removePartition: (table, sourceId, expected) => {
+        partitionWriters[table].remove(sourceId, expected)
+      },
+      writePartitionRecord: (table, sourceId, expected, next) => {
+        partitionWriters[table].write(sourceId, expected, next)
+      },
       commitModelRevision: (expected, next) => {
         if (this.#modelRevision !== expected) {
           rejectStoreWrite(
@@ -340,96 +397,11 @@ export class ModelStore implements ModelStoreReader {
     return this.#trackOrder.values()
   }
 
-  getTrack(id: TrackId): TrackRecord | undefined {
-    return this.#tracks.get(id)
+  recordTable<Name extends RecordTableName>(name: Name): RecordTableViews[Name] {
+    return this.#recordViews[name]
   }
 
-  trackEntries(): IterableIterator<readonly [TrackId, TrackRecord]> {
-    return this.#tracks.entries()
-  }
-
-  getClip(id: ClipId): ClipRecord | undefined {
-    return this.#clips.get(id)
-  }
-
-  clipEntries(): IterableIterator<readonly [ClipId, ClipRecord]> {
-    return this.#clips.entries()
-  }
-
-  getMidiSource(id: MidiSourceId): MidiSourceRecord | undefined {
-    return this.#midiSources.get(id)
-  }
-
-  midiSourceEntries(): IterableIterator<readonly [MidiSourceId, MidiSourceRecord]> {
-    return this.#midiSources.entries()
-  }
-
-  hasMidiNotePartition(sourceId: MidiSourceId): boolean {
-    return this.#midiNotesBySource.has(sourceId)
-  }
-
-  midiNotePartitionIds(): IterableIterator<MidiSourceId> {
-    return this.#midiNotesBySource.keys()
-  }
-
-  getMidiNote(sourceId: MidiSourceId, noteId: NoteId): MidiNoteRecord | undefined {
-    return this.#midiNotesBySource.get(sourceId)?.get(noteId)
-  }
-
-  *midiNoteEntries(sourceId: MidiSourceId): IterableIterator<readonly [NoteId, MidiNoteRecord]> {
-    const noteTable = this.#midiNotesBySource.get(sourceId)
-
-    if (noteTable !== undefined) {
-      yield* noteTable.entries()
-    }
-  }
-
-  hasMidiSustainPedalEventPartition(sourceId: MidiSourceId): boolean {
-    return this.#midiSustainPedalEventsBySource.has(sourceId)
-  }
-
-  midiSustainPedalEventPartitionIds(): IterableIterator<MidiSourceId> {
-    return this.#midiSustainPedalEventsBySource.keys()
-  }
-
-  getMidiSustainPedalEvent(
-    sourceId: MidiSourceId,
-    eventId: MidiSustainPedalEventId,
-  ): MidiSustainPedalEventRecord | undefined {
-    return this.#midiSustainPedalEventsBySource.get(sourceId)?.get(eventId)
-  }
-
-  *midiSustainPedalEventEntries(
-    sourceId: MidiSourceId,
-  ): IterableIterator<readonly [MidiSustainPedalEventId, MidiSustainPedalEventRecord]> {
-    const eventTable = this.#midiSustainPedalEventsBySource.get(sourceId)
-
-    if (eventTable !== undefined) yield* eventTable.entries()
-  }
-
-  getTempoEvent(id: TempoEventId): TempoEventRecord | undefined {
-    return this.#tempoEvents.get(id)
-  }
-
-  tempoEventEntries(): IterableIterator<readonly [TempoEventId, TempoEventRecord]> {
-    return this.#tempoEvents.entries()
-  }
-
-  getTimeSignatureEvent(id: TimeSignatureEventId): TimeSignatureEventRecord | undefined {
-    return this.#timeSignatureEvents.get(id)
-  }
-
-  timeSignatureEventEntries(): IterableIterator<
-    readonly [TimeSignatureEventId, TimeSignatureEventRecord]
-  > {
-    return this.#timeSignatureEvents.entries()
-  }
-
-  getDevice(id: DeviceId): DeviceDescriptor | undefined {
-    return this.#devices.get(id)
-  }
-
-  deviceEntries(): IterableIterator<readonly [DeviceId, DeviceDescriptor]> {
-    return this.#devices.entries()
+  partitionedTable<Name extends PartitionedTableName>(name: Name): PartitionedTableViews[Name] {
+    return this.#partitionedViews[name]
   }
 }

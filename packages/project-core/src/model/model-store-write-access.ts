@@ -1,22 +1,15 @@
 /**
  * Owns the one-shot registry for ModelStore's private write capability.
  *
- * ModelStore registers closures that can reach its ECMAScript #private fields;
- * MutationApplier claims those closures exactly once. Keeping the lease here avoids
- * public/protected fields, mutable container exposure, and generic path-based writes.
+ * ModelStore registers closures over its private containers; MutationApplier claims those
+ * closures exactly once. Keeping the lease here avoids public or protected fields and never
+ * exposes a mutable container.
  */
 import type { MasterChannelRecord } from './channel'
-import type { DeviceDescriptor } from './device'
 import type { MidiSourceId, TrackId } from './ids'
-import type { ClipRecord } from './midi-clip'
-import type { MidiNoteRecord } from './midi-note'
-import type { MidiSourceRecord } from './midi-source'
-import type { MidiSustainPedalEventRecord } from './midi-sustain-pedal-event'
 import type { ModelRevision } from './model-revision'
+import type { PartitionedTableName, RecordTableName, StoredRecord } from './model-tables'
 import type { ProjectRecord } from './project'
-import type { TrackRecord } from './track'
-import type { TempoEventRecord } from '#internal/time/tempo-event'
-import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 
 export type ModelStoreWriteAccessErrorCode =
   | 'write-access-already-registered'
@@ -37,60 +30,38 @@ export class ModelStoreWriteAccessError extends Error {
 /**
  * A narrow compare-and-swap surface over ModelStore.
  *
- * Each method checks its expected state before performing one logical container write.
- * The interface deliberately exposes neither tables nor general-purpose setters.
+ * Each method checks its expected state before performing one logical container write. Record
+ * writes insert when nothing is expected and remove when nothing comes next. Tables are named,
+ * never handed out.
  */
 export interface ModelStoreWriteAccess {
   readonly writeProject: (expected: ProjectRecord, next: ProjectRecord) => void
   readonly writeMaster: (expected: MasterChannelRecord, next: MasterChannelRecord) => void
 
-  readonly writeTrack: (expected: TrackRecord | undefined, next: TrackRecord | undefined) => void
-  readonly writeClip: (expected: ClipRecord | undefined, next: ClipRecord | undefined) => void
-  readonly writeMidiSource: (
-    expected: MidiSourceRecord | undefined,
-    next: MidiSourceRecord | undefined,
-  ) => void
-  readonly writeTempoEvent: (
-    expected: TempoEventRecord | undefined,
-    next: TempoEventRecord | undefined,
-  ) => void
-  readonly writeTimeSignatureEvent: (
-    expected: TimeSignatureEventRecord | undefined,
-    next: TimeSignatureEventRecord | undefined,
-  ) => void
-  readonly writeDevice: (
-    expected: DeviceDescriptor | undefined,
-    next: DeviceDescriptor | undefined,
+  readonly writeRecord: (
+    table: RecordTableName,
+    expected: StoredRecord | undefined,
+    next: StoredRecord | undefined,
   ) => void
 
   readonly insertTrackOrder: (index: number, trackId: TrackId) => void
   readonly removeTrackOrder: (index: number, trackId: TrackId) => void
 
-  readonly insertMidiNotePartition: (
+  readonly insertPartition: (
+    table: PartitionedTableName,
     sourceId: MidiSourceId,
-    notes: readonly MidiNoteRecord[],
+    records: readonly StoredRecord[],
   ) => void
-  readonly removeMidiNotePartition: (
+  readonly removePartition: (
+    table: PartitionedTableName,
     sourceId: MidiSourceId,
-    expectedNotes: readonly MidiNoteRecord[],
+    expected: readonly StoredRecord[],
   ) => void
-  readonly writeMidiNote: (
+  readonly writePartitionRecord: (
+    table: PartitionedTableName,
     sourceId: MidiSourceId,
-    expected: MidiNoteRecord | undefined,
-    next: MidiNoteRecord | undefined,
-  ) => void
-  readonly insertMidiSustainPedalEventPartition: (
-    sourceId: MidiSourceId,
-    events: readonly MidiSustainPedalEventRecord[],
-  ) => void
-  readonly removeMidiSustainPedalEventPartition: (
-    sourceId: MidiSourceId,
-    expectedEvents: readonly MidiSustainPedalEventRecord[],
-  ) => void
-  readonly writeMidiSustainPedalEvent: (
-    sourceId: MidiSourceId,
-    expected: MidiSustainPedalEventRecord | undefined,
-    next: MidiSustainPedalEventRecord | undefined,
+    expected: StoredRecord | undefined,
+    next: StoredRecord | undefined,
   ) => void
 
   readonly commitModelRevision: (expected: ModelRevision, next: ModelRevision) => void

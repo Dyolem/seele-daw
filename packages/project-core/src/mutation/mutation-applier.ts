@@ -14,20 +14,8 @@ import {
 } from '#internal/model/model-store-write-access'
 import { MutationApplyError, MutationRollbackError } from './mutation-apply-error'
 import { assertCreatedMutationPlan, type MutationPlan } from './mutation-plan'
-import { MutationPlanError } from './mutation-plan-error'
-import { PROJECT_MUTATION_TYPE } from './mutation-type'
-import type { ProjectMutation } from './project-mutation'
+import { describeMutation, type ProjectMutation } from './project-mutation'
 import { ProjectedModelStoreReader } from './projected-model-store-reader'
-
-function rejectUnknownMutation(mutation: never, index: number): never {
-  const type = (mutation as { readonly type?: unknown }).type
-
-  throw new MutationPlanError(
-    'unknown-mutation-type',
-    `Mutation at index ${index} has an unknown type: ${String(type)}`,
-    index,
-  )
-}
 
 export class MutationApplier {
   readonly #store: ModelStore
@@ -168,122 +156,32 @@ export class MutationApplier {
   }
 
   #writeMutation(mutation: ProjectMutation, index: number): void {
-    switch (mutation.type) {
-      case PROJECT_MUTATION_TYPE.PROJECT.REPLACE:
-        this.#writeAccess.writeProject(mutation.before, mutation.after)
-        return
+    const step = describeMutation(mutation, index)
 
-      case PROJECT_MUTATION_TYPE.MASTER.REPLACE:
-        this.#writeAccess.writeMaster(mutation.before, mutation.after)
+    switch (step.kind) {
+      case 'project':
+        this.#writeAccess.writeProject(step.before, step.after)
         return
-
-      case PROJECT_MUTATION_TYPE.TRACK.INSERT:
-        this.#writeAccess.writeTrack(undefined, mutation.after)
+      case 'master':
+        this.#writeAccess.writeMaster(step.before, step.after)
         return
-      case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
-        this.#writeAccess.writeTrack(mutation.before, undefined)
+      case 'track-order':
+        if (step.op === 'insert') this.#writeAccess.insertTrackOrder(step.index, step.trackId)
+        else this.#writeAccess.removeTrackOrder(step.index, step.trackId)
         return
-      case PROJECT_MUTATION_TYPE.TRACK.REPLACE:
-        this.#writeAccess.writeTrack(mutation.before, mutation.after)
+      case 'record':
+        this.#writeAccess.writeRecord(step.table, step.before, step.after)
         return
-
-      case PROJECT_MUTATION_TYPE.CLIP.INSERT:
-        this.#writeAccess.writeClip(undefined, mutation.after)
+      case 'partition':
+        if (step.op === 'insert') {
+          this.#writeAccess.insertPartition(step.table, step.sourceId, step.records)
+        } else {
+          this.#writeAccess.removePartition(step.table, step.sourceId, step.records)
+        }
         return
-      case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
-        this.#writeAccess.writeClip(mutation.before, undefined)
+      case 'partition-record':
+        this.#writeAccess.writePartitionRecord(step.table, step.sourceId, step.before, step.after)
         return
-      case PROJECT_MUTATION_TYPE.CLIP.REPLACE:
-        this.#writeAccess.writeClip(mutation.before, mutation.after)
-        return
-
-      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
-        this.#writeAccess.writeMidiSource(undefined, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE:
-        this.#writeAccess.writeMidiSource(mutation.before, undefined)
-        return
-      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE:
-        this.#writeAccess.writeMidiSource(mutation.before, mutation.after)
-        return
-
-      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
-        this.#writeAccess.writeTempoEvent(undefined, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
-        this.#writeAccess.writeTempoEvent(mutation.before, undefined)
-        return
-      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
-        this.#writeAccess.writeTempoEvent(mutation.before, mutation.after)
-        return
-
-      case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT:
-        this.#writeAccess.writeTimeSignatureEvent(undefined, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
-        this.#writeAccess.writeTimeSignatureEvent(mutation.before, undefined)
-        return
-      case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
-        this.#writeAccess.writeTimeSignatureEvent(mutation.before, mutation.after)
-        return
-
-      case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
-        this.#writeAccess.writeDevice(undefined, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
-        this.#writeAccess.writeDevice(mutation.before, undefined)
-        return
-      case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
-        this.#writeAccess.writeDevice(mutation.before, mutation.after)
-        return
-
-      case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-        this.#writeAccess.insertTrackOrder(mutation.index, mutation.trackId)
-        return
-      case PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE:
-        this.#writeAccess.removeTrackOrder(mutation.index, mutation.trackId)
-        return
-
-      case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-        this.#writeAccess.insertMidiNotePartition(mutation.sourceId, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
-        this.#writeAccess.removeMidiNotePartition(mutation.sourceId, mutation.before)
-        return
-
-      case PROJECT_MUTATION_TYPE.NOTE.INSERT:
-        this.#writeAccess.writeMidiNote(mutation.sourceId, undefined, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
-        this.#writeAccess.writeMidiNote(mutation.sourceId, mutation.before, undefined)
-        return
-      case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
-        this.#writeAccess.writeMidiNote(mutation.sourceId, mutation.before, mutation.after)
-        return
-
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-        this.#writeAccess.insertMidiSustainPedalEventPartition(mutation.sourceId, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
-        this.#writeAccess.removeMidiSustainPedalEventPartition(mutation.sourceId, mutation.before)
-        return
-
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
-        this.#writeAccess.writeMidiSustainPedalEvent(mutation.sourceId, undefined, mutation.after)
-        return
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
-        this.#writeAccess.writeMidiSustainPedalEvent(mutation.sourceId, mutation.before, undefined)
-        return
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
-        this.#writeAccess.writeMidiSustainPedalEvent(
-          mutation.sourceId,
-          mutation.before,
-          mutation.after,
-        )
-        return
-
-      default:
-        return rejectUnknownMutation(mutation, index)
     }
   }
 }

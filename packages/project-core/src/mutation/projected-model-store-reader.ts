@@ -4,35 +4,36 @@
  * checked once after the final projected state exists. The base reader is never mutated.
  */
 import type { MasterChannelRecord } from '#internal/model/channel'
-import type { DeviceDescriptor } from '#internal/model/device'
-import type {
-  ClipId,
-  DeviceId,
-  MidiSourceId,
-  MidiSustainPedalEventId,
-  NoteId,
-  TempoEventId,
-  TimeSignatureEventId,
-  TrackId,
-} from '#internal/model/ids'
+import type { MidiSourceId, TrackId } from '#internal/model/ids'
 import { assertModelInvariants } from '#internal/model/invariant-validator'
-import type { ClipRecord } from '#internal/model/midi-clip'
-import type { MidiNoteRecord } from '#internal/model/midi-note'
-import type { MidiSourceRecord } from '#internal/model/midi-source'
-import type { MidiSustainPedalEventRecord } from '#internal/model/midi-sustain-pedal-event'
 import type { ModelRevision } from '#internal/model/model-revision'
-import type { ModelStoreReader } from '#internal/model/model-store'
+import { ModelStoreReader } from '#internal/model/model-store'
+import {
+  PARTITIONED_TABLES,
+  PARTITIONED_TABLE_NAMES,
+  RECORD_TABLES,
+  RECORD_TABLE_NAMES,
+  mapTables,
+  type PartitionedTableName,
+  type PartitionedTableView,
+  type PartitionedTableViews,
+  type RecordTableName,
+  type RecordTableView,
+  type RecordTableViews,
+  type StoredRecord,
+} from '#internal/model/model-tables'
 import type { ProjectRecord } from '#internal/model/project'
-import type { TrackRecord } from '#internal/model/track'
-import type { TempoEventRecord } from '#internal/time/tempo-event'
-import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 import { MutationPlanError, type MutationPlanErrorCode } from './mutation-plan-error'
 import {
   MutationPreconditionError,
   type MutationPreconditionErrorCode,
 } from './mutation-precondition-error'
-import { PROJECT_MUTATION_TYPE, type ProjectMutationType } from './mutation-type'
-import type { ProjectMutation } from './project-mutation'
+import type { ProjectMutationType } from './mutation-type'
+import {
+  PARTITIONED_MUTATION_TYPES,
+  describeMutation,
+  type ProjectMutation,
+} from './project-mutation'
 
 /** Marks a record or partition the projection deleted. Never a Project fact. */
 const DELETED = Symbol('seele/project-core/projected-deleted')
@@ -59,33 +60,18 @@ function rejectPrecondition(
   throw new MutationPreconditionError(code, context.index, context.type, detail)
 }
 
-function rejectUnknownMutation(mutation: never, index: number): never {
-  const type = (mutation as { readonly type?: unknown }).type
-
-  throw new MutationPlanError(
-    'unknown-mutation-type',
-    `Mutation at index ${index} has an unknown type: ${String(type)}`,
-    index,
-  )
-}
-
-class ProjectedEntityTable<Id extends string, RecordType extends { readonly id: Id }> {
+/** A copy-on-write view of one record table. */
+class ProjectedRecordTable implements RecordTableView<StoredRecord> {
   readonly #entityName: string
-  readonly #getBase: (id: Id) => RecordType | undefined
-  readonly #iterateBase: () => IterableIterator<readonly [Id, RecordType]>
-  readonly #patches = new Map<Id, TablePatch<RecordType>>()
+  readonly #base: RecordTableView<StoredRecord>
+  readonly #patches = new Map<string, TablePatch<StoredRecord>>()
 
-  constructor(
-    entityName: string,
-    getBase: (id: Id) => RecordType | undefined,
-    iterateBase: () => IterableIterator<readonly [Id, RecordType]>,
-  ) {
+  constructor(entityName: string, base: RecordTableView<StoredRecord>) {
     this.#entityName = entityName
-    this.#getBase = getBase
-    this.#iterateBase = iterateBase
+    this.#base = base
   }
 
-  get(id: Id): RecordType | undefined {
+  get(id: string): StoredRecord | undefined {
     const patch = this.#patches.get(id)
 
     if (patch === DELETED) {
@@ -96,77 +82,11 @@ class ProjectedEntityTable<Id extends string, RecordType extends { readonly id: 
       return patch.value
     }
 
-    return this.#getBase(id)
+    return this.#base.get(id)
   }
 
-  insert(after: RecordType, context: MutationContext): void {
-    if (this.get(after.id) !== undefined) {
-      rejectPrecondition(
-        'insert-target-exists',
-        context,
-        `cannot insert existing ${this.#entityName} ${after.id}`,
-      )
-    }
-
-    // Deleting first makes a delete-then-insert move to the real Map append position.
-    this.#patches.delete(after.id)
-    this.#patches.set(after.id, { position: 'append', value: after })
-  }
-
-  remove(before: RecordType, context: MutationContext): void {
-    const current = this.get(before.id)
-
-    if (current === undefined) {
-      rejectPrecondition(
-        'target-missing',
-        context,
-        `cannot remove missing ${this.#entityName} ${before.id}`,
-      )
-    }
-
-    if (current !== before) {
-      rejectPrecondition(
-        'before-reference-mismatch',
-        context,
-        `${this.#entityName} ${before.id} no longer matches the expected before record`,
-      )
-    }
-
-    if (this.#getBase(before.id) === undefined) {
-      this.#patches.delete(before.id)
-    } else {
-      this.#patches.set(before.id, DELETED)
-    }
-  }
-
-  replace(before: RecordType, after: RecordType, context: MutationContext): void {
-    const current = this.get(before.id)
-
-    if (current === undefined) {
-      rejectPrecondition(
-        'target-missing',
-        context,
-        `cannot replace missing ${this.#entityName} ${before.id}`,
-      )
-    }
-
-    if (current !== before) {
-      rejectPrecondition(
-        'before-reference-mismatch',
-        context,
-        `${this.#entityName} ${before.id} no longer matches the expected before record`,
-      )
-    }
-
-    const patch = this.#patches.get(before.id)
-    const position = patch !== undefined && patch !== DELETED ? patch.position : 'base'
-
-    // Keying by before.id lets final invariant validation catch a forged ID-changing replace.
-    this.#patches.set(before.id, { position, value: after })
-  }
-
-  *entries(): IterableIterator<readonly [Id, RecordType]> {
-    for (const [id, baseRecord] of this.#iterateBase()) {
+  *entries(): IterableIterator<readonly [string, StoredRecord]> {
+    for (const [id, baseRecord] of this.#base.entries()) {
       const patch = this.#patches.get(id)
 
       if (patch === DELETED || patch?.position === 'append') {
@@ -182,16 +102,85 @@ class ProjectedEntityTable<Id extends string, RecordType extends { readonly id: 
       }
     }
   }
+
+  /** No `before` inserts, no `after` removes, both replace. */
+  write(
+    before: StoredRecord | undefined,
+    after: StoredRecord | undefined,
+    context: MutationContext,
+  ): void {
+    if (before === undefined) this.#insert(after!, context)
+    else if (after === undefined) this.#remove(before, context)
+    else this.#replace(before, after, context)
+  }
+
+  #insert(after: StoredRecord, context: MutationContext): void {
+    if (this.get(after.id) !== undefined) {
+      rejectPrecondition(
+        'insert-target-exists',
+        context,
+        `cannot insert existing ${this.#entityName} ${after.id}`,
+      )
+    }
+
+    // Deleting first makes a delete-then-insert move to the real Map append position.
+    this.#patches.delete(after.id)
+    this.#patches.set(after.id, { position: 'append', value: after })
+  }
+
+  #remove(before: StoredRecord, context: MutationContext): void {
+    this.#requireCurrent(before, 'remove', context)
+
+    if (this.#base.get(before.id) === undefined) {
+      this.#patches.delete(before.id)
+    } else {
+      this.#patches.set(before.id, DELETED)
+    }
+  }
+
+  #replace(before: StoredRecord, after: StoredRecord, context: MutationContext): void {
+    this.#requireCurrent(before, 'replace', context)
+
+    const patch = this.#patches.get(before.id)
+    const position = patch !== undefined && patch !== DELETED ? patch.position : 'base'
+
+    // Keying by before.id lets final invariant validation catch a forged ID-changing replace.
+    this.#patches.set(before.id, { position, value: after })
+  }
+
+  #requireCurrent(
+    before: StoredRecord,
+    verb: 'remove' | 'replace',
+    context: MutationContext,
+  ): void {
+    const current = this.get(before.id)
+
+    if (current === undefined) {
+      rejectPrecondition(
+        'target-missing',
+        context,
+        `cannot ${verb} missing ${this.#entityName} ${before.id}`,
+      )
+    }
+
+    if (current !== before) {
+      rejectPrecondition(
+        'before-reference-mismatch',
+        context,
+        `${this.#entityName} ${before.id} no longer matches the expected before record`,
+      )
+    }
+  }
 }
 
-interface ProjectedPartition<Id, RecordType> {
+interface ProjectedPartition {
   readonly position: EntryPosition
-  readonly records: Map<Id, RecordType>
+  readonly records: Map<string, StoredRecord>
 }
 
-type PartitionPatch<Id, RecordType> = ProjectedPartition<Id, RecordType> | typeof DELETED
+type PartitionPatch = ProjectedPartition | typeof DELETED
 
-/** How a partitioned table names itself in errors; MIDI Notes and CC64 events share the rest. */
+/** How a partitioned table names itself in errors. */
 interface PartitionNames {
   /** e.g. "MIDI Note" */
   readonly entity: string
@@ -199,20 +188,13 @@ interface PartitionNames {
   readonly contentMismatchCode: MutationPreconditionErrorCode
 }
 
-interface PartitionedBase<Id, RecordType> {
-  has(partitionId: MidiSourceId): boolean
-  partitionIds(): IterableIterator<MidiSourceId>
-  get(partitionId: MidiSourceId, id: Id): RecordType | undefined
-  entries(partitionId: MidiSourceId): IterableIterator<readonly [Id, RecordType]>
-}
-
 /** A copy-on-write view of records partitioned by MIDI Source, such as Notes or CC64 events. */
-class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly id: Id }> {
+class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
   readonly #names: PartitionNames
-  readonly #base: PartitionedBase<Id, RecordType>
-  readonly #patches = new Map<MidiSourceId, PartitionPatch<Id, RecordType>>()
+  readonly #base: PartitionedTableView<StoredRecord>
+  readonly #patches = new Map<MidiSourceId, PartitionPatch>()
 
-  constructor(names: PartitionNames, base: PartitionedBase<Id, RecordType>) {
+  constructor(names: PartitionNames, base: PartitionedTableView<StoredRecord>) {
     this.#names = names
     this.#base = base
   }
@@ -235,14 +217,14 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
     }
   }
 
-  get(partitionId: MidiSourceId, id: Id): RecordType | undefined {
+  get(partitionId: MidiSourceId, id: string): StoredRecord | undefined {
     const patch = this.#patches.get(partitionId)
     if (patch === DELETED) return undefined
     if (patch !== undefined) return patch.records.get(id)
     return this.#base.get(partitionId, id)
   }
 
-  *entries(partitionId: MidiSourceId): IterableIterator<readonly [Id, RecordType]> {
+  *entries(partitionId: MidiSourceId): IterableIterator<readonly [string, StoredRecord]> {
     const patch = this.#patches.get(partitionId)
     if (patch === DELETED) return
     if (patch !== undefined) {
@@ -254,7 +236,7 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
 
   insertPartition(
     partitionId: MidiSourceId,
-    records: readonly RecordType[],
+    records: readonly StoredRecord[],
     context: MutationContext,
   ): void {
     const { entity } = this.#names
@@ -265,7 +247,7 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
         `cannot insert existing ${entity} partition ${partitionId}`,
       )
     }
-    const table = new Map<Id, RecordType>()
+    const table = new Map<string, StoredRecord>()
     for (const record of records) {
       if (table.has(record.id)) {
         throw new MutationPlanError(
@@ -282,7 +264,7 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
 
   removePartition(
     partitionId: MidiSourceId,
-    before: readonly RecordType[],
+    before: readonly StoredRecord[],
     context: MutationContext,
   ): void {
     const { entity } = this.#names
@@ -304,39 +286,42 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
     else this.#patches.delete(partitionId)
   }
 
-  insert(partitionId: MidiSourceId, after: RecordType, context: MutationContext): void {
-    const table = this.#mutable(partitionId, context)
-    if (table.has(after.id)) {
-      rejectPrecondition(
-        'insert-target-exists',
-        context,
-        `cannot insert existing ${this.#names.entity} ${partitionId}/${after.id}`,
-      )
-    }
-    table.set(after.id, after)
-  }
-
-  remove(partitionId: MidiSourceId, before: RecordType, context: MutationContext): void {
-    const table = this.#mutable(partitionId, context)
-    this.#requireCurrent(table, partitionId, before, 'remove', context)
-    table.delete(before.id)
-  }
-
-  replace(
+  /** No `before` inserts, no `after` removes, both replace. */
+  write(
     partitionId: MidiSourceId,
-    before: RecordType,
-    after: RecordType,
+    before: StoredRecord | undefined,
+    after: StoredRecord | undefined,
     context: MutationContext,
   ): void {
     const table = this.#mutable(partitionId, context)
-    this.#requireCurrent(table, partitionId, before, 'replace', context)
-    table.set(before.id, after)
+
+    if (before === undefined) {
+      if (table.has(after!.id)) {
+        rejectPrecondition(
+          'insert-target-exists',
+          context,
+          `cannot insert existing ${this.#names.entity} ${partitionId}/${after!.id}`,
+        )
+      }
+      table.set(after!.id, after!)
+      return
+    }
+
+    this.#requireCurrent(
+      table,
+      partitionId,
+      before,
+      after === undefined ? 'remove' : 'replace',
+      context,
+    )
+    if (after === undefined) table.delete(before.id)
+    else table.set(before.id, after)
   }
 
   #requireCurrent(
-    table: Map<Id, RecordType>,
+    table: Map<string, StoredRecord>,
     partitionId: MidiSourceId,
-    before: RecordType,
+    before: StoredRecord,
     verb: 'remove' | 'replace',
     context: MutationContext,
   ): void {
@@ -359,7 +344,7 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
   }
 
   /** The projected records of one partition, copied from the base the first time it is edited. */
-  #mutable(partitionId: MidiSourceId, context: MutationContext): Map<Id, RecordType> {
+  #mutable(partitionId: MidiSourceId, context: MutationContext): Map<string, StoredRecord> {
     const patch = this.#patches.get(partitionId)
     if (patch !== undefined && patch !== DELETED) return patch.records
     if (patch === DELETED || !this.#base.has(partitionId)) {
@@ -374,7 +359,7 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
     return table
   }
 
-  #matches(partitionId: MidiSourceId, before: readonly RecordType[]): boolean {
+  #matches(partitionId: MidiSourceId, before: readonly StoredRecord[]): boolean {
     const expected = new Map(before.map((record) => [record.id, record] as const))
     if (expected.size !== before.length) return false
     let size = 0
@@ -386,90 +371,49 @@ class ProjectedPartitionedTable<Id extends string, RecordType extends { readonly
   }
 }
 
-export class ProjectedModelStoreReader implements ModelStoreReader {
+export class ProjectedModelStoreReader extends ModelStoreReader {
   readonly #base: ModelStoreReader
   #project: ProjectRecord
   #master: MasterChannelRecord
   #trackOrder: TrackId[] | undefined
 
-  readonly #tracks: ProjectedEntityTable<TrackId, TrackRecord>
-  readonly #clips: ProjectedEntityTable<ClipId, ClipRecord>
-  readonly #midiSources: ProjectedEntityTable<MidiSourceId, MidiSourceRecord>
-  readonly #tempoEvents: ProjectedEntityTable<TempoEventId, TempoEventRecord>
-  readonly #timeSignatureEvents: ProjectedEntityTable<
-    TimeSignatureEventId,
-    TimeSignatureEventRecord
-  >
-  readonly #devices: ProjectedEntityTable<DeviceId, DeviceDescriptor>
-  readonly #notes: ProjectedPartitionedTable<NoteId, MidiNoteRecord>
-  readonly #sustainPedalEvents: ProjectedPartitionedTable<
-    MidiSustainPedalEventId,
-    MidiSustainPedalEventRecord
-  >
+  readonly #records: Readonly<Record<RecordTableName, ProjectedRecordTable>>
+  readonly #partitions: Readonly<Record<PartitionedTableName, ProjectedPartitionedTable>>
+  readonly #recordViews: RecordTableViews
+  readonly #partitionedViews: PartitionedTableViews
 
   /** Mutations must be the normalized forward entries produced by createMutationPlan. */
   constructor(base: ModelStoreReader, mutations: readonly ProjectMutation[]) {
+    super()
     this.#base = base
     this.#project = base.project
     this.#master = base.master
 
-    this.#tracks = new ProjectedEntityTable(
-      'Track',
-      (id) => base.getTrack(id),
-      () => base.trackEntries(),
+    this.#records = mapTables(
+      RECORD_TABLE_NAMES,
+      (name) => new ProjectedRecordTable(RECORD_TABLES[name].entity, base.recordTable(name)),
     )
-    this.#clips = new ProjectedEntityTable(
-      'Clip',
-      (id) => base.getClip(id),
-      () => base.clipEntries(),
+    this.#partitions = mapTables(
+      PARTITIONED_TABLE_NAMES,
+      (name) =>
+        new ProjectedPartitionedTable(
+          {
+            entity: PARTITIONED_TABLES[name].entity,
+            duplicateIdCode: PARTITIONED_MUTATION_TYPES[name].duplicateIdCode,
+            contentMismatchCode: PARTITIONED_MUTATION_TYPES[name].contentMismatchCode,
+          },
+          base.partitionedTable(name),
+        ),
     )
-    this.#midiSources = new ProjectedEntityTable(
-      'MIDI Source',
-      (id) => base.getMidiSource(id),
-      () => base.midiSourceEntries(),
-    )
-    this.#tempoEvents = new ProjectedEntityTable(
-      'Tempo Event',
-      (id) => base.getTempoEvent(id),
-      () => base.tempoEventEntries(),
-    )
-    this.#timeSignatureEvents = new ProjectedEntityTable(
-      'Time Signature Event',
-      (id) => base.getTimeSignatureEvent(id),
-      () => base.timeSignatureEventEntries(),
-    )
-    this.#devices = new ProjectedEntityTable(
-      'Device',
-      (id) => base.getDevice(id),
-      () => base.deviceEntries(),
-    )
-
-    this.#notes = new ProjectedPartitionedTable(
-      {
-        entity: 'MIDI Note',
-        duplicateIdCode: 'duplicate-note-id-in-partition',
-        contentMismatchCode: 'note-partition-content-mismatch',
-      },
-      {
-        has: (sourceId) => base.hasMidiNotePartition(sourceId),
-        partitionIds: () => base.midiNotePartitionIds(),
-        get: (sourceId, noteId) => base.getMidiNote(sourceId, noteId),
-        entries: (sourceId) => base.midiNoteEntries(sourceId),
-      },
-    )
-    this.#sustainPedalEvents = new ProjectedPartitionedTable(
-      {
-        entity: 'MIDI Sustain Pedal Event',
-        duplicateIdCode: 'duplicate-sustain-pedal-event-id-in-partition',
-        contentMismatchCode: 'sustain-pedal-event-partition-content-mismatch',
-      },
-      {
-        has: (sourceId) => base.hasMidiSustainPedalEventPartition(sourceId),
-        partitionIds: () => base.midiSustainPedalEventPartitionIds(),
-        get: (sourceId, eventId) => base.getMidiSustainPedalEvent(sourceId, eventId),
-        entries: (sourceId) => base.midiSustainPedalEventEntries(sourceId),
-      },
-    )
+    // Each projected table only ever holds records of the table it projects.
+    this.#recordViews = mapTables(
+      RECORD_TABLE_NAMES,
+      (name): RecordTableView<StoredRecord> => this.#records[name],
+    ) as RecordTableViews
+    this.#partitionedViews = mapTables(
+      PARTITIONED_TABLE_NAMES,
+      (name): PartitionedTableView<StoredRecord> => this.#partitions[name],
+    ) as PartitionedTableViews
 
     mutations.forEach((mutation, index) => this.#applyMutation(mutation, index))
 
@@ -497,91 +441,12 @@ export class ProjectedModelStoreReader implements ModelStoreReader {
     return this.#trackOrder.values()
   }
 
-  getTrack(id: TrackId): TrackRecord | undefined {
-    return this.#tracks.get(id)
+  recordTable<Name extends RecordTableName>(name: Name): RecordTableViews[Name] {
+    return this.#recordViews[name]
   }
 
-  trackEntries(): IterableIterator<readonly [TrackId, TrackRecord]> {
-    return this.#tracks.entries()
-  }
-
-  getClip(id: ClipId): ClipRecord | undefined {
-    return this.#clips.get(id)
-  }
-
-  clipEntries(): IterableIterator<readonly [ClipId, ClipRecord]> {
-    return this.#clips.entries()
-  }
-
-  getMidiSource(id: MidiSourceId): MidiSourceRecord | undefined {
-    return this.#midiSources.get(id)
-  }
-
-  midiSourceEntries(): IterableIterator<readonly [MidiSourceId, MidiSourceRecord]> {
-    return this.#midiSources.entries()
-  }
-
-  hasMidiNotePartition(sourceId: MidiSourceId): boolean {
-    return this.#notes.has(sourceId)
-  }
-
-  midiNotePartitionIds(): IterableIterator<MidiSourceId> {
-    return this.#notes.partitionIds()
-  }
-
-  getMidiNote(sourceId: MidiSourceId, noteId: NoteId): MidiNoteRecord | undefined {
-    return this.#notes.get(sourceId, noteId)
-  }
-
-  midiNoteEntries(sourceId: MidiSourceId): IterableIterator<readonly [NoteId, MidiNoteRecord]> {
-    return this.#notes.entries(sourceId)
-  }
-
-  hasMidiSustainPedalEventPartition(sourceId: MidiSourceId): boolean {
-    return this.#sustainPedalEvents.has(sourceId)
-  }
-
-  midiSustainPedalEventPartitionIds(): IterableIterator<MidiSourceId> {
-    return this.#sustainPedalEvents.partitionIds()
-  }
-
-  getMidiSustainPedalEvent(
-    sourceId: MidiSourceId,
-    eventId: MidiSustainPedalEventId,
-  ): MidiSustainPedalEventRecord | undefined {
-    return this.#sustainPedalEvents.get(sourceId, eventId)
-  }
-
-  midiSustainPedalEventEntries(
-    sourceId: MidiSourceId,
-  ): IterableIterator<readonly [MidiSustainPedalEventId, MidiSustainPedalEventRecord]> {
-    return this.#sustainPedalEvents.entries(sourceId)
-  }
-
-  getTempoEvent(id: TempoEventId): TempoEventRecord | undefined {
-    return this.#tempoEvents.get(id)
-  }
-
-  tempoEventEntries(): IterableIterator<readonly [TempoEventId, TempoEventRecord]> {
-    return this.#tempoEvents.entries()
-  }
-
-  getTimeSignatureEvent(id: TimeSignatureEventId): TimeSignatureEventRecord | undefined {
-    return this.#timeSignatureEvents.get(id)
-  }
-
-  timeSignatureEventEntries(): IterableIterator<
-    readonly [TimeSignatureEventId, TimeSignatureEventRecord]
-  > {
-    return this.#timeSignatureEvents.entries()
-  }
-
-  getDevice(id: DeviceId): DeviceDescriptor | undefined {
-    return this.#devices.get(id)
-  }
-
-  deviceEntries(): IterableIterator<readonly [DeviceId, DeviceDescriptor]> {
-    return this.#devices.entries()
+  partitionedTable<Name extends PartitionedTableName>(name: Name): PartitionedTableViews[Name] {
+    return this.#partitionedViews[name]
   }
 
   #mutableTrackOrder(): TrackId[] {
@@ -627,139 +492,52 @@ export class ProjectedModelStoreReader implements ModelStoreReader {
   }
 
   #applyMutation(mutation: ProjectMutation, index: number): void {
+    const step = describeMutation(mutation, index)
     const context = { index, type: mutation.type }
 
-    switch (mutation.type) {
-      case PROJECT_MUTATION_TYPE.PROJECT.REPLACE:
-        if (this.#project !== mutation.before) {
+    switch (step.kind) {
+      case 'project':
+        if (this.#project !== step.before) {
           rejectPrecondition(
             'before-reference-mismatch',
             context,
             'Project no longer matches the expected before record',
           )
         }
-        this.#project = mutation.after
+        this.#project = step.after
         return
 
-      case PROJECT_MUTATION_TYPE.MASTER.REPLACE:
-        if (this.#master !== mutation.before) {
+      case 'master':
+        if (this.#master !== step.before) {
           rejectPrecondition(
             'before-reference-mismatch',
             context,
             'Master Channel no longer matches the expected before record',
           )
         }
-        this.#master = mutation.after
+        this.#master = step.after
         return
 
-      case PROJECT_MUTATION_TYPE.TRACK.INSERT:
-        this.#tracks.insert(mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.TRACK.REMOVE:
-        this.#tracks.remove(mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.TRACK.REPLACE:
-        this.#tracks.replace(mutation.before, mutation.after, context)
+      case 'track-order':
+        if (step.op === 'insert') this.#insertTrackOrder(step.index, step.trackId, context)
+        else this.#removeTrackOrder(step.index, step.trackId, context)
         return
 
-      case PROJECT_MUTATION_TYPE.CLIP.INSERT:
-        this.#clips.insert(mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.CLIP.REMOVE:
-        this.#clips.remove(mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.CLIP.REPLACE:
-        this.#clips.replace(mutation.before, mutation.after, context)
+      case 'record':
+        this.#records[step.table].write(step.before, step.after, context)
         return
 
-      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.INSERT:
-        this.#midiSources.insert(mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REMOVE:
-        this.#midiSources.remove(mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.MIDI_SOURCE.REPLACE:
-        this.#midiSources.replace(mutation.before, mutation.after, context)
+      case 'partition':
+        if (step.op === 'insert') {
+          this.#partitions[step.table].insertPartition(step.sourceId, step.records, context)
+        } else {
+          this.#partitions[step.table].removePartition(step.sourceId, step.records, context)
+        }
         return
 
-      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.INSERT:
-        this.#tempoEvents.insert(mutation.after, context)
+      case 'partition-record':
+        this.#partitions[step.table].write(step.sourceId, step.before, step.after, context)
         return
-      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REMOVE:
-        this.#tempoEvents.remove(mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.TEMPO_EVENT.REPLACE:
-        this.#tempoEvents.replace(mutation.before, mutation.after, context)
-        return
-
-      case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.INSERT:
-        this.#timeSignatureEvents.insert(mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REMOVE:
-        this.#timeSignatureEvents.remove(mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.TIME_SIGNATURE_EVENT.REPLACE:
-        this.#timeSignatureEvents.replace(mutation.before, mutation.after, context)
-        return
-
-      case PROJECT_MUTATION_TYPE.DEVICE.INSERT:
-        this.#devices.insert(mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.DEVICE.REMOVE:
-        this.#devices.remove(mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.DEVICE.REPLACE:
-        this.#devices.replace(mutation.before, mutation.after, context)
-        return
-
-      case PROJECT_MUTATION_TYPE.TRACK_ORDER.INSERT:
-        this.#insertTrackOrder(mutation.index, mutation.trackId, context)
-        return
-      case PROJECT_MUTATION_TYPE.TRACK_ORDER.REMOVE:
-        this.#removeTrackOrder(mutation.index, mutation.trackId, context)
-        return
-
-      case PROJECT_MUTATION_TYPE.NOTE_PARTITION.INSERT:
-        this.#notes.insertPartition(mutation.sourceId, mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.NOTE_PARTITION.REMOVE:
-        this.#notes.removePartition(mutation.sourceId, mutation.before, context)
-        return
-
-      case PROJECT_MUTATION_TYPE.NOTE.INSERT:
-        this.#notes.insert(mutation.sourceId, mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.NOTE.REMOVE:
-        this.#notes.remove(mutation.sourceId, mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.NOTE.REPLACE:
-        this.#notes.replace(mutation.sourceId, mutation.before, mutation.after, context)
-        return
-
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.INSERT:
-        this.#sustainPedalEvents.insertPartition(mutation.sourceId, mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT_PARTITION.REMOVE:
-        this.#sustainPedalEvents.removePartition(mutation.sourceId, mutation.before, context)
-        return
-
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.INSERT:
-        this.#sustainPedalEvents.insert(mutation.sourceId, mutation.after, context)
-        return
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REMOVE:
-        this.#sustainPedalEvents.remove(mutation.sourceId, mutation.before, context)
-        return
-      case PROJECT_MUTATION_TYPE.SUSTAIN_PEDAL_EVENT.REPLACE:
-        this.#sustainPedalEvents.replace(
-          mutation.sourceId,
-          mutation.before,
-          mutation.after,
-          context,
-        )
-        return
-
-      default:
-        return rejectUnknownMutation(mutation, index)
     }
   }
 }

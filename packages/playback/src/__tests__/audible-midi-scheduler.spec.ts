@@ -101,7 +101,6 @@ describe('Audible MIDI Scheduler Planner', () => {
     expect(batch.voicePlans).toEqual([
       {
         channel: firstSpan?.channel,
-        engineGeneration: 1,
         instrumentDeviceId: firstTrack?.instrumentDeviceId,
         kind: 'sample-voice',
         keyReleasePlaybackClockSecond: 10.5,
@@ -313,7 +312,6 @@ describe('Audible MIDI Scheduler Planner', () => {
     })
     expect(resumedBatch.voicePlans).toHaveLength(1)
     expect(resumedBatch.voicePlans[0]).toMatchObject({
-      engineGeneration: 3,
       occurrenceKey: plan.midiNoteSpans[1]?.occurrenceKey,
       startPlaybackClockSecond: 105.5,
       timing: 'on-time',

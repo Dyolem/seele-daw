@@ -1,322 +1,151 @@
-import type { AudibleMidiProjectPlan, MidiNoteSpanPlan, SoundbankId } from '@seele-daw/playback'
+import {
+  PLAYBACK_INSTRUMENT_FAILURE_MODE,
+  type AudibleMidiProjectPlan,
+  type InstrumentPreparationFailure,
+  type MidiNoteSpanPlan,
+  type PlaybackInstrumentFailureMode,
+  type SoundbankId,
+  type UnsupportedNoteOccurrence,
+} from '@seele-daw/playback'
 
-import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
 import type {
-  LoadedSampleInstrumentResource,
-  PreparedSampleInstrumentResources,
   SampleInstrumentAssetLocation,
   SampleInstrumentResourceCache,
 } from '#internal/sample-instrument/loading/resource-cache'
-import {
-  SampleInstrumentZoneSelectionError,
-  findSampleInstrumentZoneForPitch,
-} from '#internal/sample-instrument/loading/zone-selection'
+import { findSampleInstrumentZoneForPitch } from '#internal/sample-instrument/loading/zone-selection'
+import type { SampleInstrument } from '#internal/sample-instrument/voice/voice-runtime'
 
-export interface AudibleMidiSampleResourceLocator {
-  locate(soundbankId: SoundbankId): SampleInstrumentAssetLocation | null
-}
+/** Where a Soundbank's assets are served from; null when this build has none for it. */
+export type SampleAssetBaseUrl = (soundbankId: SoundbankId) => string | URL | null
 
-export interface PreparedAudibleMidiSampleInstrument {
-  readonly manifest: SampleInstrumentManifestV1
-  readonly resources: readonly LoadedSampleInstrumentResource[]
-  readonly soundbankId: SoundbankId
-}
-
-export interface PreparedAudibleMidiSampleResources {
-  readonly failures: readonly AudibleMidiSamplePreparationFailure[]
-  readonly instruments: readonly PreparedAudibleMidiSampleInstrument[]
+/** The instruments loaded for one plan revision, and what of the plan they cannot play. */
+export interface PreparedSampleResources {
   readonly modelRevision: AudibleMidiProjectPlan['modelRevision']
-  readonly unsupportedNoteOccurrences: readonly AudibleMidiUnsupportedSampleNoteOccurrence[]
+  readonly instruments: ReadonlyMap<SoundbankId, SampleInstrument>
+  readonly preparationFailures: readonly InstrumentPreparationFailure[]
+  readonly unsupportedNoteOccurrences: readonly UnsupportedNoteOccurrence[]
 }
 
-export const AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON = Object.freeze({
-  NO_MATCHING_ZONE: 'no-matching-zone',
-} as const)
-
-export type AudibleMidiUnsupportedSampleNoteReason =
-  (typeof AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON)[keyof typeof AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON]
-
-/** Objective per-occurrence coverage result; it deliberately makes no musical interpretation. */
-export interface AudibleMidiUnsupportedSampleNoteOccurrence {
-  readonly occurrenceKey: MidiNoteSpanPlan['occurrenceKey']
-  readonly pitch: MidiNoteSpanPlan['pitch']
-  readonly reason: AudibleMidiUnsupportedSampleNoteReason
+interface PreparedInstrument {
+  readonly instrument: SampleInstrument
   readonly soundbankId: SoundbankId
-  readonly trackId: MidiNoteSpanPlan['trackId']
+  readonly unsupportedNoteOccurrences: readonly UnsupportedNoteOccurrence[]
 }
 
-export const AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE = Object.freeze({
-  FAIL_FAST: 'fail-fast',
-  SKIP_UNAVAILABLE_INSTRUMENTS: 'skip-unavailable-instruments',
-} as const)
-
-export type AudibleMidiSamplePreparationFailureMode =
-  (typeof AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE)[keyof typeof AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE]
-
-export interface AudibleMidiSamplePreparationFailure {
-  readonly cause: unknown
-  readonly soundbankId: SoundbankId
+function compareStrings(left: string, right: string): number {
+  if (left < right) return -1
+  if (left > right) return 1
+  return 0
 }
 
-export interface PrepareAudibleMidiSampleResourcesOptions {
-  readonly failureMode?: AudibleMidiSamplePreparationFailureMode
-  readonly signal?: AbortSignal
-}
-
-export type AudibleMidiSamplePreparationErrorCode =
-  | 'aborted'
-  | 'blocked-plan'
-  | 'duplicate-track-route'
-  | 'inaudible-track-route'
-  | 'invalid-failure-mode'
-  | 'invalid-pitch'
-  | 'invalid-plan-status'
-  | 'missing-asset-location'
-  | 'missing-track-route'
-  | 'soundbank-location-mismatch'
-  | 'unsupported-pitch'
-
-export class AudibleMidiSamplePreparationError extends Error {
-  readonly code: AudibleMidiSamplePreparationErrorCode
-  readonly soundbankId: SoundbankId | null
-
-  constructor(
-    code: AudibleMidiSamplePreparationErrorCode,
-    message: string,
-    soundbankId: SoundbankId | null = null,
-  ) {
-    super(message)
-    this.name = 'AudibleMidiSamplePreparationError'
-    this.code = code
-    this.soundbankId = soundbankId
-  }
-}
-
-function fail(
-  code: AudibleMidiSamplePreparationErrorCode,
-  message: string,
-  soundbankId: SoundbankId | null = null,
-): never {
-  throw new AudibleMidiSamplePreparationError(code, message, soundbankId)
-}
-
-function collectNoteSpansBySoundbank(
+/** The plan's note spans grouped by the Soundbank their Track plays, in a stable order. */
+function groupSpansBySoundbank(
   plan: AudibleMidiProjectPlan,
-): ReadonlyMap<SoundbankId, readonly MidiNoteSpanPlan[]> {
-  const routes = new Map<(typeof plan.tracks)[number]['trackId'], (typeof plan.tracks)[number]>()
-  for (const track of plan.tracks) {
-    if (routes.has(track.trackId)) {
-      fail('duplicate-track-route', `Audible MIDI Plan repeats Track route ${track.trackId}`)
-    }
-    routes.set(track.trackId, track)
-  }
-  const spansBySoundbank = new Map<SoundbankId, MidiNoteSpanPlan[]>()
-  for (const span of plan.midiNoteSpans) {
-    const route = routes.get(span.trackId)
-    if (route === undefined) {
-      fail('missing-track-route', `MIDI Note Span ${span.occurrenceKey} has no Track route`)
-    }
-    if (!route.audible) {
-      fail(
-        'inaudible-track-route',
-        `MIDI Note Span ${span.occurrenceKey} targets an inaudible Track`,
-      )
-    }
-    const soundbankId = route.instrument.soundbankId
-    let spans = spansBySoundbank.get(soundbankId)
-    if (spans === undefined) {
-      spans = []
-      spansBySoundbank.set(soundbankId, spans)
-    }
-    spans.push(span)
-  }
-  return new Map(
-    [...spansBySoundbank]
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([soundbankId, spans]) => [
-        soundbankId,
-        Object.freeze(
-          [...spans].sort((left, right) => {
-            if (left.occurrenceKey < right.occurrenceKey) return -1
-            if (left.occurrenceKey > right.occurrenceKey) return 1
-            return 0
-          }),
-        ),
-      ]),
+): readonly (readonly [SoundbankId, readonly MidiNoteSpanPlan[]])[] {
+  const soundbankByTrack = new Map(
+    plan.tracks.map((track) => [track.trackId, track.instrument.soundbankId]),
   )
+  const grouped = new Map<SoundbankId, MidiNoteSpanPlan[]>()
+  for (const span of plan.midiNoteSpans) {
+    const soundbankId = soundbankByTrack.get(span.trackId)
+    if (soundbankId === undefined) throw new Error(`Note span ${span.occurrenceKey} has no Track`)
+    const spans = grouped.get(soundbankId) ?? []
+    spans.push(span)
+    grouped.set(soundbankId, spans)
+  }
+  return [...grouped]
+    .sort(([left], [right]) => compareStrings(left, right))
+    .map(([soundbankId, spans]) => [
+      soundbankId,
+      spans.sort((left, right) => compareStrings(left.occurrenceKey, right.occurrenceKey)),
+    ])
 }
 
-function partitionSampleResourcesForNoteSpans(
-  manifest: SampleInstrumentManifestV1,
-  soundbankId: SoundbankId,
+async function prepareInstrument(
+  cache: SampleInstrumentResourceCache,
+  location: SampleInstrumentAssetLocation,
   spans: readonly MidiNoteSpanPlan[],
-): {
-  readonly resourceKeys: readonly string[]
-  readonly unsupportedNoteOccurrences: readonly AudibleMidiUnsupportedSampleNoteOccurrence[]
-} {
+  signal: AbortSignal | undefined,
+): Promise<PreparedInstrument> {
+  const { soundbankId } = location
+  const manifest = await cache.loadManifest(location, signal)
   const resourceKeys = new Set<string>()
-  const unsupportedNoteOccurrences: AudibleMidiUnsupportedSampleNoteOccurrence[] = []
+  const unsupportedNoteOccurrences: UnsupportedNoteOccurrence[] = []
 
   for (const span of spans) {
-    let zone: ReturnType<typeof findSampleInstrumentZoneForPitch>
-    try {
-      zone = findSampleInstrumentZoneForPitch(manifest, span.pitch)
-    } catch (error) {
-      if (error instanceof SampleInstrumentZoneSelectionError && error.code === 'invalid-pitch') {
-        fail('invalid-pitch', `Audible MIDI Plan contains invalid pitch ${error.pitch}`)
-      }
-      throw error
-    }
-    if (zone === null) {
-      unsupportedNoteOccurrences.push(
-        Object.freeze({
-          occurrenceKey: span.occurrenceKey,
-          pitch: span.pitch,
-          reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
-          soundbankId,
-          trackId: span.trackId,
-        }),
-      )
+    const zone = findSampleInstrumentZoneForPitch(manifest, span.pitch)
+    if (zone !== null) {
+      resourceKeys.add(zone.resource.key)
       continue
     }
-    resourceKeys.add(zone.resource.key)
+    unsupportedNoteOccurrences.push(
+      Object.freeze({
+        occurrenceKey: span.occurrenceKey,
+        pitch: span.pitch,
+        reason: 'no-matching-zone',
+        soundbankId,
+        trackId: span.trackId,
+      }),
+    )
   }
 
+  const prepared = await cache.prepare(location, [...resourceKeys], signal)
   return Object.freeze({
-    resourceKeys: Object.freeze([...resourceKeys].sort()),
+    instrument: Object.freeze({
+      manifest: prepared.manifest,
+      resources: new Map(prepared.resources.map((resource) => [resource.key, resource])),
+    }),
+    soundbankId,
     unsupportedNoteOccurrences: Object.freeze(unsupportedNoteOccurrences),
   })
 }
 
-function requireLocation(
-  locator: AudibleMidiSampleResourceLocator,
-  soundbankId: SoundbankId,
-): SampleInstrumentAssetLocation {
-  const location = locator.locate(soundbankId)
-  if (location === null) {
-    fail(
-      'missing-asset-location',
-      `No Sample Instrument assets are available for ${soundbankId}`,
-      soundbankId,
-    )
-  }
-  if (location.soundbankId !== soundbankId) {
-    fail(
-      'soundbank-location-mismatch',
-      `Resource locator returned ${location.soundbankId} for ${soundbankId}`,
-      soundbankId,
-    )
-  }
-  return Object.freeze({
-    assetBaseUrl: String(location.assetBaseUrl),
-    soundbankId: location.soundbankId,
-  })
-}
-
-function createPreparedInstrument(
-  soundbankId: SoundbankId,
-  prepared: PreparedSampleInstrumentResources,
-): PreparedAudibleMidiSampleInstrument {
-  return Object.freeze({
-    manifest: prepared.manifest,
-    resources: prepared.resources,
-    soundbankId,
-  })
-}
-
-function parseFailureMode(
-  value: AudibleMidiSamplePreparationFailureMode | undefined,
-): AudibleMidiSamplePreparationFailureMode {
-  switch (value) {
-    case undefined:
-    case AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST:
-      return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST
-    case AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS:
-      return AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS
-    default:
-      fail('invalid-failure-mode', `Unknown Sample preparation failure mode ${String(value)}`)
-  }
-}
-
-type InstrumentPreparationResult =
-  | {
-      readonly kind: 'prepared'
-      readonly instrument: PreparedAudibleMidiSampleInstrument
-      readonly unsupportedNoteOccurrences: readonly AudibleMidiUnsupportedSampleNoteOccurrence[]
-    }
-  | {
-      readonly kind: 'failed'
-      readonly failure: AudibleMidiSamplePreparationFailure
-    }
-
-/** Prepares Sample resources for one stable Plan under an explicit per-Instrument failure policy. */
-export async function prepareAudibleMidiSampleResources(
+/**
+ * Loads every instrument a plan plays. Under SKIP_UNAVAILABLE_INSTRUMENTS an instrument that fails
+ * to load is reported and left out; under FAIL_PLAN its failure rejects the whole preparation.
+ */
+export async function prepareSampleResources(
   plan: AudibleMidiProjectPlan,
   cache: SampleInstrumentResourceCache,
-  locator: AudibleMidiSampleResourceLocator,
-  options: PrepareAudibleMidiSampleResourcesOptions = {},
-): Promise<PreparedAudibleMidiSampleResources> {
-  const failureMode = parseFailureMode(options.failureMode)
-  const { signal } = options
-  if (signal?.aborted === true) {
-    fail('aborted', 'Sample resource preparation was aborted')
-  }
-  switch (plan.status) {
-    case 'blocked':
-      fail('blocked-plan', 'A blocked Audible MIDI Plan cannot prepare audio resources')
-    case 'empty':
-    case 'partial':
-    case 'playable':
-      break
-    default:
-      fail('invalid-plan-status', 'Audible MIDI Plan has an unknown status')
-  }
-
-  const spansBySoundbank = collectNoteSpansBySoundbank(plan)
+  assetBaseUrl: SampleAssetBaseUrl,
+  failureMode: PlaybackInstrumentFailureMode,
+  signal?: AbortSignal,
+): Promise<PreparedSampleResources> {
+  signal?.throwIfAborted()
   const results = await Promise.all(
-    [...spansBySoundbank].map(async ([soundbankId, spans]) => {
+    groupSpansBySoundbank(plan).map(async ([soundbankId, spans]) => {
       try {
-        const location = requireLocation(locator, soundbankId)
-        const manifest = await cache.loadManifest(location, signal)
-        const { resourceKeys, unsupportedNoteOccurrences } = partitionSampleResourcesForNoteSpans(
-          manifest,
-          soundbankId,
-          spans,
-        )
-        const prepared = await cache.prepare(location, resourceKeys, signal)
-        return Object.freeze<InstrumentPreparationResult>({
-          instrument: createPreparedInstrument(soundbankId, prepared),
-          kind: 'prepared',
-          unsupportedNoteOccurrences,
-        })
+        const baseUrl = assetBaseUrl(soundbankId)
+        if (baseUrl === null) throw new Error(`No sample assets are available for ${soundbankId}`)
+        return await prepareInstrument(cache, { assetBaseUrl: baseUrl, soundbankId }, spans, signal)
       } catch (cause) {
         if (
           signal?.aborted === true ||
-          failureMode === AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.FAIL_FAST
+          failureMode === PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN
         ) {
           throw cause
         }
-        return Object.freeze<InstrumentPreparationResult>({
-          failure: Object.freeze({ cause, soundbankId }),
-          kind: 'failed',
-        })
+        return Object.freeze<InstrumentPreparationFailure>({ cause, soundbankId })
       }
     }),
   )
-  const failures: AudibleMidiSamplePreparationFailure[] = []
-  const instruments: PreparedAudibleMidiSampleInstrument[] = []
-  const unsupportedNoteOccurrences: AudibleMidiUnsupportedSampleNoteOccurrence[] = []
+
+  const instruments = new Map<SoundbankId, SampleInstrument>()
+  const preparationFailures: InstrumentPreparationFailure[] = []
+  const unsupportedNoteOccurrences: UnsupportedNoteOccurrence[] = []
   for (const result of results) {
-    if (result.kind === 'prepared') {
-      instruments.push(result.instrument)
+    if ('instrument' in result) {
+      instruments.set(result.soundbankId, result.instrument)
       unsupportedNoteOccurrences.push(...result.unsupportedNoteOccurrences)
-    } else failures.push(result.failure)
+    } else {
+      preparationFailures.push(result)
+    }
   }
 
   return Object.freeze({
-    failures: Object.freeze(failures),
-    instruments: Object.freeze(instruments),
     modelRevision: plan.modelRevision,
+    instruments,
+    preparationFailures: Object.freeze(preparationFailures),
     unsupportedNoteOccurrences: Object.freeze(unsupportedNoteOccurrences),
   })
 }

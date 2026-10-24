@@ -1,12 +1,14 @@
-import { parseSoundbankId, type AudibleMidiProjectPlan } from '@seele-daw/playback'
+import {
+  PLAYBACK_INSTRUMENT_FAILURE_MODE,
+  parseSoundbankId,
+  type AudibleMidiProjectPlan,
+  type SoundbankId,
+} from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
-  AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE,
-  AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON,
-  AudibleMidiSamplePreparationError,
-  prepareAudibleMidiSampleResources,
-  type AudibleMidiSampleResourceLocator,
+  prepareSampleResources,
+  type SampleAssetBaseUrl,
 } from '#internal/sample-instrument/loading/prepare-plan-resources'
 import { SampleInstrumentResourceCache } from '#internal/sample-instrument/loading/resource-cache'
 import {
@@ -20,22 +22,27 @@ const TRACK_ID = 'track-fixture'
 const SECOND_TRACK_ID = 'track-fixture-strings'
 const SECOND_SOUNDBANK_ID = parseSoundbankId('fixture-strings')
 const UNAVAILABLE_SOUNDBANK_ID = parseSoundbankId('unavailable-fixture')
-const LOCATION = Object.freeze({
-  assetBaseUrl: 'https://studio.test/assets/fixture-piano/',
-  soundbankId: FIXTURE_SOUNDBANK_ID,
-})
-const SECOND_LOCATION = Object.freeze({
-  assetBaseUrl: 'https://studio.test/assets/fixture-strings/',
-  soundbankId: SECOND_SOUNDBANK_ID,
-})
+const ASSET_BASE = 'https://studio.test/assets/fixture-piano/'
+const SECOND_ASSET_BASE = 'https://studio.test/assets/fixture-strings/'
+const { FAIL_PLAN, SKIP_UNAVAILABLE_INSTRUMENTS } = PLAYBACK_INSTRUMENT_FAILURE_MODE
+
+function assetBases(entries: readonly (readonly [SoundbankId, string])[]): SampleAssetBaseUrl {
+  const bases = new Map(entries)
+  return (soundbankId) => bases.get(soundbankId) ?? null
+}
+
+const FIXTURE_ASSETS = assetBases([[FIXTURE_SOUNDBANK_ID, ASSET_BASE]])
+const BOTH_ASSETS = assetBases([
+  [FIXTURE_SOUNDBANK_ID, ASSET_BASE],
+  [SECOND_SOUNDBANK_ID, SECOND_ASSET_BASE],
+])
 
 function createPlan(
   pitches: readonly number[],
   status: AudibleMidiProjectPlan['status'] = 'playable',
-  options: { readonly audible?: boolean; readonly duplicateTrackRoute?: boolean } = {},
 ) {
   const track = Object.freeze({
-    audible: options.audible ?? true,
+    audible: true,
     gain: 0.8,
     instrument: Object.freeze({
       deviceId: 'device-fixture',
@@ -72,7 +79,7 @@ function createPlan(
     status,
     tempoSegments: Object.freeze([]),
     timelineEndTick: 1_920,
-    tracks: Object.freeze(options.duplicateTrackRoute ? [track, track] : [track]),
+    tracks: Object.freeze([track]),
   })
   // Playback owns validation and branding; this fixture supplies its already-validated DTO shape.
   return plan as unknown as AudibleMidiProjectPlan
@@ -166,46 +173,47 @@ function createFixture() {
       : new Response(createPcmWav()),
   )
   const cache = createCache(fetchImplementation)
-  const locator: AudibleMidiSampleResourceLocator = {
-    locate: (soundbankId) => (soundbankId === FIXTURE_SOUNDBANK_ID ? LOCATION : null),
-  }
-  return { cache, fetchImplementation, locator }
+  return { cache, fetchImplementation }
 }
 
-describe('Audible MIDI Sample resource preparation', () => {
-  it('loads only unique resources used by the complete stable Plan', async () => {
-    const { cache, fetchImplementation, locator } = createFixture()
+function resourceKeys(
+  prepared: Awaited<ReturnType<typeof prepareSampleResources>>,
+  soundbankId: SoundbankId = FIXTURE_SOUNDBANK_ID,
+): readonly string[] {
+  return [...(prepared.instruments.get(soundbankId)?.resources.keys() ?? [])].sort()
+}
 
-    const prepared = await prepareAudibleMidiSampleResources(
+describe('Sample resource preparation', () => {
+  it('loads only unique resources used by the complete stable Plan', async () => {
+    const { cache, fetchImplementation } = createFixture()
+
+    const prepared = await prepareSampleResources(
       createPlan([48, 52, 60, 60]),
       cache,
-      locator,
+      FIXTURE_ASSETS,
+      FAIL_PLAN,
     )
 
-    expect(prepared.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
-      FIXTURE_SOUNDBANK_ID,
-    ])
-    expect(prepared.failures).toEqual([])
+    expect([...prepared.instruments.keys()]).toEqual([FIXTURE_SOUNDBANK_ID])
+    expect(prepared.preparationFailures).toEqual([])
     expect(prepared.unsupportedNoteOccurrences).toEqual([])
-    expect(prepared.instruments[0]?.resources.map(({ key }) => key)).toEqual([
-      'samples/high.wav',
-      'samples/low.wav',
-    ])
+    expect(resourceKeys(prepared)).toEqual(['samples/high.wav', 'samples/low.wav'])
     expect(prepared.modelRevision).toBe(0)
     expect(fetchImplementation).toHaveBeenCalledTimes(3)
   })
 
   it('treats an empty Plan as a successful zero-resource preparation', async () => {
-    const { cache, fetchImplementation, locator } = createFixture()
+    const { cache, fetchImplementation } = createFixture()
 
-    const prepared = await prepareAudibleMidiSampleResources(
+    const prepared = await prepareSampleResources(
       createPlan([], 'empty'),
       cache,
-      locator,
+      FIXTURE_ASSETS,
+      FAIL_PLAN,
     )
 
-    expect(prepared.instruments).toEqual([])
-    expect(prepared.failures).toEqual([])
+    expect(prepared.instruments.size).toBe(0)
+    expect(prepared.preparationFailures).toEqual([])
     expect(prepared.unsupportedNoteOccurrences).toEqual([])
     expect(prepared.modelRevision).toBe(0)
     expect(fetchImplementation).not.toHaveBeenCalled()
@@ -227,34 +235,21 @@ describe('Audible MIDI Sample resource preparation', () => {
       return new Promise<Response>((resolve) => manifestResolvers.set(url, resolve))
     })
     const cache = createCache(fetchImplementation, new FakeDecodeAudioContext(decodeAudioData))
-    const locator: AudibleMidiSampleResourceLocator = {
-      locate: (soundbankId) => {
-        if (soundbankId === FIXTURE_SOUNDBANK_ID) return LOCATION
-        if (soundbankId === SECOND_SOUNDBANK_ID) return SECOND_LOCATION
-        return null
-      },
-    }
     const plan = createMultiInstrumentPlan()
-    const firstPreparation = prepareAudibleMidiSampleResources(plan, cache, locator)
+    const firstPreparation = prepareSampleResources(plan, cache, BOTH_ASSETS, FAIL_PLAN)
 
     await vi.waitFor(() => expect(manifestResolvers.size).toBe(2))
-    manifestResolvers.get(`${LOCATION.assetBaseUrl}manifest.json`)?.(
+    manifestResolvers.get(`${ASSET_BASE}manifest.json`)?.(
       createManifestResponse(FIXTURE_SOUNDBANK_ID),
     )
-    manifestResolvers.get(`${SECOND_LOCATION.assetBaseUrl}manifest.json`)?.(
+    manifestResolvers.get(`${SECOND_ASSET_BASE}manifest.json`)?.(
       createManifestResponse(SECOND_SOUNDBANK_ID),
     )
     const first = await firstPreparation
-    const second = await prepareAudibleMidiSampleResources(plan, cache, locator)
+    const second = await prepareSampleResources(plan, cache, BOTH_ASSETS, FAIL_PLAN)
 
-    expect(first.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
-      FIXTURE_SOUNDBANK_ID,
-      SECOND_SOUNDBANK_ID,
-    ])
-    expect(second.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
-      FIXTURE_SOUNDBANK_ID,
-      SECOND_SOUNDBANK_ID,
-    ])
+    expect([...first.instruments.keys()]).toEqual([FIXTURE_SOUNDBANK_ID, SECOND_SOUNDBANK_ID])
+    expect([...second.instruments.keys()]).toEqual([FIXTURE_SOUNDBANK_ID, SECOND_SOUNDBANK_ID])
     expect(fetchImplementation).toHaveBeenCalledTimes(4)
     expect(decodeAudioData).toHaveBeenCalledTimes(2)
     expect(cache.statistics).toEqual({
@@ -287,15 +282,13 @@ describe('Audible MIDI Sample resource preparation', () => {
       )
     })
     const cache = createCache(fetchImplementation)
-    const locator: AudibleMidiSampleResourceLocator = {
-      locate: (soundbankId) => (soundbankId === FIXTURE_SOUNDBANK_ID ? LOCATION : SECOND_LOCATION),
-    }
     const controller = new AbortController()
-    const preparation = prepareAudibleMidiSampleResources(
+    const preparation = prepareSampleResources(
       createMultiInstrumentPlan(),
       cache,
-      locator,
-      { signal: controller.signal },
+      BOTH_ASSETS,
+      FAIL_PLAN,
+      controller.signal,
     )
 
     await vi.waitFor(() => expect(resourceSignals).toHaveLength(2))
@@ -312,74 +305,86 @@ describe('Audible MIDI Sample resource preparation', () => {
   })
 
   it('rejects an already-cancelled empty preparation without starting resource work', async () => {
-    const { cache, fetchImplementation, locator } = createFixture()
+    const { cache, fetchImplementation } = createFixture()
     const controller = new AbortController()
     controller.abort()
 
     await expect(
-      prepareAudibleMidiSampleResources(createPlan([], 'empty'), cache, locator, {
-        signal: controller.signal,
-      }),
-    ).rejects.toEqual(
-      expect.objectContaining<Partial<AudibleMidiSamplePreparationError>>({ code: 'aborted' }),
-    )
+      prepareSampleResources(
+        createPlan([], 'empty'),
+        cache,
+        FIXTURE_ASSETS,
+        FAIL_PLAN,
+        controller.signal,
+      ),
+    ).rejects.toMatchObject({ name: 'AbortError' })
     expect(fetchImplementation).not.toHaveBeenCalled()
   })
 
   it('retains available Instruments and reports unavailable ones in selective mode', async () => {
-    const { cache, locator } = createFixture()
+    const { cache } = createFixture()
 
-    const prepared = await prepareAudibleMidiSampleResources(
+    const prepared = await prepareSampleResources(
       createPlanWithUnavailableInstrument(),
       cache,
-      locator,
-      {
-        failureMode: AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
-      },
+      FIXTURE_ASSETS,
+      SKIP_UNAVAILABLE_INSTRUMENTS,
     )
 
-    expect(prepared.instruments.map(({ soundbankId }) => soundbankId)).toEqual([
-      FIXTURE_SOUNDBANK_ID,
-    ])
-    expect(prepared.failures).toEqual([
-      expect.objectContaining({
-        cause: expect.objectContaining({ code: 'missing-asset-location' }),
+    expect([...prepared.instruments.keys()]).toEqual([FIXTURE_SOUNDBANK_ID])
+    expect(prepared.preparationFailures).toEqual([
+      {
+        cause: new Error('No sample assets are available for unavailable-fixture'),
         soundbankId: UNAVAILABLE_SOUNDBANK_ID,
-      }),
+      },
     ])
     expect(prepared.unsupportedNoteOccurrences).toEqual([])
   })
 
-  it('isolates valid uncovered Note occurrences and prepares only covered resources', async () => {
-    const { cache, fetchImplementation, locator } = createFixture()
+  it('rejects the whole preparation for an unavailable Instrument in fail-plan mode', async () => {
+    const { cache } = createFixture()
 
-    const prepared = await prepareAudibleMidiSampleResources(
+    await expect(
+      prepareSampleResources(
+        createPlanWithUnavailableInstrument(),
+        cache,
+        FIXTURE_ASSETS,
+        FAIL_PLAN,
+      ),
+    ).rejects.toThrow('No sample assets are available for unavailable-fixture')
+  })
+
+  it('isolates valid uncovered Note occurrences and prepares only covered resources', async () => {
+    const { cache, fetchImplementation } = createFixture()
+
+    const prepared = await prepareSampleResources(
       createPlan([47, 48, 73, 73]),
       cache,
-      locator,
+      FIXTURE_ASSETS,
+      FAIL_PLAN,
     )
 
-    expect(prepared.failures).toEqual([])
-    expect(prepared.instruments[0]?.resources.map(({ key }) => key)).toEqual(['samples/low.wav'])
+    expect(prepared.preparationFailures).toEqual([])
+    expect(resourceKeys(prepared)).toEqual(['samples/low.wav'])
     expect(prepared.unsupportedNoteOccurrences).toEqual([
       {
         occurrenceKey: JSON.stringify([TRACK_ID, 0]),
         pitch: 47,
-        reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
+        reason: 'no-matching-zone',
         soundbankId: FIXTURE_SOUNDBANK_ID,
         trackId: TRACK_ID,
       },
       {
         occurrenceKey: JSON.stringify([TRACK_ID, 2]),
         pitch: 73,
-        reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
+        reason: 'no-matching-zone',
         soundbankId: FIXTURE_SOUNDBANK_ID,
         trackId: TRACK_ID,
       },
       {
         occurrenceKey: JSON.stringify([TRACK_ID, 3]),
         pitch: 73,
-        reason: AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON.NO_MATCHING_ZONE,
+        reason: 'no-matching-zone',
         soundbankId: FIXTURE_SOUNDBANK_ID,
         trackId: TRACK_ID,
       },
@@ -388,85 +393,19 @@ describe('Audible MIDI Sample resource preparation', () => {
   })
 
   it('returns an empty-resource Instrument when every valid Note occurrence is uncovered', async () => {
-    const { cache, fetchImplementation, locator } = createFixture()
+    const { cache, fetchImplementation } = createFixture()
 
-    const prepared = await prepareAudibleMidiSampleResources(createPlan([0, 33]), cache, locator)
+    const prepared = await prepareSampleResources(
+      createPlan([0, 33]),
+      cache,
+      FIXTURE_ASSETS,
+      FAIL_PLAN,
+    )
 
-    expect(prepared.failures).toEqual([])
-    expect(prepared.instruments).toEqual([
-      expect.objectContaining({ resources: [], soundbankId: FIXTURE_SOUNDBANK_ID }),
-    ])
+    expect(prepared.preparationFailures).toEqual([])
+    expect([...prepared.instruments.keys()]).toEqual([FIXTURE_SOUNDBANK_ID])
+    expect(resourceKeys(prepared)).toEqual([])
     expect(prepared.unsupportedNoteOccurrences).toHaveLength(2)
     expect(fetchImplementation).toHaveBeenCalledTimes(1)
-  })
-
-  it.each([
-    {
-      code: 'blocked-plan',
-      run: async () => {
-        const { cache, locator } = createFixture()
-        return prepareAudibleMidiSampleResources(createPlan([], 'blocked'), cache, locator)
-      },
-    },
-    {
-      code: 'invalid-plan-status',
-      run: async () => {
-        const { cache, locator } = createFixture()
-        return prepareAudibleMidiSampleResources(
-          createPlan([], 'future-status' as AudibleMidiProjectPlan['status']),
-          cache,
-          locator,
-        )
-      },
-    },
-    {
-      code: 'missing-asset-location',
-      run: async () => {
-        const { cache } = createFixture()
-        return prepareAudibleMidiSampleResources(createPlan([60]), cache, { locate: () => null })
-      },
-    },
-    {
-      code: 'duplicate-track-route',
-      run: async () => {
-        const { cache, locator } = createFixture()
-        return prepareAudibleMidiSampleResources(
-          createPlan([60], 'playable', { duplicateTrackRoute: true }),
-          cache,
-          locator,
-        )
-      },
-    },
-    {
-      code: 'inaudible-track-route',
-      run: async () => {
-        const { cache, locator } = createFixture()
-        return prepareAudibleMidiSampleResources(
-          createPlan([60], 'playable', { audible: false }),
-          cache,
-          locator,
-        )
-      },
-    },
-    {
-      code: 'soundbank-location-mismatch',
-      run: async () => {
-        const { cache } = createFixture()
-        return prepareAudibleMidiSampleResources(createPlan([60]), cache, {
-          locate: () => ({ ...LOCATION, soundbankId: parseSoundbankId('wrong-soundbank') }),
-        })
-      },
-    },
-    {
-      code: 'invalid-pitch',
-      run: async () => {
-        const { cache, locator } = createFixture()
-        return prepareAudibleMidiSampleResources(createPlan([128]), cache, locator)
-      },
-    },
-  ] as const)('fails closed with $code', async ({ code, run }) => {
-    await expect(run()).rejects.toEqual(
-      expect.objectContaining<Partial<AudibleMidiSamplePreparationError>>({ code }),
-    )
   })
 })

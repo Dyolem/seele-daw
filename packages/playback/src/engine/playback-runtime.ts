@@ -39,34 +39,40 @@ export interface UnsupportedNoteOccurrence {
   readonly trackId: ScheduledSampleVoicePlan['trackId']
 }
 
-/** One scheduled sample voice in the audio runtime. */
-export interface PlaybackVoiceHandle {
-  readonly engineGeneration: ScheduledSampleVoicePlan['engineGeneration']
-  readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey']
-  cancel(atPlaybackClockSecond?: PlaybackClockSecond): boolean
+/** One voice the output is playing. */
+export interface PlaybackVoice {
+  /** Fades the voice out quickly, from the given time or now. */
+  cancel(atPlaybackClockSecond?: PlaybackClockSecond): void
+  /** True until the voice has fallen silent. */
   isActive(): boolean
-  rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): boolean
+  /** Moves the release of a voice whose release has not started; otherwise does nothing. */
+  rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): void
 }
 
-/** Audio resources loaded for one plan revision, with its own clock. */
-export interface PreparedPlaybackRuntime {
+/** The instruments loaded for one plan revision, and what of the plan they cannot play. */
+export interface PreparedPlaybackPlan {
   readonly modelRevision: ModelRevision
   readonly preparationFailures: readonly InstrumentPreparationFailure[]
   readonly unsupportedNoteOccurrences: readonly UnsupportedNoteOccurrence[]
-  advanceGeneration(generation: ScheduledSampleVoicePlan['engineGeneration']): void
-  allNotesOff(): void
-  dispose(): void
-  now(): PlaybackClockSecond
-  schedule(plan: ScheduledSampleVoicePlan): PlaybackVoiceHandle | null
+  /** Starts one voice of the plan on the output; null when it cannot sound. */
+  schedule(voice: ScheduledSampleVoicePlan): PlaybackVoice | null
 }
 
-/** The audio side of playback: loads a plan's instruments and plays its voices. */
+/**
+ * The audio side of playback: one output with its clock and every voice it plays. Voices of an
+ * older revision keep sounding until they end, so polyphony and all-notes-off cover all of them.
+ */
 export interface PlaybackRuntimePort {
+  /** Loads the instruments a plan needs; the first call also starts the output. */
   prepare(
     plan: AudibleMidiProjectPlan,
     signal: PlaybackAbortSignal,
     options: PlaybackPreparationOptions,
-  ): Promise<PreparedPlaybackRuntime>
+  ): Promise<PreparedPlaybackPlan>
+  /** The output clock; only read once a preparation has started the output. */
+  now(): PlaybackClockSecond
+  /** Fades out every voice. */
+  allNotesOff(): void
   dispose(): void
 }
 

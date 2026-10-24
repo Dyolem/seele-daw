@@ -7,12 +7,7 @@ import {
 } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
-import { BUILT_IN_INSTRUMENT_CATALOGUE } from '@/workbench/instrument/built-in-instrument-catalogue'
-import {
-  DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
-  createBrowserProjectPlaybackRuntime,
-  createDefaultBuiltInSampleAssetLocations,
-} from '@/workbench/project/playback/browser-runtime'
+import { createWebAudioPlaybackRuntime } from '#internal/web-audio-playback-runtime'
 
 const FIRST_SOUNDBANK_ID = parseSoundbankId('fixture-piano')
 const SECOND_SOUNDBANK_ID = parseSoundbankId('fixture-strings')
@@ -165,32 +160,57 @@ function createPlan(
   }) as unknown as AudibleMidiProjectPlan
 }
 
-function createAssetLocations(): ReadonlyMap<SoundbankId, string> {
-  return new Map([
-    [FIRST_SOUNDBANK_ID, FIRST_ASSET_BASE],
-    [SECOND_SOUNDBANK_ID, SECOND_ASSET_BASE],
-  ])
+const ASSET_BASES = new Map([
+  [FIRST_SOUNDBANK_ID, FIRST_ASSET_BASE],
+  [SECOND_SOUNDBANK_ID, SECOND_ASSET_BASE],
+])
+
+const LIMITS = Object.freeze({
+  maximumDecodedFloat32ByteLength: 4 * 1_024 * 1_024,
+  maximumManifestByteLength: 64 * 1_024,
+  maximumResourceByteLength: 4 * 1_024 * 1_024,
+})
+
+function createRuntime(
+  context: FakeBrowserAudioContext,
+  fetch: typeof globalThis.fetch,
+  limits = LIMITS,
+) {
+  return createWebAudioPlaybackRuntime({
+    assetBaseUrl: (soundbankId: SoundbankId) => ASSET_BASES.get(soundbankId) ?? null,
+    audioContextFactory: () => context.asAudioContext(),
+    expectedOrigin: 'https://studio.example.test',
+    fetch,
+    limits,
+  })
 }
 
-describe('Browser Project Playback Runtime built-in locations', () => {
-  it('projects every Catalogue entry to its same-origin developer asset base', () => {
-    const locations = createDefaultBuiltInSampleAssetLocations('https://studio.example.test')
+function createVoicePlan(
+  plan: AudibleMidiProjectPlan,
+  index: number,
+  soundbankId: SoundbankId,
+): ScheduledSampleVoicePlan {
+  const span = plan.midiNoteSpans[index]!
+  return Object.freeze({
+    channel: span.channel,
+    instrumentDeviceId: `device-${index}`,
+    keyReleasePlaybackClockSecond: 0.5,
+    kind: 'sample-voice',
+    masterGain: 1,
+    occurrenceKey: span.occurrenceKey,
+    pan: 0,
+    pitch: span.pitch,
+    releasePlaybackClockSecond: 0.5,
+    soundbankId,
+    startPlaybackClockSecond: 0,
+    timing: 'on-time',
+    trackGain: 1,
+    trackId: span.trackId,
+    velocity: span.velocity,
+  }) as unknown as ScheduledSampleVoicePlan
+}
 
-    expect(DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS.maximumResourceByteLength).toBe(
-      8 * 1_024 * 1_024,
-    )
-    expect([...locations.keys()]).toEqual(
-      BUILT_IN_INSTRUMENT_CATALOGUE.map(({ soundbankId }) => soundbankId),
-    )
-    expect(locations.get(parseSoundbankId('studio-grand'))?.href).toBe(
-      'https://studio.example.test/soundbanks/generated/studio-grand/',
-    )
-    expect(locations.get(parseSoundbankId('general-midi-percussion'))?.href).toBe(
-      'https://studio.example.test/soundbanks/generated/general-midi-percussion/',
-    )
-    expect(locations.get(parseSoundbankId('unknown-bank'))).toBeUndefined()
-  })
-
+describe('Web Audio playback runtime', () => {
   it('shares one bounded application cache across repeated multi-instrument preparations', async () => {
     const context = new FakeBrowserAudioContext()
     const fetchImplementation = vi.fn<typeof globalThis.fetch>(async (input) => {
@@ -202,27 +222,18 @@ describe('Browser Project Playback Runtime built-in locations', () => {
       }
       return new Response(createPcmWav())
     })
-    const runtime = createBrowserProjectPlaybackRuntime({
-      assetBaseBySoundbank: createAssetLocations(),
-      audioContextFactory: () => context.asAudioContext(),
-      expectedOrigin: 'https://studio.example.test',
-      fetch: fetchImplementation,
-      resourceLimits: {
-        maximumDecodedFloat32ByteLength: 1_600,
-        maximumManifestByteLength: 64 * 1_024,
-        maximumResourceByteLength: 4 * 1_024 * 1_024,
-      },
+    const runtime = createRuntime(context, fetchImplementation, {
+      ...LIMITS,
+      maximumDecodedFloat32ByteLength: 1_600,
     })
     const plan = createPlan([FIRST_SOUNDBANK_ID, SECOND_SOUNDBANK_ID])
 
-    const first = await runtime.prepare(plan, new AbortController().signal, {
+    await runtime.prepare(plan, new AbortController().signal, {
       instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
-    first.dispose()
-    const second = await runtime.prepare(plan, new AbortController().signal, {
+    await runtime.prepare(plan, new AbortController().signal, {
       instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
-    second.dispose()
 
     expect(fetchImplementation).toHaveBeenCalledTimes(4)
     expect(context.decodeAudioData).toHaveBeenCalledTimes(2)
@@ -237,12 +248,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
         ? createManifestResponse(FIRST_SOUNDBANK_ID)
         : new Response(createPcmWav()),
     )
-    const runtime = createBrowserProjectPlaybackRuntime({
-      assetBaseBySoundbank: createAssetLocations(),
-      audioContextFactory: () => context.asAudioContext(),
-      expectedOrigin: 'https://studio.example.test',
-      fetch: fetchImplementation,
-    })
+    const runtime = createRuntime(context, fetchImplementation)
     const plan = createPlan([FIRST_SOUNDBANK_ID, FIRST_SOUNDBANK_ID], [47, 60])
 
     const prepared = await runtime.prepare(plan, new AbortController().signal, {
@@ -258,14 +264,9 @@ describe('Browser Project Playback Runtime built-in locations', () => {
         soundbankId: FIRST_SOUNDBANK_ID,
       }),
     ])
-    expect(
-      prepared.schedule({
-        occurrenceKey: plan.midiNoteSpans[0]?.occurrenceKey,
-        soundbankId: FIRST_SOUNDBANK_ID,
-      } as ScheduledSampleVoicePlan),
-    ).toBeNull()
+    expect(prepared.schedule(createVoicePlan(plan, 0, FIRST_SOUNDBANK_ID))).toBeNull()
+    expect(prepared.schedule(createVoicePlan(plan, 0, SECOND_SOUNDBANK_ID))).toBeNull()
     expect(fetchImplementation).toHaveBeenCalledTimes(2)
-    prepared.dispose()
     runtime.dispose()
   })
 
@@ -277,12 +278,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
       }
       return createManifestResponse(FIRST_SOUNDBANK_ID)
     })
-    const runtime = createBrowserProjectPlaybackRuntime({
-      assetBaseBySoundbank: createAssetLocations(),
-      audioContextFactory: () => context.asAudioContext(),
-      expectedOrigin: 'https://studio.example.test',
-      fetch: fetchImplementation,
-    })
+    const runtime = createRuntime(context, fetchImplementation)
     const plan = createPlan([FIRST_SOUNDBANK_ID], [33])
 
     const prepared = await runtime.prepare(plan, new AbortController().signal, {
@@ -298,7 +294,6 @@ describe('Browser Project Playback Runtime built-in locations', () => {
     ])
     expect(fetchImplementation).toHaveBeenCalledOnce()
     expect(context.decodeAudioData).not.toHaveBeenCalled()
-    prepared.dispose()
     runtime.dispose()
   })
 
@@ -315,17 +310,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
       if (url.endsWith('manifest.json')) return createManifestResponse(FIRST_SOUNDBANK_ID)
       return new Response(createPcmWav())
     })
-    const runtime = createBrowserProjectPlaybackRuntime({
-      assetBaseBySoundbank: createAssetLocations(),
-      audioContextFactory: () => context.asAudioContext(),
-      expectedOrigin: 'https://studio.example.test',
-      fetch: fetchImplementation,
-      resourceLimits: {
-        maximumDecodedFloat32ByteLength: 4 * 1_024 * 1_024,
-        maximumManifestByteLength: 64 * 1_024,
-        maximumResourceByteLength: 4 * 1_024 * 1_024,
-      },
-    })
+    const runtime = createRuntime(context, fetchImplementation)
     const plan = createPlan([FIRST_SOUNDBANK_ID, SECOND_SOUNDBANK_ID])
 
     await expect(
@@ -346,14 +331,12 @@ describe('Browser Project Playback Runtime built-in locations', () => {
         soundbankId: SECOND_SOUNDBANK_ID,
       }),
     ])
-    selective.dispose()
 
     const retried = await runtime.prepare(plan, new AbortController().signal, {
       instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
     })
     expect(retried.preparationFailures).toEqual([])
     expect(secondManifestRequestCount).toBe(3)
-    retried.dispose()
     runtime.dispose()
   })
 
@@ -372,12 +355,7 @@ describe('Browser Project Playback Runtime built-in locations', () => {
         ),
       )
     })
-    const runtime = createBrowserProjectPlaybackRuntime({
-      assetBaseBySoundbank: createAssetLocations(),
-      audioContextFactory: () => context.asAudioContext(),
-      expectedOrigin: 'https://studio.example.test',
-      fetch: fetchImplementation,
-    })
+    const runtime = createRuntime(context, fetchImplementation)
     const preparation = runtime.prepare(
       createPlan([FIRST_SOUNDBANK_ID]),
       new AbortController().signal,

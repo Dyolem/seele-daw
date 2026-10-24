@@ -16,10 +16,10 @@ import {
   type PlaybackAbortSignal,
   type PlaybackRuntimePort,
   type PlaybackTimerPort,
-  type PreparedPlaybackRuntime,
+  type PlaybackVoice,
+  type PreparedPlaybackPlan,
   type UnsupportedNoteOccurrence,
 } from '#internal/engine/playback-runtime'
-import { VoiceLedger } from '#internal/engine/voice-ledger'
 import {
   AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND,
   AUDIBLE_MIDI_RECONCILIATION_SCOPE,
@@ -124,6 +124,11 @@ interface ActiveLocateSession {
   readonly startedWhilePlaying: boolean
 }
 
+interface ScheduledVoice {
+  readonly voice: PlaybackVoice
+  readonly plan: ScheduledSampleVoicePlan
+}
+
 /** The cancellation handed to one preparation request. */
 class PreparationAbort implements PlaybackAbortSignal {
   readonly #listeners = new Set<() => void>()
@@ -224,27 +229,20 @@ function onlyReleaseChanged(change: AudibleMidiOccurrenceChange): boolean {
 
 /**
  * Plays one Project revision at a time and follows its commits. It owns the audible plan, the
- * transport and scheduler built from it, the prepared audio runtime and the voices it schedules,
- * and hands playback over to each new revision without restarting it when it can.
+ * transport and scheduler built from it, the instruments prepared for it and the voices it has
+ * scheduled, and hands playback over to each new revision without restarting it when it can.
  */
 class PlaybackEngineImpl implements PlaybackEngine {
   readonly #runtimePort: PlaybackRuntimePort
   readonly #timerPort: PlaybackTimerPort
   readonly #onStateChange: (state: PlaybackEngineState) => void
-  readonly #ledger: VoiceLedger
-  readonly #clock = Object.freeze({
-    now: () => {
-      const runtime = this.#runtime
-      if (runtime === null) {
-        throw new PlaybackEngineError('playback-unavailable', 'Playback has no active audio clock')
-      }
-      return runtime.now()
-    },
-  })
+  readonly #clock = Object.freeze({ now: () => this.#runtimePort.now() })
+  /** Voices that may still sound, from this revision or an earlier one. */
+  readonly #voices = new Set<ScheduledVoice>()
   /** The revision playback reflects, set even when that revision failed to compile. */
   #revision: ModelRevision | null = null
   #plan: AudibleMidiProjectPlan | null = null
-  #runtime: PreparedPlaybackRuntime | null = null
+  #prepared: PreparedPlaybackPlan | null = null
   #transport: AudibleMidiTransport | null = null
   #scheduler: AudibleMidiSchedulerPlanner | null = null
   #timerHandle: unknown = null
@@ -256,8 +254,6 @@ class PlaybackEngineImpl implements PlaybackEngine {
   #pendingChainBroken = false
   #pendingPlan: AudibleMidiProjectPlan | null = null
   #locatedDuringLoading = false
-  #preparationFailures = NO_PREPARATION_FAILURES
-  #unsupportedNotes = NO_UNSUPPORTED_NOTES
   #suppressedOccurrenceKeys = new Set<ScheduledSampleVoicePlan['occurrenceKey']>()
   #suppressedTrackIds = new Set<ScheduledSampleVoicePlan['trackId']>()
   #state: PlaybackEngineState = UNAVAILABLE_STATE
@@ -268,7 +264,6 @@ class PlaybackEngineImpl implements PlaybackEngine {
     this.#runtimePort = dependencies.runtime
     this.#timerPort = dependencies.timer
     this.#onStateChange = dependencies.onStateChange
-    this.#ledger = new VoiceLedger(dependencies.timer, SCHEDULER_WAKE_CADENCE_MILLISECOND)
   }
 
   get state(): PlaybackEngineState {
@@ -332,7 +327,6 @@ class PlaybackEngineImpl implements PlaybackEngine {
         // A visual sample can see the natural end before the scheduler wakes; publish the same
         // transition here and keep the transport's end position.
         this.#stopTimer()
-        this.#ledger.startSweep()
         this.#publishTransport(snapshot)
       }
       return this.#visualPosition(snapshot.positionProjectSecond, snapshot.positionTick)
@@ -398,7 +392,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
     }
     if (this.#transport === null || this.#scheduler === null) this.#installControls(plan)
     if (
-      this.#runtime?.modelRevision === plan.modelRevision &&
+      this.#prepared?.modelRevision === plan.modelRevision &&
       this.#transport !== null &&
       this.#scheduler !== null
     ) {
@@ -417,21 +411,13 @@ class PlaybackEngineImpl implements PlaybackEngine {
     )
 
     try {
-      const previousRuntime = this.#runtime
-      previousRuntime?.dispose()
-      if (previousRuntime !== null) this.#ledger.forget(previousRuntime)
-      this.#runtime = null
-      const runtime = await this.#runtimePort.prepare(plan, preparation, {
+      this.#prepared = null
+      const prepared = await this.#runtimePort.prepare(plan, preparation, {
         instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
       })
-      if (!this.#isCurrentRequest(requestSequence, plan, preparation)) {
-        runtime.dispose()
-        return false
-      }
+      if (!this.#isCurrentRequest(requestSequence, plan, preparation)) return false
 
-      this.#runtime = runtime
-      this.#preparationFailures = runtime.preparationFailures
-      this.#unsupportedNotes = runtime.unsupportedNoteOccurrences
+      this.#prepared = prepared
       const transport = this.#transport
       if (transport === null || this.#scheduler === null) {
         throw new PlaybackEngineError(
@@ -446,7 +432,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
         this.#publishTransport(pending)
         return true
       }
-      if (!hasCoveredNote(plan, this.#unsupportedNotes)) {
+      if (!hasCoveredNote(plan, prepared.unsupportedNoteOccurrences)) {
         this.#locatedDuringLoading = false
         this.#publishTransport(pending)
         return false
@@ -459,7 +445,6 @@ class PlaybackEngineImpl implements PlaybackEngine {
           `Transport rejected Play with outcome ${transition.outcome}`,
         )
       }
-      runtime.advanceGeneration(transition.snapshot.engineGeneration)
       this.#scheduleNextWindow(transition.snapshot)
       this.#startTimer()
       this.#publishTransport(transition.snapshot)
@@ -498,17 +483,14 @@ class PlaybackEngineImpl implements PlaybackEngine {
     try {
       const transport = this.#transport
       if (transport === null) {
-        this.#ledger.allNotesOff(this.#runtime)
-        this.#ledger.startSweep()
+        this.#allNotesOff()
         this.#publishStoppedAtStart()
         return wasLoading
       }
       const transition = transport.returnToLastStartPosition()
       const returned =
         transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION
-      if (returned) this.#runtime?.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#ledger.allNotesOff(this.#runtime)
-      this.#ledger.startSweep()
+      this.#allNotesOff()
       this.#publishTransport(transition.snapshot)
       return wasLoading || returned
     } catch (cause) {
@@ -520,7 +502,6 @@ class PlaybackEngineImpl implements PlaybackEngine {
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
-    this.#ledger.close()
     this.#release()
     this.#runtimePort.dispose()
     this.#revision = null
@@ -571,10 +552,24 @@ class PlaybackEngineImpl implements PlaybackEngine {
     this.#publish(
       planState(phase, plan, {
         positionProjectSecond: snapshot.positionProjectSecond,
-        preparationFailures: this.#preparationFailures,
-        unsupportedNoteOccurrences: this.#unsupportedNotes,
+        preparationFailures: this.#prepared?.preparationFailures ?? NO_PREPARATION_FAILURES,
+        unsupportedNoteOccurrences:
+          this.#prepared?.unsupportedNoteOccurrences ?? NO_UNSUPPORTED_NOTES,
       }),
     )
+  }
+
+  /** Fades out every voice still sounding; voices already fading need no further edits. */
+  #allNotesOff(): void {
+    if (this.#voices.size === 0) return
+    this.#runtimePort.allNotesOff()
+    this.#voices.clear()
+  }
+
+  #forgetSilentVoices(): void {
+    for (const scheduled of this.#voices) {
+      if (!scheduled.voice.isActive()) this.#voices.delete(scheduled)
+    }
   }
 
   #failCurrentPlan(cause: unknown): void {
@@ -631,22 +626,18 @@ class PlaybackEngineImpl implements PlaybackEngine {
     this.#locateSession = null
     this.#cancelPreparation()
     this.#stopTimer()
-    this.#ledger.stopSweep()
     try {
-      this.#ledger.allNotesOff(this.#runtime)
+      this.#allNotesOff()
     } catch {
-      // Disposing the runtimes below still silences them.
+      // A failed output reports itself the next time playback uses it.
     }
-    this.#ledger.release(this.#runtime)
-    this.#runtime = null
+    this.#prepared = null
     this.#pendingCommits = []
     this.#pendingSnapshot = null
     this.#pendingFlushQueued = false
     this.#pendingChainBroken = false
     this.#pendingPlan = null
     this.#locatedDuringLoading = false
-    this.#preparationFailures = NO_PREPARATION_FAILURES
-    this.#unsupportedNotes = NO_UNSUPPORTED_NOTES
     this.#suppressedOccurrenceKeys.clear()
     this.#suppressedTrackIds.clear()
     this.#transport = null
@@ -667,8 +658,8 @@ class PlaybackEngineImpl implements PlaybackEngine {
 
   #scheduleNextWindow(snapshot: AudibleMidiTransportSnapshot): void {
     const scheduler = this.#scheduler
-    const runtime = this.#runtime
-    if (scheduler === null || runtime === null) {
+    const prepared = this.#prepared
+    if (scheduler === null || prepared === null) {
       throw new PlaybackEngineError('playback-unavailable', 'Playback scheduling is unavailable')
     }
     const batch = scheduler.planNextWindow(snapshot)
@@ -680,13 +671,12 @@ class PlaybackEngineImpl implements PlaybackEngine {
       ) {
         continue
       }
-      const handle = runtime.schedule(plan)
-      if (handle !== null) this.#ledger.add(Object.freeze({ handle, plan, runtime }))
+      const voice = prepared.schedule(plan)
+      if (voice !== null) this.#voices.add(Object.freeze({ voice, plan }))
     }
   }
 
   #startTimer(): void {
-    this.#ledger.stopSweep()
     if (this.#timerHandle !== null) return
     this.#timerHandle = this.#timerPort.setRepeating(
       () => this.#tick(),
@@ -702,14 +692,13 @@ class PlaybackEngineImpl implements PlaybackEngine {
 
   #tick(): void {
     if (this.#disposed) return
-    this.#ledger.collect()
     const transport = this.#transport
     if (transport === null) return
     try {
+      this.#forgetSilentVoices()
       const snapshot = transport.getSnapshot()
       if (snapshot.state !== 'playing') {
         this.#stopTimer()
-        this.#ledger.startSweep()
         this.#publishTransport(snapshot)
         return
       }
@@ -727,9 +716,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
       const transition = transport.pause()
       if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PAUSED) return false
       this.#stopTimer()
-      this.#runtime?.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#ledger.allNotesOff(this.#runtime)
-      this.#ledger.startSweep()
+      this.#allNotesOff()
       this.#publishTransport(transition.snapshot)
       return true
     } catch (cause) {
@@ -740,20 +727,19 @@ class PlaybackEngineImpl implements PlaybackEngine {
 
   #resume(): boolean {
     const transport = this.#transport
-    const runtime = this.#runtime
+    const prepared = this.#prepared
     const plan = this.#plan
-    if (transport === null || runtime === null || this.#scheduler === null || plan === null) {
+    if (transport === null || prepared === null || this.#scheduler === null || plan === null) {
       return false
     }
-    if (!hasCoveredNote(plan, this.#unsupportedNotes)) {
+    if (!hasCoveredNote(plan, prepared.unsupportedNoteOccurrences)) {
       this.#publishTransport(transport.getSnapshot())
       return false
     }
     try {
       const transition = transport.play()
       if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) return false
-      runtime.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#ledger.collect()
+      this.#forgetSilentVoices()
       this.#scheduleNextWindow(transition.snapshot)
       this.#startTimer()
       this.#publishTransport(transition.snapshot)
@@ -799,14 +785,10 @@ class PlaybackEngineImpl implements PlaybackEngine {
       }
       if (transition.outcome === AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE) return true
       this.#stopTimer()
-      this.#runtime?.advanceGeneration(transition.snapshot.engineGeneration)
-      this.#ledger.allNotesOff(this.#runtime)
-      this.#ledger.collect()
+      this.#allNotesOff()
       if (transition.snapshot.state === 'playing') {
         this.#scheduleNextWindow(transition.snapshot)
         this.#startTimer()
-      } else {
-        this.#ledger.startSweep()
       }
       this.#publishTransport(transition.snapshot)
       return true
@@ -818,8 +800,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
 
   #resumeAt(tick: Tick): boolean {
     const transport = this.#transport
-    const runtime = this.#runtime
-    if (transport === null || runtime === null || this.#scheduler === null) return false
+    if (transport === null || this.#prepared === null || this.#scheduler === null) return false
     try {
       const played = transport.play()
       if (played.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) {
@@ -829,14 +810,12 @@ class PlaybackEngineImpl implements PlaybackEngine {
         )
       }
       const located = transport.locateAtTick(tick)
-      runtime.advanceGeneration(located.snapshot.engineGeneration)
-      this.#ledger.collect()
+      this.#forgetSilentVoices()
       if (located.snapshot.state === 'playing') {
         this.#scheduleNextWindow(located.snapshot)
         this.#startTimer()
       } else {
         this.#stopTimer()
-        this.#ledger.startSweep()
       }
       this.#publishTransport(located.snapshot)
       return true
@@ -896,7 +875,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
     const canContinue =
       (this.#state.phase === PLAYBACK_PHASE.PLAYING ||
         this.#state.phase === PLAYBACK_PHASE.PAUSED) &&
-      this.#runtime !== null &&
+      this.#prepared !== null &&
       this.#transport !== null &&
       this.#scheduler !== null
     if (!canContinue || reconciliation.scope !== AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE) {
@@ -921,48 +900,44 @@ class PlaybackEngineImpl implements PlaybackEngine {
 
   /** Cuts or retimes the voices the edit changed, before the new runtime is ready. */
   #adjustSoundingVoices(reconciliation: AudibleMidiReconciliationPlan): void {
-    const runtime = this.#runtime
     const transport = this.#transport
-    if (runtime === null || transport === null) return
-    const now = runtime.now()
+    if (this.#prepared === null || transport === null) return
+    const now = this.#runtimePort.now()
 
     for (const change of reconciliation.trackChanges) {
       if (change.kind === AUDIBLE_MIDI_TRACK_CHANGE_KIND.ADDED) continue
-      for (const voice of this.#ledger.voices) {
-        if (voice.plan.trackId === change.trackId) voice.handle.cancel(now)
+      for (const { voice, plan } of this.#voices) {
+        if (plan.trackId === change.trackId) voice.cancel(now)
       }
     }
 
     for (const change of reconciliation.occurrenceChanges) {
       if (change.kind === AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED) continue
-      const voices = [...this.#ledger.voices].filter(
-        ({ handle }) => handle.occurrenceKey === change.occurrenceKey,
-      )
-      for (const voice of voices) {
-        if (!voice.handle.isActive()) {
-          this.#ledger.delete(voice)
+      for (const scheduled of this.#voices) {
+        const { voice, plan } = scheduled
+        if (plan.occurrenceKey !== change.occurrenceKey) continue
+        if (!voice.isActive()) {
+          this.#voices.delete(scheduled)
           continue
         }
-        if (voice.plan.startPlaybackClockSecond >= now) {
-          voice.handle.cancel(now)
+        if (plan.startPlaybackClockSecond >= now) {
+          voice.cancel(now)
           continue
         }
         if (change.after === null || !onlyReleaseChanged(change)) {
-          voice.handle.cancel(now)
+          voice.cancel(now)
           continue
         }
         if (this.#state.phase !== PLAYBACK_PHASE.PLAYING) {
-          voice.handle.cancel(now)
+          voice.cancel(now)
           continue
         }
         const nextStart = transport.playbackClockSecondAtTick(change.after.startTick)
         if (nextStart > now) {
-          voice.handle.cancel(now)
+          voice.cancel(now)
           continue
         }
-        voice.handle.rescheduleRelease(
-          transport.playbackClockSecondAtTick(change.after.releaseTick),
-        )
+        voice.rescheduleRelease(transport.playbackClockSecondAtTick(change.after.releaseTick))
       }
     }
   }
@@ -981,7 +956,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
       .prepare(nextPlan, preparation, {
         instrumentFailureMode: PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
       })
-      .then((runtime) => {
+      .then((prepared) => {
         if (
           this.#disposed ||
           preparation.aborted ||
@@ -989,17 +964,15 @@ class PlaybackEngineImpl implements PlaybackEngine {
           this.#plan !== previousPlan ||
           this.#pendingPlan !== nextPlan
         ) {
-          runtime.dispose()
           return
         }
-        if (runtime.modelRevision !== nextPlan.modelRevision) {
-          runtime.dispose()
+        if (prepared.modelRevision !== nextPlan.modelRevision) {
           throw new PlaybackEngineError(
             'playback-unavailable',
-            'The prepared runtime does not match the reconciled revision',
+            'The prepared instruments do not match the reconciled revision',
           )
         }
-        this.#installSelectiveHandoff(nextPlan, runtime)
+        this.#installSelectiveHandoff(nextPlan, prepared)
       })
       .catch((cause: unknown) => {
         if (this.#disposed || preparation.aborted || requestSequence !== this.#requestSequence) {
@@ -1012,30 +985,22 @@ class PlaybackEngineImpl implements PlaybackEngine {
       })
   }
 
-  #installSelectiveHandoff(
-    nextPlan: AudibleMidiProjectPlan,
-    nextRuntime: PreparedPlaybackRuntime,
-  ): void {
+  /** Voices already sounding keep playing; only the ones not yet started are replaced. */
+  #installSelectiveHandoff(nextPlan: AudibleMidiProjectPlan, prepared: PreparedPlaybackPlan): void {
     this.#locateSession = null
     const transport = this.#transport
-    const previousRuntime = this.#runtime
-    if (transport === null || previousRuntime === null) {
-      nextRuntime.dispose()
+    if (transport === null || this.#prepared === null) {
       this.#installStoppedPlan(nextPlan)
       return
     }
 
-    const now: PlaybackClockSecond = previousRuntime.now()
-    for (const voice of this.#ledger.voices) {
-      if (voice.plan.startPlaybackClockSecond >= now) voice.handle.cancel(now)
+    const now: PlaybackClockSecond = this.#runtimePort.now()
+    for (const { voice, plan } of this.#voices) {
+      if (plan.startPlaybackClockSecond >= now) voice.cancel(now)
     }
     const transition = transport.handoffPlan(nextPlan)
-    nextRuntime.advanceGeneration(transition.snapshot.engineGeneration)
 
-    this.#runtime = nextRuntime
-    this.#preparationFailures = nextRuntime.preparationFailures
-    this.#unsupportedNotes = nextRuntime.unsupportedNoteOccurrences
-    this.#ledger.retire(previousRuntime)
+    this.#prepared = prepared
     this.#scheduler = this.#createScheduler(nextPlan)
     this.#adoptPlan(nextPlan)
 
@@ -1044,10 +1009,8 @@ class PlaybackEngineImpl implements PlaybackEngine {
       this.#startTimer()
     } else {
       this.#stopTimer()
-      this.#ledger.startSweep()
     }
     this.#publishTransport(transition.snapshot)
-    this.#ledger.collect()
   }
 
   #installStoppedPlan(nextPlan: AudibleMidiProjectPlan): void {
@@ -1060,13 +1023,12 @@ class PlaybackEngineImpl implements PlaybackEngine {
 
   /**
    * Replaces the wall-clock mapping but keeps the musical position. A playing transport is paused
-   * first and its runtime retired, so a tempo edit never resumes playback on its own.
+   * first and its voices faded, so a tempo edit never resumes playback on its own.
    */
   #installTempoHandoff(nextPlan: AudibleMidiProjectPlan): void {
     this.#locateSession = null
     this.#cancelPreparation()
     this.#stopTimer()
-    this.#ledger.stopSweep()
 
     const transport = this.#transport
     if (transport === null) {
@@ -1079,21 +1041,14 @@ class PlaybackEngineImpl implements PlaybackEngine {
       if (startedPlaying) transport.pause()
 
       const transition = transport.handoffPlan(nextPlan)
-      const previousRuntime = this.#runtime
-      previousRuntime?.advanceGeneration(transition.snapshot.engineGeneration)
-      if (startedPlaying) this.#ledger.allNotesOff(this.#runtime)
-      if (previousRuntime !== null) this.#ledger.retire(previousRuntime)
+      if (startedPlaying) this.#allNotesOff()
 
-      this.#runtime = null
-      this.#preparationFailures = NO_PREPARATION_FAILURES
-      this.#unsupportedNotes = NO_UNSUPPORTED_NOTES
+      this.#prepared = null
       this.#scheduler = this.#createScheduler(nextPlan)
       this.#locatedDuringLoading = false
       this.#adoptPlan(nextPlan)
 
       this.#publishTransport(transition.snapshot)
-      this.#ledger.startSweep()
-      this.#ledger.collect()
     } catch (cause) {
       this.#failReconciledPlan(nextPlan, cause)
     }

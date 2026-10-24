@@ -72,9 +72,9 @@ import {
 import {
   ControlledProjectPlaybackRuntime,
   DeferredProjectPlaybackRuntime,
-  ManualPreparedPlaybackRuntime,
+  ManualPreparedPlaybackPlan,
   ManualProjectPlaybackTimer,
-  type ManualProjectPlaybackVoiceHandle,
+  type ManualProjectPlaybackVoice,
 } from '@/workbench/project/playback/__tests__/project-playback-test-support'
 import { createProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 
@@ -405,15 +405,15 @@ function createReadyState(projectId: ProjectId, session: ProjectSession): ReadyA
   })
 }
 
-function requireVoiceHandle(
-  runtime: ManualPreparedPlaybackRuntime,
+function requireVoice(
+  prepared: ManualPreparedPlaybackPlan,
   plan: AudibleMidiProjectPlan,
   noteId: NoteId,
-): ManualProjectPlaybackVoiceHandle {
+): ManualProjectPlaybackVoice {
   const occurrenceKey = plan.midiNoteSpans.find((span) => span.noteId === noteId)?.occurrenceKey
-  const handle = runtime.handles.find((candidate) => candidate.occurrenceKey === occurrenceKey)
-  if (handle === undefined) throw new Error(`Expected scheduled Voice for Note ${noteId}`)
-  return handle
+  const voice = prepared.voices.find((candidate) => candidate.occurrenceKey === occurrenceKey)
+  if (voice === undefined) throw new Error(`Expected scheduled Voice for Note ${noteId}`)
+  return voice
 }
 
 describe('ProjectPlaybackCoordinator', () => {
@@ -454,11 +454,10 @@ describe('ProjectPlaybackCoordinator', () => {
     const prepared = runtime.prepared[0]!
     expect(coordinator.state.phase).toBe('playing')
     expect(coordinator.canReturnToLastStartPosition()).toBe(true)
-    expect(prepared.generations).toEqual([1])
     expect(prepared.scheduled).toHaveLength(1)
     expect(timer.intervals).toEqual([25])
 
-    prepared.currentTime = 0.5 as typeof prepared.currentTime
+    runtime.currentTime = 0.5 as typeof runtime.currentTime
     timer.fire()
     expect(coordinator.state.positionProjectSecond).toBe(0)
     expect(coordinator.readVisualPosition()).toMatchObject({
@@ -468,14 +467,13 @@ describe('ProjectPlaybackCoordinator', () => {
     })
     expect(coordinator.pause()).toBe(true)
     expect(coordinator.state.phase).toBe('paused')
-    expect(prepared.generations).toEqual([1, 2])
-    expect(prepared.allNotesOffCount).toBe(1)
+    expect(runtime.allNotesOffCount).toBe(1)
     expect(timer.callbacks.size).toBe(0)
 
     expect(coordinator.returnToLastStartPosition()).toBe(true)
     expect(coordinator.state).toMatchObject({ phase: 'stopped', positionProjectSecond: 0 })
-    expect(prepared.generations).toEqual([1, 2, 3])
-    expect(prepared.allNotesOffCount).toBe(2)
+    // Pause already faded every Voice, so Return has nothing left to silence.
+    expect(runtime.allNotesOffCount).toBe(1)
     expect(coordinator.canReturnToLastStartPosition()).toBe(false)
     coordinator.dispose()
     expect(runtime.disposeCount).toBe(1)
@@ -543,7 +541,6 @@ describe('ProjectPlaybackCoordinator', () => {
       },
       phase: 'stopped',
     })
-    expect(runtime.prepared[0]?.generations).toEqual([])
     expect(runtime.prepared[0]?.scheduled).toEqual([])
     expect(timer.callbacks.size).toBe(0)
 
@@ -566,13 +563,12 @@ describe('ProjectPlaybackCoordinator', () => {
 
     await coordinator.play()
     const prepared = runtime.prepared[0]!
-    prepared.currentTime = parsePlaybackClockSecond(0.25)
+    runtime.currentTime = parsePlaybackClockSecond(0.25)
     const locate = coordinator.beginTimelineLocate()
 
     expect(locate?.startedWhilePlaying).toBe(true)
     expect(coordinator.state.phase).toBe('paused')
-    expect(prepared.generations).toEqual([1, 2])
-    expect(prepared.allNotesOffCount).toBe(1)
+    expect(runtime.allNotesOffCount).toBe(1)
     expect(timer.callbacks.size).toBe(0)
 
     expect(locate?.commit(parseTick(1_920))).toBe(true)
@@ -582,7 +578,6 @@ describe('ProjectPlaybackCoordinator', () => {
       positionProjectSecond: 1,
     })
     expect(coordinator.readVisualPosition().positionTick).toBe(1_920)
-    expect(prepared.generations).toEqual([1, 2, 4])
     expect(prepared.scheduled).toHaveLength(1)
 
     expect(coordinator.returnToLastStartPosition()).toBe(true)
@@ -602,8 +597,7 @@ describe('ProjectPlaybackCoordinator', () => {
     })
 
     await coordinator.play()
-    const prepared = runtime.prepared[0]!
-    prepared.currentTime = parsePlaybackClockSecond(0.25)
+    runtime.currentTime = parsePlaybackClockSecond(0.25)
     const locate = coordinator.beginTimelineLocate()
 
     expect(locate?.cancel()).toBe(true)
@@ -613,7 +607,6 @@ describe('ProjectPlaybackCoordinator', () => {
       phase: 'playing',
       positionProjectSecond: 0.25,
     })
-    expect(prepared.generations).toEqual([1, 2, 3])
     expect(coordinator.returnToLastStartPosition()).toBe(true)
     expect(coordinator.state.positionProjectSecond).toBe(0)
     coordinator.dispose()
@@ -686,9 +679,9 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const activeVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const commit = requireCommitted(
       session,
@@ -711,10 +704,8 @@ describe('ProjectPlaybackCoordinator', () => {
       phase: 'playing',
       positionProjectSecond: 0.1,
     })
-    expect(activeHandle.isActive()).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(0)
-    expect(firstRuntime.disposeCount).toBe(0)
-    expect(runtime.prepared[1]?.generations).toEqual([2])
+    expect(activeVoice.isActive()).toBe(true)
+    expect(runtime.allNotesOffCount).toBe(0)
     coordinator.dispose()
   })
 
@@ -742,10 +733,10 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const removedHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    const continuingHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, SECOND_NOTE_ID)
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const removedVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    const continuingVoice = requireVoice(firstPrepared, runtime.plans[0]!, SECOND_NOTE_ID)
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const commit = requireCommitted(
       session,
@@ -758,10 +749,10 @@ describe('ProjectPlaybackCoordinator', () => {
     activeProject.publishCommit(commit)
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
 
-    expect(removedHandle.isActive()).toBe(false)
-    expect(removedHandle.cancelCalls).toEqual([0.1])
-    expect(continuingHandle.isActive()).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(removedVoice.isActive()).toBe(false)
+    expect(removedVoice.cancelCalls).toEqual([0.1])
+    expect(continuingVoice.isActive()).toBe(true)
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -791,10 +782,10 @@ describe('ProjectPlaybackCoordinator', () => {
       timer,
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    const queuedHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, MOVED_NOTE_ID)
-    firstRuntime.currentTime = 0.05 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const activeVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    const queuedVoice = requireVoice(firstPrepared, runtime.plans[0]!, MOVED_NOTE_ID)
+    runtime.currentTime = 0.05 as typeof runtime.currentTime
 
     const commit = requireCommitted(
       session,
@@ -809,15 +800,15 @@ describe('ProjectPlaybackCoordinator', () => {
     activeProject.publishCommit(commit)
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
 
-    expect(queuedHandle.isActive()).toBe(false)
-    expect(queuedHandle.cancelCalls).toEqual([0.05])
-    expect(activeHandle.isActive()).toBe(true)
+    expect(queuedVoice.isActive()).toBe(false)
+    expect(queuedVoice.cancelCalls).toEqual([0.05])
+    expect(activeVoice.isActive()).toBe(true)
     expect(runtime.prepared[1]?.scheduled).toEqual([])
 
-    const nextRuntime = runtime.prepared[1]!
-    nextRuntime.currentTime = 0.2 as typeof nextRuntime.currentTime
+    const nextPrepared = runtime.prepared[1]!
+    runtime.currentTime = 0.2 as typeof runtime.currentTime
     timer.fire()
-    expect(nextRuntime.scheduled).toEqual([
+    expect(nextPrepared.scheduled).toEqual([
       expect.objectContaining({ pitch: 68, startPlaybackClockSecond: 0.375 }),
     ])
     coordinator.dispose()
@@ -834,9 +825,9 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const activeVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const commit = requireCommitted(
       session,
@@ -851,9 +842,9 @@ describe('ProjectPlaybackCoordinator', () => {
     activeProject.publishCommit(commit)
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
 
-    expect(activeHandle.isActive()).toBe(true)
-    expect(activeHandle.releaseUpdates).toEqual([0.75])
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(activeVoice.isActive()).toBe(true)
+    expect(activeVoice.releaseUpdates).toEqual([0.75])
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -880,9 +871,9 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const activeVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const commit = requireCommitted(
       session,
@@ -898,9 +889,9 @@ describe('ProjectPlaybackCoordinator', () => {
     activeProject.publishCommit(commit)
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
 
-    expect(activeHandle.isActive()).toBe(true)
-    expect(activeHandle.releaseUpdates).toEqual([0.75])
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(activeVoice.isActive()).toBe(true)
+    expect(activeVoice.releaseUpdates).toEqual([0.75])
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -916,9 +907,9 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const activeVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const commit = requireCommitted(
       session,
@@ -937,9 +928,9 @@ describe('ProjectPlaybackCoordinator', () => {
     activeProject.publishCommit(commit)
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
 
-    expect(activeHandle.isActive()).toBe(true)
-    expect(activeHandle.releaseUpdates).toEqual([1.25])
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(activeVoice.isActive()).toBe(true)
+    expect(activeVoice.releaseUpdates).toEqual([1.25])
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -970,14 +961,14 @@ describe('ProjectPlaybackCoordinator', () => {
       timer,
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const replacedTrackHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    const continuingTrackHandle = requireVoiceHandle(
-      firstRuntime,
+    const firstPrepared = runtime.prepared[0]!
+    const replacedTrackVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    const continuingTrackVoice = requireVoice(
+      firstPrepared,
       runtime.plans[0]!,
       SECOND_TRACK_NOTE_ID,
     )
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const commit = requireCommitted(
       session,
@@ -990,10 +981,10 @@ describe('ProjectPlaybackCoordinator', () => {
     activeProject.publishCommit(commit)
     await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
 
-    expect(replacedTrackHandle.isActive()).toBe(false)
-    expect(replacedTrackHandle.cancelCalls).toEqual([0.1])
-    expect(continuingTrackHandle.isActive()).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(replacedTrackVoice.isActive()).toBe(false)
+    expect(replacedTrackVoice.cancelCalls).toEqual([0.1])
+    expect(continuingTrackVoice.isActive()).toBe(true)
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(
       runtime.preparationOptions.map(({ instrumentFailureMode }) => instrumentFailureMode),
     ).toEqual([
@@ -1001,11 +992,11 @@ describe('ProjectPlaybackCoordinator', () => {
       PLAYBACK_INSTRUMENT_FAILURE_MODE.SKIP_UNAVAILABLE_INSTRUMENTS,
     ])
 
-    const nextRuntime = runtime.prepared[1]!
-    expect(nextRuntime.scheduled).toEqual([])
-    nextRuntime.currentTime = 0.2 as typeof nextRuntime.currentTime
+    const nextPrepared = runtime.prepared[1]!
+    expect(nextPrepared.scheduled).toEqual([])
+    runtime.currentTime = 0.2 as typeof runtime.currentTime
     timer.fire()
-    expect(nextRuntime.scheduled).toEqual([
+    expect(nextPrepared.scheduled).toEqual([
       expect.objectContaining({
         pitch: 67,
         soundbankId: REPLACEMENT_SOUNDBANK_ID,
@@ -1042,14 +1033,14 @@ describe('ProjectPlaybackCoordinator', () => {
       timer,
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const replacedTrackHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    const continuingTrackHandle = requireVoiceHandle(
-      firstRuntime,
+    const firstPrepared = runtime.prepared[0]!
+    const replacedTrackVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    const continuingTrackVoice = requireVoice(
+      firstPrepared,
       runtime.plans[0]!,
       SECOND_TRACK_NOTE_ID,
     )
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
     const cause = new Error('Replacement manifest is unavailable')
     runtime.preparationFailures = [Object.freeze({ cause, soundbankId: MISSING_SOUNDBANK_ID })]
 
@@ -1064,9 +1055,9 @@ describe('ProjectPlaybackCoordinator', () => {
     activeProject.publishCommit(commit)
     await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
 
-    expect(replacedTrackHandle.isActive()).toBe(false)
-    expect(continuingTrackHandle.isActive()).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(replacedTrackVoice.isActive()).toBe(false)
+    expect(continuingTrackVoice.isActive()).toBe(true)
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state).toMatchObject({
       failureCause: [expect.objectContaining({ cause, soundbankId: MISSING_SOUNDBANK_ID })],
       feedback: {
@@ -1075,10 +1066,10 @@ describe('ProjectPlaybackCoordinator', () => {
       },
       phase: 'playing',
     })
-    const nextRuntime = runtime.prepared[1]!
-    nextRuntime.currentTime = 0.2 as typeof nextRuntime.currentTime
+    const nextPrepared = runtime.prepared[1]!
+    runtime.currentTime = 0.2 as typeof runtime.currentTime
     timer.fire()
-    expect(nextRuntime.scheduled).toEqual([])
+    expect(nextPrepared.scheduled).toEqual([])
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -1094,9 +1085,9 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const activeVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const addCommit = requireCommitted(
       session,
@@ -1117,15 +1108,13 @@ describe('ProjectPlaybackCoordinator', () => {
     )
     activeProject.publishCommit(addCommit)
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
-    expect(activeHandle.isActive()).toBe(true)
+    expect(activeVoice.isActive()).toBe(true)
 
-    const addedTrackRuntime = runtime.prepared[1]!
-    addedTrackRuntime.currentTime = 0.1 as typeof addedTrackRuntime.currentTime
     activeProject.publishCommit(requireUndo(session))
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(3))
 
-    expect(activeHandle.isActive()).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(activeVoice.isActive()).toBe(true)
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state).toMatchObject({
       modelRevision: session.modelRevision,
       phase: 'playing',
@@ -1144,9 +1133,9 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    firstRuntime.currentTime = 0.1 as typeof firstRuntime.currentTime
+    const firstPrepared = runtime.prepared[0]!
+    const activeVoice = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
+    runtime.currentTime = 0.1 as typeof runtime.currentTime
 
     const addCommit = requireCommitted(
       session,
@@ -1167,15 +1156,13 @@ describe('ProjectPlaybackCoordinator', () => {
     )
     activeProject.publishCommit(addCommit)
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(2))
-    expect(activeHandle.isActive()).toBe(true)
+    expect(activeVoice.isActive()).toBe(true)
 
-    const addedClipRuntime = runtime.prepared[1]!
-    addedClipRuntime.currentTime = 0.1 as typeof addedClipRuntime.currentTime
     activeProject.publishCommit(requireUndo(session))
     await vi.waitFor(() => expect(runtime.prepared).toHaveLength(3))
 
-    expect(activeHandle.isActive()).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(0)
+    expect(activeVoice.isActive()).toBe(true)
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state).toMatchObject({
       modelRevision: session.modelRevision,
       phase: 'playing',
@@ -1188,17 +1175,18 @@ describe('ProjectPlaybackCoordinator', () => {
     const session = createPlayableSession(projectId)
     const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
     const runtime = new DeferredProjectPlaybackRuntime()
+    const timer = new ManualProjectPlaybackTimer()
     const coordinator = createProjectPlaybackCoordinator({
       activeProject: activeProject.service,
       runtime,
-      timer: new ManualProjectPlaybackTimer(),
+      timer,
     })
     const initialPlay = coordinator.play()
     await vi.waitFor(() => expect(runtime.requests).toHaveLength(1))
-    const firstRuntime = runtime.resolve(0, parsePlaybackClockSecond(0))
+    const firstPrepared = runtime.resolve(0, parsePlaybackClockSecond(0))
     await expect(initialPlay).resolves.toBe(true)
-    const activeHandle = requireVoiceHandle(firstRuntime, runtime.requests[0]!.plan, NOTE_ID)
-    firstRuntime.currentTime = parsePlaybackClockSecond(0.1)
+    const activeVoice = requireVoice(firstPrepared, runtime.requests[0]!.plan, NOTE_ID)
+    runtime.currentTime = parsePlaybackClockSecond(0.1)
 
     const firstCommit = requireCommitted(
       session,
@@ -1233,15 +1221,18 @@ describe('ProjectPlaybackCoordinator', () => {
     await vi.waitFor(() => expect(runtime.requests).toHaveLength(3))
     expect(runtime.requests[1]?.signal.aborted).toBe(true)
 
-    const staleRuntime = runtime.resolve(1, parsePlaybackClockSecond(0.1))
-    await vi.waitFor(() => expect(staleRuntime.disposeCount).toBe(1))
-    const latestRuntime = runtime.resolve(2, parsePlaybackClockSecond(0.1))
+    const stale = runtime.resolve(1, parsePlaybackClockSecond(0.1))
+    const latest = runtime.resolve(2, parsePlaybackClockSecond(0.1))
     await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
 
-    expect(activeHandle.isActive()).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(0)
-    expect(latestRuntime.generations).toEqual([2])
+    expect(activeVoice.isActive()).toBe(true)
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(coordinator.state.phase).toBe('playing')
+
+    runtime.currentTime = parsePlaybackClockSecond(0.6)
+    timer.fire()
+    expect(stale.scheduled).toEqual([])
+    expect(latest.scheduled.map(({ pitch }) => pitch)).toEqual([67, 69])
     coordinator.dispose()
   })
 
@@ -1256,7 +1247,6 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
 
     requireCommitted(
       session,
@@ -1288,8 +1278,7 @@ describe('ProjectPlaybackCoordinator', () => {
     await vi.waitFor(() => expect(coordinator.state.phase).toBe('stopped'))
 
     expect(coordinator.state.modelRevision).toBe(session.modelRevision)
-    expect(firstRuntime.allNotesOffCount).toBe(1)
-    expect(firstRuntime.disposeCount).toBe(1)
+    expect(runtime.allNotesOffCount).toBe(1)
     expect(runtime.prepared).toHaveLength(1)
     await expect(coordinator.play()).resolves.toBe(true)
     expect(runtime.plans.at(-1)?.modelRevision).toBe(session.modelRevision)
@@ -1307,7 +1296,6 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
     const cause = new Error('AudioContext was interrupted during preparation')
     runtime.failure = cause
 
@@ -1331,8 +1319,7 @@ describe('ProjectPlaybackCoordinator', () => {
       failureCause: cause,
       modelRevision: session.modelRevision,
     })
-    expect(firstRuntime.allNotesOffCount).toBe(1)
-    expect(firstRuntime.disposeCount).toBe(1)
+    expect(runtime.allNotesOffCount).toBe(1)
     runtime.failure = null
     await expect(coordinator.play()).resolves.toBe(true)
     expect(runtime.plans.at(-1)?.modelRevision).toBe(session.modelRevision)
@@ -1350,9 +1337,8 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const prepared = runtime.prepared[0]!
     const cause = new Error('Voice release failed')
-    prepared.allNotesOffFailure = cause
+    runtime.allNotesOffFailure = cause
     const revisionBefore = session.modelRevision
 
     expect(coordinator.pause()).toBe(false)
@@ -1362,12 +1348,11 @@ describe('ProjectPlaybackCoordinator', () => {
       modelRevision: revisionBefore,
       phase: 'failed',
     })
-    expect(prepared.disposeCount).toBe(1)
     expect(session.modelRevision).toBe(revisionBefore)
     coordinator.dispose()
   })
 
-  it('cleans a retired release tail after a paused edit and resumes the handed-off Plan', async () => {
+  it('leaves fading Voices alone across a paused edit and resumes the handed-off Plan', async () => {
     const projectId = parseProjectId('project-playback-paused-edit')
     const session = createPlayableSession(projectId)
     const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
@@ -1380,13 +1365,13 @@ describe('ProjectPlaybackCoordinator', () => {
       timer,
     })
     await coordinator.play()
-    const firstRuntime = runtime.prepared[0]!
-    const releaseTail = requireVoiceHandle(firstRuntime, runtime.plans[0]!, NOTE_ID)
-    firstRuntime.currentTime = parsePlaybackClockSecond(0.1)
+    const firstPrepared = runtime.prepared[0]!
+    const fading = requireVoice(firstPrepared, runtime.plans[0]!, NOTE_ID)
     runtime.currentTime = parsePlaybackClockSecond(0.1)
     expect(coordinator.pause()).toBe(true)
-    expect(releaseTail.isActive()).toBe(true)
-    expect(timer.callbacks.size).toBe(1)
+    expect(fading.cancelCalls).toEqual([undefined])
+    expect(fading.isActive()).toBe(true)
+    expect(timer.callbacks.size).toBe(0)
 
     const commit = requireCommitted(
       session,
@@ -1402,19 +1387,12 @@ describe('ProjectPlaybackCoordinator', () => {
     await vi.waitFor(() => expect(coordinator.state.modelRevision).toBe(session.modelRevision))
 
     expect(coordinator.state.phase).toBe('paused')
-    expect(releaseTail.releaseUpdates).toEqual([])
-    expect(firstRuntime.disposeCount).toBe(0)
-    expect(timer.callbacks.size).toBe(1)
-    releaseTail.finish()
-    timer.fire()
-    expect(firstRuntime.disposeCount).toBe(1)
-    expect(timer.callbacks.size).toBe(0)
+    expect(fading.releaseUpdates).toEqual([])
 
-    const handedOffRuntime = runtime.prepared.at(-1)
+    const handedOff = runtime.prepared.at(-1)
     await expect(coordinator.play()).resolves.toBe(true)
     expect(runtime.prepared).toHaveLength(2)
-    expect(runtime.prepared.at(-1)).toBe(handedOffRuntime)
-    expect(handedOffRuntime?.generations).toEqual([3, 4])
+    expect(runtime.prepared.at(-1)).toBe(handedOff)
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -1467,8 +1445,6 @@ describe('ProjectPlaybackCoordinator', () => {
       timer,
     })
     await coordinator.play()
-    const previousRuntime = runtime.prepared[0]!
-    previousRuntime.currentTime = parsePlaybackClockSecond(0.25)
     runtime.currentTime = parsePlaybackClockSecond(0.25)
 
     const commit = requireCommitted(
@@ -1491,15 +1467,12 @@ describe('ProjectPlaybackCoordinator', () => {
       positionProjectSecond: 0.5,
       positionTick: 480,
     })
-    expect(previousRuntime.generations).toEqual([1, 3])
-    expect(previousRuntime.allNotesOffCount).toBe(1)
-    expect(previousRuntime.disposeCount).toBe(1)
+    expect(runtime.allNotesOffCount).toBe(1)
     expect(runtime.plans).toHaveLength(1)
     expect(timer.callbacks.size).toBe(0)
 
     await expect(coordinator.play()).resolves.toBe(true)
     expect(runtime.plans).toHaveLength(2)
-    expect(runtime.prepared[1]?.generations).toEqual([4])
     expect(coordinator.readVisualPosition()).toMatchObject({
       phase: 'playing',
       positionProjectSecond: 0.5,
@@ -1606,9 +1579,7 @@ describe('ProjectPlaybackCoordinator', () => {
         timer,
       })
       await coordinator.play()
-      const previousRuntime = runtime.prepared[0]!
       const targetClockSecond = parsePlaybackClockSecond(testCase.playbackClockSecondAtTargetTick)
-      previousRuntime.currentTime = targetClockSecond
       runtime.currentTime = targetClockSecond
       expect(coordinator.pause()).toBe(true)
       expect(coordinator.readVisualPosition().positionTick).toBe(MOVED_TEMPO_EVENT_TICK)
@@ -1626,15 +1597,12 @@ describe('ProjectPlaybackCoordinator', () => {
         positionProjectSecond: testCase.expectedProjectSecondAtTargetTick,
         positionTick: MOVED_TEMPO_EVENT_TICK,
       })
-      expect(previousRuntime.generations).toEqual([1, 2, 3])
-      expect(previousRuntime.allNotesOffCount).toBe(1)
-      expect(previousRuntime.disposeCount).toBe(1)
+      expect(runtime.allNotesOffCount).toBe(1)
       expect(runtime.plans).toHaveLength(1)
       expect(timer.callbacks.size).toBe(0)
 
       await expect(coordinator.play()).resolves.toBe(true)
       expect(runtime.plans).toHaveLength(2)
-      expect(runtime.prepared[1]?.generations).toEqual([4])
       expect(coordinator.readVisualPosition()).toMatchObject({
         phase: 'playing',
         positionProjectSecond: testCase.expectedProjectSecondAtTargetTick,
@@ -1661,9 +1629,7 @@ describe('ProjectPlaybackCoordinator', () => {
         timer,
       })
       await coordinator.play()
-      const previousRuntime = runtime.prepared[0]!
       const targetClockSecond = parsePlaybackClockSecond(testCase.playbackClockSecondAtTargetTick)
-      previousRuntime.currentTime = targetClockSecond
       runtime.currentTime = targetClockSecond
 
       const commit = requireCommitted(session, testCase.createCommand(session))
@@ -1679,15 +1645,12 @@ describe('ProjectPlaybackCoordinator', () => {
         positionProjectSecond: testCase.expectedProjectSecondAtTargetTick,
         positionTick: MOVED_TEMPO_EVENT_TICK,
       })
-      expect(previousRuntime.generations).toEqual([1, 3])
-      expect(previousRuntime.allNotesOffCount).toBe(1)
-      expect(previousRuntime.disposeCount).toBe(1)
+      expect(runtime.allNotesOffCount).toBe(1)
       expect(runtime.plans).toHaveLength(1)
       expect(timer.callbacks.size).toBe(0)
 
       await expect(coordinator.play()).resolves.toBe(true)
       expect(runtime.plans).toHaveLength(2)
-      expect(runtime.prepared[1]?.generations).toEqual([4])
       expect(coordinator.readVisualPosition()).toMatchObject({
         phase: 'playing',
         positionProjectSecond: testCase.expectedProjectSecondAtTargetTick,
@@ -1709,9 +1672,9 @@ describe('ProjectPlaybackCoordinator', () => {
     })
     const initialPlay = coordinator.play()
     await vi.waitFor(() => expect(runtime.requests).toHaveLength(1))
-    const firstRuntime = runtime.resolve(0, parsePlaybackClockSecond(0))
+    runtime.resolve(0, parsePlaybackClockSecond(0))
     await initialPlay
-    firstRuntime.currentTime = parsePlaybackClockSecond(0.1)
+    runtime.currentTime = parsePlaybackClockSecond(0.1)
 
     const commit = requireCommitted(
       firstSession,
@@ -1733,11 +1696,10 @@ describe('ProjectPlaybackCoordinator', () => {
     const secondSession = createPlayableSession(secondProjectId)
     activeProject.publish(createReadyState(secondProjectId, secondSession))
     expect(runtime.requests[1]?.signal.aborted).toBe(true)
-    expect(firstRuntime.allNotesOffCount).toBe(1)
-    expect(firstRuntime.disposeCount).toBe(1)
+    expect(runtime.allNotesOffCount).toBe(1)
 
-    const staleRuntime = runtime.resolve(1, parsePlaybackClockSecond(0.1))
-    await vi.waitFor(() => expect(staleRuntime.disposeCount).toBe(1))
+    runtime.resolve(1, parsePlaybackClockSecond(0.1))
+    expect(runtime.prepared[1]?.scheduled).toEqual([])
     expect(coordinator.state).toMatchObject({
       modelRevision: secondSession.modelRevision,
       phase: 'stopped',
@@ -1761,10 +1723,10 @@ describe('ProjectPlaybackCoordinator', () => {
     })
     await coordinator.play()
     const prepared = runtime.prepared[0]!
-    const completedVoice = requireVoiceHandle(prepared, runtime.plans[0]!, NOTE_ID)
+    const completedVoice = requireVoice(prepared, runtime.plans[0]!, NOTE_ID)
     completedVoice.finish()
 
-    prepared.currentTime = 300 as typeof prepared.currentTime
+    runtime.currentTime = 300 as typeof runtime.currentTime
     const visualPosition = coordinator.readVisualPosition()
 
     expect(visualPosition).toMatchObject({
@@ -1777,11 +1739,11 @@ describe('ProjectPlaybackCoordinator', () => {
       positionProjectSecond: 300,
     })
     expect(timer.callbacks.size).toBe(0)
-    expect(prepared.allNotesOffCount).toBe(0)
+    expect(runtime.allNotesOffCount).toBe(0)
     coordinator.dispose()
   })
 
-  it('collects a natural-end release tail without disposing the reusable Runtime', async () => {
+  it('lets a natural-end release tail ring out and replays the prepared Plan', async () => {
     const projectId = parseProjectId('project-playback-natural-end-release-tail')
     const session = createPlayableSession(projectId)
     const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
@@ -1794,22 +1756,17 @@ describe('ProjectPlaybackCoordinator', () => {
     })
     await coordinator.play()
     const prepared = runtime.prepared[0]!
-    const releaseTail = requireVoiceHandle(prepared, runtime.plans[0]!, NOTE_ID)
+    const releaseTail = requireVoice(prepared, runtime.plans[0]!, NOTE_ID)
 
-    prepared.currentTime = 300 as typeof prepared.currentTime
+    runtime.currentTime = 300 as typeof runtime.currentTime
     expect(coordinator.readVisualPosition().phase).toBe('stopped')
     expect(releaseTail.isActive()).toBe(true)
-    expect(prepared.allNotesOffCount).toBe(0)
-    expect(timer.callbacks.size).toBe(1)
-
-    releaseTail.finish()
-    timer.fire()
+    expect(releaseTail.cancelCalls).toEqual([])
+    expect(runtime.allNotesOffCount).toBe(0)
     expect(timer.callbacks.size).toBe(0)
-    expect(prepared.disposeCount).toBe(0)
 
     await expect(coordinator.play()).resolves.toBe(true)
     expect(runtime.prepared).toEqual([prepared])
-    expect(prepared.generations).toEqual([1, 2])
     expect(coordinator.state.phase).toBe('playing')
     coordinator.dispose()
   })
@@ -1851,8 +1808,7 @@ describe('ProjectPlaybackCoordinator', () => {
       timer: new ManualProjectPlaybackTimer(),
     })
     await coordinator.play()
-    const prepared = runtime.prepared[0]!
-    prepared.currentTime = 0.5 as typeof prepared.currentTime
+    runtime.currentTime = 0.5 as typeof runtime.currentTime
     expect(coordinator.readVisualPosition()).toMatchObject({
       phase: 'playing',
       positionProjectSecond: 0.5,
@@ -1869,8 +1825,7 @@ describe('ProjectPlaybackCoordinator', () => {
       positionTick: 0,
       projectId: null,
     })
-    expect(prepared.allNotesOffCount).toBe(1)
-    expect(prepared.disposeCount).toBe(1)
+    expect(runtime.allNotesOffCount).toBe(1)
 
     const secondProjectId = parseProjectId('project-playback-second')
     const secondSession = createPlayableSession(secondProjectId)
@@ -1919,24 +1874,7 @@ describe('ProjectPlaybackCoordinator', () => {
     const projectId = parseProjectId('project-playback-loading-return')
     const session = createPlayableSession(projectId)
     const activeProject = createActiveProjectHarness(createReadyState(projectId, session))
-    const pendingPreparation: {
-      resolve: ((runtime: ManualPreparedPlaybackRuntime) => void) | null
-    } = { resolve: null }
-    const baseRuntime = new ControlledProjectPlaybackRuntime()
-    const runtime = {
-      ...baseRuntime,
-      dispose: () => baseRuntime.dispose(),
-      prepare: (
-        plan: Parameters<ControlledProjectPlaybackRuntime['prepare']>[0],
-        signal: AbortSignal,
-      ) => {
-        baseRuntime.plans.push(plan)
-        baseRuntime.signals.push(signal)
-        return new Promise<ManualPreparedPlaybackRuntime>((resolve) => {
-          pendingPreparation.resolve = resolve
-        })
-      },
-    }
+    const runtime = new DeferredProjectPlaybackRuntime()
     const coordinator = createProjectPlaybackCoordinator({
       activeProject: activeProject.service,
       runtime,
@@ -1946,13 +1884,10 @@ describe('ProjectPlaybackCoordinator', () => {
     const play = coordinator.play()
     expect(coordinator.state.phase).toBe('loading')
     expect(coordinator.returnToLastStartPosition()).toBe(true)
-    expect(baseRuntime.signals[0]?.aborted).toBe(true)
-    const staleRuntime = new ManualPreparedPlaybackRuntime(session.modelRevision)
-    const resolvePending = pendingPreparation.resolve
-    if (resolvePending === null) throw new Error('Expected pending preparation resolver')
-    resolvePending(staleRuntime)
+    expect(runtime.requests[0]?.signal.aborted).toBe(true)
+    runtime.resolve(0, parsePlaybackClockSecond(0))
     await expect(play).resolves.toBe(false)
-    expect(staleRuntime.disposeCount).toBe(1)
+    expect(runtime.prepared[0]?.scheduled).toEqual([])
     expect(coordinator.state.phase).toBe('stopped')
     coordinator.dispose()
   })

@@ -111,12 +111,13 @@ async function renderFastRelease(): Promise<AudioQualityAq2EnvelopeMeasurement> 
     AUDIO_QUALITY_AQ2_FAST_RELEASE_START_SECOND +
     AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
   const rendered = await renderAudioQualityAq2({
-    onScheduled: (runtime, results) => {
-      const token = results[0]?.token
-      if (token === null || token === undefined) {
+    onScheduled: (voices) => {
+      const voice = voices[0]
+      if (voice === null || voice === undefined)
         throw new TypeError('AQ2 fast Voice is unavailable')
-      }
-      runtime.cancel(token, AUDIO_QUALITY_AQ2_FAST_RELEASE_START_SECOND)
+      voice.cancel(
+        AUDIO_QUALITY_AQ2_FAST_RELEASE_START_SECOND as Parameters<typeof voice.cancel>[0],
+      )
     },
     plans: [
       createAudioQualityAq2Plan({

@@ -1,4 +1,4 @@
-import type { ScheduledSampleVoicePlan } from '@seele-daw/playback'
+import type { PlaybackVoice, ScheduledSampleVoicePlan } from '@seele-daw/playback'
 
 import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
@@ -9,14 +9,12 @@ import {
   createAudioQualityPreparedResources,
   createAudioQualityReferenceSineBuffer,
 } from '#internal/development/audio-quality-aq0/fixture'
+import type { PreparedSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 import {
   SampleInstrumentVoiceRuntime,
   type SampleInstrumentVoicePolyphonyStatistics,
-  type SampleInstrumentVoiceScheduleOutcome,
-  type SampleInstrumentVoiceScheduleResult,
   type SampleInstrumentVoiceRuntimeStatistics,
 } from '#internal/sample-instrument/voice/voice-runtime'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 
 export interface AudioQualityOfflineRenderResult {
   readonly channels: readonly Float32Array[]
@@ -25,18 +23,17 @@ export interface AudioQualityOfflineRenderResult {
   readonly polyphonyStatisticsAfterSchedule: SampleInstrumentVoicePolyphonyStatistics
   readonly runtimeStatisticsAfterDispose: SampleInstrumentVoiceRuntimeStatistics
   readonly runtimeStatisticsAfterRender: SampleInstrumentVoiceRuntimeStatistics
-  readonly scheduleResults: readonly SampleInstrumentVoiceScheduleResult[]
+  /** Each plan's voice, or null where the runtime started none. */
+  readonly voices: readonly (PlaybackVoice | null)[]
 }
 
 export interface AudioQualityOfflineRenderOptions {
-  readonly acceptedScheduleOutcomes?: readonly SampleInstrumentVoiceScheduleOutcome[]
+  /** Accepts plans the polyphony limits drop instead of failing the render. */
+  readonly allowDroppedVoices?: boolean
   readonly createPreparedResources: (
     context: OfflineAudioContext,
-  ) => PreparedAudibleMidiSampleResources | Promise<PreparedAudibleMidiSampleResources>
-  readonly onScheduled?: (
-    runtime: SampleInstrumentVoiceRuntime,
-    results: readonly SampleInstrumentVoiceScheduleResult[],
-  ) => void
+  ) => PreparedSampleResources | Promise<PreparedSampleResources>
+  readonly onScheduled?: (voices: readonly (PlaybackVoice | null)[]) => void
   readonly plans: readonly ScheduledSampleVoicePlan[]
   readonly renderDurationSecond: number
 }
@@ -121,23 +118,25 @@ export async function renderAudioQualityPlans(
   try {
     // Real developer-local Soundbanks require asynchronous Fetch/decode before scheduling.
     // The same production Runtime and output calibration remain authoritative after preparation.
-    const preparedResources = await options.createPreparedResources(context)
-    runtime = new SampleInstrumentVoiceRuntime({
+    const prepared = await options.createPreparedResources(context)
+    const voiceRuntime = new SampleInstrumentVoiceRuntime({
       output: createOutput(context, contextAdapter.audioContext),
-      preparedResources,
     })
-    runtime.advanceGeneration(1 as ScheduledSampleVoicePlan['engineGeneration'])
-    const results: SampleInstrumentVoiceScheduleResult[] = []
-    const acceptedScheduleOutcomes = options.acceptedScheduleOutcomes ?? ['scheduled']
-    for (const plan of plans) {
-      const result = runtime.schedule(plan)
-      if (!acceptedScheduleOutcomes.includes(result.outcome)) {
-        throw new TypeError(`Audio Quality Voice was not scheduled: ${result.outcome}`)
-      }
-      results.push(result)
-    }
-    const scheduleResults = Object.freeze(results)
-    options.onScheduled?.(runtime, scheduleResults)
+    runtime = voiceRuntime
+    const voices = Object.freeze(
+      plans.map((plan) => {
+        const instrument = prepared.instruments.get(plan.soundbankId)
+        if (instrument === undefined) {
+          throw new TypeError(`Audio Quality has no instrument ${plan.soundbankId}`)
+        }
+        const voice = voiceRuntime.schedule(plan, instrument)
+        if (voice === null && options.allowDroppedVoices !== true) {
+          throw new TypeError(`Audio Quality Voice ${plan.occurrenceKey} was not scheduled`)
+        }
+        return voice
+      }),
+    )
+    options.onScheduled?.(voices)
     const polyphonyStatisticsAfterSchedule = runtime.polyphonyStatistics
 
     const renderRequest = context.startRendering()
@@ -154,7 +153,7 @@ export async function renderAudioQualityPlans(
       polyphonyStatisticsAfterSchedule,
       runtimeStatisticsAfterDispose: runtime.statistics,
       runtimeStatisticsAfterRender,
-      scheduleResults,
+      voices,
     })
   } catch (error) {
     contextAdapter.finishScheduling()

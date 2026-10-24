@@ -1,4 +1,5 @@
 import { type PlaybackRuntimePort, type PlaybackTimerPort } from '@seele-daw/playback'
+import { createWebAudioPlaybackRuntime } from '@seele-daw/audio-web'
 import { ToneJsMidiFileDecoder, type MidiFileDecoder } from '@seele-daw/midi-file'
 import { BrowserLocalFileByteReader, type LocalFileByteReader } from '@seele-daw/platform-browser'
 import type { ProjectMidiImportIdFactory } from '@seele-daw/project-midi'
@@ -39,11 +40,11 @@ import {
   createProjectNavigationDecisionVueBinding,
   type ProjectNavigationDecisionVueBinding,
 } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-binding'
-import { createBrowserProjectPlaybackVisualFrame } from '@/workbench/project/playback/browser-animation-frame'
 import {
-  createBrowserProjectPlaybackRuntime,
-  createDefaultBuiltInSampleAssetLocations,
-} from '@/workbench/project/playback/browser-runtime'
+  DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
+  builtInSampleAssetBaseUrl,
+} from '@/workbench/instrument/built-in-sample-assets'
+import { createBrowserProjectPlaybackVisualFrame } from '@/workbench/project/playback/browser-animation-frame'
 import { createBrowserProjectPlaybackTimer } from '@/workbench/project/playback/browser-timer'
 import {
   createProjectPlaybackCoordinator,
@@ -107,9 +108,10 @@ export function composeStudioApplication(
 
     const playbackRuntime =
       composition.projectPlaybackRuntime ??
-      createBrowserProjectPlaybackRuntime({
-        assetBaseBySoundbank: createDefaultBuiltInSampleAssetLocations(location.origin),
+      createWebAudioPlaybackRuntime({
+        assetBaseUrl: builtInSampleAssetBaseUrl(location.origin),
         expectedOrigin: location.origin,
+        limits: DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
       })
     let projectPlayback: ProjectPlaybackCoordinator
     try {

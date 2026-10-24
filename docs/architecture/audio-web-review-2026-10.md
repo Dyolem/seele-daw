@@ -4,8 +4,8 @@
 >
 > 代码基线：`main` 分支 `b36fbb1`，文中行号都指这个基线。
 >
-> 范围：`packages/audio-web`，以及 Studio 中把它接入播放引擎的
-> [`browser-runtime.ts`](../../apps/studio/src/workbench/project/playback/browser-runtime.ts)。
+> 范围：`packages/audio-web`，以及 Studio 中把它接入播放引擎的 `browser-runtime.ts`（已删除，
+> 见第 7 节）。
 > [2026-10 架构复盘](./web-daw-architecture-review-2026-10.md)没有覆盖这个包。本文只做诊断，每条建议
 > 单独决定、单独提交。数字的复测方法见附录。
 
@@ -248,6 +248,31 @@ createWebAudioPlaybackRuntime({
 - 开发报告页的去留由维护者决定（3.5）。
 - 删除 `advanceGeneration` 会改 playback 的公开端口，应等 3.2 的第一步稳定后单独做。
 - 第 4 节的行数是估算，每步完成后按附录复测。
+
+## 7. 实施结果（2026-10-24）
+
+| 节  | 状态                                                                                                                                                                                               |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.1 | 完成。audio-web 的 `createWebAudioPlaybackRuntime` 直接实现端口，使用 playback 的类型与常量；Studio 的 `browser-runtime.ts` 删除，只留 26 行的 `built-in-sample-assets.ts`。公开入口只剩这个函数。 |
+| 3.2 | 完成，范围比提案大，见下。                                                                                                                                                                         |
+| 3.3 | 部分完成：README 改成一页；`docs/` 里的阶段报告与审计还没有归档。                                                                                                                                  |
+| 3.4 | 部分完成：`validateVoicePlan`、Plan 路由复查，以及 Voice Runtime 与资源准备的错误类删除。每个音符的 Zone 时长核对、运行时读 WAV 头，以及缓存、Manifest 与 Context 的错误类仍在。                   |
+| 3.5 | 未开始。                                                                                                                                                                                           |
+| 3.6 | 未开始。                                                                                                                                                                                           |
+| 3.7 | 部分完成：locator 换成 `assetBaseUrl(soundbankId)`；`expectedOrigin` 与 URL 规范化仍在。                                                                                                           |
+
+与提案的偏差：
+
+- 3.2 没有停在“Voice 本身就是句柄”。按 revision 分代的运行时整个删除：一个应用只有一个输出和一个
+  Voice 池，`prepare` 只加载乐器，准备结果没有生命周期（ADR-006）。token、generation、
+  `advanceGeneration`、`VoiceLedger` 与结果枚举一并删除，playback 的端口在同一次提交里改完，没有分两步。
+- 主音量没有放在 prepare 时设置，而是在 Voice Plan 带来不同的值时设置一次：输出不必读 Plan。
+
+第 6 节待决事项：
+
+- 播放中每次编辑仍会重新 prepare 整个 Plan，但不再新建 Voice Runtime；逐个音符找 Zone 的成本仍未测量。
+- 删除 `advanceGeneration`：已与 3.2 一起完成。
+- 3.6 与开发报告页的去留：仍待决。
 
 ## 附录：度量方法
 

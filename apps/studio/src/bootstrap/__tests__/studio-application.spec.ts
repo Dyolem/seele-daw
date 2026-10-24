@@ -52,6 +52,10 @@ interface RuntimeFixture {
 
 const INERT_PLAYBACK_RUNTIME: PlaybackRuntimePort = Object.freeze({
   prepare: () => Promise.reject(new Error('Playback is not used by this composition test')),
+  now: () => {
+    throw new Error('Playback is not used by this composition test')
+  },
+  allNotesOff() {},
   dispose() {},
 })
 
@@ -160,7 +164,7 @@ function createCompositionOptions() {
 
 function createTrackedPlaybackRuntime(order: string[]): PlaybackRuntimePort {
   return Object.freeze({
-    prepare: () => Promise.reject(new Error('Playback is not used by this composition test')),
+    ...INERT_PLAYBACK_RUNTIME,
     dispose: () => order.push('playback-runtime'),
   })
 }
@@ -516,7 +520,7 @@ describe('StudioApplication', () => {
         router,
         projectRuntime: fixture.runtime,
         projectPlaybackRuntime: Object.freeze({
-          prepare: INERT_PLAYBACK_RUNTIME.prepare,
+          ...INERT_PLAYBACK_RUNTIME,
           dispose: playbackDispose,
         }),
         projectPlaybackTimer: INERT_PLAYBACK_TIMER,

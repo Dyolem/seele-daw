@@ -4,7 +4,8 @@ import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
+import { createSyntheticPreparedResources } from '#internal/development/audio-quality-aq0/fixture'
+import type { PreparedSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 import {
   AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ,
   audioQualitySecondToFrame,
@@ -159,7 +160,7 @@ function createZones(): readonly SampleInstrumentZoneV1[] {
 
 export function createAudioQualityAq2PreparedResources(
   context: OfflineAudioContext,
-): PreparedAudibleMidiSampleResources {
+): PreparedSampleResources {
   const constantBuffer = createBuffer(
     context,
     SOURCE_DURATION_SECOND,
@@ -185,33 +186,11 @@ export function createAudioQualityAq2PreparedResources(
     soundbankId: SOUNDBANK_ID,
     zones,
   }) as SampleInstrumentManifestV1
-  return Object.freeze({
-    failures: Object.freeze([]),
-    instruments: Object.freeze([
-      Object.freeze({
-        manifest,
-        resources: Object.freeze([
-          Object.freeze({
-            audioBuffer: constantBuffer,
-            encodedByteLength: constantBuffer.length * Float32Array.BYTES_PER_ELEMENT,
-            key: CONSTANT_RESOURCE_KEY,
-          }),
-          Object.freeze({
-            audioBuffer: loopBuffer,
-            encodedByteLength: loopBuffer.length * Float32Array.BYTES_PER_ELEMENT,
-            key: LOOP_RESOURCE_KEY,
-          }),
-          Object.freeze({
-            audioBuffer: oneShotBuffer,
-            encodedByteLength: oneShotBuffer.length * Float32Array.BYTES_PER_ELEMENT,
-            key: ONE_SHOT_RESOURCE_KEY,
-          }),
-        ]),
-        soundbankId: SOUNDBANK_ID,
-      }),
-    ]),
-    modelRevision: 1,
-  }) as unknown as PreparedAudibleMidiSampleResources
+  return createSyntheticPreparedResources(SOUNDBANK_ID, manifest, [
+    { audioBuffer: constantBuffer, key: CONSTANT_RESOURCE_KEY },
+    { audioBuffer: loopBuffer, key: LOOP_RESOURCE_KEY },
+    { audioBuffer: oneShotBuffer, key: ONE_SHOT_RESOURCE_KEY },
+  ])
 }
 
 export function createAudioQualityAq2Plan(
@@ -219,7 +198,6 @@ export function createAudioQualityAq2Plan(
 ): ScheduledSampleVoicePlan {
   return Object.freeze({
     channel: 0,
-    engineGeneration: 1,
     instrumentDeviceId: 'audio-quality-aq2-browser-device',
     kind: 'sample-voice',
     keyReleasePlaybackClockSecond: options.releaseSecond,

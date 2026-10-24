@@ -1,15 +1,14 @@
 import {
   type AudibleMidiProjectPlan,
-  type EngineGeneration,
-  type PlaybackClockSecond,
-  type ScheduledSampleVoicePlan,
   type InstrumentPreparationFailure,
-  type PreparedPlaybackRuntime,
+  type PlaybackClockSecond,
   type PlaybackPreparationOptions,
   type PlaybackRuntimePort,
   type PlaybackTimerPort,
+  type PlaybackVoice,
+  type PreparedPlaybackPlan,
+  type ScheduledSampleVoicePlan,
   type UnsupportedNoteOccurrence,
-  type PlaybackVoiceHandle,
 } from '@seele-daw/playback'
 
 export class ManualProjectPlaybackTimer implements PlaybackTimerPort {
@@ -32,24 +31,26 @@ export class ManualProjectPlaybackTimer implements PlaybackTimerPort {
   }
 }
 
-export class ManualProjectPlaybackVoiceHandle implements PlaybackVoiceHandle {
+export class ManualProjectPlaybackVoice implements PlaybackVoice {
   readonly cancelCalls: (PlaybackClockSecond | undefined)[] = []
   readonly releaseUpdates: PlaybackClockSecond[] = []
   #active = true
   #releaseRequested = false
 
   constructor(
-    readonly engineGeneration: ScheduledSampleVoicePlan['engineGeneration'],
-    readonly occurrenceKey: ScheduledSampleVoicePlan['occurrenceKey'],
+    readonly plan: ScheduledSampleVoicePlan,
     readonly remainsActiveDuringRelease = false,
   ) {}
 
-  cancel(atPlaybackClockSecond?: PlaybackClockSecond): boolean {
-    if (!this.#active || this.#releaseRequested) return false
+  get occurrenceKey(): ScheduledSampleVoicePlan['occurrenceKey'] {
+    return this.plan.occurrenceKey
+  }
+
+  cancel(atPlaybackClockSecond?: PlaybackClockSecond): void {
+    if (!this.#active || this.#releaseRequested) return
     this.#releaseRequested = true
     if (!this.remainsActiveDuringRelease) this.#active = false
     this.cancelCalls.push(atPlaybackClockSecond)
-    return true
   }
 
   finish(): void {
@@ -60,33 +61,60 @@ export class ManualProjectPlaybackVoiceHandle implements PlaybackVoiceHandle {
     return this.#active
   }
 
-  rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): boolean {
-    if (!this.#active || this.#releaseRequested) return false
+  rescheduleRelease(releasePlaybackClockSecond: PlaybackClockSecond): void {
+    if (!this.#active || this.#releaseRequested) return
     this.releaseUpdates.push(releasePlaybackClockSecond)
-    return true
   }
 }
 
-export class ManualPreparedPlaybackRuntime implements PreparedPlaybackRuntime {
-  readonly generations: EngineGeneration[] = []
-  readonly handles: ManualProjectPlaybackVoiceHandle[] = []
-  readonly scheduled: ScheduledSampleVoicePlan[] = []
+/** The output both fake runtimes share: one clock, and every voice any prepared plan started. */
+abstract class ManualPlaybackOutput implements PlaybackRuntimePort {
+  readonly prepared: ManualPreparedPlaybackPlan[] = []
+  readonly voices: ManualProjectPlaybackVoice[] = []
   allNotesOffCount = 0
   allNotesOffFailure: unknown = null
-  disposeCount = 0
   currentTime = 0 as PlaybackClockSecond
+  disposeCount = 0
+  voicesRemainActiveDuringRelease = false
+
+  abstract prepare(
+    plan: AudibleMidiProjectPlan,
+    signal: AbortSignal,
+    options: PlaybackPreparationOptions,
+  ): Promise<PreparedPlaybackPlan>
+
+  now(): PlaybackClockSecond {
+    return this.currentTime
+  }
+
+  allNotesOff(): void {
+    this.allNotesOffCount += 1
+    if (this.allNotesOffFailure !== null) throw this.allNotesOffFailure
+    for (const voice of this.voices) voice.cancel()
+  }
+
+  dispose(): void {
+    this.disposeCount += 1
+    for (const voice of this.voices) voice.finish()
+  }
+}
+
+export class ManualPreparedPlaybackPlan implements PreparedPlaybackPlan {
+  readonly scheduled: ScheduledSampleVoicePlan[] = []
+  readonly voices: ManualProjectPlaybackVoice[] = []
   readonly preparationFailures: readonly InstrumentPreparationFailure[]
   readonly unsupportedNoteOccurrences: readonly UnsupportedNoteOccurrence[]
+  readonly #output: ManualPlaybackOutput
   readonly #unavailableSoundbankIds: ReadonlySet<InstrumentPreparationFailure['soundbankId']>
   readonly #unsupportedOccurrenceKeys: ReadonlySet<UnsupportedNoteOccurrence['occurrenceKey']>
-  readonly #voicesRemainActiveDuringRelease: boolean
 
   constructor(
-    readonly modelRevision: PreparedPlaybackRuntime['modelRevision'],
+    output: ManualPlaybackOutput,
+    readonly modelRevision: PreparedPlaybackPlan['modelRevision'],
     preparationFailures: readonly InstrumentPreparationFailure[] = [],
-    voicesRemainActiveDuringRelease = false,
     unsupportedNoteOccurrences: readonly UnsupportedNoteOccurrence[] = [],
   ) {
+    this.#output = output
     this.preparationFailures = Object.freeze([...preparationFailures])
     this.unsupportedNoteOccurrences = Object.freeze([...unsupportedNoteOccurrences])
     this.#unavailableSoundbankIds = new Set(
@@ -95,29 +123,9 @@ export class ManualPreparedPlaybackRuntime implements PreparedPlaybackRuntime {
     this.#unsupportedOccurrenceKeys = new Set(
       unsupportedNoteOccurrences.map(({ occurrenceKey }) => occurrenceKey),
     )
-    this.#voicesRemainActiveDuringRelease = voicesRemainActiveDuringRelease
   }
 
-  advanceGeneration(generation: EngineGeneration): void {
-    this.generations.push(generation)
-  }
-
-  allNotesOff(): void {
-    this.allNotesOffCount += 1
-    if (this.allNotesOffFailure !== null) throw this.allNotesOffFailure
-    for (const handle of this.handles) handle.cancel()
-  }
-
-  dispose(): void {
-    this.disposeCount += 1
-    for (const handle of this.handles) handle.finish()
-  }
-
-  now(): PlaybackClockSecond {
-    return this.currentTime
-  }
-
-  schedule(plan: ScheduledSampleVoicePlan): PlaybackVoiceHandle | null {
+  schedule(plan: ScheduledSampleVoicePlan): PlaybackVoice | null {
     if (
       this.#unavailableSoundbankIds.has(plan.soundbankId) ||
       this.#unsupportedOccurrenceKeys.has(plan.occurrenceKey)
@@ -125,33 +133,26 @@ export class ManualPreparedPlaybackRuntime implements PreparedPlaybackRuntime {
       return null
     }
     this.scheduled.push(plan)
-    const handle = new ManualProjectPlaybackVoiceHandle(
-      plan.engineGeneration,
-      plan.occurrenceKey,
-      this.#voicesRemainActiveDuringRelease,
-    )
-    this.handles.push(handle)
-    return handle
+    const voice = new ManualProjectPlaybackVoice(plan, this.#output.voicesRemainActiveDuringRelease)
+    this.voices.push(voice)
+    this.#output.voices.push(voice)
+    return voice
   }
 }
 
-export class ControlledProjectPlaybackRuntime implements PlaybackRuntimePort {
+export class ControlledProjectPlaybackRuntime extends ManualPlaybackOutput {
   readonly plans: AudibleMidiProjectPlan[] = []
   readonly preparationOptions: PlaybackPreparationOptions[] = []
   readonly signals: AbortSignal[] = []
-  readonly prepared: ManualPreparedPlaybackRuntime[] = []
-  currentTime = 0 as PlaybackClockSecond
-  disposeCount = 0
   failure: unknown = null
   preparationFailures: readonly InstrumentPreparationFailure[] = []
   unsupportedNotePitches: readonly number[] = []
-  voicesRemainActiveDuringRelease = false
 
   async prepare(
     plan: AudibleMidiProjectPlan,
     signal: AbortSignal,
     options: PlaybackPreparationOptions,
-  ) {
+  ): Promise<ManualPreparedPlaybackPlan> {
     this.plans.push(plan)
     this.signals.push(signal)
     this.preparationOptions.push(options)
@@ -172,19 +173,14 @@ export class ControlledProjectPlaybackRuntime implements PlaybackRuntimePort {
         }),
       )
     }
-    const runtime = new ManualPreparedPlaybackRuntime(
+    const prepared = new ManualPreparedPlaybackPlan(
+      this,
       plan.modelRevision,
       this.preparationFailures,
-      this.voicesRemainActiveDuringRelease,
       unsupportedNoteOccurrences,
     )
-    runtime.currentTime = this.currentTime
-    this.prepared.push(runtime)
-    return runtime
-  }
-
-  dispose(): void {
-    this.disposeCount += 1
+    this.prepared.push(prepared)
+    return prepared
   }
 }
 
@@ -192,42 +188,36 @@ interface DeferredPreparationRequest {
   readonly options: PlaybackPreparationOptions
   readonly plan: AudibleMidiProjectPlan
   readonly reject: (cause: unknown) => void
-  readonly resolve: (runtime: ManualPreparedPlaybackRuntime) => void
+  readonly resolve: (prepared: ManualPreparedPlaybackPlan) => void
   readonly signal: AbortSignal
 }
 
-export class DeferredProjectPlaybackRuntime implements PlaybackRuntimePort {
-  readonly prepared: ManualPreparedPlaybackRuntime[] = []
+export class DeferredProjectPlaybackRuntime extends ManualPlaybackOutput {
   readonly requests: DeferredPreparationRequest[] = []
-  disposeCount = 0
 
   prepare(
     plan: AudibleMidiProjectPlan,
     signal: AbortSignal,
     options: PlaybackPreparationOptions,
-  ): Promise<PreparedPlaybackRuntime> {
+  ): Promise<ManualPreparedPlaybackPlan> {
     return new Promise((resolve, reject) => {
       this.requests.push(Object.freeze({ options, plan, reject, resolve, signal }))
     })
   }
 
-  resolve(index: number, currentTime: PlaybackClockSecond): ManualPreparedPlaybackRuntime {
+  resolve(index: number, currentTime: PlaybackClockSecond): ManualPreparedPlaybackPlan {
     const request = this.requests[index]
     if (request === undefined) throw new Error(`Missing deferred preparation ${index}`)
-    const runtime = new ManualPreparedPlaybackRuntime(request.plan.modelRevision)
-    runtime.currentTime = currentTime
-    this.prepared.push(runtime)
-    request.resolve(runtime)
-    return runtime
+    this.currentTime = currentTime
+    const prepared = new ManualPreparedPlaybackPlan(this, request.plan.modelRevision)
+    this.prepared.push(prepared)
+    request.resolve(prepared)
+    return prepared
   }
 
   reject(index: number, cause: unknown): void {
     const request = this.requests[index]
     if (request === undefined) throw new Error(`Missing deferred preparation ${index}`)
     request.reject(cause)
-  }
-
-  dispose(): void {
-    this.disposeCount += 1
   }
 }

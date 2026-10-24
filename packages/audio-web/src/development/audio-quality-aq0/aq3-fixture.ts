@@ -8,7 +8,8 @@ import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
+import { createSyntheticPreparedResources } from '#internal/development/audio-quality-aq0/fixture'
+import type { PreparedSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 
 export const AUDIO_QUALITY_AQ3_RENDER_DURATION_SECOND = 0.32
 export const AUDIO_QUALITY_AQ3_SOURCE_AMPLITUDE = 0.005
@@ -68,7 +69,7 @@ function createZone(): SampleInstrumentZoneV1 {
 
 export function createAudioQualityAq3PreparedResources(
   context: OfflineAudioContext,
-): PreparedAudibleMidiSampleResources {
+): PreparedSampleResources {
   const audioBuffer = createBuffer(context)
   const zone = createZone()
   const manifest = Object.freeze({
@@ -78,23 +79,9 @@ export function createAudioQualityAq3PreparedResources(
     soundbankId: SOUNDBANK_ID,
     zones: Object.freeze([zone]),
   }) as SampleInstrumentManifestV1
-  return Object.freeze({
-    failures: Object.freeze([]),
-    instruments: Object.freeze([
-      Object.freeze({
-        manifest,
-        resources: Object.freeze([
-          Object.freeze({
-            audioBuffer,
-            encodedByteLength: audioBuffer.length * Float32Array.BYTES_PER_ELEMENT,
-            key: RESOURCE_KEY,
-          }),
-        ]),
-        soundbankId: SOUNDBANK_ID,
-      }),
-    ]),
-    modelRevision: 1,
-  }) as unknown as PreparedAudibleMidiSampleResources
+  return createSyntheticPreparedResources(SOUNDBANK_ID, manifest, [
+    { audioBuffer, key: RESOURCE_KEY },
+  ])
 }
 
 export function createAudioQualityAq3Plan(
@@ -102,7 +89,6 @@ export function createAudioQualityAq3Plan(
 ): ScheduledSampleVoicePlan {
   return Object.freeze({
     channel: 0,
-    engineGeneration: 1,
     instrumentDeviceId: options.instrumentDeviceId,
     kind: 'sample-voice',
     keyReleasePlaybackClockSecond: AUDIO_QUALITY_AQ3_RELEASE_SECOND,

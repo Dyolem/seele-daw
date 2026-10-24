@@ -1,17 +1,15 @@
 import {
-  SampleInstrumentResourceCache,
-  prepareAudibleMidiSampleResources,
-  type PreparedAudibleMidiSampleResources,
-} from '@seele-daw/audio-web'
-import {
   AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ,
+  SampleInstrumentResourceCache,
+  prepareSampleResources,
+  type PreparedSampleResources,
   audioQualitySecondToFrame,
   countAudioQualityClippedFrames,
   measureAudioQualityAq0Channels,
   renderAudioQualityPlans,
   type AudioQualityAq0ChannelMeasurement,
 } from '@seele-daw/audio-web/development/audio-quality-aq0'
-import type { SoundbankId } from '@seele-daw/playback'
+import { PLAYBACK_INSTRUMENT_FAILURE_MODE, type SoundbankId } from '@seele-daw/playback'
 import { PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE } from '@seele-daw/project-midi'
 
 import {
@@ -25,8 +23,8 @@ import {
 import { decodeMidiProgramPlaceholderDeviceState } from '@/workbench/instrument/midi-import-instrument-policy'
 import {
   DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
-  createDefaultBuiltInSampleAssetLocations,
-} from '@/workbench/project/playback/browser-runtime'
+  builtInSampleAssetBaseUrl,
+} from '@/workbench/instrument/built-in-sample-assets'
 
 export const BUILT_IN_SCORE_QUALITY_BROWSER_REPORT_SCHEMA =
   'seele.built-in-multi-instrument-score-quality-browser-report'
@@ -37,8 +35,9 @@ export const BUILT_IN_SCORE_QUALITY_GATE_POLICY = Object.freeze({
 } as const)
 
 type ResourceCacheStatistics = SampleInstrumentResourceCache['statistics']
-type PreparedZone =
-  PreparedAudibleMidiSampleResources['instruments'][number]['manifest']['zones'][number]
+type PreparedZone = NonNullable<
+  ReturnType<PreparedSampleResources['instruments']['get']>
+>['manifest']['zones'][number]
 
 export interface BuiltInScoreQualitySelectedZoneMeasurement {
   readonly exclusiveGroup: PreparedZone['exclusiveGroup']
@@ -151,14 +150,10 @@ function copyExclusiveGroup(group: PreparedZone['exclusiveGroup']): PreparedZone
 }
 
 function collectSelectedZones(
-  preparedResources: PreparedAudibleMidiSampleResources,
+  preparedResources: PreparedSampleResources,
   voicePlans: ReturnType<typeof createBuiltInScoreQualityPlaybackFixture>['voicePlans'],
 ): readonly BuiltInScoreQualitySelectedZoneMeasurement[] {
-  const instrumentBySoundbank = new Map(
-    preparedResources.instruments.map(
-      (instrument) => [instrument.soundbankId, instrument] as const,
-    ),
-  )
+  const instrumentBySoundbank = preparedResources.instruments
   const identities = new Map<
     string,
     { readonly pitch: number; readonly soundbankId: SoundbankId }
@@ -196,8 +191,10 @@ function collectSelectedZones(
   )
 }
 
-function measurePreparedResources(preparedResources: PreparedAudibleMidiSampleResources) {
-  const resources = preparedResources.instruments.flatMap(({ resources }) => resources)
+function measurePreparedResources(preparedResources: PreparedSampleResources) {
+  const resources = [...preparedResources.instruments.values()].flatMap(({ resources }) => [
+    ...resources.values(),
+  ])
   return Object.freeze({
     decodedFloat32ByteLength: resources.reduce(
       (total, { audioBuffer }) =>
@@ -208,7 +205,7 @@ function measurePreparedResources(preparedResources: PreparedAudibleMidiSampleRe
       (total, { encodedByteLength }) => total + encodedByteLength,
       0,
     ),
-    instrumentCount: preparedResources.instruments.length,
+    instrumentCount: preparedResources.instruments.size,
     resourceCount: resources.length,
   })
 }
@@ -329,10 +326,10 @@ export async function runBuiltInScoreQualityBrowserReport(
   options: RunBuiltInScoreQualityBrowserReportOptions,
 ): Promise<BuiltInScoreQualityBrowserReport> {
   const fixture = createBuiltInScoreQualityPlaybackFixture()
-  const assetLocations = createDefaultBuiltInSampleAssetLocations(options.expectedOrigin)
+  const assetBaseUrl = builtInSampleAssetBaseUrl(options.expectedOrigin)
   const renderState: {
     cache?: SampleInstrumentResourceCache
-    preparedResources?: PreparedAudibleMidiSampleResources
+    preparedResources?: PreparedSampleResources
   } = {}
 
   try {
@@ -345,17 +342,11 @@ export async function runBuiltInScoreQualityBrowserReport(
           limits: DEFAULT_BUILT_IN_SAMPLE_RESOURCE_LIMITS,
         })
         renderState.cache = cache
-        const preparedResources = await prepareAudibleMidiSampleResources(
+        const preparedResources = await prepareSampleResources(
           fixture.projectPlan,
           cache,
-          Object.freeze({
-            locate: (soundbankId: SoundbankId) => {
-              const assetBaseUrl = assetLocations.get(soundbankId)
-              return assetBaseUrl === undefined
-                ? null
-                : Object.freeze({ assetBaseUrl, soundbankId })
-            },
-          }),
+          assetBaseUrl,
+          PLAYBACK_INSTRUMENT_FAILURE_MODE.FAIL_PLAN,
         )
         renderState.preparedResources = preparedResources
         return preparedResources
@@ -399,8 +390,8 @@ export async function runBuiltInScoreQualityBrowserReport(
       checks: Object.freeze({
         allMeasurementsFinite: finiteMeasurementValues(mix, tail).every(Number.isFinite),
         allPlansScheduled:
-          rendered.scheduleResults.length === fixture.voicePlans.length &&
-          rendered.scheduleResults.every(({ outcome }) => outcome === 'scheduled'),
+          rendered.voices.length === fixture.voicePlans.length &&
+          rendered.voices.every((voice) => voice !== null),
         allScorePitchesCovered,
         cc64FinalGateExtended: fixture.voicePlans.some(
           ({ keyReleasePlaybackClockSecond, releasePlaybackClockSecond, soundbankId }) =>

@@ -38,3 +38,6 @@ export {
   measureAudioQualityAq0Channels,
 } from './audio-quality-aq0/measurement'
 export type { AudioQualityAq0ChannelMeasurement } from './audio-quality-aq0/measurement'
+export { prepareSampleResources } from '../sample-instrument/loading/prepare-plan-resources'
+export type { PreparedSampleResources } from '../sample-instrument/loading/prepare-plan-resources'
+export { SampleInstrumentResourceCache } from '../sample-instrument/loading/resource-cache'

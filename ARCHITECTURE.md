@@ -10,17 +10,17 @@
 
 ## 1. 分层
 
-| 包                 | 职责                                                             | 可以依赖                           |
-| ------------------ | ---------------------------------------------------------------- | ---------------------------------- |
-| `project-core`     | 项目模型、命令、事务、历史、查询与持久化 DTO                     | type-utils                         |
-| `editor`           | Pointer 输入 → 手势 → 意图；Piano Roll 的几何、命中与渲染        | project-core、type-utils           |
-| `playback`         | 编译、调和、调度、Transport 与 PlaybackEngine                    | project-core、type-utils           |
-| `audio-web`        | Web Audio 与采样音源；Studio 把它适配成 playback 的 Runtime Port | playback、type-utils               |
-| `platform-browser` | IndexedDB 项目目录与 Checkpoint、本地文件读取                    | project-core、playback、type-utils |
-| `midi-file`        | 标准 MIDI 文件编解码                                             | 无                                 |
-| `project-midi`     | MIDI 文档 ↔ 项目模型                                             | midi-file、project-core            |
-| `type-utils`       | 纯编译期类型工具                                                 | 无                                 |
-| `apps/studio`      | 唯一组合根：Vue 界面、浏览器实现、产品默认值                     | 以上全部                           |
+| 包                 | 职责                                                         | 可以依赖                           |
+| ------------------ | ------------------------------------------------------------ | ---------------------------------- |
+| `project-core`     | 项目模型、命令、事务、历史、查询与持久化 DTO                 | type-utils                         |
+| `editor`           | Pointer 输入 → 手势 → 意图；Piano Roll 的几何、命中与渲染    | project-core、type-utils           |
+| `playback`         | 编译、调和、调度、Transport 与 PlaybackEngine                | project-core、type-utils           |
+| `audio-web`        | Web Audio 与采样音源；实现 playback 的 `PlaybackRuntimePort` | playback、type-utils               |
+| `platform-browser` | IndexedDB 项目目录与 Checkpoint、本地文件读取                | project-core、playback、type-utils |
+| `midi-file`        | 标准 MIDI 文件编解码                                         | 无                                 |
+| `project-midi`     | MIDI 文档 ↔ 项目模型                                         | midi-file、project-core            |
+| `type-utils`       | 纯编译期类型工具                                             | 无                                 |
+| `apps/studio`      | 唯一组合根：Vue 界面、浏览器实现、产品默认值                 | 以上全部                           |
 
 `tooling/architecture-rules` 在 `pnpm lint` 中检查以下规则：
 
@@ -67,7 +67,8 @@ Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 | ----------------------------------- | ------------------------ | --------------------------- |
 | 可保存的项目事实、History、revision | `ProjectSession`         | 只能通过命令修改            |
 | 当前项目、加载、保存、dirty         | `ActiveProjectService`   | Studio `workbench/project/` |
-| 播放状态、Voice                     | `PlaybackEngine`         | Studio 只做投影             |
+| 播放状态、要调整的 Voice            | `PlaybackEngine`         | Studio 只做投影             |
+| 发声的 Voice、复音、音源缓存        | audio-web 的输出         | 整个应用一个（ADR-006）     |
 | 选择、工具、预览、缩放、面板        | editor 会话或 feature UI | 可随时丢弃                  |
 | 用户键位覆盖                        | `StudioUserKeymap`       | 存在 localStorage           |
 | Read Model、Scene、Canvas           | 可重建的投影             | 不反向修改事实              |
@@ -77,19 +78,19 @@ Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 
 ## 4. 新代码放在哪里
 
-| 要做的事                       | 位置                                                                                      |
-| ------------------------------ | ----------------------------------------------------------------------------------------- |
-| 命令的形状与工厂               | project-core `commands/protocol/project-command.ts`                                       |
-| 命令的校验与 MutationPlan      | `commands/<实体>/command-handler.ts`，并在 `preparation/project-command-preparer.ts` 注册 |
-| Studio 写项目的用例            | `apps/studio/src/workbench/edits/*-edits.ts`，普通函数，汇总在 `project-edits.ts`         |
-| 有生命周期的应用服务           | `workbench/project/…`；在 `bootstrap/studio-application.ts` 创建，放进 `StudioServices`   |
-| 用户动作（菜单、按钮、快捷键） | 所属 feature 的 `actions/`，用 `defineStudioAction` 声明                                  |
-| 焦点上下文                     | `defineStudioContext`；视图挂载或聚焦时用 `contexts.bind` 绑定目标                        |
-| 拖拽手势                       | `new GestureSession(start)`；提交用 `completeGesture`                                     |
-| 播放行为                       | `packages/playback`：`engine/`、`reconciliation/`、`scheduler/`                           |
-| 浏览器音频与音源               | `packages/audio-web`；接入点是 Studio 的 `workbench/project/playback/browser-runtime.ts`  |
-| 可见功能                       | `apps/studio/src/features/<功能>/`                                                        |
-| 与具体功能无关的控件和样式     | `apps/studio/src/ui/`                                                                     |
+| 要做的事                       | 位置                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------- |
+| 命令的形状与工厂               | project-core `commands/protocol/project-command.ts`                                         |
+| 命令的校验与 MutationPlan      | `commands/<实体>/command-handler.ts`，并在 `preparation/project-command-preparer.ts` 注册   |
+| Studio 写项目的用例            | `apps/studio/src/workbench/edits/*-edits.ts`，普通函数，汇总在 `project-edits.ts`           |
+| 有生命周期的应用服务           | `workbench/project/…`；在 `bootstrap/studio-application.ts` 创建，放进 `StudioServices`     |
+| 用户动作（菜单、按钮、快捷键） | 所属 feature 的 `actions/`，用 `defineStudioAction` 声明                                    |
+| 焦点上下文                     | `defineStudioContext`；视图挂载或聚焦时用 `contexts.bind` 绑定目标                          |
+| 拖拽手势                       | `new GestureSession(start)`；提交用 `completeGesture`                                       |
+| 播放行为                       | `packages/playback`：`engine/`、`reconciliation/`、`scheduler/`                             |
+| 浏览器音频与音源               | `packages/audio-web`；Studio 只给资产地址：`workbench/instrument/built-in-sample-assets.ts` |
+| 可见功能                       | `apps/studio/src/features/<功能>/`                                                          |
+| 与具体功能无关的控件和样式     | `apps/studio/src/ui/`                                                                       |
 
 组件通过 `useStudio()` 取得服务：`edits`、`actions`、`project`、`playback`、`navigation`、
 `midiImport`、`projectEntry`。InjectionKey 与它的 provide / inject 函数写在同一个文件里。

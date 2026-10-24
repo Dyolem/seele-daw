@@ -407,7 +407,8 @@ packages/project-core                    一个命令一个文件；实体表泛
   仍按实体编写，它们是领域本身。
 - PlaybackEngine 保持为一个状态机，没有再拆成 Reconciler、RuntimePreparation 与 LocateSession
   三个对象：它们共享 Transport、Voice 与请求序号，拆开后同一组不变量会分散到多个对象里。
-  调和决策是 `reconciliation/` 中的纯函数，Voice 跟踪由 `VoiceLedger` 负责。
+  调和决策是 `reconciliation/` 中的纯函数。之后 Voice 的生命周期整体交给 audio-web 的输出，
+  `VoiceLedger` 与按 revision 分代的 Runtime 一并删除（ADR-006）。
 - 没有做 `useProjectSnapshot()`：整项目 Snapshot 只有 WorkspacePage 一个读者。
 - 5 个编辑错误类合并为一个 `ProjectEditError`（4 个 code），7 个只含 `missing-context` 的 Vue
   错误类删除；导航决策的错误类有真实语义，保留。没有引入通用的 `StudioError`。

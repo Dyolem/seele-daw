@@ -1,10 +1,14 @@
-import { parseSoundbankId, type ScheduledSampleVoicePlan } from '@seele-daw/playback'
+import {
+  parseSoundbankId,
+  type ScheduledSampleVoicePlan,
+  type SoundbankId,
+} from '@seele-daw/playback'
 
 import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
+import type { PreparedSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 
 export const AUDIO_QUALITY_AQ0_REPORT_SCHEMA = 'seele.audio-quality-aq0-browser-report'
 export const AUDIO_QUALITY_AQ0_VELOCITY_VECTOR = Object.freeze([1, 32, 64, 96, 127] as const)
@@ -72,9 +76,32 @@ export function createAudioQualityReferenceSineBuffer(context: OfflineAudioConte
   return buffer
 }
 
+/** Prepared resources for a synthetic instrument whose buffers are already decoded. */
+export function createSyntheticPreparedResources(
+  soundbankId: SoundbankId,
+  manifest: SampleInstrumentManifestV1,
+  resources: readonly { readonly audioBuffer: AudioBuffer; readonly key: string }[],
+): PreparedSampleResources {
+  const loaded = resources.map(({ audioBuffer, key }) =>
+    Object.freeze({
+      audioBuffer,
+      encodedByteLength: audioBuffer.length * Float32Array.BYTES_PER_ELEMENT,
+      key,
+    }),
+  )
+  return Object.freeze({
+    modelRevision: 1 as PreparedSampleResources['modelRevision'],
+    instruments: new Map([
+      [soundbankId, Object.freeze({ manifest, resources: new Map(loaded.map((r) => [r.key, r])) })],
+    ]),
+    preparationFailures: Object.freeze([]),
+    unsupportedNoteOccurrences: Object.freeze([]),
+  })
+}
+
 export function createAudioQualityPreparedResources(
   audioBuffer: AudioBuffer,
-): PreparedAudibleMidiSampleResources {
+): PreparedSampleResources {
   const zone = createZone()
   const manifest = Object.freeze({
     displayName: 'AQ0 Synthetic Reference',
@@ -83,23 +110,9 @@ export function createAudioQualityPreparedResources(
     soundbankId: SOUNDBANK_ID,
     zones: Object.freeze([zone]),
   }) as SampleInstrumentManifestV1
-  return Object.freeze({
-    failures: Object.freeze([]),
-    instruments: Object.freeze([
-      Object.freeze({
-        manifest,
-        resources: Object.freeze([
-          Object.freeze({
-            audioBuffer,
-            encodedByteLength: audioBuffer.length * Float32Array.BYTES_PER_ELEMENT,
-            key: zone.resource.key,
-          }),
-        ]),
-        soundbankId: SOUNDBANK_ID,
-      }),
-    ]),
-    modelRevision: 1,
-  }) as unknown as PreparedAudibleMidiSampleResources
+  return createSyntheticPreparedResources(SOUNDBANK_ID, manifest, [
+    { audioBuffer, key: zone.resource.key },
+  ])
 }
 
 export function createAudioQualityBrowserPlan(
@@ -107,7 +120,6 @@ export function createAudioQualityBrowserPlan(
 ): ScheduledSampleVoicePlan {
   return Object.freeze({
     channel: 0,
-    engineGeneration: 1,
     instrumentDeviceId: 'audio-quality-aq0-browser-device',
     kind: 'sample-voice',
     keyReleasePlaybackClockSecond: AUDIO_QUALITY_AQ0_NOTE_RELEASE_SECOND,

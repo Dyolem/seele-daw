@@ -111,19 +111,15 @@ async function renderPolyphonyScenario(
   expectedSoundingVoiceCount: number,
 ): Promise<AudioQualityAq3PolyphonyMeasurement> {
   const rendered = await renderAudioQualityPlans({
-    acceptedScheduleOutcomes: ['scheduled', 'polyphony-dropped'],
+    allowDroppedVoices: true,
     createPreparedResources: createAudioQualityAq3PreparedResources,
     plans,
     renderDurationSecond: AUDIO_QUALITY_AQ3_RENDER_DURATION_SECOND,
   })
   const retirementChannel = rendered.channels[0]!
   const soundingChannel = rendered.channels[1]!
-  const scheduledPlanCount = rendered.scheduleResults.filter(
-    ({ outcome }) => outcome === 'scheduled',
-  ).length
-  const droppedPlanCount = rendered.scheduleResults.filter(
-    ({ outcome }) => outcome === 'polyphony-dropped',
-  ).length
+  const scheduledPlanCount = rendered.voices.filter((voice) => voice !== null).length
+  const droppedPlanCount = rendered.voices.length - scheduledPlanCount
   const expectedSoundingChannelLevel =
     AUDIO_QUALITY_AQ3_SOURCE_AMPLITUDE *
     AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain *

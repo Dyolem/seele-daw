@@ -1,32 +1,5 @@
-/** Public API for the Web Audio backend. */
-export { WebAudioContextRuntime } from './context/audio-context-runtime'
-export type { ActiveWebAudioOutput } from './context/audio-context-runtime'
-export {
-  AUDIBLE_MIDI_SAMPLE_PREPARATION_FAILURE_MODE,
-  AUDIBLE_MIDI_UNSUPPORTED_SAMPLE_NOTE_REASON,
-  prepareAudibleMidiSampleResources,
-} from './sample-instrument/loading/prepare-plan-resources'
-export type {
-  AudibleMidiSamplePreparationFailure,
-  AudibleMidiSamplePreparationFailureMode,
-  AudibleMidiSampleResourceLocator,
-  AudibleMidiUnsupportedSampleNoteOccurrence,
-  AudibleMidiUnsupportedSampleNoteReason,
-  PrepareAudibleMidiSampleResourcesOptions,
-  PreparedAudibleMidiSampleResources,
-} from './sample-instrument/loading/prepare-plan-resources'
-export { SampleInstrumentResourceCache } from './sample-instrument/loading/resource-cache'
-export type {
-  SampleInstrumentAssetLocation,
-  SampleInstrumentResourceCacheLimits,
-} from './sample-instrument/loading/resource-cache'
-export { SampleInstrumentVoiceRuntime } from './sample-instrument/voice/voice-runtime'
-export type {
-  SampleInstrumentVoiceReleaseUpdateOutcome,
-  SampleInstrumentVoiceReleaseUpdateResult,
-  SampleInstrumentVoicePolyphonyStatistics,
-  SampleInstrumentVoiceRuntimeStatistics,
-  SampleInstrumentVoiceScheduleOutcome,
-  SampleInstrumentVoiceScheduleResult,
-  SampleInstrumentVoiceToken,
-} from './sample-instrument/voice/voice-runtime'
+/** Public API for the Web Audio backend: the runtime playback plays through. */
+export { createWebAudioPlaybackRuntime } from './web-audio-playback-runtime'
+export type { WebAudioPlaybackRuntimeOptions } from './web-audio-playback-runtime'
+export type { SampleAssetBaseUrl } from './sample-instrument/loading/prepare-plan-resources'
+export type { SampleInstrumentResourceCacheLimits } from './sample-instrument/loading/resource-cache'

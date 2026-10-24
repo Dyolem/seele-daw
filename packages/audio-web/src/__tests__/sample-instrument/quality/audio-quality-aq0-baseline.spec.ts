@@ -1,4 +1,3 @@
-import type { ScheduledSampleVoicePlan } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
@@ -6,9 +5,11 @@ import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 import { calculateAudioQualityV1aVelocityGain } from '#internal/audio-quality/render-policy'
-import { SampleInstrumentVoiceRuntime } from '#internal/sample-instrument/voice/voice-runtime'
+import {
+  SampleInstrumentVoiceRuntime,
+  type SampleInstrument,
+} from '#internal/sample-instrument/voice/voice-runtime'
 import {
   AUDIO_QUALITY_AQ0_VELOCITY_VECTOR,
   countAudioQualityClippedFrames,
@@ -50,7 +51,7 @@ function createVelocityZone(): SampleInstrumentZoneV1 {
   })
 }
 
-function createPreparedResources(): PreparedAudibleMidiSampleResources {
+function createInstrument(): SampleInstrument {
   const zone = createVelocityZone()
   const manifest = Object.freeze({
     displayName: 'AQ0 Synthetic Reference',
@@ -59,23 +60,12 @@ function createPreparedResources(): PreparedAudibleMidiSampleResources {
     soundbankId: AUDIO_QUALITY_FIXTURE_SOUNDBANK_ID,
     zones: Object.freeze([zone]),
   }) as SampleInstrumentManifestV1
-  return Object.freeze({
-    failures: Object.freeze([]),
-    instruments: Object.freeze([
-      Object.freeze({
-        manifest,
-        resources: Object.freeze([
-          Object.freeze({
-            audioBuffer: createFakeAudioBuffer(8),
-            encodedByteLength: 1_024,
-            key: zone.resource.key,
-          }),
-        ]),
-        soundbankId: AUDIO_QUALITY_FIXTURE_SOUNDBANK_ID,
-      }),
-    ]),
-    modelRevision: 1,
-  }) as unknown as PreparedAudibleMidiSampleResources
+  const resource = Object.freeze({
+    audioBuffer: createFakeAudioBuffer(8),
+    encodedByteLength: 1_024,
+    key: zone.resource.key,
+  })
+  return Object.freeze({ manifest, resources: new Map([[resource.key, resource]]) })
 }
 
 function createRuntime() {
@@ -89,12 +79,8 @@ function createRuntime() {
     masterInput: master as unknown as AudioNode,
     setMasterGainAtTime,
   })
-  const runtime = new SampleInstrumentVoiceRuntime({
-    output,
-    preparedResources: createPreparedResources(),
-  })
-  runtime.advanceGeneration(1 as ScheduledSampleVoicePlan['engineGeneration'])
-  return { context, runtime, setMasterGainAtTime }
+  const runtime = new SampleInstrumentVoiceRuntime({ output })
+  return { context, instrument: createInstrument(), runtime, setMasterGainAtTime }
 }
 
 describe('Audio Quality Foundation AQ0 baseline', () => {
@@ -166,8 +152,8 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
     ).toBe(true)
   })
 
-  it('applies the approved AQ1 Velocity response while preserving raw master gain handoff', () => {
-    const { context, runtime, setMasterGainAtTime } = createRuntime()
+  it('applies the approved AQ1 Velocity response and hands the raw master gain over once', () => {
+    const { context, instrument, runtime, setMasterGainAtTime } = createRuntime()
     const plans = AUDIO_QUALITY_VELOCITY_VECTOR.map((velocity, index) =>
       createAudioQualityVoicePlan({
         occurrenceKey: `aq1-velocity-${velocity}`,
@@ -176,7 +162,7 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
       }),
     )
 
-    for (const plan of plans) expect(runtime.schedule(plan).outcome).toBe('scheduled')
+    for (const plan of plans) expect(runtime.schedule(plan, instrument)).not.toBeNull()
 
     expect(context.gainNodes).toHaveLength(plans.length)
     for (let index = 0; index < plans.length; index += 1) {
@@ -186,8 +172,7 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
         value: calculateAudioQualityV1aVelocityGain(plans[index]!.velocity),
       })
     }
-    expect(setMasterGainAtTime).toHaveBeenCalledTimes(plans.length)
-    expect(setMasterGainAtTime.mock.calls.every(([gain]) => gain === 1)).toBe(true)
+    expect(setMasterGainAtTime.mock.calls).toEqual([[1, 0]])
 
     for (const source of context.bufferSources) source.finish()
     expect(runtime.statistics).toEqual({
@@ -199,12 +184,12 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
   })
 
   it('characterizes the AQ3 per-Instrument sounding and retirement Voice budgets', () => {
-    const { context, runtime } = createRuntime()
+    const { context, instrument, runtime } = createRuntime()
     const plans = Array.from({ length: 65 }, (_, index) =>
       createAudioQualityVoicePlan({ occurrenceKey: `uncapped-${index + 1}` }),
     )
 
-    for (const plan of plans) expect(runtime.schedule(plan).outcome).toBe('scheduled')
+    for (const plan of plans) expect(runtime.schedule(plan, instrument)).not.toBeNull()
     expect(runtime.statistics.activeVoiceCount).toBe(65)
     expect(runtime.polyphonyStatistics).toEqual({
       polyphonyDropCount: 0,

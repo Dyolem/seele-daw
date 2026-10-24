@@ -29,8 +29,8 @@ export type {
   PlaybackPreparationOptions,
   PlaybackRuntimePort,
   PlaybackTimerPort,
-  PlaybackVoiceHandle,
-  PreparedPlaybackRuntime,
+  PlaybackVoice,
+  PreparedPlaybackPlan,
   UnsupportedNoteOccurrence,
 } from './engine/playback-runtime'
 export {

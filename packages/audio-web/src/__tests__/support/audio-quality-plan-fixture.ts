@@ -36,7 +36,6 @@ export function createAudioQualityVoicePlan(
   const durationSecond = options.durationSecond ?? 0.25
   return Object.freeze({
     channel: 0,
-    engineGeneration: 1,
     instrumentDeviceId: 'audio-quality-fixture-device',
     kind: 'sample-voice',
     keyReleasePlaybackClockSecond: startSecond + durationSecond,

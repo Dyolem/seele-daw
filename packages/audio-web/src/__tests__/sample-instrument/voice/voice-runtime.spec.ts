@@ -1,4 +1,8 @@
-import { parseSoundbankId, type ScheduledSampleVoicePlan } from '@seele-daw/playback'
+import {
+  parsePlaybackClockSecond,
+  parseSoundbankId,
+  type ScheduledSampleVoicePlan,
+} from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
@@ -7,10 +11,9 @@ import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 import {
   SampleInstrumentVoiceRuntime,
-  type SampleInstrumentVoiceRuntimeError,
+  type SampleInstrument,
 } from '#internal/sample-instrument/voice/voice-runtime'
 import {
   FakeAudioContext,
@@ -105,10 +108,10 @@ function createVoiceZones(): readonly SampleInstrumentZoneV1[] {
   ])
 }
 
-function createPreparedResources(
+function createInstrument(
   zones: readonly SampleInstrumentZoneV1[] = createVoiceZones(),
   audioBuffer = createFakeAudioBuffer(),
-): PreparedAudibleMidiSampleResources {
+): SampleInstrument {
   const manifest = Object.freeze({
     displayName: 'Fixture Voice Bank',
     schema: 'seele.sample-instrument-manifest',
@@ -117,29 +120,21 @@ function createPreparedResources(
     zones,
   }) as SampleInstrumentManifestV1
   return Object.freeze({
-    instruments: Object.freeze([
-      Object.freeze({
-        manifest,
-        resources: Object.freeze(
-          zones.map((zone) =>
-            Object.freeze({
-              audioBuffer,
-              encodedByteLength: 1_024,
-              key: zone.resource.key,
-            }),
-          ),
-        ),
-        soundbankId: SOUNDBANK_ID,
-      }),
-    ]),
-    modelRevision: 1,
-  }) as unknown as PreparedAudibleMidiSampleResources
+    manifest,
+    resources: new Map(
+      zones.map((zone) => [
+        zone.resource.key,
+        Object.freeze({ audioBuffer, encodedByteLength: 1_024, key: zone.resource.key }),
+      ]),
+    ),
+  })
 }
 
 type VoicePlanOverrides = Omit<
   Partial<ScheduledSampleVoicePlan>,
   | 'instrumentDeviceId'
   | 'keyReleasePlaybackClockSecond'
+  | 'masterGain'
   | 'pan'
   | 'releasePlaybackClockSecond'
   | 'startPlaybackClockSecond'
@@ -148,6 +143,7 @@ type VoicePlanOverrides = Omit<
 > & {
   readonly instrumentDeviceId?: string
   readonly keyReleasePlaybackClockSecond?: number
+  readonly masterGain?: number
   readonly pan?: number
   readonly releasePlaybackClockSecond?: number
   readonly startPlaybackClockSecond?: number
@@ -163,7 +159,6 @@ function createPlan(
   const releasePlaybackClockSecond = overrides.releasePlaybackClockSecond ?? 6
   return Object.freeze({
     channel: 0,
-    engineGeneration: 1,
     instrumentDeviceId: 'fixture-device',
     kind: 'sample-voice',
     keyReleasePlaybackClockSecond:
@@ -187,7 +182,7 @@ function createRuntime(
   options: {
     readonly createGain?: () => FakeGainNode
     readonly currentTime?: number
-    readonly preparedResources?: PreparedAudibleMidiSampleResources
+    readonly instrument?: SampleInstrument
     readonly setMasterGainAtTime?: ActiveWebAudioOutput['setMasterGainAtTime']
     readonly stereoPannerAvailable?: boolean
   } = {},
@@ -208,30 +203,28 @@ function createRuntime(
     masterInput: master as unknown as AudioNode,
     setMasterGainAtTime,
   })
-  const runtime = new SampleInstrumentVoiceRuntime({
-    output,
-    preparedResources: options.preparedResources ?? createPreparedResources(),
-  })
-  runtime.advanceGeneration(1 as ScheduledSampleVoicePlan['engineGeneration'])
-  return { context, master, runtime, setMasterGainAtTime }
+  const runtime = new SampleInstrumentVoiceRuntime({ output })
+  const instrument = options.instrument ?? createInstrument()
+  const schedule = (plan: ScheduledSampleVoicePlan) => runtime.schedule(plan, instrument)
+  return { context, master, runtime, schedule, setMasterGainAtTime }
 }
+
+const EMPTY_STATISTICS = Object.freeze({
+  activeVoiceCount: 0,
+  connectedNodeCount: 0,
+  endedListenerCount: 0,
+  sourceNodeCount: 0,
+})
 
 describe('Sample Instrument Voice Runtime', () => {
   it('selects a range Zone and schedules pitch, offset, velocity, gain, pan, and envelope', () => {
-    const { context, runtime, setMasterGainAtTime } = createRuntime({ currentTime: 5 })
+    const { context, runtime, schedule, setMasterGainAtTime } = createRuntime({ currentTime: 5 })
 
-    const result = runtime.schedule(
-      createPlan('range-note', 50, { keyReleasePlaybackClockSecond: 5.5 }),
-    )
+    const voice = schedule(createPlan('range-note', 50, { keyReleasePlaybackClockSecond: 5.5 }))
 
     const expectedRate = 2 ** (2.5 / 12)
     const expectedGain = 0.26577656381975606 * 0.8
-    expect(result).toEqual({
-      outcome: 'scheduled',
-      playbackRate: expectedRate,
-      token: { engineGeneration: 1, occurrenceKey: 'range-note' },
-      zoneId: 'range',
-    })
+    expect(voice?.isActive()).toBe(true)
     expect(context.bufferSources[0]).toMatchObject({
       loop: false,
       starts: [{ duration: null, offset: 0.25, when: 5 }],
@@ -264,18 +257,14 @@ describe('Sample Instrument Voice Runtime', () => {
     })
 
     context.bufferSources[0]?.finish()
-    expect(runtime.statistics).toEqual({
-      activeVoiceCount: 0,
-      connectedNodeCount: 0,
-      endedListenerCount: 0,
-      sourceNodeCount: 0,
-    })
+    expect(voice?.isActive()).toBe(false)
+    expect(runtime.statistics).toEqual(EMPTY_STATISTICS)
   })
 
   it('keeps a continuous loop active through pedal hold and stops after final release', () => {
-    const { context, runtime, setMasterGainAtTime } = createRuntime()
+    const { context, schedule, setMasterGainAtTime } = createRuntime()
 
-    runtime.schedule(
+    schedule(
       createPlan('continuous-note', 61, {
         startPlaybackClockSecond: 1,
         keyReleasePlaybackClockSecond: 2,
@@ -293,28 +282,38 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(setMasterGainAtTime).toHaveBeenCalledWith(0.9, 0)
   })
 
+  it('moves the master gain only when a plan brings another one', () => {
+    const setMasterGainAtTime = vi.fn<ActiveWebAudioOutput['setMasterGainAtTime']>()
+    const { schedule } = createRuntime({ setMasterGainAtTime })
+
+    schedule(createPlan('first-master', 60))
+    schedule(createPlan('same-master', 61))
+    schedule(createPlan('louder-master', 62, { masterGain: 1 }))
+
+    expect(setMasterGainAtTime.mock.calls).toEqual([
+      [0.9, 0],
+      [1, 0],
+    ])
+  })
+
   it('falls back to a centered Gain output only when StereoPanner is unavailable', () => {
     const centered = createRuntime({ stereoPannerAvailable: false })
 
-    expect(centered.runtime.schedule(createPlan('centered-note', 60, { pan: 0 })).outcome).toBe(
-      'scheduled',
-    )
+    expect(centered.schedule(createPlan('centered-note', 60, { pan: 0 }))).not.toBeNull()
     expect(centered.context.gainNodes).toHaveLength(2)
     expect(centered.runtime.statistics.connectedNodeCount).toBe(3)
 
     const panned = createRuntime({ stereoPannerAvailable: false })
-    expect(() => panned.runtime.schedule(createPlan('panned-note', 60))).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({
-        code: 'audio-context-unavailable',
-      }),
+    expect(() => panned.schedule(createPlan('panned-note', 60))).toThrow(
+      'Stereo panning is unavailable',
     )
     expect(panned.runtime.statistics.activeVoiceCount).toBe(0)
   })
 
   it('switches a sustain loop to an unlooped tail at final release after pedal hold', () => {
-    const { context, runtime } = createRuntime()
+    const { context, runtime, schedule } = createRuntime()
 
-    runtime.schedule(
+    schedule(
       createPlan('sustain-note', 62, {
         startPlaybackClockSecond: 10,
         keyReleasePlaybackClockSecond: 11,
@@ -344,21 +343,21 @@ describe('Sample Instrument Voice Runtime', () => {
   })
 
   it('does not reinterpret one-shot behavior when a pedal-derived release is supplied', () => {
-    const { context, runtime } = createRuntime()
-    const result = runtime.schedule(
+    const { context, schedule } = createRuntime()
+    const voice = schedule(
       createPlan('one-shot-note', 63, {
         startPlaybackClockSecond: 1,
         keyReleasePlaybackClockSecond: 1.5,
         releasePlaybackClockSecond: 2,
       }),
-    )
+    )!
 
     expect(context.bufferSources[0]?.stops).toEqual([])
     expect(context.gainNodes[0]?.gain.events).toEqual([
       { kind: 'set', time: 1, value: 0 },
       { kind: 'set', time: 1, value: 0.26577656381975606 * 0.8 },
     ])
-    expect(runtime.cancel(result.token!, 2.5)).toBe(true)
+    voice.cancel(parsePlaybackClockSecond(2.5))
     expect(context.gainNodes[0]?.gain.events).toContainEqual({
       kind: 'cancel-and-hold',
       time: 2.5,
@@ -367,24 +366,23 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(
       2.5 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
     )
+
     context.bufferSources[0]?.finish()
-    expect(runtime.cancel(result.token!)).toBe(false)
+    expect(voice.isActive()).toBe(false)
+    voice.cancel()
+    expect(context.bufferSources[0]?.stops).toHaveLength(1)
   })
 
   it('reschedules a gated Note Off before release without recreating its active Voice', () => {
-    const { context, runtime } = createRuntime({ currentTime: 2 })
-    const result = runtime.schedule(
+    const { context, schedule } = createRuntime({ currentTime: 2 })
+    const voice = schedule(
       createPlan('rescheduled-note', 50, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 6,
       }),
-    )
+    )!
 
-    expect(runtime.hasVoice(result.token!)).toBe(true)
-    expect(runtime.rescheduleRelease(result.token!, 8)).toEqual({
-      outcome: 'rescheduled',
-      releasePlaybackClockSecond: 8,
-    })
+    voice.rescheduleRelease(parsePlaybackClockSecond(8))
     expect(context.gainNodes[0]?.gain.events).toContainEqual({
       kind: 'cancel-and-hold',
       time: 6,
@@ -394,31 +392,27 @@ describe('Sample Instrument Voice Runtime', () => {
       time: 8.4,
       value: 0,
     })
+    expect(context.bufferSources).toHaveLength(1)
     expect(context.bufferSources[0]?.stops).toHaveLength(2)
     expect(context.bufferSources[0]?.stops[0]).toBeCloseTo(6.4 + STOP_SAFETY_SECOND)
     expect(context.bufferSources[0]?.stops[1]).toBeCloseTo(8.4 + STOP_SAFETY_SECOND)
 
     context.bufferSources[0]?.finish()
-    expect(runtime.hasVoice(result.token!)).toBe(false)
-    expect(runtime.rescheduleRelease(result.token!, 9)).toEqual({
-      outcome: 'not-found',
-      releasePlaybackClockSecond: null,
-    })
+    expect(voice.isActive()).toBe(false)
+    voice.rescheduleRelease(parsePlaybackClockSecond(9))
+    expect(context.bufferSources[0]?.stops).toHaveLength(2)
   })
 
   it('replaces a future sustain-loop tail when its Note Off moves', () => {
-    const { context, runtime } = createRuntime({ currentTime: 2 })
-    const result = runtime.schedule(
+    const { context, schedule } = createRuntime({ currentTime: 2 })
+    const voice = schedule(
       createPlan('rescheduled-sustain-note', 62, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 5,
       }),
-    )
+    )!
 
-    expect(runtime.rescheduleRelease(result.token!, 7)).toMatchObject({
-      outcome: 'rescheduled',
-      releasePlaybackClockSecond: 7,
-    })
+    voice.rescheduleRelease(parsePlaybackClockSecond(7))
     expect(context.bufferSources).toHaveLength(3)
     expect(context.bufferSources[0]?.stops).toEqual([5, 7])
     expect(context.bufferSources[1]).toMatchObject({
@@ -435,76 +429,75 @@ describe('Sample Instrument Voice Runtime', () => {
 
   it('does not resurrect a release tail or reinterpret one-shot Note length', () => {
     const released = createRuntime({ currentTime: 6 })
-    const gated = released.runtime.schedule(
+    const gated = released.schedule(
       createPlan('already-released-note', 60, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 7,
       }),
-    )
+    )!
+    const gatedEvents = [...released.context.gainNodes[0]!.gain.events]
     released.context.currentTime = 7
-    expect(released.runtime.rescheduleRelease(gated.token!, 9)).toEqual({
-      outcome: 'release-started',
-      releasePlaybackClockSecond: 7,
-    })
+    gated.rescheduleRelease(parsePlaybackClockSecond(9))
+    expect(released.context.gainNodes[0]?.gain.events).toEqual(gatedEvents)
+    expect(released.context.bufferSources[0]?.stops).toEqual([7.3 + STOP_SAFETY_SECOND])
 
     const oneShot = createRuntime({ currentTime: 1 })
-    const oneShotVoice = oneShot.runtime.schedule(
+    const oneShotVoice = oneShot.schedule(
       createPlan('one-shot-resize', 63, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 2,
       }),
-    )
-    expect(oneShot.runtime.rescheduleRelease(oneShotVoice.token!, 3)).toEqual({
-      outcome: 'one-shot',
-      releasePlaybackClockSecond: 2,
-    })
+    )!
+    const oneShotEvents = [...oneShot.context.gainNodes[0]!.gain.events]
+    oneShotVoice.rescheduleRelease(parsePlaybackClockSecond(3))
+    expect(oneShot.context.gainNodes[0]?.gain.events).toEqual(oneShotEvents)
+    expect(oneShot.context.bufferSources[0]?.stops).toEqual([])
   })
 
   it('starts normal release now when a resized Note end has already passed', () => {
-    const { context, runtime } = createRuntime({ currentTime: 1 })
-    const result = runtime.schedule(
+    const { context, schedule } = createRuntime({ currentTime: 1 })
+    const voice = schedule(
       createPlan('shortened-active-note', 60, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 6,
       }),
-    )
+    )!
     context.currentTime = 3
 
-    expect(runtime.rescheduleRelease(result.token!, 2)).toEqual({
-      outcome: 'released-now',
-      releasePlaybackClockSecond: 3,
-    })
+    voice.rescheduleRelease(parsePlaybackClockSecond(2))
     expect(context.gainNodes[0]?.gain.events).toContainEqual({
       kind: 'cancel-and-hold',
       time: 3,
     })
+    expect(context.bufferSources[0]?.stops).toHaveLength(2)
     expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(3.3 + STOP_SAFETY_SECOND)
-    expect(runtime.rescheduleRelease(result.token!, 8)).toMatchObject({
-      outcome: 'release-started',
-    })
+
+    // The release has started; a later Note end cannot bring the Voice back.
+    voice.rescheduleRelease(parsePlaybackClockSecond(8))
+    expect(context.bufferSources[0]?.stops).toHaveLength(2)
   })
 
   it('applies fast and normal exclusive-group release modes to older voices', () => {
-    const { context, runtime } = createRuntime()
-    runtime.schedule(
+    const { context, schedule } = createRuntime()
+    schedule(
       createPlan('fast-old-note', 64, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 10,
       }),
     )
-    runtime.schedule(
+    schedule(
       createPlan('fast-new-note', 65, {
         startPlaybackClockSecond: 2,
         releasePlaybackClockSecond: 10,
       }),
     )
-    runtime.schedule(
+    schedule(
       createPlan('normal-old-note', 66, {
         startPlaybackClockSecond: 3,
         releasePlaybackClockSecond: 10,
       }),
     )
-    runtime.schedule(
+    schedule(
       createPlan('normal-new-note', 67, {
         startPlaybackClockSecond: 4,
         releasePlaybackClockSecond: 10,
@@ -539,17 +532,15 @@ describe('Sample Instrument Voice Runtime', () => {
         triggerMode: 'one-shot',
       }),
     ])
-    const { context, runtime } = createRuntime({
-      preparedResources: createPreparedResources(zones),
-    })
+    const { context, schedule } = createRuntime({ instrument: createInstrument(zones) })
 
-    runtime.schedule(
+    schedule(
       createPlan('open-hat', 70, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 1.05,
       }),
     )
-    runtime.schedule(
+    schedule(
       createPlan('closed-hat', 71, {
         startPlaybackClockSecond: 2,
         releasePlaybackClockSecond: 2.05,
@@ -568,14 +559,14 @@ describe('Sample Instrument Voice Runtime', () => {
   })
 
   it('moves a sustain loop into its unlooped tail when normal mutex release starts early', () => {
-    const { context, runtime } = createRuntime()
-    runtime.schedule(
+    const { context, schedule } = createRuntime()
+    schedule(
       createPlan('normal-sustain-old-note', 68, {
         startPlaybackClockSecond: 1,
         releasePlaybackClockSecond: 10,
       }),
     )
-    runtime.schedule(
+    schedule(
       createPlan('normal-sustain-new-note', 69, {
         startPlaybackClockSecond: 4,
         releasePlaybackClockSecond: 10,
@@ -597,70 +588,46 @@ describe('Sample Instrument Voice Runtime', () => {
     expect(context.bufferSources[3]?.stops[0]).toBeCloseTo(4.4 + STOP_SAFETY_SECOND)
   })
 
-  it('isolates generations and occurrence tokens while suppressing stale and expired plans', () => {
-    const { context, runtime } = createRuntime({ currentTime: 2 })
-    const active = runtime.schedule(
-      createPlan('shared-occurrence', 60, {
-        startPlaybackClockSecond: 2,
-        releasePlaybackClockSecond: 8,
-      }),
-    )
+  it('drops plans that cannot sound and keeps every scheduled Voice independent', () => {
+    const { context, runtime, schedule } = createRuntime({ currentTime: 2 })
 
-    expect(() => runtime.schedule(createPlan('shared-occurrence', 60))).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({
-        code: 'duplicate-voice-token',
-      }),
-    )
     expect(
-      runtime.schedule(
-        createPlan('stale-note', 60, {
-          engineGeneration: 0 as ScheduledSampleVoicePlan['engineGeneration'],
-        }),
-      ),
-    ).toEqual({
-      outcome: 'stale-generation',
-      playbackRate: null,
-      token: null,
-      zoneId: null,
-    })
-    expect(() =>
-      runtime.schedule(
-        createPlan('future-note', 60, {
-          engineGeneration: 2 as ScheduledSampleVoicePlan['engineGeneration'],
-        }),
-      ),
-    ).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({
-        code: 'generation-not-active',
-      }),
-    )
-    expect(
-      runtime.schedule(
+      schedule(
         createPlan('expired-note', 60, {
           startPlaybackClockSecond: 0,
           releasePlaybackClockSecond: 1,
         }),
       ),
-    ).toEqual({ outcome: 'expired', playbackRate: null, token: null, zoneId: null })
+    ).toBeNull()
+    expect(schedule(createPlan('no-zone-note', 80))).toBeNull()
+    expect(context.bufferSources).toHaveLength(0)
 
-    expect(runtime.advanceGeneration(2 as ScheduledSampleVoicePlan['engineGeneration'])).toBe(true)
-    expect(context.bufferSources[0]?.stops).toEqual([8.3 + STOP_SAFETY_SECOND])
-    expect(
-      runtime.schedule(
-        createPlan('shared-occurrence', 60, {
-          engineGeneration: 2 as ScheduledSampleVoicePlan['engineGeneration'],
-          startPlaybackClockSecond: 3,
-          releasePlaybackClockSecond: 8,
-        }),
-      ).outcome,
-    ).toBe('scheduled')
-    expect(runtime.cancel(active.token!)).toBe(true)
+    const first = schedule(
+      createPlan('shared-occurrence', 60, {
+        startPlaybackClockSecond: 2,
+        releasePlaybackClockSecond: 8,
+      }),
+    )!
+    const second = schedule(
+      createPlan('shared-occurrence', 60, {
+        startPlaybackClockSecond: 3,
+        releasePlaybackClockSecond: 8,
+      }),
+    )!
+    first.cancel()
+
+    expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(
+      2 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
+    )
+    expect(context.bufferSources[1]?.stops).toEqual([8.3 + STOP_SAFETY_SECOND])
+    expect(second.isActive()).toBe(true)
+    expect(runtime.statistics.activeVoiceCount).toBe(2)
   })
 
   it('bounds one Instrument to 64 sounding Voices and 16 fast-release retirement tails', () => {
-    const { context, runtime } = createRuntime()
-    const results = Array.from({ length: 81 }, (_, index) =>
-      runtime.schedule(
+    const { context, runtime, schedule } = createRuntime()
+    const voices = Array.from({ length: 81 }, (_, index) =>
+      schedule(
         createPlan(`instrument-polyphony-${String(index).padStart(3, '0')}`, 60, {
           instrumentDeviceId: 'polyphony-instrument-a',
           releasePlaybackClockSecond: 10,
@@ -671,13 +638,8 @@ describe('Sample Instrument Voice Runtime', () => {
       ),
     )
 
-    expect(results.slice(0, 80).every(({ outcome }) => outcome === 'scheduled')).toBe(true)
-    expect(results[80]).toEqual({
-      outcome: 'polyphony-dropped',
-      playbackRate: null,
-      token: null,
-      zoneId: null,
-    })
+    expect(voices.slice(0, 80).every((voice) => voice !== null)).toBe(true)
+    expect(voices[80]).toBeNull()
     expect(context.bufferSources).toHaveLength(80)
     expect(runtime.statistics.activeVoiceCount).toBe(80)
     expect(runtime.polyphonyStatistics).toEqual({
@@ -702,7 +664,7 @@ describe('Sample Instrument Voice Runtime', () => {
   })
 
   it('steals a pedal-held Voice before a quieter key-held Voice', () => {
-    const { context, runtime } = createRuntime()
+    const { context, runtime, schedule } = createRuntime()
     const initialPlans = Array.from({ length: 64 }, (_, index) =>
       createPlan(`expression-priority-${String(index).padStart(3, '0')}`, 60, {
         keyReleasePlaybackClockSecond: index === 0 ? 2 : 10,
@@ -712,10 +674,10 @@ describe('Sample Instrument Voice Runtime', () => {
         velocity: index === 0 ? 127 : 1,
       }),
     )
-    for (const plan of initialPlans) expect(runtime.schedule(plan).outcome).toBe('scheduled')
+    for (const plan of initialPlans) expect(schedule(plan)).not.toBeNull()
 
     expect(
-      runtime.schedule(
+      schedule(
         createPlan('expression-priority-new', 60, {
           keyReleasePlaybackClockSecond: 10,
           releasePlaybackClockSecond: 10,
@@ -723,8 +685,8 @@ describe('Sample Instrument Voice Runtime', () => {
           trackGain: 1,
           velocity: 127,
         }),
-      ).outcome,
-    ).toBe('scheduled')
+      ),
+    ).not.toBeNull()
 
     expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(
       4 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
@@ -738,8 +700,8 @@ describe('Sample Instrument Voice Runtime', () => {
     })
   })
 
-  it('applies the 128 Voice Runtime budget across distinct Instrument devices', () => {
-    const { context, runtime } = createRuntime()
+  it('applies the 128 Voice budget across distinct Instrument devices', () => {
+    const { context, runtime, schedule } = createRuntime()
     const initialPlans = Array.from({ length: 128 }, (_, index) =>
       createPlan(`runtime-polyphony-${String(index).padStart(3, '0')}`, 60, {
         instrumentDeviceId: index < 64 ? 'polyphony-instrument-a' : 'polyphony-instrument-b',
@@ -749,10 +711,10 @@ describe('Sample Instrument Voice Runtime', () => {
         velocity: 127,
       }),
     )
-    for (const plan of initialPlans) expect(runtime.schedule(plan).outcome).toBe('scheduled')
+    for (const plan of initialPlans) expect(schedule(plan)).not.toBeNull()
 
     expect(
-      runtime.schedule(
+      schedule(
         createPlan('runtime-polyphony-new', 60, {
           instrumentDeviceId: 'polyphony-instrument-c',
           releasePlaybackClockSecond: 10,
@@ -760,8 +722,8 @@ describe('Sample Instrument Voice Runtime', () => {
           trackGain: 1,
           velocity: 127,
         }),
-      ).outcome,
-    ).toBe('scheduled')
+      ),
+    ).not.toBeNull()
 
     expect(context.bufferSources).toHaveLength(129)
     expect(context.bufferSources[0]?.stops.at(-1)).toBeCloseTo(
@@ -775,140 +737,102 @@ describe('Sample Instrument Voice Runtime', () => {
     })
   })
 
-  it('supports allNotesOff and deterministic disposal without residual listeners or nodes', () => {
-    const { context, runtime } = createRuntime()
-    runtime.schedule(createPlan('first', 60))
-    runtime.schedule(createPlan('second', 61))
+  it('fades every Voice on allNotesOff and disposes without residual listeners or nodes', () => {
+    const { context, runtime, schedule } = createRuntime()
+    schedule(createPlan('first', 60))
+    schedule(createPlan('second', 61))
 
-    expect(runtime.allNotesOff(1)).toBe(2)
-    expect(runtime.allNotesOff(2)).toBe(0)
+    runtime.allNotesOff(1)
+    for (const source of context.bufferSources) {
+      expect(source.stops.at(-1)).toBeCloseTo(1 + FAST_RELEASE_SECOND + STOP_SAFETY_SECOND)
+    }
+    // Voices already fading keep their earlier release.
+    runtime.allNotesOff(2)
+    expect(context.bufferSources.map(({ stops }) => stops.length)).toEqual([2, 2])
+
     runtime.dispose()
     runtime.dispose()
-
-    expect(runtime.statistics).toEqual({
-      activeVoiceCount: 0,
-      connectedNodeCount: 0,
-      endedListenerCount: 0,
-      sourceNodeCount: 0,
-    })
+    expect(runtime.statistics).toEqual(EMPTY_STATISTICS)
     expect(context.endedListenerCount).toBe(0)
     expect(
       context.bufferSources.every(({ disconnectCallCount }) => disconnectCallCount === 1),
     ).toBe(true)
-    expect(() => runtime.allNotesOff()).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({ code: 'disposed' }),
-    )
+    expect(() => runtime.allNotesOff()).not.toThrow()
+    expect(() => schedule(createPlan('after-dispose', 60))).toThrow('Sample voices are disposed')
   })
 
   it('fails closed and cleans a partially scheduled graph when master scheduling fails', () => {
     const setMasterGainAtTime = vi.fn<ActiveWebAudioOutput['setMasterGainAtTime']>(() => {
       throw new TypeError('fixture master failure')
     })
-    const { context, runtime } = createRuntime({ setMasterGainAtTime })
+    const { context, runtime, schedule } = createRuntime({ setMasterGainAtTime })
 
-    expect(() => runtime.schedule(createPlan('failed-voice', 60))).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({
-        code: 'voice-create-failed',
-      }),
+    expect(() => schedule(createPlan('failed-voice', 60))).toThrow(
+      'Voice failed-voice could not be scheduled: fixture master failure',
     )
-    expect(runtime.statistics).toEqual({
-      activeVoiceCount: 0,
-      connectedNodeCount: 0,
-      endedListenerCount: 0,
-      sourceNodeCount: 0,
-    })
+    expect(runtime.statistics).toEqual(EMPTY_STATISTICS)
     expect(context.bufferSources[0]?.stops).toEqual([6.3 + STOP_SAFETY_SECOND, 0])
     expect(context.endedListenerCount).toBe(0)
   })
 
-  it('normalizes a browser node creation failure without retaining a Voice', () => {
-    const { runtime } = createRuntime({
+  it('surfaces a browser node creation failure without retaining a Voice', () => {
+    const { runtime, schedule } = createRuntime({
       createGain: () => {
         throw new TypeError('fixture node creation failure')
       },
     })
 
-    expect(() => runtime.schedule(createPlan('node-failure', 60))).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({
-        code: 'voice-create-failed',
-      }),
-    )
+    expect(() => schedule(createPlan('node-failure', 60))).toThrow('fixture node creation failure')
     expect(runtime.statistics.activeVoiceCount).toBe(0)
   })
 
-  it('normalizes release automation failure and detaches the affected Voice', () => {
-    const { context, runtime } = createRuntime()
-    const result = runtime.schedule(createPlan('release-failure', 60))
+  it('detaches a Voice whose release automation fails', () => {
+    const { context, runtime, schedule } = createRuntime()
+    const voice = schedule(createPlan('release-failure', 60))!
     context.gainNodes[0]!.gain.cancelAndHoldFailure = new TypeError('fixture automation failure')
 
-    expect(() => runtime.cancel(result.token!)).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({
-        code: 'voice-create-failed',
-      }),
+    expect(() => voice.cancel()).toThrow(
+      'Voice release-failure release could not be scheduled: fixture automation failure',
     )
-    expect(runtime.statistics).toEqual({
-      activeVoiceCount: 0,
-      connectedNodeCount: 0,
-      endedListenerCount: 0,
-      sourceNodeCount: 0,
-    })
+    expect(voice.isActive()).toBe(false)
+    expect(runtime.statistics).toEqual(EMPTY_STATISTICS)
     expect(context.endedListenerCount).toBe(0)
   })
 
   it('continues allNotesOff cleanup after one Voice release fails', () => {
-    const { context, runtime } = createRuntime()
-    runtime.schedule(createPlan('release-failure-first', 60))
-    runtime.schedule(createPlan('release-failure-second', 61))
+    const { context, runtime, schedule } = createRuntime()
+    schedule(createPlan('release-failure-first', 60))
+    schedule(createPlan('release-failure-second', 61))
     context.gainNodes[0]!.gain.cancelAndHoldFailure = new TypeError('fixture automation failure')
 
-    expect(() => runtime.allNotesOff()).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({
-        code: 'voice-create-failed',
-      }),
+    expect(() => runtime.allNotesOff()).toThrow(
+      'Voice release-failure-first release could not be scheduled',
     )
     expect(runtime.statistics.activeVoiceCount).toBe(1)
     expect(context.bufferSources[1]?.stops.at(-1)).toBeCloseTo(
       FAST_RELEASE_SECOND + STOP_SAFETY_SECOND,
     )
     context.bufferSources[1]?.finish()
-    expect(runtime.statistics).toEqual({
-      activeVoiceCount: 0,
-      connectedNodeCount: 0,
-      endedListenerCount: 0,
-      sourceNodeCount: 0,
-    })
+    expect(runtime.statistics).toEqual(EMPTY_STATISTICS)
   })
 
   it.each([
     {
-      code: 'unsupported-pitch',
-      preparedResources: createPreparedResources(),
-      plan: createPlan('unsupported', 80),
-    },
-    {
-      code: 'resource-duration-mismatch',
-      preparedResources: createPreparedResources(createVoiceZones(), createFakeAudioBuffer(0.1)),
+      failure: 'a decoded resource shorter than its Zone timing',
+      instrument: createInstrument(createVoiceZones(), createFakeAudioBuffer(0.1)),
+      message: 'range timing is outside decoded resource samples/range.wav',
       plan: createPlan('duration-mismatch', 50),
     },
     {
-      code: 'missing-resource',
-      preparedResources: Object.freeze({
-        ...createPreparedResources(),
-        instruments: Object.freeze([
-          Object.freeze({
-            ...createPreparedResources().instruments[0],
-            resources: Object.freeze([]),
-          }),
-        ]),
-      }) as PreparedAudibleMidiSampleResources,
+      failure: 'a Zone without its loaded resource',
+      instrument: Object.freeze({ ...createInstrument(), resources: new Map() }),
+      message: 'fixture-voice-bank has no loaded resource samples/exact.wav',
       plan: createPlan('missing-resource', 60),
     },
-  ] as const)('rejects $code before retaining a Voice', ({ code, plan, preparedResources }) => {
-    const { runtime } = createRuntime({ preparedResources })
+  ])('rejects $failure before retaining a Voice', ({ instrument, message, plan }) => {
+    const { runtime } = createRuntime()
 
-    expect(() => runtime.schedule(plan)).toThrowError(
-      expect.objectContaining<Partial<SampleInstrumentVoiceRuntimeError>>({ code }),
-    )
+    expect(() => runtime.schedule(plan, instrument)).toThrow(message)
     expect(runtime.statistics.activeVoiceCount).toBe(0)
   })
 })

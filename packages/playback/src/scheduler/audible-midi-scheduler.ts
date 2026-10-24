@@ -75,7 +75,6 @@ export type ScheduledVoiceTiming = 'late-immediate' | 'on-time'
 
 export interface ScheduledSampleVoicePlan {
   readonly kind: 'sample-voice'
-  readonly engineGeneration: EngineGeneration
   readonly occurrenceKey: NoteOccurrenceKey
   readonly trackId: TrackId
   readonly instrumentDeviceId: DeviceId
@@ -409,7 +408,6 @@ export function createAudibleMidiSchedulerPlanner(
   function createScheduledVoice(
     span: MidiNoteSpanPlan,
     route: SchedulerTrackRoute,
-    generation: EngineGeneration,
     startPlaybackClockSecond: PlaybackClockSecond,
     keyReleasePlaybackClockSecond: PlaybackClockSecond,
     releasePlaybackClockSecond: PlaybackClockSecond,
@@ -417,7 +415,6 @@ export function createAudibleMidiSchedulerPlanner(
   ): ScheduledSampleVoicePlan {
     return Object.freeze({
       channel: span.channel,
-      engineGeneration: generation,
       instrumentDeviceId: route.instrumentDeviceId,
       kind: 'sample-voice',
       keyReleasePlaybackClockSecond,
@@ -553,7 +550,6 @@ export function createAudibleMidiSchedulerPlanner(
         createScheduledVoice(
           span,
           route,
-          snapshot.engineGeneration,
           startPlaybackClockSecond,
           targetKeyReleasePlaybackClockSecond,
           targetReleasePlaybackClockSecond,

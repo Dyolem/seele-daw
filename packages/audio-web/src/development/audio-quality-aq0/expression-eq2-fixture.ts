@@ -8,7 +8,8 @@ import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
+import { createSyntheticPreparedResources } from '#internal/development/audio-quality-aq0/fixture'
+import type { PreparedSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 
 export const AUDIO_QUALITY_EXPRESSION_EQ2_RENDER_DURATION_SECOND = 0.48
 export const AUDIO_QUALITY_EXPRESSION_EQ2_SOURCE_AMPLITUDE = 0.04
@@ -127,7 +128,7 @@ function createZones(): readonly SampleInstrumentZoneV1[] {
 
 export function createAudioQualityExpressionEq2PreparedResources(
   context: OfflineAudioContext,
-): PreparedAudibleMidiSampleResources {
+): PreparedSampleResources {
   const loopBuffer = createSineBuffer(context, LOOP_SOURCE_DURATION_SECOND)
   const oneShotBuffer = createSineBuffer(context, ONE_SHOT_SOURCE_DURATION_SECOND)
   const zones = createZones()
@@ -138,28 +139,10 @@ export function createAudioQualityExpressionEq2PreparedResources(
     soundbankId: SOUNDBANK_ID,
     zones,
   }) as SampleInstrumentManifestV1
-  return Object.freeze({
-    failures: Object.freeze([]),
-    instruments: Object.freeze([
-      Object.freeze({
-        manifest,
-        resources: Object.freeze([
-          Object.freeze({
-            audioBuffer: loopBuffer,
-            encodedByteLength: loopBuffer.length * Float32Array.BYTES_PER_ELEMENT,
-            key: LOOP_RESOURCE_KEY,
-          }),
-          Object.freeze({
-            audioBuffer: oneShotBuffer,
-            encodedByteLength: oneShotBuffer.length * Float32Array.BYTES_PER_ELEMENT,
-            key: ONE_SHOT_RESOURCE_KEY,
-          }),
-        ]),
-        soundbankId: SOUNDBANK_ID,
-      }),
-    ]),
-    modelRevision: 1,
-  }) as unknown as PreparedAudibleMidiSampleResources
+  return createSyntheticPreparedResources(SOUNDBANK_ID, manifest, [
+    { audioBuffer: loopBuffer, key: LOOP_RESOURCE_KEY },
+    { audioBuffer: oneShotBuffer, key: ONE_SHOT_RESOURCE_KEY },
+  ])
 }
 
 export function createAudioQualityExpressionEq2Plan(
@@ -167,7 +150,6 @@ export function createAudioQualityExpressionEq2Plan(
 ): ScheduledSampleVoicePlan {
   return Object.freeze({
     channel: 0,
-    engineGeneration: 1,
     instrumentDeviceId: 'audio-quality-expression-eq2-browser-device',
     kind: 'sample-voice',
     keyReleasePlaybackClockSecond:

@@ -1,4 +1,4 @@
-import type { ScheduledSampleVoicePlan, SoundbankId } from '@seele-daw/playback'
+import type { PlaybackVoice, ScheduledSampleVoicePlan } from '@seele-daw/playback'
 
 import {
   AUDIO_QUALITY_V1A_RENDER_POLICY,
@@ -11,50 +11,18 @@ import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import type { PreparedAudibleMidiSampleResources } from '#internal/sample-instrument/loading/prepare-plan-resources'
 import type { LoadedSampleInstrumentResource } from '#internal/sample-instrument/loading/resource-cache'
-import {
-  SampleInstrumentZoneSelectionError,
-  findSampleInstrumentZoneForPitch,
-} from '#internal/sample-instrument/loading/zone-selection'
+import { findSampleInstrumentZoneForPitch } from '#internal/sample-instrument/loading/zone-selection'
 import {
   evaluateSampleInstrumentEnvelopeTransition,
   scheduleSampleInstrumentEnvelopeTransition,
 } from '#internal/sample-instrument/voice/envelope'
 import { selectSampleInstrumentVoiceStealCandidate } from '#internal/sample-instrument/voice/polyphony-policy'
 
-type EngineGeneration = ScheduledSampleVoicePlan['engineGeneration']
-type NoteOccurrenceKey = ScheduledSampleVoicePlan['occurrenceKey']
-
-export interface SampleInstrumentVoiceToken {
-  readonly engineGeneration: EngineGeneration
-  readonly occurrenceKey: NoteOccurrenceKey
-}
-
-export type SampleInstrumentVoiceScheduleOutcome =
-  | 'expired'
-  | 'polyphony-dropped'
-  | 'scheduled'
-  | 'stale-generation'
-
-export interface SampleInstrumentVoiceScheduleResult {
-  readonly outcome: SampleInstrumentVoiceScheduleOutcome
-  readonly playbackRate: number | null
-  readonly token: SampleInstrumentVoiceToken | null
-  readonly zoneId: string | null
-}
-
-export type SampleInstrumentVoiceReleaseUpdateOutcome =
-  | 'no-change'
-  | 'not-found'
-  | 'one-shot'
-  | 'release-started'
-  | 'released-now'
-  | 'rescheduled'
-
-export interface SampleInstrumentVoiceReleaseUpdateResult {
-  readonly outcome: SampleInstrumentVoiceReleaseUpdateOutcome
-  readonly releasePlaybackClockSecond: number | null
+/** What a voice plays: an instrument's Manifest and the decoded resources its zones use. */
+export interface SampleInstrument {
+  readonly manifest: SampleInstrumentManifestV1
+  readonly resources: ReadonlyMap<string, LoadedSampleInstrumentResource>
 }
 
 export interface SampleInstrumentVoiceRuntimeStatistics {
@@ -74,57 +42,19 @@ export interface SampleInstrumentVoicePolyphonyStatistics {
 export interface SampleInstrumentVoiceRuntimeOptions {
   readonly fastReleaseSecond?: number
   readonly output: ActiveWebAudioOutput
-  readonly preparedResources: PreparedAudibleMidiSampleResources
-}
-
-export type SampleInstrumentVoiceRuntimeErrorCode =
-  | 'audio-context-unavailable'
-  | 'duplicate-instrument'
-  | 'duplicate-resource'
-  | 'duplicate-voice-token'
-  | 'generation-not-active'
-  | 'invalid-configuration'
-  | 'invalid-generation'
-  | 'invalid-voice-plan'
-  | 'missing-instrument'
-  | 'missing-resource'
-  | 'resource-duration-mismatch'
-  | 'unsupported-pitch'
-  | 'voice-create-failed'
-  | 'disposed'
-
-export class SampleInstrumentVoiceRuntimeError extends Error {
-  readonly code: SampleInstrumentVoiceRuntimeErrorCode
-  readonly soundbankId: SoundbankId | null
-
-  constructor(
-    code: SampleInstrumentVoiceRuntimeErrorCode,
-    message: string,
-    soundbankId: SoundbankId | null = null,
-  ) {
-    super(message)
-    this.name = 'SampleInstrumentVoiceRuntimeError'
-    this.code = code
-    this.soundbankId = soundbankId
-  }
-}
-
-interface PreparedInstrumentIndex {
-  readonly manifest: SampleInstrumentManifestV1
-  readonly resources: ReadonlyMap<string, LoadedSampleInstrumentResource>
 }
 
 interface ActiveSampleVoice {
   readonly audioBuffer: AudioBuffer
   readonly baseGain: number
   readonly gain: GainNode
-  readonly key: string
   readonly output: AudioNode
   readonly playbackRate: number
   readonly plan: ScheduledSampleVoicePlan
   readonly sources: Set<ActiveSampleSource>
+  /** Breaks polyphony ties in scheduling order. */
+  readonly stableToken: string
   readonly startTime: number
-  readonly token: SampleInstrumentVoiceToken
   readonly zone: SampleInstrumentZoneV1
   forcedRelease: ActiveSampleVoiceForcedRelease | null
   polyphonyRetired: boolean
@@ -149,119 +79,14 @@ type SampleInstrumentVoicePolyphonyAdmission =
   | { readonly kind: 'drop' }
   | { readonly kind: 'steal'; readonly voice: ActiveSampleVoice }
 
-function fail(
-  code: SampleInstrumentVoiceRuntimeErrorCode,
-  message: string,
-  soundbankId: SoundbankId | null = null,
-): never {
-  throw new SampleInstrumentVoiceRuntimeError(code, message, soundbankId)
-}
-
 function errorDetail(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown failure'
-}
-
-function voiceKey(token: SampleInstrumentVoiceToken): string {
-  return JSON.stringify([token.engineGeneration, token.occurrenceKey])
-}
-
-function validateVoiceToken(token: SampleInstrumentVoiceToken): void {
-  validateGeneration(token.engineGeneration)
-  if (typeof token.occurrenceKey !== 'string' || token.occurrenceKey.trim() === '') {
-    fail('invalid-voice-plan', 'Voice Token occurrenceKey must be a nonblank string')
-  }
-}
-
-function validateGeneration(generation: EngineGeneration): void {
-  if (!Number.isSafeInteger(generation) || generation < 0) {
-    fail('invalid-generation', 'engineGeneration must be a non-negative safe integer')
-  }
-}
-
-function validateVoicePlan(plan: ScheduledSampleVoicePlan): void {
-  const finiteValues = [
-    plan.masterGain,
-    plan.pan,
-    plan.keyReleasePlaybackClockSecond,
-    plan.releasePlaybackClockSecond,
-    plan.startPlaybackClockSecond,
-    plan.trackGain,
-    plan.velocity,
-  ]
-  if (finiteValues.some((value) => !Number.isFinite(value))) {
-    fail('invalid-voice-plan', 'Voice Plan contains a non-finite numeric value', plan.soundbankId)
-  }
-  if (
-    plan.kind !== 'sample-voice' ||
-    plan.masterGain < 0 ||
-    plan.masterGain > 4 ||
-    plan.trackGain < 0 ||
-    plan.trackGain > 4 ||
-    plan.pan < -1 ||
-    plan.pan > 1 ||
-    !Number.isInteger(plan.pitch) ||
-    plan.pitch < 0 ||
-    plan.pitch > 127 ||
-    !Number.isInteger(plan.velocity) ||
-    plan.velocity < 1 ||
-    plan.velocity > 127 ||
-    plan.startPlaybackClockSecond < 0 ||
-    plan.keyReleasePlaybackClockSecond < 0 ||
-    plan.keyReleasePlaybackClockSecond > plan.releasePlaybackClockSecond ||
-    (plan.timing === 'on-time' &&
-      plan.keyReleasePlaybackClockSecond <= plan.startPlaybackClockSecond) ||
-    plan.releasePlaybackClockSecond <= plan.startPlaybackClockSecond
-  ) {
-    fail('invalid-voice-plan', 'Voice Plan violates the Sample Voice V1 contract', plan.soundbankId)
-  }
-  validateVoiceToken({
-    engineGeneration: plan.engineGeneration,
-    occurrenceKey: plan.occurrenceKey,
-  })
-}
-
-function createInstrumentIndex(
-  prepared: PreparedAudibleMidiSampleResources,
-): ReadonlyMap<SoundbankId, PreparedInstrumentIndex> {
-  const instruments = new Map<SoundbankId, PreparedInstrumentIndex>()
-  for (const instrument of prepared.instruments) {
-    if (instruments.has(instrument.soundbankId)) {
-      fail(
-        'duplicate-instrument',
-        `Prepared resources repeat ${instrument.soundbankId}`,
-        instrument.soundbankId,
-      )
-    }
-    if (instrument.manifest.soundbankId !== instrument.soundbankId) {
-      fail(
-        'missing-instrument',
-        `Prepared Manifest identity does not match ${instrument.soundbankId}`,
-        instrument.soundbankId,
-      )
-    }
-    const resources = new Map<string, LoadedSampleInstrumentResource>()
-    for (const resource of instrument.resources) {
-      if (resources.has(resource.key)) {
-        fail(
-          'duplicate-resource',
-          `${instrument.soundbankId} repeats resource ${resource.key}`,
-          instrument.soundbankId,
-        )
-      }
-      resources.set(resource.key, resource)
-    }
-    instruments.set(
-      instrument.soundbankId,
-      Object.freeze({ manifest: instrument.manifest, resources }),
-    )
-  }
-  return instruments
 }
 
 function requireRunningContext(output: ActiveWebAudioOutput): AudioContext {
   const context = output.audioContext
   if (String(context.state) !== 'running') {
-    fail('audio-context-unavailable', `Sample Voice requires a running AudioContext`)
+    throw new Error('Sample voices need a running AudioContext')
   }
   return context
 }
@@ -273,7 +98,6 @@ function calculatePlaybackRate(zone: SampleInstrumentZoneV1, pitch: number): num
 function assertZoneMatchesResource(
   zone: SampleInstrumentZoneV1,
   resource: LoadedSampleInstrumentResource,
-  soundbankId: SoundbankId,
 ): void {
   const duration = resource.audioBuffer.duration
   if (
@@ -283,11 +107,7 @@ function assertZoneMatchesResource(
     (zone.loop.kind !== 'none' &&
       (zone.loop.endSecond > duration || zone.startOffsetSecond >= zone.loop.endSecond))
   ) {
-    fail(
-      'resource-duration-mismatch',
-      `${zone.zoneId} timing is outside decoded resource ${resource.key}`,
-      soundbankId,
-    )
+    throw new Error(`${zone.zoneId} timing is outside decoded resource ${resource.key}`)
   }
 }
 
@@ -385,43 +205,33 @@ function calculatePolyphonyPriorityGain(voice: ActiveSampleVoice, time: number):
 }
 
 /**
- * Bridges the external playback pipeline into disposable Web Audio voices.
- *
- * The caller supplies an activated Web Audio output, prepared sample resources, Scheduler-produced
- * Voice Plans, and generation or cancellation commands. This runtime resolves each plan against
- * its Manifest, creates and schedules the native audio graph, coordinates Note Off and exclusive
- * group behavior, and owns voice cleanup. It deliberately does not own Project state, resource
- * loading, Transport, Scheduler wake-ups, or the AudioContext lifecycle.
+ * Plays sample voices on one Web Audio output. Voices of every plan revision share it, so the
+ * polyphony limits and all-notes-off cover all of them. Each voice resolves its plan against the
+ * instrument's Manifest, schedules its own native graph, and disconnects it once it has ended.
  */
 export class SampleInstrumentVoiceRuntime {
   readonly #fastRelease: SampleInstrumentEnvelopeSegmentV1
-  readonly #instruments: ReadonlyMap<SoundbankId, PreparedInstrumentIndex>
   readonly #output: ActiveWebAudioOutput
-  readonly #voices = new Map<string, ActiveSampleVoice>()
-  #activeGeneration: EngineGeneration | null = null
+  readonly #voices = new Set<ActiveSampleVoice>()
+  #masterGain: number | null = null
   #disposed = false
   #polyphonyDropCount = 0
+  #scheduledCount = 0
   #voiceStealCount = 0
 
   constructor(options: SampleInstrumentVoiceRuntimeOptions) {
     const fastReleaseSecond =
       options.fastReleaseSecond ?? AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
     if (!Number.isFinite(fastReleaseSecond) || fastReleaseSecond <= 0 || fastReleaseSecond > 0.1) {
-      fail('invalid-configuration', 'fastReleaseSecond must be greater than 0 through 0.1 seconds')
+      throw new RangeError('fastReleaseSecond must be greater than 0 through 0.1 seconds')
     }
     this.#output = options.output
-    requireRunningContext(options.output)
-    this.#instruments = createInstrumentIndex(options.preparedResources)
     this.#fastRelease = Object.freeze({ curve: null, durationSecond: fastReleaseSecond })
-  }
-
-  get activeGeneration(): EngineGeneration | null {
-    return this.#activeGeneration
   }
 
   get statistics(): SampleInstrumentVoiceRuntimeStatistics {
     let sourceNodeCount = 0
-    for (const voice of this.#voices.values()) sourceNodeCount += voice.sources.size
+    for (const voice of this.#voices) sourceNodeCount += voice.sources.size
     return Object.freeze({
       activeVoiceCount: this.#voices.size,
       connectedNodeCount: sourceNodeCount + this.#voices.size * 2,
@@ -432,7 +242,7 @@ export class SampleInstrumentVoiceRuntime {
 
   get polyphonyStatistics(): SampleInstrumentVoicePolyphonyStatistics {
     let retirementVoiceCount = 0
-    for (const voice of this.#voices.values()) {
+    for (const voice of this.#voices) {
       if (voice.polyphonyRetired) retirementVoiceCount += 1
     }
     return Object.freeze({
@@ -443,89 +253,22 @@ export class SampleInstrumentVoiceRuntime {
     })
   }
 
-  advanceGeneration(generation: EngineGeneration): boolean {
-    this.#assertUsable()
-    validateGeneration(generation)
-    const activeGeneration = this.#activeGeneration
-    if (activeGeneration !== null && generation < activeGeneration) {
-      fail('invalid-generation', `Cannot advance to stale engineGeneration ${generation}`)
-    }
-    if (activeGeneration === generation) return false
-    this.#activeGeneration = generation
-    return true
-  }
-
-  schedule(plan: ScheduledSampleVoicePlan): SampleInstrumentVoiceScheduleResult {
-    this.#assertUsable()
-    validateVoicePlan(plan)
-    const activeGeneration = this.#activeGeneration
-    if (activeGeneration === null || plan.engineGeneration > activeGeneration) {
-      fail(
-        'generation-not-active',
-        `engineGeneration ${plan.engineGeneration} is not active`,
-        plan.soundbankId,
-      )
-    }
-    if (plan.engineGeneration < activeGeneration) {
-      return Object.freeze({
-        outcome: 'stale-generation',
-        playbackRate: null,
-        token: null,
-        zoneId: null,
-      })
-    }
-
+  /**
+   * Starts one voice of `instrument`. Returns null when the voice would already have ended, the
+   * instrument has no zone for its pitch, or the polyphony limits drop it.
+   */
+  schedule(plan: ScheduledSampleVoicePlan, instrument: SampleInstrument): PlaybackVoice | null {
+    if (this.#disposed) throw new Error('Sample voices are disposed')
     const context = requireRunningContext(this.#output)
-    if (plan.releasePlaybackClockSecond <= context.currentTime) {
-      return Object.freeze({ outcome: 'expired', playbackRate: null, token: null, zoneId: null })
-    }
-    const instrument = this.#instruments.get(plan.soundbankId)
-    if (instrument === undefined) {
-      fail(
-        'missing-instrument',
-        `No prepared Sample Instrument exists for ${plan.soundbankId}`,
-        plan.soundbankId,
-      )
-    }
+    if (plan.releasePlaybackClockSecond <= context.currentTime) return null
 
-    let zone: SampleInstrumentZoneV1 | null
-    try {
-      zone = findSampleInstrumentZoneForPitch(instrument.manifest, plan.pitch)
-    } catch (error) {
-      if (error instanceof SampleInstrumentZoneSelectionError) {
-        fail('invalid-voice-plan', error.message, plan.soundbankId)
-      }
-      throw error
-    }
-    if (zone === null) {
-      fail(
-        'unsupported-pitch',
-        `${plan.soundbankId} does not cover MIDI pitch ${plan.pitch}`,
-        plan.soundbankId,
-      )
-    }
+    const zone = findSampleInstrumentZoneForPitch(instrument.manifest, plan.pitch)
+    if (zone === null) return null
     const resource = instrument.resources.get(zone.resource.key)
     if (resource === undefined) {
-      fail(
-        'missing-resource',
-        `${plan.soundbankId} has no prepared resource ${zone.resource.key}`,
-        plan.soundbankId,
-      )
+      throw new Error(`${plan.soundbankId} has no loaded resource ${zone.resource.key}`)
     }
-    assertZoneMatchesResource(zone, resource, plan.soundbankId)
-
-    const token = Object.freeze({
-      engineGeneration: plan.engineGeneration,
-      occurrenceKey: plan.occurrenceKey,
-    })
-    const key = voiceKey(token)
-    if (this.#voices.has(key)) {
-      fail(
-        'duplicate-voice-token',
-        `Voice ${plan.occurrenceKey} is already active`,
-        plan.soundbankId,
-      )
-    }
+    assertZoneMatchesResource(zone, resource)
 
     const startTime = Math.max(plan.startPlaybackClockSecond, context.currentTime)
     const playbackRate = calculatePlaybackRate(zone, plan.pitch)
@@ -533,44 +276,39 @@ export class SampleInstrumentVoiceRuntime {
     const polyphonyAdmission = this.#planPolyphonyAdmission(plan, startTime)
     if (polyphonyAdmission.kind === 'drop') {
       this.#polyphonyDropCount += 1
-      return Object.freeze({
-        outcome: 'polyphony-dropped',
-        playbackRate: null,
-        token: null,
-        zoneId: null,
-      })
+      return null
     }
     const { gain, output } = this.#createVoiceGainAndOutput(context, plan, startTime)
+    this.#scheduledCount += 1
     const voice: ActiveSampleVoice = {
       audioBuffer: resource.audioBuffer,
       baseGain,
       forcedRelease: null,
       gain,
-      key,
       output,
       plan,
       playbackRate,
       polyphonyRetired: false,
       releasePlaybackClockSecond: plan.releasePlaybackClockSecond,
       sources: new Set<ActiveSampleSource>(),
+      stableToken: String(this.#scheduledCount).padStart(16, '0'),
       startTime,
-      token,
       zone,
     }
 
     try {
-      this.#voices.set(key, voice)
+      this.#voices.add(voice)
       this.#scheduleVoiceNodes(voice, resource)
-      // Master gain is static plan state, not a per-note future event that may outlive generation.
-      this.#output.setMasterGainAtTime(plan.masterGain, context.currentTime)
+      // The master gain belongs to the plan; it only moves when a plan with another one plays.
+      if (this.#masterGain !== plan.masterGain) {
+        this.#output.setMasterGainAtTime(plan.masterGain, context.currentTime)
+        this.#masterGain = plan.masterGain
+      }
     } catch (error) {
       this.#stopAndDisconnectVoice(voice)
-      if (error instanceof SampleInstrumentVoiceRuntimeError) throw error
-      fail(
-        'voice-create-failed',
-        `Voice ${plan.occurrenceKey} could not be scheduled: ${errorDetail(error)}`,
-        plan.soundbankId,
-      )
+      throw new Error(`Voice ${plan.occurrenceKey} could not be scheduled: ${errorDetail(error)}`, {
+        cause: error,
+      })
     }
     try {
       if (polyphonyAdmission.kind === 'steal') {
@@ -582,107 +320,55 @@ export class SampleInstrumentVoiceRuntime {
       throw error
     }
 
-    return Object.freeze({ outcome: 'scheduled', playbackRate, token, zoneId: zone.zoneId })
-  }
-
-  cancel(token: SampleInstrumentVoiceToken, atAudioContextSecond?: number): boolean {
-    this.#assertUsable()
-    validateVoiceToken(token)
-    const voice = this.#voices.get(voiceKey(token))
-    if (voice === undefined) return false
-    return this.#releaseVoice(
-      voice,
-      atAudioContextSecond ?? this.#output.audioContext.currentTime,
-      'fast',
-    )
-  }
-
-  hasVoice(token: SampleInstrumentVoiceToken): boolean {
-    this.#assertUsable()
-    validateVoiceToken(token)
-    return this.#voices.has(voiceKey(token))
-  }
-
-  rescheduleRelease(
-    token: SampleInstrumentVoiceToken,
-    releasePlaybackClockSecond: number,
-  ): SampleInstrumentVoiceReleaseUpdateResult {
-    this.#assertUsable()
-    validateVoiceToken(token)
-    if (!Number.isFinite(releasePlaybackClockSecond) || releasePlaybackClockSecond < 0) {
-      fail('invalid-voice-plan', 'Voice release time must be a finite non-negative second')
-    }
-    const voice = this.#voices.get(voiceKey(token))
-    if (voice === undefined) {
-      return Object.freeze({ outcome: 'not-found', releasePlaybackClockSecond: null })
-    }
-    if (voice.zone.triggerMode === 'one-shot') {
-      return Object.freeze({
-        outcome: 'one-shot',
-        releasePlaybackClockSecond: voice.releasePlaybackClockSecond,
-      })
-    }
-    if (releasePlaybackClockSecond <= voice.startTime) {
-      fail('invalid-voice-plan', 'Voice release time must remain after its scheduled start')
-    }
-    if (releasePlaybackClockSecond === voice.releasePlaybackClockSecond) {
-      return Object.freeze({
-        outcome: 'no-change',
-        releasePlaybackClockSecond: voice.releasePlaybackClockSecond,
-      })
-    }
-
-    const context = requireRunningContext(this.#output)
-    if (voice.forcedRelease !== null || context.currentTime >= voice.releasePlaybackClockSecond) {
-      return Object.freeze({
-        outcome: 'release-started',
-        releasePlaybackClockSecond: voice.releasePlaybackClockSecond,
-      })
-    }
-    if (releasePlaybackClockSecond <= context.currentTime) {
-      this.#releaseVoice(voice, context.currentTime, 'normal')
-      return Object.freeze({
-        outcome: 'released-now',
-        releasePlaybackClockSecond: context.currentTime,
-      })
-    }
-
-    this.#reschedulePlannedRelease(voice, releasePlaybackClockSecond)
     return Object.freeze({
-      outcome: 'rescheduled',
-      releasePlaybackClockSecond,
+      cancel: (atPlaybackClockSecond?: number) => {
+        if (!this.#voices.has(voice)) return
+        this.#releaseVoice(voice, atPlaybackClockSecond ?? context.currentTime, 'fast')
+      },
+      isActive: () => this.#voices.has(voice),
+      rescheduleRelease: (releasePlaybackClockSecond: number) => {
+        this.#rescheduleRelease(voice, releasePlaybackClockSecond)
+      },
     })
   }
 
-  allNotesOff(atAudioContextSecond?: number): number {
-    this.#assertUsable()
+  /** Fades out every voice from the given time, or now. */
+  allNotesOff(atAudioContextSecond?: number): void {
+    if (this.#disposed) return
     const releaseTime = atAudioContextSecond ?? this.#output.audioContext.currentTime
-    let releasedCount = 0
     let firstFailure: unknown = null
-    for (const voice of this.#voices.values()) {
+    for (const voice of this.#voices) {
       try {
-        if (this.#releaseVoice(voice, releaseTime, 'fast')) releasedCount += 1
+        this.#releaseVoice(voice, releaseTime, 'fast')
       } catch (error) {
         firstFailure ??= error
         this.#stopAndDisconnectVoice(voice)
       }
     }
     if (firstFailure !== null) throw firstFailure
-    return releasedCount
   }
 
+  /** Stops every voice at once and disconnects its graph. */
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
-    for (const voice of this.#voices.values()) {
-      this.#stopAndDisconnectVoice(voice)
-    }
+    for (const voice of this.#voices) this.#stopAndDisconnectVoice(voice)
     this.#voices.clear()
-    this.#activeGeneration = null
   }
 
-  #assertUsable(): void {
-    if (this.#disposed) fail('disposed', 'Sample Instrument Voice Runtime is disposed')
+  #rescheduleRelease(voice: ActiveSampleVoice, releasePlaybackClockSecond: number): void {
+    if (!this.#voices.has(voice) || voice.zone.triggerMode === 'one-shot') return
+    if (releasePlaybackClockSecond === voice.releasePlaybackClockSecond) return
+
+    const context = requireRunningContext(this.#output)
+    if (voice.forcedRelease !== null || context.currentTime >= voice.releasePlaybackClockSecond) {
+      return
+    }
+    if (releasePlaybackClockSecond <= context.currentTime) {
+      this.#releaseVoice(voice, context.currentTime, 'normal')
+      return
+    }
+    this.#reschedulePlannedRelease(voice, releasePlaybackClockSecond)
   }
 
   #reschedulePlannedRelease(
@@ -694,14 +380,8 @@ export class SampleInstrumentVoiceRuntime {
       previousReleasePlaybackClockSecond,
       nextReleasePlaybackClockSecond,
     )
-    const release = voice.zone.amplitudeEnvelope.release
-    if (release === null) {
-      fail(
-        'invalid-voice-plan',
-        `${voice.zone.zoneId} is gated without release`,
-        voice.plan.soundbankId,
-      )
-    }
+    // A gated zone always has a release; the Manifest validator rejects one without.
+    const release = voice.zone.amplitudeEnvelope.release!
 
     try {
       voice.gain.gain.cancelAndHoldAtTime(cancellationTime)
@@ -717,11 +397,9 @@ export class SampleInstrumentVoiceRuntime {
       voice.releasePlaybackClockSecond = nextReleasePlaybackClockSecond
     } catch (error) {
       this.#stopAndDisconnectVoice(voice)
-      if (error instanceof SampleInstrumentVoiceRuntimeError) throw error
-      fail(
-        'voice-create-failed',
+      throw new Error(
         `Voice ${voice.plan.occurrenceKey} release could not be rescheduled: ${errorDetail(error)}`,
-        voice.plan.soundbankId,
+        { cause: error },
       )
     }
   }
@@ -797,7 +475,7 @@ export class SampleInstrumentVoiceRuntime {
   }
 
   #scheduleVoiceNodes(voice: ActiveSampleVoice, resource: LoadedSampleInstrumentResource): void {
-    const { gain, output, plan, releasePlaybackClockSecond: releaseTime, startTime, zone } = voice
+    const { gain, output, releasePlaybackClockSecond: releaseTime, startTime, zone } = voice
     gain.connect(output)
     output.connect(this.#output.masterInput)
 
@@ -815,20 +493,15 @@ export class SampleInstrumentVoiceRuntime {
       zone.amplitudeEnvelope.attack,
       attackLimit,
     )
-    if (zone.triggerMode === 'gated') {
-      const release = zone.amplitudeEnvelope.release
-      if (release === null) {
-        fail('invalid-voice-plan', `${zone.zoneId} is gated without release`, plan.soundbankId)
-      }
+    const release = zone.amplitudeEnvelope.release
+    if (zone.triggerMode === 'gated' && release !== null) {
       scheduleSampleInstrumentEnvelopeTransition(gain.gain, gainAtRelease, 0, releaseTime, release)
     }
 
     const source = this.#createSource(voice, resource.audioBuffer)
     source.start(startTime, zone.startOffsetSecond)
 
-    if (zone.triggerMode === 'one-shot') return
-    const release = zone.amplitudeEnvelope.release
-    if (release === null) return
+    if (zone.triggerMode === 'one-shot' || release === null) return
     const releaseEndTime = releaseTime + release.durationSecond
     if (zone.loop.kind === 'sustain' && release.durationSecond > 0) {
       source.stop(releaseTime)
@@ -873,7 +546,7 @@ export class SampleInstrumentVoiceRuntime {
         // The source can already be detached by an explicit runtime cleanup.
       }
       voice.sources.delete(activeSource)
-      if (voice.sources.size === 0) this.#finishVoice(voice)
+      if (voice.sources.size === 0) this.#disconnectVoice(voice)
     }
     const activeSource = Object.freeze({ handleEnded, kind, node: source })
     voice.sources.add(activeSource)
@@ -887,9 +560,7 @@ export class SampleInstrumentVoiceRuntime {
       panner.pan.setValueAtTime(pan, startTime)
       return panner
     }
-    if (pan !== 0) {
-      fail('audio-context-unavailable', 'Stereo panning is unavailable in this AudioContext')
-    }
+    if (pan !== 0) throw new Error('Stereo panning is unavailable in this AudioContext')
     // Capability fallback preserves centered output without inventing a different pan law.
     return context.createGain()
   }
@@ -899,25 +570,12 @@ export class SampleInstrumentVoiceRuntime {
     plan: ScheduledSampleVoicePlan,
     startTime: number,
   ): { readonly gain: GainNode; readonly output: AudioNode } {
-    let gain: GainNode | null = null
+    const gain = context.createGain()
     try {
-      gain = context.createGain()
-      return Object.freeze({
-        gain,
-        output: this.#createVoiceOutput(context, plan.pan, startTime),
-      })
+      return Object.freeze({ gain, output: this.#createVoiceOutput(context, plan.pan, startTime) })
     } catch (error) {
-      try {
-        gain?.disconnect()
-      } catch {
-        // A partially created node has no live graph ownership, but cleanup stays defensive.
-      }
-      if (error instanceof SampleInstrumentVoiceRuntimeError) throw error
-      fail(
-        'voice-create-failed',
-        `Voice ${plan.occurrenceKey} output could not be created: ${errorDetail(error)}`,
-        plan.soundbankId,
-      )
+      gain.disconnect()
+      throw error
     }
   }
 
@@ -925,7 +583,7 @@ export class SampleInstrumentVoiceRuntime {
     plan: ScheduledSampleVoicePlan,
     startTime: number,
   ): SampleInstrumentVoicePolyphonyAdmission {
-    const soundingVoices = [...this.#voices.values()].filter((voice) => !voice.polyphonyRetired)
+    const soundingVoices = [...this.#voices].filter((voice) => !voice.polyphonyRetired)
     const instrumentSoundingVoiceCount = soundingVoices.reduce(
       (count, voice) => count + Number(voice.plan.instrumentDeviceId === plan.instrumentDeviceId),
       0,
@@ -949,7 +607,7 @@ export class SampleInstrumentVoiceRuntime {
         Object.freeze({
           effectiveGain: calculatePolyphonyPriorityGain(voice, startTime),
           lifecycle: classifyVoiceStealLifecycle(voice, startTime),
-          stableToken: voice.key,
+          stableToken: voice.stableToken,
           startTime: voice.startTime,
           value: voice,
         }),
@@ -972,27 +630,23 @@ export class SampleInstrumentVoiceRuntime {
   #chokeVoicesFor(newVoice: ActiveSampleVoice): void {
     const groupId = newVoice.zone.exclusiveGroup?.groupId
     if (groupId === undefined) return
-    for (const voice of this.#voices.values()) {
+    for (const voice of this.#voices) {
       if (voice === newVoice || voice.zone.exclusiveGroup?.offByGroupId !== groupId) continue
       try {
         this.#releaseVoice(voice, newVoice.startTime, voice.zone.exclusiveGroup.offMode)
       } catch (error) {
         // Keep the new voice valid, but surface a deterministic cleanup failure to diagnostics.
         this.#stopAndDisconnectVoice(voice)
-        if (error instanceof SampleInstrumentVoiceRuntimeError) throw error
-        fail(
-          'voice-create-failed',
+        throw new Error(
           `Voice ${voice.plan.occurrenceKey} could not be choked: ${errorDetail(error)}`,
-          voice.plan.soundbankId,
+          { cause: error },
         )
       }
     }
   }
 
+  /** Starts a forced release; returns false when an earlier one already covers it. */
   #releaseVoice(voice: ActiveSampleVoice, requestedTime: number, mode: 'fast' | 'normal'): boolean {
-    if (!Number.isFinite(requestedTime) || requestedTime < 0) {
-      fail('invalid-voice-plan', 'Voice release time must be a finite non-negative second')
-    }
     const context = this.#output.audioContext
     if (String(context.state) !== 'running') {
       this.#stopAndDisconnectVoice(voice)
@@ -1060,11 +714,9 @@ export class SampleInstrumentVoiceRuntime {
       }
     } catch (error) {
       this.#stopAndDisconnectVoice(voice)
-      if (error instanceof SampleInstrumentVoiceRuntimeError) throw error
-      fail(
-        'voice-create-failed',
+      throw new Error(
         `Voice ${voice.plan.occurrenceKey} release could not be scheduled: ${errorDetail(error)}`,
-        voice.plan.soundbankId,
+        { cause: error },
       )
     }
     voice.forcedRelease = Object.freeze({
@@ -1074,11 +726,6 @@ export class SampleInstrumentVoiceRuntime {
       startTime: releaseTime,
     })
     return true
-  }
-
-  #finishVoice(voice: ActiveSampleVoice): void {
-    if (this.#voices.get(voice.key) !== voice) return
-    this.#disconnectVoice(voice)
   }
 
   #disconnectVoice(voice: ActiveSampleVoice): void {
@@ -1101,7 +748,7 @@ export class SampleInstrumentVoiceRuntime {
     } catch {
       // Cleanup remains idempotent when a partial graph failed before connection.
     }
-    if (this.#voices.get(voice.key) === voice) this.#voices.delete(voice.key)
+    this.#voices.delete(voice)
   }
 
   #stopAndDisconnectVoice(voice: ActiveSampleVoice): void {

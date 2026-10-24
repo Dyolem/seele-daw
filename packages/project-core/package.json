@@ -16,7 +16,8 @@
     "lint": "pnpm --workspace-root lint",
     "lint:fix": "pnpm --workspace-root lint:fix",
     "type-check": "tsc -p tsconfig.json",
-    "test:run": "vitest run --environment node"
+    "test:run": "vitest run --environment node",
+    "bench": "vitest bench --run --environment node"
   },
   "dependencies": {
     "@seele-daw/type-utils": "workspace:*"

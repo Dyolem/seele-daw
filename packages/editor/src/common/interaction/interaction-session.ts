@@ -1,5 +1,3 @@
-import { createInteractionId } from './interaction-symbols'
-
 /** Identifies one semantic interaction independently of reusable browser Pointer IDs. */
 export type InteractionId = symbol
 
@@ -34,7 +32,7 @@ export class InteractionSession<Input, Preview, Result> {
   begin(operation: InteractionOperation<Input, Preview, Result>): InteractionId | null {
     if (this.#disposed || this.#state.phase === 'active' || this.#state.phase === 'completing')
       return null
-    const interactionId = createInteractionId()
+    const interactionId: InteractionId = Symbol('seele/editor/interaction')
     this.#operation = operation
     this.#claimed = false
     this.#state = Object.freeze({ phase: 'active', interactionId, preview: null })

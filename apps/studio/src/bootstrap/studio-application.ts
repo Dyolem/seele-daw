@@ -10,7 +10,6 @@ import { DisposalStack } from '@/bootstrap/disposal-stack'
 import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
 import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import { installProjectNavigationGuard } from '@/router/project-navigation-guard'
-import { STUDIO_SERVICES_KEY } from '@/symbols'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createProjectEdits } from '@/workbench/edits/project-edits'
 import { createStudioMidiImportInstrumentDevice } from '@/workbench/instrument/midi-import-instrument-policy'
@@ -53,7 +52,7 @@ import {
 import type { ProjectPlaybackVisualFramePort } from '@/workbench/project/playback/project-playback-visual-position'
 import { createProjectPlaybackVueBinding } from '@/workbench/project/playback/vue/project-playback-vue-binding'
 import { createActiveProjectVueBinding } from '@/workbench/project/vue/active-project-vue-binding'
-import type { StudioServices } from '@/workbench/studio-services'
+import { STUDIO_SERVICES_KEY, type StudioServices } from '@/workbench/studio-services'
 
 export interface BrowserStudioApplicationOptions {
   readonly rootComponent: Component

@@ -11,6 +11,7 @@ import {
 import {
   computed,
   inject,
+  type InjectionKey,
   provide,
   shallowRef,
   watch,
@@ -29,7 +30,6 @@ import {
   parseProjectTempoInput,
   type ProjectTempoControlPresentation,
 } from '@/features/project-workspace/tempo/tempo-control'
-import { TEMPO_EDITING_KEY } from '@/symbols'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   STUDIO_ACTION_COMPLETED,
@@ -266,6 +266,8 @@ export function provideTempoEditing(
   provide(TEMPO_EDITING_KEY, tempo)
   return tempo
 }
+
+export const TEMPO_EDITING_KEY: InjectionKey<TempoEditing> = Symbol('seele/studio/TempoEditing')
 
 export function useTempoEditing(): TempoEditing {
   const tempo = inject(TEMPO_EDITING_KEY, null)

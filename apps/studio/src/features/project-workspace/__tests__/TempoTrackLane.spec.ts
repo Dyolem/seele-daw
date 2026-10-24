@@ -6,7 +6,7 @@ import {
   dispatchTempoPointer,
   installTempoResizeObserver,
 } from './support/tempo-track-test-support'
-import { TEMPO_EDITING_KEY } from '@/symbols'
+import { TEMPO_EDITING_KEY } from '@/features/project-workspace/tempo-track/tempo-editing'
 import { createPinia } from 'pinia'
 import {
   createTestTempoEditing,

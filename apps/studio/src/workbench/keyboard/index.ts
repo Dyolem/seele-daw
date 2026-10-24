@@ -12,4 +12,4 @@ export type {
 export {
   queryStudioShortcuts,
   STUDIO_KEYBOARD_CONTROL_HELP,
-} from './keymap/studio-shortcut-catalogue'
+} from './runtime/studio-shortcut-catalogue'

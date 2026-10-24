@@ -1,17 +1,13 @@
+// Guards dependency direction and platform isolation. Directory shapes inside a package or
+// feature are left to review, so reorganizing code never requires editing these rules.
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
-import { symbolFileViolation } from './symbol-boundaries.mjs'
-import { pianoRollImportViolation } from './piano-roll-boundaries.mjs'
-import {
-  studioKeyboardFileViolation,
-  studioKeyboardImportViolation,
-} from './studio-keyboard-boundaries.mjs'
-
 import {
   editorInteractionFileViolation,
   editorInteractionImportViolation,
 } from './editor-interaction-boundaries.mjs'
+import { studioKeyboardImportViolation } from './studio-keyboard-boundaries.mjs'
 
 const root = process.cwd()
 const packageRoot = path.join(root, 'packages')
@@ -55,12 +51,11 @@ const modelStoreWriteAccessConsumers = new Set([
   'packages/project-core/src/model/model-store.ts',
   'packages/project-core/src/mutation/mutation-applier.ts',
 ])
-const studioHotkeyAdapterFiles = new Set([
-  'apps/studio/src/workbench/keyboard/browser/browser-tanstack-hotkey-registry.ts',
-  'apps/studio/src/workbench/keyboard/browser/browser-tanstack-hotkey-recorder.ts',
+const tanStackHotkeyImporters = [
+  'apps/studio/src/workbench/keyboard/browser/',
+  // The binding contract borrows TanStack's compile-time key names.
   'apps/studio/src/workbench/keyboard/contracts/studio-keyboard-binding.ts',
-])
-const projectCoreCommandsDirectory = path.join(root, 'packages', 'project-core', 'src', 'commands')
+]
 const errors = []
 
 async function collectFiles(directory) {
@@ -170,18 +165,8 @@ for (const file of await collectFiles(root)) {
 
   const source = await readFile(file, 'utf8')
   const relativeFile = path.relative(root, file).split(path.sep).join('/')
-  const symbolViolation = symbolFileViolation(root, file, source)
-  if (symbolViolation) errors.push(`${relativeFile}: ${symbolViolation}`)
   const interactionFileViolation = editorInteractionFileViolation(root, file, source)
   if (interactionFileViolation) errors.push(`${relativeFile}: ${interactionFileViolation}`)
-  const keyboardFileViolation = studioKeyboardFileViolation(root, file, source)
-  if (keyboardFileViolation) errors.push(`${relativeFile}: ${keyboardFileViolation}`)
-
-  if (path.dirname(file) === projectCoreCommandsDirectory) {
-    errors.push(
-      `${relativeFile}: Project Core commands 根层不接受平铺源码；请归入 protocol、preparation 或领域功能目录`,
-    )
-  }
 
   for (const specifier of importsFrom(source)) {
     let localTarget =
@@ -196,15 +181,13 @@ for (const file of await collectFiles(root)) {
       specifier,
     )
     if (interactionImportViolation) errors.push(`${relativeFile}: ${interactionImportViolation}`)
-    const pianoRollViolation = pianoRollImportViolation(root, file, localTarget)
-    if (pianoRollViolation) errors.push(`${relativeFile}: ${pianoRollViolation}`)
     const keyboardImportViolation = studioKeyboardImportViolation(root, file, localTarget)
     if (keyboardImportViolation) errors.push(`${relativeFile}: ${keyboardImportViolation}`)
 
     if (
       /^@tanstack\/(?:hotkeys|vue-hotkeys|react-hotkeys)(?:\/|$)/u.test(specifier) &&
       !relativeFile.includes('/__tests__/') &&
-      !studioHotkeyAdapterFiles.has(relativeFile)
+      !tanStackHotkeyImporters.some((importer) => relativeFile.startsWith(importer))
     ) {
       errors.push(
         `${relativeFile}: TanStack Hotkeys 只能由 Studio Keyboard Adapter 导入；组件应调用 Action`,
@@ -268,6 +251,13 @@ for (const file of await collectFiles(root)) {
       continue
     }
 
+    if (
+      specifier.startsWith('.') &&
+      importsTestCodeFromProduction(file, localTarget, workspaceDirectory)
+    ) {
+      errors.push(`${relativeFile}: 生产源码禁止导入 __tests__ 中的测试支持代码`)
+    }
+
     if (!owner) continue
 
     const workspaceImport = workspacePackageOf(specifier)
@@ -296,9 +286,6 @@ for (const file of await collectFiles(root)) {
       const relativeTarget = path.relative(ownerDirectory, target)
       if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
         errors.push(`${path.relative(root, file)}: 禁止用相对路径跨越 package 边界`)
-      }
-      if (importsTestCodeFromProduction(file, target, workspaceDirectory)) {
-        errors.push(`${relativeFile}: 生产源码禁止导入 __tests__ 中的测试支持代码`)
       }
     }
   }

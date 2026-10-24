@@ -1,14 +1,14 @@
 import path from 'node:path'
 
 const keyboardPath = 'apps/studio/src/workbench/keyboard'
+// Contracts hold shared types and ports, runtime owns Studio's keyboard policy, and browser
+// adapts TanStack and storage. The two implementation layers meet only through contracts.
 const layerDependencies = new Map([
   ['contracts', new Set(['contracts'])],
-  ['keymap', new Set(['contracts', 'keymap'])],
-  ['runtime', new Set(['contracts', 'keymap', 'runtime'])],
+  ['runtime', new Set(['contracts', 'runtime'])],
   ['browser', new Set(['contracts', 'browser'])],
-  ['vue', new Set(['contracts', 'runtime', 'vue'])],
-  ['index', new Set(['contracts', 'keymap'])],
-  ['setup', new Set(['contracts', 'keymap', 'runtime', 'browser', 'vue'])],
+  ['index', new Set(['contracts', 'runtime'])],
+  ['setup', new Set(['contracts', 'runtime', 'browser'])],
 ])
 
 function relativeToRoot(root, file) {
@@ -29,12 +29,10 @@ export function studioKeyboardImportViolation(root, file, target) {
   const sourcePath = relativeToRoot(root, file)
   const targetPath = modulePath(relativeToRoot(root, target))
   if (!isKeyboardFile(targetPath) || sourcePath.includes('/__tests__/')) return null
-  if (targetPath.includes('/__tests__/')) return 'Keyboard 生产源码禁止导入测试支持代码'
 
   const entry = targetPath.slice(keyboardPath.length).replace(/^\//, '')
   const publicEntry = entry === '' || entry === 'index'
   const setupEntry = entry === 'setup'
-  const sourceModule = modulePath(sourcePath).slice(keyboardPath.length + 1)
 
   if (!isKeyboardFile(sourcePath)) {
     if (publicEntry) return null
@@ -45,20 +43,11 @@ export function studioKeyboardImportViolation(root, file, target) {
   if (publicEntry || setupEntry)
     return 'Keyboard 内部必须直接引用所属文件，不能反向导入 index 或 setup 入口'
 
-  const sourceLayer = sourceModule.split('/')[0]
+  const sourceLayer = modulePath(sourcePath)
+    .slice(keyboardPath.length + 1)
+    .split('/')[0]
   const targetLayer = entry.split('/')[0]
   if (!layerDependencies.get(sourceLayer)?.has(targetLayer))
     return `Keyboard ${sourceLayer} 不允许依赖 ${targetLayer}；共享契约应归入 contracts`
-  return null
-}
-
-export function studioKeyboardFileViolation(root, file, source) {
-  const relative = relativeToRoot(root, file)
-  if (!isKeyboardFile(relative) || relative.includes('/__tests__/')) return null
-  if (path.posix.dirname(relative) !== keyboardPath) return null
-  if (!['index.ts', 'setup.ts'].includes(path.posix.basename(relative)))
-    return 'Keyboard 根层只保留 index.ts 与 setup.ts；实现应归入对应职责目录'
-  if (/\bexport\s+(?:type\s+)?\*/.test(source))
-    return 'Keyboard 入口必须明确列出导出项，不能使用 export *'
   return null
 }

@@ -11,11 +11,11 @@ import type {
 import {
   createStudioKeyboardKeymap,
   type StudioKeyboardKeymapOverrides,
-} from '@/workbench/keyboard/keymap/studio-keyboard-keymap'
+} from '@/workbench/keyboard/runtime/studio-keyboard-keymap'
 import type { StudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import type { StudioKeyboardBindingRegistry } from '@/workbench/keyboard/contracts/studio-keyboard-binding-registry'
 import type { StudioKeyboardInputRouter } from '@/workbench/keyboard/runtime/studio-keyboard-input-router'
-import { analyzeStudioKeyboardRoutes } from '@/workbench/keyboard/keymap/studio-keyboard-routes'
+import { analyzeStudioKeyboardRoutes } from '@/workbench/keyboard/runtime/studio-keyboard-routes'
 
 const USER_KEYMAP_VERSION = 1
 

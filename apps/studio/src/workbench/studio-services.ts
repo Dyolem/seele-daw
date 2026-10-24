@@ -1,7 +1,6 @@
-import { inject } from 'vue'
+import { inject, type InjectionKey } from 'vue'
 
 import type { StudioActionRuntime } from '@/bootstrap/studio-action-runtime'
-import { STUDIO_SERVICES_KEY } from '@/symbols'
 import type { ProjectEdits } from '@/workbench/edits/project-edits'
 import type { ProjectEntryCoordinator } from '@/workbench/project/entry/project-entry-coordinator'
 import type { ProjectMidiImportCoordinator } from '@/workbench/project/midi-import/project-midi-import-coordinator'
@@ -22,6 +21,10 @@ export interface StudioServices {
   readonly project: ActiveProjectVueContext
   readonly projectEntry: ProjectEntryCoordinator
 }
+
+export const STUDIO_SERVICES_KEY: InjectionKey<StudioServices> = Symbol(
+  'seele/studio/StudioServices',
+)
 
 export function useStudio(): StudioServices {
   const services = inject(STUDIO_SERVICES_KEY, null)

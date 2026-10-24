@@ -1,4 +1,4 @@
-import { TEMPO_EDITING_KEY } from '@/symbols'
+import { TEMPO_EDITING_KEY } from '@/features/project-workspace/tempo-track/tempo-editing'
 import { createTestTempoEditing } from './support/tempo-track-test-support'
 import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'

@@ -1,8 +1,7 @@
 import { inject, onBeforeUnmount, watch } from 'vue'
 
 import type { StudioActionRuntime } from '@/bootstrap/studio-action-runtime'
-import { STUDIO_SERVICES_KEY } from '@/symbols'
-import { useStudio } from '@/workbench/studio-services'
+import { STUDIO_SERVICES_KEY, useStudio } from '@/workbench/studio-services'
 
 export function useStudioActions(): Omit<StudioActionRuntime, 'dispose'> {
   return useStudio().actions

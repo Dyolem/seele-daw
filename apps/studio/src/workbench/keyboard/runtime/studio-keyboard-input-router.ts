@@ -1,4 +1,3 @@
-import { createKeyboardInputOwner } from '@/symbols'
 import type {
   StudioActionDescriptor,
   StudioActionFailure,
@@ -19,8 +18,8 @@ import type {
 import {
   createStudioKeyboardKeymap,
   type StudioKeyboardKeymapOverrides,
-} from '@/workbench/keyboard/keymap/studio-keyboard-keymap'
-import { analyzeStudioKeyboardRoutes } from '@/workbench/keyboard/keymap/studio-keyboard-routes'
+} from '@/workbench/keyboard/runtime/studio-keyboard-keymap'
+import { analyzeStudioKeyboardRoutes } from '@/workbench/keyboard/runtime/studio-keyboard-routes'
 import { isWidgetOwnedKeyboardInput } from '@/workbench/keyboard/runtime/browser-keyboard-ownership'
 
 export interface StudioKeyboardInputRouter extends StudioKeyboardInput {
@@ -128,7 +127,8 @@ class StudioKeyboardInputRouterImpl implements StudioKeyboardInputRouter {
   }
 
   readonly suspend = (): StudioKeyboardDispose => {
-    const owner = createKeyboardInputOwner()
+    // Each claim gets its own identity, so nested suspensions release independently.
+    const owner = Symbol('seele/studio/keyboard-input-owner')
     if (!this.#disposed) this.#suspended.add(owner)
     return () => {
       this.#suspended.delete(owner)

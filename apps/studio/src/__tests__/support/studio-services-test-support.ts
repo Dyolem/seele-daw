@@ -1,5 +1,4 @@
-import { STUDIO_SERVICES_KEY } from '@/symbols'
-import type { StudioServices } from '@/workbench/studio-services'
+import { STUDIO_SERVICES_KEY, type StudioServices } from '@/workbench/studio-services'
 
 export type TestStudioServices = Partial<Omit<StudioServices, 'edits'>> & {
   readonly edits?: Partial<StudioServices['edits']>

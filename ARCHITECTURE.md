@@ -129,15 +129,18 @@ category, keywords, keys, resolve })`。新建 actions 文件时，再把它加�
 
 ### 加一种实体（例如 Automation 点）
 
-这仍是最贵的改动，主要集中在 project-core：
+存储层只需声明，不用写分支（见 ADR-003）：
 
-- `model/`：记录类型、ID、`ModelStore` 表、不变量；
-- `mutation/`：Mutation 类型、Applier 分派、投影读取。按 MIDI Source 分区的实体可以直接复用
-  分区表（`partitionWriter` 与 `ProjectedPartitionedTable`）；
-- `commit/`：Delta 与 Change 推导；
-- `persistence/`：Project File DTO、编解码、版本迁移；
-- `snapshots/`：Snapshot 字段；
-- 然后再加命令（见上）。
+1. `model/model-tables.ts`：加一张表，按 ID 存储或按 MIDI Source 分区。`ModelStoreSeed` 随之多出
+   一个必填字段，类型检查会指出初始化器、项目文件归一化和测试夹具里要补的地方。
+2. `mutation/mutation-type.ts` 加这张表的 Mutation 类型名；`mutation/project-mutation.ts` 把它加进
+   `ProjectMutation` 联合，以及 `RECORD_MUTATION_TYPES` 或 `PARTITIONED_MUTATION_TYPES`（分区表另需
+   两个错误码）。Store、投影和 Applier 不用改。
+3. 需要类型化访问器时，在 `ModelStoreReader` 中写一次；也可以直接用 `reader.recordTable('…')`。
+
+其余是领域本身，仍要逐项编写：记录类型与 ID、`model/invariant-validator.ts` 中的不变量、
+`commit/` 中的 Change 类型与推导、Snapshot 字段、`persistence/` 中的项目文件协议与版本迁移，
+以及命令（见上）。
 
 ## 6. 检查
 

@@ -102,14 +102,14 @@ ModelStore
 └── current modelRevision
 ```
 
-`ModelStore` 是包内 Class，不从 `@seele-daw/project-core` 的公共入口导出。实体表使用 ECMAScript `#private` 字段；内部消费者通过 `ModelStoreReader` 的类型化查找和迭代方法读取记录，不能取得 `Map`、`ReadonlyMap` 或 `trackOrder` 的数组引用。
+`ModelStore` 是包内 Class，不从 `@seele-daw/project-core` 的公共入口导出。表在 `model/model-tables.ts` 中声明一次：按 ID 存储的记录表，以及按 MIDI Source 分区的表。Store 把容器留在私有闭包里；内部消费者通过 `ModelStoreReader` 的类型化查找和迭代方法，或 `recordTable(name)` / `partitionedTable(name)` 返回的冻结只读视图读取记录，不能取得 `Map`、`ReadonlyMap` 或 `trackOrder` 的数组引用。
 
 构造输入使用已经规范化为实体表的 `ModelStoreSeed`，它不是外部 DTO。构造器复制
 `trackOrder`、所有顶层 Map，以及每张 MIDI Note 和 Sustain Pedal Event 分区 Map，从而取得
 容器所有权；表中的只读 Record 保持原引用，避免为大型项目重新创建全部实体并保留引用相等
 语义。
 
-ModelStore 构造器只取得存储容器所有权并注册内部 write lease，不验证或修复跨实体关系。Seed 是否满足 Track 顺序、外键、Source 所有权、Timeline 初始事件和 Device 所有权等全局规则，由 `InvariantValidator` 判断。新 Store 的 `modelRevision` 固定从 `0` 开始；构造器向包内 `WeakMap` 注册一组捕获 `#private` 字段的细粒度写闭包，只有 `MutationApplier` 可以一次性领取这份 lease。同一个 Store 不能创建第二个写入者，也不能从 Store 实例取得 Map、数组、通用 setter 或任意 patch 能力。
+ModelStore 构造器只取得存储容器所有权并注册内部 write lease，不验证或修复跨实体关系。Seed 是否满足 Track 顺序、外键、Source 所有权、Timeline 初始事件和 Device 所有权等全局规则，由 `InvariantValidator` 判断。新 Store 的 `modelRevision` 固定从 `0` 开始；构造器向包内 `WeakMap` 注册一组按表名指定目标的写闭包（`writeRecord`、`insertPartition`、`removePartition`、`writePartitionRecord` 等），只有 `MutationApplier` 可以一次性领取这份 lease。同一个 Store 不能创建第二个写入者，也不能从 Store 实例取得 Map、数组、通用 setter 或任意 patch 能力。
 
 写闭包使用 compare-and-swap 语义：entity write 携带 expected / next Record，顺序 write 携带
 index / ID，Source 内容分区删除携带完整 expected Record 集合。每个 primitive 必须先完成全部

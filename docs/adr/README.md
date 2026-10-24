@@ -6,7 +6,8 @@
 命名为 `ADR-NNN-short-title.md`，至少包含 Context、Decision、Consequences、Validation 与
 Revisit Trigger。决定被推翻时，把状态改为 Superseded 并链接到新的 ADR，不删除旧文件。
 
-| ADR                                                          | 决定                                         |
-| ------------------------------------------------------------ | -------------------------------------------- |
-| [001](./ADR-001-validate-each-commit-once.md)                | 每次提交只在投影上做一次全量不变量校验       |
-| [002](./ADR-002-consumers-read-changes-not-command-types.md) | 消费者按 Change 路由；命令语义由属性测试固定 |
+| ADR                                                           | 决定                                         |
+| ------------------------------------------------------------- | -------------------------------------------- |
+| [001](./ADR-001-validate-each-commit-once.md)                 | 每次提交只在投影上做一次全量不变量校验       |
+| [002](./ADR-002-consumers-read-changes-not-command-types.md)  | 消费者按 Change 路由；命令语义由属性测试固定 |
+| [003](./ADR-003-storage-written-against-table-definitions.md) | 存储按表定义编写；Mutation 形状保持显式      |

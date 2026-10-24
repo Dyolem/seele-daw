@@ -558,13 +558,13 @@ ModelStore 从内部 `ModelStoreSeed` 构造。Seed 使用 `ReadonlyMap` 和只�
 所有可变容器的独占所有权；已经由领域工厂创建的只读实体 Record 保持原引用。调用方在构造
 后修改原 Seed 容器不能改变 Store，未变化实体则继续保持引用相等。
 
-`ModelStoreReader` 只提供实体属性、按 ID 查找和 entry iterator，不返回内部 `Map`、表的 `ReadonlyMap` 视图或 `trackOrder` 数组。`ModelStore`、Seed 和 Reader 都是包内实现，不从 package 公共入口导出。
+`ModelStoreReader` 只提供实体属性、按 ID 查找、entry iterator 和按表名取得的冻结只读视图，不返回内部 `Map`、表的 `ReadonlyMap` 或 `trackOrder` 数组。`ModelStore`、Seed 和 Reader 都是包内实现，不从 package 公共入口导出。
 
 内部可变性规则：
 
 - 新建 ModelStore 的 `modelRevision` 固定为 `0`，Seed 不能恢复或指定运行时 revision；
 - ModelStore 构造器不执行跨实体校验、修复或过滤，完整 Seed 由 `InvariantValidator` 判断是否合法；
-- ModelStore 构造时注册捕获 `#private` 字段的细粒度写闭包，但不开放 Map、分区表、`trackOrder`、通用 setter 或 revision setter；
+- ModelStore 构造时注册按表名指定目标的写闭包，但不开放 Map、分区表、`trackOrder`、通用 setter 或 revision setter；
 - `MutationApplier` 是唯一允许领取写 capability 的组件，同一个 ModelStore 的 lease 只能领取一次；
 - 实体表、Source 内容分区和 `trackOrder` 通过 expected / next 或 index / ID 形式的 CAS
   primitive 修改；全部前置检查和临时 Map 构建必须先于那一次权威容器写；

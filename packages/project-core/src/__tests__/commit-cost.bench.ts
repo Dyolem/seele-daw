@@ -119,6 +119,21 @@ for (const [trackCount, notesPerTrack] of [
       deltaTick = -deltaTick
     })
 
+    let snapshotDeltaTick = 1
+    bench('move one note, then read the Snapshot', () => {
+      session.execute(
+        createMoveNotesCommand({
+          baseRevision: session.modelRevision,
+          sourceId,
+          noteIds: [parseNoteId('note-0-1')],
+          deltaTick: parseTickDelta(snapshotDeltaTick),
+          deltaPitch: parseMidiPitchDelta(0),
+        }),
+      )
+      session.getSnapshot()
+      snapshotDeltaTick = -snapshotDeltaTick
+    })
+
     bench('validate the whole model', () => {
       assertModelInvariants(store)
     })

@@ -860,6 +860,18 @@ class PlaybackEngineImpl implements PlaybackEngine {
       return
     }
 
+    // Only voices that may sound need the comparison; a stopped plan is simply replaced.
+    const canContinue =
+      (this.#state.phase === PLAYBACK_PHASE.PLAYING ||
+        this.#state.phase === PLAYBACK_PHASE.PAUSED) &&
+      this.#prepared !== null &&
+      this.#transport !== null &&
+      this.#scheduler !== null
+    if (!canContinue) {
+      this.#installStoppedPlan(nextPlan)
+      return
+    }
+
     let reconciliation: AudibleMidiReconciliationPlan
     try {
       reconciliation = createAudibleMidiReconciliationPlan({
@@ -871,14 +883,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
       this.#failReconciledPlan(nextPlan, cause)
       return
     }
-
-    const canContinue =
-      (this.#state.phase === PLAYBACK_PHASE.PLAYING ||
-        this.#state.phase === PLAYBACK_PHASE.PAUSED) &&
-      this.#prepared !== null &&
-      this.#transport !== null &&
-      this.#scheduler !== null
-    if (!canContinue || reconciliation.scope !== AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE) {
+    if (reconciliation.scope !== AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE) {
       this.#installStoppedPlan(nextPlan)
       return
     }

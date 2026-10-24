@@ -81,15 +81,11 @@ export interface AudibleMidiTrackChange {
 }
 
 export interface AudibleMidiReconciliationPlan {
-  readonly fromModelRevision: ModelRevision
-  readonly toModelRevision: ModelRevision
   readonly scope: AudibleMidiReconciliationScope
   readonly reasons: readonly AudibleMidiReconciliationReason[]
   readonly occurrenceChanges: readonly AudibleMidiOccurrenceChange[]
   readonly trackChanges: readonly AudibleMidiTrackChange[]
-  readonly affectedTrackIds: readonly TrackId[]
   readonly invalidatedPreviousOccurrenceKeys: readonly NoteOccurrenceKey[]
-  readonly unchangedOccurrenceKeys: readonly NoteOccurrenceKey[]
 }
 
 export interface CreateAudibleMidiReconciliationPlanInput {
@@ -115,33 +111,34 @@ function compareStrings(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
 }
 
-function createOccurrenceIndex(
-  spans: readonly MidiNoteSpanPlan[],
-): ReadonlyMap<NoteOccurrenceKey, MidiNoteSpanPlan> {
-  return new Map(spans.map((span) => [span.occurrenceKey, span]))
-}
-
 function createTrackIndex(
   tracks: readonly TrackPlaybackPlan[],
 ): ReadonlyMap<TrackId, TrackPlaybackPlan> {
   return new Map(tracks.map((track) => [track.trackId, track]))
 }
 
+const OCCURRENCE_FIELDS = Object.freeze<readonly AudibleMidiOccurrenceField[]>([
+  'trackId',
+  'clipId',
+  'sourceId',
+  'startTick',
+  'endTick',
+  'releaseTick',
+  'pitch',
+  'velocity',
+  'channel',
+])
+
+/** The fields that differ; null for the common case of none, without allocating. */
 function occurrenceChangedFields(
   before: MidiNoteSpanPlan,
   after: MidiNoteSpanPlan,
-): readonly AudibleMidiOccurrenceField[] {
-  const fields: AudibleMidiOccurrenceField[] = []
-  if (before.trackId !== after.trackId) fields.push('trackId')
-  if (before.clipId !== after.clipId) fields.push('clipId')
-  if (before.sourceId !== after.sourceId) fields.push('sourceId')
-  if (before.startTick !== after.startTick) fields.push('startTick')
-  if (before.endTick !== after.endTick) fields.push('endTick')
-  if (before.releaseTick !== after.releaseTick) fields.push('releaseTick')
-  if (before.pitch !== after.pitch) fields.push('pitch')
-  if (before.velocity !== after.velocity) fields.push('velocity')
-  if (before.channel !== after.channel) fields.push('channel')
-  return Object.freeze(fields)
+): readonly AudibleMidiOccurrenceField[] | null {
+  let fields: AudibleMidiOccurrenceField[] | null = null
+  for (const field of OCCURRENCE_FIELDS) {
+    if (before[field] !== after[field]) (fields ??= []).push(field)
+  }
+  return fields === null ? null : Object.freeze(fields)
 }
 
 function trackChangedFields(
@@ -175,45 +172,37 @@ function commitsFormContinuousChain(
   return expectedBaseRevision === toModelRevision
 }
 
+const NO_FIELDS = Object.freeze<readonly AudibleMidiOccurrenceField[]>([])
+
+/**
+ * The occurrences that were added, removed or changed. An edit usually touches a few of tens of
+ * thousands, so the plans are walked once and only the changes are sorted.
+ */
 function createOccurrenceChanges(
   previousPlan: AudibleMidiProjectPlan,
   nextPlan: AudibleMidiProjectPlan,
 ): readonly AudibleMidiOccurrenceChange[] {
-  const previous = createOccurrenceIndex(previousPlan.midiNoteSpans)
-  const next = createOccurrenceIndex(nextPlan.midiNoteSpans)
-  const keys = [...new Set([...previous.keys(), ...next.keys()])].sort(compareStrings)
+  const removed = new Map(previousPlan.midiNoteSpans.map((span) => [span.occurrenceKey, span]))
   const changes: AudibleMidiOccurrenceChange[] = []
 
-  for (const occurrenceKey of keys) {
-    const before = previous.get(occurrenceKey) ?? null
-    const after = next.get(occurrenceKey) ?? null
-    if (before === null && after !== null) {
+  for (const after of nextPlan.midiNoteSpans) {
+    const { occurrenceKey } = after
+    const before = removed.get(occurrenceKey)
+    if (before === undefined) {
       changes.push(
         Object.freeze({
           after,
-          before,
-          changedFields: Object.freeze([]),
+          before: null,
+          changedFields: NO_FIELDS,
           kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
           occurrenceKey,
         }),
       )
       continue
     }
-    if (before !== null && after === null) {
-      changes.push(
-        Object.freeze({
-          after,
-          before,
-          changedFields: Object.freeze([]),
-          kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.REMOVED,
-          occurrenceKey,
-        }),
-      )
-      continue
-    }
-    if (before === null || after === null) continue
+    removed.delete(occurrenceKey)
     const changedFields = occurrenceChangedFields(before, after)
-    if (changedFields.length === 0) continue
+    if (changedFields === null) continue
     changes.push(
       Object.freeze({
         after,
@@ -224,8 +213,21 @@ function createOccurrenceChanges(
       }),
     )
   }
+  for (const before of removed.values()) {
+    changes.push(
+      Object.freeze({
+        after: null,
+        before,
+        changedFields: NO_FIELDS,
+        kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.REMOVED,
+        occurrenceKey: before.occurrenceKey,
+      }),
+    )
+  }
 
-  return Object.freeze(changes)
+  return Object.freeze(
+    changes.sort((left, right) => compareStrings(left.occurrenceKey, right.occurrenceKey)),
+  )
 }
 
 function createTrackChanges(
@@ -349,11 +351,6 @@ export function createAudibleMidiReconciliationPlan(
 
   const occurrenceChanges = createOccurrenceChanges(previousPlan, nextPlan)
   const trackChanges = createTrackChanges(previousPlan, nextPlan)
-  const affectedTrackIds = new Set<TrackId>(trackChanges.map(({ trackId }) => trackId))
-  for (const change of occurrenceChanges) {
-    if (change.before !== null) affectedTrackIds.add(change.before.trackId)
-    if (change.after !== null) affectedTrackIds.add(change.after.trackId)
-  }
 
   const invalidatedPreviousOccurrenceKeys = new Set<NoteOccurrenceKey>()
   for (const change of occurrenceChanges) {
@@ -364,28 +361,16 @@ export function createAudibleMidiReconciliationPlan(
       .filter(({ kind }) => kind !== AUDIBLE_MIDI_TRACK_CHANGE_KIND.ADDED)
       .map(({ trackId }) => trackId),
   )
-  for (const span of previousPlan.midiNoteSpans) {
-    if (invalidatedTrackIds.has(span.trackId)) {
-      invalidatedPreviousOccurrenceKeys.add(span.occurrenceKey)
+  if (invalidatedTrackIds.size > 0) {
+    for (const span of previousPlan.midiNoteSpans) {
+      if (invalidatedTrackIds.has(span.trackId)) {
+        invalidatedPreviousOccurrenceKeys.add(span.occurrenceKey)
+      }
     }
   }
-
-  const nextOccurrenceKeys = new Set(
-    nextPlan.midiNoteSpans.map(({ occurrenceKey }) => occurrenceKey),
-  )
-  const unchangedOccurrenceKeys = previousPlan.midiNoteSpans
-    .map(({ occurrenceKey }) => occurrenceKey)
-    .filter(
-      (occurrenceKey) =>
-        nextOccurrenceKeys.has(occurrenceKey) &&
-        !invalidatedPreviousOccurrenceKeys.has(occurrenceKey),
-    )
-    .sort(compareStrings)
   const reasons = createReasons(previousPlan, nextPlan, commits)
 
   return Object.freeze({
-    affectedTrackIds: Object.freeze([...affectedTrackIds].sort(compareStrings)),
-    fromModelRevision: previousPlan.modelRevision,
     invalidatedPreviousOccurrenceKeys: Object.freeze(
       [...invalidatedPreviousOccurrenceKeys].sort(compareStrings),
     ),
@@ -395,8 +380,6 @@ export function createAudibleMidiReconciliationPlan(
       reasons.length === 0
         ? AUDIBLE_MIDI_RECONCILIATION_SCOPE.SELECTIVE
         : AUDIBLE_MIDI_RECONCILIATION_SCOPE.GLOBAL_RESET,
-    toModelRevision: nextPlan.modelRevision,
     trackChanges,
-    unchangedOccurrenceKeys: Object.freeze(unchangedOccurrenceKeys),
   })
 }

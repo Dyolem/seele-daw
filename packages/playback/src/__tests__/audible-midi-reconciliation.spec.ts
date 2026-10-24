@@ -162,7 +162,6 @@ describe('Audible MIDI reconciliation', () => {
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([
       previousPlan.midiNoteSpans[0]?.occurrenceKey,
     ])
-    expect(plan.affectedTrackIds).toEqual([TRACK_ID])
   })
 
   it('keeps unchanged occurrences valid when a different Note is added', () => {
@@ -194,7 +193,6 @@ describe('Audible MIDI reconciliation', () => {
       kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.ADDED,
     })
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([])
-    expect(plan.unchangedOccurrenceKeys).toEqual([previousPlan.midiNoteSpans[0]?.occurrenceKey])
   })
 
   it('attributes populated Clip creation to its composite product command', () => {

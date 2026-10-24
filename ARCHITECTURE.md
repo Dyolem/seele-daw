@@ -3,7 +3,7 @@
 本文描述代码现在的样子：分层、一次编辑如何流动、新代码放在哪里，以及常见改动要碰哪些文件。
 本文与代码不一致时，以代码为准，并修正本文。
 
-- 为什么这样设计：[ADR](docs/adr/README.md)、[2026-10 架构复盘](docs/architecture/web-daw-architecture-review-2026-10.md)
+- 为什么这样设计：[ADR](docs/adr/README.md)、[2026-10 架构复盘](docs/architecture/web-daw-architecture-review-2026-10.md)、[audio-web 复盘](docs/architecture/audio-web-review-2026-10.md)
 - 长期方向（尚未实现的部分）：[长期路线 v3](docs/architecture/web-daw-long-term-architecture-v3.md)
 - 产品行为与设计语言：[PRODUCT](PRODUCT.md)、[DESIGN](DESIGN.md)；编码约定：[CODE_GUIDELINES](CODE_GUIDELINES.md)
 - 已完成阶段的计划与收口报告：[docs/archive](docs/archive/README.md)

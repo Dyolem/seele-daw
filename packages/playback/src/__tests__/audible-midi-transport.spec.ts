@@ -22,10 +22,10 @@ import {
   AUDIBLE_MIDI_TRANSPORT_OUTCOME,
   AUDIBLE_MIDI_TRANSPORT_STATE,
   AudibleMidiTransportError,
-  INITIAL_ENGINE_GENERATION,
+  INITIAL_MAPPING_GENERATION,
   createAudibleMidiTransport,
   type AudibleMidiTransportSnapshot,
-  type EngineGeneration,
+  type MappingGeneration,
   type PlaybackClock,
 } from '#internal/transport/audible-midi-transport'
 import {
@@ -68,7 +68,7 @@ describe('Audible MIDI Transport', () => {
     expect(snapshot).toEqual({
       anchorPlaybackClockSecond: null,
       anchorProjectSecond: null,
-      engineGeneration: INITIAL_ENGINE_GENERATION,
+      mappingGeneration: INITIAL_MAPPING_GENERATION,
       modelRevision: plan.modelRevision,
       planStatus: AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE,
       positionProjectSecond: 0,
@@ -81,7 +81,7 @@ describe('Audible MIDI Transport', () => {
     expect(Object.isFrozen(snapshot)).toBe(true)
     expect(Object.isFrozen(transport)).toBe(true)
     expectTypeOf(snapshot).toEqualTypeOf<AudibleMidiTransportSnapshot>()
-    expectTypeOf(snapshot.engineGeneration).toEqualTypeOf<EngineGeneration>()
+    expectTypeOf(snapshot.mappingGeneration).toEqualTypeOf<MappingGeneration>()
   })
 
   it('maps Project position and Playback Clock across multiple Tempo Segments', () => {
@@ -110,7 +110,7 @@ describe('Audible MIDI Transport', () => {
     expect(played.snapshot).toMatchObject({
       anchorPlaybackClockSecond: 10,
       anchorProjectSecond: 0,
-      engineGeneration: 1,
+      mappingGeneration: 1,
       positionProjectSecond: 0,
       positionTick: 0,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
@@ -142,7 +142,7 @@ describe('Audible MIDI Transport', () => {
     const clock = new ManualPlaybackClock(100)
     const transport = createAudibleMidiTransport(createFixturePlan(), clock)
 
-    expect(transport.play().snapshot.engineGeneration).toBe(1)
+    expect(transport.play().snapshot.mappingGeneration).toBe(1)
     clock.advanceBy(0.25)
     const paused = transport.pause()
 
@@ -150,7 +150,7 @@ describe('Audible MIDI Transport', () => {
     expect(paused.snapshot).toMatchObject({
       anchorPlaybackClockSecond: null,
       anchorProjectSecond: null,
-      engineGeneration: 2,
+      mappingGeneration: 2,
       positionProjectSecond: 0.25,
       positionTick: 480,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.PAUSED,
@@ -160,7 +160,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.getSnapshot()).toEqual(paused.snapshot)
     expect(transport.pause()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
-      snapshot: { engineGeneration: 2 },
+      snapshot: { mappingGeneration: 2 },
     })
 
     const resumed = transport.play()
@@ -169,14 +169,14 @@ describe('Audible MIDI Transport', () => {
       snapshot: {
         anchorPlaybackClockSecond: 110.25,
         anchorProjectSecond: 0.25,
-        engineGeneration: 3,
+        mappingGeneration: 3,
         positionProjectSecond: 0.25,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
       },
     })
     expect(transport.play()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
-      snapshot: { engineGeneration: 3 },
+      snapshot: { mappingGeneration: 3 },
     })
 
     clock.advanceBy(0.25)
@@ -193,7 +193,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
       snapshot: {
-        engineGeneration: 1,
+        mappingGeneration: 1,
         positionProjectSecond: 1,
         positionTick: 1_920,
         returnAnchorTick: 1_920,
@@ -202,7 +202,7 @@ describe('Audible MIDI Transport', () => {
     })
     expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
-      snapshot: { engineGeneration: 1 },
+      snapshot: { mappingGeneration: 1 },
     })
 
     transport.play()
@@ -211,7 +211,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.locateAtTick(parseTick(3_840))).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
       snapshot: {
-        engineGeneration: 4,
+        mappingGeneration: 4,
         positionProjectSecond: 2,
         positionTick: 3_840,
         returnAnchorTick: 3_840,
@@ -221,7 +221,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.returnToLastStartPosition()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION,
       snapshot: {
-        engineGeneration: 5,
+        mappingGeneration: 5,
         positionTick: 3_840,
         returnAnchorTick: 3_840,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
@@ -240,7 +240,7 @@ describe('Audible MIDI Transport', () => {
       snapshot: {
         anchorPlaybackClockSecond: 20.25,
         anchorProjectSecond: 1,
-        engineGeneration: 2,
+        mappingGeneration: 2,
         positionTick: 1_920,
         returnAnchorTick: 1_920,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
@@ -253,7 +253,7 @@ describe('Audible MIDI Transport', () => {
       snapshot: {
         anchorPlaybackClockSecond: 20.5,
         anchorProjectSecond: 3,
-        engineGeneration: 3,
+        mappingGeneration: 3,
         positionTick: 5_760,
         returnAnchorTick: 5_760,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
@@ -264,7 +264,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.returnToLastStartPosition()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION,
       snapshot: {
-        engineGeneration: 4,
+        mappingGeneration: 4,
         positionProjectSecond: 3,
         positionTick: 5_760,
         returnAnchorTick: 5_760,
@@ -286,7 +286,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
       snapshot: {
-        engineGeneration: 1,
+        mappingGeneration: 1,
         positionTick: 1_920,
         returnAnchorTick: 1_920,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
@@ -294,7 +294,7 @@ describe('Audible MIDI Transport', () => {
     })
     expect(transport.play()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_EMPTY,
-      snapshot: { engineGeneration: 1, positionTick: 1_920 },
+      snapshot: { mappingGeneration: 1, positionTick: 1_920 },
     })
   })
 
@@ -313,7 +313,7 @@ describe('Audible MIDI Transport', () => {
       snapshot: {
         anchorPlaybackClockSecond: 10.25,
         anchorProjectSecond: 0.25,
-        engineGeneration: 2,
+        mappingGeneration: 2,
         modelRevision: 1,
         positionProjectSecond: 0.25,
         positionTick: 480,
@@ -323,7 +323,7 @@ describe('Audible MIDI Transport', () => {
 
     clock.advanceBy(0.25)
     expect(transport.getSnapshot()).toMatchObject({
-      engineGeneration: 2,
+      mappingGeneration: 2,
       modelRevision: 1,
       positionProjectSecond: 0.5,
       positionTick: 960,
@@ -358,7 +358,7 @@ describe('Audible MIDI Transport', () => {
       snapshot: {
         anchorPlaybackClockSecond: 10.25,
         anchorProjectSecond: 0.5,
-        engineGeneration: 2,
+        mappingGeneration: 2,
         modelRevision: 1,
         positionProjectSecond: 0.5,
         positionTick: 480,
@@ -393,7 +393,7 @@ describe('Audible MIDI Transport', () => {
       snapshot: {
         anchorPlaybackClockSecond: null,
         anchorProjectSecond: null,
-        engineGeneration: 3,
+        mappingGeneration: 3,
         modelRevision: 1,
         positionProjectSecond: 0.25,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.PAUSED,
@@ -417,7 +417,7 @@ describe('Audible MIDI Transport', () => {
     )
 
     expect(handedOff.snapshot).toMatchObject({
-      engineGeneration: 2,
+      mappingGeneration: 2,
       positionProjectSecond: 0.125,
       positionTick: 240,
       returnAnchorTick: 0,
@@ -441,14 +441,14 @@ describe('Audible MIDI Transport', () => {
     )
 
     expect(handedOff.snapshot).toMatchObject({
-      engineGeneration: 2,
+      mappingGeneration: 2,
       positionTick: 240,
       returnAnchorTick: 240,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
     })
     expect(transport.returnToLastStartPosition()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
-      snapshot: { engineGeneration: 2, positionTick: 240 },
+      snapshot: { mappingGeneration: 2, positionTick: 240 },
     })
   })
 
@@ -468,7 +468,7 @@ describe('Audible MIDI Transport', () => {
     )
 
     expect(handedOff.snapshot).toMatchObject({
-      engineGeneration: 2,
+      mappingGeneration: 2,
       modelRevision: 1,
       planStatus: AUDIBLE_MIDI_PLAN_STATUS.EMPTY,
       positionProjectSecond: 0.25,
@@ -476,7 +476,7 @@ describe('Audible MIDI Transport', () => {
     })
     expect(transport.play()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_EMPTY,
-      snapshot: { engineGeneration: 2 },
+      snapshot: { mappingGeneration: 2 },
     })
   })
 
@@ -488,7 +488,7 @@ describe('Audible MIDI Transport', () => {
       expect.objectContaining({ code: 'handoff-plan-not-forward' }) as AudibleMidiTransportError,
     )
     expect(transport.getSnapshot()).toMatchObject({
-      engineGeneration: INITIAL_ENGINE_GENERATION,
+      mappingGeneration: INITIAL_MAPPING_GENERATION,
       modelRevision: plan.modelRevision,
     })
   })
@@ -504,7 +504,7 @@ describe('Audible MIDI Transport', () => {
     expect(returned).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.RETURNED_TO_LAST_START_POSITION,
       snapshot: {
-        engineGeneration: 2,
+        mappingGeneration: 2,
         positionProjectSecond: 0,
         positionTick: 0,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
@@ -512,7 +512,7 @@ describe('Audible MIDI Transport', () => {
     })
     expect(transport.returnToLastStartPosition()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE,
-      snapshot: { engineGeneration: 2 },
+      snapshot: { mappingGeneration: 2 },
     })
   })
 
@@ -531,7 +531,7 @@ describe('Audible MIDI Transport', () => {
     expect(ended).toMatchObject({
       anchorPlaybackClockSecond: null,
       anchorProjectSecond: null,
-      engineGeneration: 1,
+      mappingGeneration: 1,
       positionProjectSecond: 1,
       positionTick: 1_920,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
@@ -544,7 +544,7 @@ describe('Audible MIDI Transport', () => {
       snapshot: {
         anchorPlaybackClockSecond: 23,
         anchorProjectSecond: 0,
-        engineGeneration: 2,
+        mappingGeneration: 2,
         positionProjectSecond: 0,
         returnAnchorTick: 0,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
@@ -561,7 +561,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.locateAtTick(parseTick(1_920))).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.LOCATED,
       snapshot: {
-        engineGeneration: 2,
+        mappingGeneration: 2,
         positionTick: 1_920,
         returnAnchorTick: 1_920,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
@@ -570,7 +570,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.play()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED,
       snapshot: {
-        engineGeneration: 3,
+        mappingGeneration: 3,
         positionTick: 0,
         returnAnchorTick: 0,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
@@ -627,7 +627,7 @@ describe('Audible MIDI Transport', () => {
     expect(transport.play()).toMatchObject({
       outcome,
       snapshot: {
-        engineGeneration: INITIAL_ENGINE_GENERATION,
+        mappingGeneration: INITIAL_MAPPING_GENERATION,
         positionTick: 0,
         state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
       },
@@ -643,7 +643,7 @@ describe('Audible MIDI Transport', () => {
 
     expect(transport.play()).toMatchObject({
       outcome: AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED,
-      snapshot: { engineGeneration: 1, state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING },
+      snapshot: { mappingGeneration: 1, state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING },
     })
   })
 
@@ -698,7 +698,7 @@ describe('Audible MIDI Transport', () => {
     expect(invalidError).toBeInstanceOf(ProjectTimeError)
     expect(invalidError).toMatchObject({ code: 'invalid-playback-clock-second' })
     expect(invalidTransport.getSnapshot()).toMatchObject({
-      engineGeneration: INITIAL_ENGINE_GENERATION,
+      mappingGeneration: INITIAL_MAPPING_GENERATION,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
     })
 
@@ -711,7 +711,7 @@ describe('Audible MIDI Transport', () => {
     )
     clock.setTo(10)
     expect(transport.getSnapshot()).toMatchObject({
-      engineGeneration: 1,
+      mappingGeneration: 1,
       positionProjectSecond: 0,
       state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
     })

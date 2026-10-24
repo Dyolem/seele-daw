@@ -102,6 +102,6 @@ export type {
   AudibleMidiTransport,
   AudibleMidiTransportSnapshot,
   AudibleMidiTransportTransition,
-  EngineGeneration,
+  MappingGeneration,
   PlaybackClock,
 } from './transport/audible-midi-transport'

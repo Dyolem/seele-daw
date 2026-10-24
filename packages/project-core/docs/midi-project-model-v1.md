@@ -678,7 +678,7 @@ Loop 边界 Note Off / Note On 的排序仍需在 Playback Compiler 实现前确
 - Playhead、Transport 播放状态和 Preview Voice；
 - AudioNode、Worklet 实例、Active Voice 和 Meter；
 - Undo / Redo 栈；
-- `modelRevision`、`engineGeneration` 和 `journalSequence`；
+- `modelRevision`、Transport 的 `mappingGeneration` 和 `journalSequence`；
 - 浏览器暴露的物理 MIDI / Audio device ID 与权限状态；
 - 解码 PCM、波形缓存和渲染缓存；
 - Vue、Pinia 或其他 UI 响应式对象。

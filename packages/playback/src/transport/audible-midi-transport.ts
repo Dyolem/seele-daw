@@ -16,9 +16,9 @@ import {
 } from '#internal/time/project-time'
 import { createTempoMapFromSegments, type TempoMap } from '#internal/time/tempo-map'
 
-export type EngineGeneration = Brand<number, 'EngineGeneration'>
+export type MappingGeneration = Brand<number, 'MappingGeneration'>
 
-export const INITIAL_ENGINE_GENERATION = 0 as EngineGeneration
+export const INITIAL_MAPPING_GENERATION = 0 as MappingGeneration
 
 export const AUDIBLE_MIDI_TRANSPORT_STATE = Object.freeze({
   PAUSED: 'paused',
@@ -44,7 +44,7 @@ export type AudibleMidiTransportOutcome =
   (typeof AUDIBLE_MIDI_TRANSPORT_OUTCOME)[keyof typeof AUDIBLE_MIDI_TRANSPORT_OUTCOME]
 
 export type AudibleMidiTransportErrorCode =
-  | 'engine-generation-overflow'
+  | 'mapping-generation-overflow'
   | 'handoff-plan-not-forward'
   | 'invalid-plan-status'
   | 'playback-clock-before-anchor'
@@ -69,7 +69,7 @@ export interface PlaybackClock {
 }
 
 interface AudibleMidiTransportSnapshotBase {
-  readonly engineGeneration: EngineGeneration
+  readonly mappingGeneration: MappingGeneration
   readonly modelRevision: ModelRevision
   readonly planStatus: AudibleMidiPlanStatus
   readonly positionProjectSecond: ProjectSecond
@@ -128,15 +128,15 @@ function parsePlanStatus(value: unknown): AudibleMidiPlanStatus {
   }
 }
 
-function incrementEngineGeneration(generation: EngineGeneration): EngineGeneration {
+function incrementMappingGeneration(generation: MappingGeneration): MappingGeneration {
   if (generation >= Number.MAX_SAFE_INTEGER) {
     throw new AudibleMidiTransportError(
-      'engine-generation-overflow',
-      'Transport engineGeneration exceeded Number.MAX_SAFE_INTEGER',
+      'mapping-generation-overflow',
+      'Transport mappingGeneration exceeded Number.MAX_SAFE_INTEGER',
     )
   }
 
-  return (generation + 1) as EngineGeneration
+  return (generation + 1) as MappingGeneration
 }
 
 function parseCalculatedPlaybackClockSecond(value: number, context: string): PlaybackClockSecond {
@@ -166,7 +166,7 @@ export function createAudibleMidiTransport(
   let timelineEndTickPosition = parseContinuousTickPosition(timelineEndTick)
 
   let state: AudibleMidiTransportState = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
-  let engineGeneration = INITIAL_ENGINE_GENERATION
+  let mappingGeneration = INITIAL_MAPPING_GENERATION
   let anchorProjectSecond = zeroProjectSecond
   let anchorPlaybackClockSecond: PlaybackClockSecond | null = null
   let lastObservedPlaybackClockSecond: PlaybackClockSecond | null = null
@@ -194,7 +194,7 @@ export function createAudibleMidiTransport(
 
   function createSnapshot(positionProjectSecond: ProjectSecond): AudibleMidiTransportSnapshot {
     const base = {
-      engineGeneration,
+      mappingGeneration,
       modelRevision,
       planStatus,
       positionProjectSecond,
@@ -301,7 +301,7 @@ export function createAudibleMidiTransport(
     const startProjectSecond = restartsFromTimelineStart ? zeroProjectSecond : anchorProjectSecond
     const startPlaybackClockSecond = readPlaybackClock()
 
-    engineGeneration = incrementEngineGeneration(engineGeneration)
+    mappingGeneration = incrementMappingGeneration(mappingGeneration)
     if (restartsFromTimelineStart) returnAnchorTick = zeroTick
     state = AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
     anchorProjectSecond = startProjectSecond
@@ -320,7 +320,7 @@ export function createAudibleMidiTransport(
       return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE, pausedProjectSecond)
     }
 
-    engineGeneration = incrementEngineGeneration(engineGeneration)
+    mappingGeneration = incrementMappingGeneration(mappingGeneration)
     state = AUDIBLE_MIDI_TRANSPORT_STATE.PAUSED
     anchorProjectSecond = pausedProjectSecond
     anchorPlaybackClockSecond = null
@@ -342,7 +342,7 @@ export function createAudibleMidiTransport(
     const nextTempoMap = createTempoMapFromSegments(nextPlan.tempoSegments)
     const nextTimelineEndProjectSecond = nextTempoMap.projectSecondAtTick(nextTimelineEndTick)
     const nextTimelineEndTickPosition = parseContinuousTickPosition(nextTimelineEndTick)
-    const nextGeneration = incrementEngineGeneration(engineGeneration)
+    const nextGeneration = incrementMappingGeneration(mappingGeneration)
     const wasPlaying = state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING
     const currentProjectSecond = synchronizePlayingPosition()
     const currentTickPosition = positionTickAtProjectSecond(currentProjectSecond)
@@ -356,7 +356,7 @@ export function createAudibleMidiTransport(
     timelineEndProjectSecond = nextTimelineEndProjectSecond
     timelineEndTickPosition = nextTimelineEndTickPosition
     returnAnchorTick = parseTick(Math.min(returnAnchorTick, nextTimelineEndTick))
-    engineGeneration = nextGeneration
+    mappingGeneration = nextGeneration
 
     // Musical position owns the handoff. A Tempo Map replacement may change the
     // corresponding ProjectSecond, but it must not move the Playhead to another Tick.
@@ -417,7 +417,7 @@ export function createAudibleMidiTransport(
       wasPlaying && state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING && targetTick < timelineEndTick
     const locatePlaybackClockSecond = continuesPlaying ? lastObservedPlaybackClockSecond : null
 
-    engineGeneration = incrementEngineGeneration(engineGeneration)
+    mappingGeneration = incrementMappingGeneration(mappingGeneration)
     returnAnchorTick = targetTick
     anchorProjectSecond = targetProjectSecond
     if (continuesPlaying) {
@@ -448,7 +448,7 @@ export function createAudibleMidiTransport(
       return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.NO_CHANGE, returnProjectSecond)
     }
 
-    engineGeneration = incrementEngineGeneration(engineGeneration)
+    mappingGeneration = incrementMappingGeneration(mappingGeneration)
     state = AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED
     anchorProjectSecond = returnProjectSecond
     anchorPlaybackClockSecond = null

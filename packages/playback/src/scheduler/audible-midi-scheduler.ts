@@ -27,7 +27,7 @@ import {
 import { createTempoMapFromSegments, type TempoMap } from '#internal/time/tempo-map'
 import type {
   AudibleMidiTransportSnapshot,
-  EngineGeneration,
+  MappingGeneration,
   PlayingAudibleMidiTransportSnapshot,
 } from '#internal/transport/audible-midi-transport'
 
@@ -50,7 +50,7 @@ export type AudibleMidiSchedulerErrorCode =
   | 'missing-track-route'
   | 'playback-clock-window-out-of-range'
   | 'schedule-cursor-inconsistent'
-  | 'stale-engine-generation'
+  | 'stale-mapping-generation'
   | 'timeline-end-before-arrangement-end'
   | 'transport-mapping-changed-without-generation'
   | 'transport-plan-mismatch'
@@ -106,7 +106,7 @@ export interface AudibleMidiSchedulerDiagnostics {
 
 export interface AudibleMidiScheduleBatch {
   readonly outcome: AudibleMidiSchedulerOutcome
-  readonly engineGeneration: EngineGeneration
+  readonly mappingGeneration: MappingGeneration
   readonly modelRevision: ModelRevision
   readonly planningPlaybackClockSecond: PlaybackClockSecond | null
   readonly window: AudibleMidiScheduleWindow | null
@@ -281,7 +281,7 @@ function createDiagnostics(
 
 function createBatch(input: {
   readonly outcome: AudibleMidiSchedulerOutcome
-  readonly engineGeneration: EngineGeneration
+  readonly mappingGeneration: MappingGeneration
   readonly modelRevision: ModelRevision
   readonly planningPlaybackClockSecond?: PlaybackClockSecond
   readonly window?: AudibleMidiScheduleWindow
@@ -290,7 +290,7 @@ function createBatch(input: {
 }): AudibleMidiScheduleBatch {
   return Object.freeze({
     diagnostics: input.diagnostics ?? createDiagnostics(),
-    engineGeneration: input.engineGeneration,
+    mappingGeneration: input.mappingGeneration,
     modelRevision: input.modelRevision,
     outcome: input.outcome,
     planningPlaybackClockSecond: input.planningPlaybackClockSecond ?? null,
@@ -320,8 +320,8 @@ export function createAudibleMidiSchedulerPlanner(
   const routes = normalizeTrackRoutes(plan)
   const spans = normalizeNoteSpans(plan, routes, arrangementEndTick)
 
-  let highestObservedGeneration: EngineGeneration | null = null
-  let activeGeneration: EngineGeneration | null = null
+  let highestObservedGeneration: MappingGeneration | null = null
+  let activeGeneration: MappingGeneration | null = null
   let activeAnchorPlaybackClockSecond: PlaybackClockSecond | null = null
   let activeAnchorProjectSecond: ProjectSecond | null = null
   let plannedThroughPlaybackClockSecond: PlaybackClockSecond | null = null
@@ -350,15 +350,15 @@ export function createAudibleMidiSchedulerPlanner(
     }
   }
 
-  function observeGeneration(generation: EngineGeneration): void {
+  function observeGeneration(generation: MappingGeneration): void {
     if (
       !Number.isSafeInteger(generation) ||
       generation < 0 ||
       (highestObservedGeneration !== null && generation < highestObservedGeneration)
     ) {
       throw new AudibleMidiSchedulerError(
-        'stale-engine-generation',
-        `Scheduler cannot return to stale engineGeneration ${generation}`,
+        'stale-mapping-generation',
+        `Scheduler cannot return to stale mappingGeneration ${generation}`,
       )
     }
 
@@ -371,7 +371,7 @@ export function createAudibleMidiSchedulerPlanner(
   function initializeGeneration(snapshot: PlayingAudibleMidiTransportSnapshot): void {
     const anchorTickPosition = tempoMap.tickPositionAtProjectSecond(snapshot.anchorProjectSecond)
 
-    activeGeneration = snapshot.engineGeneration
+    activeGeneration = snapshot.mappingGeneration
     activeAnchorPlaybackClockSecond = snapshot.anchorPlaybackClockSecond
     activeAnchorProjectSecond = snapshot.anchorProjectSecond
     plannedThroughPlaybackClockSecond = snapshot.anchorPlaybackClockSecond
@@ -386,7 +386,7 @@ export function createAudibleMidiSchedulerPlanner(
     ) {
       throw new AudibleMidiSchedulerError(
         'transport-mapping-changed-without-generation',
-        'Transport mapping changed without a new engineGeneration',
+        'Transport mapping changed without a new mappingGeneration',
       )
     }
   }
@@ -434,17 +434,17 @@ export function createAudibleMidiSchedulerPlanner(
 
   function planNextWindow(snapshot: AudibleMidiTransportSnapshot): AudibleMidiScheduleBatch {
     assertSnapshotMatchesPlan(snapshot)
-    observeGeneration(snapshot.engineGeneration)
+    observeGeneration(snapshot.mappingGeneration)
 
     if (snapshot.state !== 'playing') {
       return createBatch({
-        engineGeneration: snapshot.engineGeneration,
+        mappingGeneration: snapshot.mappingGeneration,
         modelRevision,
         outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.INACTIVE,
       })
     }
 
-    if (activeGeneration !== snapshot.engineGeneration) {
+    if (activeGeneration !== snapshot.mappingGeneration) {
       initializeGeneration(snapshot)
     } else {
       assertStableMapping(snapshot)
@@ -483,7 +483,7 @@ export function createAudibleMidiSchedulerPlanner(
 
     if (toPlaybackClockSecond <= fromPlaybackClockSecond) {
       return createBatch({
-        engineGeneration: snapshot.engineGeneration,
+        mappingGeneration: snapshot.mappingGeneration,
         modelRevision,
         outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.NO_CHANGE,
         planningPlaybackClockSecond,
@@ -570,7 +570,7 @@ export function createAudibleMidiSchedulerPlanner(
         expiredSpanDropCount,
         lateStartCount,
       ),
-      engineGeneration: snapshot.engineGeneration,
+      mappingGeneration: snapshot.mappingGeneration,
       modelRevision,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED,
       planningPlaybackClockSecond,

@@ -70,7 +70,7 @@ describe('Audible MIDI Scheduler Planner', () => {
         expiredSpanDropCount: 0,
         lateStartCount: 0,
       },
-      engineGeneration: 0,
+      mappingGeneration: 0,
       modelRevision: plan.modelRevision,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.INACTIVE,
       planningPlaybackClockSecond: null,
@@ -89,7 +89,7 @@ describe('Audible MIDI Scheduler Planner', () => {
         expiredSpanDropCount: 0,
         lateStartCount: 0,
       },
-      engineGeneration: 1,
+      mappingGeneration: 1,
       modelRevision: plan.modelRevision,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED,
       planningPlaybackClockSecond: 10,
@@ -293,7 +293,7 @@ describe('Audible MIDI Scheduler Planner', () => {
     clock.advanceBy(0.25)
     const paused = transport.pause().snapshot
     expect(planner.planNextWindow(paused)).toMatchObject({
-      engineGeneration: 2,
+      mappingGeneration: 2,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.INACTIVE,
     })
 
@@ -304,7 +304,7 @@ describe('Audible MIDI Scheduler Planner', () => {
     expect(resumed).toMatchObject({
       anchorPlaybackClockSecond: 105.25,
       anchorProjectSecond: 0.25,
-      engineGeneration: 3,
+      mappingGeneration: 3,
     })
     expect(resumedBatch.window).toEqual({
       fromPlaybackClockSecond: 105.25,
@@ -317,7 +317,7 @@ describe('Audible MIDI Scheduler Planner', () => {
       timing: 'on-time',
     })
     expect(() => planner.planNextWindow(generationOneSnapshot)).toThrow(
-      expect.objectContaining({ code: 'stale-engine-generation' }) as AudibleMidiSchedulerError,
+      expect.objectContaining({ code: 'stale-mapping-generation' }) as AudibleMidiSchedulerError,
     )
   })
 
@@ -347,7 +347,7 @@ describe('Audible MIDI Scheduler Planner', () => {
     const ended = transport.getSnapshot()
     expect(ended.state).toBe(AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED)
     expect(planner.planNextWindow(ended)).toMatchObject({
-      engineGeneration: 1,
+      mappingGeneration: 1,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.INACTIVE,
       voicePlans: [],
     })

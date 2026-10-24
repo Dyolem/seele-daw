@@ -36,7 +36,7 @@ Batch 3B 完成的是“可靠排期”，不是“已经能听见声音”。
 | 名词                 | 通俗含义                         | 主要解决的问题                                  |
 | -------------------- | -------------------------------- | ----------------------------------------------- |
 | `modelRevision`      | 乐谱版本                         | 播放计划是否对应当前项目内容                    |
-| `engineGeneration`   | 本轮播放执行计划的代次编号       | 旧的未来播放指令是否仍然有效                    |
+| `mappingGeneration`  | Transport 时间映射的代次编号     | Planner 是否要从新的 Anchor 重新规划            |
 | occurrence           | 一个 Note 在编排中的具体一次出现 | 区分共享 Source、不同 Clip 和重叠同音高 Note    |
 | Anchor               | 项目时间与播放时钟的同步点       | 把 Tick / Project Second 换算成播放时钟秒       |
 | Position / Playhead  | 当前播放到的位置                 | Transport 与未来 UI 的当前时间                  |
@@ -60,9 +60,9 @@ Batch 3B 完成的是“可靠排期”，不是“已经能听见声音”。
 
 它不表示用户播放了几次，也不表示 Transport 当前处于 Playing 还是 Paused。
 
-### 2.2 `engineGeneration`：播放执行代次
+### 2.2 `mappingGeneration`：时间映射代次
 
-`engineGeneration` 可以理解为“当前仍然有效的播放执行批次”。例如：
+Transport 每次改变 Playback Clock 与项目位置之间的映射，就把 `mappingGeneration` 加一。例如：
 
 ```text
 第一次 Play       generation 1
@@ -84,11 +84,9 @@ Return to Anchor  generation 5
 Playback Clock 10.80：开始 C4
 ```
 
-用户在 10.60 Pause 后，generation 已经变成 2。即使旧指令稍后抵达执行边界，也必须因为
-generation 过期而被丢弃。
-
-Scheduler 只保证自己不再从旧 Snapshot 生成新指令。已经交给执行层的计划，仍需要未来
-Audio Runtime 独立比较 generation；这是旧事件最终不会发声的第二道边界。
+用户在 10.60 Pause 后，generation 已经变成 2，Scheduler 不会再从旧 Snapshot 生成指令。已经
+交给输出的那枚 C4 由引擎处理：Pause 让输出对所有 Voice 做 all-notes-off，还没开始的 Voice
+在起音前就被停掉。输出本身不认识 generation（见 ADR-006）。
 
 ### 2.3 occurrence：编排中的一次具体演奏
 
@@ -407,7 +405,6 @@ Effect 状态，因此保留为独立产品切片。
 当前每枚计划包含：
 
 ```text
-engineGeneration
 occurrenceKey
 
 soundbankId

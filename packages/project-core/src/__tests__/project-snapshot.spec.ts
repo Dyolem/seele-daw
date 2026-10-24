@@ -282,6 +282,47 @@ describe('ProjectSnapshot revision isolation', () => {
     ]).toEqual([0, 1, 2, 3])
   })
 
+  it('shares the tables and partitions that commits since the last Snapshot did not touch', () => {
+    const { fixture, session } = createFixtureProjectSession()
+    const editedSourceId = fixture.records.nonLoopSource.id
+    const untouchedSourceId = fixture.records.loopingSource.id
+    const noteId = fixture.records.nonLoopNote.id
+    const before = session.getSnapshot()
+    const moveNote = (deltaTick: number) =>
+      session.execute(
+        createMoveNotesCommand({
+          baseRevision: session.modelRevision,
+          sourceId: editedSourceId,
+          noteIds: [noteId],
+          deltaTick: parseTickDelta(deltaTick),
+          deltaPitch: parseMidiPitchDelta(0),
+        }),
+      )
+
+    // Two commits before the next read; both are accounted for.
+    moveNote(240)
+    moveNote(240)
+    const moved = session.getSnapshot()
+
+    expect(findNote(moved, editedSourceId, noteId)?.startTick).toBe(
+      (findNote(before, editedSourceId, noteId)?.startTick ?? 0) + 480,
+    )
+    expect(notesOf(moved, editedSourceId)).not.toBe(notesOf(before, editedSourceId))
+    expect(notesOf(moved, untouchedSourceId)).toBe(notesOf(before, untouchedSourceId))
+    expect(moved.midiSustainPedalEvents).toBe(before.midiSustainPedalEvents)
+    expect(moved.tracks).toBe(before.tracks)
+    expect(moved.clips).toBe(before.clips)
+    expect(moved.tempoEvents).toBe(before.tempoEvents)
+    expect(moved.trackOrder).toBe(before.trackOrder)
+
+    session.undo()
+    session.undo()
+    const restored = session.getSnapshot()
+
+    expect(notesOf(restored, editedSourceId)).toEqual(notesOf(before, editedSourceId))
+    expect(notesOf(restored, untouchedSourceId)).toBe(notesOf(before, untouchedSourceId))
+  })
+
   it('captures new Undo and Redo revisions while restoring the corresponding Record versions', () => {
     const { fixture, session } = createFixtureProjectSession()
     const sourceId = fixture.records.nonLoopSource.id

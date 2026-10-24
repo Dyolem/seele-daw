@@ -2,6 +2,7 @@ import type { MasterChannelRecord } from '#internal/model/channel'
 import type { MidiSourceId, TrackId } from '#internal/model/ids'
 import type { ModelRevision } from '#internal/model/model-revision'
 import type { ModelStoreReader } from '#internal/model/model-store'
+import type { ProjectChange } from '#internal/mutation/project-change'
 import type {
   PartitionedRecordOf,
   PartitionedTableName,
@@ -66,34 +67,108 @@ export function freezePartitions<RecordType>(
   return Object.freeze(frozen)
 }
 
+/** What commits since a Snapshot touched: whole tables, and single partitions by MIDI Source. */
+interface TouchedParts {
+  readonly tables: ReadonlySet<string>
+  readonly partitions: ReadonlyMap<string, ReadonlySet<MidiSourceId>>
+}
+
+const NO_SOURCES: ReadonlySet<MidiSourceId> = new Set()
+
 function copyPartitions<RecordType extends StoredRecord>(
   table: PartitionedTableView<RecordType>,
   copyRecords: (entries: Iterable<readonly [string, RecordType]>) => readonly RecordType[],
+  previous: MidiSourcePartitions<RecordType> | null,
+  touched: ReadonlySet<MidiSourceId>,
 ): MidiSourcePartitions<RecordType> {
+  if (previous !== null && touched.size === 0) return previous
   return freezePartitions(
-    [...table.partitionIds()]
-      .sort(compareStrings)
-      .map((sourceId) => [sourceId, copyRecords(table.entries(sourceId))] as const),
+    [...table.partitionIds()].sort(compareStrings).map((sourceId) => {
+      const shared = previous === null || touched.has(sourceId) ? undefined : previous[sourceId]
+      return [sourceId, shared ?? copyRecords(table.entries(sourceId))] as const
+    }),
   )
 }
 
-/** @internal Copies the Store's tables once; records are shared, containers are frozen. */
-export function createProjectSnapshot(reader: ModelStoreReader): ProjectSnapshot {
+/**
+ * Copies the Store's tables; records are shared, containers are frozen. Given the previous
+ * Snapshot and what was touched since, the untouched tables and partitions are the previous ones,
+ * so an unchanged part keeps its identity from one revision to the next.
+ */
+function createProjectSnapshot(
+  reader: ModelStoreReader,
+  previous: ProjectSnapshot | null,
+  touched: TouchedParts,
+): ProjectSnapshot {
+  function part<Part>(name: string, previousPart: Part | undefined, copy: () => Part): Part {
+    return previousPart === undefined || touched.tables.has(name) ? copy() : previousPart
+  }
   return Object.freeze({
     modelRevision: reader.modelRevision,
     project: reader.project,
     master: reader.master,
-    trackOrder: Object.freeze([...reader.orderedTrackIds()]),
-    tracks: copySortedRecords(reader.trackEntries()),
-    clips: copySortedRecords(reader.clipEntries()),
-    midiSources: copySortedRecords(reader.midiSourceEntries()),
-    tempoEvents: copySortedTimelineRecords(reader.tempoEventEntries()),
-    timeSignatureEvents: copySortedTimelineRecords(reader.timeSignatureEventEntries()),
-    devices: copySortedRecords(reader.deviceEntries()),
-    midiNotes: copyPartitions(reader.partitionedTable('midiNotes'), copySortedRecords),
+    trackOrder: part('trackOrder', previous?.trackOrder, () =>
+      Object.freeze([...reader.orderedTrackIds()]),
+    ),
+    tracks: part('tracks', previous?.tracks, () => copySortedRecords(reader.trackEntries())),
+    clips: part('clips', previous?.clips, () => copySortedRecords(reader.clipEntries())),
+    midiSources: part('midiSources', previous?.midiSources, () =>
+      copySortedRecords(reader.midiSourceEntries()),
+    ),
+    tempoEvents: part('tempoEvents', previous?.tempoEvents, () =>
+      copySortedTimelineRecords(reader.tempoEventEntries()),
+    ),
+    timeSignatureEvents: part('timeSignatureEvents', previous?.timeSignatureEvents, () =>
+      copySortedTimelineRecords(reader.timeSignatureEventEntries()),
+    ),
+    devices: part('devices', previous?.devices, () => copySortedRecords(reader.deviceEntries())),
+    midiNotes: copyPartitions(
+      reader.partitionedTable('midiNotes'),
+      copySortedRecords,
+      previous?.midiNotes ?? null,
+      touched.partitions.get('midiNotes') ?? NO_SOURCES,
+    ),
     midiSustainPedalEvents: copyPartitions(
       reader.partitionedTable('midiSustainPedalEvents'),
       copySortedTimelineRecords,
+      previous?.midiSustainPedalEvents ?? null,
+      touched.partitions.get('midiSustainPedalEvents') ?? NO_SOURCES,
     ),
   })
+}
+
+/**
+ * @internal The Session's Snapshots. It remembers what each commit touched until the next
+ * Snapshot is read, so that Snapshot copies only those parts and shares the rest.
+ */
+export class ProjectSnapshots {
+  #snapshot: ProjectSnapshot | null = null
+  readonly #tables = new Set<string>()
+  readonly #partitions = new Map<string, Set<MidiSourceId>>()
+
+  noteChanges(changes: readonly ProjectChange[]): void {
+    if (this.#snapshot === null) return
+    for (const change of changes) {
+      if (!('sourceId' in change)) {
+        this.#tables.add(change.table)
+        continue
+      }
+      let sources = this.#partitions.get(change.table)
+      if (sources === undefined) this.#partitions.set(change.table, (sources = new Set()))
+      sources.add(change.sourceId)
+    }
+  }
+
+  read(reader: ModelStoreReader): ProjectSnapshot {
+    // Snapshots are immutable and only a committed revision changes Store content.
+    if (this.#snapshot?.modelRevision === reader.modelRevision) return this.#snapshot
+    const snapshot = createProjectSnapshot(reader, this.#snapshot, {
+      partitions: this.#partitions,
+      tables: this.#tables,
+    })
+    this.#snapshot = snapshot
+    this.#tables.clear()
+    this.#partitions.clear()
+    return snapshot
+  }
 }

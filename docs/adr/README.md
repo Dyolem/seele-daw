@@ -14,3 +14,4 @@ Revisit Trigger。决定被推翻时，把状态改为 Superseded 并链接到�
 | [004](./ADR-004-commits-publish-storage-changes.md)           | Commit 发布它写入的存储变化，不再派生 Delta  |
 | [005](./ADR-005-persistence-stores-the-tables.md)             | 持久化直接存储表，只读当前格式               |
 | [006](./ADR-006-one-audio-output-for-every-revision.md)       | 所有 revision 共用一个音频输出               |
+| [007](./ADR-007-snapshots-share-unchanged-parts.md)           | Snapshot 在 revision 之间共享没变的部分      |

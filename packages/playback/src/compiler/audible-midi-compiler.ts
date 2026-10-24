@@ -12,6 +12,7 @@ import {
   type MidiSourceId,
   type MidiSourceRecord,
   type MidiSourcePartitions,
+  type MidiSustainPedalEventRecord,
   type ProjectSnapshot,
   type TrackId,
   type TrackRecord,
@@ -51,12 +52,31 @@ interface SnapshotIndexes {
   readonly devicesById: ReadonlyMap<DeviceId, DeviceDescriptor>
   readonly sourcesById: ReadonlyMap<MidiSourceId, MidiSourceRecord>
   readonly notesBySourceId: ReadonlyMap<MidiSourceId, readonly MidiNoteRecord[]>
-  readonly sustainPedalReleaseResolversBySourceId: ReadonlyMap<
+  readonly sustainPedalEventsBySourceId: ReadonlyMap<
     MidiSourceId,
-    SustainPedalReleaseResolver
+    readonly MidiSustainPedalEventRecord[]
   >
   readonly clipsByTrackId: ReadonlyMap<TrackId, readonly ClipRecord[]>
 }
+
+interface CompiledClip {
+  readonly notes: readonly MidiNoteRecord[]
+  readonly spans: readonly MidiNoteSpanPlan[]
+  readonly sustainPedalEvents: readonly MidiSustainPedalEventRecord[]
+}
+
+const NO_SPANS = Object.freeze<MidiNoteSpanPlan[]>([])
+const NO_CLIP_SPANS: ReadonlyMap<ClipId, readonly MidiNoteSpanPlan[]> = new Map()
+
+/**
+ * Each Clip's spans, kept while its record and its Source's note and pedal arrays are the same.
+ * Snapshots share the arrays of untouched Sources, so an edit compiles only the Clips it touched.
+ */
+const compiledClips = new WeakMap<MidiClipRecord, CompiledClip>()
+const sustainPedalResolvers = new WeakMap<
+  readonly MidiSustainPedalEventRecord[],
+  SustainPedalReleaseResolver
+>()
 
 interface DiagnosticInput {
   readonly code: PlaybackDiagnosticCode
@@ -162,12 +182,7 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
   const devicesById = indexUnique(snapshot.devices, 'Device')
   const sourcesById = indexUnique(snapshot.midiSources, 'MIDI Source')
   const notesBySourceId = indexPartitions(snapshot.midiNotes)
-  const sustainPedalReleaseResolversBySourceId = new Map(
-    [...indexPartitions(snapshot.midiSustainPedalEvents)].map(([sourceId, events]) => [
-      sourceId,
-      createSustainPedalReleaseResolver(events),
-    ]),
-  )
+  const sustainPedalEventsBySourceId = indexPartitions(snapshot.midiSustainPedalEvents)
   const mutableClipsByTrackId = new Map<TrackId, ClipRecord[]>()
   const clipIds = new Set<ClipId>()
 
@@ -186,7 +201,7 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
     requireReference(sourcesById, clip.sourceId, `Clip:${clip.id}.sourceId`)
     requireReference(notesBySourceId, clip.sourceId, `Clip:${clip.id}.notePartition`)
     requireReference(
-      sustainPedalReleaseResolversBySourceId,
+      sustainPedalEventsBySourceId,
       clip.sourceId,
       `Clip:${clip.id}.sustainPedalEventPartition`,
     )
@@ -206,7 +221,7 @@ function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
     clipsByTrackId,
     devicesById,
     notesBySourceId,
-    sustainPedalReleaseResolversBySourceId,
+    sustainPedalEventsBySourceId,
     sourcesById,
     tracksById,
   }
@@ -355,6 +370,38 @@ function createTrackPlan(
   })
 }
 
+function resolveSustainPedalReleases(
+  events: readonly MidiSustainPedalEventRecord[],
+): SustainPedalReleaseResolver {
+  let resolver = sustainPedalResolvers.get(events)
+  if (resolver === undefined) {
+    resolver = createSustainPedalReleaseResolver(events)
+    sustainPedalResolvers.set(events, resolver)
+  }
+  return resolver
+}
+
+/** The Clip's spans, compiled again only when the Clip or its Source changed. */
+function compiledClipNoteSpans(
+  trackPlan: TrackPlaybackPlan,
+  clip: MidiClipRecord,
+  notes: readonly MidiNoteRecord[],
+  sustainPedalEvents: readonly MidiSustainPedalEventRecord[],
+): readonly MidiNoteSpanPlan[] {
+  const compiled = compiledClips.get(clip)
+  if (compiled?.notes === notes && compiled.sustainPedalEvents === sustainPedalEvents) {
+    return compiled.spans
+  }
+  const spans = compileClipNoteSpans(
+    trackPlan,
+    clip,
+    notes,
+    resolveSustainPedalReleases(sustainPedalEvents),
+  )
+  compiledClips.set(clip, Object.freeze({ notes, spans, sustainPedalEvents }))
+  return spans
+}
+
 /**
  * Projects Note starts in the Clip's half-open source window and clips their ends at the boundary.
  * Notes already active before the window are deliberately not chased in V1.
@@ -365,7 +412,7 @@ function compileClipNoteSpans(
   sourceNotes: readonly MidiNoteRecord[],
   sustainPedalReleaseResolver: SustainPedalReleaseResolver,
 ): readonly MidiNoteSpanPlan[] {
-  if (!trackPlan.audible || clip.muted) return []
+  if (!trackPlan.audible || clip.muted) return NO_SPANS
 
   const sourceWindowEndTick = addTicks(clip.sourceOffsetTick, clip.spanTick)
   const clipEndTick = addTicks(clip.startTick, clip.spanTick)
@@ -426,7 +473,8 @@ function compileClipNoteSpans(
     )
   }
 
-  return spans
+  // Sorted here, the whole plan's sort only merges these runs.
+  return Object.freeze(spans.sort(compareNoteSpans))
 }
 
 function derivePlanStatus(
@@ -449,6 +497,7 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
   const diagnostics: PlaybackDiagnostic[] = []
   const trackPlans: TrackPlaybackPlan[] = []
   const noteSpans: MidiNoteSpanPlan[] = []
+  const clipSpans = new Map<ClipId, readonly MidiNoteSpanPlan[]>()
   // Compute global Solo before unsupported Track kinds are filtered out of executable plans.
   const hasSoloedTrack = snapshot.tracks.some(({ channel }) => channel.soloed)
   const enabledMasterEffects = getEnabledDevices(
@@ -507,14 +556,14 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
         clip.sourceId,
         `Clip:${clip.id}.notePartition`,
       )
-      const sustainPedalReleaseResolver = requireReference(
-        indexes.sustainPedalReleaseResolversBySourceId,
+      const sustainPedalEvents = requireReference(
+        indexes.sustainPedalEventsBySourceId,
         clip.sourceId,
         `Clip:${clip.id}.sustainPedalEventPartition`,
       )
-      noteSpans.push(
-        ...compileClipNoteSpans(trackPlan, clip, sourceNotes, sustainPedalReleaseResolver),
-      )
+      const spans = compiledClipNoteSpans(trackPlan, clip, sourceNotes, sustainPedalEvents)
+      clipSpans.set(clip.id, spans)
+      for (const span of spans) noteSpans.push(span)
     }
   }
 
@@ -535,6 +584,7 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
     diagnostics: Object.freeze(diagnostics),
     master: Object.freeze({ gain: snapshot.master.gain, muted: snapshot.master.muted }),
     midiNoteSpans: executableSpans,
+    clipSpans: masterBlocked ? NO_CLIP_SPANS : clipSpans,
     modelRevision: snapshot.modelRevision,
     status,
     tempoSegments: tempoMap.segments,

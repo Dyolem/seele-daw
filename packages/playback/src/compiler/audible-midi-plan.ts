@@ -103,6 +103,11 @@ export interface AudibleMidiProjectPlan {
   readonly master: MasterChannelPlan
   readonly tracks: readonly TrackPlaybackPlan[]
   readonly midiNoteSpans: readonly MidiNoteSpanPlan[]
+  /**
+   * The same spans by compiled Clip, each in span order. A Clip that did not change between two
+   * plans has the same array in both.
+   */
+  readonly clipSpans: ReadonlyMap<ClipId, readonly MidiNoteSpanPlan[]>
   readonly diagnostics: readonly PlaybackDiagnostic[]
 }
 

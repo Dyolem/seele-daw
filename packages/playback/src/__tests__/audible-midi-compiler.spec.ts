@@ -252,6 +252,39 @@ describe('Audible MIDI Compiler', () => {
     expect(plan.midiNoteSpans).toEqual([])
   })
 
+  it('compiles again only the Clips whose Source changed, with the result of a full compile', () => {
+    const { records, snapshot } = createAudibleMidiProjectFixture()
+    const before = compileAudibleMidiProject(snapshot)
+    const primary = records.pianoNotes.find(({ id }) => id === 'note-piano-primary')
+    if (primary === undefined) throw new Error('Expected the primary piano Note')
+    const moved = createMidiNoteRecord({
+      ...primary,
+      startTick: parseTick(primary.startTick + 240),
+    })
+    const edited = replaceCompilerFixtureSnapshot(snapshot, {
+      midiNotes: {
+        ...snapshot.midiNotes,
+        [records.pianoSource.id]: records.pianoNotes.map((note) =>
+          note === primary ? moved : note,
+        ),
+      },
+    })
+
+    const after = compileAudibleMidiProject(edited)
+
+    expect(after.clipSpans.get(records.alternateClip.id)).toBe(
+      before.clipSpans.get(records.alternateClip.id),
+    )
+    expect(after.clipSpans.get(records.pianoClip.id)).not.toBe(
+      before.clipSpans.get(records.pianoClip.id),
+    )
+    const spanOf = (plan: typeof before) =>
+      plan.clipSpans.get(records.pianoClip.id)?.find(({ noteId }) => noteId === primary.id)
+    expect((spanOf(after)?.startTick ?? 0) - (spanOf(before)?.startTick ?? 0)).toBe(240)
+    // Fresh objects share nothing with earlier compiles, so this is the plan compiled from scratch.
+    expect(after).toEqual(compileAudibleMidiProject(structuredClone(edited)))
+  })
+
   it('keeps overlapping Clip occurrences on one Track as independent Note Spans', () => {
     const { records, snapshot } = createAudibleMidiProjectFixture()
     const overlappingSource = createMidiSourceRecord({

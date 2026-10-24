@@ -25,7 +25,7 @@ import {
   type ProjectCommandExecutionResult,
 } from '#internal/session/project-command-execution'
 import type { ProjectContentStateId } from '#internal/session/project-content-state-id'
-import { createProjectSnapshot, type ProjectSnapshot } from '#internal/snapshots/project-snapshot'
+import { ProjectSnapshots, type ProjectSnapshot } from '#internal/snapshots/project-snapshot'
 import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import type {
   ProjectSubscription,
@@ -70,7 +70,7 @@ class ProjectSessionImpl implements ProjectSession {
   readonly #history = new HistoryController()
   readonly #queryIndex: QueryIndex
   readonly #changePublisher = new ChangePublisher()
-  #snapshot: ProjectSnapshot | null = null
+  readonly #snapshots = new ProjectSnapshots()
 
   constructor(store: ModelStore) {
     this.#store = store
@@ -97,11 +97,7 @@ class ProjectSessionImpl implements ProjectSession {
   }
 
   getSnapshot(): ProjectSnapshot {
-    // Snapshots are immutable and only a committed revision changes Store content.
-    if (this.#snapshot?.modelRevision !== this.#store.modelRevision) {
-      this.#snapshot = createProjectSnapshot(this.#store)
-    }
-    return this.#snapshot
+    return this.#snapshots.read(this.#store)
   }
 
   query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query> {
@@ -203,7 +199,8 @@ class ProjectSessionImpl implements ProjectSession {
     }
 
     // History, QueryIndex, Commit/result objects, and the gated publication all exist
-    // before apply. A successful revision write is followed only by this bare return.
+    // before apply. A successful revision write is followed only by noting what it touched.
+    this.#snapshots.noteChanges(commit.changes)
     return result
   }
 }

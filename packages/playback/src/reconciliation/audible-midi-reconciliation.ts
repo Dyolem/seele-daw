@@ -173,19 +173,36 @@ function commitsFormContinuousChain(
 }
 
 const NO_FIELDS = Object.freeze<readonly AudibleMidiOccurrenceField[]>([])
+const NO_SPANS = Object.freeze<MidiNoteSpanPlan[]>([])
 
 /**
- * The occurrences that were added, removed or changed. An edit usually touches a few of tens of
- * thousands, so the plans are walked once and only the changes are sorted.
+ * The occurrences that were added, removed or changed. An occurrence belongs to one Clip, and a
+ * Clip the edit did not touch keeps its span array, so only the Clips that changed are compared.
  */
 function createOccurrenceChanges(
   previousPlan: AudibleMidiProjectPlan,
   nextPlan: AudibleMidiProjectPlan,
 ): readonly AudibleMidiOccurrenceChange[] {
-  const removed = new Map(previousPlan.midiNoteSpans.map((span) => [span.occurrenceKey, span]))
   const changes: AudibleMidiOccurrenceChange[] = []
+  for (const [clipId, nextSpans] of nextPlan.clipSpans) {
+    const previousSpans = previousPlan.clipSpans.get(clipId) ?? NO_SPANS
+    if (previousSpans !== nextSpans) appendSpanChanges(previousSpans, nextSpans, changes)
+  }
+  for (const [clipId, previousSpans] of previousPlan.clipSpans) {
+    if (!nextPlan.clipSpans.has(clipId)) appendSpanChanges(previousSpans, NO_SPANS, changes)
+  }
+  return Object.freeze(
+    changes.sort((left, right) => compareStrings(left.occurrenceKey, right.occurrenceKey)),
+  )
+}
 
-  for (const after of nextPlan.midiNoteSpans) {
+function appendSpanChanges(
+  previousSpans: readonly MidiNoteSpanPlan[],
+  nextSpans: readonly MidiNoteSpanPlan[],
+  changes: AudibleMidiOccurrenceChange[],
+): void {
+  const removed = new Map(previousSpans.map((span) => [span.occurrenceKey, span]))
+  for (const after of nextSpans) {
     const { occurrenceKey } = after
     const before = removed.get(occurrenceKey)
     if (before === undefined) {
@@ -201,6 +218,7 @@ function createOccurrenceChanges(
       continue
     }
     removed.delete(occurrenceKey)
+    if (before === after) continue
     const changedFields = occurrenceChangedFields(before, after)
     if (changedFields === null) continue
     changes.push(
@@ -224,10 +242,6 @@ function createOccurrenceChanges(
       }),
     )
   }
-
-  return Object.freeze(
-    changes.sort((left, right) => compareStrings(left.occurrenceKey, right.occurrenceKey)),
-  )
 }
 
 function createTrackChanges(

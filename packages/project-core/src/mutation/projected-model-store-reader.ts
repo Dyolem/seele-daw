@@ -144,11 +144,7 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
     this.#patches.set(before.id, { position, value: after })
   }
 
-  #requireCurrent(
-    before: StoredRecord,
-    verb: 'remove' | 'replace',
-    context: ChangeContext,
-  ): void {
+  #requireCurrent(before: StoredRecord, verb: 'remove' | 'replace', context: ChangeContext): void {
     const current = this.get(before.id)
 
     if (current === undefined) {

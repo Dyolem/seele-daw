@@ -24,12 +24,15 @@ import {
   readDataObject,
   readFiniteNumber,
   readInteger,
+  readMidiPitch,
   readNonBlankString,
+  readNonNegativeNumber,
   readOptionalValue,
   readRequiredValue,
   readString,
   type DataObject,
 } from '#internal/sample-instrument/contract/structured-data'
+import { sampleInstrumentZoneMatchesPitch } from '#internal/sample-instrument/loading/zone-selection'
 
 const MAPPING_REQUIRED_KEYS = Object.freeze([
   'category',
@@ -135,20 +138,6 @@ export class BuiltInMidiSampleSynthAdapterError extends TypeError {
 
 function fail(code: BuiltInMidiSampleSynthAdapterErrorCode, path: string, message: string): never {
   throw new BuiltInMidiSampleSynthAdapterError(code, path, message)
-}
-
-function readMidiPitch(input: unknown, path: string): number {
-  const value = readInteger(input, path)
-  if (value < 0 || value > 127) {
-    throw new StructuredDataError(path, 'expected a MIDI pitch from 0 through 127')
-  }
-  return value
-}
-
-function readNonNegativeNumber(input: unknown, path: string): number {
-  const value = readFiniteNumber(input, path)
-  if (value < 0) throw new StructuredDataError(path, 'expected a non-negative number')
-  return value
 }
 
 function readNullableNonNegativeNumber(input: unknown, path: string): number | null {
@@ -484,12 +473,6 @@ function resolveResource(
   })
 }
 
-function selectorMatchesPitch(selector: SampleInstrumentSelectorV1, pitch: number): boolean {
-  return selector.kind === 'exact-midi'
-    ? selector.pitch === pitch
-    : selector.minimumPitch <= pitch && pitch <= selector.maximumPitch
-}
-
 function applyMutexSets(
   zones: readonly SampleInstrumentZoneV1[],
   mutexSets: readonly (readonly number[])[],
@@ -499,7 +482,7 @@ function applyMutexSets(
     const groupId = groupIndex + 1
     for (const [pitchIndex, pitch] of pitches.entries()) {
       const path = `$.mutexSets[${groupIndex}][${pitchIndex}]`
-      const matchingZones = zones.filter((zone) => selectorMatchesPitch(zone.selector, pitch))
+      const matchingZones = zones.filter((zone) => sampleInstrumentZoneMatchesPitch(zone, pitch))
       if (
         matchingZones.length !== 1 ||
         matchingZones[0]?.selector.kind !== 'exact-midi' ||

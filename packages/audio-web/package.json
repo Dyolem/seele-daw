@@ -28,7 +28,9 @@
     "test:run": "vitest run --environment node"
   },
   "dependencies": {
-    "@seele-daw/playback": "workspace:*",
+    "@seele-daw/playback": "workspace:*"
+  },
+  "devDependencies": {
     "fflate": "0.8.3"
   }
 }

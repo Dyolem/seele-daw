@@ -9,8 +9,8 @@ import { parseSupportedWavMetadata } from '#internal/sample-instrument/contract/
 import {
   estimateSampleInstrumentLoading,
   type SampleInstrumentResourceMeasurement,
-} from '#internal/sample-instrument/loading/measurement'
-import { collectSampleInstrumentResourceKeysForPitches } from '#internal/sample-instrument/loading/measurement'
+} from '#internal/development/sample-instrument-measurement'
+import { collectSampleInstrumentResourceKeysForPitches } from '#internal/development/sample-instrument-measurement'
 
 import { BUILT_IN_SCORE_CORE_LOCAL_INSTRUMENTS } from './built-in-score-core-local-instruments'
 

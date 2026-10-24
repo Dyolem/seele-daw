@@ -8,11 +8,8 @@ import { parseSoundbankId, type SoundbankId } from '@seele-daw/playback'
 import {
   adaptBuiltInMidiSampleSynthMapping,
   inspectBuiltInMidiSampleSynthMapping,
-} from '#internal/sample-instrument/assets/built-in-mapping-adapter'
-import {
-  extractRestrictedZipArchive,
-  type RestrictedZipArchiveLimits,
-} from '#internal/sample-instrument/assets/restricted-zip'
+} from './built-in-mapping-adapter'
+import { extractRestrictedZipArchive, type RestrictedZipArchiveLimits } from './restricted-zip'
 import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
 import {
   parseSupportedWavMetadata,

@@ -90,6 +90,20 @@ export function readInteger(input: unknown, path: string): number {
   return value
 }
 
+export function readMidiPitch(input: unknown, path: string): number {
+  const value = readInteger(input, path)
+  if (value < 0 || value > 127) {
+    throw new StructuredDataError(path, 'expected a MIDI pitch from 0 through 127')
+  }
+  return value
+}
+
+export function readNonNegativeNumber(input: unknown, path: string): number {
+  const value = readFiniteNumber(input, path)
+  if (value < 0) throw new StructuredDataError(path, 'expected a non-negative number')
+  return value
+}
+
 export function readString(input: unknown, path: string): string {
   if (typeof input !== 'string') throw new StructuredDataError(path, 'expected a string')
   return input

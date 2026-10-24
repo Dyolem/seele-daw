@@ -2,7 +2,7 @@ import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/con
 import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
 import { findSampleInstrumentZoneForPitch } from '#internal/sample-instrument/loading/zone-selection'
 import { resolveSampleResourceUrl } from '#internal/sample-instrument/contract/resource-key'
-import { type SampleInstrumentResourceMeasurement } from '#internal/sample-instrument/loading/measurement'
+import { type SampleInstrumentResourceMeasurement } from '#internal/development/sample-instrument-measurement'
 
 export type SampleInstrumentAuditionNoteOffMode = 'linear-release' | 'natural-end'
 export type SampleInstrumentAuditionVelocityCurve =

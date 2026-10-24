@@ -61,12 +61,11 @@ src/
 ├── context/                        AudioContext、master 与输出校准
 ├── audio-quality/                  渲染政策常数与力度曲线
 ├── sample-instrument/
-│   ├── contract/   Manifest V1、Supported SFZ Profile、resource key、WAV 文件头
-│   ├── loading/    Zone 选择、资源缓存、计划的资源准备、测量
-│   ├── voice/      包络、偷 Voice 的排序、Voice 池
-│   └── assets/     Mapping Adapter 与受限 ZIP，只给 scripts/ 用
-└── development/    开发报告页与离线渲染
-scripts/            本地 Soundbank 的准备与测量
+│   ├── contract/   Manifest V1、Supported SFZ Profile、resource key、WAV 文件头（脚本与运行时共用）
+│   ├── loading/    Zone 选择、资源缓存、计划的资源准备
+│   └── voice/      包络、偷 Voice 的排序、Voice 池
+└── development/    开发报告页、离线渲染与加载测量
+scripts/            本地 Soundbank 的准备与测量，含 Mapping Adapter 与受限 ZIP
 ```
 
 ## 本地 Soundbank

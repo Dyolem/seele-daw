@@ -27,7 +27,9 @@ import {
   readDataObject,
   readFiniteNumber,
   readInteger,
+  readMidiPitch,
   readNonBlankString,
+  readNonNegativeNumber,
   readRequiredValue,
   readString,
 } from '#internal/sample-instrument/contract/structured-data'
@@ -79,20 +81,6 @@ export class SampleInstrumentManifestError extends TypeError {
 
 function fail(code: SampleInstrumentManifestErrorCode, path: string, message: string): never {
   throw new SampleInstrumentManifestError(code, path, message)
-}
-
-function readMidiPitch(input: unknown, path: string): number {
-  const value = readInteger(input, path)
-  if (value < 0 || value > 127) {
-    throw new StructuredDataError(path, 'expected a MIDI pitch from 0 through 127')
-  }
-  return value
-}
-
-function readNonNegativeNumber(input: unknown, path: string): number {
-  const value = readFiniteNumber(input, path)
-  if (value < 0) throw new StructuredDataError(path, 'expected a non-negative number')
-  return value
 }
 
 function readPositiveInteger(input: unknown, path: string): number {

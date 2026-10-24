@@ -11,7 +11,7 @@ import {
   estimateSampleInstrumentLoading,
   measureSampleInstrumentPitchForAudition,
   type SampleInstrumentResourceMeasurement,
-} from '#internal/sample-instrument/loading/measurement'
+} from '#internal/development/sample-instrument-measurement'
 
 const RESOURCES: readonly SampleInstrumentResourceMeasurement[] = Object.freeze([
   Object.freeze({

@@ -6,11 +6,11 @@ import {
   adaptBuiltInMidiSampleSynthMapping,
   inspectBuiltInMidiSampleSynthMapping,
   type BuiltInWavResourceRequest,
-} from '#internal/sample-instrument/assets/built-in-mapping-adapter'
+} from '../built-in-mapping-adapter'
 import {
   createBuiltInMapping,
   createBuiltInZone,
-} from '#internal/__tests__/support/built-in-midi-sample-synth-fixture'
+} from './support/built-in-midi-sample-synth-fixture'
 
 function resolveWavResource({ fileName }: BuiltInWavResourceRequest) {
   return { key: `samples/${fileName}.wav`, sourceSampleRateHz: 44_100 }

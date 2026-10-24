@@ -50,8 +50,8 @@
 - 主音量只在 Voice Plan 带来不同的值时设置一次，不再每个音符设置一次。
 - 播放中每次编辑仍会重新 prepare 整个 Plan。乐器已经缓存，剩下的成本是逐个音符找 Zone，大项目下
   还没有测过。
-- 引擎的行为测试仍在 Studio 的 coordinator spec 里，跑在一个单输出的假实现上。下一步把它们移进
-  playback。
+- 引擎的行为测试随后移进 playback 的 `playback-engine.spec`，用 project-core 的真实 Session 驱动
+  引擎；Studio 的 coordinator spec 只测它自己加上的东西：跟随 Active Project、Project 身份与提示文案。
 
 ## Validation
 
@@ -59,7 +59,7 @@
   Voice 互不影响；过期计划与没有 Zone 的音高返回 null；复音预算；主音量只在变化时设置；dispose
   之后 `schedule` 抛错，`allNotesOff` 不做任何事。
 - `web-audio-playback-runtime.spec`：从 Studio 移入，覆盖共享缓存、未覆盖音符、选择性失败、重试与中止。
-- `project-playback-coordinator.spec`：
+- `playback-engine.spec`：
   - 过期的准备结果从未调度过 Voice；
   - 暂停后的编辑不改动正在淡出的 Voice；
   - 自然结束时尾音不被切断，引擎不再唤醒，再次播放复用同一个准备结果；

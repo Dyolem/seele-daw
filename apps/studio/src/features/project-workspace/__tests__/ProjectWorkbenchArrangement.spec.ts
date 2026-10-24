@@ -1,3 +1,4 @@
+import { createTestProjectWorkspace } from './support/project-workspace-test-support'
 import {
   createTestTempoEditing,
   installTempoPointerCapture,
@@ -31,8 +32,12 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { h, nextTick, shallowRef, type ShallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { presentProjectWorkbenchActions } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
-import { PROJECT_TRACK_INSTRUMENT_STATUS } from '@/features/project-workspace/project-track-presentation'
+import {
+  PROJECT_TRACK_INSTRUMENT_STATUS,
+  type ProjectTrackPresentation,
+} from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
@@ -71,6 +76,7 @@ interface ArrangementFixture {
   readonly cancelTimelineLocate: ReturnType<typeof vi.fn<PlaybackLocateSession['cancel']>>
   readonly commitTimelineLocate: ReturnType<typeof vi.fn<PlaybackLocateSession['commit']>>
   readonly locateAtTick: ReturnType<typeof vi.fn<ProjectPlaybackCoordinator['locateAtTick']>>
+  readonly workspace: ReturnType<typeof createTestProjectWorkspace>['refs']
   readonly wrapper: VueWrapper
 }
 
@@ -82,7 +88,7 @@ interface MountArrangementOptions {
   readonly selectedTempoEventId?: TempoEventId | null
   readonly tempoEvents?: readonly TempoEventRecord[]
   readonly timelineEndTick?: Tick
-  readonly tracks?: InstanceType<typeof ProjectWorkbenchArrangement>['$props']['tracks']
+  readonly tracks?: readonly ProjectTrackPresentation[]
 }
 
 function mountArrangement(options: MountArrangementOptions = {}): ArrangementFixture {
@@ -181,25 +187,29 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     state: playbackState,
     visualPosition: playbackVisualPosition,
   })
-  const wrapper = mount(ProjectWorkbenchArrangement, {
-    attachTo: document.body,
-    props: {
-      barSpanTick: parsePositiveTick(3_840),
-      midiImportAction: {
+  const workspace = createTestProjectWorkspace({
+    actionControls: {
+      ...presentProjectWorkbenchActions(keyboard.runtime.actions, keyboard.runtime.keyboard),
+      importMidiTracks: {
         ...createStudioActionPresentation('Import MIDI as new tracks…'),
         actionId: 'project.import-midi-tracks',
         shortcut: '',
         title: 'Import MIDI as new tracks…',
       },
-      clips: options.clips ?? Object.freeze([]),
-      projectId,
-      timeSignatureNumerator: 4,
-      timelineEndTick: options.timelineEndTick ?? parseTick(3_840 * 8),
-      tracks: options.tracks ?? Object.freeze([]),
     },
+    barSpanTick: parsePositiveTick(3_840),
+    clips: options.clips ?? Object.freeze([]),
+    projectId,
+    timeSignatureNumerator: 4,
+    timelineEndTick: options.timelineEndTick ?? parseTick(3_840 * 8),
+    tracks: options.tracks ?? Object.freeze([]),
+  })
+  const wrapper = mount(ProjectWorkbenchArrangement, {
+    attachTo: document.body,
     global: {
       plugins: [pinia],
       provide: {
+        ...workspace.provide,
         [TEMPO_EDITING_KEY as symbol]: tempoEditing.tempo,
         ...provideTestStudioServices({
           actions: keyboard.runtime,
@@ -239,6 +249,7 @@ function mountArrangement(options: MountArrangementOptions = {}): ArrangementFix
     toasts,
     playbackState,
     playbackVisualPosition,
+    workspace: workspace.refs,
     wrapper,
   }
 }
@@ -1556,8 +1567,14 @@ describe('ProjectWorkbenchArrangement', () => {
       const ruler = fixture.wrapper.get('.project-workbench__ruler-locate-surface').element
       await dispatchPointerEvent(ruler, 'pointerdown', { clientX: 100, pointerId: 10 })
       if (reason === 'blur') window.dispatchEvent(new Event('blur'))
-      if (reason === 'project') await fixture.wrapper.setProps({ projectId: 'replacement-project' })
-      if (reason === 'scale') await fixture.wrapper.setProps({ timelineEndTick: parseTick(10000) })
+      if (reason === 'project') {
+        fixture.workspace.projectId.value = parseProjectId('replacement-project')
+        await nextTick()
+      }
+      if (reason === 'scale') {
+        fixture.workspace.timelineEndTick.value = parseTick(10000)
+        await nextTick()
+      }
       if (reason === 'runtime') fixture.keyboard.runtime.dispose()
       if (reason === 'geometry') {
         const viewport = fixture.wrapper.get(

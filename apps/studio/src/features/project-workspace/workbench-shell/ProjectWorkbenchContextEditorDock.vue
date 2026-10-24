@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { WORKSPACE_DOCK_HEADER_HEIGHT } from './layout/workspace-layout-policy'
-import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { parseSoundbankId } from '@seele-daw/playback'
 import DismissIcon from '~icons/fluent/dismiss-16-regular'
 import FullScreenMaximizeIcon from '~icons/fluent/full-screen-maximize-16-regular'
@@ -13,14 +12,11 @@ import { computed } from 'vue'
 
 import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue'
-import {
-  PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
-  type ProjectPianoRollPresentation,
-  type ProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/types/piano-roll-presentation'
+import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import { PIANO_ROLL_EDITING_SCOPE } from '@/features/piano-roll/types/piano-roll-preferences'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
+import { useProjectWorkspace } from '@/features/project-workspace/project-workspace'
 import {
   PROJECT_TRACK_INSTRUMENT_STATUS,
   type ProjectTrackPresentation,
@@ -37,19 +33,14 @@ import type { RuntimeUnavailableBuiltInInstrumentPreset } from '@/workbench/inst
 import { useStudio } from '@/workbench/studio-services'
 
 interface ProjectWorkbenchContextEditorDockProps {
-  readonly barSpanTick: Tick
   readonly dockMode: ProjectWorkbenchDockMode
   readonly isMaximized: boolean
-  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
-  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
-  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly selectedClip: ProjectMidiClipPresentation | null
   readonly selectedTrack: ProjectTrackPresentation | null
-  readonly timeSignatureNumerator: number
-  readonly timelineEndTick: Tick
 }
 
 const props = defineProps<ProjectWorkbenchContextEditorDockProps>()
+const { pianoRoll, pianoRollTrack, project, session, timelineEndTick } = useProjectWorkspace()
 const { tracks: trackEdits } = useStudio().edits
 const pianoRollPreferences = usePianoRollPreferencesStore()
 const toasts = useUiToastStore()
@@ -270,24 +261,23 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
         <ProjectPianoRollTrackSurface
           v-if="
             pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK &&
-            props.pianoRollTrackPresentation?.status ===
-              PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+            pianoRollTrack?.status === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
           "
-          :bar-span-tick="props.barSpanTick"
-          :presentation="props.pianoRollTrackPresentation"
-          :session="props.projectSession"
-          :timeline-end-tick="props.timelineEndTick"
-          :time-signature-numerator="props.timeSignatureNumerator"
+          :bar-span-tick="project.barSpanTick"
+          :presentation="pianoRollTrack"
+          :session="session"
+          :timeline-end-tick="timelineEndTick"
+          :time-signature-numerator="project.timeSignatureNumerator"
         />
         <ProjectPianoRollSurface
           v-else-if="
             pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.CLIP &&
-            props.pianoRollPresentation?.status === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+            pianoRoll?.status === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
           "
-          :bar-span-tick="props.barSpanTick"
-          :presentation="props.pianoRollPresentation"
-          :session="props.projectSession"
-          :time-signature-numerator="props.timeSignatureNumerator"
+          :bar-span-tick="project.barSpanTick"
+          :presentation="pianoRoll"
+          :session="session"
+          :time-signature-numerator="project.timeSignatureNumerator"
         />
         <div v-else class="project-workbench__surface-empty">
           <span><UiIcon :icon="MidiIcon" :size="24" /></span>
@@ -295,9 +285,8 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
           <p
             v-if="
               (pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK
-                ? props.pianoRollTrackPresentation?.status
-                : props.pianoRollPresentation?.status) ===
-              PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
+                ? pianoRollTrack?.status
+                : pianoRoll?.status) === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
             "
           >
             {{

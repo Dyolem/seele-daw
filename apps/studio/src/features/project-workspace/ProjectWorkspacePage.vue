@@ -8,8 +8,6 @@ import { useProjectWorkbenchMidiImport } from '@/features/project-workspace/acti
 import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import { provideTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
-import { useWorkspacePresentation } from '@/features/project-workspace/use-workspace-presentation'
-import { formatProjectTimelineTime } from '@/features/project-workspace/timeline/presentation'
 import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
@@ -67,11 +65,6 @@ const midiImport = useProjectWorkbenchMidiImport({
   getPlacementTick: () => parseTick(Math.round(playbackVisualPosition.value.positionTick)),
 })
 const midiFileInput = midiImport.input
-const { project, timelineEndTick, tracks, clips, pianoRoll, pianoRollTrack } =
-  useWorkspacePresentation(readyProject)
-const playbackTime = computed(() =>
-  formatProjectTimelineTime(playbackVisualPosition.value.positionProjectSecond),
-)
 const playbackCanReturnToLastStartPosition = computed(() => {
   // These projections make the Coordinator-owned capability reactive without duplicating its
   // Return Anchor in component state.
@@ -139,13 +132,6 @@ async function showProjects(): Promise<StudioActionCompletion> {
   } finally {
     isShowingProjects.value = false
   }
-}
-
-function describeSaveFailure(saveFailure: unknown): string | null {
-  if (saveFailure instanceof Error && saveFailure.message.trim().length > 0) {
-    return saveFailure.message
-  }
-  return saveFailure === null ? null : 'The project could not be saved.'
 }
 
 let releaseActionTarget: (() => void) | null = null
@@ -237,22 +223,7 @@ onUnmounted(() => {
     v-if="readyProject"
     ref="workbenchShell"
     :action-controls="actionControls"
-    :bar-span-tick="project.barSpanTick"
-    :clips="clips"
-    :is-dirty="readyProject.isDirty"
-    :piano-roll-presentation="pianoRoll"
-    :piano-roll-track-presentation="pianoRollTrack"
-    :playback-feedback="playbackState.feedback?.message ?? null"
-    :playback-time="playbackTime"
-    :project-id="readyProject.projectId"
-    :project-name="project.projectName"
-    :project-session="readyProject.session"
-    :save-failure-message="describeSaveFailure(readyProject.saveFailure)"
-    :save-status="readyProject.saveStatus"
-    :time-signature-denominator="project.timeSignatureDenominator"
-    :time-signature-numerator="project.timeSignatureNumerator"
-    :timeline-end-tick="timelineEndTick"
-    :tracks="tracks"
+    :ready-project="readyProject"
   />
 
   <main v-else class="project-route-state" aria-labelledby="project-open-title">

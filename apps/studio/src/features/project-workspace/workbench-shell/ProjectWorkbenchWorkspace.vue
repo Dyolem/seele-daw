@@ -1,15 +1,8 @@
 <script setup lang="ts">
-import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { computed, onMounted, onBeforeUnmount, shallowRef } from 'vue'
-import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 
-import type {
-  ProjectPianoRollPresentation,
-  ProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/types/piano-roll-presentation'
-import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
-import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import { useProjectWorkspace } from '@/features/project-workspace/project-workspace'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
 import {
@@ -22,18 +15,7 @@ import UiHeightResizeHandle from '@/ui/components/UiHeightResizeHandle.vue'
 import { useWorkspaceLayout } from './layout/use-workspace-layout'
 import { WORKSPACE_MINIMUM_DOCK_HEIGHT } from './layout/workspace-layout-policy'
 
-const props = defineProps<{
-  readonly barSpanTick: Tick
-  readonly clips: readonly ProjectMidiClipPresentation[]
-  readonly midiImportAction: StudioActionControl
-  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
-  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
-  readonly projectId: string
-  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
-  readonly timeSignatureNumerator: number
-  readonly timelineEndTick: Tick
-  readonly tracks: readonly ProjectTrackPresentation[]
-}>()
+const { clips, tracks } = useProjectWorkspace()
 const workbenchSelection = useProjectWorkbenchSelectionStore()
 
 const workspaceElement = shallowRef<HTMLElement | null>(null)
@@ -41,10 +23,10 @@ const dock = useWorkspaceLayout(workspaceElement)
 const { layout, mode: dockMode, maximized: isDockMaximized, style: workspaceStyle } = dock
 const isContextEditorOpen = computed(() => dockMode.value !== PROJECT_WORKBENCH_DOCK_MODE.CLOSED)
 const selectedTrack = computed(
-  () => props.tracks.find((track) => track.id === workbenchSelection.selectedTrackId) ?? null,
+  () => tracks.value.find((track) => track.id === workbenchSelection.selectedTrackId) ?? null,
 )
 const selectedClip = computed(
-  () => props.clips.find((clip) => clip.id === workbenchSelection.selectedClipId) ?? null,
+  () => clips.value.find((clip) => clip.id === workbenchSelection.selectedClipId) ?? null,
 )
 onMounted(dock.mount)
 onBeforeUnmount(dock.dispose)
@@ -68,13 +50,6 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
       v-show="dockMode !== PROJECT_WORKBENCH_DOCK_MODE.FULLSCREEN && !layout.arrangementCompact"
       @pointerdown.capture="dock.activateArrangement"
       @focusin="dock.activateArrangement"
-      :bar-span-tick="props.barSpanTick"
-      :clips="props.clips"
-      :midi-import-action="props.midiImportAction"
-      :project-id="props.projectId"
-      :time-signature-numerator="props.timeSignatureNumerator"
-      :timeline-end-tick="props.timelineEndTick"
-      :tracks="props.tracks"
       @open-midi-clip="dock.open"
     />
 
@@ -105,14 +80,8 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({ getMidiEditor: () => midiEditor 
       @pointerdown.capture="dock.activateMidi"
       @focusin="dock.activateMidi"
       :is-maximized="isDockMaximized"
-      :piano-roll-presentation="props.pianoRollPresentation"
-      :piano-roll-track-presentation="props.pianoRollTrackPresentation"
-      :project-session="props.projectSession"
       :selected-clip="selectedClip"
       :selected-track="selectedTrack"
-      :bar-span-tick="props.barSpanTick"
-      :time-signature-numerator="props.timeSignatureNumerator"
-      :timeline-end-tick="props.timelineEndTick"
       @close="dock.close"
       @minimize="dock.toggleMinimized"
       @toggle-fullscreen="dock.toggleFullscreen"

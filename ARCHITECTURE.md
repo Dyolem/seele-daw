@@ -78,19 +78,20 @@ Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 
 ## 4. 新代码放在哪里
 
-| 要做的事                       | 位置                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------- |
-| 命令的形状与工厂               | project-core `commands/protocol/project-command.ts`                                         |
-| 命令的校验与 MutationPlan      | `commands/<实体>/command-handler.ts`，并在 `preparation/project-command-preparer.ts` 注册   |
-| Studio 写项目的用例            | `apps/studio/src/workbench/edits/*-edits.ts`，普通函数，汇总在 `project-edits.ts`           |
-| 有生命周期的应用服务           | `workbench/project/…`；在 `bootstrap/studio-application.ts` 创建，放进 `StudioServices`     |
-| 用户动作（菜单、按钮、快捷键） | 所属 feature 的 `actions/`，用 `defineStudioAction` 声明                                    |
-| 焦点上下文                     | `defineStudioContext`；视图挂载或聚焦时用 `contexts.bind` 绑定目标                          |
-| 拖拽手势                       | `new GestureSession(start)`；提交用 `completeGesture`                                       |
-| 播放行为                       | `packages/playback`：`engine/`、`reconciliation/`、`scheduler/`                             |
-| 浏览器音频与音源               | `packages/audio-web`；Studio 只给资产地址：`workbench/instrument/built-in-sample-assets.ts` |
-| 可见功能                       | `apps/studio/src/features/<功能>/`                                                          |
-| 与具体功能无关的控件和样式     | `apps/studio/src/ui/`                                                                       |
+| 要做的事                       | 位置                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| 命令的形状与工厂               | project-core `commands/protocol/project-command.ts`                                              |
+| 命令的校验与 MutationPlan      | `commands/<实体>/command-handler.ts`，并在 `preparation/project-command-preparer.ts` 注册        |
+| Studio 写项目的用例            | `apps/studio/src/workbench/edits/*-edits.ts`，普通函数，汇总在 `project-edits.ts`                |
+| 有生命周期的应用服务           | `workbench/project/…`；在 `bootstrap/studio-application.ts` 创建，放进 `StudioServices`          |
+| 用户动作（菜单、按钮、快捷键） | 所属 feature 的 `actions/`，用 `defineStudioAction` 声明                                         |
+| 焦点上下文                     | `defineStudioContext`；视图挂载或聚焦时用 `contexts.bind` 绑定目标                               |
+| 拖拽手势                       | `new GestureSession(start)`；提交用 `completeGesture`                                            |
+| 播放行为                       | `packages/playback`：`engine/`、`reconciliation/`、`scheduler/`                                  |
+| 浏览器音频与音源               | `packages/audio-web`；Studio 只给资产地址：`workbench/instrument/built-in-sample-assets.ts`      |
+| 工作台视图要读的项目数据       | `features/project-workspace/project-workspace.ts`：Shell 提供，视图用 `useProjectWorkspace()` 读 |
+| 可见功能                       | `apps/studio/src/features/<功能>/`                                                               |
+| 与具体功能无关的控件和样式     | `apps/studio/src/ui/`                                                                            |
 
 组件通过 `useStudio()` 取得服务：`edits`、`actions`、`project`、`playback`、`navigation`、
 `midiImport`、`projectEntry`。InjectionKey 与它的 provide / inject 函数写在同一个文件里。

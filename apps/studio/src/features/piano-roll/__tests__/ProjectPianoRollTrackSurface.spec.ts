@@ -28,6 +28,7 @@ import { markRaw, nextTick, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue'
+import { createTestProjectWorkspace } from '@/features/project-workspace/__tests__/support/project-workspace-test-support'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
@@ -832,21 +833,15 @@ describe('ProjectPianoRollTrackSurface', () => {
         session.getSnapshot(),
         fixture.clip.clipId,
       )
+      const workspace = createTestProjectWorkspace({
+        pianoRoll: presentation,
+        pianoRollTrack: fixture.presentation,
+        session,
+      })
       const dock = mount(ProjectWorkbenchContextEditorDock, {
         attachTo: document.body,
-        global: fixture.global,
-        props: {
-          barSpanTick: parseTick(3840),
-          dockMode: 'docked',
-          isMaximized: false,
-          pianoRollPresentation: presentation,
-          pianoRollTrackPresentation: fixture.presentation,
-          projectSession: session,
-          selectedClip: null,
-          selectedTrack: null,
-          timeSignatureNumerator: 4,
-          timelineEndTick: parseTick(576000),
-        },
+        global: { ...fixture.global, provide: { ...fixture.global.provide, ...workspace.provide } },
+        props: { dockMode: 'docked', isMaximized: false, selectedClip: null, selectedTrack: null },
       })
       await nextTick()
       const host = dock.get('.project-piano-roll-track__canvas-host').element

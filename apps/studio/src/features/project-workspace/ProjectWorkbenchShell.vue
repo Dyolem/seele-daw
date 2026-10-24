@@ -1,15 +1,9 @@
 <script setup lang="ts">
-import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import OptionsIcon from '~icons/fluent/options-20-regular'
-import { shallowRef } from 'vue'
+import { computed, shallowRef, toRef } from 'vue'
 
-import type {
-  ProjectPianoRollPresentation,
-  ProjectPianoRollTrackPresentation,
-} from '@/features/piano-roll/types/piano-roll-presentation'
-import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
-import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
+import { provideProjectWorkspace } from '@/features/project-workspace/project-workspace'
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
 import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue'
@@ -17,32 +11,22 @@ import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspa
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
-import type { ActiveProjectSaveStatus } from '@/workbench/project/active-project-state'
+import type { ReadyActiveProjectState } from '@/workbench/project/active-project-state'
 
-interface ProjectWorkbenchShellProps {
+const props = defineProps<{
   readonly actionControls: ProjectWorkbenchActionControls
-  readonly barSpanTick: Tick
-  readonly clips: readonly ProjectMidiClipPresentation[]
-  readonly isDirty: boolean
-  readonly pianoRollPresentation: ProjectPianoRollPresentation | null
-  readonly pianoRollTrackPresentation: ProjectPianoRollTrackPresentation | null
-  readonly playbackFeedback: string | null
-  readonly playbackTime: string
-  readonly projectId: string
-  readonly projectName: string
-  readonly projectSession: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
-  readonly saveFailureMessage?: string | null
-  readonly saveStatus: ActiveProjectSaveStatus
-  readonly timeSignatureDenominator: number
-  readonly timeSignatureNumerator: number
-  readonly timelineEndTick: Tick
-  readonly tracks: readonly ProjectTrackPresentation[]
-}
-
-const props = withDefaults(defineProps<ProjectWorkbenchShellProps>(), {
-  saveFailureMessage: null,
-})
+  readonly readyProject: ReadyActiveProjectState
+}>()
 const { actions } = useStudioActions()
+const { project } = provideProjectWorkspace(
+  toRef(props, 'readyProject'),
+  toRef(props, 'actionControls'),
+)
+const saveFailureMessage = computed(() => {
+  const failure = props.readyProject.saveFailure
+  if (failure instanceof Error && failure.message.trim().length > 0) return failure.message
+  return failure === null ? null : 'The project could not be saved.'
+})
 
 const workspace = shallowRef<ProjectWorkbenchWorkspaceHandle | null>(null)
 defineExpose<ProjectWorkbenchWorkspaceHandle>({
@@ -54,19 +38,17 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({
   <div class="project-workbench">
     <ProjectWorkbenchGlobalBar
       :action-controls="props.actionControls"
-      :is-dirty="props.isDirty"
-      :project-id="props.projectId"
-      :project-name="props.projectName"
-      :save-failure-message="props.saveFailureMessage"
-      :save-status="props.saveStatus"
+      :is-dirty="props.readyProject.isDirty"
+      :project-id="props.readyProject.projectId"
+      :project-name="project.projectName"
+      :save-failure-message="saveFailureMessage"
+      :save-status="props.readyProject.saveStatus"
     />
 
     <ProjectWorkbenchTransport
       :action-controls="props.actionControls"
-      :playback-feedback="props.playbackFeedback"
-      :playback-time="props.playbackTime"
-      :time-signature-denominator="props.timeSignatureDenominator"
-      :time-signature-numerator="props.timeSignatureNumerator"
+      :time-signature-denominator="project.timeSignatureDenominator"
+      :time-signature-numerator="project.timeSignatureNumerator"
     />
 
     <main class="project-workbench__main">
@@ -83,19 +65,7 @@ defineExpose<ProjectWorkbenchWorkspaceHandle>({
         >
       </section>
 
-      <ProjectWorkbenchWorkspace
-        ref="workspace"
-        :bar-span-tick="props.barSpanTick"
-        :clips="props.clips"
-        :midi-import-action="props.actionControls.importMidiTracks"
-        :piano-roll-presentation="props.pianoRollPresentation"
-        :piano-roll-track-presentation="props.pianoRollTrackPresentation"
-        :project-id="props.projectId"
-        :project-session="props.projectSession"
-        :time-signature-numerator="props.timeSignatureNumerator"
-        :timeline-end-tick="props.timelineEndTick"
-        :tracks="props.tracks"
-      />
+      <ProjectWorkbenchWorkspace ref="workspace" />
     </main>
   </div>
 </template>

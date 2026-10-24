@@ -13,14 +13,14 @@ import { computed } from 'vue'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import { useTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
 import ProjectTempoControl from '@/features/project-workspace/tempo/ProjectTempoControl.vue'
+import { formatProjectTimelineTime } from '@/features/project-workspace/timeline/presentation'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
+import { useStudio } from '@/workbench/studio-services'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 
 interface ProjectWorkbenchTransportProps {
   readonly actionControls: ProjectWorkbenchActionControls
-  readonly playbackFeedback: string | null
-  readonly playbackTime: string
   readonly timeSignatureDenominator: number
   readonly timeSignatureNumerator: number
 }
@@ -29,6 +29,11 @@ const props = defineProps<ProjectWorkbenchTransportProps>()
 const { actions } = useStudioActions()
 const tempo = useTempoEditing()
 const { field: tempoField, fieldEditable: tempoFieldEditable } = tempo
+const { state: playbackState, visualPosition } = useStudio().playback
+const playbackTime = computed(() =>
+  formatProjectTimelineTime(visualPosition.value.positionProjectSecond),
+)
+const playbackFeedback = computed(() => playbackState.value.feedback?.message ?? null)
 
 const playbackIcon = computed(() => {
   if (props.actionControls.togglePlayback.busy) return SpinnerIcon
@@ -105,9 +110,9 @@ const playbackIcon = computed(() => {
       <output
         class="project-workbench__time"
         aria-label="Current play time"
-        :title="props.playbackFeedback ?? undefined"
+        :title="playbackFeedback ?? undefined"
       >
-        {{ props.playbackTime }}
+        {{ playbackTime }}
       </output>
     </div>
 

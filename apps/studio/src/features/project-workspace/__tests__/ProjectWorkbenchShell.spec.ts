@@ -1,16 +1,20 @@
 import { TEMPO_EDITING_KEY } from '@/features/project-workspace/tempo-track/tempo-editing'
+import { createTestProjectWorkspace } from './support/project-workspace-test-support'
 import { createTestTempoEditing } from './support/tempo-track-test-support'
 import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import type { StudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import {
+  createInitialProjectSession,
   parseClipId,
   parseDeviceTypeId,
   parsePositiveTick,
   parseProjectColor,
   parseProjectId,
+  parseTempoEventId,
   parseTick,
+  parseTimeSignatureEventId,
   parseTrackId,
   type ClipId,
   type ProjectCommit,
@@ -19,7 +23,7 @@ import {
 import { parseSoundbankId } from '@seele-daw/playback'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { nextTick, shallowRef } from 'vue'
+import { nextTick, shallowRef, type ShallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { createStudioActionPresentation } from '@/workbench/actions/studio-action'
@@ -36,10 +40,11 @@ import {
   type ProjectTrackPresentation,
 } from '@/features/project-workspace/project-track-presentation'
 import {
+  ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectSaveStatus,
+  type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ClipEdits } from '@/workbench/edits/clip-edits'
 import type { TrackEdits } from '@/workbench/edits/track-edits'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
@@ -58,14 +63,14 @@ afterEach(() => {
 })
 
 interface MountShellOptions {
-  readonly clips?: readonly ProjectMidiClipPresentation[]
   readonly isDirty?: boolean
-  readonly saveFailureMessage?: string | null
+  readonly saveFailure?: Error | null
   readonly saveStatus?: ActiveProjectSaveStatus
   readonly selectedClipId?: ClipId | null
   readonly selectedTrackId?: TrackId | null
-  readonly tracks?: readonly ProjectTrackPresentation[]
 }
+
+const PROJECT_ID = parseProjectId('workbench-shell-project')
 
 const STUDIO_GRAND_INSTRUMENT = Object.freeze({
   deviceTypeId: parseDeviceTypeId('seele.sample-instrument'),
@@ -74,13 +79,16 @@ const STUDIO_GRAND_INSTRUMENT = Object.freeze({
   status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
 })
 
-/** The coordinator's invoke, spied on by the latest mountShell(). */
+/** The coordinator's invoke, spied on by the latest mount. */
 let invoke: MockInstance<StudioActionCoordinator['invoke']>
+let playbackState: ShallowRef<ProjectPlaybackState>
+let playbackVisualPosition: ShallowRef<ProjectPlaybackVisualPosition>
 
-function mountShell(options: MountShellOptions = {}) {
+/** Pinia, services and action controls shared by the Shell and the Workspace below it. */
+function createShellEnvironment(options: MountShellOptions = {}) {
   const pinia = createPinia()
   const selection = useProjectWorkbenchSelectionStore(pinia)
-  const projectId = parseProjectId('workbench-shell-project')
+  const projectId = PROJECT_ID
   selection.activateProject(projectId)
   if (options.selectedTrackId && options.selectedClipId) {
     selection.selectClip(options.selectedTrackId, options.selectedClipId)
@@ -101,7 +109,7 @@ function mountShell(options: MountShellOptions = {}) {
     })),
     selectBuiltInInstrument: vi.fn<TrackEdits['selectBuiltInInstrument']>(),
   }
-  const playbackState = shallowRef<ProjectPlaybackState>(
+  playbackState = shallowRef<ProjectPlaybackState>(
     Object.freeze({
       diagnostics: Object.freeze([]),
       failureCause: null,
@@ -113,7 +121,7 @@ function mountShell(options: MountShellOptions = {}) {
       projectId,
     }),
   )
-  const playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
+  playbackVisualPosition = shallowRef<ProjectPlaybackVisualPosition>(
     Object.freeze({
       modelRevision: null,
       phase: PROJECT_PLAYBACK_PHASE.STOPPED,
@@ -168,36 +176,65 @@ function mountShell(options: MountShellOptions = {}) {
     },
   }
 
-  return mount(ProjectWorkbenchShell, {
-    props: {
-      barSpanTick: parsePositiveTick(3_840),
-      actionControls,
-      clips: options.clips ?? Object.freeze([]),
-      isDirty: options.isDirty ?? false,
-      pianoRollPresentation: null,
-      pianoRollTrackPresentation: null,
-      playbackFeedback: null,
-      playbackTime: '00:00.000',
-      projectId: 'workbench-shell-project',
-      projectName: 'Midnight Study',
-      projectSession: createTestSession(parseProjectId('workbench-shell-project-session')),
-      saveFailureMessage: options.saveFailureMessage,
-      saveStatus: options.saveStatus ?? ACTIVE_PROJECT_SAVE_STATUS.IDLE,
-      timeSignatureDenominator: 4,
-      timeSignatureNumerator: 4,
-      timelineEndTick: parseTick(576_000),
-      tracks: options.tracks ?? Object.freeze([]),
+  return {
+    actionControls,
+    pinia,
+    provide: {
+      [TEMPO_EDITING_KEY as symbol]: createTestTempoEditing([]).tempo,
+      ...provideTestStudioServices({
+        actions: actionFixture.runtime,
+        edits: { clips, tracks },
+        playback: playbackContext,
+      }),
     },
+  }
+}
+
+function mountShell(options: MountShellOptions = {}) {
+  const environment = createShellEnvironment(options)
+  const session = createInitialProjectSession({
+    projectId: PROJECT_ID,
+    projectName: 'Midnight Study',
+    tempoEventId: parseTempoEventId('tempo-workbench-shell'),
+    timeSignatureEventId: parseTimeSignatureEventId('meter-workbench-shell'),
+  })
+  const readyProject: ReadyActiveProjectState = Object.freeze({
+    contentStateId: session.contentStateId,
+    isDirty: options.isDirty ?? false,
+    modelRevision: session.modelRevision,
+    phase: ACTIVE_PROJECT_PHASE.READY,
+    projectId: PROJECT_ID,
+    recoveryFailures: Object.freeze([]),
+    savedContentStateId: null,
+    savedRevision: null,
+    saveFailure: options.saveFailure ?? null,
+    saveStatus: options.saveStatus ?? ACTIVE_PROJECT_SAVE_STATUS.IDLE,
+    session,
+  })
+  return mount(ProjectWorkbenchShell, {
+    props: { actionControls: environment.actionControls, readyProject },
+    global: { plugins: [environment.pinia], provide: environment.provide },
+  })
+}
+
+/** The Workspace on its own, for what it shows of a given set of Tracks and Clips. */
+function mountWorkspace(
+  options: MountShellOptions & {
+    readonly clips?: readonly ProjectMidiClipPresentation[]
+    readonly tracks?: readonly ProjectTrackPresentation[]
+  },
+) {
+  const environment = createShellEnvironment(options)
+  const workspace = createTestProjectWorkspace({
+    actionControls: environment.actionControls,
+    clips: options.clips,
+    projectId: PROJECT_ID,
+    tracks: options.tracks,
+  })
+  return mount(ProjectWorkbenchWorkspace, {
     global: {
-      plugins: [pinia],
-      provide: {
-        [TEMPO_EDITING_KEY as symbol]: createTestTempoEditing([]).tempo,
-        ...provideTestStudioServices({
-          actions: actionFixture.runtime,
-          edits: { clips, tracks },
-          playback: playbackContext,
-        }),
-      },
+      plugins: [environment.pinia],
+      provide: { ...environment.provide, ...workspace.provide },
     },
   })
 }
@@ -210,10 +247,10 @@ describe('ProjectWorkbenchShell', () => {
     expect(wrapper.findComponent(ProjectWorkbenchGlobalBar).exists()).toBe(true)
     expect(wrapper.findComponent(ProjectWorkbenchTransport).exists()).toBe(true)
     expect(workspace.findComponent(ProjectWorkbenchArrangement).exists()).toBe(true)
-    expect(workspace.getComponent(ProjectWorkbenchArrangement).props('timelineEndTick')).toBe(
-      576_000,
-    )
-    expect(workspace.getComponent(ProjectWorkbenchArrangement).props('projectId')).toBe(
+    expect(
+      wrapper.get('.project-workbench__ruler-locate-surface').attributes('aria-valuemax'),
+    ).toBe('576000')
+    expect(wrapper.get('.project-workbench__project-identity').attributes('title')).toBe(
       'workbench-shell-project',
     )
     expect(workspace.findComponent(ProjectWorkbenchContextEditorDock).exists()).toBe(true)
@@ -263,9 +300,16 @@ describe('ProjectWorkbenchShell', () => {
           checked: true,
         },
       },
-      playbackFeedback: 'Some content will be skipped.',
-      playbackTime: '01:02.345',
     })
+    playbackVisualPosition.value = Object.freeze({
+      ...playbackVisualPosition.value,
+      positionProjectSecond: 62.345,
+    })
+    playbackState.value = Object.freeze({
+      ...playbackState.value,
+      feedback: Object.freeze({ kind: 'warning', message: 'Some content will be skipped.' }),
+    })
+    await nextTick()
 
     expect(wrapper.get('button[aria-label="Pause"]').attributes('aria-pressed')).toBe('true')
     expect(wrapper.get('.project-workbench__time').text()).toBe('01:02.345')
@@ -332,7 +376,7 @@ describe('ProjectWorkbenchShell', () => {
   it('exposes dirty and failed Save states and emits the real Save intent', async () => {
     const wrapper = mountShell({
       isDirty: true,
-      saveFailureMessage: 'Checkpoint write failed',
+      saveFailure: new Error('Checkpoint write failed'),
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.FAILED,
     })
 
@@ -432,7 +476,7 @@ describe('ProjectWorkbenchShell', () => {
 
   it('projects the selected Track into the Context Editor Dock', () => {
     const selectedTrackId = parseTrackId('shell-selected-track')
-    const wrapper = mountShell({
+    const wrapper = mountWorkspace({
       selectedTrackId,
       tracks: Object.freeze([
         Object.freeze({
@@ -455,7 +499,7 @@ describe('ProjectWorkbenchShell', () => {
   it('projects the selected MIDI Clip into the open Context Editor', () => {
     const selectedTrackId = parseTrackId('shell-clip-owner')
     const selectedClipId = parseClipId('shell-selected-clip')
-    const wrapper = mountShell({
+    const wrapper = mountWorkspace({
       clips: Object.freeze([
         Object.freeze({
           color: parseProjectColor('#8B5CF6'),

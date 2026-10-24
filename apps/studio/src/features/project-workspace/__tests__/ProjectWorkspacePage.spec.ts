@@ -341,7 +341,9 @@ async function mountTempoDragPage() {
   await flushPromises()
   await page.wrapper.get('[aria-label="Expand Tempo editor"]').trigger('click')
   const plot = page.wrapper.get('.tempo-track-lane__plot').element as HTMLElement
-  const width = Number(page.wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick'))
+  const width = Number(
+    page.wrapper.get('.project-workbench__ruler-locate-surface').attributes('aria-valuemax'),
+  )
   vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
     left: 100,
     top: 50,
@@ -1173,7 +1175,9 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.find('.project-workbench').exists()).toBe(true)
     expect(wrapper.text()).toContain(`Test ${projectId}`)
     expect(wrapper.text()).toContain(projectId)
-    expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(576_000)
+    expect(
+      wrapper.get('.project-workbench__ruler-locate-surface').attributes('aria-valuemax'),
+    ).toBe('576000')
   })
 
   it('preserves hidden Tempo precision until the user enters a visibly different value', async () => {
@@ -1447,7 +1451,9 @@ describe('ProjectWorkspacePage', () => {
     const { wrapper } = await mountPage(fixture, projectId)
     await flushPromises()
 
-    expect(wrapper.getComponent(ProjectWorkbenchShell).props('timelineEndTick')).toBe(610_560)
+    expect(
+      wrapper.get('.project-workbench__ruler-locate-surface').attributes('aria-valuemax'),
+    ).toBe('610560')
     const rulerBars = wrapper.findAll('.project-workbench__ruler li')
     expect(rulerBars).toHaveLength(159)
     expect(rulerBars[158]?.text()).toBe('159')

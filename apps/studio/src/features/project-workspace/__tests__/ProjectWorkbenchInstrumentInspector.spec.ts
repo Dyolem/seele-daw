@@ -1,4 +1,5 @@
 import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
+import { createTestProjectWorkspace } from './support/project-workspace-test-support'
 import {
   parseClipId,
   parseDeviceTypeId,
@@ -58,20 +59,17 @@ function mountInspector(options: MountInspectorOptions) {
   const projectSession = createTestSession(parseProjectId('project-instrument-inspector'))
   const wrapper = mount(ProjectWorkbenchContextEditorDock, {
     props: {
-      barSpanTick: parsePositiveTick(3_840),
       dockMode: PROJECT_WORKBENCH_DOCK_MODE.DOCKED,
       isMaximized: false,
-      pianoRollPresentation: null,
-      pianoRollTrackPresentation: null,
-      projectSession,
       selectedClip: options.selectedClip ?? null,
       selectedTrack: options.selectedTrack,
-      timeSignatureNumerator: 4,
-      timelineEndTick: parsePositiveTick(576_000),
     },
     global: {
       plugins: [pinia],
-      provide: provideTestStudioServices({ edits: { tracks } }),
+      provide: {
+        ...createTestProjectWorkspace({ session: projectSession }).provide,
+        ...provideTestStudioServices({ edits: { tracks } }),
+      },
     },
   })
   mountedWrappers.push(wrapper)

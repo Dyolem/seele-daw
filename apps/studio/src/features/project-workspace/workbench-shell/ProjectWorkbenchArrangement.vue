@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { parseTick, type Tick, type TrackId } from '@seele-daw/project-core'
+import { parseTick, type TrackId } from '@seele-daw/project-core'
 import ChevronDownIcon from '~icons/fluent/chevron-down-16-regular'
 import ChevronRightIcon from '~icons/fluent/chevron-right-16-regular'
 import GridIcon from '~icons/fluent/grid-20-regular'
@@ -9,10 +9,19 @@ import MusicNoteIcon from '~icons/fluent/music-note-2-20-regular'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import ZoomInIcon from '~icons/fluent/zoom-in-20-regular'
 import ZoomOutIcon from '~icons/fluent/zoom-out-20-regular'
-import { computed, onBeforeUnmount, onMounted, onUnmounted, shallowRef, type StyleValue } from 'vue'
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  onUnmounted,
+  reactive,
+  shallowRef,
+  type StyleValue,
+} from 'vue'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkspace } from '@/features/project-workspace/project-workspace'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
 import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackLane.vue'
@@ -31,20 +40,20 @@ import { useTempoLaneLayout } from '@/features/project-workspace/workbench-shell
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
-import type { StudioActionControl } from '@/workbench/actions/studio-action-control'
 import { useStudioActions } from '@/workbench/actions/vue/studio-action-context'
 
 const EMPTY_CLIPS: readonly ProjectMidiClipPresentation[] = Object.freeze([])
 
-const props = defineProps<{
-  readonly barSpanTick: Tick
-  readonly clips: readonly ProjectMidiClipPresentation[]
-  readonly midiImportAction: StudioActionControl
-  readonly projectId: string
-  readonly timeSignatureNumerator: number
-  readonly timelineEndTick: Tick
-  readonly tracks: readonly ProjectTrackPresentation[]
-}>()
+const workspace = useProjectWorkspace()
+const props = reactive({
+  barSpanTick: computed(() => workspace.project.value.barSpanTick),
+  clips: workspace.clips,
+  midiImportAction: computed(() => workspace.actionControls.value.importMidiTracks),
+  projectId: workspace.projectId,
+  timeSignatureNumerator: computed(() => workspace.project.value.timeSignatureNumerator),
+  timelineEndTick: workspace.timelineEndTick,
+  tracks: workspace.tracks,
+})
 const emit = defineEmits<{
   openMidiClip: []
 }>()

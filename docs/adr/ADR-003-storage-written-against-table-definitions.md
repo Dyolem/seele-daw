@@ -1,6 +1,6 @@
 # ADR-003：存储按表定义编写，Mutation 形状保持显式
 
-- 状态：Accepted
+- 状态：Accepted；第 4、5 条被 [ADR-004](./ADR-004-commits-publish-storage-changes.md) 取代
 - 日期：2026-10-23
 - 实施：`21dd1df`
 

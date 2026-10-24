@@ -10,4 +10,5 @@ Revisit Trigger。决定被推翻时，把状态改为 Superseded 并链接到�
 | ------------------------------------------------------------- | -------------------------------------------- |
 | [001](./ADR-001-validate-each-commit-once.md)                 | 每次提交只在投影上做一次全量不变量校验       |
 | [002](./ADR-002-consumers-read-changes-not-command-types.md)  | 消费者按 Change 路由；命令语义由属性测试固定 |
-| [003](./ADR-003-storage-written-against-table-definitions.md) | 存储按表定义编写；Mutation 形状保持显式      |
+| [003](./ADR-003-storage-written-against-table-definitions.md) | 存储按表定义编写                             |
+| [004](./ADR-004-commits-publish-storage-changes.md)           | Commit 发布它写入的存储变化，不再派生 Delta  |

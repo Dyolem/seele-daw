@@ -1,6 +1,6 @@
 # ADR-002：消费者按变化路由，不按命令类型路由
 
-- 状态：Accepted
+- 状态：Accepted；“Change”自 [ADR-004](./ADR-004-commits-publish-storage-changes.md) 起指存储变化
 - 日期：2026-10-23
 - 实施：`9d5579c`（播放按变化路由）、`5f54e36`（命令与 Plan 的对应改由测试固定）
 

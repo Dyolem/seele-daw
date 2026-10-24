@@ -45,13 +45,13 @@ EditorPointerInputAdapter       editor/browser   DOM Pointer → 中立的 Point
                                                  Source Tick；构造 Project Command
 → ProjectSession.execute        project-core
     prepareProjectCommand          命令注册表：normalize → 检查 baseRevision → handler 产出 MutationPlan
-    createProjectCommitCandidate   推导 Delta 与 Change
+    createProjectCommitCandidate   Commit 直接发布 Plan 写入的存储变化（ADR-004）
     History / QueryIndex 预备
     MutationApplier                投影 → 一次全量不变量校验 → 写入（ADR-001）
     ChangePublisher                在微任务中通知订阅者
 → 订阅者
     ActiveProjectService → Vue 绑定（Snapshot 按 revision 缓存）
-    ProjectPlaybackCoordinator → PlaybackEngine.commit   按 Change 调和，不看命令类型（ADR-002）
+    ProjectPlaybackCoordinator → PlaybackEngine.commit   按变化调和，不看命令类型（ADR-002）
     GestureSession                 看到自己那次 Commit 的 revision 后，结束交接
 ```
 
@@ -106,7 +106,7 @@ Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 5. `__tests__/command-properties.spec.ts`：加一条用例；缺用例时完整性检查会失败。
 6. Studio：在 `workbench/edits` 中加用例函数，再由界面调用。
 
-播放不需要改，它按 Change 反应。
+播放不需要改，它按存储变化反应。
 
 ### 加一个 Action
 
@@ -129,18 +129,16 @@ category, keywords, keys, resolve })`。新建 actions 文件时，再把它加�
 
 ### 加一种实体（例如 Automation 点）
 
-存储层只需声明，不用写分支（见 ADR-003）：
+存储层只需声明，不用写分支（见 ADR-003、ADR-004）：
 
 1. `model/model-tables.ts`：加一张表，按 ID 存储或按 MIDI Source 分区。`ModelStoreSeed` 随之多出
-   一个必填字段，类型检查会指出初始化器、项目文件归一化和测试夹具里要补的地方。
-2. `mutation/mutation-type.ts` 加这张表的 Mutation 类型名；`mutation/project-mutation.ts` 把它加进
-   `ProjectMutation` 联合，以及 `RECORD_MUTATION_TYPES` 或 `PARTITIONED_MUTATION_TYPES`（分区表另需
-   两个错误码）。Store、投影和 Applier 不用改。
-3. 需要类型化访问器时，在 `ModelStoreReader` 中写一次；也可以直接用 `reader.recordTable('…')`。
+   一个必填字段，类型检查会指出初始化器、项目文件归一化和测试夹具里要补的地方。这张表的变化
+   （`table.op`）、反转、投影与写入随即可用。
+2. 需要类型化访问器时，在 `ModelStoreReader` 中写一次；也可以直接用 `reader.recordTable('…')`。
+3. `__tests__/mutation-plan.spec.ts` 会要求为新表的每种操作补一个变化例子。
 
 其余是领域本身，仍要逐项编写：记录类型与 ID、`model/invariant-validator.ts` 中的不变量、
-`commit/` 中的 Change 类型与推导、Snapshot 字段、`persistence/` 中的项目文件协议与版本迁移，
-以及命令（见上）。
+Snapshot 字段、`persistence/` 中的项目文件协议与版本迁移，以及命令（见上）。
 
 ## 6. 检查
 

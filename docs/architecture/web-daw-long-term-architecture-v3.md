@@ -726,6 +726,9 @@ flowchart TD
 
 ## 19. 类型化 ProjectDelta
 
+> 已实现的做法不同：Commit 发布它写入的存储变化（`{ op, table, ... }`），失效范围由消费者从记录
+> 推导，见 [ADR-004](../adr/ADR-004-commits-publish-storage-changes.md)。下文保留当初的设计。
+
 通用 changedEntityIds 无法告诉播放编译器“哪条轨、哪个区间、为何失效”。使用语义明确的变化：
 
 ```ts

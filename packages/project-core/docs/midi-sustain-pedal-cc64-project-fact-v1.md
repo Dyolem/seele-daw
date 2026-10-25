@@ -159,8 +159,7 @@ Event 的增、删、改是 `midiSustainPedalEvents` 表上的 `insert`、`remov
 状态边界前，消费者的保守失效范围必须从旧 Tick 与新 Tick 的较早者一直向后。Playback 消费者可以通过重新编译更窄窗口优化，但不能假设只需
 刷新 Event 所在的一个瞬间。
 
-MIDI Note QueryIndex 不索引 CC64，因此只推进 revision 而不重建 Note 索引；MIDI Note 局部
-订阅也不接收只含 CC64 变化的 Commit。`project-commit.all` 仍接收全部合法提交。
+Note 查询不读 CC64；MIDI Note 局部订阅也不接收只含 CC64 变化的 Commit。`project-commit.all` 仍接收全部合法提交。
 
 ## 项目文件
 

@@ -372,7 +372,7 @@ describe('MIDI Clip commit and History semantics', () => {
 })
 
 describe('MIDI Clip consumer compatibility', () => {
-  it('adds an empty QueryIndex partition that can immediately receive Note commands', () => {
+  it('adds an empty Note partition that can immediately receive and answer Note commands', () => {
     const { store, session } = createFixtureProjectSession()
     const clipCommand = createCommand(store)
     const clipResult = session.execute(clipCommand)

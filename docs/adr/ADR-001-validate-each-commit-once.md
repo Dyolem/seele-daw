@@ -1,6 +1,6 @@
 # ADR-001：每次提交只做一次全量不变量校验
 
-- 状态：Accepted
+- 状态：Superseded by [ADR-008](./ADR-008-commits-validate-what-they-wrote.md)
 - 日期：2026-10-23
 - 实施：`91e1fef`
 

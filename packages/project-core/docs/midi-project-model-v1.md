@@ -464,7 +464,7 @@ interface TimeSignatureEventRecord {
   Undo / Redo；是否允许当前 UI 编辑由 Tempo Map 与 Transport 产品状态决定；
 - 上述每个 Tempo Event 意图各形成一个 Project Command / History 步骤，并分别发布
   `tempoEvents` 表上的 `insert`、`replace` 或 `remove` 变化；
-- TempoMap 的有序段、累计秒数和查找缓存是 QueryIndex，不进入项目文件。
+- TempoMap 的有序段、累计秒数和查找缓存由播放派生，不进入项目文件。
 
 Timeline 当前不是包含事件数组的大型 Record。两类事件分别进入规范化实体表，时间顺序由 `tick` 派生；项目不保存重复的事件顺序数组或固定的 Timeline 结束 Tick。
 
@@ -585,29 +585,11 @@ Map insertion order 不表达实体表的领域顺序。防御性回滚或 Undo 
 
 测试使用的完整 fixture 会覆盖当前全部实体关系，但它不是项目模板、持久化示例或产品默认状态。
 
-## QueryIndex
+## 查询
 
-建议维护以下可重建索引：
-
-```ts
-interface QueryIndexes {
-  readonly clipsByTrack: Map<TrackId, readonly ClipId[]>
-  readonly clipTimeIndexByTrack: Map<TrackId, ClipTimeIndex>
-  readonly noteIndexBySource: Map<MidiSourceId, MidiNoteIndex>
-  readonly orderedTempoEvents: readonly TempoEventId[]
-  readonly orderedTimeSignatures: readonly TimeSignatureEventId[]
-  readonly deviceOwnerById: Map<DeviceId, DeviceOwner>
-}
-```
-
-规则：
-
-- `clipsByTrack` 按 `[startTick, clipId]` 稳定排序；
-- Track 到 Clip 的正常查询使用索引，不在每次查询时扫描整张 Clip 表；
-- 时间范围 Clip 索引与 Note 的 tick/pitch 索引按产品规模逐步实现；
-- 索引在写入前按提交的变化增量准备，失败时从 ModelStore 全量重建；
-- 索引不持久化、不进入 Undo、不成为第二份关系事实；
-- 重建后的查询结果必须与直接扫描权威实体表一致。
+`session.query` 从当前 Snapshot 回答两种 Note 查询：按 ID（在按 ID 排序的分区里二分查找）与
+按时间和音高范围（每个分区数组各自记忆一个按起点排序的索引）。Snapshot 在 revision 之间共享
+没变的分区，所以没被改过的分区沿用上次的索引；索引不持久化、不进入 Undo，也不在提交时维护。
 
 ## 项目文件
 
@@ -621,8 +603,7 @@ History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelSt
 复制为被动 JSON 数据
 -> 检查版本与结构
 -> 记录工厂校验每条记录
--> 建立 ModelStore 并校验跨实体不变量
--> 重建 QueryIndex，得到 revision 0 的新 Session
+-> 建立 ModelStore 并校验跨实体不变量，得到 revision 0 的新 Session
 ```
 
 只读当前版本，不做迁移。字段、错误码与 Checkpoint 信封见
@@ -648,9 +629,12 @@ History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelSt
 10. 每个 Device Descriptor 恰好拥有一个 Track 或 Master 拓扑位置，所有设备引用都存在。
 11. 所有实体表 key 与记录自身 `id` 相同。
 12. 不存在孤立 Source、Device 或悬空外键。
-13. QueryIndex 可以从当前 ModelStore 丢弃并得到等价重建结果。
 
 单实体的 Tick、MIDI 数值、gain、pan、BPM 和拍号值域由 parser 与 Record 工厂保证；`InvariantValidator` 不为每次全局扫描重复执行全部本地解析。外部文件必须先经过结构检查和记录工厂，形成 ModelStore 后再检查跨实体规则。
+
+提交前的模型总是有效的，所以提交只检查它可能破坏的关系：上面 1–6、9、10 属于编排，每次整体
+检查；7、8 属于内容，只检查写过的 Note、写过的 CC64 分区、被写过的 Source 的全部内容，以及
+插入的 ID（ADR-008）。新建、加载与回滚之后做全量检查。
 
 结构 Validator 接受 `ModelStoreReader`，聚合所有违规并返回稳定排序的 `ModelInvariantViolation`。`assertModelInvariants` 在需要强制合法状态的边界抛出携带完整违规列表的 `ModelInvariantError`。它不修改或自动修复 Store，也不把 Map 插入顺序当作项目语义。
 
@@ -673,7 +657,7 @@ Loop 边界 Note Off / Note On 的排序仍需在 Playback Compiler 实现前确
 
 以下数据不保存为创作事实：
 
-- QueryIndex；
+- 查询索引；
 - Editor Selection、hover、工具状态和拖拽预览；
 - Playhead、Transport 播放状态和 Preview Voice；
 - AudioNode、Worklet 实例、Active Voice 和 Meter；

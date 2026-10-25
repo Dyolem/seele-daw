@@ -20,13 +20,39 @@ import {
   parseTick,
   parseTickDelta,
   type MidiNoteByIdQueryResult,
+  type MidiNoteRecord,
+  type MidiNotesIntersectingRangeQuery,
   type MidiNotesIntersectingRangeQueryResult,
+  type ModelRevision,
   type ProjectQuery,
 } from '#internal/index'
+import type { ModelStore } from '#internal/model/model-store'
 import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
-import { executeProjectQueryByScan } from '#internal/queries/project-query-executor'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { createFixtureProjectSession } from './support/project-session-test-support'
+
+/** The range query answered by scanning the Store, as the oracle for the indexed answer. */
+function scanRange(
+  store: ModelStore,
+  query: MidiNotesIntersectingRangeQuery,
+): { readonly modelRevision: ModelRevision; readonly notes: readonly MidiNoteRecord[] } {
+  const notes = [...store.midiNoteEntries(query.sourceId)]
+    .map(([, note]) => note)
+    .filter(
+      (note) =>
+        note.startTick < query.endTick &&
+        note.startTick + note.durationTick > query.startTick &&
+        note.pitch >= query.minimumPitch &&
+        note.pitch <= query.maximumPitch,
+    )
+    .sort(
+      (left, right) =>
+        left.startTick - right.startTick ||
+        left.pitch - right.pitch ||
+        (left.id < right.id ? -1 : left.id > right.id ? 1 : 0),
+    )
+  return { modelRevision: store.modelRevision, notes }
+}
 
 function createFullSourceRangeQuery(sourceId: ReturnType<typeof parseMidiSourceId>) {
   return createMidiNotesIntersectingRangeQuery({
@@ -59,8 +85,7 @@ describe('ProjectQuery public contract', () => {
     expect(Object.isFrozen(rangeQuery)).toBe(true)
     expectTypeOf(byIdResult).toEqualTypeOf<MidiNoteByIdQueryResult>()
     expectTypeOf(rangeResult).toEqualTypeOf<MidiNotesIntersectingRangeQueryResult>()
-    expect('QueryIndex' in projectCore).toBe(false)
-    expect('executeProjectQueryByScan' in projectCore).toBe(false)
+    expect('executeProjectQuery' in projectCore).toBe(false)
     expect('normalizeProjectQuery' in projectCore).toBe(false)
   })
 
@@ -250,9 +275,9 @@ describe('ProjectSession MIDI Note queries', () => {
     const assertEquivalent = (): void => {
       for (const rangeQuery of rangeQueries) {
         const indexed = session.query(rangeQuery)
-        const scanned = executeProjectQueryByScan(store, rangeQuery)
+        const scanned = scanRange(store, rangeQuery)
 
-        expect(indexed).toEqual(scanned)
+        expect(indexed.modelRevision).toBe(scanned.modelRevision)
         expect(indexed.notes).toEqual(scanned.notes)
         indexed.notes.forEach((note, index) => expect(note).toBe(scanned.notes[index]))
       }
@@ -327,7 +352,7 @@ describe('ProjectSession MIDI Note queries', () => {
     expect(result.note).toBe(before)
   })
 
-  it('restores the previous QueryIndex root when authoritative apply fails', () => {
+  it('keeps answering at the previous revision when authoritative apply fails', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const sourceId = fixture.records.nonLoopSource.id
     const noteId = parseNoteId('note-query-write-failure')
@@ -351,7 +376,7 @@ describe('ProjectSession MIDI Note queries', () => {
             'id' in value &&
             value.id === noteId
           ) {
-            throw new Error('injected QueryIndex write failure')
+            throw new Error('injected Store write failure')
           }
         },
         () => session.execute(command),

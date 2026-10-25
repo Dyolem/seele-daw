@@ -156,9 +156,11 @@ active / cancel 生命周期已经由 Browser Input Adapter 和 Studio Surface �
 
 它持有 Undo/Redo 栈、当前位置和 merge session。调用顺序会改变后续行为，实例内部状态具有持续性。
 
-### QueryIndex
+### 查询索引不是 Class
 
-它持有可重建但可变的索引，并需要在 apply、rebuild 和 fault recovery 之间保持一致状态。
+范围查询需要按起点排序的索引。它曾是一个随每次提交更新、带 prepare / stage / rollback 的
+Class。现在它是以 Snapshot 分区数组为键的 `WeakMap`：输入不可变，没改过的分区在下一份
+Snapshot 中是同一个数组，缓存于是不需要生命周期、失效协议或故障恢复（ADR-008）。
 
 ### ProjectSession
 
@@ -344,7 +346,7 @@ Seele DAW 当前选择数据导向的 Project Model，是由具体约束决定�
 | `ProjectSession`                   | Class                         | 会话生命周期、依赖组合、故障状态   |
 | `ModelStore`                       | Class                         | 私有 Map、revision、唯一写权限     |
 | `HistoryController`                | Class                         | Undo/Redo 栈和 merge 状态          |
-| `QueryIndex`                       | Class                         | 可变缓存、重建和故障恢复           |
+| 查询索引                           | 以不可变输入为键的 `WeakMap`  | 输入不变，缓存就不需要生命周期     |
 | `NoteDragSession`                  | Class                         | 多事件手势状态、commit/cancel 协议 |
 | Renderer                           | Class 或封装状态的模块        | Viewport、缓存、资源和批次生命周期 |
 | `NoteRenderPrimitive`              | 临时 readonly Record          | 一帧或一批的绘制输入               |
@@ -492,7 +494,7 @@ External Boundaries
 - `MidiNoteRecord`、`MidiSourceRecord`、`MidiClipRecord` 和 `MidiLoop` 保持为只读数据；
 - 本地构造使用模块函数；
 - 跨实体行为进入 Command handler 和 InvariantValidator；
-- `ModelStore`、`ProjectSession`、`HistoryController`、`QueryIndex` 和 Editor gesture session 是 Class 的主要候选；
+- `ModelStore`、`ProjectSession`、`HistoryController` 和 Editor gesture session 是 Class 的主要候选；
 - 不创建只有静态方法、仅充当命名空间的实体 Class。
 
 最终判断标准不是“哪种写法更像面向对象”，而是：

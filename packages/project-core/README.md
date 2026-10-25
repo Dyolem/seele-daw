@@ -32,9 +32,9 @@ execute(command)
 → prepareProjectCommand   normalize；检查 baseRevision；handler 读取当前记录，产出 MutationPlan
                           （forward 变化与工厂生成的 inverse），或 no-change
 → commit candidate        下一个 revision、origin，changes 即 plan.forward
-→ History、QueryIndex、ChangePublisher 预备
-→ MutationApplier         在写时复制的投影上检查每条变化的前置条件，做一次全量不变量校验
-                          （ADR-001），再写入；revision 最后写
+→ History、ChangePublisher 预备
+→ MutationApplier         在只记录写入的投影上检查每条变化的前置条件，校验编排与写过的
+                          内容（ADR-008），再写入；revision 最后写
 → 返回结果；订阅者在微任务中收到 Commit
 ```
 
@@ -63,11 +63,17 @@ execute(command)
 | `insert` / `remove`                     | `trackOrder`                                     | `index` 与 `trackId`                            |
 
 命令产出这些变化，History 重放它们的反转，Commit 原样发布写入的那些（ADR-004）。消费者按表
-读取：播放看有没有 `tempoEvents` 变化，QueryIndex 与 Note 订阅只读 `midiNotes`。新增一张表时，
+读取：播放看有没有 `tempoEvents` 变化，Note 订阅只读 `midiNotes`。新增一张表时，
 变化词汇、反转、投影与写入都随表定义生效（ADR-003）。
 
 跨实体规则（外键、唯一所有权、Source 范围、Timeline 初始事件、Device 拓扑）只由
-`model/invariant-validator.ts` 判断；单条记录的值域由各自的记录工厂判断。
+`model/invariant-validator.ts` 判断；单条记录的值域由各自的记录工厂判断。提交前的模型总是
+有效的，所以提交只校验它可能破坏的关系：编排（Track、Clip、Source、Device、Timeline 事件、
+Track 顺序与分区是否存在）每次整体检查；分区里的内容只检查写过的 Note、写过的 CC64 分区、
+被写过的 Source 的全部内容，以及插入的 ID 是否唯一（ADR-008）。新建、加载与回滚之后做全量校验。
+
+查询（`session.query`）从当前 Snapshot 回答：按 ID 在分区里二分查找，按范围查询用每个分区
+数组各自记忆的索引，没被改过的分区沿用上次的索引。提交不为查询做任何事。
 
 ## 持久化
 
@@ -92,7 +98,7 @@ src/
 ├── commit/         ProjectCommit 与候选
 ├── session/        ProjectSession 与提交编排
 ├── history/        Undo / Redo
-├── queries/        QueryIndex 与查询
+├── queries/        从 Snapshot 回答的查询
 ├── subscriptions/  ChangePublisher 与订阅过滤
 ├── snapshots/      Snapshot
 ├── persistence/    项目文件（字段表与解码器）与 Checkpoint
@@ -106,7 +112,8 @@ src/
 
 - `command-properties.spec.ts`：每种命令只改自己点名的实体，Undo / Redo 精确往返（ADR-002）；
 - `mutation-applier.spec.ts`：每种表与操作的真实写入等于投影；
-- `mutation-plan.spec.ts`：从表定义生成全部 `table.op`，逐一检查反转。
+- `mutation-plan.spec.ts`：从表定义生成全部 `table.op`，逐一检查反转；
+- `written-model-invariants.spec.ts`：随机变化序列上，提交校验与全量校验报告相同的违规。
 
 提交成本基准：`pnpm --filter @seele-daw/project-core bench`。
 

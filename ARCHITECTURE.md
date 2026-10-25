@@ -46,8 +46,8 @@ EditorPointerInputAdapter       editor/browser   DOM Pointer → 中立的 Point
 → ProjectSession.execute        project-core
     prepareProjectCommand          命令注册表：normalize → 检查 baseRevision → handler 产出 MutationPlan
     createProjectCommitCandidate   Commit 直接发布 Plan 写入的存储变化（ADR-004）
-    History / QueryIndex 预备
-    MutationApplier                投影 → 一次全量不变量校验 → 写入（ADR-001）
+    History 预备
+    MutationApplier                投影 → 校验编排与写过的内容 → 写入（ADR-008）
     ChangePublisher                在微任务中通知订阅者
 → 订阅者
     ActiveProjectService → Vue 绑定（Snapshot 按 revision 缓存）
@@ -143,7 +143,9 @@ category, keywords, keys, resolve })`。新建 actions 文件时，再把它加�
 4. `__tests__/mutation-plan.spec.ts` 会要求为新表的每种操作补一个变化例子。
 
 其余是领域本身，仍要逐项编写：记录类型与 ID、`model/invariant-validator.ts` 中的不变量，
-以及命令（见上）。
+以及命令（见上）。不变量要先定规模：编排表每次提交整体检查；内容表（随音乐增长、按 Source
+分区）只检查写过的部分，所以每条关系都要写清从写过的记录出发怎么查，并让
+`written-model-invariants.spec.ts` 的生成器能写出破坏它的变化（ADR-008）。
 
 ## 6. 检查
 

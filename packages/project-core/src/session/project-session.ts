@@ -16,7 +16,7 @@ import {
 import type { ModelRevision } from '#internal/model/model-revision'
 import { ModelStore } from '#internal/model/model-store'
 import { MutationApplier } from '#internal/mutation/mutation-applier'
-import { QueryIndex, type PreparedQueryIndexTransition } from '#internal/queries/query-index'
+import { executeProjectQuery } from '#internal/queries/project-query-executor'
 import type { ProjectQuery, ProjectQueryResultFor } from '#internal/queries/project-query'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
@@ -68,15 +68,11 @@ class ProjectSessionImpl implements ProjectSession {
   readonly #store: ModelStore
   readonly #applier: MutationApplier
   readonly #history = new HistoryController()
-  readonly #queryIndex: QueryIndex
   readonly #changePublisher = new ChangePublisher()
   readonly #snapshots = new ProjectSnapshots()
 
   constructor(store: ModelStore) {
     this.#store = store
-    this.#queryIndex = new QueryIndex(store)
-    // Claim the unique writer only after every other fallible Session component
-    // has constructed successfully, so a failed composition does not strand the Store.
     this.#applier = new MutationApplier(store)
   }
 
@@ -101,7 +97,7 @@ class ProjectSessionImpl implements ProjectSession {
   }
 
   query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query> {
-    return this.#queryIndex.execute(this.#store, query)
+    return executeProjectQuery(this.getSnapshot(), query)
   }
 
   subscribe(
@@ -127,9 +123,7 @@ class ProjectSessionImpl implements ProjectSession {
       commit.origin.commandType,
       preparation.plan,
     )
-    const queryTransition = this.#queryIndex.prepare(this.#store, commit)
-
-    return this.#applySessionTransition(historyTransition, queryTransition, commit, result)
+    return this.#applySessionTransition(historyTransition, commit, result)
   }
 
   undo(): ProjectCommit | null {
@@ -144,9 +138,7 @@ class ProjectSessionImpl implements ProjectSession {
       },
       historyTransition.plan,
     )
-    const queryTransition = this.#queryIndex.prepare(this.#store, commit)
-
-    return this.#applySessionTransition(historyTransition, queryTransition, commit, commit)
+    return this.#applySessionTransition(historyTransition, commit, commit)
   }
 
   redo(): ProjectCommit | null {
@@ -161,31 +153,20 @@ class ProjectSessionImpl implements ProjectSession {
       },
       historyTransition.plan,
     )
-    const queryTransition = this.#queryIndex.prepare(this.#store, commit)
-
-    return this.#applySessionTransition(historyTransition, queryTransition, commit, commit)
+    return this.#applySessionTransition(historyTransition, commit, commit)
   }
 
   #applySessionTransition<Result>(
     historyTransition: PreparedHistoryTransition,
-    queryTransition: PreparedQueryIndexTransition,
     commit: ProjectCommit,
     result: Result,
   ): Result {
     const publication = this.#changePublisher.prepare(commit)
 
     try {
-      queryTransition.stage()
-    } catch (error) {
-      publication.cancel()
-      throw error
-    }
-
-    try {
       historyTransition.stage()
     } catch (error) {
       publication.cancel()
-      queryTransition.rollback()
       throw error
     }
 
@@ -194,11 +175,10 @@ class ProjectSessionImpl implements ProjectSession {
     } catch (error) {
       publication.cancel()
       historyTransition.rollback()
-      queryTransition.rollback()
       throw error
     }
 
-    // History, QueryIndex, Commit/result objects, and the gated publication all exist
+    // History, Commit/result objects, and the gated publication all exist
     // before apply. A successful revision write is followed only by noting what it touched.
     this.#snapshots.noteChanges(commit.changes)
     return result

@@ -24,10 +24,7 @@ import {
   type ProjectCommit,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { MutationApplier } from '#internal/mutation/mutation-applier'
-import { QueryIndex } from '#internal/queries/query-index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { describeChanges, requireChange } from './support/project-change-test-support'
 import { requireReadyProjectCommandPlan } from './support/project-command-test-support'
@@ -320,33 +317,22 @@ describe('Instrument Track commit and History semantics', () => {
 })
 
 describe('Instrument Track consumer compatibility', () => {
-  it('advances the Note QueryIndex revision without changing Note results', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const index = new QueryIndex(store)
+  it('advances the Note query revision without changing Note results', () => {
+    const { fixture, store, session } = createFixtureProjectSession()
     const query = createMidiNoteByIdQuery({
       sourceId: fixture.records.nonLoopSource.id,
       noteId: fixture.records.nonLoopNote.id,
     })
-    const before = index.execute(store, query)
-    const command = createCommand(store)
-    const preparation = prepareProjectCommand(store, command)
-    const plan = requireReadyProjectCommandPlan(preparation)
+    const before = session.query(query)
+    const result = session.execute(createCommand(store))
 
-    if (preparation.status !== 'ready') {
-      throw new Error('Expected a ready Instrument Track command preparation')
+    if (result.status !== PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED) {
+      throw new Error('Expected the Instrument Track command to commit')
     }
 
-    const commit = createProjectCommitCandidate(preparation.command, plan)
-    const transition = index.prepare(store, commit)
+    const after = session.query(query)
 
-    transition.stage()
-    new MutationApplier(store).apply(plan)
-
-    const after = index.execute(store, query)
-
-    expect(index.modelRevision).toBe(commit.modelRevision)
-    expect(after.modelRevision).toBe(commit.modelRevision)
+    expect(after.modelRevision).toBe(result.commit.modelRevision)
     expect(after.note).toBe(before.note)
   })
 

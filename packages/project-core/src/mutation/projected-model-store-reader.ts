@@ -1,11 +1,12 @@
 /**
  * Builds a copy-on-write ModelStoreReader that previews a complete change sequence.
  * Local storage preconditions are checked per change; cross-entity invariants are
- * checked once after the final projected state exists. The base reader is never mutated.
+ * checked once after the final projected state exists. The base reader is never mutated,
+ * and the projection holds only what the changes wrote, never a copy of a table or partition.
  */
 import type { MasterChannelRecord } from '#internal/model/channel'
 import type { MidiSourceId, TrackId } from '#internal/model/ids'
-import { assertModelInvariants } from '#internal/model/invariant-validator'
+import { assertWrittenModelInvariants } from '#internal/model/invariant-validator'
 import type { ModelRevision } from '#internal/model/model-revision'
 import { ModelStoreReader } from '#internal/model/model-store'
 import {
@@ -56,15 +57,26 @@ function rejectPrecondition(
   throw new MutationPreconditionError(code, context.index, context.change, detail)
 }
 
-/** A copy-on-write view of one record table. */
+/**
+ * A copy-on-write view of records keyed by ID: a record table, or one partition. Entries keep
+ * the order the Store's Map would have after the same writes: replacements stay in place,
+ * inserts append, and a removed record inserted again moves to the end.
+ */
 class ProjectedRecordTable implements RecordTableView<StoredRecord> {
-  readonly #entityName: string
+  /** Names one record in errors, e.g. "MIDI Note source-1/note-1". */
+  readonly #describe: (id: string) => string
   readonly #base: RecordTableView<StoredRecord>
   readonly #patches = new Map<string, TablePatch<StoredRecord>>()
+  #sizeChange = 0
 
-  constructor(entityName: string, base: RecordTableView<StoredRecord>) {
-    this.#entityName = entityName
+  constructor(describe: (id: string) => string, base: RecordTableView<StoredRecord>) {
+    this.#describe = describe
     this.#base = base
+  }
+
+  /** Records inserted minus records removed. */
+  get sizeChange(): number {
+    return this.#sizeChange
   }
 
   get(id: string): StoredRecord | undefined {
@@ -115,13 +127,14 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
       rejectPrecondition(
         'insert-target-exists',
         context,
-        `cannot insert existing ${this.#entityName} ${after.id}`,
+        `cannot insert existing ${this.#describe(after.id)}`,
       )
     }
 
     // Deleting first makes a delete-then-insert move to the real Map append position.
     this.#patches.delete(after.id)
     this.#patches.set(after.id, { position: 'append', value: after })
+    this.#sizeChange += 1
   }
 
   #remove(before: StoredRecord, context: ChangeContext): void {
@@ -132,6 +145,7 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
     } else {
       this.#patches.set(before.id, DELETED)
     }
+    this.#sizeChange -= 1
   }
 
   #replace(before: StoredRecord, after: StoredRecord, context: ChangeContext): void {
@@ -151,7 +165,7 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
       rejectPrecondition(
         'target-missing',
         context,
-        `cannot ${verb} missing ${this.#entityName} ${before.id}`,
+        `cannot ${verb} missing ${this.#describe(before.id)}`,
       )
     }
 
@@ -159,15 +173,17 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
       rejectPrecondition(
         'before-reference-mismatch',
         context,
-        `${this.#entityName} ${before.id} no longer matches the expected before record`,
+        `${this.#describe(before.id)} no longer matches the expected before record`,
       )
     }
   }
 }
 
 interface ProjectedPartition {
+  /** `base` while the Store already holds the partition, `append` once this projection made it. */
   readonly position: EntryPosition
-  readonly records: Map<string, StoredRecord>
+  readonly baseSize: number
+  readonly records: ProjectedRecordTable
 }
 
 type PartitionPatch = ProjectedPartition | typeof DELETED
@@ -219,6 +235,13 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
     yield* this.#base.entries(partitionId)
   }
 
+  size(partitionId: MidiSourceId): number {
+    const patch = this.#patches.get(partitionId)
+    if (patch === DELETED) return 0
+    if (patch !== undefined) return patch.baseSize + patch.records.sizeChange
+    return this.#base.size(partitionId)
+  }
+
   insertPartition(
     partitionId: MidiSourceId,
     records: readonly StoredRecord[],
@@ -244,7 +267,14 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
       table.set(record.id, record)
     }
     this.#patches.delete(partitionId)
-    this.#patches.set(partitionId, { position: 'append', records: table })
+    this.#patches.set(partitionId, {
+      position: 'append',
+      baseSize: table.size,
+      records: new ProjectedRecordTable(this.#describer(partitionId), {
+        get: (id) => table.get(id),
+        entries: () => table.entries(),
+      }),
+    })
   }
 
   removePartition(
@@ -278,58 +308,15 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
     after: StoredRecord | undefined,
     context: ChangeContext,
   ): void {
-    const table = this.#mutable(partitionId, context)
-
-    if (before === undefined) {
-      if (table.has(after!.id)) {
-        rejectPrecondition(
-          'insert-target-exists',
-          context,
-          `cannot insert existing ${this.#entity} ${partitionId}/${after!.id}`,
-        )
-      }
-      table.set(after!.id, after!)
-      return
-    }
-
-    this.#requireCurrent(
-      table,
-      partitionId,
-      before,
-      after === undefined ? 'remove' : 'replace',
-      context,
-    )
-    if (after === undefined) table.delete(before.id)
-    else table.set(before.id, after)
+    this.#editable(partitionId, context).write(before, after, context)
   }
 
-  #requireCurrent(
-    table: Map<string, StoredRecord>,
-    partitionId: MidiSourceId,
-    before: StoredRecord,
-    verb: 'remove' | 'replace',
-    context: ChangeContext,
-  ): void {
-    const entity = this.#entity
-    const current = table.get(before.id)
-    if (current === undefined) {
-      rejectPrecondition(
-        'target-missing',
-        context,
-        `cannot ${verb} missing ${entity} ${partitionId}/${before.id}`,
-      )
-    }
-    if (current !== before) {
-      rejectPrecondition(
-        'before-reference-mismatch',
-        context,
-        `${entity} ${partitionId}/${before.id} no longer matches the expected before record`,
-      )
-    }
+  #describer(partitionId: MidiSourceId): (id: string) => string {
+    return (id) => `${this.#entity} ${partitionId}/${id}`
   }
 
-  /** The projected records of one partition, copied from the base the first time it is edited. */
-  #mutable(partitionId: MidiSourceId, context: ChangeContext): Map<string, StoredRecord> {
+  /** The projected records of one partition; the first edit overlays the base partition. */
+  #editable(partitionId: MidiSourceId, context: ChangeContext): ProjectedRecordTable {
     const patch = this.#patches.get(partitionId)
     if (patch !== undefined && patch !== DELETED) return patch.records
     if (patch === DELETED || !this.#base.has(partitionId)) {
@@ -339,9 +326,17 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
         `${this.#entity} partition ${partitionId} does not exist`,
       )
     }
-    const table = new Map(this.#base.entries(partitionId))
-    this.#patches.set(partitionId, { position: 'base', records: table })
-    return table
+    const base = this.#base
+    const records = new ProjectedRecordTable(this.#describer(partitionId), {
+      get: (id) => base.get(partitionId, id),
+      entries: () => base.entries(partitionId),
+    })
+    this.#patches.set(partitionId, {
+      position: 'base',
+      baseSize: base.size(partitionId),
+      records,
+    })
+    return records
   }
 
   #matches(partitionId: MidiSourceId, before: readonly StoredRecord[]): boolean {
@@ -356,6 +351,14 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
   }
 }
 
+function emptyWrittenContent() {
+  return {
+    sources: new Set<MidiSourceId>(),
+    records: mapTables(PARTITIONED_TABLE_NAMES, () => new Map<MidiSourceId, Set<string>>()),
+    insertedIds: mapTables(PARTITIONED_TABLE_NAMES, () => new Set<string>()),
+  }
+}
+
 export class ProjectedModelStoreReader extends ModelStoreReader {
   readonly #base: ModelStoreReader
   #project: ProjectRecord
@@ -366,18 +369,22 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
   readonly #partitions: Readonly<Record<PartitionedTableName, ProjectedPartitionedTable>>
   readonly #recordViews: RecordTableViews
   readonly #partitionedViews: PartitionedTableViews
+  readonly #written = emptyWrittenContent()
 
-  /** Changes must be the normalized forward entries produced by createMutationPlan. */
+  /**
+   * Changes must be the normalized forward entries produced by createMutationPlan, and the base
+   * must be valid: only what the changes wrote is validated.
+   */
   constructor(base: ModelStoreReader, changes: readonly ProjectChange[]) {
     super()
     this.#base = base
     this.#project = base.project
     this.#master = base.master
 
-    this.#records = mapTables(
-      RECORD_TABLE_NAMES,
-      (name) => new ProjectedRecordTable(RECORD_TABLES[name].entity, base.recordTable(name)),
-    )
+    this.#records = mapTables(RECORD_TABLE_NAMES, (name) => {
+      const { entity } = RECORD_TABLES[name]
+      return new ProjectedRecordTable((id) => `${entity} ${id}`, base.recordTable(name))
+    })
     this.#partitions = mapTables(
       PARTITIONED_TABLE_NAMES,
       (name) =>
@@ -396,7 +403,7 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
     changes.forEach((change, index) => this.#applyChange(change, index))
 
     // Intermediate steps may be relationally incomplete; only the final view is validated.
-    assertModelInvariants(this)
+    assertWrittenModelInvariants(this, this.#written)
   }
 
   get modelRevision(): ModelRevision {
@@ -469,6 +476,38 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
     trackOrder.splice(index, 1)
   }
 
+  /** Remembers the content a change wrote, so validation can stay with it. */
+  #noteWritten(change: ProjectChange): void {
+    const written = this.#written
+
+    if (change.table === 'midiSources') {
+      written.sources.add(change.op === 'remove' ? change.before.id : change.after.id)
+      return
+    }
+
+    if (!('sourceId' in change)) return
+
+    const insertedIds = written.insertedIds[change.table]
+
+    if (change.op === 'insert-partition') {
+      written.sources.add(change.sourceId)
+      for (const record of change.records) insertedIds.add(record.id)
+      return
+    }
+
+    if (change.op === 'remove-partition') return
+
+    const records = written.records[change.table]
+    let ids = records.get(change.sourceId)
+    if (ids === undefined) records.set(change.sourceId, (ids = new Set()))
+    if (change.op === 'insert') {
+      ids.add(change.after.id)
+      insertedIds.add(change.after.id)
+    } else {
+      ids.add(change.before.id)
+    }
+  }
+
   #applyChange(change: ProjectChange, index: number): void {
     const context = { index, change: changeLabel(change) }
 
@@ -515,6 +554,7 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
             context,
           )
         }
+        this.#noteWritten(change)
     }
   }
 }

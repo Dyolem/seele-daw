@@ -1,5 +1,5 @@
-// Run with `pnpm --filter @seele-daw/project-core bench`. Backs ADR-001: what one small commit
-// costs on a large project, and how much of it is full invariant validation.
+// Run with `pnpm --filter @seele-daw/project-core bench`. Backs ADR-008: one small commit on a
+// large project costs what it writes, while a full invariant validation costs the whole project.
 import {
   DEVICE_DEFINITION_VERSION_MIN,
   createAddInstrumentTrackCollectionCommand,

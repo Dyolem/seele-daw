@@ -158,6 +158,7 @@ function partitionedView(partitions: PartitionedContainer): PartitionedTableView
       const table = partitions.get(sourceId)
       if (table !== undefined) yield* table.entries()
     },
+    size: (sourceId: MidiSourceId) => partitions.get(sourceId)?.size ?? 0,
   })
 }
 

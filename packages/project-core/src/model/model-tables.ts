@@ -90,6 +90,8 @@ export interface PartitionedTableView<RecordType extends StoredRecord> {
   partitionIds(): IterableIterator<MidiSourceId>
   get(sourceId: MidiSourceId, id: RecordType['id']): RecordType | undefined
   entries(sourceId: MidiSourceId): IterableIterator<readonly [RecordType['id'], RecordType]>
+  /** How many records the partition holds; 0 when it does not exist. */
+  size(sourceId: MidiSourceId): number
 }
 
 export type RecordTableViews = {

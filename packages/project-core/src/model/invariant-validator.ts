@@ -1,13 +1,21 @@
 /**
- * Validates cross-entity invariants across the normalized project model.
+ * Validates the relations between records that record factories cannot check alone.
  *
- * Parsers and record factories enforce local value validity; this module inspects the
- * relationships that can only be verified with a complete ModelStore view. Validation
- * is read-only: it returns deterministic diagnostics and never mutates or repairs data.
+ * The arrangement — Tracks, Clips, MIDI Sources, Devices, timeline events, the Track order and
+ * which partitions exist — grows with the number of Tracks and Clips, so it is always checked
+ * whole. Content, the records inside MIDI Source partitions, grows with the music. A full
+ * validation checks all of it; a commit checks only the content it wrote, because it starts
+ * from a valid model. Validation is read-only and its diagnostics are deterministic.
  */
 import type { MidiClipRecord } from './midi-clip'
 import type { MidiSourceRecord } from './midi-source'
 import type { ModelStoreReader } from './model-store'
+import {
+  PARTITIONED_TABLE_NAMES,
+  type PartitionedTableName,
+  type PartitionedTableView,
+  type StoredRecord,
+} from './model-tables'
 import type {
   DeviceId,
   MidiSourceId,
@@ -17,6 +25,7 @@ import type {
   TimeSignatureEventId,
   TrackId,
 } from './ids'
+import type { MidiNoteRecord } from './midi-note'
 import type { TempoEventRecord } from '#internal/time/tempo-event'
 import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
 
@@ -83,6 +92,18 @@ export class ModelInvariantError extends Error {
   }
 }
 
+/** The content a set of changes wrote, as the projection that applied them records it. */
+export interface WrittenContent {
+  /** MIDI Sources whose record was written or whose partitions were inserted or removed. */
+  readonly sources: ReadonlySet<MidiSourceId>
+  /** Partition records written one at a time, by table and MIDI Source. */
+  readonly records: {
+    readonly [Name in PartitionedTableName]: ReadonlyMap<MidiSourceId, ReadonlySet<string>>
+  }
+  /** The IDs each partitioned table gained, one at a time or with a new partition. */
+  readonly insertedIds: { readonly [Name in PartitionedTableName]: ReadonlySet<string> }
+}
+
 type ViolationList = ModelInvariantViolation[]
 
 interface DeviceReference {
@@ -90,14 +111,9 @@ interface DeviceReference {
   readonly slot: string
 }
 
-interface NoteOccurrence {
+interface RecordOccurrence {
   readonly sourceId: MidiSourceId
-  readonly tableKey: NoteId
-}
-
-interface SustainPedalEventOccurrence {
-  readonly sourceId: MidiSourceId
-  readonly tableKey: MidiSustainPedalEventId
+  readonly tableKey: string
 }
 
 interface SustainPedalEventsAtPosition {
@@ -105,6 +121,19 @@ interface SustainPedalEventsAtPosition {
   readonly channel: number
   readonly eventIds: MidiSustainPedalEventId[]
 }
+
+/** How the duplicate-ID diagnostics of one partitioned table name its records. */
+const ID_DUPLICATE_DIAGNOSTICS = Object.freeze({
+  midiNotes: { code: 'note-id-duplicate', kind: 'midi-note', label: 'MIDI Note' },
+  midiSustainPedalEvents: {
+    code: 'sustain-pedal-event-id-duplicate',
+    kind: 'midi-sustain-pedal-event',
+    label: 'MIDI Sustain Pedal Event',
+  },
+} as const satisfies Record<
+  PartitionedTableName,
+  { readonly code: ModelInvariantCode; readonly kind: ModelEntityKind; readonly label: string }
+>)
 
 function compareStrings(left: string, right: string): number {
   if (left < right) {
@@ -291,7 +320,8 @@ function validateClips(
   return clipIdsBySource
 }
 
-function validateMidiSourceContent(
+/** Each Source has one Clip and both partitions, and each partition has its Source. */
+function validateMidiSources(
   model: ModelStoreReader,
   clipIdsBySource: ReadonlyMap<MidiSourceId, readonly string[]>,
   violations: ViolationList,
@@ -327,13 +357,8 @@ function validateMidiSourceContent(
     }
   }
 
-  const noteOccurrencesById = new Map<NoteId, NoteOccurrence[]>()
-
-  // A partition key expresses Source ownership, so bounds are validated against that Source.
   for (const sourceId of model.midiNotePartitionIds()) {
-    const source = model.getMidiSource(sourceId)
-
-    if (source === undefined) {
+    if (model.getMidiSource(sourceId) === undefined) {
       addViolation(
         violations,
         'note-partition-missing-midi-source',
@@ -341,61 +366,10 @@ function validateMidiSourceContent(
         [subject('midi-note-partition', sourceId), subject('midi-source', sourceId)],
       )
     }
-
-    for (const [noteTableKey, note] of model.midiNoteEntries(sourceId)) {
-      if (noteTableKey !== note.id) {
-        addTableKeyMismatch(violations, 'MIDI Note', 'midi-note', noteTableKey, note.id)
-      }
-
-      const occurrences = noteOccurrencesById.get(note.id)
-      const occurrence = { sourceId, tableKey: noteTableKey }
-
-      if (occurrences === undefined) {
-        noteOccurrencesById.set(note.id, [occurrence])
-      } else {
-        occurrences.push(occurrence)
-      }
-
-      if (source !== undefined) {
-        const noteEndTick = note.startTick + note.durationTick
-
-        if (!Number.isSafeInteger(noteEndTick) || noteEndTick > source.lengthTick) {
-          addViolation(
-            violations,
-            'note-outside-midi-source',
-            `MIDI Note ${note.id} ends at Tick ${noteEndTick} beyond Source ${source.id} length ${source.lengthTick}`,
-            [subject('midi-note', note.id), subject('midi-source', source.id)],
-          )
-        }
-      }
-    }
   }
-
-  // Note IDs stay project-wide unique even though physical storage is partitioned by Source.
-  for (const [noteId, occurrences] of noteOccurrencesById) {
-    if (occurrences.length > 1) {
-      const occurrenceLabels = occurrences
-        .map(({ sourceId, tableKey }) => `${sourceId}/${tableKey}`)
-        .sort(compareStrings)
-
-      addViolation(
-        violations,
-        'note-id-duplicate',
-        `MIDI Note ID ${noteId} appears ${occurrences.length} times: ${occurrenceLabels.join(', ')}`,
-        [
-          subject('midi-note', noteId),
-          ...occurrences.map(({ sourceId }) => subject('midi-source', sourceId)),
-        ],
-      )
-    }
-  }
-
-  const eventOccurrencesById = new Map<MidiSustainPedalEventId, SustainPedalEventOccurrence[]>()
 
   for (const sourceId of model.midiSustainPedalEventPartitionIds()) {
-    const source = model.getMidiSource(sourceId)
-
-    if (source === undefined) {
+    if (model.getMidiSource(sourceId) === undefined) {
       addViolation(
         violations,
         'sustain-pedal-event-partition-missing-midi-source',
@@ -403,85 +377,6 @@ function validateMidiSourceContent(
         [subject('midi-sustain-pedal-event-partition', sourceId), subject('midi-source', sourceId)],
       )
     }
-
-    const eventsByTickAndChannel = new Map<string, SustainPedalEventsAtPosition>()
-
-    for (const [eventTableKey, event] of model.midiSustainPedalEventEntries(sourceId)) {
-      if (eventTableKey !== event.id) {
-        addTableKeyMismatch(
-          violations,
-          'MIDI Sustain Pedal Event',
-          'midi-sustain-pedal-event',
-          eventTableKey,
-          event.id,
-        )
-      }
-
-      const occurrences = eventOccurrencesById.get(event.id)
-      const occurrence = { sourceId, tableKey: eventTableKey }
-
-      if (occurrences === undefined) {
-        eventOccurrencesById.set(event.id, [occurrence])
-      } else {
-        occurrences.push(occurrence)
-      }
-
-      if (source !== undefined && event.tick > source.lengthTick) {
-        addViolation(
-          violations,
-          'sustain-pedal-event-outside-midi-source',
-          `MIDI Sustain Pedal Event ${event.id} occurs at Tick ${event.tick} beyond Source ${source.id} length ${source.lengthTick}`,
-          [subject('midi-sustain-pedal-event', event.id), subject('midi-source', source.id)],
-        )
-      }
-
-      const tickAndChannelKey = `${event.tick}\u0000${event.channel}`
-      const samePositionEvents = eventsByTickAndChannel.get(tickAndChannelKey)
-
-      if (samePositionEvents === undefined) {
-        eventsByTickAndChannel.set(tickAndChannelKey, {
-          tick: event.tick,
-          channel: event.channel,
-          eventIds: [event.id],
-        })
-      } else {
-        samePositionEvents.eventIds.push(event.id)
-      }
-    }
-
-    for (const { tick, channel, eventIds } of eventsByTickAndChannel.values()) {
-      if (eventIds.length < 2) continue
-
-      const sortedEventIds = [...eventIds].sort(compareStrings)
-
-      addViolation(
-        violations,
-        'sustain-pedal-event-duplicate-tick-channel',
-        `MIDI Sustain Pedal Events ${sortedEventIds.join(', ')} share Tick ${tick} and Channel ${channel} in Source ${sourceId}`,
-        [
-          subject('midi-source', sourceId),
-          ...sortedEventIds.map((eventId) => subject('midi-sustain-pedal-event', eventId)),
-        ],
-      )
-    }
-  }
-
-  for (const [eventId, occurrences] of eventOccurrencesById) {
-    if (occurrences.length < 2) continue
-
-    const occurrenceLabels = occurrences
-      .map(({ sourceId, tableKey }) => `${sourceId}/${tableKey}`)
-      .sort(compareStrings)
-
-    addViolation(
-      violations,
-      'sustain-pedal-event-id-duplicate',
-      `MIDI Sustain Pedal Event ID ${eventId} appears ${occurrences.length} times: ${occurrenceLabels.join(', ')}`,
-      [
-        subject('midi-sustain-pedal-event', eventId),
-        ...occurrences.map(({ sourceId }) => subject('midi-source', sourceId)),
-      ],
-    )
   }
 }
 
@@ -619,30 +514,8 @@ function validateDevices(model: ModelStoreReader, violations: ViolationList): vo
   // Slot-role compatibility needs Device Definitions; unknown implementations must remain loadable.
 }
 
-function compareViolations(left: ModelInvariantViolation, right: ModelInvariantViolation): number {
-  const codeComparison = compareStrings(left.code, right.code)
-
-  if (codeComparison !== 0) {
-    return codeComparison
-  }
-
-  const messageComparison = compareStrings(left.message, right.message)
-
-  if (messageComparison !== 0) {
-    return messageComparison
-  }
-
-  const leftSubjects = left.subjects.map(({ kind, id }) => `${kind}:${id}`).join('|')
-  const rightSubjects = right.subjects.map(({ kind, id }) => `${kind}:${id}`).join('|')
-
-  return compareStrings(leftSubjects, rightSubjects)
-}
-
-export function validateModelInvariants(
-  model: ModelStoreReader,
-): readonly ModelInvariantViolation[] {
-  const violations: ViolationList = []
-
+/** Every relation outside the partitions' records. */
+function validateArrangement(model: ModelStoreReader, violations: ViolationList): void {
   // Local scalar validity belongs to entity factories; this pass only checks model-wide relations.
   validateTableKeys(model.trackEntries(), 'Track', 'track', violations)
   validateTableKeys(model.clipEntries(), 'Clip', 'clip', violations)
@@ -650,9 +523,7 @@ export function validateModelInvariants(
   validateTableKeys(model.deviceEntries(), 'Device', 'device', violations)
 
   validateTrackOrder(model, violations)
-
-  const clipIdsBySource = validateClips(model, violations)
-  validateMidiSourceContent(model, clipIdsBySource, violations)
+  validateMidiSources(model, validateClips(model, violations), violations)
 
   validateTimelineEvents<TempoEventId, TempoEventRecord>(
     model.tempoEventEntries(),
@@ -672,13 +543,274 @@ export function validateModelInvariants(
   )
 
   validateDevices(model, violations)
+}
+
+/** Notes fit inside their Source; a partition without a Source is reported by the arrangement. */
+function validateNotes(
+  source: MidiSourceRecord | undefined,
+  notes: Iterable<readonly [NoteId, MidiNoteRecord]>,
+  violations: ViolationList,
+): void {
+  for (const [noteTableKey, note] of notes) {
+    if (noteTableKey !== note.id) {
+      addTableKeyMismatch(violations, 'MIDI Note', 'midi-note', noteTableKey, note.id)
+    }
+
+    if (source === undefined) continue
+
+    const noteEndTick = note.startTick + note.durationTick
+
+    if (!Number.isSafeInteger(noteEndTick) || noteEndTick > source.lengthTick) {
+      addViolation(
+        violations,
+        'note-outside-midi-source',
+        `MIDI Note ${note.id} ends at Tick ${noteEndTick} beyond Source ${source.id} length ${source.lengthTick}`,
+        [subject('midi-note', note.id), subject('midi-source', source.id)],
+      )
+    }
+  }
+}
+
+/** Events fit inside their Source, and no two share a Tick and Channel. */
+function validateSustainPedalEvents(
+  model: ModelStoreReader,
+  sourceId: MidiSourceId,
+  violations: ViolationList,
+): void {
+  const source = model.getMidiSource(sourceId)
+  const eventsByTickAndChannel = new Map<string, SustainPedalEventsAtPosition>()
+
+  for (const [eventTableKey, event] of model.midiSustainPedalEventEntries(sourceId)) {
+    if (eventTableKey !== event.id) {
+      addTableKeyMismatch(
+        violations,
+        'MIDI Sustain Pedal Event',
+        'midi-sustain-pedal-event',
+        eventTableKey,
+        event.id,
+      )
+    }
+
+    if (source !== undefined && event.tick > source.lengthTick) {
+      addViolation(
+        violations,
+        'sustain-pedal-event-outside-midi-source',
+        `MIDI Sustain Pedal Event ${event.id} occurs at Tick ${event.tick} beyond Source ${source.id} length ${source.lengthTick}`,
+        [subject('midi-sustain-pedal-event', event.id), subject('midi-source', source.id)],
+      )
+    }
+
+    const tickAndChannelKey = `${event.tick}\u0000${event.channel}`
+    const samePositionEvents = eventsByTickAndChannel.get(tickAndChannelKey)
+
+    if (samePositionEvents === undefined) {
+      eventsByTickAndChannel.set(tickAndChannelKey, {
+        tick: event.tick,
+        channel: event.channel,
+        eventIds: [event.id],
+      })
+    } else {
+      samePositionEvents.eventIds.push(event.id)
+    }
+  }
+
+  for (const { tick, channel, eventIds } of eventsByTickAndChannel.values()) {
+    if (eventIds.length < 2) continue
+
+    const sortedEventIds = [...eventIds].sort(compareStrings)
+
+    addViolation(
+      violations,
+      'sustain-pedal-event-duplicate-tick-channel',
+      `MIDI Sustain Pedal Events ${sortedEventIds.join(', ')} share Tick ${tick} and Channel ${channel} in Source ${sourceId}`,
+      [
+        subject('midi-source', sourceId),
+        ...sortedEventIds.map((eventId) => subject('midi-sustain-pedal-event', eventId)),
+      ],
+    )
+  }
+}
+
+/** Record IDs stay project-wide unique even though storage is partitioned by Source. */
+function validateUniqueIds(
+  model: ModelStoreReader,
+  tableName: PartitionedTableName,
+  violations: ViolationList,
+): void {
+  const table: PartitionedTableView<StoredRecord> = model.partitionedTable(tableName)
+  const seen = new Set<string>()
+  let duplicated: Set<string> | undefined
+
+  for (const sourceId of table.partitionIds()) {
+    for (const [, record] of table.entries(sourceId)) {
+      if (seen.has(record.id)) (duplicated ??= new Set()).add(record.id)
+      else seen.add(record.id)
+    }
+  }
+
+  if (duplicated === undefined) return
+
+  const occurrencesById = new Map<string, RecordOccurrence[]>()
+
+  for (const sourceId of table.partitionIds()) {
+    for (const [tableKey, record] of table.entries(sourceId)) {
+      if (!duplicated.has(record.id)) continue
+      const occurrences = occurrencesById.get(record.id) ?? []
+      occurrences.push({ sourceId, tableKey })
+      occurrencesById.set(record.id, occurrences)
+    }
+  }
+
+  const { code, kind, label } = ID_DUPLICATE_DIAGNOSTICS[tableName]
+
+  for (const [id, occurrences] of occurrencesById) {
+    const occurrenceLabels = occurrences
+      .map(({ sourceId, tableKey }) => `${sourceId}/${tableKey}`)
+      .sort(compareStrings)
+
+    addViolation(
+      violations,
+      code,
+      `${label} ID ${id} appears ${occurrences.length} times: ${occurrenceLabels.join(', ')}`,
+      [subject(kind, id), ...occurrences.map(({ sourceId }) => subject('midi-source', sourceId))],
+    )
+  }
+}
+
+/**
+ * Whether each inserted ID is in at most one partition. Each partition is probed from its
+ * smaller side, so one new Note costs a lookup per partition and a whole import costs one pass.
+ */
+function insertedIdsStayUnique(
+  table: PartitionedTableView<StoredRecord>,
+  insertedIds: ReadonlySet<string>,
+): boolean {
+  if (insertedIds.size === 0) return true
+
+  const found = new Set<string>()
+  const claim = (id: string): boolean => {
+    if (found.has(id)) return false
+    found.add(id)
+    return true
+  }
+
+  for (const sourceId of table.partitionIds()) {
+    if (table.size(sourceId) < insertedIds.size) {
+      for (const [id] of table.entries(sourceId)) {
+        if (insertedIds.has(id) && !claim(id)) return false
+      }
+    } else {
+      for (const id of insertedIds) {
+        if (table.get(sourceId, id) !== undefined && !claim(id)) return false
+      }
+    }
+  }
+
+  return true
+}
+
+function compareViolations(left: ModelInvariantViolation, right: ModelInvariantViolation): number {
+  const codeComparison = compareStrings(left.code, right.code)
+
+  if (codeComparison !== 0) {
+    return codeComparison
+  }
+
+  const messageComparison = compareStrings(left.message, right.message)
+
+  if (messageComparison !== 0) {
+    return messageComparison
+  }
+
+  const leftSubjects = left.subjects.map(({ kind, id }) => `${kind}:${id}`).join('|')
+  const rightSubjects = right.subjects.map(({ kind, id }) => `${kind}:${id}`).join('|')
+
+  return compareStrings(leftSubjects, rightSubjects)
+}
+
+/** Every invariant of the model, for a model that comes from outside: a seed, a file, a rollback. */
+export function validateModelInvariants(
+  model: ModelStoreReader,
+): readonly ModelInvariantViolation[] {
+  const violations: ViolationList = []
+
+  validateArrangement(model, violations)
+
+  for (const sourceId of model.midiNotePartitionIds()) {
+    validateNotes(model.getMidiSource(sourceId), model.midiNoteEntries(sourceId), violations)
+  }
+
+  for (const sourceId of model.midiSustainPedalEventPartitionIds()) {
+    validateSustainPedalEvents(model, sourceId, violations)
+  }
+
+  for (const tableName of PARTITIONED_TABLE_NAMES) {
+    validateUniqueIds(model, tableName, violations)
+  }
 
   // Sort only diagnostics, not valid entity tables, so the valid-model path stays linear.
   return violations.sort(compareViolations)
 }
 
+function* writtenNotes(
+  model: ModelStoreReader,
+  sourceId: MidiSourceId,
+  noteIds: ReadonlySet<string>,
+): Generator<readonly [NoteId, MidiNoteRecord]> {
+  for (const noteId of noteIds as ReadonlySet<NoteId>) {
+    const note = model.getMidiNote(sourceId, noteId)
+    if (note !== undefined) yield [noteId, note]
+  }
+}
+
+/**
+ * The invariants a commit can break, on the model it produces from a valid one. Relations among
+ * records it did not write still hold, so beyond the arrangement this checks the Notes it wrote,
+ * the CC64 partitions it wrote into, every record of a Source it wrote, and the IDs it inserted.
+ * A violation is reported as the full validation of the same model reports it.
+ */
+export function validateWrittenModelInvariants(
+  model: ModelStoreReader,
+  written: WrittenContent,
+): readonly ModelInvariantViolation[] {
+  const violations: ViolationList = []
+
+  validateArrangement(model, violations)
+
+  for (const sourceId of written.sources) {
+    validateNotes(model.getMidiSource(sourceId), model.midiNoteEntries(sourceId), violations)
+    validateSustainPedalEvents(model, sourceId, violations)
+  }
+
+  for (const [sourceId, noteIds] of written.records.midiNotes) {
+    if (written.sources.has(sourceId)) continue
+    validateNotes(model.getMidiSource(sourceId), writtenNotes(model, sourceId, noteIds), violations)
+  }
+
+  for (const sourceId of written.records.midiSustainPedalEvents.keys()) {
+    if (!written.sources.has(sourceId)) validateSustainPedalEvents(model, sourceId, violations)
+  }
+
+  const idsStayUnique = PARTITIONED_TABLE_NAMES.every((tableName) =>
+    insertedIdsStayUnique(model.partitionedTable(tableName), written.insertedIds[tableName]),
+  )
+
+  return violations.length === 0 && idsStayUnique ? violations : validateModelInvariants(model)
+}
+
 export function assertModelInvariants(model: ModelStoreReader): void {
   const violations = validateModelInvariants(model)
+
+  if (violations.length > 0) {
+    throw new ModelInvariantError(violations)
+  }
+}
+
+export function assertWrittenModelInvariants(
+  model: ModelStoreReader,
+  written: WrittenContent,
+): void {
+  const violations = validateWrittenModelInvariants(model, written)
 
   if (violations.length > 0) {
     throw new ModelInvariantError(violations)

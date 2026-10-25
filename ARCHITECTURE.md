@@ -12,7 +12,7 @@
 
 | 包                 | 职责                                                         | 可以依赖                           |
 | ------------------ | ------------------------------------------------------------ | ---------------------------------- |
-| `project-core`     | 项目模型、命令、事务、历史、查询与持久化 DTO                 | type-utils                         |
+| `project-core`     | 项目模型、命令、事务、历史、查询、Snapshot 与持久化          | type-utils                         |
 | `editor`           | Pointer 输入 → 手势 → 意图；Piano Roll 的几何、命中与渲染    | project-core、type-utils           |
 | `playback`         | 编译、调和、调度、Transport 与 PlaybackEngine                | project-core、type-utils           |
 | `audio-web`        | Web Audio 与采样音源；实现 playback 的 `PlaybackRuntimePort` | playback、type-utils               |

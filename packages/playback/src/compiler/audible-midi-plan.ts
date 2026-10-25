@@ -102,13 +102,22 @@ export interface AudibleMidiProjectPlan {
   readonly tempoSegments: readonly TempoSegmentPlan[]
   readonly master: MasterChannelPlan
   readonly tracks: readonly TrackPlaybackPlan[]
-  readonly midiNoteSpans: readonly MidiNoteSpanPlan[]
   /**
-   * The same spans by compiled Clip, each in span order. A Clip that did not change between two
-   * plans has the same array in both.
+   * The note spans of each audible Clip, in span order. Every span belongs to an audible Track of
+   * `tracks`, and occurrence keys are unique across the plan. A Clip that did not change between
+   * two plans has the same array in both, so consumers can do per-Clip work once.
    */
   readonly clipSpans: ReadonlyMap<ClipId, readonly MidiNoteSpanPlan[]>
   readonly diagnostics: readonly PlaybackDiagnostic[]
+}
+
+/** Span order: start, then end, then occurrence key, so it never depends on storage order. */
+export function compareNoteSpans(left: MidiNoteSpanPlan, right: MidiNoteSpanPlan): number {
+  if (left.startTick !== right.startTick) return left.startTick - right.startTick
+  if (left.endTick !== right.endTick) return left.endTick - right.endTick
+  if (left.occurrenceKey < right.occurrenceKey) return -1
+  if (left.occurrenceKey > right.occurrenceKey) return 1
+  return 0
 }
 
 /** Encodes an occurrence tuple without delimiter ambiguity or runtime object identity. */

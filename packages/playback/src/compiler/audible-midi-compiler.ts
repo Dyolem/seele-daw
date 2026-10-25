@@ -20,6 +20,7 @@ import {
 
 import {
   AUDIBLE_MIDI_PLAN_STATUS,
+  compareNoteSpans,
   createNoteOccurrenceKey,
   type AudibleMidiPlanStatus,
   type AudibleMidiProjectPlan,
@@ -100,15 +101,6 @@ function compareClips(left: ClipRecord, right: ClipRecord): number {
 function compareNotes(left: MidiNoteRecord, right: MidiNoteRecord): number {
   if (left.startTick !== right.startTick) return left.startTick - right.startTick
   return compareIds(left, right)
-}
-
-// The final order must not depend on the storage order of Snapshot collections.
-function compareNoteSpans(left: MidiNoteSpanPlan, right: MidiNoteSpanPlan): number {
-  if (left.startTick !== right.startTick) return left.startTick - right.startTick
-  if (left.endTick !== right.endTick) return left.endTick - right.endTick
-  if (left.occurrenceKey < right.occurrenceKey) return -1
-  if (left.occurrenceKey > right.occurrenceKey) return 1
-  return 0
 }
 
 function indexUnique<Entity extends { readonly id: string }>(
@@ -473,7 +465,6 @@ function compileClipNoteSpans(
     )
   }
 
-  // Sorted here, the whole plan's sort only merges these runs.
   return Object.freeze(spans.sort(compareNoteSpans))
 }
 
@@ -496,8 +487,8 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
   const tempoMap = createTempoMap(snapshot.tempoEvents)
   const diagnostics: PlaybackDiagnostic[] = []
   const trackPlans: TrackPlaybackPlan[] = []
-  const noteSpans: MidiNoteSpanPlan[] = []
   const clipSpans = new Map<ClipId, readonly MidiNoteSpanPlan[]>()
+  let spanCount = 0
   // Compute global Solo before unsupported Track kinds are filtered out of executable plans.
   const hasSoloedTrack = snapshot.tracks.some(({ channel }) => channel.soloed)
   const enabledMasterEffects = getEnabledDevices(
@@ -563,27 +554,22 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
       )
       const spans = compiledClipNoteSpans(trackPlan, clip, sourceNotes, sustainPedalEvents)
       clipSpans.set(clip.id, spans)
-      for (const span of spans) noteSpans.push(span)
+      spanCount += spans.length
     }
   }
 
-  noteSpans.sort(compareNoteSpans)
-  if (!masterBlocked && noteSpans.length === 0) {
+  if (!masterBlocked && spanCount === 0) {
     diagnostics.push(createDiagnostic({ code: 'no-audible-midi-note-spans', severity: 'info' }))
   }
 
-  const status = derivePlanStatus(masterBlocked, noteSpans.length, diagnostics.length)
-  // A blocked plan remains inspectable but must never expose events that a scheduler could run.
-  const executableSpans = masterBlocked
-    ? Object.freeze<MidiNoteSpanPlan[]>([])
-    : Object.freeze(noteSpans)
+  const status = derivePlanStatus(masterBlocked, spanCount, diagnostics.length)
 
   // Freeze the complete plan boundary so later runtimes cannot mutate compiled Project meaning.
   return Object.freeze({
     arrangementEndTick: timelineRange.contentEndTick,
     diagnostics: Object.freeze(diagnostics),
     master: Object.freeze({ gain: snapshot.master.gain, muted: snapshot.master.muted }),
-    midiNoteSpans: executableSpans,
+    // A blocked plan remains inspectable but never exposes events that a scheduler could run.
     clipSpans: masterBlocked ? NO_CLIP_SPANS : clipSpans,
     modelRevision: snapshot.modelRevision,
     status,

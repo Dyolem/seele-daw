@@ -208,10 +208,11 @@ function hasCoveredNote(
   plan: AudibleMidiProjectPlan,
   unsupported: readonly UnsupportedNoteOccurrence[],
 ): boolean {
-  if (plan.midiNoteSpans.length === 0) return false
-  if (unsupported.length === 0) return true
   const keys = new Set(unsupported.map(({ occurrenceKey }) => occurrenceKey))
-  return plan.midiNoteSpans.some(({ occurrenceKey }) => !keys.has(occurrenceKey))
+  for (const spans of plan.clipSpans.values()) {
+    for (const { occurrenceKey } of spans) if (!keys.has(occurrenceKey)) return true
+  }
+  return false
 }
 
 /** Tempo is read from the changes, so History commits are routed like the commands they undo. */

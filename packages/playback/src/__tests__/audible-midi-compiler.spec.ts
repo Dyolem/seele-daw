@@ -42,6 +42,7 @@ import {
   replaceCompilerFixtureSnapshot,
   replaceCompilerFixtureTrackChannel,
 } from '#internal/__tests__/support/audible-midi-project-fixture'
+import { planSpans } from '#internal/__tests__/support/plan-spans'
 
 function createFixtureDevice(
   id: string,
@@ -106,7 +107,7 @@ describe('Audible MIDI Compiler', () => {
       { gain: 0.6, pan: 0.25 },
       { gain: 0.8, pan: -0.25 },
     ])
-    expect(firstPlan.midiNoteSpans).toEqual([
+    expect(planSpans(firstPlan)).toEqual([
       {
         occurrenceKey: createNoteOccurrenceKey(
           records.alternateTrack.id,
@@ -169,8 +170,8 @@ describe('Audible MIDI Compiler', () => {
     expect(Object.isFrozen(firstPlan.tracks)).toBe(true)
     expect(Object.isFrozen(firstPlan.tracks[0])).toBe(true)
     expect(Object.isFrozen(firstPlan.tracks[0]?.instrument)).toBe(true)
-    expect(Object.isFrozen(firstPlan.midiNoteSpans)).toBe(true)
-    expect(Object.isFrozen(firstPlan.midiNoteSpans[0])).toBe(true)
+    expect([...firstPlan.clipSpans.values()].every((spans) => Object.isFrozen(spans))).toBe(true)
+    expect(Object.isFrozen(planSpans(firstPlan)[0])).toBe(true)
     expect(Object.isFrozen(firstPlan.diagnostics)).toBe(true)
     expect(Object.isFrozen(firstPlan.tempoSegments)).toBe(true)
   })
@@ -213,7 +214,7 @@ describe('Audible MIDI Compiler', () => {
       { trackId: records.alternateTrack.id, audible: false },
       { trackId: records.pianoTrack.id, audible: true },
     ])
-    expect(soloPlan.midiNoteSpans.map(({ trackId }) => trackId)).toEqual([
+    expect(planSpans(soloPlan).map(({ trackId }) => trackId)).toEqual([
       records.pianoTrack.id,
       records.pianoTrack.id,
     ])
@@ -229,7 +230,7 @@ describe('Audible MIDI Compiler', () => {
     )
     expect(mutedMasterPlan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.EMPTY)
     expect(mutedMasterPlan.tracks.every(({ audible }) => !audible)).toBe(true)
-    expect(mutedMasterPlan.midiNoteSpans).toEqual([])
+    expect(planSpans(mutedMasterPlan)).toEqual([])
     expect(diagnosticCodes(mutedMasterPlan)).toContain('no-audible-midi-note-spans')
   })
 
@@ -249,7 +250,7 @@ describe('Audible MIDI Compiler', () => {
 
     expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.EMPTY)
     expect(plan.arrangementEndTick).toBe(1_920)
-    expect(plan.midiNoteSpans).toEqual([])
+    expect(planSpans(plan)).toEqual([])
   })
 
   it('compiles again only the Clips whose Source changed, with the result of a full compile', () => {
@@ -319,7 +320,7 @@ describe('Audible MIDI Compiler', () => {
         midiSustainPedalEvents: { ...snapshot.midiSustainPedalEvents, [overlappingSource.id]: [] },
       }),
     )
-    const overlappingSpans = plan.midiNoteSpans.filter(
+    const overlappingSpans = planSpans(plan).filter(
       ({ trackId, startTick, endTick, pitch }) =>
         trackId === records.pianoTrack.id && startTick === 960 && endTick === 1_440 && pitch === 60,
     )
@@ -362,10 +363,8 @@ describe('Audible MIDI Compiler', () => {
         },
       }),
     )
-    const primary = plan.midiNoteSpans.find(({ noteId }) => noteId === records.pianoNotes[1]?.id)
-    const otherChannel = plan.midiNoteSpans.find(
-      ({ noteId }) => noteId === records.pianoNotes[2]?.id,
-    )
+    const primary = planSpans(plan).find(({ noteId }) => noteId === records.pianoNotes[1]?.id)
+    const otherChannel = planSpans(plan).find(({ noteId }) => noteId === records.pianoNotes[2]?.id)
 
     expect(primary).toMatchObject({
       channel: 0,
@@ -396,9 +395,7 @@ describe('Audible MIDI Compiler', () => {
       }),
     )
 
-    const pedalHeldSpan = plan.midiNoteSpans.find(
-      ({ noteId }) => noteId === records.pianoNotes[1]?.id,
-    )
+    const pedalHeldSpan = planSpans(plan).find(({ noteId }) => noteId === records.pianoNotes[1]?.id)
     const clipEndTick = parseTick(records.pianoClip.startTick + records.pianoClip.spanTick)
 
     expect(clipEndTick).toBe(1_920)
@@ -537,7 +534,7 @@ describe('Audible MIDI Compiler', () => {
     )
 
     expect(blockedPlan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.BLOCKED)
-    expect(blockedPlan.midiNoteSpans).toEqual([])
+    expect(planSpans(blockedPlan)).toEqual([])
     expect(blockedPlan.diagnostics).toMatchObject([
       {
         code: 'master-audio-effect-chain-unsupported',
@@ -561,7 +558,7 @@ describe('Audible MIDI Compiler', () => {
 
     expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.PARTIAL)
     expect(plan.arrangementEndTick).toBe(1_920)
-    expect(plan.midiNoteSpans.map(({ trackId }) => trackId)).toEqual([records.alternateTrack.id])
+    expect(planSpans(plan).map(({ trackId }) => trackId)).toEqual([records.alternateTrack.id])
     expect(diagnosticCodes(plan)).toEqual(['looped-midi-clip-unsupported'])
   })
 
@@ -579,7 +576,7 @@ describe('Audible MIDI Compiler', () => {
     expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.EMPTY)
     expect(plan.arrangementEndTick).toBe(0)
     expect(plan.timelineEndTick).toBe(576_000)
-    expect(plan.midiNoteSpans).toEqual([])
+    expect(planSpans(plan)).toEqual([])
     expect(diagnosticCodes(plan)).toEqual(['no-audible-midi-note-spans'])
   })
 
@@ -654,8 +651,8 @@ describe('Audible MIDI Compiler', () => {
     const plan = compileAudibleMidiProject(snapshot)
 
     expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE)
-    expect(plan.midiNoteSpans).toHaveLength(10_000)
-    expect(plan.midiNoteSpans[0]?.startTick).toBe(0)
-    expect(plan.midiNoteSpans.at(-1)?.endTick).toBe(19_999)
+    expect(planSpans(plan)).toHaveLength(10_000)
+    expect(planSpans(plan)[0]?.startTick).toBe(0)
+    expect(planSpans(plan).at(-1)?.endTick).toBe(19_999)
   })
 })

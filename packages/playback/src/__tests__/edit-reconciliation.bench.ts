@@ -1,5 +1,5 @@
 // Run with `pnpm --filter @seele-daw/playback bench`. What playback does with every commit while it
-// plays: compile the whole plan again, then compare it with the previous one.
+// plays: compile the plan again, compare it with the previous one, and plan from it.
 import {
   createAddInstrumentTrackCollectionCommand,
   createInitialProjectSession,
@@ -32,9 +32,15 @@ import { bench, describe } from 'vitest'
 
 import { compileAudibleMidiProject } from '#internal/compiler/audible-midi-compiler'
 import { createAudibleMidiReconciliationPlan } from '#internal/reconciliation/audible-midi-reconciliation'
+import { createAudibleMidiSchedulerPlanner } from '#internal/scheduler/audible-midi-scheduler'
 import { createStudioGrandDeviceDescriptor } from '#internal/studio-grand-device'
+import { parsePlaybackClockDurationSecond } from '#internal/time/project-time'
 
 const NOTE_SPACING_TICK = 120
+const PLANNER_CONFIGURATION = Object.freeze({
+  lookAheadHorizonSecond: parsePlaybackClockDurationSecond(0.2),
+  wakeCadenceSecond: parsePlaybackClockDurationSecond(0.025),
+})
 
 function importedTrack(index: number, noteCount: number): InstrumentTrackCollectionEntry {
   const device = createStudioGrandDeviceDescriptor(parseDeviceId(`device-${index}`))
@@ -155,7 +161,7 @@ for (const [trackCount, notesPerTrack] of [
       commitOnlyDeltaTick = -commitOnlyDeltaTick
     })
 
-    bench('move one note: compile and reconcile', () => {
+    bench('move one note: compile, reconcile and create the planner', () => {
       const commit = requireCommit(
         session.execute(
           createMoveNotesCommand({
@@ -170,6 +176,7 @@ for (const [trackCount, notesPerTrack] of [
       deltaTick = -deltaTick
       const nextPlan = compileAudibleMidiProject(session.getSnapshot())
       createAudibleMidiReconciliationPlan({ commits: [commit], nextPlan, previousPlan })
+      createAudibleMidiSchedulerPlanner(nextPlan, PLANNER_CONFIGURATION)
       previousPlan = nextPlan
     })
   })

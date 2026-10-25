@@ -17,7 +17,7 @@ import {
 } from '#internal/index'
 
 it('exports the browser-independent playback slice required by Studio and Audio Web', () => {
-  expectTypeOf<AudibleMidiProjectPlan>().toHaveProperty('midiNoteSpans')
+  expectTypeOf<AudibleMidiProjectPlan>().toHaveProperty('clipSpans')
   expectTypeOf<ScheduledSampleVoicePlan>().toHaveProperty('startPlaybackClockSecond')
   expectTypeOf<ScheduledSampleVoicePlan>().toHaveProperty('keyReleasePlaybackClockSecond')
   expectTypeOf<ScheduledSampleVoicePlan>().toHaveProperty('releasePlaybackClockSecond')

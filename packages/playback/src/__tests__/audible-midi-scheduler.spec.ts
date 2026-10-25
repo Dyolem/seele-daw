@@ -12,7 +12,7 @@ import {
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import { compileAudibleMidiProject } from '#internal/compiler/audible-midi-compiler'
-import type { AudibleMidiProjectPlan, MidiNoteSpanPlan } from '#internal/compiler/audible-midi-plan'
+import type { AudibleMidiProjectPlan } from '#internal/compiler/audible-midi-plan'
 import {
   AUDIBLE_MIDI_SCHEDULER_OUTCOME,
   AudibleMidiSchedulerError,
@@ -34,6 +34,7 @@ import {
   replaceCompilerFixtureSnapshot,
 } from '#internal/__tests__/support/audible-midi-project-fixture'
 import { ManualPlaybackClock } from '#internal/__tests__/support/manual-playback-clock'
+import { planSpans } from '#internal/__tests__/support/plan-spans'
 
 function createFixturePlan(): AudibleMidiProjectPlan {
   return compileAudibleMidiProject(createAudibleMidiProjectFixture().snapshot)
@@ -65,11 +66,6 @@ describe('Audible MIDI Scheduler Planner', () => {
 
     const inactive = planner.planNextWindow(transport.getSnapshot())
     expect(inactive).toEqual({
-      diagnostics: {
-        duplicateSuppressionCount: 0,
-        expiredSpanDropCount: 0,
-        lateStartCount: 0,
-      },
       mappingGeneration: 0,
       modelRevision: plan.modelRevision,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.INACTIVE,
@@ -80,15 +76,10 @@ describe('Audible MIDI Scheduler Planner', () => {
 
     transport.play()
     const batch = planner.planNextWindow(transport.getSnapshot())
-    const firstSpan = plan.midiNoteSpans[0]
+    const firstSpan = planSpans(plan)[0]
     const firstTrack = plan.tracks.find(({ trackId }) => trackId === firstSpan?.trackId)
 
     expect(batch).toMatchObject({
-      diagnostics: {
-        duplicateSuppressionCount: 0,
-        expiredSpanDropCount: 0,
-        lateStartCount: 0,
-      },
       mappingGeneration: 1,
       modelRevision: plan.modelRevision,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED,
@@ -122,7 +113,6 @@ describe('Audible MIDI Scheduler Planner', () => {
     expect(Object.isFrozen(batch.window)).toBe(true)
     expect(Object.isFrozen(batch.voicePlans)).toBe(true)
     expect(Object.isFrozen(batch.voicePlans[0])).toBe(true)
-    expect(Object.isFrozen(batch.diagnostics)).toBe(true)
     expectTypeOf(batch).toEqualTypeOf<AudibleMidiScheduleBatch>()
     expectTypeOf(batch.voicePlans[0]!).toEqualTypeOf<ScheduledSampleVoicePlan>()
   })
@@ -164,10 +154,28 @@ describe('Audible MIDI Scheduler Planner', () => {
     })
     expect(third.voicePlans).toHaveLength(1)
     expect(third.voicePlans[0]).toMatchObject({
-      occurrenceKey: plan.midiNoteSpans[1]?.occurrenceKey,
+      occurrenceKey: planSpans(plan)[1]?.occurrenceKey,
       startPlaybackClockSecond: 10.5,
     })
     expect(thirdRepeated.outcome).toBe(AUDIBLE_MIDI_SCHEDULER_OUTCOME.NO_CHANGE)
+  })
+
+  it('plans every span of every Clip once, in span order, across consecutive windows', () => {
+    const plan = createFixturePlan()
+    const clock = new ManualPlaybackClock(10)
+    const transport = createAudibleMidiTransport(plan, clock)
+    const planner = createAudibleMidiSchedulerPlanner(plan, createConfiguration(0.1, 0.3))
+    const planned: string[] = []
+
+    expect([...plan.clipSpans.values()].filter((spans) => spans.length > 0).length).toBe(2)
+    transport.play()
+    while (transport.getSnapshot().state === AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING) {
+      const batch = planner.planNextWindow(transport.getSnapshot())
+      for (const voice of batch.voicePlans) planned.push(voice.occurrenceKey)
+      clock.advanceBy(0.1)
+    }
+
+    expect(planned).toEqual(planSpans(plan).map(({ occurrenceKey }) => occurrenceKey))
   })
 
   it('maps start and release targets through multiple Tempo Segments', () => {
@@ -245,7 +253,7 @@ describe('Audible MIDI Scheduler Planner', () => {
 
     expect(batch.voicePlans).toEqual([
       expect.objectContaining({
-        occurrenceKey: plan.midiNoteSpans[1]?.occurrenceKey,
+        occurrenceKey: planSpans(plan)[1]?.occurrenceKey,
         startPlaybackClockSecond: 10.125,
         keyReleasePlaybackClockSecond: 10.375,
         releasePlaybackClockSecond: 10.46875,
@@ -265,14 +273,9 @@ describe('Audible MIDI Scheduler Planner', () => {
 
     expect(batch.window?.fromPlaybackClockSecond).toBe(10)
     expect(batch.window?.toPlaybackClockSecond).toBeCloseTo(10.8)
-    expect(batch.diagnostics).toEqual({
-      duplicateSuppressionCount: 0,
-      expiredSpanDropCount: 1,
-      lateStartCount: 1,
-    })
     expect(batch.voicePlans).toEqual([
       expect.objectContaining({
-        occurrenceKey: plan.midiNoteSpans[1]?.occurrenceKey,
+        occurrenceKey: planSpans(plan)[1]?.occurrenceKey,
         releasePlaybackClockSecond: 10.75,
         startPlaybackClockSecond: 10.6,
         timing: 'late-immediate',
@@ -312,7 +315,7 @@ describe('Audible MIDI Scheduler Planner', () => {
     })
     expect(resumedBatch.voicePlans).toHaveLength(1)
     expect(resumedBatch.voicePlans[0]).toMatchObject({
-      occurrenceKey: plan.midiNoteSpans[1]?.occurrenceKey,
+      occurrenceKey: planSpans(plan)[1]?.occurrenceKey,
       startPlaybackClockSecond: 105.5,
       timing: 'on-time',
     })
@@ -340,7 +343,7 @@ describe('Audible MIDI Scheduler Planner', () => {
       toPlaybackClockSecond: 1,
     })
     expect(second.voicePlans).toHaveLength(1)
-    expect(second.voicePlans[0]?.occurrenceKey).toBe(plan.midiNoteSpans[2]?.occurrenceKey)
+    expect(second.voicePlans[0]?.occurrenceKey).toBe(planSpans(plan)[2]?.occurrenceKey)
     expect(repeated.outcome).toBe(AUDIBLE_MIDI_SCHEDULER_OUTCOME.NO_CHANGE)
 
     clock.advanceBy(0.8)
@@ -397,44 +400,6 @@ describe('Audible MIDI Scheduler Planner', () => {
     )
   })
 
-  it.each([
-    [
-      'duplicate-note-occurrence-key',
-      (plan: AudibleMidiProjectPlan) =>
-        replacePlan(plan, {
-          midiNoteSpans: Object.freeze([plan.midiNoteSpans[0]!, plan.midiNoteSpans[0]!]),
-        }),
-    ],
-    [
-      'invalid-note-span-order',
-      (plan: AudibleMidiProjectPlan) =>
-        replacePlan(plan, { midiNoteSpans: Object.freeze([...plan.midiNoteSpans].reverse()) }),
-    ],
-    [
-      'invalid-note-span',
-      (plan: AudibleMidiProjectPlan) => {
-        const firstSpan = plan.midiNoteSpans[0]!
-        const invalidSpan: MidiNoteSpanPlan = Object.freeze({
-          ...firstSpan,
-          endTick: firstSpan.startTick,
-        })
-        return replacePlan(plan, { midiNoteSpans: Object.freeze([invalidSpan]) })
-      },
-    ],
-    [
-      'missing-track-route',
-      (plan: AudibleMidiProjectPlan) => replacePlan(plan, { tracks: Object.freeze([]) }),
-    ],
-    [
-      'timeline-end-before-arrangement-end',
-      (plan: AudibleMidiProjectPlan) => replacePlan(plan, { timelineEndTick: parseTick(1_919) }),
-    ],
-  ] as const)('fails closed for malformed compiled plans with code %s', (code, createPlan) => {
-    expect(() =>
-      createAudibleMidiSchedulerPlanner(createPlan(createFixturePlan()), createConfiguration()),
-    ).toThrow(expect.objectContaining({ code }) as AudibleMidiSchedulerError)
-  })
-
   it('rejects Transport snapshots from a different plan or a remapped same generation', () => {
     const plan = createFixturePlan()
     const otherPlan = replacePlan(plan, {
@@ -463,35 +428,5 @@ describe('Audible MIDI Scheduler Planner', () => {
         code: 'transport-mapping-changed-without-generation',
       }) as AudibleMidiSchedulerError,
     )
-  })
-
-  it('copies Track routes and Note Spans instead of retaining mutable Plan records', () => {
-    const compiledPlan = createFixturePlan()
-    const mutableTracks = compiledPlan.tracks.map((track) => ({
-      ...track,
-      instrument: { ...track.instrument },
-    }))
-    const mutableSpans = compiledPlan.midiNoteSpans.map((span) => ({ ...span }))
-    const mutablePlan = {
-      ...compiledPlan,
-      midiNoteSpans: mutableSpans,
-      tracks: mutableTracks,
-    }
-    const planner = createAudibleMidiSchedulerPlanner(mutablePlan, createConfiguration())
-    const clock = new ManualPlaybackClock(10)
-    const transport = createAudibleMidiTransport(compiledPlan, clock)
-
-    Object.assign(mutableTracks[0]!, { gain: 0, pan: -1 })
-    Object.assign(mutableTracks[0]!.instrument, { soundbankId: 'mutated-soundbank' })
-    Object.assign(mutableSpans[0]!, { startTick: parseTick(1_900) })
-
-    transport.play()
-    const batch = planner.planNextWindow(transport.getSnapshot())
-    expect(batch.voicePlans[0]).toMatchObject({
-      occurrenceKey: compiledPlan.midiNoteSpans[0]?.occurrenceKey,
-      soundbankId: compiledPlan.tracks[0]?.instrument.soundbankId,
-      startPlaybackClockSecond: 10,
-      trackGain: compiledPlan.tracks[0]?.gain,
-    })
   })
 })

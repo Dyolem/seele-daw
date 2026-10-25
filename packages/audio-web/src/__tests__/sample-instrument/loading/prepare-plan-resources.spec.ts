@@ -37,6 +37,17 @@ const BOTH_ASSETS = assetBases([
   [SECOND_SOUNDBANK_ID, SECOND_ASSET_BASE],
 ])
 
+/** Groups spans by Clip, keeping their order, as compiled plans hold them. */
+function byClip<Span extends { readonly clipId: string }>(
+  spans: readonly Span[],
+): ReadonlyMap<string, readonly Span[]> {
+  const clips = new Map<string, readonly Span[]>()
+  for (const span of spans) {
+    clips.set(span.clipId, Object.freeze([...(clips.get(span.clipId) ?? []), span]))
+  }
+  return clips
+}
+
 function createPlan(
   pitches: readonly number[],
   status: AudibleMidiProjectPlan['status'] = 'playable',
@@ -59,7 +70,7 @@ function createPlan(
     arrangementEndTick: 1_920,
     diagnostics: Object.freeze([]),
     master: Object.freeze({ gain: 1, muted: false }),
-    midiNoteSpans: Object.freeze(
+    clipSpans: byClip(
       pitches.map((pitch, index) =>
         Object.freeze({
           channel: 0,
@@ -88,14 +99,15 @@ function createPlan(
 function createPlanWithUnavailableInstrument(): AudibleMidiProjectPlan {
   const base = createPlan([60])
   const availableTrack = base.tracks[0]!
-  const availableSpan = base.midiNoteSpans[0]!
+  const availableSpan = [...base.clipSpans.values()][0]![0]!
   const unavailableTrackId = 'track-unavailable'
   return Object.freeze({
     ...base,
-    midiNoteSpans: Object.freeze([
+    clipSpans: byClip([
       availableSpan,
       Object.freeze({
         ...availableSpan,
+        clipId: 'clip-unavailable',
         noteId: 'note-unavailable',
         occurrenceKey: JSON.stringify([unavailableTrackId, 0]),
         pitch: 64,
@@ -121,14 +133,13 @@ function createPlanWithUnavailableInstrument(): AudibleMidiProjectPlan {
 function createMultiInstrumentPlan(): AudibleMidiProjectPlan {
   const base = createPlan([60, 60])
   const firstTrack = base.tracks[0]!
-  const firstSpan = base.midiNoteSpans[0]!
-  const secondSpan = base.midiNoteSpans[1]!
+  const [firstSpan, secondSpan] = [...base.clipSpans.values()].flat()
   return Object.freeze({
     ...base,
-    midiNoteSpans: Object.freeze([
-      firstSpan,
+    clipSpans: byClip([
+      firstSpan!,
       Object.freeze({
-        ...secondSpan,
+        ...secondSpan!,
         noteId: 'note-strings',
         occurrenceKey: JSON.stringify([SECOND_TRACK_ID, 0]),
         trackId: SECOND_TRACK_ID,

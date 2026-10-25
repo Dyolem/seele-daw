@@ -47,7 +47,8 @@ export class FakeProjectPlaybackRuntime implements PlaybackRuntimePort {
     const soundbankByTrack = new Map(
       plan.tracks.map(({ instrument, trackId }) => [trackId, instrument.soundbankId]),
     )
-    const unsupportedNoteOccurrences = plan.midiNoteSpans
+    const unsupportedNoteOccurrences = [...plan.clipSpans.values()]
+      .flat()
       .filter(({ pitch }) => unsupportedPitches.has(pitch))
       .map((span) =>
         Object.freeze<UnsupportedNoteOccurrence>({

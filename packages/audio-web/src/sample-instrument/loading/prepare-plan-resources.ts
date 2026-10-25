@@ -35,20 +35,36 @@ function compareStrings(left: string, right: string): number {
   return 0
 }
 
-/** The plan's note spans grouped by the Soundbank their Track plays, Soundbanks in ID order. */
-function groupSpansBySoundbank(
+type ClipSpans = readonly MidiNoteSpanPlan[]
+type MidiPitch = MidiNoteSpanPlan['pitch']
+
+/** Each Clip's distinct pitches. A Clip no edit touched keeps its spans array, and so its entry. */
+const clipPitches = new WeakMap<ClipSpans, ReadonlySet<MidiPitch>>()
+
+function pitchesOf(spans: ClipSpans): ReadonlySet<MidiPitch> {
+  let pitches = clipPitches.get(spans)
+  if (pitches === undefined) {
+    pitches = new Set(spans.map(({ pitch }) => pitch))
+    clipPitches.set(spans, pitches)
+  }
+  return pitches
+}
+
+/** The plan's Clips grouped by the Soundbank their Track plays, Soundbanks in ID order. */
+function groupClipsBySoundbank(
   plan: AudibleMidiProjectPlan,
-): readonly (readonly [SoundbankId, readonly MidiNoteSpanPlan[]])[] {
+): readonly (readonly [SoundbankId, readonly ClipSpans[]])[] {
   const soundbankByTrack = new Map(
     plan.tracks.map((track) => [track.trackId, track.instrument.soundbankId]),
   )
-  const grouped = new Map<SoundbankId, MidiNoteSpanPlan[]>()
-  for (const span of plan.midiNoteSpans) {
-    const soundbankId = soundbankByTrack.get(span.trackId)
-    if (soundbankId === undefined) throw new Error(`Note span ${span.occurrenceKey} has no Track`)
-    const spans = grouped.get(soundbankId) ?? []
-    spans.push(span)
-    grouped.set(soundbankId, spans)
+  const grouped = new Map<SoundbankId, ClipSpans[]>()
+  for (const spans of plan.clipSpans.values()) {
+    if (spans.length === 0) continue
+    // A Clip's spans all belong to its Track.
+    const soundbankId = soundbankByTrack.get(spans[0]!.trackId)!
+    const clips = grouped.get(soundbankId) ?? []
+    clips.push(spans)
+    grouped.set(soundbankId, clips)
   }
   return [...grouped].sort(([left], [right]) => compareStrings(left, right))
 }
@@ -57,28 +73,34 @@ async function prepareInstrument(
   cache: SampleInstrumentResourceCache,
   baseUrl: URL,
   soundbankId: SoundbankId,
-  spans: readonly MidiNoteSpanPlan[],
+  clips: readonly ClipSpans[],
   signal: AbortSignal | undefined,
 ): Promise<PreparedInstrument> {
   const manifest = await cache.loadManifest(baseUrl, soundbankId, signal)
   const resourceKeys = new Set<string>()
   const unsupportedNoteOccurrences: UnsupportedNoteOccurrence[] = []
 
-  for (const span of spans) {
-    const zone = findSampleInstrumentZoneForPitch(manifest, span.pitch)
-    if (zone !== null) {
-      resourceKeys.add(zone.resource.key)
-      continue
+  // Zones depend on pitch alone, so a Clip's notes are visited only when some pitch has no zone.
+  for (const spans of clips) {
+    let uncovered: Set<MidiPitch> | undefined
+    for (const pitch of pitchesOf(spans)) {
+      const zone = findSampleInstrumentZoneForPitch(manifest, pitch)
+      if (zone !== null) resourceKeys.add(zone.resource.key)
+      else (uncovered ??= new Set()).add(pitch)
     }
-    unsupportedNoteOccurrences.push(
-      Object.freeze({
-        occurrenceKey: span.occurrenceKey,
-        pitch: span.pitch,
-        reason: 'no-matching-zone',
-        soundbankId,
-        trackId: span.trackId,
-      }),
-    )
+    if (uncovered === undefined) continue
+    for (const span of spans) {
+      if (!uncovered.has(span.pitch)) continue
+      unsupportedNoteOccurrences.push(
+        Object.freeze({
+          occurrenceKey: span.occurrenceKey,
+          pitch: span.pitch,
+          reason: 'no-matching-zone',
+          soundbankId,
+          trackId: span.trackId,
+        }),
+      )
+    }
   }
 
   const resources = await cache.loadResources(baseUrl, resourceKeys, signal)
@@ -107,11 +129,11 @@ export async function prepareSampleResources(
 ): Promise<PreparedSampleResources> {
   signal?.throwIfAborted()
   const results = await Promise.all(
-    groupSpansBySoundbank(plan).map(async ([soundbankId, spans]) => {
+    groupClipsBySoundbank(plan).map(async ([soundbankId, clips]) => {
       try {
         const baseUrl = assetBaseUrl(soundbankId)
         if (baseUrl === null) throw new Error(`No sample assets are available for ${soundbankId}`)
-        return await prepareInstrument(cache, baseUrl, soundbankId, spans, signal)
+        return await prepareInstrument(cache, baseUrl, soundbankId, clips, signal)
       } catch (cause) {
         if (
           signal?.aborted === true ||

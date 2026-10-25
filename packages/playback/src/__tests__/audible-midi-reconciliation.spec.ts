@@ -49,6 +49,7 @@ import {
   createSampleInstrumentDeviceDescriptor,
   parseSoundbankId,
 } from '#internal/sample-instrument-device'
+import { planSpans } from '#internal/__tests__/support/plan-spans'
 
 const TRACK_ID = parseTrackId('track-reconciliation')
 const CLIP_ID = parseClipId('clip-reconciliation')
@@ -160,7 +161,7 @@ describe('Audible MIDI reconciliation', () => {
       kind: AUDIBLE_MIDI_OCCURRENCE_CHANGE_KIND.UPDATED,
     })
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([
-      previousPlan.midiNoteSpans[0]?.occurrenceKey,
+      planSpans(previousPlan)[0]?.occurrenceKey,
     ])
   })
 
@@ -314,7 +315,7 @@ describe('Audible MIDI reconciliation', () => {
       }),
     ])
     expect(plan.invalidatedPreviousOccurrenceKeys).toEqual([
-      previousPlan.midiNoteSpans[0]?.occurrenceKey,
+      planSpans(previousPlan)[0]?.occurrenceKey,
     ])
   })
 

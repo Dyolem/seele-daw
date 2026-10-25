@@ -67,6 +67,7 @@ import {
   type ManualPlaybackVoice,
   type ManualPreparedPlaybackPlan,
 } from '#internal/__tests__/support/fake-playback-runtime'
+import { planSpans } from '#internal/__tests__/support/plan-spans'
 
 const TRACK_ID = parseTrackId('track-playback-engine')
 const DEVICE_ID = parseDeviceId('device-playback-engine')
@@ -335,7 +336,7 @@ function requireVoice(
   plan: AudibleMidiProjectPlan,
   noteId: NoteId,
 ): ManualPlaybackVoice {
-  const occurrenceKey = plan.midiNoteSpans.find((span) => span.noteId === noteId)?.occurrenceKey
+  const occurrenceKey = planSpans(plan).find((span) => span.noteId === noteId)?.occurrenceKey
   const voice = prepared.voices.find((candidate) => candidate.occurrenceKey === occurrenceKey)
   if (voice === undefined) throw new Error(`Expected scheduled Voice for Note ${noteId}`)
   return voice

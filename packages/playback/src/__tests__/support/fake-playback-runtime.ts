@@ -159,7 +159,7 @@ export class ControlledPlaybackRuntime extends ManualPlaybackOutput {
     if (this.failure !== null) throw this.failure
     const unsupportedPitches = new Set(this.unsupportedNotePitches)
     const unsupportedNoteOccurrences: UnsupportedNoteOccurrence[] = []
-    for (const span of plan.midiNoteSpans) {
+    for (const span of [...plan.clipSpans.values()].flat()) {
       if (!unsupportedPitches.has(span.pitch)) continue
       const route = plan.tracks.find(({ trackId }) => trackId === span.trackId)
       if (route === undefined) throw new Error(`Missing Track route ${span.trackId}`)

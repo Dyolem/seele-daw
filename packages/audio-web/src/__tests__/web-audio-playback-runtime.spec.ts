@@ -110,6 +110,17 @@ class FakeBrowserAudioContext {
   }
 }
 
+/** Groups spans by Clip, keeping their order, as compiled plans hold them. */
+function byClip<Span extends { readonly clipId: string }>(
+  spans: readonly Span[],
+): ReadonlyMap<string, readonly Span[]> {
+  const clips = new Map<string, readonly Span[]>()
+  for (const span of spans) {
+    clips.set(span.clipId, Object.freeze([...(clips.get(span.clipId) ?? []), span]))
+  }
+  return clips
+}
+
 function createPlan(
   soundbankIds: readonly SoundbankId[],
   pitches: readonly number[] = soundbankIds.map(() => 60),
@@ -118,7 +129,7 @@ function createPlan(
     arrangementEndTick: 960,
     diagnostics: Object.freeze([]),
     master: Object.freeze({ gain: 1, muted: false }),
-    midiNoteSpans: Object.freeze(
+    clipSpans: byClip(
       soundbankIds.map((_soundbankId, index) =>
         Object.freeze({
           channel: index,
@@ -192,7 +203,7 @@ function createVoicePlan(
   index: number,
   soundbankId: SoundbankId,
 ): ScheduledSampleVoicePlan {
-  const span = plan.midiNoteSpans[index]!
+  const span = [...plan.clipSpans.values()].flat()[index]!
   return Object.freeze({
     channel: span.channel,
     instrumentDeviceId: `device-${index}`,
@@ -260,7 +271,7 @@ describe('Web Audio playback runtime', () => {
     expect(prepared.preparationFailures).toEqual([])
     expect(prepared.unsupportedNoteOccurrences).toEqual([
       expect.objectContaining({
-        occurrenceKey: plan.midiNoteSpans[0]?.occurrenceKey,
+        occurrenceKey: [...plan.clipSpans.values()][0]?.[0]?.occurrenceKey,
         pitch: 47,
         reason: 'no-matching-zone',
         soundbankId: FIRST_SOUNDBANK_ID,
@@ -289,7 +300,7 @@ describe('Web Audio playback runtime', () => {
 
     expect(prepared.unsupportedNoteOccurrences).toEqual([
       expect.objectContaining({
-        occurrenceKey: plan.midiNoteSpans[0]?.occurrenceKey,
+        occurrenceKey: [...plan.clipSpans.values()][0]?.[0]?.occurrenceKey,
         pitch: 33,
         reason: 'no-matching-zone',
       }),

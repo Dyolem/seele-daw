@@ -376,10 +376,10 @@ export function createAudibleMidiReconciliationPlan(
       .map(({ trackId }) => trackId),
   )
   if (invalidatedTrackIds.size > 0) {
-    for (const span of previousPlan.midiNoteSpans) {
-      if (invalidatedTrackIds.has(span.trackId)) {
-        invalidatedPreviousOccurrenceKeys.add(span.occurrenceKey)
-      }
+    // A Clip's spans all belong to its Track.
+    for (const spans of previousPlan.clipSpans.values()) {
+      if (spans.length === 0 || !invalidatedTrackIds.has(spans[0]!.trackId)) continue
+      for (const span of spans) invalidatedPreviousOccurrenceKeys.add(span.occurrenceKey)
     }
   }
   const reasons = createReasons(previousPlan, nextPlan, commits)

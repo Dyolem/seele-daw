@@ -277,7 +277,7 @@ describe('Audible MIDI Transport', () => {
     const plan = createFixturePlan()
     const transport = createAudibleMidiTransport(
       replacePlan(plan, {
-        midiNoteSpans: Object.freeze([]),
+        clipSpans: new Map(),
         status: AUDIBLE_MIDI_PLAN_STATUS.EMPTY,
       }),
       new ManualPlaybackClock(),
@@ -461,7 +461,7 @@ describe('Audible MIDI Transport', () => {
 
     const handedOff = transport.handoffPlan(
       replacePlan(plan, {
-        midiNoteSpans: Object.freeze([]),
+        clipSpans: new Map(),
         modelRevision: nextModelRevision(plan),
         status: AUDIBLE_MIDI_PLAN_STATUS.EMPTY,
       }),
@@ -620,7 +620,7 @@ describe('Audible MIDI Transport', () => {
   ] as const)('rejects %s Plans without changing state or generation', (status, outcome) => {
     const plan = createFixturePlan()
     const transport = createAudibleMidiTransport(
-      replacePlan(plan, { midiNoteSpans: Object.freeze([]), status }),
+      replacePlan(plan, { clipSpans: new Map(), status }),
       new ManualPlaybackClock(),
     )
 

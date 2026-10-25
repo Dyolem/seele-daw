@@ -1,5 +1,4 @@
 import {
-  parseTick,
   type BipolarValue,
   type DeviceId,
   type LinearGain,
@@ -7,14 +6,14 @@ import {
   type MidiPitch,
   type MidiVelocity,
   type ModelRevision,
-  type Tick,
   type TrackId,
 } from '@seele-daw/project-core'
 
-import type {
-  AudibleMidiProjectPlan,
-  MidiNoteSpanPlan,
-  NoteOccurrenceKey,
+import {
+  compareNoteSpans,
+  type AudibleMidiProjectPlan,
+  type MidiNoteSpanPlan,
+  type NoteOccurrenceKey,
 } from '#internal/compiler/audible-midi-plan'
 import type { SoundbankId } from '#internal/sample-instrument-device'
 import {
@@ -41,17 +40,10 @@ export type AudibleMidiSchedulerOutcome =
   (typeof AUDIBLE_MIDI_SCHEDULER_OUTCOME)[keyof typeof AUDIBLE_MIDI_SCHEDULER_OUTCOME]
 
 export type AudibleMidiSchedulerErrorCode =
-  | 'duplicate-note-occurrence-key'
-  | 'duplicate-track-route'
-  | 'inaudible-track-route'
-  | 'invalid-note-span'
-  | 'invalid-note-span-order'
   | 'invalid-scheduler-configuration'
-  | 'missing-track-route'
   | 'playback-clock-window-out-of-range'
   | 'schedule-cursor-inconsistent'
   | 'stale-mapping-generation'
-  | 'timeline-end-before-arrangement-end'
   | 'transport-mapping-changed-without-generation'
   | 'transport-plan-mismatch'
 
@@ -98,12 +90,6 @@ export interface AudibleMidiScheduleWindow {
   readonly toPlaybackClockSecond: PlaybackClockSecond
 }
 
-export interface AudibleMidiSchedulerDiagnostics {
-  readonly duplicateSuppressionCount: number
-  readonly expiredSpanDropCount: number
-  readonly lateStartCount: number
-}
-
 export interface AudibleMidiScheduleBatch {
   readonly outcome: AudibleMidiSchedulerOutcome
   readonly mappingGeneration: MappingGeneration
@@ -111,7 +97,6 @@ export interface AudibleMidiScheduleBatch {
   readonly planningPlaybackClockSecond: PlaybackClockSecond | null
   readonly window: AudibleMidiScheduleWindow | null
   readonly voicePlans: readonly ScheduledSampleVoicePlan[]
-  readonly diagnostics: AudibleMidiSchedulerDiagnostics
 }
 
 export interface AudibleMidiSchedulerPlanner {
@@ -119,7 +104,6 @@ export interface AudibleMidiSchedulerPlanner {
 }
 
 interface SchedulerTrackRoute {
-  readonly audible: boolean
   readonly instrumentDeviceId: DeviceId
   readonly soundbankId: SoundbankId
   readonly trackGain: LinearGain
@@ -156,91 +140,18 @@ function normalizeConfiguration(
   return Object.freeze({ lookAheadHorizonSecond })
 }
 
-function normalizeTrackRoutes(
-  plan: AudibleMidiProjectPlan,
-): ReadonlyMap<TrackId, SchedulerTrackRoute> {
-  const routes = new Map<TrackId, SchedulerTrackRoute>()
-
-  for (const track of plan.tracks) {
-    if (routes.has(track.trackId)) {
-      throw new AudibleMidiSchedulerError(
-        'duplicate-track-route',
-        `Scheduler Plan contains duplicate Track route ${track.trackId}`,
-      )
-    }
-
-    routes.set(
+function trackRoutes(plan: AudibleMidiProjectPlan): ReadonlyMap<TrackId, SchedulerTrackRoute> {
+  return new Map(
+    plan.tracks.map((track) => [
       track.trackId,
       Object.freeze({
-        audible: track.audible,
         instrumentDeviceId: track.instrumentDeviceId,
         pan: track.pan,
         soundbankId: track.instrument.soundbankId,
         trackGain: track.gain,
       }),
-    )
-  }
-
-  return routes
-}
-
-function normalizeNoteSpans(
-  plan: AudibleMidiProjectPlan,
-  routes: ReadonlyMap<TrackId, SchedulerTrackRoute>,
-  arrangementEndTick: Tick,
-): readonly MidiNoteSpanPlan[] {
-  const occurrenceKeys = new Set<NoteOccurrenceKey>()
-  const spans: MidiNoteSpanPlan[] = []
-  let previousStartTick: Tick | null = null
-
-  for (const inputSpan of plan.midiNoteSpans) {
-    const startTick = parseTick(inputSpan.startTick)
-    const endTick = parseTick(inputSpan.endTick)
-    const releaseTick = parseTick(inputSpan.releaseTick)
-    if (
-      endTick <= startTick ||
-      endTick > arrangementEndTick ||
-      releaseTick < endTick ||
-      releaseTick > arrangementEndTick
-    ) {
-      throw new AudibleMidiSchedulerError(
-        'invalid-note-span',
-        `Scheduler Note Span ${inputSpan.occurrenceKey} has an invalid Tick range`,
-      )
-    }
-    if (previousStartTick !== null && startTick < previousStartTick) {
-      throw new AudibleMidiSchedulerError(
-        'invalid-note-span-order',
-        'Scheduler Note Spans must remain sorted by startTick',
-      )
-    }
-    if (occurrenceKeys.has(inputSpan.occurrenceKey)) {
-      throw new AudibleMidiSchedulerError(
-        'duplicate-note-occurrence-key',
-        `Scheduler Plan contains duplicate occurrence key ${inputSpan.occurrenceKey}`,
-      )
-    }
-
-    const route = routes.get(inputSpan.trackId)
-    if (route === undefined) {
-      throw new AudibleMidiSchedulerError(
-        'missing-track-route',
-        `Scheduler Note Span ${inputSpan.occurrenceKey} has no Track route`,
-      )
-    }
-    if (!route.audible) {
-      throw new AudibleMidiSchedulerError(
-        'inaudible-track-route',
-        `Scheduler Note Span ${inputSpan.occurrenceKey} targets an inaudible Track`,
-      )
-    }
-
-    occurrenceKeys.add(inputSpan.occurrenceKey)
-    spans.push(Object.freeze({ ...inputSpan, endTick, releaseTick, startTick }))
-    previousStartTick = startTick
-  }
-
-  return Object.freeze(spans)
+    ]),
+  )
 }
 
 function parseCalculatedPlaybackClockSecond(value: number, context: string): PlaybackClockSecond {
@@ -271,14 +182,6 @@ function findFirstSpanAtOrAfter(spans: readonly MidiNoteSpanPlan[], tickPosition
   return lowerIndex
 }
 
-function createDiagnostics(
-  duplicateSuppressionCount = 0,
-  expiredSpanDropCount = 0,
-  lateStartCount = 0,
-): AudibleMidiSchedulerDiagnostics {
-  return Object.freeze({ duplicateSuppressionCount, expiredSpanDropCount, lateStartCount })
-}
-
 function createBatch(input: {
   readonly outcome: AudibleMidiSchedulerOutcome
   readonly mappingGeneration: MappingGeneration
@@ -286,10 +189,8 @@ function createBatch(input: {
   readonly planningPlaybackClockSecond?: PlaybackClockSecond
   readonly window?: AudibleMidiScheduleWindow
   readonly voicePlans?: readonly ScheduledSampleVoicePlan[]
-  readonly diagnostics?: AudibleMidiSchedulerDiagnostics
 }): AudibleMidiScheduleBatch {
   return Object.freeze({
-    diagnostics: input.diagnostics ?? createDiagnostics(),
     mappingGeneration: input.mappingGeneration,
     modelRevision: input.modelRevision,
     outcome: input.outcome,
@@ -299,7 +200,10 @@ function createBatch(input: {
   })
 }
 
-/** Creates a browser-independent look-ahead planner without owning a Timer or audio resource. */
+/**
+ * Creates a browser-independent look-ahead planner without owning a Timer or audio resource. It
+ * reads the plan's spans in place, one Clip at a time, so creating one costs the number of Clips.
+ */
 export function createAudibleMidiSchedulerPlanner(
   plan: AudibleMidiProjectPlan,
   configurationInput: AudibleMidiSchedulerConfiguration,
@@ -307,34 +211,26 @@ export function createAudibleMidiSchedulerPlanner(
   const configuration = normalizeConfiguration(configurationInput)
   const modelRevision = plan.modelRevision
   const masterGain = plan.master.gain
-  const arrangementEndTick = parseTick(plan.arrangementEndTick)
-  const timelineEndTick = parseTick(plan.timelineEndTick)
-  if (timelineEndTick < arrangementEndTick) {
-    throw new AudibleMidiSchedulerError(
-      'timeline-end-before-arrangement-end',
-      `Timeline End ${timelineEndTick} cannot precede Arrangement End ${arrangementEndTick}`,
-    )
-  }
+  const timelineEndTick = plan.timelineEndTick
   const tempoMap: TempoMap = createTempoMapFromSegments(plan.tempoSegments)
   const timelineEndProjectSecond = tempoMap.projectSecondAtTick(timelineEndTick)
-  const routes = normalizeTrackRoutes(plan)
-  const spans = normalizeNoteSpans(plan, routes, arrangementEndTick)
+  const routes = trackRoutes(plan)
+  // Each run is one Clip's spans in span order, with the index of the next span to plan.
+  const runs = [...plan.clipSpans.values()].filter((spans) => spans.length > 0)
+  const cursors = runs.map(() => 0)
 
   let highestObservedGeneration: MappingGeneration | null = null
   let activeGeneration: MappingGeneration | null = null
   let activeAnchorPlaybackClockSecond: PlaybackClockSecond | null = null
   let activeAnchorProjectSecond: ProjectSecond | null = null
   let plannedThroughPlaybackClockSecond: PlaybackClockSecond | null = null
-  let nextSpanIndex = 0
-  const handledOccurrenceKeys = new Set<NoteOccurrenceKey>()
 
   function clearActivePlanningState(): void {
     activeGeneration = null
     activeAnchorPlaybackClockSecond = null
     activeAnchorProjectSecond = null
     plannedThroughPlaybackClockSecond = null
-    nextSpanIndex = 0
-    handledOccurrenceKeys.clear()
+    cursors.fill(0)
   }
 
   function assertSnapshotMatchesPlan(snapshot: AudibleMidiTransportSnapshot): void {
@@ -375,8 +271,9 @@ export function createAudibleMidiSchedulerPlanner(
     activeAnchorPlaybackClockSecond = snapshot.anchorPlaybackClockSecond
     activeAnchorProjectSecond = snapshot.anchorProjectSecond
     plannedThroughPlaybackClockSecond = snapshot.anchorPlaybackClockSecond
-    nextSpanIndex = findFirstSpanAtOrAfter(spans, anchorTickPosition)
-    handledOccurrenceKeys.clear()
+    runs.forEach((spans, run) => {
+      cursors[run] = findFirstSpanAtOrAfter(spans, anchorTickPosition)
+    })
   }
 
   function assertStableMapping(snapshot: PlayingAudibleMidiTransportSnapshot): void {
@@ -490,67 +387,49 @@ export function createAudibleMidiSchedulerPlanner(
       })
     }
 
-    const voicePlans: ScheduledSampleVoicePlan[] = []
-    const newlyHandledKeys: NoteOccurrenceKey[] = []
-    let candidateSpanIndex = nextSpanIndex
-    let duplicateSuppressionCount = 0
-    let expiredSpanDropCount = 0
-    let lateStartCount = 0
-
     // Windows are half-open; an event exactly at the horizon belongs to the next wake.
-    while (candidateSpanIndex < spans.length) {
-      const span = spans[candidateSpanIndex]
-      if (span === undefined) break
+    const windowSpans: MidiNoteSpanPlan[] = []
+    const nextCursors = [...cursors]
+    runs.forEach((spans, run) => {
+      let index = nextCursors[run]!
+      for (; index < spans.length; index += 1) {
+        const span = spans[index]!
+        const targetStartPlaybackClockSecond = playbackClockSecondAtProjectSecond(
+          tempoMap.projectSecondAtTick(span.startTick),
+        )
+        if (targetStartPlaybackClockSecond >= toPlaybackClockSecond) break
+        if (targetStartPlaybackClockSecond < fromPlaybackClockSecond) {
+          throw new AudibleMidiSchedulerError(
+            'schedule-cursor-inconsistent',
+            `Occurrence ${span.occurrenceKey} fell behind the continuous Scheduler cursor`,
+          )
+        }
+        windowSpans.push(span)
+      }
+      nextCursors[run] = index
+    })
+
+    const voicePlans: ScheduledSampleVoicePlan[] = []
+    for (const span of windowSpans.sort(compareNoteSpans)) {
+      const targetReleasePlaybackClockSecond = playbackClockSecondAtProjectSecond(
+        tempoMap.projectSecondAtTick(span.releaseTick),
+      )
+      // A span whose release already passed is dropped; one that already started starts now.
+      if (targetReleasePlaybackClockSecond <= planningPlaybackClockSecond) continue
 
       const targetStartPlaybackClockSecond = playbackClockSecondAtProjectSecond(
         tempoMap.projectSecondAtTick(span.startTick),
       )
-      if (targetStartPlaybackClockSecond >= toPlaybackClockSecond) break
-      if (targetStartPlaybackClockSecond < fromPlaybackClockSecond) {
-        throw new AudibleMidiSchedulerError(
-          'schedule-cursor-inconsistent',
-          `Occurrence ${span.occurrenceKey} fell behind the continuous Scheduler cursor`,
-        )
-      }
-
-      candidateSpanIndex += 1
-      if (handledOccurrenceKeys.has(span.occurrenceKey)) {
-        duplicateSuppressionCount += 1
-        continue
-      }
-
-      const targetReleasePlaybackClockSecond = playbackClockSecondAtProjectSecond(
-        tempoMap.projectSecondAtTick(span.releaseTick),
-      )
       const targetKeyReleasePlaybackClockSecond = playbackClockSecondAtProjectSecond(
         tempoMap.projectSecondAtTick(span.endTick),
       )
-      newlyHandledKeys.push(span.occurrenceKey)
-
-      if (targetReleasePlaybackClockSecond <= planningPlaybackClockSecond) {
-        expiredSpanDropCount += 1
-        continue
-      }
-
-      const route = routes.get(span.trackId)
-      if (route === undefined) {
-        throw new AudibleMidiSchedulerError(
-          'missing-track-route',
-          `Scheduler Note Span ${span.occurrenceKey} has no Track route`,
-        )
-      }
-
       const isLate = targetStartPlaybackClockSecond < planningPlaybackClockSecond
-      const startPlaybackClockSecond = isLate
-        ? planningPlaybackClockSecond
-        : targetStartPlaybackClockSecond
-      if (isLate) lateStartCount += 1
 
       voicePlans.push(
         createScheduledVoice(
           span,
-          route,
-          startPlaybackClockSecond,
+          routes.get(span.trackId)!,
+          isLate ? planningPlaybackClockSecond : targetStartPlaybackClockSecond,
           targetKeyReleasePlaybackClockSecond,
           targetReleasePlaybackClockSecond,
           isLate ? 'late-immediate' : 'on-time',
@@ -558,18 +437,14 @@ export function createAudibleMidiSchedulerPlanner(
       )
     }
 
-    // Publish cursor and deduplication state only after the complete batch is valid.
-    nextSpanIndex = candidateSpanIndex
+    // Publish the cursors only after the complete batch is valid.
+    nextCursors.forEach((index, run) => {
+      cursors[run] = index
+    })
     plannedThroughPlaybackClockSecond = toPlaybackClockSecond
-    for (const occurrenceKey of newlyHandledKeys) handledOccurrenceKeys.add(occurrenceKey)
 
     const window = Object.freeze({ fromPlaybackClockSecond, toPlaybackClockSecond })
     return createBatch({
-      diagnostics: createDiagnostics(
-        duplicateSuppressionCount,
-        expiredSpanDropCount,
-        lateStartCount,
-      ),
       mappingGeneration: snapshot.mappingGeneration,
       modelRevision,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED,

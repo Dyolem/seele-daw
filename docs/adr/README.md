@@ -16,3 +16,4 @@ Revisit Trigger。决定被推翻时，把状态改为 Superseded 并链接到�
 | [006](./ADR-006-one-audio-output-for-every-revision.md)       | 所有 revision 共用一个音频输出                          |
 | [007](./ADR-007-snapshots-share-unchanged-parts.md)           | Snapshot 在 revision 之间共享没变的部分                 |
 | [008](./ADR-008-commits-validate-what-they-wrote.md)          | 提交只校验它写过的内容                                  |
+| [009](./ADR-009-playback-plans-keep-spans-by-clip.md)         | 播放计划只按 Clip 保存音符                              |

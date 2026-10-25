@@ -1,6 +1,6 @@
 import type { PlaybackVoice, ScheduledSampleVoicePlan } from '@seele-daw/playback'
 
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
 import {
   AUDIO_QUALITY_AQ0_RENDER_DURATION_SECOND,
@@ -50,7 +50,7 @@ function createOutput(context: OfflineAudioContext): ActiveWebAudioOutput {
   const projectMaster = context.createGain()
   const outputCalibration = context.createGain()
   projectMaster.gain.setValueAtTime(1, 0)
-  outputCalibration.gain.setValueAtTime(AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain, 0)
+  outputCalibration.gain.setValueAtTime(SAMPLE_VOICE_POLICY.outputCalibrationGain, 0)
   projectMaster.connect(outputCalibration)
   outputCalibration.connect(context.destination)
   return Object.freeze({

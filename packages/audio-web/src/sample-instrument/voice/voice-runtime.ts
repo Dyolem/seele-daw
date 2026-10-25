@@ -1,10 +1,10 @@
 import type { PlaybackVoice, ScheduledSampleVoicePlan } from '@seele-daw/playback'
 
 import {
-  AUDIO_QUALITY_V1A_RENDER_POLICY,
-  calculateAudioQualityV1aVelocityGain,
-  type AudioQualityExpressionVoiceLifecycle,
-} from '#internal/audio-quality/render-policy'
+  SAMPLE_VOICE_POLICY,
+  velocityGain,
+  type SampleVoiceLifecycle,
+} from '#internal/sample-instrument/voice/sample-voice-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
 import type {
   SampleInstrumentEnvelopeSegmentV1,
@@ -45,7 +45,7 @@ export interface SampleInstrumentVoiceRuntimeOptions {
 
 const FAST_RELEASE = Object.freeze<SampleInstrumentEnvelopeSegmentV1>({
   curve: null,
-  durationSecond: AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond,
+  durationSecond: SAMPLE_VOICE_POLICY.defaultFastReleaseSecond,
 })
 
 interface ActiveSampleVoice {
@@ -169,10 +169,7 @@ function hasReleaseStartedAtTime(voice: ActiveSampleVoice, time: number): boolea
   )
 }
 
-function classifyVoiceStealLifecycle(
-  voice: ActiveSampleVoice,
-  time: number,
-): AudioQualityExpressionVoiceLifecycle {
+function classifyVoiceStealLifecycle(voice: ActiveSampleVoice, time: number): SampleVoiceLifecycle {
   if (hasReleaseStartedAtTime(voice, time)) return 'release-started'
   // For a gated Voice, this middle state is the CC64 pedal-held interval. One-shot Voices also
   // retain their authored trigger semantics, but become preferable to a Voice whose key is held.
@@ -245,7 +242,7 @@ export class SampleInstrumentVoiceRuntime {
 
     const startTime = Math.max(plan.startPlaybackClockSecond, context.currentTime)
     const playbackRate = calculatePlaybackRate(zone, plan.pitch)
-    const baseGain = calculateAudioQualityV1aVelocityGain(plan.velocity) * plan.trackGain
+    const baseGain = velocityGain(plan.velocity) * plan.trackGain
     const polyphonyAdmission = this.#planPolyphonyAdmission(plan, startTime)
     if (polyphonyAdmission.kind === 'drop') {
       this.#polyphonyDropCount += 1
@@ -391,7 +388,7 @@ export class SampleInstrumentVoiceRuntime {
     const remainingFraction = (endTime - fromTime) / attack.durationSecond
     const segmentCount = Math.max(
       1,
-      Math.ceil(AUDIO_QUALITY_V1A_RENDER_POLICY.envelopeCurveSegmentCount * remainingFraction),
+      Math.ceil(SAMPLE_VOICE_POLICY.envelopeCurveSegmentCount * remainingFraction),
     )
     for (let index = 1; index <= segmentCount; index += 1) {
       const time = fromTime + (endTime - fromTime) * (index / segmentCount)
@@ -413,7 +410,7 @@ export class SampleInstrumentVoiceRuntime {
     durationSecond: number,
     leaveSustainLoop: boolean,
   ): void {
-    const stopTime = time + durationSecond + AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
+    const stopTime = time + durationSecond + SAMPLE_VOICE_POLICY.sourceStopSafetySecond
     if (!leaveSustainLoop || durationSecond === 0) {
       // Web Audio applies the latest stop() call while an earlier scheduled stop has not fired.
       for (const source of voice.sources) source.node.stop(stopTime)
@@ -545,14 +542,13 @@ export class SampleInstrumentVoiceRuntime {
       0,
     )
     const instrumentLimitReached =
-      instrumentSoundingVoiceCount >=
-      AUDIO_QUALITY_V1A_RENDER_POLICY.maximumInstrumentSoundingVoiceCount
+      instrumentSoundingVoiceCount >= SAMPLE_VOICE_POLICY.maximumInstrumentSoundingVoiceCount
     const runtimeLimitReached =
-      soundingVoices.length >= AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRuntimeSoundingVoiceCount
+      soundingVoices.length >= SAMPLE_VOICE_POLICY.maximumRuntimeSoundingVoiceCount
     if (!instrumentLimitReached && !runtimeLimitReached) return Object.freeze({ kind: 'admit' })
 
     const retirementVoiceCount = this.#voices.size - soundingVoices.length
-    if (retirementVoiceCount >= AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRetirementVoiceCount) {
+    if (retirementVoiceCount >= SAMPLE_VOICE_POLICY.maximumRetirementVoiceCount) {
       return Object.freeze({ kind: 'drop' })
     }
     const eligibleVoices = instrumentLimitReached

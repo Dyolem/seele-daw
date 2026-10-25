@@ -1,8 +1,7 @@
 import {
-  AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
-  AUDIO_QUALITY_V1A_RENDER_POLICY,
-  calculateAudioQualityV1aVelocityGain,
-} from '#internal/audio-quality/render-policy'
+  SAMPLE_VOICE_POLICY,
+  velocityGain,
+} from '#internal/sample-instrument/voice/sample-voice-policy'
 import {
   runAudioQualityAq2BrowserReport,
   type AudioQualityAq2BrowserReport,
@@ -125,8 +124,6 @@ export interface AudioQualityAq0BrowserReport {
     readonly userAgent: string
   }
   readonly expressionEq2: AudioQualityExpressionEq2BrowserReport
-  readonly expressionPolicy: typeof AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY
-  readonly expressionRenderPolicy: typeof AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY.id
   readonly fixture: {
     readonly noteReleaseSecond: number
     readonly noteStartSecond: number
@@ -139,9 +136,8 @@ export interface AudioQualityAq0BrowserReport {
     readonly tailWindow: typeof AUDIO_QUALITY_AQ0_TAIL_WINDOW
     readonly zoneReleaseSecond: number
   }
-  readonly policy: typeof AUDIO_QUALITY_V1A_RENDER_POLICY
+  readonly policy: typeof SAMPLE_VOICE_POLICY
   readonly polyphonyMeasurements: readonly AudioQualityAq0PolyphonyMeasurement[]
-  readonly renderPolicy: typeof AUDIO_QUALITY_V1A_RENDER_POLICY.id
   readonly schema: typeof AUDIO_QUALITY_AQ0_REPORT_SCHEMA
   readonly schemaVersion: 5
   readonly velocityMeasurements: readonly AudioQualityAq0VelocityMeasurement[]
@@ -191,7 +187,7 @@ async function renderVelocity(velocity: number): Promise<AudioQualityAq0Velocity
   )
   return Object.freeze({
     ...measured,
-    baseGain: calculateAudioQualityV1aVelocityGain(velocity),
+    baseGain: velocityGain(velocity),
     relativeRmsDbToVelocity127: null,
     velocity,
   })
@@ -362,8 +358,6 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
       userAgent: navigator.userAgent,
     }),
     expressionEq2,
-    expressionPolicy: AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
-    expressionRenderPolicy: AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY.id,
     fixture: Object.freeze({
       noteReleaseSecond: AUDIO_QUALITY_AQ0_NOTE_RELEASE_SECOND,
       noteStartSecond: AUDIO_QUALITY_AQ0_NOTE_START_SECOND,
@@ -376,9 +370,8 @@ export async function runAudioQualityAq0BrowserBaseline(): Promise<AudioQualityA
       tailWindow: AUDIO_QUALITY_AQ0_TAIL_WINDOW,
       zoneReleaseSecond: AUDIO_QUALITY_AQ0_ZONE_RELEASE_SECOND,
     }),
-    policy: AUDIO_QUALITY_V1A_RENDER_POLICY,
+    policy: SAMPLE_VOICE_POLICY,
     polyphonyMeasurements,
-    renderPolicy: AUDIO_QUALITY_V1A_RENDER_POLICY.id,
     schema: AUDIO_QUALITY_AQ0_REPORT_SCHEMA,
     schemaVersion: 5,
     velocityMeasurements,

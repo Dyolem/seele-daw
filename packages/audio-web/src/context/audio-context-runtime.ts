@@ -1,4 +1,4 @@
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 
 export type WebAudioContextRuntimeState =
   | 'closed'
@@ -140,7 +140,7 @@ export class WebAudioContextRuntime {
         outputCalibrationGain = context.createGain()
         masterGain.gain.setValueAtTime(1, context.currentTime)
         outputCalibrationGain.gain.setValueAtTime(
-          AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain,
+          SAMPLE_VOICE_POLICY.outputCalibrationGain,
           context.currentTime,
         )
         masterGain.connect(outputCalibrationGain)

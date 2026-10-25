@@ -35,12 +35,13 @@ schedule(voicePlan)
 同一资源的并发请求共享一次 fetch 与解码；某个等待者取消不影响其他等待者，最后一个离开才取消底层
 请求；失败的请求不留在缓存里。Studio 默认的解码预算是 192 MiB。
 
-播放中的每次编辑都会重新准备整个计划。乐器都已缓存时，剩下的是逐个音符找 Zone：每个 Manifest
-第一次被用到时建一张按音高的表。基准：`pnpm --filter @seele-daw/audio-web bench`。
+播放中的每次编辑都会重新准备整个计划，但工作按 Clip 记忆：每个 Clip 用到的音高只算一次（span
+数组不变就沿用），每个 Manifest 第一次被用到时建一张按音高的表；只有某个音高没有 Zone 时，才逐个
+检查这个 Clip 的音符（[ADR-009](../../docs/adr/ADR-009-playback-plans-keep-spans-by-clip.md)）。基准：`pnpm --filter @seele-daw/audio-web bench`。
 
 ## 发声规则
 
-常数集中在 `audio-quality/render-policy.ts`：
+常数集中在 `sample-instrument/voice/sample-voice-policy.ts`：
 
 - 力度：平方响应，下限 -36 dB，再乘 Track Gain。Project Master 保持原值，之后固定做 -12 dB 输出
   校准，没有隐藏的 limiter。

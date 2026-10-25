@@ -1,7 +1,4 @@
-import {
-  AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
-  AUDIO_QUALITY_V1A_RENDER_POLICY,
-} from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import {
   AUDIO_QUALITY_EXPRESSION_EQ2_KEY_RELEASE_SECOND,
   AUDIO_QUALITY_EXPRESSION_EQ2_NOTE_START_SECOND,
@@ -99,7 +96,6 @@ export interface AudioQualityExpressionEq2BrowserReport {
     readonly retriggerOccurrencesRemainIndependent: boolean
     readonly tailsBelowMinus90Dbfs: boolean
   }
-  readonly expressionPolicy: typeof AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY
   readonly gatePolicy: typeof AUDIO_QUALITY_EXPRESSION_EQ2_GATE_POLICY
   readonly retriggerMeasurement: AudioQualityExpressionEq2RetriggerMeasurement
   readonly stressMeasurement: AudioQualityExpressionEq2StressMeasurement
@@ -128,8 +124,7 @@ function maximumExpectedSignalError(
     AUDIO_QUALITY_EXPRESSION_EQ2_ZONE_RELEASE_SECOND,
   )
   const expectedLevel =
-    AUDIO_QUALITY_EXPRESSION_EQ2_SOURCE_AMPLITUDE *
-    AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain
+    AUDIO_QUALITY_EXPRESSION_EQ2_SOURCE_AMPLITUDE * SAMPLE_VOICE_POLICY.outputCalibrationGain
   let maximumError = 0
   for (let frame = fromFrame; frame < toFrame; frame += 1) {
     const elapsedFrame = frame - startFrame
@@ -356,8 +351,7 @@ export async function runAudioQualityExpressionEq2BrowserReport(): Promise<Audio
     retriggerMeasurement,
   ]
   const expectedSingleVoicePeak =
-    AUDIO_QUALITY_EXPRESSION_EQ2_SOURCE_AMPLITUDE *
-    AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain
+    AUDIO_QUALITY_EXPRESSION_EQ2_SOURCE_AMPLITUDE * SAMPLE_VOICE_POLICY.outputCalibrationGain
   return Object.freeze({
     checks: Object.freeze({
       allMeasurementsFinite: collectFiniteValues(
@@ -411,7 +405,6 @@ export async function runAudioQualityExpressionEq2BrowserReport(): Promise<Audio
           tailPeakDbfs < AUDIO_QUALITY_EXPRESSION_EQ2_GATE_POLICY.tailThresholdDbfs,
       ),
     }),
-    expressionPolicy: AUDIO_QUALITY_EXPRESSION_V1_RENDER_POLICY,
     gatePolicy: AUDIO_QUALITY_EXPRESSION_EQ2_GATE_POLICY,
     retriggerMeasurement,
     stressMeasurement,

@@ -1,4 +1,4 @@
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import {
   AUDIO_QUALITY_AQ3_PROJECT_PLAN_COUNT,
   AUDIO_QUALITY_AQ3_RENDER_DURATION_SECOND,
@@ -83,17 +83,17 @@ function measureRetirementFastReleaseError(
 ): number {
   const expectedStartLevel =
     AUDIO_QUALITY_AQ3_SOURCE_AMPLITUDE *
-    AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain *
+    SAMPLE_VOICE_POLICY.outputCalibrationGain *
     retirementVoiceCount
   const fromFrame = audioQualitySecondToFrame(AUDIO_QUALITY_AQ3_STEAL_SECOND) + 1
   const releaseEndSecond =
-    AUDIO_QUALITY_AQ3_STEAL_SECOND + AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
+    AUDIO_QUALITY_AQ3_STEAL_SECOND + SAMPLE_VOICE_POLICY.defaultFastReleaseSecond
   const toFrame = audioQualitySecondToFrame(releaseEndSecond)
   let maximumError = 0
   for (let frame = fromFrame; frame < toFrame; frame += 1) {
     const progress =
       (frame / AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ - AUDIO_QUALITY_AQ3_STEAL_SECOND) /
-      AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
+      SAMPLE_VOICE_POLICY.defaultFastReleaseSecond
     maximumError = Math.max(
       maximumError,
       Math.abs(channel[frame]! - expectedStartLevel * (1 - progress)),
@@ -122,7 +122,7 @@ async function renderPolyphonyScenario(
   const droppedPlanCount = rendered.voices.length - scheduledPlanCount
   const expectedSoundingChannelLevel =
     AUDIO_QUALITY_AQ3_SOURCE_AMPLITUDE *
-    AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain *
+    SAMPLE_VOICE_POLICY.outputCalibrationGain *
     expectedSoundingVoiceCount
   const sounding = measureAudioQualityAq0Channel(
     soundingChannel,
@@ -131,7 +131,7 @@ async function renderPolyphonyScenario(
   )
   const retirementTailStartSecond =
     AUDIO_QUALITY_AQ3_STEAL_SECOND +
-    AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond +
+    SAMPLE_VOICE_POLICY.defaultFastReleaseSecond +
     128 / AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ
   const retirementTail = measureAudioQualityAq0Channel(
     retirementChannel,
@@ -203,14 +203,14 @@ export async function runAudioQualityAq3BrowserReport(): Promise<AudioQualityAq3
     renderPolyphonyScenario(
       'ten-thousand-plan-stress',
       createAudioQualityAq3StressPlans(),
-      AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRetirementVoiceCount,
-      AUDIO_QUALITY_V1A_RENDER_POLICY.maximumInstrumentSoundingVoiceCount,
+      SAMPLE_VOICE_POLICY.maximumRetirementVoiceCount,
+      SAMPLE_VOICE_POLICY.maximumInstrumentSoundingVoiceCount,
     ),
     renderPolyphonyScenario(
       'project-runtime-limit',
       createAudioQualityAq3ProjectLimitPlans(),
       1,
-      AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRuntimeSoundingVoiceCount,
+      SAMPLE_VOICE_POLICY.maximumRuntimeSoundingVoiceCount,
     ),
   ])
   const measurements = Object.freeze([stress, projectRuntime])
@@ -223,7 +223,7 @@ export async function runAudioQualityAq3BrowserReport(): Promise<AudioQualityAq3
         projectRuntime.scheduledPlanCount === AUDIO_QUALITY_AQ3_PROJECT_PLAN_COUNT &&
         projectRuntime.droppedPlanCount === 0 &&
         projectRuntime.polyphonyStatisticsAfterSchedule.soundingVoiceCount ===
-          AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRuntimeSoundingVoiceCount &&
+          SAMPLE_VOICE_POLICY.maximumRuntimeSoundingVoiceCount &&
         projectRuntime.polyphonyStatisticsAfterSchedule.retirementVoiceCount === 1 &&
         projectRuntime.polyphonyStatisticsAfterSchedule.voiceStealCount === 1,
       resourcesReleasedAfterDispose: measurements.every(
@@ -253,16 +253,16 @@ export async function runAudioQualityAq3BrowserReport(): Promise<AudioQualityAq3
       stressBudgetExact:
         stress.planCount === AUDIO_QUALITY_AQ3_STRESS_PLAN_COUNT &&
         stress.scheduledPlanCount ===
-          AUDIO_QUALITY_V1A_RENDER_POLICY.maximumInstrumentSoundingVoiceCount +
-            AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRetirementVoiceCount &&
+          SAMPLE_VOICE_POLICY.maximumInstrumentSoundingVoiceCount +
+            SAMPLE_VOICE_POLICY.maximumRetirementVoiceCount &&
         stress.droppedPlanCount ===
           AUDIO_QUALITY_AQ3_STRESS_PLAN_COUNT - stress.scheduledPlanCount &&
         stress.polyphonyStatisticsAfterSchedule.soundingVoiceCount ===
-          AUDIO_QUALITY_V1A_RENDER_POLICY.maximumInstrumentSoundingVoiceCount &&
+          SAMPLE_VOICE_POLICY.maximumInstrumentSoundingVoiceCount &&
         stress.polyphonyStatisticsAfterSchedule.retirementVoiceCount ===
-          AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRetirementVoiceCount &&
+          SAMPLE_VOICE_POLICY.maximumRetirementVoiceCount &&
         stress.polyphonyStatisticsAfterSchedule.voiceStealCount ===
-          AUDIO_QUALITY_V1A_RENDER_POLICY.maximumRetirementVoiceCount &&
+          SAMPLE_VOICE_POLICY.maximumRetirementVoiceCount &&
         stress.polyphonyStatisticsAfterSchedule.polyphonyDropCount === stress.droppedPlanCount,
       tailsBelowMinus90Dbfs: measurements.every(
         ({ tailPeakDbfs }) =>

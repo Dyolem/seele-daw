@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import { FakeAudioParam } from '#internal/__tests__/support/fake-web-audio'
 import {
   evaluateSampleInstrumentEnvelopeProgress,
@@ -68,7 +68,7 @@ describe('Sample Instrument envelope', () => {
 
     expect(endValue).toBeCloseTo(evaluateSampleInstrumentEnvelopeProgress(0.25, -2))
     expect(parameter.events.filter(({ kind }) => kind === 'linear-ramp')).toHaveLength(
-      AUDIO_QUALITY_V1A_RENDER_POLICY.envelopeCurveSegmentCount / 4,
+      SAMPLE_VOICE_POLICY.envelopeCurveSegmentCount / 4,
     )
     expect(parameter.events.at(-1)?.time).toBe(10.5)
     expect(parameter.events.every(({ time }) => time <= 10.5)).toBe(true)

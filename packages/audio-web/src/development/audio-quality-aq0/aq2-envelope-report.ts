@@ -1,4 +1,4 @@
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import {
   AUDIO_QUALITY_AQ2_FAST_RELEASE_START_SECOND,
   AUDIO_QUALITY_AQ2_MUTEX_RELEASE_SECOND,
@@ -108,8 +108,7 @@ async function renderShortNote(): Promise<AudioQualityAq2EnvelopeMeasurement> {
 
 async function renderFastRelease(): Promise<AudioQualityAq2EnvelopeMeasurement> {
   const releaseEndSecond =
-    AUDIO_QUALITY_AQ2_FAST_RELEASE_START_SECOND +
-    AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
+    AUDIO_QUALITY_AQ2_FAST_RELEASE_START_SECOND + SAMPLE_VOICE_POLICY.defaultFastReleaseSecond
   const rendered = await renderAudioQualityAq2({
     onScheduled: (voices) => {
       const voice = voices[0]
@@ -132,7 +131,7 @@ async function renderFastRelease(): Promise<AudioQualityAq2EnvelopeMeasurement> 
       ? 1
       : 1 -
         (second - AUDIO_QUALITY_AQ2_FAST_RELEASE_START_SECOND) /
-          AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
+          SAMPLE_VOICE_POLICY.defaultFastReleaseSecond
   return Object.freeze({
     ...withAudioQualityAq2RuntimeMeasurement(rendered),
     id: 'fast-release',

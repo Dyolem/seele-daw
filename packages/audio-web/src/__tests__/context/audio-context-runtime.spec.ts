@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { WebAudioContextRuntime } from '#internal/context/audio-context-runtime'
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import { FakeAudioContext, FakeGainNode } from '#internal/__tests__/support/fake-web-audio'
 
 describe('Web Audio context runtime', () => {
@@ -33,7 +33,7 @@ describe('Web Audio context runtime', () => {
       {
         kind: 'set',
         time: 3,
-        value: AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain,
+        value: SAMPLE_VOICE_POLICY.outputCalibrationGain,
       },
     ])
     expect(context.gainNodes[0]?.connections).toEqual([context.gainNodes[1]])

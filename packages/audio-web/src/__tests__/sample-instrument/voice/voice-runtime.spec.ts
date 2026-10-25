@@ -5,7 +5,7 @@ import {
 } from '@seele-daw/playback'
 import { describe, expect, it, vi } from 'vitest'
 
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import type { ActiveWebAudioOutput } from '#internal/context/audio-context-runtime'
 import type {
   SampleInstrumentManifestV1,
@@ -22,8 +22,8 @@ import {
 } from '#internal/__tests__/support/fake-web-audio'
 
 const SOUNDBANK_ID = parseSoundbankId('fixture-voice-bank')
-const FAST_RELEASE_SECOND = AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
-const STOP_SAFETY_SECOND = AUDIO_QUALITY_V1A_RENDER_POLICY.sourceStopSafetySecond
+const FAST_RELEASE_SECOND = SAMPLE_VOICE_POLICY.defaultFastReleaseSecond
+const STOP_SAFETY_SECOND = SAMPLE_VOICE_POLICY.sourceStopSafetySecond
 
 function createZone(
   zoneId: string,

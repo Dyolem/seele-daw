@@ -1,4 +1,4 @@
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import {
   AUDIO_QUALITY_AQ2_RENDER_DURATION_SECOND,
   AUDIO_QUALITY_AQ2_SOURCE_AMPLITUDE,
@@ -19,12 +19,10 @@ import {
 import type { SampleInstrumentVoiceRuntimeStatistics } from '#internal/sample-instrument/voice/voice-runtime'
 
 export const AUDIO_QUALITY_AQ2_CENTERED_CONSTANT_LEVEL =
-  AUDIO_QUALITY_AQ2_SOURCE_AMPLITUDE *
-  AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain *
-  Math.SQRT1_2
+  AUDIO_QUALITY_AQ2_SOURCE_AMPLITUDE * SAMPLE_VOICE_POLICY.outputCalibrationGain * Math.SQRT1_2
 
 export const AUDIO_QUALITY_AQ2_HARD_PANNED_CONSTANT_LEVEL =
-  AUDIO_QUALITY_AQ2_SOURCE_AMPLITUDE * AUDIO_QUALITY_V1A_RENDER_POLICY.outputCalibrationGain
+  AUDIO_QUALITY_AQ2_SOURCE_AMPLITUDE * SAMPLE_VOICE_POLICY.outputCalibrationGain
 
 export function isZeroAudioQualityAq2Statistics(
   statistics: SampleInstrumentVoiceRuntimeStatistics,

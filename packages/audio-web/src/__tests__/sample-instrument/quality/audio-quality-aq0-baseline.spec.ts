@@ -5,7 +5,7 @@ import type {
   SampleInstrumentManifestV1,
   SampleInstrumentZoneV1,
 } from '#internal/sample-instrument/contract/manifest'
-import { calculateAudioQualityV1aVelocityGain } from '#internal/audio-quality/render-policy'
+import { velocityGain } from '#internal/sample-instrument/voice/sample-voice-policy'
 import {
   SampleInstrumentVoiceRuntime,
   type SampleInstrument,
@@ -170,7 +170,7 @@ describe('Audio Quality Foundation AQ0 baseline', () => {
       expect(context.gainNodes[index]?.gain.events).toContainEqual({
         kind: 'set',
         time: plans[index]!.startPlaybackClockSecond,
-        value: calculateAudioQualityV1aVelocityGain(plans[index]!.velocity),
+        value: velocityGain(plans[index]!.velocity),
       })
     }
     expect(setMasterGainAtTime.mock.calls).toEqual([[1, 0]])

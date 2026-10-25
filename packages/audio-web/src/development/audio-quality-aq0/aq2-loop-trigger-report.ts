@@ -1,4 +1,4 @@
-import { AUDIO_QUALITY_V1A_RENDER_POLICY } from '#internal/audio-quality/render-policy'
+import { SAMPLE_VOICE_POLICY } from '#internal/sample-instrument/voice/sample-voice-policy'
 import {
   AUDIO_QUALITY_AQ2_CONTINUOUS_RELEASE_SECOND,
   AUDIO_QUALITY_AQ2_LOOP_END_SECOND,
@@ -139,8 +139,7 @@ async function renderMutex(): Promise<AudioQualityAq2MutexMeasurement> {
   const left = rendered.channels[0]!
   const right = rendered.channels[1]!
   const releaseEndSecond =
-    AUDIO_QUALITY_AQ2_MUTEX_NEW_START_SECOND +
-    AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
+    AUDIO_QUALITY_AQ2_MUTEX_NEW_START_SECOND + SAMPLE_VOICE_POLICY.defaultFastReleaseSecond
   let oldVoiceFastReleaseMaximumAbsoluteError = 0
   for (
     let frame = audioQualitySecondToFrame(AUDIO_QUALITY_AQ2_MUTEX_NEW_START_SECOND) + 1;
@@ -149,7 +148,7 @@ async function renderMutex(): Promise<AudioQualityAq2MutexMeasurement> {
   ) {
     const progress =
       (frame / AUDIO_QUALITY_AQ0_SAMPLE_RATE_HZ - AUDIO_QUALITY_AQ2_MUTEX_NEW_START_SECOND) /
-      AUDIO_QUALITY_V1A_RENDER_POLICY.defaultFastReleaseSecond
+      SAMPLE_VOICE_POLICY.defaultFastReleaseSecond
     oldVoiceFastReleaseMaximumAbsoluteError = Math.max(
       oldVoiceFastReleaseMaximumAbsoluteError,
       Math.abs(left[frame]! - AUDIO_QUALITY_AQ2_HARD_PANNED_CONSTANT_LEVEL * (1 - progress)),

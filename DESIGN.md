@@ -307,7 +307,7 @@ Studio 中组件本地状态、Props / Emits、Pinia 与类型化 Vue Context �
 - 当前 label，例如 Save / Saving… / Retry save。
 
 Binding 是独立输入配置，Action 可以没有快捷键。平台化 Binding 文案可用于菜单和按钮提示。
-Save、Undo／Redo、Play／Pause，以及 WA2 的 Return、Projects、MIDI Import 和 Open MIDI Editor
+Save、Undo／Redo、Play／Pause、Return、Projects、MIDI Import 和 Open MIDI Editor 的
 入口已统一。Project Menu 按 Project、History、Playback、View 分组，超过可用高度时滚动。
 按钮的无障碍名称使用 Action label，禁用原因与平台化快捷键进入提示；Dock 的 checked 状态
 直接从 Workspace 派生。两种导入共用选择／导入中的 busy 状态，取消文件选择后恢复可用。

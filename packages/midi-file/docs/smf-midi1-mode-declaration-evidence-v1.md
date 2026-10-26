@@ -1,21 +1,16 @@
 # SMF MIDI 1.0 Mode Declaration Evidence V1
 
-> Status: MI6C reviewed and committed as `32a8f36`; full root check passed
->
-> Date: 2026-09-07
->
-> Scope owner: `@seele-daw/midi-file`; evidence transit through `@seele-daw/project-midi`
-
-本文定义传统 Standard MIDI File 中模式声明的第一批客观证据。它回答“文件明确发送了什么系统模式
-消息”，不直接回答“每个 Note 应该如何解释”，也不会让当前 Sample Runtime 获得尚未实现的
-Keyswitch、Drum Map、Bank、Articulation 或合成能力。
+本文定义传统 Standard MIDI File 中模式声明的客观证据，由 `@seele-daw/midi-file` 检查、经
+`@seele-daw/project-midi` 传递。它回答“文件明确发送了什么系统模式消息”，不回答“每个 Note
+应该如何解释”，也不会让 Sample Runtime 获得尚未实现的 Keyswitch、Drum Map、Bank、Articulation
+或合成能力。
 
 相关基础术语见
 [多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)，
 Source Envelope 的分层和生命周期见
 [MIDI Source Envelope V1](./midi-source-envelope-v1.md)。
 
-## 1. 本批识别范围
+## 1. 识别范围
 
 检查器只接受以下完整、精确的 MIDI 1.0 System Exclusive 数据。表中的数据不含 SMF 事件状态字节
 `F0`，但包含消息终止字节 `F7`：
@@ -75,15 +70,15 @@ SMF bytes
 
 ## 4. 与 Semantic Binding 的分界
 
-本批没有建立可执行的 `MIDI Semantic Binding`：
+Evidence 本身不是可执行的语义：
 
 - 多种 On / Off / Reset 声明可能按时间切换，或在不同 Type 1 Track 的同一 Tick 产生顺序歧义；
 - GM、GS 或 XG 模式证据不能证明任意低音 Note 是 Keyswitch；
-- 没有模式声明的文件仍可能按 GM 习惯创作，现有 Program / Channel 10 兼容路由也不会在本批改变；
-- 即使绑定成功，只有已经实现的 Project Fact 与 Runtime 能力才能执行，不能伪造缺少的音源或控制。
+- 没有模式声明的文件仍可能按 GM 习惯创作，Program / Channel 10 兼容路由不因证据改变；
+- 即使绑定成功，也只有已经实现的 Project Fact 与 Runtime 能力才能执行，不能伪造缺少的音源或控制。
 
-MI6D 已在 `project-midi` 导入边界从这些位置化声明生成保守、版本化、带冲突结果的 Binding，同时
-保留原始 Evidence，并继续区分“无声明”“未分类”“检查失败”和“互相冲突”。它的政策与用户反馈见
+`project-midi` 在导入边界从这些位置化声明生成保守、版本化、带冲突结果的 Binding，同时保留原始
+Evidence，并区分“无声明”“未分类”“检查失败”和“互相冲突”。政策与用户反馈见
 [MIDI Semantic Binding V1](../../project-midi/docs/midi-semantic-binding-v1.md)。
 
 ## 5. 术语速查
@@ -95,19 +90,14 @@ MI6D 已在 `project-midi` 导入边界从这些位置化声明生成保守、�
 | Continuation Event       | SMF 用 `F7` 事件继续前一段尚未结束的 `F0` SysEx 数据                        |
 | Inspection Policy        | 本次检查承诺识别的有限消息集合，不等于“理解了所有 SysEx”                    |
 | Unclassified             | 看见了 SysEx，但当前政策不能精确分类；不等于错误或可以删除                  |
-| Semantic Binding         | MI6D 把证据分类成可绑定或风险状态；当前结果不会改变 Note 或声音             |
+| Semantic Binding         | 把证据分类成可绑定或风险状态；结果不会改变 Note 或声音                      |
 
-## 6. 自动验证门禁
+## 6. 测试覆盖
 
 - 精确识别五类声明，并把近似 GM 子类型、错误 GS Checksum 与厂商私有消息保持为未分类；
 - 一个 `F0` 加多个 `F7` continuation packet 可重组，检查 parser 失败保持 `unresolved`；
 - Source Envelope、声明数组与声明对象在 Decoder、Project MIDI Import Summary 边界保持深度不可变；
-- Encoder 覆盖五类消息、确定顺序和重新解析，并拒绝检查失败或存在未分类 SysEx 的来源；
-- 2026-09-07 完整 `pnpm check` 已通过 Architecture、Workspace Quality、Format、Oxlint、ESLint、
-  全工作区 Type Check、159 个测试文件 / 1,384 项测试、Studio Production Build 与 soundbank dist
-  boundary。
-
-这些门禁证明有限证据契约与失败边界，不表示已解释声明、改变导入路由或实现新发声功能。
+- Encoder 覆盖五类消息、确定顺序和重新解析，并拒绝检查失败或存在未分类 SysEx 的来源。
 
 ## 7. 规范依据
 

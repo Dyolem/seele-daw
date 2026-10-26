@@ -1,14 +1,7 @@
 # Studio MIDI Program Import Routing V1
 
-> Status: MI3A reviewed and committed as `cd043b9`; extended through complete GM routing on
-> 2026-09-04
->
-> Date: 2026-09-03
->
-> Scope: `@seele-daw/project-midi` and `apps/studio`
-
 本文记录 Standard MIDI File 的 Program 与 Channel 10 如何在导入时成为明确的 Project
-Instrument Device。Program、Channel 10、精确映射、近似映射与不可用占位等术语见
+Instrument Device，涉及 `@seele-daw/project-midi` 与 `apps/studio`。Program、Channel 10、精确映射、近似映射与不可用占位等术语见
 [多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户可见行为
@@ -49,7 +42,7 @@ MidiFileTrack { channel, programNumber }
 - Inspector 把 Placeholder 与损坏或未知的 Missing Instrument 分开说明；两者都只能由用户显式
   Replace，不能自动改写。
 
-本批不升级 Project File schema。现有通用 Device Descriptor 已足以保存新 Device 类型。
+Project File schema 不因此改变：通用 Device Descriptor 已足以保存这种 Device。
 
 ## 3. 路由优先级与诊断
 
@@ -62,8 +55,8 @@ MidiFileTrack { channel, programNumber }
    `program-unavailable`；近似诊断包含实际 Preset 名称。
 
 `@tonejs/midi` 已在中立 Decoder 边界按 `[Program, Channel]` 规范化来源，因此同一 SMF Track
-出现多个 Channel 或 Program 时会形成多个 normalized Track。本批不增加动态 Program Change
-Project Fact，也不在播放途中切换 Device。`midi-file` 回归 fixture 固定了同一 Channel 中途换
+出现多个 Channel 或 Program 时会形成多个 normalized Track。没有动态 Program Change 的 Project
+Fact，播放途中也不切换 Device。`midi-file` 回归 fixture 固定了同一 Channel 中途换
 Program 后，前后 Note 会进入不同 normalized Track 的行为。
 
 ## 4. 兼容与失败边界
@@ -77,28 +70,17 @@ Program 后，前后 Note 会进入不同 normalized Track 的行为。
   Program Exact 宣称为完整 Bank 兼容。
 - Decoder 拆分 Program 时不会替 V1 在拆分后的 Track 间追赶此前已生效的 Controller 状态；在踏板
   按住期间换 Program 等边界输入，不能宣称已完整还原动态换音色语义。
-- MI3B 把首个 Note 前或同 Tick 最终生效的 CC7 / CC10 转成 Track 初始 Gain / Pan；动态 Program、
-  后续 CC7 / CC10、CC11、Pitch Bend、Aftertouch 和 Articulation 继续延期。
-- MI6D 即使从来源 Mode Declaration 得到唯一 GM / GS / XG Binding，也只在导入反馈中显示检测结果；
-  本页的 Program / Channel 10 路由不会自动切换成尚未实现的 Bank、Drum Map 或 Articulation 政策。
+- 首个 Note 前或同 Tick 最终生效的 CC7 / CC10 成为 Track 初始 Gain / Pan；动态 Program、后续
+  CC7 / CC10、CC11、Pitch Bend、Aftertouch 和 Articulation 尚未实现。
+- 即使来源 Mode Declaration 得到唯一的 GM / GS / XG Binding，也只在导入反馈中显示；本页的
+  Program / Channel 10 路由不会因此切换成尚未实现的 Bank、Drum Map 或 Articulation 政策。
 
 初始 Channel 控制的听觉与数值契约见
 [MIDI Initial Channel Controls V1](../../../packages/project-midi/docs/midi-initial-channel-controls-v1.md)。
-MI6D 的保守分类与冲突反馈见
+模式声明的保守分类与冲突反馈见
 [MIDI Semantic Binding V1](../../../packages/project-midi/docs/midi-semantic-binding-v1.md)。
 
-## 5. 自动验证
-
-- `@seele-daw/project-midi` Type Check 与 3 个测试文件 / 26 项测试通过；
-- `@seele-daw/midi-file` Type Check 与 3 个测试文件 / 15 项测试通过；
-- `@seele-daw/playback` Type Check 与 9 个测试文件 / 107 项测试通过；
-- Studio Type Check 与 64 个测试文件 / 412 项测试通过；
-- 根级 `pnpm lint` 已通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint；
-- Studio Production Build 与 soundbank dist boundary 通过，本地 Soundbank 未进入 `dist`。
-
-本批不执行人工声音试听，也不重复完整根级 `pnpm check`；多音源资源压力与自动混合 Peak 随后
-由 MI4 / MI5 完成，总谱人工听测仍为 `not-run`。
+## 5. 相关文档
 
 完整 128 项路由、其使用的 86 个唯一采样资产，以及与 439 项手动 Preset 目录的区别见
 [Studio Built-in Preset Catalogue and General MIDI Routing V1](./general-midi-built-in-routing-v1.md)。
-MI3A 的 21 项 Exact 记录仍表示当时的历史范围。

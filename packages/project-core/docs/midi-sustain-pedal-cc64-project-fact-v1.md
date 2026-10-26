@@ -1,29 +1,22 @@
 # MIDI Sustain Pedal CC64 Project Fact V1
 
-## 阶段状态
+本文定义 Sustain Pedal CC64 在 Project Core 中的事实边界。已经具备：
 
-本文档定义 Sustain Pedal CC64 的 Project Core 事实边界，并记录后续纵向切片的集成状态。
-Project Core 的可保存、可撤销、可增量观察事实与命令事务已经提交；Standard MIDI File 导入、
-Playback、Audio Runtime、Studio 选择性重协调与 Controller Lane Pencil Add 已在后续批次实现。
-Event Selection / Move / Replace Value / Remove 的 Editor Foundation 已建立，但 Studio 尚未接入。
-
-当前批次完成：
-
-- `MidiSustainPedalEventRecord`、Source 所有权分区与全局不变量；
-- Add、批量 Move、批量 Remove、Replace Value Project Command；
+- `MidiSustainPedalEventRecord`、按 Source 的所有权分区与全局不变量；
+- Add、批量 Move、批量 Remove、Replace Value 四个 Project Command；
 - 存储变化、History、Undo / Redo 与 Snapshot；
 - 项目文件的写出与严格读取；
 - 新建 MIDI Clip 与整轨集合导入命令所需的完整所有权图；
-- Standard MIDI File CC64 导入、PPQ 碰撞诊断与原始 Value / Channel 保留；
-- 非循环 Clip 的 Playback 状态追赶、最终 Gate Release 推导与确定性同 Tick 排序；
-- Audio Runtime 最终释放执行，以及播放中 CC64 编辑的选择性 Voice 重排。
+- Standard MIDI File 的 CC64 导入、PPQ 碰撞诊断与原始 Value / Channel 保留；
+- 非循环 Clip 的播放状态追赶、最终 Gate Release 推导与确定性的同 Tick 排序；
+- Studio Piano Roll 的 CC64 Lane：Pencil 新增、Cursor 选择、移动、改值与删除。
 
-后续批次仍需完成：
+尚未提供：
 
-- Project MIDI Export Bridge 的 CC64 导出映射与 Studio Export UI；
+- CC64 的 Standard MIDI File 导出；
 - Looped MIDI Clip 的控制器循环展开与已有 Note 的 Note Chase；
-- Studio Event Selection / Move / Replace Value / Remove、精确输入和批量编辑；
-- half-pedal、repedaling、共鸣、pedal noise 与 release sample 等更丰富音源表现力。
+- 精确数值输入与批量编辑；
+- half-pedal、repedaling、共鸣、pedal noise 与 release sample 等更丰富的音源表现力。
 
 播放侧的完整排序、边界与术语见
 [MIDI Sustain Pedal CC64 Playback V1](../../playback/docs/midi-sustain-pedal-cc64-playback-v1.md)。
@@ -107,7 +100,7 @@ MutationPlan 中原子删除或恢复。新建空 MIDI Clip 也会建立空踏�
 - `value < 64` 解释为 Pedal Up；
 - Source / Channel 在第一条事件前的派生初始状态是 Pedal Up；
 - V1 保留全部 `0..127`，但不把 `64..127` 映射为不同制音深度；
-- half-pedal、repedaling、pedal noise 和 damper resonance 不在本批次中实现。
+- half-pedal、repedaling、pedal noise 和 damper resonance 尚未实现。
 
 保留原值的目的，是避免项目文件在未来增加更细表达时已经丢失输入信息。当前二值播放政策
 不等于把原值规范化为 `0` 或 `127`。
@@ -183,19 +176,11 @@ Project Fact 不包含 Sample Loop、Envelope、Trigger、Mutex、Release 或 Zo
 因此 Project Core 不读取 Studio Grand 名称、Soundbank、SFZ opcode 或 AudioNode；Playback 与
 Audio Runtime 也不会对不同控制文件采用同一套硬编码 Loop / Release 参数。
 
-## 后续集成门禁
+## 音质验证
 
-CC64 Playback 与 Audio Runtime 的代码级门禁已覆盖基本保持、释放、Channel 隔离和 Manifest
-行为。Controller Lane 完成后、WAV Export 开始前，仍必须重新验证：
+保持、释放、Channel 隔离、同音重触发、Voice Stealing 中 pedal-held Voice 的优先级，以及各类 Zone
+的 Loop / Trigger 语义，由测试与 AQ0 报告的 CC64 合成 PCM 场景检查。将来做离线导出时，实时与
+离线必须采用同一套 CC64 排序与终点政策。真实音源的人工听测仍为 `not-run`。
 
-- Note Off 在 Pedal Down 时进入 pedal-held，而不是立即 Release；
-- Pedal Up 只释放对应 Channel 中已经松键的 Voice；
-- 同音重触发、voice stealing 和 pedal-held Voice 优先级；
-- Loop / non-loop / one-shot Zone 各自遵守控制文件语义；
-- Locate / Seek、Clip Loop 边界和播放开始前的 Pedal Chase；
-- 停止播放、设备替换、generation 切换和资源销毁没有悬挂 Voice；
-- 实时与未来离线导出采用同一 CC64 排序与终点政策；
-- 峰值、headroom、click 和 Pedal Up Release 通过表达力音质门禁。
-
-在这些门禁完成前，产品文档可以声明“导入的二值 CC64 会延后最终 Gate Release”，但不能声明
-Studio Grand 已经产生新的采样内容、共鸣、release sample 或 half-pedal 音色。
+所以可以说“导入的二值 CC64 会延后最终 Gate Release”，但不能说 Studio Grand 有了新的采样内容、
+共鸣、release sample 或 half-pedal 音色。

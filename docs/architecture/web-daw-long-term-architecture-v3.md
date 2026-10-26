@@ -16,7 +16,7 @@
 > 本文其余未加 `Audible MIDI Playback` 限定的 `V1` 是 2026-07-09 长期基线中的“首版产品 /
 > 模型”简称，同样不是文档版本；落地时仍须由对应专项计划重新确认。
 > Manual Timeline Locate 已通过 `checkpoint/manual-timeline-locate-2026-08-18` 收口；随后实施的
-> [Standard MIDI File Import / Export V1](../../packages/midi-file/docs/midi-import-export-v1-phase-plan.md)
+> [Standard MIDI File Import / Export V1](../archive/midi/midi-import-export-v1-phase-plan.md)
 > 以独立 `midi-file` Codec 和 `project-midi` 映射边界开始，不把第三方 Parser 类型、格式规则或
 > 文件 I/O 反向带入 Project Core。当前已完成调用方验证 Session 的新项目生命周期入口、本地 Blob
 > 字节读取 Adapter，以及 Studio Project Entry / Workbench 的文件选择、Codec / Bridge 组合、

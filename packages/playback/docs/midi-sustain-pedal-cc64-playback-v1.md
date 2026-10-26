@@ -1,12 +1,7 @@
 # MIDI Sustain Pedal CC64 Playback V1
 
-> 状态：导入、Playback、Audio Runtime 与 Studio 选择性重协调已提交为 `3ff2853`
->
-> 日期：2026-08-31
-
-本文记录 Seele 第一版延音踏板播放契约。它只回答一件事：Standard MIDI File 中已经存在的
-MIDI CC64 数据，如何作为独立 Project Fact 导入，并在播放时延后已经松键的声音。Controller
-Lane、半踏板、钢琴共鸣与额外松键采样不属于本批次。
+本文记录延音踏板的播放契约：MIDI CC64 如何作为独立的 Project Fact 导入，并在播放时延后已经
+松键的声音。半踏板、钢琴共鸣与额外的松键采样尚未实现。
 
 Project Core 的事实与命令契约见
 [MIDI Sustain Pedal CC64 Project Fact V1](../../project-core/docs/midi-sustain-pedal-cc64-project-fact-v1.md)；
@@ -15,7 +10,7 @@ Project Core 的事实与命令契约见
 
 ## 术语与时间边界
 
-| 中文术语     | 英文 / 源码名称                    | 本批次中的含义                                                                 |
+| 中文术语     | 英文 / 源码名称                    | 含义                                                                           |
 | ------------ | ---------------------------------- | ------------------------------------------------------------------------------ |
 | 按键释放     | Key Release / Note Off             | MIDI Note 自己记录的松键时间；Clip 边缘裁剪后写入 `endTick`。                  |
 | 踏板保持声部 | Pedal-held Voice                   | 已经按键释放，但对应 Channel 的 CC64 仍为按下，因此尚未进入最终释放的 Voice。  |
@@ -29,7 +24,7 @@ Project Core 的事实与命令契约见
 ## Standard MIDI File 导入
 
 - 只导入 Controller Number `64`；原始整数值 `0..127` 与 Track Channel 原样保留；
-- `value >= 64` 为 Pedal Down，`value < 64` 为 Pedal Up；本批次不连续解释中间值；
+- `value >= 64` 为 Pedal Down，`value < 64` 为 Pedal Up；不连续解释中间值；
 - CC64 与 Note 使用同一 PPQ 换算。若多个来源事件四舍五入到同一 Project Tick，按来源 Tick 和
   来源事件顺序确定性保留最后一条，并产生 `SUSTAIN_PEDAL_EVENTS_COLLAPSED` 诊断；
 - 含 Note 的 normalized Track 会同时导入自己的 CC64。只有控制器、没有 Note 的 Track 仍不创建
@@ -54,7 +49,7 @@ Project MIDI Export Bridge 尚未实现，因此当前没有把 Project CC64 写
 每个 Source 都有踏板分区，同一 Source / Channel / Tick 至多一枚事件，分区按 Tick 排序：这些是
 Project Core 的不变量与 Snapshot 的约定，Compiler 不再检查。
 
-当前 Looped MIDI Clip 仍整体不进入可听编译，因此本批次没有宣称完成跨循环的踏板状态展开。
+Looped MIDI Clip 整体不进入可听编译，所以没有跨循环的踏板状态展开。
 非循环 Clip 采用半开 Source Window；位于终点的 CC64 Fact 可以保存和往返，但不会把声音延长到
 Clip 之外。
 
@@ -85,10 +80,9 @@ Studio Grand 当前控制文件没有 Sample Loop，所以 CC64 最直接的效�
 
 ## 播放中编辑与失败边界
 
-已有 CC64 Project Command 进入 Studio Playback Coordinator 的选择性 Reconciliation：Add、
-Move、Remove 与 Replace Value 会重新编译受影响 Source 的 occurrence。已经开始且仍活动的 Voice
-只重排最终释放时间；不相关 Voice 不执行全局 `allNotesOff`。当前 CC64 Controller Lane 已复用
-这条路径，并保持一次手势只提交一个 Project Command / History 步骤。
+CC64 的 Add、Move、Remove 与 Replace Value 进入播放引擎的选择性调和：受影响 Clip 的 span 重新
+编译，已经开始且仍在发声的 Voice 只改期最终释放；不相关的 Voice 不受影响。Piano Roll 的 CC64
+Lane 走同一条路径，一次手势只提交一个 Project Command / History 步骤。
 
 以下能力仍明确延期：
 
@@ -101,18 +95,9 @@ Move、Remove 与 Replace Value 会重新编译受影响 Source 的 occurrence�
 这些限制不影响保存原始 CC64 值，但禁止把当前能力描述为完整钢琴物理模型或完整 MIDI 控制器
 实现。
 
-## 本批次验证范围
+## 测试覆盖
 
-自动测试覆盖：CC64 导入、PPQ 碰撞诊断、Channel 隔离、同 Tick 顺序、窗口前状态追赶、Clip
-终点释放、Scheduler 的双释放时间、选择性 Reconciliation，以及 no-loop / continuous loop /
-sustain loop / one-shot 对最终 Gate Release 的执行。
-
-本批次不把代码级时间测试冒充人工听测。Controller Lane 完成后、WAV Export 开始前，仍需执行
-表达力集成质量门禁，复核 Pedal Up click、release tail、复音峰值、Voice Stealing、停止 / Locate /
-设备替换资源清理，以及实时与离线语义一致性。EQ1 Voice Stealing 与 EQ2 Chromium PCM 已分别提交
-为 `f47bf38`、`3c29bc9`，EQ3A 尾音所有权清理已提交为 `5ef34a5`；EQ3B 已冻结
-`arrangementEndTick`、`timelineEndTick` 与音频输出渲染终点的区别。
-该门禁由
-[Expression Quality Integration V1](../../../docs/archive/audio-web/expression-quality-integration-v1-phase-plan.md)
-独立跟踪，集中收口证据见
-[Expression Quality Integration V1 收口报告](../../../docs/archive/audio-web/expression-quality-integration-v1-closure-report.md)。
+自动测试覆盖：CC64 导入、PPQ 碰撞诊断、Channel 隔离、同 Tick 顺序、窗口前状态追赶、Clip 终点
+释放、Scheduler 的双释放时间、选择性调和，以及 no-loop / continuous loop / sustain loop /
+one-shot 对最终 Gate Release 的执行。合成 PCM 场景在 AQ0 报告中检查；真实音源的人工听测仍为
+`not-run`。

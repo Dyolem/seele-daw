@@ -1,13 +1,7 @@
 # MIDI Initial Channel Controls V1
 
-> Status: MI3B implementation pending review
->
-> Date: 2026-09-03
->
-> Scope: `@seele-daw/project-midi`, with existing Playback and Audio Web consumers
-
-本文记录 Standard MIDI File 中初始 Channel Volume（CC7）与 Pan（CC10）如何变成 Seele Track
-Channel Facts。CC、Linear Gain、Pan、Automation 等术语见
+本文记录 `@seele-daw/project-midi` 如何把 Standard MIDI File 中初始 Channel Volume（CC7）与
+Pan（CC10）变成 Seele Track Channel Facts。CC、Linear Gain、Pan、Automation 等术语见
 [多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户预期听觉
@@ -17,8 +11,8 @@ Channel Facts。CC、Linear Gain、Pan、Automation 等术语见
 - 已设置的 CC10 会成为整条 Track 的固定左右位置：`0` 最左、`64` 正中、`127` 最右。
 - 这些值由现有 Playback Track Plan 和 Audio Web Gain / Panner 路径执行，不建立另一套 MIDI
   Runtime 状态；Velocity、Track Gain、Master Gain 与固定输出校准仍按既有顺序共同决定最终电平。
-- CC7 `0` 只表示 Gain 为零，不会伪造 `muted: true`；Track Mute 继续是独立 Project Fact。当前
-  Studio 尚未提供 Track Gain 编辑 UI，本批也不把这一事实描述成新的用户编辑能力。
+- CC7 `0` 只表示 Gain 为零，不会伪造 `muted: true`；Track Mute 是独立的 Project Fact。Studio
+  尚未提供 Track Gain 编辑 UI，所以这不是一项用户编辑能力。
 - 这是初始静态状态，不是 Automation。首个 Note 之后的 CC7 / CC10 不会形成渐强、渐弱或移动
   声像，并会通过非阻断诊断明确告知未导入。
 - 不同 Soundbank 本身的录音响度仍可能不同；本映射保留来源比例，不做跨乐器响度归一化，也不
@@ -54,7 +48,7 @@ MidiFileTrack { notes, controlChanges }
   -> Audio Web Gain / Stereo Panner
 ```
 
-- 本批复用 Project Core 已有 `ChannelStripDescriptor`，不升级 Project File schema，不新增命令类型。
+- 复用 Project Core 已有的 `ChannelStripDescriptor`，不改变 Project File schema，不新增命令类型。
 - “导入为新项目”把值写入新 Session；“导入为当前项目的新 Track”在原有单次 Collection Command
   内与 Device、Clip、Note 和 CC64 一起提交，仍只有一个 History 步骤。
 - 首个 Note 之后的 CC7 / CC10 与所有未支持 Controller 进入既有
@@ -66,7 +60,7 @@ MidiFileTrack { notes, controlChanges }
 ## 4. 失败与兼容边界
 
 - normalized Document 中任一 Control Change 的 Tick、Controller 或 Value 越界时，整个导入在创建
-  Project Fact 前失败；本批不 clamp 或猜测损坏输入。
+  Project Fact 前失败；不 clamp 或猜测损坏的输入。
 - 同 Tick Note 与 Controller 的跨事件原始字节顺序没有保留在中立 Document 中。V1 按已批准规则把
   首个 Note Tick 上的最后一条同类 CC 当作初始值，不能据此声称逐字节重放原始事件顺序。
 - Decoder 因中途 Program Change 拆分 Track 时，不会跨拆分 Track 追赶更早的 CC7 / CC10；完整
@@ -76,7 +70,7 @@ MidiFileTrack { notes, controlChanges }
 - CC11 Expression、动态 CC7 / CC10、CC1、Pitch Bend、Aftertouch、Bank Select 与通用 Automation
   仍未实现。
 
-## 5. 自动验证
+## 5. 测试覆盖
 
 - 无 Controller 时保持 Gain `1` / Pan `0`；
 - CC7 `0` / `64` / `127` 与 CC10 `0` / `32` / `64` / `96` / `127` 换算；
@@ -84,14 +78,3 @@ MidiFileTrack { notes, controlChanges }
 - 新项目与当前项目 Track 导入使用同一规则并保持原子性；
 - Playback Compiler 原样保存 Track Gain / Pan；
 - 非法 CC、空 Track、CC64 隔离与既有 Program / Channel 10 路由兼容。
-
-验证结果：
-
-- `@seele-daw/project-midi` Type Check 与 3 个测试文件 / 29 项测试通过；
-- `@seele-daw/playback` Type Check 与 9 个测试文件 / 107 项测试通过；
-- Studio Type Check、64 个测试文件 / 412 项测试、Production Build 与 soundbank dist boundary
-  通过；
-- 根级 `pnpm lint` 通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint。
-
-本批不执行人工声音试听、浏览器声像检查或多音源混合 Peak 测量，也不重复完整根级
-`pnpm check`；这些音频门禁仍属于 MI5。

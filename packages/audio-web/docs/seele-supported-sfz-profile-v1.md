@@ -1,21 +1,14 @@
 # Seele Supported SFZ Profile V1 与 Sample Instrument Manifest V1
 
-> Status: Batch 4A.1b reviewed and committed as `07f4218`
->
-> Last updated: 2026-08-12
-
-本文定义 Seele 内置 Sample Instrument 首个浏览器无关语义契约。它由两个彼此分离的层次组成：
+本文定义 Seele Sample Instrument 的浏览器无关语义契约。它由两个彼此分离的层次组成：
 
 1. **Seele Supported SFZ Profile V1**：面向可交换音源和未来 SFZ Importer 的公开 authoring
    子集；
 2. **Sample Instrument Manifest V1**：Importer 规范化后交给 Seele Sample Runtime 的唯一数据
    形状。
 
-Batch 4A.1a 已实现并通过审阅：Profile 常量、Manifest 类型、严格 validator 和默认内置
-`MIDISampleSynth` Mapping Adapter 已提交。Batch 4A.1b 的独立受限 ZIP / WAV 边界与本地规范化
-工具也已通过审阅并提交；Batch 4B.1 资源准备以及 Batch 4B.2 的生产 AudioContext 与 Voice 执行
-均已通过审阅。尚未实现 SFZ 文本 parser；Studio Timeline 首次可听闭环也已在 Batch 5A 实现并
-通过功能审核，进一步优化留待后续讨论。
+Profile 常量、Manifest 类型、严格的 validator 与 Runtime 都已实现；内置音源由准备工具里的
+`MIDISampleSynth` Mapping Adapter 规范化成 Manifest。SFZ 文本 parser 尚未实现。
 
 默认内置数据的字段统计与行为推断不是本规范的一部分，另见
 [默认内置 MIDISampleSynth 控制文件逆向分析](./default-built-in-midi-sample-synth-reverse-analysis.md)。
@@ -165,7 +158,7 @@ resource:
 Manifest 使用秒，而 SFZ `offset` / `loop_start` / `loop_end` 使用 source sample frame。单位转换是
 Importer 的责任；Runtime 不接收模糊的裸数值，也不重新读取源格式默认值。
 
-Batch 4B.2 为 envelope shape 固定了一项 Seele Runtime 执行定义：`curve: null` 与 `0` 使用
+Runtime 对 envelope shape 的执行定义是：`curve: null` 与 `0` 使用
 linear amplitude；非零 curve 使用归一化指数进度
 `expm1(shape * t) / expm1(shape)`，其中 `t` 为 `0...1`，shape 在执行时钳制到 `[-10, 10]`。
 Runtime 用分段原生 linear ramps 逼近该曲线，使未来 cancel / choke 能替换尚未发生的 automation。
@@ -217,7 +210,7 @@ Mapping、4,664 个 Zone 做过一次性兼容审计，全部可规范化。全�
 
 ## 5. Archive 与本地规范化边界
 
-Batch 4A.1b 不改变本文的发声语义，而是在 Manifest 外建立资源容器边界：
+资源容器的边界在 Manifest 之外，由准备工具负责，不影响发声语义：
 
 - 受限 ZIP Adapter 只解压调用方预先声明的精确 entry 集合，并限制路径、压缩方法、entry 数量、
   单文件 / 总解压大小和压缩比；支持 `AbortSignal`，返回稳定错误分类；
@@ -235,19 +228,16 @@ Manifest 只保存 Runtime 所需的稳定资源 key，不保存 ZIP entry、Cat
 
 ## 6. 明确延期
 
-本批次不实现：
+尚未实现：
 
 - SFZ 文本 tokenizer / parser、include、macro、SFZ 2 或 ARIA extensions；
 - velocity layer、round-robin、random、sequence、release trigger、key switch、controller 或复杂
   modulation；
 - SoundFont、DLS、DecentSampler 或其他格式 Importer；
 - 面向任意后端 Bundle 的可信 manifest / checksum 协议、任意 Archive 扫描与自动安装；
-- M4A 自动协商；
-- Studio Scheduler Executor、Transport UI、浏览器自动音频渲染 smoke 与真实 Timeline 发声闭环。
+- M4A 自动协商。
 
-下一独立批次先基于本地规范化结果测量读取、解码内存与听觉边界，再确认浏览器 Sample Loader
-与 Runtime 策略。SFZ 文本 Importer 仍可单独实现，并以本文 Profile 与相同 Manifest contract
-tests 作为验收标准。
+SFZ 文本 Importer 可以单独实现，以本文 Profile 与同一组 Manifest contract tests 作为验收标准。
 
 ## 7. 行业背景与参考
 

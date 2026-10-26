@@ -130,7 +130,7 @@ Project Entry 是当前启动页，提供：
 - 创建中的项目不可被重复创建；打开中的项目不可被重复打开。
 - Project Entry 的 MIDI 导入创建独立项目；读取、解码或 Project 映射失败时不创建 Catalog、
   Checkpoint 或活动 Session。
-- SMF 内嵌名称优先；缺失时使用本地文件名。普通导入 Track 按已审核的零基 GM Program 选择音源，
+- SMF 内嵌名称优先；缺失时使用本地文件名。普通导入 Track 按零基 GM Program 路由表选择音源，
   Channel 10 优先使用 General MIDI Percussion；未支持 Program 保存可见无声占位，不回退 Studio
   Grand。首个 Note 前或同 Tick 最终生效的 CC7 / CC10 初始化 Track Gain / Pan；后续动态事件与
   Bank Select 尚未应用并继续产生诊断。
@@ -629,7 +629,7 @@ Track 上的 MIDI Clip，Instrument 状态和修复入口仍然可见：
 - Undo 恢复旧 Device，Redo 恢复新音色；Save / Reload 保留当前选择。
 - 未知、版本不兼容或状态不兼容的 Descriptor 显示 `Missing instrument` 和已保存的
   `soundbankId` 或 `typeId`，继续原样 round-trip；用户可以显式替换，但 Studio 不自动 fallback。
-- MIDI 导入为未审核 Program 保存的严格 V1 占位显示 `MIDI Program N unavailable`，明确说明
+- MIDI 导入为没有可播放映射的 Program 保存的占位显示 `MIDI Program N unavailable`，明确说明
   Track 在选择替代音色前保持无声；它与损坏资源或未知 Device 的 Missing 状态不同。
 - Command 失败时旧 Descriptor 保持不变，并通过 Toast 显示原因。
 - 展示始终从 Active Project 的 Snapshot 派生，不在 Pinia 或组件本地复制 Device Fact。

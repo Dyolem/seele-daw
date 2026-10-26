@@ -1,12 +1,5 @@
 # Studio Built-in Preset Catalogue and General MIDI Routing V1
 
-> Status: implemented, pending review
->
-> Date: 2026-09-04
->
-> Scope: complete source Preset catalogue, General MIDI Program routing, developer-local
-> MIDISampleSynth assets, and the Studio Instrument picker
-
 本文记录 Studio 如何同时处理两类容易混淆、但用途不同的目录：用户手动浏览的是来源提供的完整
 Preset 目录；Standard MIDI File 导入查询的是固定 128 项 General MIDI（GM）Program 路由。相关
 MIDI、Program、Preset、Soundbank、控制文件与精确 / 近似映射等术语见
@@ -52,7 +45,7 @@ Studio 冻结的 Preset Snapshot 是完整手动目录权威；`GENERAL_MIDI_PRO
 Core 不知道 Preset 类别或 GM 表，只保存通用 Device Descriptor；Playback 只消费
 `soundbankId`。
 
-多个 GM Program 可以经过审核后复用同一近似 Soundbank，例如 Electric Piano 1 / 2 都可路由到
+多个 GM Program 可以复用同一个近似 Soundbank，例如 Electric Piano 1 / 2 都可路由到
 `electric-piano`。这不会减少手动目录：用户直接选择来源 Preset 时，每个可播放 Preset 都有唯一
 Soundbank ID，并能恢复该具体选择。GM 导入的 Approximate 结果仍产生非阻断诊断，不能伪装成
 完全一致的原音色。
@@ -65,14 +58,14 @@ Catalog、Mapping 与 WAV Archive 哈希。完整输入集合为 870 个文件�
 重新审计，不能由运行时自动接受。跟踪的 Snapshot 不保存远程下载 URL。
 
 开发命令 `pnpm --filter @seele-daw/audio-web prepare:built-in-presets-local` 逐音源准备完整 289
-项采样 Preset，复用已经审核的 86 项 GM 子集并新增 203 项定义。新增定义保留来源原生 Pitch
+项采样 Preset：GM 路由用到的 86 项，加上另外 203 项定义。新增定义保留来源原生 Pitch
 Selector 与空隙，不人为扩展连续音域；未覆盖 Pitch 会在资源准备边界明确失败。
 
-首次完整准备得到 289 个 Manifest、4,664 个 Zone / Resource，合计约 2.172 GB 压缩 Archive、
+完整准备得到 289 个 Manifest、4,664 个 Zone / Resource，合计约 2.172 GB 压缩 Archive、
 2.758 GB 解压输入、2.756 GB 生成 WAV 与 5.511 GB 解码 Float32 估算。实测最大单 Archive 为
 67,453,699 bytes、最多 74 个 Entry、最大单 Entry 为 4,659,232 bytes、最大总解压为
 87,662,379 bytes；新增来源采用 128 MiB Archive / 总解压、128 Entries、8 MiB 单 Entry 与压缩率
-64 的上限。既有 86 项继续保持各自已审核的更窄预算。幂等复跑时 289 项全部为 `current`，库存
+64 的上限，GM 路由的 86 项沿用各自更窄的预算。幂等复跑时 289 项全部为 `current`，库存
 报告 SHA-256 保持
 `0117e50075604585a43a583c5fe83dfc2fde4ec26055dc2e7b7c9207812a3234`。
 
@@ -85,15 +78,15 @@ Selector 与空隙，不人为扩展连续音域；未覆盖 Pitch 会在资源�
 文件转换为严格的 Seele Sample Instrument Manifest，现有 Sample Voice Runtime 再执行该
 Manifest。完整 Snapshot 审计覆盖 4,664 个 Zone，当前实际出现的控制如下：
 
-| 来源控制含义                       | Seele Manifest / Runtime 行为                                         |
-| ---------------------------------- | --------------------------------------------------------------------- |
-| Pitch Selector / Range             | 为目标 MIDI Pitch 选择确定的 Zone 与 WAV；空隙不猜测资源              |
-| Root Pitch 与 Tune                 | 计算 `AudioBufferSourceNode.playbackRate`，完成移调与微调             |
-| Source Frame Offset                | 从声明的采样帧位置开始播放                                            |
-| Attack / Release 与 Envelope Curve | 由 Gain Envelope 排程起音和退场；非零曲线使用 Seele 已冻结的分段近似  |
-| Loop Start / End / Mode            | 执行 no-loop、continuous loop 或 sustain loop                         |
-| Trigger                            | 区分 gated Voice 与 one-shot；普通 Note Off 不提前截断 one-shot       |
-| Mutex / Exclusive Group            | 执行有方向的 Choke，例如已审核 General MIDI Percussion 的 Hi-hat 互斥 |
+| 来源控制含义                       | Seele Manifest / Runtime 行为                                        |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| Pitch Selector / Range             | 为目标 MIDI Pitch 选择确定的 Zone 与 WAV；空隙不猜测资源             |
+| Root Pitch 与 Tune                 | 计算 `AudioBufferSourceNode.playbackRate`，完成移调与微调            |
+| Source Frame Offset                | 从声明的采样帧位置开始播放                                           |
+| Attack / Release 与 Envelope Curve | 由 Gain Envelope 排程起音和退场；非零曲线使用 Seele 已冻结的分段近似 |
+| Loop Start / End / Mode            | 执行 no-loop、continuous loop 或 sustain loop                        |
+| Trigger                            | 区分 gated Voice 与 one-shot；普通 Note Off 不提前截断 one-shot      |
+| Mutex / Exclusive Group            | 执行有方向的 Choke，例如 General MIDI Percussion 的 Hi-hat 互斥      |
 
 Velocity、Track Gain、Pan、系统输出校准、复音预算、Voice Stealing 与 CC64 最终释放由 Seele 的通用
 Playback / Audio Runtime 政策叠加，不是每份来源 Mapping 各自实现一套播放器。
@@ -116,21 +109,16 @@ Playback / Audio Runtime 政策叠加，不是每份来源 Mapping 各自实现�
   显式选择采样替代。
 - Catalogue 已声明可播放但本机 Manifest/WAV 缺失或内容不符，属于播放资源失败；合法 Project
   Commit 不回滚，也不静默换成 Studio Grand。
-- 本批没有实现 Bank Select、动态 Program Change、CC1、CC11、动态 CC7 / CC10、Pitch Bend、
+- 尚未实现 Bank Select、动态 Program Change、CC1、CC11、动态 CC7 / CC10、Pitch Bend、
   Aftertouch、Articulation、Velocity Layer、Release Sample 或钢琴共鸣。
-- 本批扩大的是可访问目录和资源准备覆盖，不等于 289 个音色全部完成人工试听。自动结构与数值
-  门禁不能替代逐音色听觉审核。
+- 能浏览、能准备，不等于 289 个音色都经过人工试听；结构与数值检查不能替代逐个音色的听感
+  核对。
 
-## 6. 验证证据
+## 6. 检查
 
 - Snapshot 生成器幂等复跑得到 439 项 Preset、289 项采样指纹与相同的 870 文件集合哈希。
-- 完整本地资产准备幂等复跑时，289 项全部为 `current`，库存报告哈希保持不变。
-- Audio Web 目标测试 3 个文件 / 9 项、Studio 目录 / 导入 / Inspector / Browser Runtime 目标测试
-  4 个文件 / 23 项，以及两个包的 Type Check 均通过。
-- 根级 `pnpm check` 通过 Architecture、Workspace Quality、Format、Oxlint、ESLint、全工作区 Type
-  Check、157 个测试文件 / 1,365 项测试、Studio Production Build 与 soundbank dist boundary。
-- 真实 Studio 浏览器 smoke 在 1280 × 720 视口确认：浮层完整位于视口内；15 类与 439 / 289
-  计数正确；23 项 Piano 与 74 项 Synth Bass 目录可滚动且没有文本换行；VASynth / FMSynth 点击
-  只告警并保持当前 Track；新增 `Dark Grand` 可选择并恢复选中态；控制台无 warning / error。
+- 完整本地资产准备幂等复跑时，289 项全部为 `current`，库存报告哈希不变。
+- Audio Web 与 Studio 的目录、导入、Inspector 与 Browser Runtime 测试覆盖目录计数、路由与失败
+  边界。
 
-本批没有执行 289 个音色的逐项人工听测，也没有把结构兼容审计解释成与来源播放器逐音色一致。
+289 个音色没有逐项人工听测，结构兼容审计也不等于与来源播放器逐音色一致。

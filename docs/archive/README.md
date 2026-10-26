@@ -7,4 +7,4 @@
 和各包 README 为准；长期决定见 [ADR](../adr/README.md)。
 
 目录按原来所属的区域划分：`product`、`studio`、`project-core`、`editor`、`playback`、
-`audio-web`、`platform-browser`、`architecture`。
+`audio-web`、`midi`、`platform-browser`、`architecture`。

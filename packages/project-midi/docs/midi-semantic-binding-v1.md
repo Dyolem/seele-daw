@@ -1,13 +1,8 @@
 # MIDI Semantic Binding V1
 
-> Status: MI6D reviewed; full root check passed
->
-> Date: 2026-09-07
->
-> Scope owner: `@seele-daw/project-midi`; user feedback owned by Studio
-
-本文定义 Seele 第一个可执行前的 MIDI 语义绑定结果。它把 MI6C 已保存的客观 Mode Declaration
-Evidence 分类为“可绑定、未绑定、未解析或冲突”，但不据此改变乐器、Note、Controller 或发声。
+本文定义 `@seele-daw/project-midi` 的 MIDI 语义绑定结果，用户反馈由 Studio 呈现。它把 Source
+Envelope 中客观的 Mode Declaration Evidence 分类为“可绑定、未绑定、未解析或冲突”，但不据此改变
+乐器、Note、Controller 或发声。
 
 来源字节证据仍由
 [SMF MIDI 1.0 Mode Declaration Evidence V1](../../midi-file/docs/smf-midi1-mode-declaration-evidence-v1.md)
@@ -100,18 +95,15 @@ V1 不解释跨 Tick 的模式切换，也不为不同 Track 的同 Tick 事件�
 | Unbound            | 已完成判断，但没有一个启用模式；不等于解析失败                          |
 | Unresolved         | 证据没有检查完、检查失败或包含未知内容；不能当成“没有声明”              |
 | Conflicted         | 已识别声明互不兼容；V1 不按位置或厂商偏好擅自选择                       |
-| Instrument routing | 把 Program / Channel 映射到 Seele Device 的产品政策；本批明确不修改它   |
+| Instrument routing | 把 Program / Channel 映射到 Seele Device 的产品政策；Binding 不修改它   |
 | Evidence reference | Binding 中指回 Source Envelope 声明数组的索引，用来审计结论来自哪些消息 |
 
-## 7. 自动验证门禁
+## 7. 测试覆盖
 
 - Project MIDI 单元测试覆盖四种 Status、全部 Reason、同模式重复、候选模式顺序、GM Off 与深度冻结；
 - 两种导入摘要必须携带与 Source Envelope 配对的 Binding；
-- Studio 测试覆盖 Bound 信息、Conflict、GM Off、检查失败、未分类 SysEx notice，以及既有 Timeline
-  notice 合并；
-- 2026-09-07 完整 `pnpm check` 已通过 Architecture、Workspace Quality、Format、Oxlint、ESLint、
-  全工作区 Type Check、160 个测试文件 / 1,398 项测试、Studio Production Build 与 soundbank dist
-  boundary。
+- Studio 测试覆盖 Bound 信息、Conflict、GM Off、检查失败、未分类 SysEx notice，以及与 Timeline
+  notice 的合并。
 
-自动测试只能证明分类与反馈契约，不代表已支持 GM2 Drum Map、GS / XG Bank、Keyswitch、
-Articulation、MIDI 2.0 或 MIDI-CI。
+这些测试证明分类与反馈契约，不代表已支持 GM2 Drum Map、GS / XG Bank、Keyswitch、Articulation、
+MIDI 2.0 或 MIDI-CI。

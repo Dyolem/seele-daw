@@ -1,15 +1,7 @@
 # Studio Built-in Instrument Catalogue V1
 
-> Status: MI2 reviewed and committed as `f13df2f`; complete source Preset extension implemented,
-> pending review on 2026-09-04
->
-> Date: 2026-09-03
->
-> Scope: `apps/studio` and the minimal public Sample Instrument surface of
-> `@seele-daw/playback`
-
-本文记录 Studio 如何把 MI1B / MI1C 已审核的开发者本地 Soundbank 变成可见、可保存的 Track
-Instrument 选择。MIDI、Soundbank、Catalogue 与 Missing Instrument 等术语见
+本文记录 Studio 如何把开发者本地的 Soundbank 变成可见、可保存的 Track Instrument 选择，涉及
+`apps/studio` 与 `@seele-daw/playback` 公开的通用 Sample Instrument 接口。MIDI、Soundbank、Catalogue 与 Missing Instrument 等术语见
 [多乐器总谱发声 V1 术语表](../../../docs/archive/audio-web/built-in-multi-instrument-score-playback-v1-glossary.md)。
 
 ## 1. 用户可见行为
@@ -84,28 +76,13 @@ Missing 不会改写 Project Fact。若未知 Sample Device 含合法 `soundbank
 
 - developer-local Soundbank 继续由 `.gitignore` 排除，Studio production dist guard 继续禁止复制
   整棵本地资产。
-- 本批不升级 Project File schema，不迁移旧项目，也不把未知 Device 回退为钢琴。
-- MIDI Program、Channel 10 自动路由和不可用 Program 占位由 MI3A 接入；MI3B 进一步把导入时的
-  初始 CC7 / CC10 映射到 Track Channel，不改变 Catalogue 身份。
-- 完整固定 Preset 目录已经可浏览；跨字段搜索、Preview Audition、远程安装、插件管理、Action
-  Catalogue 与用户 Keymap 继续延期。
-- 本批只接通目录、显式选择与位置派生；多 Soundbank Cache 与自动混合 Peak 随后分别由 MI4 /
-  MI5 验收，人工总谱听测仍为 `not-run`。
+- 目录不改变 Project File schema，也不把未知 Device 回退为钢琴。
+- 导入 MIDI 时，Program 与 Channel 10 自动选择音色，不可用的 Program 保存为可见的占位；初始
+  CC7 / CC10 映射到 Track Channel。这些都不改变目录身份。
+- 跨字段搜索、Preview Audition、远程安装与插件管理尚未提供。
+- 音色的人工听测仍为 `not-run`。
 
-## 5. MI2 自动验证
-
-- `@seele-daw/playback` Type Check 与 9 个测试文件 / 107 项测试通过；
-- Studio Type Check 与 63 个测试文件 / 403 项测试通过；
-- 根级 `pnpm lint` 通过 Architecture、Workspace Quality、Format、Oxlint 与 ESLint；
-- Studio Production Build 与 soundbank dist boundary 通过，本地 Soundbank 未进入 `dist`。
-- 本地浏览器可见 smoke 确认 Reka UI Portal 使用 Piano Black 样式呈现分组与滚动，选择后 Trigger
-  更新且关闭弹层，Instrument Card 内没有原生 `select`，控制台没有 warning / error。22 个选项
-  均保留固定的选中标记列并让名称使用完整文本列；在 201 px 实际弹层宽度下，最长的
-  `General MIDI Percussion` 保持单行且没有单词截断换行。
-
-本批未执行人工声音试听；完整根级 `pnpm check` 继续保留给多乐器阶段门禁，不把手动选择自动
-解释为 Program 路由、Runtime 压力或听觉验收已经完成。
+## 5. 相关文档
 
 完整 Preset 扩展、独立 GM 路由、289 项资产指纹、控制元数据执行边界和失败边界见
 [Studio Built-in Preset Catalogue and General MIDI Routing V1](./general-midi-built-in-routing-v1.md)。
-MI2 的 22 项验证记录仍是历史基线，不应被倒写成当时已经完成完整目录覆盖。

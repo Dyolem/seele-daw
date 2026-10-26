@@ -1,21 +1,8 @@
 # @seele-daw/editor
 
-`editor` 负责把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑会话状态，但不拥有 Track、Clip、Note 等项目事实。
-
-> 当前状态：`common` 已完成首个 Piano Roll Clip / Viewport / Note Read Model，以及从
-> immutable Snapshot 派生的 Track 全局 Clip / Note Read Model；
-> Clip-scoped Note Selection Session、Timeline Grid Snap 与 Pencil Note Placement；
-> Cursor Move 与 Cursor / Pencil 单 Note Resize Gesture、Preview 已迁移到中立 Interaction
-> Session 与独立 Note Operation，提交使用冻结目标和单次交互身份；
-> `browser` 已提供 Canvas Grid、Renderer-neutral Note Scene 与可替换的 DOM / Canvas
-> Note Renderer，以及委托式 DOM Hit 与 primary Pointer Input Adapter；`common` / `browser`
-> 还已完成显式 Channel 的 CC64 Value Lane、Pencil Placement、Event Selection、主导轴 Move /
-> Replace Value 与 authority handoff 基础。Studio 已接入 Note 编辑闭环，以及 CC64 Lane 的 Add、
-> Selection、Move、Replace Value 与 Remove。
-
-## 包定位
-
-当前仓库采用架构总纲的初期五包结构：长期文档中的 `editor-core` 和尚未稳定的 `editor-renderer` 暂时合并在本包内。
+`editor` 把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑
+会话的状态，但不拥有 Track、Clip、Note 等项目事实。长期路线中的 `editor-core` 与
+`editor-renderer` 暂时合并在本包里；Renderer 边界稳定、满足独立拆包条件后再评估拆分。
 
 ```text
 DOM / Pointer / Keyboard / MIDI
@@ -27,240 +14,116 @@ DOM / Pointer / Keyboard / MIDI
 -> project-core atomic commit
 ```
 
-`common` 保存框架无关的编辑语义；`browser` 保存 DOM/Canvas 适配和当前阶段的 Renderer。Renderer 边界稳定且满足独立拆包条件后，再评估 `editor-renderer` package。
-
-## 主要职责
-
-| 领域          | 规划职责                                                             |
-| ------------- | -------------------------------------------------------------------- |
-| EditorSession | Selection、focused surface、active tool、内部 Clipboard              |
-| 输入          | DOM/MIDI 事件归一化为框架无关的 EditorInput                          |
-| Surface       | 坐标转换、Hit Test、Snap candidates、Read Model                      |
-| Tool          | Idle/Pressed/Dragging/Committing/Cancelled 显式状态机                |
-| Preview       | Drag ghost、box selection、snap result，不写 ProjectModel            |
-| 命令解析      | 根据上下文把 EditorIntent 转成完整 ProjectCommand                    |
-| Read Model    | 面向可见范围的稳定查询结果，不复制完整项目                           |
-| Renderer      | DOM / Canvas Adapter、Scene、空间索引、dirty region、frame scheduler |
-
-## 状态所有权
-
-本包可以拥有：
-
-- Selection、focus、active tool 和 clipboard；
-- zoom、scroll、viewport 等视图状态；
-- pointer capture、drag origin、preview geometry 等交互状态；
-- Renderer 的可重建缓存。
-
-本包不能拥有或复制一份可写 ProjectModel。删除实体、Undo/Redo 和项目切换后，Selection 必须按稳定 ID 清理或恢复；Preview 不进入 History、Autosave 或 Playback compiler。
-
-## 当前交互模块
+## 结构
 
 ```text
 src/
-├── common/
+├── common/                        框架无关：禁止 Vue、Pinia、DOM、Canvas 与 Web Audio
 │   ├── interaction/               输入契约、Session、Modifier、可选 Commit Handoff
 │   └── piano-roll/
 │       ├── interaction/           Note 契约、Operation 与 Session 组合
 │       ├── operations/            Note 选择、放置、移动、缩放的领域运算
+│       ├── track/                 Track 全局 Read Model 与放置解析
 │       └── sustain-pedal-lane/    CC64 投影、契约、Operation 与 Session 组合
-├── browser/
+├── browser/                       DOM / Canvas 适配：禁止 Vue 与 audio-web
 │   ├── interaction/               中立 Pointer Capture 与 Key State Adapter
 │   └── piano-roll/                Grid / Note Renderer、领域 Hit 与 Adapter 组合
-└── index.ts                        唯一公开入口
+└── index.ts                       唯一公开入口
 ```
 
-中立 Session 使用 class 拥有生命周期，领域规则通过 Operation 组合接入。
+本包只依赖 [`@seele-daw/project-core`](../project-core/README.md) 的公开 API，不导入
+`apps/studio`，也不解释 Audio Runtime、Transport 或设备状态机。Vue 组件、Workbench Action 与
+Feature 的装配属于 Studio。
+
+## 状态所有权
+
+本包可以拥有 Selection、focus、active tool 与 clipboard；zoom、scroll、viewport 等视图状态；
+pointer capture、drag origin、preview 几何等交互状态；以及 Renderer 的可重建缓存。
+
+本包不拥有、也不复制一份可写的项目模型。删除实体、Undo / Redo 和切换项目之后，Selection 按稳定
+ID 清理或校准；Preview 不进入 History、Checkpoint 或 Playback。
+
+## 交互内核
+
+中立的 `InteractionSession` 用 class 拥有手势生命周期，领域规则通过 Operation 组合进来；可选的
+Commit Handoff 在提交后等待自己那次 Commit 的 revision，再交还权威投影。Browser Pointer Adapter
+负责 capture、阈值与取消。Note、CC64、Track Pencil 与 Timeline Locate 都使用这套内核；
 [Studio Tempo Track](../../apps/studio/src/features/project-workspace/tempo-track/README.md) 从
-package root 复用 Session、CommitHandoff 与 Browser Pointer Adapter，领域规则保留在
-Studio。CC64、Track Pencil 与 Timeline Locate 也已接入同一内核；Locate 继续由 Playback
-管理定位，不组合事实编辑 Handoff。协议对照、输入所有权、资源清理与新对象接入步骤见
-[Editor Interaction V1 决策](./docs/editor-interaction-architecture-v1.md)。
+package root 复用 Session、Handoff 与 Pointer Adapter，领域规则留在 Studio。Locate 由 Playback
+管理定位，不组合事实编辑的 Handoff。协议、输入所有权、资源清理与新对象的接入步骤见
+[Editor Interaction V1](./docs/editor-interaction-architecture-v1.md)。
 
-## 关键交互规则
+关键规则：
 
-- 所有鼠标容差和 handle 尺寸以 CSS pixel 定义，再转换到领域坐标。
-- `pointermove` 只更新 Preview，`pointerup` 才生成唯一 ProjectCommand。
-- 每次手势必须定义 Escape、`pointercancel`、失焦和实体失效时的取消行为。
-- V1 中，若依赖实体在手势期间被修改或删除，优先取消并提示，不做隐式 rebase。
-- Clipboard payload 不复用原项目 ID；Paste 生成新 ID 并通过一次事务提交。
-- Canvas 只能发出 intent/command，不能直接修改 ProjectModel。
+- 鼠标容差与 handle 尺寸以 CSS pixel 定义，再换算到领域坐标；
+- `pointermove` 只更新 Preview，`pointerup` 才生成唯一的 ProjectCommand；
+- 每种手势都定义 Escape、`pointercancel`、失焦与实体失效时的取消行为；
+- 手势依赖的实体被修改或删除时，优先取消并提示，不做隐式 rebase；
+- Clipboard payload 不复用原项目 ID，Paste 生成新 ID 并一次提交；
+- Canvas 只发出 intent / command，不直接修改项目。
 
-## 已实现：Piano Roll Common Foundation
+## Piano Roll
 
-首个 common 切片由当前 Studio 的空 MIDI Clip 入口直接驱动，公开提供：
+**坐标与视口。** `PianoRollClipContext` 组合非循环 MIDI Clip 与它唯一的 MidiSource，Clip-local
+Tick 与 Source Tick 一一对应；`PianoRollViewport` 描述 Clip-local 的可见 Tick、Pitch 与 CSS Pixel
+尺寸，提供 Tick / X、Pitch / Y 的双向确定性换算。Clip-local 与 Track-global Surface 共用
+identity-free 的 `PianoRollTimelineViewport` 几何。Looped Clip 不支持编辑：Loop 展开、重复实例的
+选择与 Source 编辑语义尚未确定。
 
-- `PianoRollClipContext`：组合非循环 MIDI Clip 与其唯一 MidiSource，明确
-  Clip-local Tick 和 Source Tick 的 1:1 映射；
-- `PianoRollViewport`：描述 Clip-local 可见 Tick、Pitch 和 CSS Pixel 尺寸；
-- Tick / X 与 Pitch / Y 的双向确定性坐标换算；
-- `PianoRollNoteReadModel`：使用 Project Core 的可见范围 Query 和局部
-  Subscription，发布冻结的可见 Note 状态；
-- `PIANO_ROLL_DEFAULT_CENTER_PITCH = 60`，对应首批 UI 的 C4 中心语义。
+**Read Model。**
 
-当前不支持 looped Clip。Loop 展开、重复实例选择和 Source 编辑语义尚未确定，不能错误套用
-非循环 1:1 映射。Read Model 只依赖 `ProjectSession.query` / `subscribe`，匹配 Commit 后
-重新读取权威结果，不从 Delta 维护第二份 Note 真相。
+- `PianoRollNoteReadModel` 用 Project Core 的范围 Query 与局部 Subscription 发布冻结的可见 Note，
+  匹配的 Commit 到达后重新读取权威结果，不维护第二份 Note。
+- Track 全局 Read Model 从一份 Snapshot 与 `TrackId` 派生排序后的 Clip window，把非循环 Clip 中的
+  Note 映射到 Project Tick（`clip.startTick + note.startTick - clip.sourceOffsetTick`）。Looped
+  Clip 出现在投影中但标记为 `unsupported`；失效的 Active Clip 身份会被清空。
+- 放置解析根据 Pointer 的全局 Tick、当前小节、Active Clip 与 Clip window，纯函数地得出
+  `add-to-clip`、`extend-clip` 或 `create-clip`；归属不明、looped Clip 与越过下一 Clip 的自动扩展
+  返回带可见原因的 blocked 结果。
 
-完整边界见
-[Piano Roll Common Foundation 实施计划](../../docs/archive/editor/piano-roll-common-foundation-plan.md)。
+**Selection。** `PianoRollEditorSession` 随当前 Clip 创建和释放，只保存冻结的 `NoteId` 列表，支持
+单选、追加切换与清空。新增选择前按 `MidiSourceId + NoteId` 查询权威 Note；Note 移出可见范围时
+保留选择，移出 Clip 的 Source 窗口或被删除时清理。
 
-## 已实现：Piano Roll Track 全局 Read Model 与放置解析
+**Grid、Snap 与 Pencil。** 视觉与交互共用 Timeline Grid。Snap 开启时有 `nearest` 与 `floor` 两种
+策略，Pencil 用 `floor` 落在 Pointer 所在单元的左边界；Snap 关闭时取最近的整数 Tick。Pencil 只把
+完成的空白 Click 解析为 Clip-local 起点、Pitch 与期望长度；拖动、命中已有 Note、取消与不完整的
+Pointer 生命周期都不产生放置。
 
-为同一个 Piano Roll 支持默认 Track Scope 与可选 Clip Focus，`common/piano-roll/track` 已提供：
+**Browser Input。** Surface 级事件委托把 composed path 解析为稳定的语义 Hit；单个 primary Pointer、
+Pointer Capture、默认 4 CSS Pixel 的拖动阈值，每次捕获有独立的 `captureId`；Up、Cancel、lost
+capture、blur、dispose 与消费者失败都会关闭输入。其他语义 Hit 由 Surface 显式提供 Resolver，复用
+同一套生命周期。
 
-- 从一个 immutable `ProjectSnapshot + TrackId` 派生排序后的全局 Clip window；
-- 用 `clip.startTick + note.startTick - clip.sourceOffsetTick` 把非循环 Clip 中可见 Note 映射到
-  Project Tick；
-- Clip / Source endpoint 的双向映射，以及由 `startTick + spanTick` 派生的 Clip 末端；
-- 可选 Active Clip 身份；已删除或不属于该 Track 的旧身份会清空，不产生幽灵选择；
-- looped Clip 仍出现在投影中，但带有明确 `unsupported` 状态且不伪造重复 Note 实例；
-- 缺失 Track、非 Instrument Track、断裂的 Source / Note Partition 引用均失败关闭。
-- 根据 Pointer 的全局 Project Tick、当前 Bar、Active Clip 与排序后的 Clip window，纯解析
-  `add-to-clip`、`extend-clip` 或 `create-clip`；重叠归属不明、looped Clip 与跨越下一 Clip 的
-  自动扩展返回稳定的 blocked 结果和可见原因；
-- Clip-local 与 Track-global Surface 共用 identity-free `PianoRollTimelineViewport` 几何，
-  Clip Viewport 继续在其上附加 `clipId` 和 Clip 边界验证。
+**CC64 Lane。** 按显式 `MidiChannel` 投影 Clip-local 与 Track-global 的 CC64 事件，追赶 Clip
+左边界之前同 Channel 的最后状态（没有历史事件时从 `0` 开始）；值 `64..127` 为踏板按下、`0..63`
+为抬起，Clip 右端点的事件可编辑但不影响半开的播放窗口。`0..127` Value Lane 有确定性的 Y 坐标，X
+与 Timeline Grid 共用 Snap。编辑支持：Pencil 新增、稳定 Event ID 的选择与失效校准、超过阈值后的
+主导轴锁定（横向批量 Move、纵向单 Event Replace Value）、绝对 Grid Snap 与 `Alt` 临时绕过、Source
+边界 clamp，以及批量 Remove。Studio 把每个手势映射为一个 Project Command。
 
-该能力是纯 Snapshot Read Model，不订阅 ProjectSession、不拥有 Selection，也不写 Project Fact。
-Studio 已用它组合默认 Track-time Surface 与原子 Pencil 放置，并接入可见 Scope 切换及双模式
-Playhead / Track Follow；Track Cursor 的完整 Note 编辑尚未实现。
+**Renderer。** 静态 Pitch / Grid 用 Canvas，bitmap 按 `devicePixelRatio` 放大；`PianoRollNoteScene`
+统一投影可见 Note 的几何；Studio 默认用 keyed DOM Note Renderer，Canvas Note Renderer 消费同一个
+Scene，可替换并作为性能基准。小节、拍、细分网格分级绘制，过密的一级不画。主题以冻结快照由宿主
+传入，Renderer 不读 Studio CSS。取舍见 [Note Renderer 决策](./docs/piano-roll-note-renderer-decision.md)。
 
-## 已实现：Piano Roll Editor Session
+## 尚未提供
 
-首个 Editor Session 切片提供：
+- Track Scope 中完整的 Cursor Note 编辑；
+- 真实性能数据需要时的空间索引、dirty region、Worker 或 OffscreenCanvas；
+- Arrangement Clip、Audio Clip、Automation 等的编辑。
 
-- 随当前 Clip 创建和释放的 `PianoRollEditorSession`；
-- 只保存冻结 `NoteId` 列表的单选、追加切换与清空语义；
-- 新增 Selection 前按 `MidiSourceId + NoteId` 查询权威 Note；
-- 当前 Source 的 Note Commit 到达后重新校准已选 Note；
-- Note 移出可见 Viewport 时保留 Selection，移出 Clip Source 时间窗口或被删除时清理；
-- Observer、Project Query、Project Subscription failure isolation 与显式 dispose。
+## 测试
 
-它不保存 `MidiNoteRecord`，不依赖当前可见 Read Model，也不进入 Vue 或 Pinia。Studio
-已经接入 Select Interaction、Keyboard Binding 和 selected Renderer 视觉。完整计划见
-[Piano Roll Interaction 第三阶段计划](../../docs/archive/editor/piano-roll-interaction-phase-plan.md)。
+- 输入归一化、坐标往返、Hit Test 与 Snap 边界；
+- 手势的 down / move / up / cancel 全路径；
+- 拖动过程中模型不变，`pointerup` 只产生一次命令；
+- 实体删除、Undo / Redo 与切换项目后的 Selection 清理；
+- 可见图元很多时的裁剪、命中与绘制性能。
 
-## 已实现：Timeline Grid Snap 与 Pencil Placement
+## 延伸阅读
 
-Editor Common 公开视觉和交互共用的 Timeline Grid，并提供：
-
-- Snap 开启时支持显式 `nearest` 与 `floor` Subdivision 策略；Pencil 创建使用 `floor`，
-  始终落在 Pointer 所在 Grid 单元的左边界；
-- Snap 关闭时按最近整数 Tick 解析，不把连续位置写入 Project Fact；
-- Pencil 只把完成的空白 Click 解析为 Clip-local Start、Pitch 和期望 Duration；
-- X 消费 Timeline Grid，Y 直接映射离散 Pitch Row；
-- Clip End 候选限制到仍可创建正 Duration 的内部起点；
-- Drag、已有 Note Hit、Cancel 与不完整 Pointer 生命周期不产生 Placement。
-
-Placement 不读取 Vue、DOM 或 ProjectSession，也不执行 Command。Studio 的 `edits.notes` 负责
-Active Project、ID、默认 Note Facts 与提交。
-
-## 已实现：Piano Roll Browser Input
-
-首个 Browser Input 切片提供：
-
-- Renderer-neutral `PianoRollHit` 和冻结的、可按 Surface Hit 类型参数化的
-  `PianoRollPointerInput`；
-- DOM Surface 级事件委托，不在每个 Note 上安装 Listener；
-- DOM Event composed path 到稳定 `NoteId` / body zone 的小型 Hit Adapter；
-- Surface-local CSS Pixel 坐标、固定的 Down origin Hit 与修饰键；
-- 单 primary Pointer、Pointer Capture 与默认 4 CSS Pixel Drag Threshold；
-- 每次捕获独立的 `captureId`；Up、Cancel、lost capture、blur、dispose 和消费者失败均关闭输入。
-- Listener 部分注册失败时回滚自身资源，同一 Surface 可以重新创建 Adapter；dispose 幂等。
-
-Browser Input 不读取 ProjectSession，也不直接修改 Selection。默认入口维持 Note DOM Hit；
-需要其他语义 Hit 的 Surface 必须显式提供 Resolver，并复用同一 Pointer Capture、阈值、取消与
-失败隔离生命周期。它把浏览器事实交给 Surface 的 Operation / Session；Keyboard、
-Tool Preference 与 Project Command 由 Studio 组合。
-
-## 已实现：CC64 Sustain Pedal Lane Editor Foundation
-
-由真实 Sustain Pedal 编辑切片驱动，`common/piano-roll` 与 `browser/piano-roll` 现已提供：
-
-- 显式 `MidiChannel` 的 Clip-local 与 Track-global CC64 Snapshot 投影，不跨 Channel 混合事件；
-- Clip 左边界前最后一条同 Channel 事件的状态追赶；没有历史事件时从 MIDI 值 `0` 开始；
-- 冻结的原始 Event 投影与派生 Step Segment；值 `64..127` 为踏板按下，`0..63` 为抬起；
-- Clip 右端点事件仍作为可编辑事实显示，但标记为不影响半开播放窗口；
-- `0..127` Value Lane 的确定性 Y 坐标，以及与 Timeline Grid 共用的 X Snap；
-- CC64 DOM Event ID 到语义 Hit 的小型 Adapter，并通过显式 Resolver 复用既有 Pointer 生命周期；
-- 只在完整空白 Click 上产生 `{ timelineTick, value }` 的纯 Pencil Placement。
-
-Studio 已提供可见 Channel 选择、Clip / Track 时间到 Source Tick 的转换、稳定 Event ID、单次
-Add Command 与失败提示。Event 编辑的 Editor 后续基础还提供：
-
-- 只指向显式非循环 Active Clip / MidiSource 的 Editable Scope；
-- 稳定 Event ID 的瞬态 Selection、失效校准与批量 Remove Target；
-- 超过共享 Drag Threshold 后的一次主导轴锁定；横向批量 Move、纵向单 Event Replace Value；
-- 绝对 Grid Snap、动态 `Alt` 临时绕过、Source 边界 clamp 与不跳值纵向 Delta；
-- Preview、取消、重复 End 抑制、单 Intent 与 commit revision authority handoff。
-
-这一基础仍不执行 Project Command，也不拥有当前 Channel。Studio 负责渲染瞬态 Selection /
-Marker Preview，并把 Move、Replace Value 与 Remove Intent 映射为每手势一个 Project Command；
-完整边界和术语见
-[Piano Roll CC64 Lane Foundation](../../docs/archive/editor/piano-roll-sustain-pedal-lane-foundation.md)与
-[Piano Roll CC64 Event Editing Foundation](../../docs/archive/editor/piano-roll-sustain-pedal-event-editing-foundation.md)。
-
-## 已实现：Piano Roll Browser Renderer
-
-`browser/piano-roll` 在不依赖 Vue 的边界内公开提供：
-
-- 静态 Pitch / Grid 使用 Canvas，bitmap 按 `devicePixelRatio` 放大；
-- `PianoRollNoteScene` 统一投影可见 Note 的 CSS Pixel 几何；
-- keyed DOM Note Renderer 是 Studio 当前默认，不创建每 Note Vue Component；
-- Canvas Note Renderer 消费同一 Scene，作为可替换实现与性能基准；
-- 小节、拍、细分网格分级绘制，密度小于可辨识 CSS Pixel 时停止绘制该级；
-- 黑白键音高行、Track Color Note、Muted 内容透明度；
-- 由宿主传入的冻结主题快照，不在 Renderer 内读取 Studio CSS 或 `themeId`；
-- 显式 `clear` / `dispose` 生命周期和缺失 2D Context、无效 Grid / Theme 错误。
-
-Renderer 只消费 Common Viewport 与 Note Read Model，既不读取 ProjectSession，也不生成
-ProjectCommand。Studio 负责把选中 Clip、Project Query、主题令牌与所选 Adapter 组合起来。
-完整边界见
-[Piano Roll Browser Renderer 实施计划](../../docs/archive/editor/piano-roll-browser-renderer-plan.md)与
-[Piano Roll Note Renderer 决策](./docs/piano-roll-note-renderer-decision.md)。
-
-## 依赖边界
-
-- 只依赖 [`@seele-daw/project-core`](../project-core/README.md) 的公开 API。
-- `common` 禁止 Vue、Pinia、DOM、Canvas 和 Web Audio。
-- `browser` 可以使用 DOM/Canvas，但禁止依赖 Vue 和 `audio-web`。
-- 不导入 `apps/studio` 或具体 Feature 内部文件。
-- 不解释 Audio Runtime、Transport 或设备状态机。
-
-Vue 组件、Workbench command/context key 和 Feature Contribution 的装配属于 `apps/studio`；本包只提供可复用编辑机制和浏览器适配。
-
-## 分阶段计划
-
-1. **已完成**：Piano Roll Clip Context、Viewport、坐标链与可见范围 Read Model。
-2. **已完成**：Browser Canvas Grid、Note Scene 和 DOM / Canvas Note Adapter，并由
-   Studio 只读组合当前 Clip。
-3. **已完成**：建立 Clip-scoped EditorSession、Select Interaction、Note Selection、
-   统一 Browser Input 与 scoped keyboard shortcuts。
-4. **已完成**：接入 Pencil Add Note 单次提交手势。
-5. **已完成**：多 Note Remove、Cursor Move 与 Cursor / Pencil 单 Note Resize 已接入
-   Studio，完整边界见
-   [Piano Roll Note Editing 第五阶段计划](../../docs/archive/editor/piano-roll-note-editing-phase-plan.md)。
-6. **局部完成**：同一 Project 模型的 Track 全局 / Clip Focus 双 Scope；共享 Track Read Model、
-   原子 Clip / Note 放置、可见模式切换与双模式 Playhead / Track Follow 已完成；Track Cursor
-   的完整 Note 编辑尚未实现。
-7. **已完成**：CC64 Sustain Pedal Lane 的 Editor Snapshot 投影、Value Lane 坐标、类型化
-   Browser Hit、Pencil Placement、Event Selection、主导轴 Transform 与 Studio 可见写入闭环。
-8. **已实施，G4 已审核通过**：公共 InteractionSession、领域 Operation、可选 Handoff 和
-   Pointer Adapter；Note、CC64、Tempo、Track Pencil 与 Timeline Locate 均有真实消费者。
-   G4 自动化与浏览器验证状态见 [阶段计划](../../docs/archive/studio/editor-input-foundation-v1-phase-plan.md#19-g4交互收口2026-10-19)。
-9. 在真实性能数据需要时增加空间索引、dirty region、Worker 或 OffscreenCanvas。
-10. 扩展 Arrangement Clip、Audio Clip、Automation 等编辑能力。
-
-## 测试与验收
-
-- 输入归一化、坐标 round trip、Hit Test 与 Snap 边界测试；
-- Tool 状态机的 down/move/up/cancel 全路径测试；
-- 拖拽过程中模型不变，pointerup 仅产生一次命令；
-- 实体删除、Undo/Redo、项目切换后的 Selection 清理；
-- 10k 可见图元下的裁剪、命中与绘制性能；
-- Canvas 键盘入口、焦点和语义摘要的可访问性测试。
-
-## 架构依据
-
-- [Web DAW 简洁架构总纲](../../docs/archive/architecture/web-daw-architecture-brief.md)
-- [Web DAW 长期路线与架构设计 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)
+- [Editor Interaction V1](./docs/editor-interaction-architecture-v1.md)、
+  [Note Renderer 决策](./docs/piano-roll-note-renderer-decision.md)
+- [长期路线 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)
+- 已完成阶段的计划：[docs/archive/editor](../../docs/archive/README.md)

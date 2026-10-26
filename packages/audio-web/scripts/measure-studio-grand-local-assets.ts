@@ -10,7 +10,7 @@ import {
   measureSampleInstrumentPitchForAudition,
   type SampleInstrumentResourceMeasurement,
 } from '#internal/development/sample-instrument-measurement'
-import { parseSupportedWavMetadata } from '#internal/sample-instrument/contract/wav-file'
+import { parseSupportedWavMetadata } from './wav-file'
 
 const REFERENCE_INITIAL_WINDOW_PITCHES = Object.freeze([48, 60, 64, 67, 72])
 const REFERENCE_NOTE_DURATIONS_SECOND = Object.freeze([0.08, 0.25, 1, 4, 10])

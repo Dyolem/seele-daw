@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
 import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
-import { parseSupportedWavMetadata } from '#internal/sample-instrument/contract/wav-file'
+import { parseSupportedWavMetadata } from './wav-file'
 import {
   estimateSampleInstrumentLoading,
   type SampleInstrumentResourceMeasurement,

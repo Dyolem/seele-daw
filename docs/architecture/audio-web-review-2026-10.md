@@ -257,7 +257,7 @@ createWebAudioPlaybackRuntime({
 | 3.2 | 完成，范围比提案大，见下。                                                                                                                                                                                                              |
 | 3.3 | 完成：README 改成一页；阶段报告、审计、术语表与本地资产记录移入 `docs/archive/audio-web/`。`docs/` 只留 SFZ Profile 与 Manifest 契约、来源控制文件逆向分析和 GM 打击乐兼容政策，脚本仍按它们实现。                                      |
 | 3.4 | 运行路径完成：Voice Plan、Plan 路由、音高、力度、主音量和每个音符的 Zone 时长都不再复查；运行时不再读 WAV 头；缓存、Context、Voice Runtime 与资源准备抛普通 `Error`，中止是 `AbortError`。Manifest 校验器与资源键的错误类留给脚本共用。 |
-| 3.5 | 部分完成：Mapping Adapter 与受限 ZIP 移进 `scripts/`，`fflate` 改为 devDependency；测量移到 `development/`；抄写的读取函数与 Zone 匹配删除。开发报告页与离线渲染的 Proxy 仍在，去留待决。                                               |
+| 3.5 | 部分完成：Mapping Adapter、受限 ZIP 与 WAV 头读取移进 `scripts/`，`fflate` 改为 devDependency；测量移到 `development/`；抄写的读取函数与 Zone 匹配删除。开发报告页与离线渲染的 Proxy 仍在，去留待决。                                   |
 | 3.6 | 完成：三种结束都经过一个 `#endSourcesAt`；running 检查集中到 output 的 `isRunning()`，离线渲染的 Proxy 删除。AQ0 合成 PCM 报告与改动前逐项一致（38 项检查通过）；真实音源的人工试听仍是 not-run。                                       |
 | 3.7 | 完成：缓存按 URL 作键，调用方传入 `assetBaseUrl(soundbankId)`；`expectedOrigin`、URL 规范化、配置复查与 `clearDecodedResources` 删除。                                                                                                  |
 
@@ -281,12 +281,12 @@ createWebAudioPlaybackRuntime({
 在仓库根目录用 Git Bash 执行：
 
 ```sh
-# 运行路径：index.ts 的导入闭包（15 个文件）
-(cd packages/audio-web/src && wc -l index.ts audio-quality/render-policy.ts \
+# 运行路径：index.ts 的导入闭包
+(cd packages/audio-web/src && wc -l index.ts web-audio-playback-runtime.ts \
   context/audio-context-runtime.ts \
-  sample-instrument/contract/{manifest,manifest-validator,resource-key,sfz-profile-v1,structured-data,wav-file}.ts \
+  sample-instrument/contract/{manifest,manifest-validator,resource-key,sfz-profile-v1,structured-data}.ts \
   sample-instrument/loading/{prepare-plan-resources,resource-cache,zone-selection}.ts \
-  sample-instrument/voice/{envelope,polyphony-policy,voice-runtime}.ts | tail -1)
+  sample-instrument/voice/{envelope,polyphony-policy,sample-voice-policy,voice-runtime}.ts | tail -1)
 
 # 只被脚本与开发页导入的模块
 grep -rln "built-in-mapping-adapter\|restricted-zip\|loading/measurement" packages apps \

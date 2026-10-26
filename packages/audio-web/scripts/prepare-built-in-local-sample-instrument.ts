@@ -11,10 +11,7 @@ import {
 } from './built-in-mapping-adapter'
 import { extractRestrictedZipArchive, type RestrictedZipArchiveLimits } from './restricted-zip'
 import type { SampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest'
-import {
-  parseSupportedWavMetadata,
-  type SupportedWavMetadata,
-} from '#internal/sample-instrument/contract/wav-file'
+import { parseSupportedWavMetadata, type SupportedWavMetadata } from './wav-file'
 
 import {
   resolveBuiltInSoundbankSource,

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  SupportedWavFileError,
-  parseSupportedWavMetadata,
-} from '#internal/sample-instrument/contract/wav-file'
+import { SupportedWavFileError, parseSupportedWavMetadata } from '../wav-file'
 
 function writeFourCc(view: DataView, offset: number, value: string): void {
   for (let index = 0; index < value.length; index += 1) {

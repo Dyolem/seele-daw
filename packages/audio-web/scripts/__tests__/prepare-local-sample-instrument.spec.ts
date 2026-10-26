@@ -7,7 +7,7 @@ import {
   type SampleInstrumentManifestV1,
 } from '#internal/sample-instrument/contract/manifest'
 import { parseSampleInstrumentManifestV1 } from '#internal/sample-instrument/contract/manifest-validator'
-import type { SupportedWavMetadata } from '#internal/sample-instrument/contract/wav-file'
+import type { SupportedWavMetadata } from '../wav-file'
 
 import {
   LocalSampleInstrumentPreparationError,

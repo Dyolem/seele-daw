@@ -164,7 +164,7 @@ Snapshot 中是同一个数组，缓存于是不需要生命周期、失效协�
 
 ### ProjectSession
 
-它组合 CommandProcessor、ModelStore、History、Query 和 Publisher，并管理整个编辑会话的依赖与生命周期。
+它组合命令注册表、ModelStore、MutationApplier、History、Snapshot 与 ChangePublisher，并管理整个编辑会话的依赖与生命周期。
 
 ### Runtime Device 与 Voice
 

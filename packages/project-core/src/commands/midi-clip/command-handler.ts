@@ -10,32 +10,17 @@ import { addTicks } from '#internal/time/tick'
 
 type NewMidiClipCommand = AddMidiClipCommand | AddMidiClipWithNoteCommand
 
-function commandDetails(command: NewMidiClipCommand) {
-  return {
-    baseRevision: command.baseRevision,
-    clipId: command.clip.id,
-    commandType: command.type,
-    sourceId: command.source.id,
-    trackId: command.clip.trackId,
-  } as const
-}
-
 function requireInstrumentTrack(reader: ModelStoreReader, command: NewMidiClipCommand): void {
   const track = reader.getTrack(command.clip.trackId)
 
   if (track === undefined) {
-    throw new ProjectCommandError(
-      'track-not-found',
-      `Track ${command.clip.trackId} does not exist`,
-      commandDetails(command),
-    )
+    throw new ProjectCommandError('track-not-found', `Track ${command.clip.trackId} does not exist`)
   }
 
   if (track.kind !== 'instrument') {
     throw new ProjectCommandError(
       'midi-clip-track-kind-mismatch',
       `MIDI Clip ${command.clip.id} cannot belong to non-Instrument Track ${track.id}`,
-      { ...commandDetails(command), trackKind: track.kind },
     )
   }
 }
@@ -48,7 +33,6 @@ function assertClipGraphIdentitiesAvailable(
     throw new ProjectCommandError(
       'clip-id-already-exists',
       `Clip ID ${command.clip.id} is already used in this project`,
-      commandDetails(command),
     )
   }
 
@@ -56,23 +40,6 @@ function assertClipGraphIdentitiesAvailable(
     throw new ProjectCommandError(
       'midi-source-id-already-exists',
       `MidiSource ID ${command.source.id} is already used in this project`,
-      commandDetails(command),
-    )
-  }
-
-  if (reader.hasMidiNotePartition(command.source.id)) {
-    throw new ProjectCommandError(
-      'midi-note-partition-already-exists',
-      `MidiSource ID ${command.source.id} already has a MIDI Note partition`,
-      commandDetails(command),
-    )
-  }
-
-  if (reader.hasMidiSustainPedalEventPartition(command.source.id)) {
-    throw new ProjectCommandError(
-      'sustain-pedal-event-partition-already-exists',
-      `MidiSource ID ${command.source.id} already has a MIDI Sustain Pedal Event partition`,
-      commandDetails(command),
     )
   }
 }
@@ -87,11 +54,6 @@ function assertClipWithinSource(command: NewMidiClipCommand): void {
     throw new ProjectCommandError(
       'midi-clip-out-of-source-range',
       `MIDI Clip ${command.clip.id} reads through Tick ${sourceReadEndTick}, beyond MidiSource ${command.source.id} length ${command.source.lengthTick}`,
-      {
-        ...commandDetails(command),
-        sourceLengthTick: command.source.lengthTick,
-        sourceReadEndTick,
-      },
     )
   }
 }

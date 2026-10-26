@@ -230,7 +230,6 @@ describe('note edits', () => {
     expect(() => move(300)).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'note-out-of-source-range',
-        noteId: noteIds[1],
       }),
     )
     expect(fixture.session.modelRevision).toBe(revision)
@@ -347,7 +346,6 @@ describe('note edits', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'midi-note-not-found',
-        noteId: missing,
       }),
     )
     expect(notesOf(fixture.session).map(({ id }) => id)).toEqual([existing])

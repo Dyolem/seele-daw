@@ -191,7 +191,7 @@ describe('AddMidiClipCommand preparation', () => {
       throw new Error('Expected a ready MIDI Clip graph insertion')
     }
 
-    expect(preparation.command).not.toBe(command)
+    expect(preparation.command).toBe(command)
     expect(plan.forward[0].after).toBe(preparation.command.source)
     expect(plan.forward[3].after).toBe(preparation.command.clip)
   })
@@ -212,17 +212,13 @@ describe('AddMidiClipCommand preparation', () => {
 
     expect(missingTrack).toMatchObject({
       code: 'track-not-found',
-      clipId: parseClipId('clip-command-empty'),
-      trackId: missingTrackId,
     })
     expect(audioTrack).toMatchObject({
       code: 'midi-clip-track-kind-mismatch',
-      trackId: fixture.records.audioTrack.id,
-      trackKind: 'audio',
     })
   })
 
-  it('rejects occupied Clip, Source, and MIDI content partition identities', () => {
+  it('rejects occupied Clip and Source identities', () => {
     const duplicateClipFixture = createCompleteProjectFixture()
     const duplicateClipStore = new ModelStore(duplicateClipFixture.seed)
     const duplicateClip = captureCommandError(() =>
@@ -245,50 +241,11 @@ describe('AddMidiClipCommand preparation', () => {
       ),
     )
 
-    const duplicatePartitionFixture = createCompleteProjectFixture()
-    const partitionSourceId = parseMidiSourceId('source-command-partition-only')
-    duplicatePartitionFixture.containers.midiNotes.set(partitionSourceId, new Map())
-    const duplicatePartitionStore = new ModelStore(duplicatePartitionFixture.seed)
-    const duplicatePartition = captureCommandError(() =>
-      prepareProjectCommand(
-        duplicatePartitionStore,
-        createCommand(duplicatePartitionStore, { sourceId: partitionSourceId }),
-      ),
-    )
-
-    const duplicateSustainPartitionFixture = createCompleteProjectFixture()
-    const sustainPartitionSourceId = parseMidiSourceId(
-      'source-command-sustain-pedal-partition-only',
-    )
-    duplicateSustainPartitionFixture.containers.midiSustainPedalEvents.set(
-      sustainPartitionSourceId,
-      new Map(),
-    )
-    const duplicateSustainPartitionStore = new ModelStore(duplicateSustainPartitionFixture.seed)
-    const duplicateSustainPartition = captureCommandError(() =>
-      prepareProjectCommand(
-        duplicateSustainPartitionStore,
-        createCommand(duplicateSustainPartitionStore, {
-          sourceId: sustainPartitionSourceId,
-        }),
-      ),
-    )
-
     expect(duplicateClip).toMatchObject({
       code: 'clip-id-already-exists',
-      clipId: duplicateClipFixture.records.nonLoopClip.id,
     })
     expect(duplicateSource).toMatchObject({
       code: 'midi-source-id-already-exists',
-      sourceId: duplicateSourceFixture.records.nonLoopSource.id,
-    })
-    expect(duplicatePartition).toMatchObject({
-      code: 'midi-note-partition-already-exists',
-      sourceId: partitionSourceId,
-    })
-    expect(duplicateSustainPartition).toMatchObject({
-      code: 'sustain-pedal-event-partition-already-exists',
-      sourceId: sustainPartitionSourceId,
     })
   })
 
@@ -303,10 +260,6 @@ describe('AddMidiClipCommand preparation', () => {
 
     expect(error).toMatchObject({
       code: 'midi-clip-out-of-source-range',
-      clipId: command.clip.id,
-      sourceId: command.source.id,
-      sourceLengthTick: parseTick(1_920),
-      sourceReadEndTick: parseTick(3_840),
     })
   })
 })

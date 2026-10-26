@@ -30,23 +30,12 @@ function rejectOccupiedTempoEventTick(
   command: AddTempoEventCommand | MoveTempoEventCommand,
   blockingTempoEvent: TempoEventRecord,
 ): never {
-  const tempoEventId =
-    command.type === PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD
-      ? command.tempoEvent.id
-      : command.tempoEventId
   const tempoEventTick =
     command.type === PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD ? command.tempoEvent.tick : command.tick
 
   throw new ProjectCommandError(
     'tempo-event-tick-already-exists',
     `Tempo Event ${blockingTempoEvent.id} already occupies Tick ${tempoEventTick}`,
-    {
-      baseRevision: command.baseRevision,
-      blockingTempoEventId: blockingTempoEvent.id,
-      commandType: command.type,
-      tempoEventId,
-      tempoEventTick,
-    },
   )
 }
 
@@ -60,12 +49,6 @@ export function prepareAddTempoEventCommand(
     throw new ProjectCommandError(
       'tempo-event-id-already-exists',
       `Tempo Event ID ${tempoEvent.id} already exists`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        tempoEventId: tempoEvent.id,
-        tempoEventTick: tempoEvent.tick,
-      },
     )
   }
 
@@ -97,12 +80,6 @@ export function prepareMoveTempoEventCommand(
     throw new ProjectCommandError(
       'tempo-event-not-found',
       `Tempo Event ${command.tempoEventId} does not exist`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        tempoEventId: command.tempoEventId,
-        tempoEventTick: command.tick,
-      },
     )
   }
 
@@ -118,12 +95,6 @@ export function prepareMoveTempoEventCommand(
     throw new ProjectCommandError(
       'initial-tempo-event-cannot-move',
       `Initial Tempo Event ${before.id} must remain at Tick 0`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        tempoEventId: before.id,
-        tempoEventTick: command.tick,
-      },
     )
   }
 
@@ -157,11 +128,6 @@ export function prepareRemoveTempoEventCommand(
     throw new ProjectCommandError(
       'tempo-event-not-found',
       `Tempo Event ${command.tempoEventId} does not exist`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        tempoEventId: command.tempoEventId,
-      },
     )
   }
 
@@ -169,12 +135,6 @@ export function prepareRemoveTempoEventCommand(
     throw new ProjectCommandError(
       'initial-tempo-event-cannot-remove',
       `Initial Tempo Event ${before.id} cannot be removed`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        tempoEventId: before.id,
-        tempoEventTick: before.tick,
-      },
     )
   }
 
@@ -201,11 +161,6 @@ export function prepareReplaceTempoEventBpmCommand(
     throw new ProjectCommandError(
       'tempo-event-not-found',
       `Tempo Event ${command.tempoEventId} does not exist`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        tempoEventId: command.tempoEventId,
-      },
     )
   }
 

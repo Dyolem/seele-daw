@@ -31,7 +31,6 @@ export function assertMidiNoteIdAvailable(
   throw new ProjectCommandError(
     'note-id-already-exists',
     `MIDI Note ID ${context.noteId} is already used in this project`,
-    context,
   )
 }
 
@@ -47,10 +46,5 @@ export function assertMidiNoteWithinSource(
   throw new ProjectCommandError(
     'note-out-of-source-range',
     `MIDI Note ${note.id} ends at Tick ${noteEndTick}, beyond MidiSource ${source.id} length ${source.lengthTick}`,
-    {
-      ...context,
-      noteEndTick,
-      sourceLengthTick: source.lengthTick,
-    },
   )
 }

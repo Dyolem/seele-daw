@@ -168,7 +168,7 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
       },
     ])
 
-    expect(preparation.command).not.toBe(command)
+    expect(preparation.command).toBe(command)
     expect(forwardMutation.after).toBe(preparation.command.instrumentDevice)
   })
 
@@ -199,7 +199,6 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     )
     expect(missingTrack).toMatchObject({
       code: 'track-not-found',
-      trackId: missingTrackId,
     })
 
     const wrongTrackKind = captureCommandError(() =>
@@ -210,8 +209,6 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     )
     expect(wrongTrackKind).toMatchObject({
       code: 'instrument-device-track-kind-mismatch',
-      trackId: fixture.records.audioTrack.id,
-      trackKind: 'audio',
     })
 
     const changedDeviceId = parseDeviceId('device-replacement-with-new-id')
@@ -228,8 +225,6 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     )
     expect(changedIdentity).toMatchObject({
       code: 'instrument-device-id-mismatch',
-      deviceId: changedDeviceId,
-      trackId: fixture.records.instrumentTrack.id,
     })
 
     const devicesWithoutInstrument = new Map(fixture.seed.devices)
@@ -243,8 +238,6 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     )
     expect(missingDevice).toMatchObject({
       code: 'device-not-found',
-      deviceId: fixture.records.instrumentDevice.id,
-      trackId: fixture.records.instrumentTrack.id,
     })
   })
 })

@@ -4,16 +4,6 @@ import type { ReadyProjectCommandPreparation } from '#internal/commands/preparat
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 
-function commandDetails(command: AddInstrumentTrackCommand) {
-  return {
-    baseRevision: command.baseRevision,
-    commandType: command.type,
-    deviceId: command.instrumentDevice.id,
-    insertAt: command.insertAt,
-    trackId: command.track.id,
-  } as const
-}
-
 function assertTrackIdAvailable(
   reader: ModelStoreReader,
   command: AddInstrumentTrackCommand,
@@ -22,7 +12,6 @@ function assertTrackIdAvailable(
     throw new ProjectCommandError(
       'track-id-already-exists',
       `Track ID ${command.track.id} is already used in this project`,
-      commandDetails(command),
     )
   }
 }
@@ -35,7 +24,6 @@ function assertDeviceIdAvailable(
     throw new ProjectCommandError(
       'device-id-already-exists',
       `Device ID ${command.instrumentDevice.id} is already used in this project`,
-      commandDetails(command),
     )
   }
 }
@@ -50,7 +38,6 @@ function requireTrackOrderLength(
     throw new ProjectCommandError(
       'track-order-index-out-of-bounds',
       `Cannot insert Track ${command.track.id} at index ${command.insertAt} for Track Order length ${trackOrderLength}`,
-      { ...commandDetails(command), trackOrderLength },
     )
   }
 

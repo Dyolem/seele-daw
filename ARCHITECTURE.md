@@ -44,7 +44,7 @@ EditorPointerInputAdapter       editor/browser   DOM Pointer → 中立的 Point
 → completeGesture → edits.notes Studio           检查项目就绪、手势未过期；把 Clip 内 Tick 换成
                                                  Source Tick；构造 Project Command
 → ProjectSession.execute        project-core
-    prepareProjectCommand          命令注册表：normalize → 检查 baseRevision → handler 产出 MutationPlan
+    prepareProjectCommand          检查 baseRevision → 按命令类型交给 handler，产出 MutationPlan
     createProjectCommitCandidate   Commit 直接发布 Plan 写入的存储变化（ADR-004）
     History 预备
     MutationApplier                投影 → 校验编排与写过的内容 → 写入（ADR-008）
@@ -103,8 +103,8 @@ Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 
 1. `protocol/project-command.ts`：在 `PROJECT_COMMAND_TYPE` 中加类型，写命令接口与工厂。
 2. `commands/<实体>/command-handler.ts`：写 `prepare`，产出 MutationPlan。
-3. `preparation/project-command-preparer.ts`：加注册项（normalize、address、prepare）。
-   注册表按命令类型穷举，漏了就是类型错误。
+3. `preparation/project-command-preparer.ts`：在注册表里登记 `prepare`。注册表按命令类型穷举，
+   漏了就是类型错误。命令只由工厂创建，执行时不再重新校验。
 4. `index.ts`：导出工厂与类型。
 5. `__tests__/command-properties.spec.ts`：加一条用例；缺用例时完整性检查会失败。
 6. Studio：在 `workbench/edits` 中加用例函数，再由界面调用。

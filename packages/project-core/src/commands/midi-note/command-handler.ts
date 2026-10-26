@@ -32,31 +32,10 @@ function requireMidiSource(reader: ModelStoreReader, command: MidiNoteCommand): 
     throw new ProjectCommandError(
       'midi-source-not-found',
       `MidiSource ${command.sourceId} does not exist`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        sourceId: command.sourceId,
-        ...('noteId' in command ? { noteId: command.noteId } : {}),
-      },
     )
   }
 
   return source
-}
-
-function assertNotePartitionExists(reader: ModelStoreReader, command: MidiNoteCommand): void {
-  if (!reader.hasMidiNotePartition(command.sourceId)) {
-    throw new ProjectCommandError(
-      'midi-note-partition-missing',
-      `MidiSource ${command.sourceId} does not have a MIDI Note partition`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        sourceId: command.sourceId,
-        ...('noteId' in command ? { noteId: command.noteId } : {}),
-      },
-    )
-  }
 }
 
 function requireMidiNote(
@@ -70,12 +49,6 @@ function requireMidiNote(
     throw new ProjectCommandError(
       'midi-note-not-found',
       `MIDI Note ${noteId} does not exist in MidiSource ${command.sourceId}`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        noteId,
-        sourceId: command.sourceId,
-      },
     )
   }
 
@@ -110,7 +83,6 @@ export function prepareAddNoteCommand(
   command: AddNoteCommand,
 ): ReadyProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
-  assertNotePartitionExists(reader, command)
   assertMidiNoteIdAvailable(reader, validationContext(command, command.noteId))
 
   const note = createMidiNoteRecord({
@@ -139,7 +111,6 @@ export function prepareRemoveNotesCommand(
   command: RemoveNotesCommand,
 ): ReadyProjectCommandPreparation {
   requireMidiSource(reader, command)
-  assertNotePartitionExists(reader, command)
 
   const changes = command.noteIds.map<ProjectChange>((noteId) => ({
     op: 'remove',
@@ -157,13 +128,6 @@ function createMovedNote(command: MoveNotesCommand, before: MidiNoteRecord): Mid
     throw new ProjectCommandError(
       'note-out-of-source-range',
       `MIDI Note ${before.id} cannot move to Tick ${nextStartTick}`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        noteId: before.id,
-        noteStartTick: nextStartTick,
-        sourceId: command.sourceId,
-      },
     )
   }
 
@@ -172,13 +136,6 @@ function createMovedNote(command: MoveNotesCommand, before: MidiNoteRecord): Mid
     throw new ProjectCommandError(
       'note-pitch-out-of-range',
       `MIDI Note ${before.id} cannot move to MIDI Pitch ${nextPitch}`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        noteId: before.id,
-        notePitch: nextPitch,
-        sourceId: command.sourceId,
-      },
     )
   }
 
@@ -194,7 +151,6 @@ export function prepareMoveNotesCommand(
   command: MoveNotesCommand,
 ): ReadyProjectCommandPreparation | NoChangeProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
-  assertNotePartitionExists(reader, command)
   const notes = command.noteIds.map((noteId) => requireMidiNote(reader, command, noteId))
 
   if (command.deltaTick === 0 && command.deltaPitch === 0) {
@@ -226,7 +182,6 @@ export function prepareResizeNoteCommand(
   command: ResizeNoteCommand,
 ): ReadyProjectCommandPreparation | NoChangeProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
-  assertNotePartitionExists(reader, command)
   const before = requireMidiNote(reader, command, command.noteId)
 
   if (command.startTick === before.startTick && command.durationTick === before.durationTick) {

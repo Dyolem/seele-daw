@@ -234,7 +234,6 @@ describe('ProjectCommand public contract', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'duplicate-note-id',
-        noteId: fixture.records.nonLoopNote.id,
       }),
     )
 
@@ -272,7 +271,6 @@ describe('ProjectCommand public contract', () => {
       )
 
       expect(error.code).toBe('invalid-base-revision')
-      expect(error.baseRevision).toBe(revision)
     },
   )
 
@@ -322,26 +320,9 @@ describe('ProjectCommand preparation boundary', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('base-revision-mismatch')
-    expect(error.baseRevision).toBe(staleRevision)
-    expect(error.currentRevision).toBe(store.modelRevision)
   })
 
-  it('rejects an unknown runtime command discriminant', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = {
-      type: 'midi-note.unknown',
-      baseRevision: store.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
-    } as unknown as ProjectCommand
-    const error = captureCommandError(() => prepareProjectCommand(store, command))
-
-    expect(error.code).toBe('unknown-command-type')
-    expect(error.commandType).toBe('midi-note.unknown')
-  })
-
-  it('rejects a missing MidiSource with address details', () => {
+  it('rejects a missing MidiSource', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const missingSourceId = parseMidiSourceId('source-command-missing')
@@ -349,19 +330,6 @@ describe('ProjectCommand preparation boundary', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('midi-source-not-found')
-    expect(error.sourceId).toBe(missingSourceId)
-    expect(error.noteId).toBe(command.noteId)
-  })
-
-  it('defensively rejects a missing Note partition', () => {
-    const fixture = createCompleteProjectFixture()
-    fixture.containers.midiNotes.delete(fixture.records.nonLoopSource.id)
-    const store = new ModelStore(fixture.seed)
-    const command = createAddCommand(store, fixture.records.nonLoopSource.id)
-    const error = captureCommandError(() => prepareProjectCommand(store, command))
-
-    expect(error.code).toBe('midi-note-partition-missing')
-    expect(error.sourceId).toBe(fixture.records.nonLoopSource.id)
   })
 })
 
@@ -412,8 +380,6 @@ describe('AddNoteCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('note-out-of-source-range')
-    expect(error.noteEndTick).toBe(1_921)
-    expect(error.sourceLengthTick).toBe(fixture.records.nonLoopSource.lengthTick)
   })
 
   it('rejects a Note ID already used in another Source partition', () => {
@@ -425,7 +391,6 @@ describe('AddNoteCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('note-id-already-exists')
-    expect(error.noteId).toBe(fixture.records.nonLoopNote.id)
   })
 
   it('applies and inverses the prepared insertion as two atomic revisions', () => {
@@ -469,7 +434,6 @@ describe('RemoveNotesCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('midi-note-not-found')
-    expect(error.noteId).toBe(command.noteIds[0])
   })
 
   it('applies the removal and inverses it with the original Record reference', () => {
@@ -570,7 +534,6 @@ describe('MoveNotesCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('note-out-of-source-range')
-    expect(error.noteId).toBe(fixture.records.nonLoopHarmonyNote.id)
     expect(store.getMidiNote(command.sourceId, fixture.records.nonLoopNote.id)).toBe(
       fixture.records.nonLoopNote,
     )
@@ -614,8 +577,6 @@ describe('MoveNotesCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('note-out-of-source-range')
-    expect(error.noteEndTick).toBe(1_921)
-    expect(error.sourceLengthTick).toBe(fixture.records.nonLoopSource.lengthTick)
   })
 
   it('rejects a shared Pitch delta that moves any Note outside MIDI 0–127', () => {
@@ -630,8 +591,6 @@ describe('MoveNotesCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('note-pitch-out-of-range')
-    expect(error.noteId).toBe(fixture.records.nonLoopNote.id)
-    expect(error.notePitch).toBe(128)
   })
 
   it('applies the replacement and inverses it with the original Record reference', () => {
@@ -711,9 +670,6 @@ describe('ResizeNoteCommand', () => {
     const error = captureCommandError(() => prepareProjectCommand(store, command))
 
     expect(error.code).toBe('base-revision-mismatch')
-    expect(error.baseRevision).toBe(command.baseRevision)
-    expect(error.currentRevision).toBe(store.modelRevision)
-    expect(error.noteId).toBe(command.noteId)
   })
 
   it('rejects missing targets and a target geometry beyond the Source boundary', () => {
@@ -728,7 +684,6 @@ describe('ResizeNoteCommand', () => {
     const missingError = captureCommandError(() => prepareProjectCommand(store, missingCommand))
 
     expect(missingError.code).toBe('midi-note-not-found')
-    expect(missingError.noteId).toBe(missingNoteId)
 
     const outOfRangeCommand = createResizeCommand(
       store,
@@ -742,8 +697,6 @@ describe('ResizeNoteCommand', () => {
     const rangeError = captureCommandError(() => prepareProjectCommand(store, outOfRangeCommand))
 
     expect(rangeError.code).toBe('note-out-of-source-range')
-    expect(rangeError.noteEndTick).toBe(1_921)
-    expect(rangeError.sourceLengthTick).toBe(fixture.records.nonLoopSource.lengthTick)
   })
 
   it('applies the replacement and inverses it with the original Record reference', () => {

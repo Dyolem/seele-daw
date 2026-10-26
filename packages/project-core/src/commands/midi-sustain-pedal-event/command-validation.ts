@@ -23,7 +23,6 @@ export function assertMidiSustainPedalEventIdAvailable(
     throw new ProjectCommandError(
       'sustain-pedal-event-id-already-exists',
       `MIDI Sustain Pedal Event ID ${context.eventId} is already used in this project`,
-      { ...context, sustainPedalEventId: context.eventId },
     )
   }
 }
@@ -38,11 +37,6 @@ export function assertMidiSustainPedalEventWithinSource(
   throw new ProjectCommandError(
     'sustain-pedal-event-out-of-source-range',
     `MIDI Sustain Pedal Event ${event.id} occurs at Tick ${event.tick}, beyond MidiSource ${source.id} length ${source.lengthTick}`,
-    {
-      ...context,
-      sourceLengthTick: source.lengthTick,
-      sustainPedalEventTick: event.tick,
-    },
   )
 }
 
@@ -67,13 +61,6 @@ export function assertMidiSustainPedalEventPositionsAvailable(
       throw new ProjectCommandError(
         'sustain-pedal-event-tick-channel-already-exists',
         `MIDI Sustain Pedal Event ${blockingEvent.id} already occupies Tick ${event.tick} and Channel ${event.channel} in MidiSource ${context.sourceId}`,
-        {
-          ...context,
-          blockingSustainPedalEventId: blockingEvent.id,
-          sustainPedalEventChannel: event.channel,
-          sustainPedalEventId: event.id,
-          sustainPedalEventTick: event.tick,
-        },
       )
     }
 

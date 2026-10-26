@@ -289,7 +289,6 @@ describe('ProjectSession command execution', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'midi-note-not-found',
-        noteId: missingNoteId,
       }),
     )
     expect(session.modelRevision).toBe(0)

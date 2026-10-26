@@ -23,70 +23,22 @@ function requireExtensionClip(
   const clip = reader.getClip(command.clipId)
 
   if (clip === undefined) {
-    throw new ProjectCommandError('clip-not-found', `MIDI Clip ${command.clipId} does not exist`, {
-      baseRevision: command.baseRevision,
-      clipId: command.clipId,
-      commandType: command.type,
-      noteId: command.note.id,
-    })
+    throw new ProjectCommandError('clip-not-found', `MIDI Clip ${command.clipId} does not exist`)
   }
 
   if (clip.loop !== null) {
     throw new ProjectCommandError(
       'looped-midi-clip-unsupported',
       `MIDI Clip ${clip.id} cannot be automatically extended while looped`,
-      {
-        baseRevision: command.baseRevision,
-        clipId: clip.id,
-        commandType: command.type,
-        noteId: command.note.id,
-        sourceId: clip.sourceId,
-        trackId: clip.trackId,
-      },
     )
   }
 
   return clip
 }
 
-function requireExtensionSource(
-  reader: ModelStoreReader,
-  command: ExtendMidiClipWithNoteCommand,
-  clip: MidiClipRecord,
-): MidiSourceRecord {
-  const source = reader.getMidiSource(clip.sourceId)
-
-  if (source === undefined) {
-    throw new ProjectCommandError(
-      'midi-source-not-found',
-      `MidiSource ${clip.sourceId} does not exist`,
-      {
-        baseRevision: command.baseRevision,
-        clipId: clip.id,
-        commandType: command.type,
-        noteId: command.note.id,
-        sourceId: clip.sourceId,
-        trackId: clip.trackId,
-      },
-    )
-  }
-
-  if (!reader.hasMidiNotePartition(source.id)) {
-    throw new ProjectCommandError(
-      'midi-note-partition-missing',
-      `MidiSource ${source.id} does not have a MIDI Note partition`,
-      {
-        baseRevision: command.baseRevision,
-        clipId: clip.id,
-        commandType: command.type,
-        noteId: command.note.id,
-        sourceId: source.id,
-        trackId: clip.trackId,
-      },
-    )
-  }
-
-  return source
+/** A Clip's Source always exists, with its partitions. */
+function requireExtensionSource(reader: ModelStoreReader, clip: MidiClipRecord): MidiSourceRecord {
+  return reader.getMidiSource(clip.sourceId)!
 }
 
 function extensionEndTick(
@@ -101,15 +53,6 @@ function extensionEndTick(
   throw new ProjectCommandError(
     'midi-clip-extension-out-of-range',
     `MIDI Clip ${clip.id} cannot extend by Span ${command.spanTick} from Tick ${startTick}`,
-    {
-      baseRevision: command.baseRevision,
-      clipId: clip.id,
-      commandType: command.type,
-      noteId: command.note.id,
-      sourceId: clip.sourceId,
-      targetSpanTick: command.spanTick,
-      trackId: clip.trackId,
-    },
   )
 }
 
@@ -154,17 +97,6 @@ function assertExtensionDoesNotCrossNextClip(
   throw new ProjectCommandError(
     'midi-clip-extension-crosses-next-clip',
     `MIDI Clip ${clip.id} cannot extend through Tick ${targetEndTick} across next Clip ${blocker.id} at Tick ${blocker.startTick}`,
-    {
-      baseRevision: command.baseRevision,
-      blockingClipId: blocker.id,
-      clipEndTick: targetEndTick,
-      clipId: clip.id,
-      commandType: command.type,
-      noteId: command.note.id,
-      sourceId: clip.sourceId,
-      targetSpanTick: command.spanTick,
-      trackId: clip.trackId,
-    },
   )
 }
 
@@ -196,19 +128,13 @@ export function prepareExtendMidiClipWithNoteCommand(
   command: ExtendMidiClipWithNoteCommand,
 ): ReadyProjectCommandPreparation {
   const beforeClip = requireExtensionClip(reader, command)
-  const beforeSource = requireExtensionSource(reader, command, beforeClip)
+  const beforeSource = requireExtensionSource(reader, beforeClip)
   const context = createPlacementNoteValidationContext(command, beforeSource.id)
 
   if (command.spanTick <= beforeClip.spanTick) {
     throw new ProjectCommandError(
       'midi-clip-extension-not-rightward',
       `MIDI Clip ${beforeClip.id} target Span ${command.spanTick} must exceed current Span ${beforeClip.spanTick}`,
-      {
-        ...context,
-        clipId: beforeClip.id,
-        targetSpanTick: command.spanTick,
-        trackId: beforeClip.trackId,
-      },
     )
   }
 
@@ -222,14 +148,6 @@ export function prepareExtendMidiClipWithNoteCommand(
     throw new ProjectCommandError(
       'midi-clip-extension-not-required',
       `MIDI Note ${command.note.id} ends inside the existing MIDI Clip ${beforeClip.id} window`,
-      {
-        ...context,
-        clipEndTick: currentEndTick,
-        clipId: beforeClip.id,
-        noteEndTick,
-        targetSpanTick: command.spanTick,
-        trackId: beforeClip.trackId,
-      },
     )
   }
 

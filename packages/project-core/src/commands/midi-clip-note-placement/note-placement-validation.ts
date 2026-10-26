@@ -36,16 +36,5 @@ export function assertNoteWithinClipWindow(
   throw new ProjectCommandError(
     'note-out-of-clip-range',
     `MIDI Note ${note.id} range [${note.startTick}, ${noteEndTick}) is outside MIDI Clip ${clip.id} source window [${clip.sourceOffsetTick}, ${sourceReadEndTick})`,
-    {
-      baseRevision: command.baseRevision,
-      clipId: clip.id,
-      commandType: command.type,
-      noteEndTick,
-      noteId: note.id,
-      noteStartTick: note.startTick,
-      sourceId: clip.sourceId,
-      sourceReadEndTick,
-      sourceReadStartTick: clip.sourceOffsetTick,
-    },
   )
 }

@@ -20,22 +20,6 @@ import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectChange } from '#internal/mutation/project-change'
 import { addTicks } from '#internal/time/tick'
 
-function commandDetails(
-  command: AddInstrumentTrackCollectionCommand,
-  entry?: InstrumentTrackCollectionEntry,
-  clipGraph?: InstrumentTrackCollectionClip,
-) {
-  return {
-    baseRevision: command.baseRevision,
-    commandType: command.type,
-    deviceId: entry?.instrumentDevice.id,
-    insertAt: command.insertAt,
-    trackId: entry?.track.id,
-    clipId: clipGraph?.clip.id,
-    sourceId: clipGraph?.source.id,
-  } as const
-}
-
 function rejectReusedId(
   code:
     | 'track-id-already-exists'
@@ -44,12 +28,10 @@ function rejectReusedId(
     | 'midi-source-id-already-exists',
   entityName: string,
   id: string,
-  details: ReturnType<typeof commandDetails>,
 ): never {
   throw new ProjectCommandError(
     code,
     `${entityName} ID ${id} is already used by the project or this collection`,
-    details,
   )
 }
 
@@ -64,7 +46,6 @@ function assertTrackOrderInsertion(
   throw new ProjectCommandError(
     'track-order-index-out-of-bounds',
     `Cannot insert Instrument Track collection at index ${command.insertAt} for Track Order length ${trackOrderLength}`,
-    { ...commandDetails(command), trackOrderLength },
   )
 }
 
@@ -83,11 +64,6 @@ function assertClipWithinSource(
   throw new ProjectCommandError(
     'midi-clip-out-of-source-range',
     `MIDI Clip ${clipGraph.clip.id} reads through Tick ${sourceReadEndTick}, beyond MidiSource ${clipGraph.source.id} length ${clipGraph.source.lengthTick}`,
-    {
-      ...commandDetails(command, entry, clipGraph),
-      sourceLengthTick: clipGraph.source.lengthTick,
-      sourceReadEndTick,
-    },
   )
 }
 
@@ -127,10 +103,8 @@ function assertCollectionGraphCanBeAdded(
   const sustainPedalEventIds = collectExistingSustainPedalEventIds(reader)
 
   for (const entry of command.entries) {
-    const details = commandDetails(command, entry)
-
     if (reader.getTrack(entry.track.id) !== undefined || trackIds.has(entry.track.id)) {
-      rejectReusedId('track-id-already-exists', 'Track', entry.track.id, details)
+      rejectReusedId('track-id-already-exists', 'Track', entry.track.id)
     }
     trackIds.add(entry.track.id)
 
@@ -138,7 +112,7 @@ function assertCollectionGraphCanBeAdded(
       reader.getDevice(entry.instrumentDevice.id) !== undefined ||
       deviceIds.has(entry.instrumentDevice.id)
     ) {
-      rejectReusedId('device-id-already-exists', 'Device', entry.instrumentDevice.id, details)
+      rejectReusedId('device-id-already-exists', 'Device', entry.instrumentDevice.id)
     }
     deviceIds.add(entry.instrumentDevice.id)
 
@@ -146,7 +120,6 @@ function assertCollectionGraphCanBeAdded(
       throw new ProjectCommandError(
         'instrument-device-id-mismatch',
         `Instrument Track ${entry.track.id} owns Device ${entry.track.instrumentDeviceId}, not supplied Device ${entry.instrumentDevice.id}`,
-        details,
       )
     }
 
@@ -154,18 +127,14 @@ function assertCollectionGraphCanBeAdded(
       throw new ProjectCommandError(
         'instrument-track-device-chain-unsupported',
         `Instrument Track ${entry.track.id} collection entry cannot reference Device chains that the command does not carry`,
-        details,
       )
     }
 
     for (const clipGraph of entry.clips) {
-      const clipDetails = commandDetails(command, entry, clipGraph)
-
       if (clipGraph.clip.trackId !== entry.track.id) {
         throw new ProjectCommandError(
           'midi-clip-track-kind-mismatch',
           `MIDI Clip ${clipGraph.clip.id} does not belong to supplied Instrument Track ${entry.track.id}`,
-          clipDetails,
         )
       }
 
@@ -173,27 +142,19 @@ function assertCollectionGraphCanBeAdded(
         throw new ProjectCommandError(
           'midi-clip-source-id-mismatch',
           `MIDI Clip ${clipGraph.clip.id} owns Source ${clipGraph.clip.sourceId}, not supplied Source ${clipGraph.source.id}`,
-          clipDetails,
         )
       }
 
       if (reader.getClip(clipGraph.clip.id) !== undefined || clipIds.has(clipGraph.clip.id)) {
-        rejectReusedId('clip-id-already-exists', 'Clip', clipGraph.clip.id, clipDetails)
+        rejectReusedId('clip-id-already-exists', 'Clip', clipGraph.clip.id)
       }
       clipIds.add(clipGraph.clip.id)
 
       if (
         reader.getMidiSource(clipGraph.source.id) !== undefined ||
-        reader.hasMidiNotePartition(clipGraph.source.id) ||
-        reader.hasMidiSustainPedalEventPartition(clipGraph.source.id) ||
         sourceIds.has(clipGraph.source.id)
       ) {
-        rejectReusedId(
-          'midi-source-id-already-exists',
-          'MidiSource',
-          clipGraph.source.id,
-          clipDetails,
-        )
+        rejectReusedId('midi-source-id-already-exists', 'MidiSource', clipGraph.source.id)
       }
       sourceIds.add(clipGraph.source.id)
 
@@ -204,7 +165,6 @@ function assertCollectionGraphCanBeAdded(
           throw new ProjectCommandError(
             'note-id-already-exists',
             `MIDI Note ID ${note.id} is already used by the project or this collection`,
-            { ...clipDetails, noteId: note.id },
           )
         }
         noteIds.add(note.id)
@@ -226,7 +186,6 @@ function assertCollectionGraphCanBeAdded(
           throw new ProjectCommandError(
             'sustain-pedal-event-id-already-exists',
             `MIDI Sustain Pedal Event ID ${event.id} is already used by the project or this collection`,
-            { ...clipDetails, sustainPedalEventId: event.id },
           )
         }
         sustainPedalEventIds.add(event.id)
@@ -248,13 +207,6 @@ function assertCollectionGraphCanBeAdded(
           throw new ProjectCommandError(
             'sustain-pedal-event-tick-channel-already-exists',
             `MIDI Sustain Pedal Events ${blockingEventId} and ${event.id} share Tick ${event.tick} and Channel ${event.channel}`,
-            {
-              ...clipDetails,
-              blockingSustainPedalEventId: blockingEventId,
-              sustainPedalEventChannel: event.channel,
-              sustainPedalEventId: event.id,
-              sustainPedalEventTick: event.tick,
-            },
           )
         }
         eventIdsByPosition.set(position, event.id)

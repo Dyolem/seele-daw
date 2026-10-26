@@ -149,7 +149,7 @@ describe('AddTempoEventCommand preparation', () => {
         before: preparation.command.tempoEvent,
       },
     ])
-    expect(preparation.command).not.toBe(command)
+    expect(preparation.command).toBe(command)
     expect(plan.forward[0]?.after).toBe(preparation.command.tempoEvent)
   })
 
@@ -165,8 +165,6 @@ describe('AddTempoEventCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'tempo-event-id-already-exists',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD,
-        tempoEventId: fixture.records.laterTempoEvent.id,
       }),
     )
 
@@ -178,10 +176,6 @@ describe('AddTempoEventCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'tempo-event-tick-already-exists',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.ADD,
-        tempoEventId: ADDED_TEMPO_EVENT_ID,
-        tempoEventTick: fixture.records.laterTempoEvent.tick,
-        blockingTempoEventId: fixture.records.laterTempoEvent.id,
       }),
     )
   })
@@ -262,8 +256,6 @@ describe('MoveTempoEventCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'initial-tempo-event-cannot-move',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE,
-        tempoEventId: fixture.records.initialTempoEvent.id,
       }),
     )
     expect(() =>
@@ -278,8 +270,6 @@ describe('MoveTempoEventCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'tempo-event-not-found',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE,
-        tempoEventId: missingTempoEventId,
       }),
     )
     expect(() =>
@@ -294,9 +284,6 @@ describe('MoveTempoEventCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'tempo-event-tick-already-exists',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.MOVE,
-        tempoEventId: fixture.records.laterTempoEvent.id,
-        blockingTempoEventId: fixture.records.initialTempoEvent.id,
       }),
     )
   })
@@ -345,8 +332,6 @@ describe('RemoveTempoEventCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'initial-tempo-event-cannot-remove',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE,
-        tempoEventId: fixture.records.initialTempoEvent.id,
       }),
     )
     expect(() =>
@@ -360,8 +345,6 @@ describe('RemoveTempoEventCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'tempo-event-not-found',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REMOVE,
-        tempoEventId: missingTempoEventId,
       }),
     )
   })

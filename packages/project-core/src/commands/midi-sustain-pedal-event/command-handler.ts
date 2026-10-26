@@ -32,12 +32,6 @@ type MidiSustainPedalEventCommand =
   | RemoveMidiSustainPedalEventsCommand
   | ReplaceMidiSustainPedalEventValueCommand
 
-function commandEventId(command: MidiSustainPedalEventCommand): MidiSustainPedalEventId {
-  if ('event' in command) return command.event.id
-  if ('eventId' in command) return command.eventId
-  return command.eventIds[0]!
-}
-
 function validationContext(
   command: MidiSustainPedalEventCommand,
   eventId: MidiSustainPedalEventId,
@@ -61,30 +55,6 @@ function requireMidiSource(
   throw new ProjectCommandError(
     'midi-source-not-found',
     `MidiSource ${command.sourceId} does not exist`,
-    {
-      baseRevision: command.baseRevision,
-      commandType: command.type,
-      sourceId: command.sourceId,
-      sustainPedalEventId: commandEventId(command),
-    },
-  )
-}
-
-function assertEventPartitionExists(
-  reader: ModelStoreReader,
-  command: MidiSustainPedalEventCommand,
-): void {
-  if (reader.hasMidiSustainPedalEventPartition(command.sourceId)) return
-
-  throw new ProjectCommandError(
-    'sustain-pedal-event-partition-missing',
-    `MidiSource ${command.sourceId} does not have a MIDI Sustain Pedal Event partition`,
-    {
-      baseRevision: command.baseRevision,
-      commandType: command.type,
-      sourceId: command.sourceId,
-      sustainPedalEventId: commandEventId(command),
-    },
   )
 }
 
@@ -103,12 +73,6 @@ function requireEvent(
   throw new ProjectCommandError(
     'sustain-pedal-event-not-found',
     `MIDI Sustain Pedal Event ${eventId} does not exist in MidiSource ${command.sourceId}`,
-    {
-      baseRevision: command.baseRevision,
-      commandType: command.type,
-      sourceId: command.sourceId,
-      sustainPedalEventId: eventId,
-    },
   )
 }
 
@@ -128,7 +92,6 @@ export function prepareAddMidiSustainPedalEventCommand(
   command: AddMidiSustainPedalEventCommand,
 ): ReadyProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
-  assertEventPartitionExists(reader, command)
   const context = validationContext(command, command.event.id)
 
   assertMidiSustainPedalEventIdAvailable(reader, context)
@@ -155,13 +118,6 @@ function createMovedEvent(
     throw new ProjectCommandError(
       'sustain-pedal-event-out-of-source-range',
       `MIDI Sustain Pedal Event ${before.id} cannot move to Tick ${nextTick}`,
-      {
-        baseRevision: command.baseRevision,
-        commandType: command.type,
-        sourceId: command.sourceId,
-        sustainPedalEventId: before.id,
-        sustainPedalEventTick: nextTick,
-      },
     )
   }
 
@@ -173,7 +129,6 @@ export function prepareMoveMidiSustainPedalEventsCommand(
   command: MoveMidiSustainPedalEventsCommand,
 ): ReadyProjectCommandPreparation | NoChangeProjectCommandPreparation {
   const source = requireMidiSource(reader, command)
-  assertEventPartitionExists(reader, command)
   const events = command.eventIds.map((eventId) => requireEvent(reader, command, eventId))
 
   if (command.deltaTick === 0) {
@@ -214,7 +169,6 @@ export function prepareRemoveMidiSustainPedalEventsCommand(
   command: RemoveMidiSustainPedalEventsCommand,
 ): ReadyProjectCommandPreparation {
   requireMidiSource(reader, command)
-  assertEventPartitionExists(reader, command)
 
   return ready(
     command,
@@ -232,7 +186,6 @@ export function prepareReplaceMidiSustainPedalEventValueCommand(
   command: ReplaceMidiSustainPedalEventValueCommand,
 ): ReadyProjectCommandPreparation | NoChangeProjectCommandPreparation {
   requireMidiSource(reader, command)
-  assertEventPartitionExists(reader, command)
   const before = requireEvent(reader, command, command.eventId)
 
   if (before.value === command.value) {

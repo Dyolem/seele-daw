@@ -144,7 +144,6 @@ describe('AddInstrumentTrackCommand public contract', () => {
       const error = captureCommandError(() => createCommand(store, { insertAt }))
 
       expect(error.code).toBe('invalid-track-order-index')
-      expect(error.insertAt).toBe(insertAt)
     },
   )
 })
@@ -205,7 +204,7 @@ describe('AddInstrumentTrackCommand preparation', () => {
       throw new Error('Expected a ready Instrument Track graph insertion')
     }
 
-    expect(preparation.command).not.toBe(command)
+    expect(preparation.command).toBe(command)
     expect(plan.forward[0].after).toBe(preparation.command.instrumentDevice)
     expect(plan.forward[1].after).toBe(preparation.command.track)
   })
@@ -222,7 +221,6 @@ describe('AddInstrumentTrackCommand preparation', () => {
     )
     expect(duplicateTrack).toMatchObject({
       code: 'track-id-already-exists',
-      trackId: fixture.records.instrumentTrack.id,
     })
 
     const duplicateDevice = captureCommandError(() =>
@@ -238,17 +236,12 @@ describe('AddInstrumentTrackCommand preparation', () => {
     )
     expect(duplicateDevice).toMatchObject({
       code: 'device-id-already-exists',
-      deviceId: fixture.records.instrumentDevice.id,
     })
 
     const outOfBounds = captureCommandError(() =>
       prepareProjectCommand(store, createCommand(store, { insertAt: 3 })),
     )
-    expect(outOfBounds).toMatchObject({
-      code: 'track-order-index-out-of-bounds',
-      insertAt: 3,
-      trackOrderLength: 2,
-    })
+    expect(outOfBounds).toMatchObject({ code: 'track-order-index-out-of-bounds' })
   })
 })
 

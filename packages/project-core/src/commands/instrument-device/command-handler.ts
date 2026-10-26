@@ -9,15 +9,6 @@ import type { ModelStoreReader } from '#internal/model/model-store'
 import type { InstrumentTrackRecord } from '#internal/model/track'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 
-function commandDetails(command: ReplaceInstrumentDeviceCommand) {
-  return {
-    baseRevision: command.baseRevision,
-    commandType: command.type,
-    deviceId: command.instrumentDevice.id,
-    trackId: command.trackId,
-  } as const
-}
-
 function requireInstrumentTrack(
   reader: ModelStoreReader,
   command: ReplaceInstrumentDeviceCommand,
@@ -25,18 +16,13 @@ function requireInstrumentTrack(
   const track = reader.getTrack(command.trackId)
 
   if (track === undefined) {
-    throw new ProjectCommandError(
-      'track-not-found',
-      `Track ${command.trackId} does not exist`,
-      commandDetails(command),
-    )
+    throw new ProjectCommandError('track-not-found', `Track ${command.trackId} does not exist`)
   }
 
   if (track.kind !== 'instrument') {
     throw new ProjectCommandError(
       'instrument-device-track-kind-mismatch',
       `Track ${command.trackId} is ${track.kind}, not instrument`,
-      { ...commandDetails(command), trackKind: track.kind },
     )
   }
 
@@ -52,7 +38,6 @@ function requireCurrentInstrumentDevice(
     throw new ProjectCommandError(
       'instrument-device-id-mismatch',
       `Replacement Device ${command.instrumentDevice.id} does not preserve Instrument Track ${track.id} Device ID ${track.instrumentDeviceId}`,
-      commandDetails(command),
     )
   }
 
@@ -62,7 +47,6 @@ function requireCurrentInstrumentDevice(
     throw new ProjectCommandError(
       'device-not-found',
       `Instrument Device ${track.instrumentDeviceId} for Track ${track.id} does not exist`,
-      commandDetails(command),
     )
   }
 

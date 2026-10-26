@@ -245,14 +245,9 @@ describe('AddMidiClipWithNoteCommand preparation', () => {
 
     expect(outside).toMatchObject({
       code: 'note-out-of-clip-range',
-      sourceReadStartTick: 0,
-      sourceReadEndTick: 960,
-      noteStartTick: 960,
-      noteEndTick: 1_440,
     })
     expect(duplicate).toMatchObject({
       code: 'note-id-already-exists',
-      noteId: duplicateFixture.records.nonLoopNote.id,
     })
   })
 })
@@ -361,15 +356,12 @@ describe('ExtendMidiClipWithNoteCommand preparation', () => {
     expect(missing.code).toBe('clip-not-found')
     expect(looped).toMatchObject({
       code: 'looped-midi-clip-unsupported',
-      clipId: loopFixture.records.loopingClip.id,
     })
     expect(notRightward).toMatchObject({
       code: 'midi-clip-extension-not-rightward',
-      targetSpanTick: 960,
     })
     expect(unnecessary).toMatchObject({
       code: 'midi-clip-extension-not-required',
-      noteEndTick: 1_200,
     })
   })
 
@@ -413,17 +405,12 @@ describe('ExtendMidiClipWithNoteCommand preparation', () => {
 
     expect(collision).toMatchObject({
       code: 'midi-clip-extension-crosses-next-clip',
-      blockingClipId: collisionFixture.records.loopingClip.id,
-      clipEndTick: 1_921,
     })
     expect(outside).toMatchObject({
       code: 'note-out-of-clip-range',
-      sourceReadEndTick: 1_680,
-      noteEndTick: 1_800,
     })
     expect(duplicate).toMatchObject({
       code: 'note-id-already-exists',
-      noteId: duplicateFixture.records.loopingNote.id,
     })
   })
 })

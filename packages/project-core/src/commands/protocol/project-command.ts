@@ -443,7 +443,6 @@ function parseCommandBaseRevision(value: ModelRevision): ModelRevision {
     throw new ProjectCommandError(
       'invalid-base-revision',
       'ProjectCommand.baseRevision must be a non-negative safe integer',
-      { baseRevision: value },
     )
   }
 }
@@ -453,7 +452,6 @@ function parseTrackOrderIndex(value: number): number {
     throw new ProjectCommandError(
       'invalid-track-order-index',
       'Instrument Track command insertAt must be a non-negative safe integer',
-      { insertAt: value },
     )
   }
 
@@ -559,7 +557,6 @@ export function createAddInstrumentTrackCollectionCommand(
     throw new ProjectCommandError(
       'empty-instrument-track-collection',
       'AddInstrumentTrackCollectionCommand.entries must contain at least one Track graph',
-      { baseRevision: input.baseRevision },
     )
   }
 
@@ -631,14 +628,6 @@ export function createAddMidiClipWithNoteCommand(
     throw new ProjectCommandError(
       'looped-midi-clip-unsupported',
       'AddMidiClipWithNoteCommand only creates a non-looped MIDI Clip',
-      {
-        baseRevision: input.baseRevision,
-        clipId: input.clipId,
-        commandType: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE,
-        noteId: input.noteId,
-        sourceId: input.sourceId,
-        trackId: input.trackId,
-      },
     )
   }
 
@@ -706,7 +695,6 @@ function parseDistinctNoteIds(
       throw new ProjectCommandError(
         'duplicate-note-id',
         `${commandName}.noteIds contains duplicate MIDI Note ID ${noteId}`,
-        { noteId },
       )
     }
     uniqueNoteIds.add(noteId)
@@ -787,7 +775,6 @@ function parseDistinctMidiSustainPedalEventIds(
       throw new ProjectCommandError(
         'duplicate-sustain-pedal-event-id',
         `${commandName}.eventIds contains duplicate MIDI Sustain Pedal Event ID ${eventId}`,
-        { sustainPedalEventId: eventId },
       )
     }
     uniqueEventIds.add(eventId)

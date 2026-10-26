@@ -63,10 +63,7 @@ export type {
   ResizeNoteCommand,
 } from './commands/protocol/project-command'
 export { ProjectCommandError } from './commands/protocol/project-command-error'
-export type {
-  ProjectCommandErrorCode,
-  ProjectCommandErrorDetails,
-} from './commands/protocol/project-command-error'
+export type { ProjectCommandErrorCode } from './commands/protocol/project-command-error'
 
 export type {
   MasterReplacement,

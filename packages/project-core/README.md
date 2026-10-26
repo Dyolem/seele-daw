@@ -23,13 +23,13 @@
 （单条或批量导入）；新增 MIDI Clip（空 Clip、带第一枚 Note，或向右扩展并加 Note）；MIDI Note
 的增、删、移动与调整长度；Sustain Pedal（CC64）事件的增、删、移动与改值；Tempo 事件的增、删、
 移动与改 BPM。命令携带完整参数和 `baseRevision`，不读取编辑器状态；违反业务规则时抛
-`ProjectCommandError`。
+`ProjectCommandError`，它的 `code` 指出是哪条规则。
 
 ## 一次提交
 
 ```text
 execute(command)
-→ prepareProjectCommand   normalize；检查 baseRevision；handler 读取当前记录，产出 MutationPlan
+→ prepareProjectCommand   检查 baseRevision；handler 读取当前记录，产出 MutationPlan
                           （forward 变化与工厂生成的 inverse），或 no-change
 → commit candidate        下一个 revision、origin，changes 即 plan.forward
 → History、ChangePublisher 预备

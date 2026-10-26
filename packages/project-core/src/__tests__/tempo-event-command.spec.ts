@@ -93,7 +93,7 @@ describe('ReplaceTempoEventBpmCommand preparation', () => {
         after: fixture.records.initialTempoEvent,
       },
     ])
-    expect(preparation.command).not.toBe(command)
+    expect(preparation.command).toBe(command)
     expect(preparation.command.bpm).toBe(forward.after.bpm)
   })
 
@@ -126,8 +126,6 @@ describe('ReplaceTempoEventBpmCommand preparation', () => {
     ).toThrowError(
       expect.objectContaining<Partial<ProjectCommandError>>({
         code: 'tempo-event-not-found',
-        commandType: PROJECT_COMMAND_TYPE.TEMPO_EVENT.REPLACE_BPM,
-        tempoEventId: missingTempoEventId,
       }),
     )
   })

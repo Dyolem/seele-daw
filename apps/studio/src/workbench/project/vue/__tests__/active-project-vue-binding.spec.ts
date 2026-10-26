@@ -1,15 +1,11 @@
 import { isProxy, isReadonly, isShallow } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
-import {
-  createActiveProjectService,
-  type ActiveProjectService,
-} from '@/workbench/project/active-project-service'
+import { describe, expect, it } from 'vitest'
+import { createActiveProjectService } from '@/workbench/project/active-project-service'
 import { createActiveProjectVueBinding } from '@/workbench/project/vue/active-project-vue-binding'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectState,
-  type ActiveProjectStateDeliveryFailure,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
 import {
@@ -136,34 +132,5 @@ describe('ActiveProjectVueBinding', () => {
     expect(binding.context.state.value).toBe(lastObservedState)
     expect(requireReady(activeProject.state).projectId).toBe(secondProjectId)
     activeProject.dispose()
-  })
-
-  it('reports a state delivery failure instead of dropping it', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const state = Object.freeze<ActiveProjectState>({ phase: ACTIVE_PROJECT_PHASE.IDLE })
-    const failure = Object.freeze<ActiveProjectStateDeliveryFailure>({
-      state,
-      cause: new Error('Vue state delivery failed'),
-    })
-    const unsubscribe = vi.fn<() => void>()
-    const activeProject: ActiveProjectService = {
-      state,
-      create: () => Promise.resolve(createTestProjectId('vue-stub')),
-      createFromSession: (session) => Promise.resolve(session.getSnapshot().project.id),
-      open: () => Promise.resolve(),
-      save: () => Promise.resolve(),
-      subscribe(observer) {
-        observer.onError(failure)
-        return unsubscribe
-      },
-      subscribeCommits: () => () => undefined,
-      dispose() {},
-    }
-
-    const binding = createActiveProjectVueBinding(activeProject)
-
-    expect(consoleError).toHaveBeenCalledWith(expect.any(String), failure)
-    binding.dispose()
-    expect(unsubscribe).toHaveBeenCalledOnce()
   })
 })

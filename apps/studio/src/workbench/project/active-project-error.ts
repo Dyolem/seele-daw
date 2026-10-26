@@ -1,7 +1,6 @@
 import type { ProjectId } from '@seele-daw/project-core'
 
 export type ActiveProjectErrorCode =
-  | 'invalid-observer'
   | 'generated-project-id-conflict'
   | 'new-session-project-id-mismatch'
   | 'project-id-conflict'
@@ -9,7 +8,6 @@ export type ActiveProjectErrorCode =
   | 'project-not-ready'
   | 'save-in-progress'
   | 'service-disposed'
-  | 'session-subscription-failed'
 
 export interface ActiveProjectErrorDetails {
   readonly actualProjectId?: ProjectId

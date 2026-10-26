@@ -48,14 +48,11 @@ export function createProjectPlaybackVueBinding(
     frame = null
   }
 
-  const unsubscribe = projectPlayback.subscribe({
-    onStateChange: (next) => {
-      state.value = next
-      if (next.phase !== PROJECT_PLAYBACK_PHASE.PLAYING) cancelFrame()
-      visualPosition.value = projectPlayback.readVisualPosition()
-      requestFrame()
-    },
-    onError: (failure) => console.error('Project Playback state was not delivered to Vue', failure),
+  const unsubscribe = projectPlayback.subscribe((next) => {
+    state.value = next
+    if (next.phase !== PROJECT_PLAYBACK_PHASE.PLAYING) cancelFrame()
+    visualPosition.value = projectPlayback.readVisualPosition()
+    requestFrame()
   })
   requestFrame()
 

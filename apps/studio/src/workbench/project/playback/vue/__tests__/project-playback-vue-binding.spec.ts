@@ -4,8 +4,7 @@ import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/pr
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
-  type ProjectPlaybackStateDeliveryFailure,
-  type ProjectPlaybackStateObserver,
+  type ProjectPlaybackStateListener,
 } from '@/workbench/project/playback/project-playback-state'
 import type {
   ProjectPlaybackVisualFrameHandle,
@@ -55,7 +54,7 @@ class ManualProjectPlaybackVisualFrame implements ProjectPlaybackVisualFramePort
 }
 
 function createCoordinatorFixture() {
-  let observer: ProjectPlaybackStateObserver | null = null
+  let listener: ProjectPlaybackStateListener | null = null
   let visualPosition = INITIAL_VISUAL_POSITION
   const unsubscribe = vi.fn<() => void>()
   const readVisualPosition = vi.fn<() => ProjectPlaybackVisualPosition>(() => visualPosition)
@@ -68,8 +67,8 @@ function createCoordinatorFixture() {
     play: async () => false,
     readVisualPosition,
     returnToLastStartPosition: () => false,
-    subscribe(input: ProjectPlaybackStateObserver) {
-      observer = input
+    subscribe(input: ProjectPlaybackStateListener) {
+      listener = input
       return unsubscribe
     },
     togglePlayPause: () => false,
@@ -78,12 +77,8 @@ function createCoordinatorFixture() {
   return {
     coordinator,
     publish(state: ProjectPlaybackState) {
-      if (observer === null) throw new Error('Expected the playback observer')
-      observer.onStateChange(state)
-    },
-    publishFailure(failure: ProjectPlaybackStateDeliveryFailure) {
-      if (observer === null) throw new Error('Expected the playback observer')
-      observer.onError(failure)
+      if (listener === null) throw new Error('Expected the playback listener')
+      listener(state)
     },
     readVisualPosition,
     setVisualPosition(position: ProjectPlaybackVisualPosition) {
@@ -236,25 +231,6 @@ describe('ProjectPlaybackVueBinding', () => {
 
     expect(binding.context.visualPosition.value).toBe(latestBackgroundPosition)
     expect(visualFrame.callbacks.size).toBe(1)
-    binding.dispose()
-  })
-
-  it('reports observer delivery failures without replacing playback state', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const fixture = createCoordinatorFixture()
-    const binding = createProjectPlaybackVueBinding(
-      fixture.coordinator,
-      new ManualProjectPlaybackVisualFrame(),
-    )
-    const failure = Object.freeze<ProjectPlaybackStateDeliveryFailure>({
-      cause: new Error('Playback state delivery failed'),
-      state: INITIAL_STATE,
-    })
-
-    fixture.publishFailure(failure)
-
-    expect(consoleError).toHaveBeenCalledWith(expect.any(String), failure)
-    expect(binding.context.state.value).toBe(INITIAL_STATE)
     binding.dispose()
   })
 })

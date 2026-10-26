@@ -5,8 +5,8 @@ import {
   type ClipId,
   type MidiSourceId,
   type NoteId,
+  reportListenerError,
   type ProjectSession,
-  type ProjectSubscriptionDeliveryFailure,
   type ProjectUnsubscribe,
 } from '@seele-daw/project-core'
 
@@ -19,29 +19,14 @@ export interface PianoRollEditorSessionState {
   readonly sourceId: MidiSourceId
 }
 
-export type PianoRollEditorSessionFailureOperation =
-  | 'observer-delivery'
-  | 'project-query'
-  | 'project-subscription'
-
-export interface PianoRollEditorSessionFailure {
-  readonly cause: unknown
-  readonly operation: PianoRollEditorSessionFailureOperation
-}
-
-export interface PianoRollEditorSessionObserver {
-  onError(failure: PianoRollEditorSessionFailure): void
-  onStateChange(state: PianoRollEditorSessionState): void
-}
-
-export type PianoRollEditorSessionUnsubscribe = () => void
+export type PianoRollEditorSessionListener = (state: PianoRollEditorSessionState) => void
 
 export interface PianoRollEditorSession {
   readonly state: PianoRollEditorSessionState
   clearSelection(): boolean
   dispose(): void
   selectOnly(noteId: NoteId): boolean
-  subscribe(observer: PianoRollEditorSessionObserver): PianoRollEditorSessionUnsubscribe
+  subscribe(listener: PianoRollEditorSessionListener): () => void
   toggleSelection(noteId: NoteId): boolean
 }
 
@@ -61,16 +46,9 @@ function createState(
   })
 }
 
-function createFailure(
-  operation: PianoRollEditorSessionFailureOperation,
-  cause: unknown,
-): PianoRollEditorSessionFailure {
-  return Object.freeze({ cause, operation })
-}
-
 class PianoRollEditorSessionImpl implements PianoRollEditorSession {
   readonly #context: PianoRollClipContext
-  readonly #observers = new Set<PianoRollEditorSessionObserver>()
+  readonly #listeners = new Set<PianoRollEditorSessionListener>()
   readonly #projectSession: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly #projectUnsubscribe: ProjectUnsubscribe
   #disposed = false
@@ -84,10 +62,7 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
       createMidiNoteChangesSubscription({
         sourceIds: [input.context.sourceId],
       }),
-      {
-        onCommit: () => this.#reconcileSelection(),
-        onError: (failure) => this.#notifyProjectSubscriptionFailure(failure),
-      },
+      () => this.#reconcileSelection(),
     )
   }
 
@@ -130,15 +105,11 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
     return true
   }
 
-  subscribe(observer: PianoRollEditorSessionObserver): PianoRollEditorSessionUnsubscribe {
+  subscribe(listener: PianoRollEditorSessionListener): () => void {
     this.#requireActive()
-    this.#observers.add(observer)
-    let subscribed = true
-
+    this.#listeners.add(listener)
     return () => {
-      if (!subscribed) return
-      subscribed = false
-      this.#observers.delete(observer)
+      this.#listeners.delete(listener)
     }
   }
 
@@ -147,7 +118,7 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
 
     this.#disposed = true
     this.#projectUnsubscribe()
-    this.#observers.clear()
+    this.#listeners.clear()
   }
 
   #noteIsSelectable(noteId: NoteId): boolean {
@@ -167,17 +138,9 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
 
   #reconcileSelection(): void {
     if (this.#disposed || this.#state.selectedNoteIds.length === 0) return
-
-    let existingNoteIds: readonly NoteId[]
-    try {
-      existingNoteIds = this.#state.selectedNoteIds.filter((noteId) =>
-        this.#noteIsSelectable(noteId),
-      )
-    } catch (cause) {
-      this.#notifyFailure(createFailure('project-query', cause))
-      return
-    }
-
+    const existingNoteIds = this.#state.selectedNoteIds.filter((noteId) =>
+      this.#noteIsSelectable(noteId),
+    )
     if (existingNoteIds.length === this.#state.selectedNoteIds.length) return
     this.#replaceSelection(existingNoteIds)
   }
@@ -188,39 +151,12 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
   }
 
   #notifyStateChange(): void {
-    const deliverySnapshot = Array.from(this.#observers)
-    for (const observer of deliverySnapshot) {
-      if (this.#disposed || !this.#observers.has(observer)) continue
-
+    for (const listener of this.#listeners) {
       try {
-        observer.onStateChange(this.#state)
+        listener(this.#state)
       } catch (cause) {
-        this.#deliverFailure(observer, createFailure('observer-delivery', cause))
+        reportListenerError(cause)
       }
-    }
-  }
-
-  #notifyProjectSubscriptionFailure(failure: ProjectSubscriptionDeliveryFailure): void {
-    if (this.#disposed) return
-    this.#notifyFailure(createFailure('project-subscription', failure))
-  }
-
-  #notifyFailure(failure: PianoRollEditorSessionFailure): void {
-    const deliverySnapshot = Array.from(this.#observers)
-    for (const observer of deliverySnapshot) {
-      if (this.#disposed || !this.#observers.has(observer)) continue
-      this.#deliverFailure(observer, failure)
-    }
-  }
-
-  #deliverFailure(
-    observer: PianoRollEditorSessionObserver,
-    failure: PianoRollEditorSessionFailure,
-  ): void {
-    try {
-      observer.onError(failure)
-    } catch {
-      // Error reporting is isolated from the Project and sibling observers.
     }
   }
 

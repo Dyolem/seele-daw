@@ -28,8 +28,8 @@ import type { ProjectContentStateId } from '#internal/session/project-content-st
 import { ProjectSnapshots, type ProjectSnapshot } from '#internal/snapshots/project-snapshot'
 import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import type {
+  ProjectCommitListener,
   ProjectSubscription,
-  ProjectSubscriptionObserver,
   ProjectUnsubscribe,
 } from '#internal/subscriptions/project-subscription'
 
@@ -44,10 +44,8 @@ export interface ProjectSession {
 
   getSnapshot(): ProjectSnapshot
   query<Query extends ProjectQuery>(query: Query): ProjectQueryResultFor<Query>
-  subscribe(
-    subscription: ProjectSubscription,
-    observer: ProjectSubscriptionObserver,
-  ): ProjectUnsubscribe
+  /** A listener that throws is reported and stays subscribed; the other listeners still run. */
+  subscribe(subscription: ProjectSubscription, listener: ProjectCommitListener): ProjectUnsubscribe
   execute(command: ProjectCommand): ProjectCommandExecutionResult
   undo(): ProjectCommit | null
   redo(): ProjectCommit | null
@@ -102,9 +100,9 @@ class ProjectSessionImpl implements ProjectSession {
 
   subscribe(
     subscription: ProjectSubscription,
-    observer: ProjectSubscriptionObserver,
+    listener: ProjectCommitListener,
   ): ProjectUnsubscribe {
-    return this.#changePublisher.subscribe(subscription, observer)
+    return this.#changePublisher.subscribe(subscription, listener)
   }
 
   execute(command: ProjectCommand): ProjectCommandExecutionResult {

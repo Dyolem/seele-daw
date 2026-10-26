@@ -57,23 +57,18 @@ export function useClipNoteModel({
       })
       editorSession = nextEditorSession
       editorState.value = nextEditorSession.state
-      unsubscribeEditorSession = nextEditorSession.subscribe({
-        onError: (failure) => {
-          interactionFailureMessage.value = describeFailure(failure.cause)
-        },
-        onStateChange: (state) => {
-          // Selection changes from another action invalidate the captured Note operation.
-          if (
-            interactionSession.state.pointerId !== null &&
-            (editorState.value?.selectedNoteIds.length !== state.selectedNoteIds.length ||
-              state.selectedNoteIds.some(
-                (noteId) => !editorState.value?.selectedNoteIds.includes(noteId),
-              ))
-          )
-            interactionSession.cancel()
-          editorState.value = state
-          interactionFailureMessage.value = null
-        },
+      unsubscribeEditorSession = nextEditorSession.subscribe((state) => {
+        // Selection changes from another action invalidate the captured Note operation.
+        if (
+          interactionSession.state.pointerId !== null &&
+          (editorState.value?.selectedNoteIds.length !== state.selectedNoteIds.length ||
+            state.selectedNoteIds.some(
+              (noteId) => !editorState.value?.selectedNoteIds.includes(noteId),
+            ))
+        )
+          interactionSession.cancel()
+        editorState.value = state
+        interactionFailureMessage.value = null
       })
       interactionFailureMessage.value = null
     } catch (cause) {
@@ -114,16 +109,9 @@ export function useClipNoteModel({
         viewport,
       })
       noteState.value = readModel.state
-      unsubscribeReadModel = readModel.subscribe({
-        onError: (failure) => {
-          interactionSession.cancel()
-          readModelFailureMessage.value = describeFailure(failure.cause)
-        },
-        onStateChange: (state) => {
-          noteState.value = state
-          interactionSession.notifyAuthorityRevision(state.modelRevision)
-          readModelFailureMessage.value = null
-        },
+      unsubscribeReadModel = readModel.subscribe((state) => {
+        noteState.value = state
+        interactionSession.notifyAuthorityRevision(state.modelRevision)
       })
       readModelFailureMessage.value = null
     } catch (cause) {

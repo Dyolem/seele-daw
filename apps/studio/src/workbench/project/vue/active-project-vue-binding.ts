@@ -12,11 +12,8 @@ export interface ActiveProjectVueContext {
 export function createActiveProjectVueBinding(activeProjectInput: ActiveProjectService) {
   const activeProject = markRaw(activeProjectInput)
   const state = shallowRef(activeProject.state)
-  let unsubscribe: (() => void) | null = activeProject.subscribe({
-    onStateChange: (next) => {
-      state.value = next
-    },
-    onError: (failure) => console.error('Active Project state was not delivered to Vue', failure),
+  let unsubscribe: (() => void) | null = activeProject.subscribe((next) => {
+    state.value = next
   })
 
   return {

@@ -3,17 +3,14 @@ import {
   parseMidiPitch,
   parseNoteId,
   parseTick,
-  type ProjectCommit,
   type ProjectSession,
-  type ProjectSubscription,
-  type ProjectSubscriptionObserver,
 } from '@seele-daw/project-core'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   PianoRollError,
   createPianoRollEditorSession,
-  type PianoRollEditorSessionObserver,
+  type PianoRollEditorSessionListener,
 } from '#internal/index'
 import { createPianoRollProjectFixture } from '#internal/__tests__/support/piano-roll-project-fixture'
 
@@ -34,6 +31,10 @@ async function flushProjectPublications(): Promise<void> {
   await Promise.resolve()
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('PianoRollEditorSession selection', () => {
   it('publishes frozen Clip-scoped selection without copying Note records', () => {
     const fixture = createPianoRollProjectFixture()
@@ -41,11 +42,8 @@ describe('PianoRollEditorSession selection', () => {
       context: fixture.context,
       session: fixture.session,
     })
-    const onStateChange = vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
-    editorSession.subscribe({
-      onError: vi.fn<PianoRollEditorSessionObserver['onError']>(),
-      onStateChange,
-    })
+    const onStateChange = vi.fn<PianoRollEditorSessionListener>()
+    editorSession.subscribe(onStateChange)
     const initialState = editorSession.state
     const noteId = parseNoteId('editor-note-inside')
 
@@ -103,11 +101,8 @@ describe('PianoRollEditorSession selection', () => {
       session: fixture.session,
     })
     const noteId = parseNoteId('editor-note-inside')
-    const onStateChange = vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
-    editorSession.subscribe({
-      onError: vi.fn<PianoRollEditorSessionObserver['onError']>(),
-      onStateChange,
-    })
+    const onStateChange = vi.fn<PianoRollEditorSessionListener>()
+    editorSession.subscribe(onStateChange)
 
     editorSession.selectOnly(noteId)
     const selectedState = editorSession.state
@@ -151,22 +146,16 @@ describe('PianoRollEditorSession selection', () => {
     editorSession.dispose()
   })
 
-  it('reports reconciliation failures without replacing valid selection', () => {
+  it("follows its Source's Note changes until disposed", () => {
     const fixture = createPianoRollProjectFixture()
-    let projectObserver: ProjectSubscriptionObserver | null = null
-    let failQuery = false
     const unsubscribeProject = vi.fn<() => void>()
     const session: Pick<ProjectSession, 'query' | 'subscribe'> = {
-      query(query) {
-        if (failQuery) throw new Error('Selection query failed')
-        return fixture.session.query(query)
-      },
-      subscribe(subscription, observer) {
+      query: (query) => fixture.session.query(query),
+      subscribe(subscription) {
         expect(subscription).toEqual({
           type: PROJECT_SUBSCRIPTION_TYPE.MIDI_NOTE_CHANGES,
           sourceIds: [fixture.context.sourceId],
         })
-        projectObserver = observer
         return unsubscribeProject
       },
     }
@@ -174,61 +163,29 @@ describe('PianoRollEditorSession selection', () => {
       context: fixture.context,
       session,
     })
-    const onError = vi.fn<PianoRollEditorSessionObserver['onError']>()
-    editorSession.subscribe({
-      onError,
-      onStateChange: vi.fn<PianoRollEditorSessionObserver['onStateChange']>(),
-    })
-    const noteId = parseNoteId('editor-note-inside')
-    editorSession.selectOnly(noteId)
-    const selectedState = editorSession.state
-    const subscribedProjectObserver = projectObserver as ProjectSubscriptionObserver | null
-    if (subscribedProjectObserver === null) {
-      throw new Error('Expected Project subscription')
-    }
-
-    failQuery = true
-    subscribedProjectObserver.onCommit(Object.freeze({}) as ProjectCommit)
-    subscribedProjectObserver.onError({
-      cause: new Error('Project observer failed'),
-      commit: Object.freeze({}) as ProjectCommit,
-      subscription: Object.freeze({}) as ProjectSubscription,
-    })
-
-    expect(onError.mock.calls.map(([failure]) => failure.operation)).toEqual([
-      'project-query',
-      'project-subscription',
-    ])
-    expect(editorSession.state).toBe(selectedState)
 
     editorSession.dispose()
     expect(unsubscribeProject).toHaveBeenCalledOnce()
   })
 
-  it('isolates observers and rejects selection operations after disposal', () => {
+  it('reports a listener failure without stopping the others, and rejects use after disposal', () => {
     const fixture = createPianoRollProjectFixture()
     const editorSession = createPianoRollEditorSession({
       context: fixture.context,
       session: fixture.session,
     })
-    const firstError = vi.fn<PianoRollEditorSessionObserver['onError']>()
-    const secondStateChange = vi.fn<PianoRollEditorSessionObserver['onStateChange']>()
-    editorSession.subscribe({
-      onError: firstError,
-      onStateChange: () => {
-        throw new Error('Observer failed')
-      },
+    const reportError = vi.fn<(error: unknown) => void>()
+    vi.stubGlobal('reportError', reportError)
+    const failure = new Error('Listener failed')
+    const secondStateChange = vi.fn<PianoRollEditorSessionListener>()
+    editorSession.subscribe(() => {
+      throw failure
     })
-    editorSession.subscribe({
-      onError: vi.fn<PianoRollEditorSessionObserver['onError']>(),
-      onStateChange: secondStateChange,
-    })
+    editorSession.subscribe(secondStateChange)
 
     editorSession.selectOnly(parseNoteId('editor-note-inside'))
 
-    expect(firstError).toHaveBeenCalledWith(
-      expect.objectContaining({ operation: 'observer-delivery' }),
-    )
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(failure)
     expect(secondStateChange).toHaveBeenCalledOnce()
 
     editorSession.dispose()
@@ -243,13 +200,8 @@ describe('PianoRollEditorSession selection', () => {
       requirePianoRollError(() => editorSession.toggleSelection(parseNoteId('editor-note-inside')))
         .code,
     ).toBe('editor-session-disposed')
-    expect(
-      requirePianoRollError(() =>
-        editorSession.subscribe({
-          onError: vi.fn<PianoRollEditorSessionObserver['onError']>(),
-          onStateChange: vi.fn<PianoRollEditorSessionObserver['onStateChange']>(),
-        }),
-      ).code,
-    ).toBe('editor-session-disposed')
+    expect(requirePianoRollError(() => editorSession.subscribe(vi.fn())).code).toBe(
+      'editor-session-disposed',
+    )
   })
 })

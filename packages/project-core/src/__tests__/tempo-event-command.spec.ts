@@ -139,14 +139,8 @@ describe('Tempo Event BPM commit and History semantics', () => {
     const original = fixture.records.initialTempoEvent
     const allCommits: ProjectCommit[] = []
     const noteCommits: ProjectCommit[] = []
-    session.subscribe(createAllProjectCommitsSubscription(), {
-      onCommit: (commit) => allCommits.push(commit),
-      onError: () => undefined,
-    })
-    session.subscribe(createMidiNoteChangesSubscription(), {
-      onCommit: (commit) => noteCommits.push(commit),
-      onError: () => undefined,
-    })
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => allCommits.push(commit))
+    session.subscribe(createMidiNoteChangesSubscription(), (commit) => noteCommits.push(commit))
     const result = session.execute(createCommand(store, fixture))
 
     expect(result.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)

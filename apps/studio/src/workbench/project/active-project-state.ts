@@ -14,7 +14,6 @@ export const ACTIVE_PROJECT_PHASE = {
   OPEN_FAILED: 'open-failed',
   OPENING: 'opening',
   READY: 'ready',
-  SESSION_FAILED: 'session-failed',
 } as const
 
 export type ActiveProjectPhase = (typeof ACTIVE_PROJECT_PHASE)[keyof typeof ACTIVE_PROJECT_PHASE]
@@ -55,12 +54,6 @@ export interface CreateFailedActiveProjectState {
   readonly failureCause: unknown
 }
 
-export interface SessionFailedActiveProjectState {
-  readonly phase: typeof ACTIVE_PROJECT_PHASE.SESSION_FAILED
-  readonly projectId: ProjectId
-  readonly failureCause: unknown
-}
-
 export interface ReadyActiveProjectState {
   readonly phase: typeof ACTIVE_PROJECT_PHASE.READY
   readonly projectId: ProjectId
@@ -86,18 +79,9 @@ export type ActiveProjectState =
   | OpeningActiveProjectState
   | CreateFailedActiveProjectState
   | OpenFailedActiveProjectState
-  | SessionFailedActiveProjectState
   | ReadyActiveProjectState
   | DisposedActiveProjectState
 
-export interface ActiveProjectStateDeliveryFailure {
-  readonly state: ActiveProjectState
-  readonly cause: unknown
-}
-
-export interface ActiveProjectStateObserver {
-  onStateChange(state: ActiveProjectState): void
-  onError(failure: ActiveProjectStateDeliveryFailure): void
-}
+export type ActiveProjectStateListener = (state: ActiveProjectState) => void
 
 export type ActiveProjectUnsubscribe = () => void

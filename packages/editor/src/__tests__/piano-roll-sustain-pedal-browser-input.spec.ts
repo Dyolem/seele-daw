@@ -6,10 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PIANO_ROLL_DOM_SUSTAIN_PEDAL_EVENT_ID_ATTRIBUTE,
   PIANO_ROLL_POINTER_INPUT_PHASE,
-  createPianoRollSemanticPointerInputAdapter,
+  createEditorPointerInputAdapter,
   resolvePianoRollDomSustainPedalEventHit,
   type PianoRollPointerInput,
-  type PianoRollPointerInputAdapterObserver,
+  type EditorPointerInputListener,
   type PianoRollSustainPedalLaneHit,
 } from '#internal/index'
 
@@ -116,12 +116,9 @@ describe('Piano Roll DOM Sustain Pedal Event Hit', () => {
 describe('Piano Roll typed Pointer Input Adapter', () => {
   it('latches a CC64 semantic hit for the complete captured gesture', () => {
     const fixture = createFixture()
-    const onInput =
-      vi.fn<PianoRollPointerInputAdapterObserver<PianoRollSustainPedalLaneHit>['onInput']>()
-    const onError =
-      vi.fn<PianoRollPointerInputAdapterObserver<PianoRollSustainPedalLaneHit>['onError']>()
-    const adapter = createPianoRollSemanticPointerInputAdapter<PianoRollSustainPedalLaneHit>({
-      observer: { onError, onInput },
+    const onInput = vi.fn<EditorPointerInputListener<PianoRollSustainPedalLaneHit>>()
+    const adapter = createEditorPointerInputAdapter<PianoRollSustainPedalLaneHit>({
+      onInput,
       resolveHit: resolvePianoRollDomSustainPedalEventHit,
       surface: fixture.surface,
     })
@@ -152,7 +149,6 @@ describe('Piano Roll typed Pointer Input Adapter', () => {
       expect(typedInput.hit).toEqual({ sustainPedalEventId: fixture.eventId })
       expect(Object.isFrozen(typedInput.hit)).toBe(true)
     }
-    expect(onError).not.toHaveBeenCalled()
 
     adapter.dispose()
   })

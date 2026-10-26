@@ -57,7 +57,8 @@ EditorPointerInputAdapter       editor/browser   DOM Pointer → 中立的 Point
 
 失败时：业务不变量只由 project-core 判断，抛 `ProjectCommandError`；Studio 只用
 `ProjectEditError` 表达应用层前置条件（`project-not-ready`、`target-stale`、`unsupported`、
-`not-placeable`）。界面直接显示错误的 `message`。
+`not-placeable`）。界面直接显示错误的 `message`。订阅者是函数；它抛错时由
+`reportListenerError` 报告，其他订阅者照常收到，它也不被退订（ADR-011）。
 
 Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 

@@ -6,7 +6,8 @@ import {
   parseTempoBpm,
   parseTempoEventId,
   parseTick,
-  type ProjectSubscriptionObserver,
+  type ProjectCommit,
+  type ProjectCommitListener,
 } from '@seele-daw/project-core'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -230,11 +231,11 @@ describe('TempoTrackDragSession', () => {
 
   it('isolates old captures, completions and subscription callbacks', () => {
     const { drag, configuration, input, project } = fixture()
-    const delivery: ProjectSubscriptionObserver[] = []
+    const delivery: ProjectCommitListener[] = []
     const subscribe = project.subscribe.bind(project)
-    vi.spyOn(project, 'subscribe').mockImplementation((subscription, observer) => {
-      delivery.push(observer)
-      return subscribe(subscription, observer)
+    vi.spyOn(project, 'subscribe').mockImplementation((subscription, listener) => {
+      delivery.push(listener)
+      return subscribe(subscription, listener)
     })
     pointer(drag, input('begin'), configuration)
     const old = pointer(drag, input('end', 500))!
@@ -242,7 +243,7 @@ describe('TempoTrackDragSession', () => {
     const captureId = Symbol('replacement-capture')
     pointer(drag, input('begin', 250, 60, { captureId }), configuration)
     const current = drag.state.interactionId
-    delivery[0]!.onError({} as Parameters<ProjectSubscriptionObserver['onError']>[0])
+    delivery[0]!(Object.freeze({}) as ProjectCommit)
     pointer(drag, input('end', 800))
     drag.resolveCommit({
       interactionId: old.interactionId,

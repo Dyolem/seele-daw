@@ -19,8 +19,7 @@ import {
   type ProjectContentStateId,
   type ProjectSnapshot,
   type ProjectSubscription,
-  type ProjectSubscriptionDeliveryFailure,
-  type ProjectSubscriptionObserver,
+  type ProjectCommitListener,
   type ProjectUnsubscribe,
 } from '@seele-daw/project-core'
 
@@ -68,7 +67,7 @@ export class ControlledProjectCheckpointStore implements ProjectCheckpointStore 
 
 interface TestSubscriptionEntry {
   active: boolean
-  readonly observer: ProjectSubscriptionObserver
+  readonly listener: ProjectCommitListener
   readonly subscription: ProjectSubscription
 }
 
@@ -119,9 +118,9 @@ export class MutableTestProjectSession implements ProjectSession {
 
   subscribe(
     _subscription: ProjectSubscription,
-    observer: ProjectSubscriptionObserver,
+    listener: ProjectCommitListener,
   ): ProjectUnsubscribe {
-    const entry: TestSubscriptionEntry = { active: true, observer, subscription: _subscription }
+    const entry: TestSubscriptionEntry = { active: true, listener, subscription: _subscription }
     this.#subscriptions.add(entry)
 
     return () => {
@@ -155,23 +154,7 @@ export class MutableTestProjectSession implements ProjectSession {
     const commit = Object.freeze({}) as ProjectCommit
     const entries = Array.from(this.#subscriptions)
     for (const entry of entries) {
-      if (entry.active) entry.observer.onCommit(commit)
-    }
-  }
-
-  async emitSubscriptionFailure(cause: unknown): Promise<void> {
-    await Promise.resolve()
-
-    const commit = Object.freeze({}) as ProjectCommit
-    for (const entry of Array.from(this.#subscriptions)) {
-      if (!entry.active) continue
-
-      const failure = Object.freeze<ProjectSubscriptionDeliveryFailure>({
-        subscription: entry.subscription,
-        commit,
-        cause,
-      })
-      entry.observer.onError(failure)
+      if (entry.active) entry.listener(commit)
     }
   }
 }

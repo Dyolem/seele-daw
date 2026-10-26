@@ -341,14 +341,8 @@ describe('Instrument Track consumer compatibility', () => {
     const allCommits: ProjectCommit[] = []
     const noteCommits: ProjectCommit[] = []
 
-    session.subscribe(createAllProjectCommitsSubscription(), {
-      onCommit: (commit) => allCommits.push(commit),
-      onError: () => undefined,
-    })
-    session.subscribe(createMidiNoteChangesSubscription(), {
-      onCommit: (commit) => noteCommits.push(commit),
-      onError: () => undefined,
-    })
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => allCommits.push(commit))
+    session.subscribe(createMidiNoteChangesSubscription(), (commit) => noteCommits.push(commit))
 
     const result = session.execute(createCommand(store))
 

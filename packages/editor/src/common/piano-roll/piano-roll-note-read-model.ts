@@ -7,8 +7,8 @@ import {
   type MidiNoteRecord,
   type MidiSourceId,
   type ModelRevision,
+  reportListenerError,
   type ProjectSession,
-  type ProjectSubscriptionDeliveryFailure,
   type ProjectUnsubscribe,
   type Tick,
 } from '@seele-daw/project-core'
@@ -37,28 +37,13 @@ export interface PianoRollNoteReadModelState {
   readonly viewport: PianoRollViewport
 }
 
-export type PianoRollNoteReadModelFailureOperation =
-  | 'observer-delivery'
-  | 'project-query'
-  | 'project-subscription'
-
-export interface PianoRollNoteReadModelFailure {
-  readonly cause: unknown
-  readonly operation: PianoRollNoteReadModelFailureOperation
-}
-
-export interface PianoRollNoteReadModelObserver {
-  onError(failure: PianoRollNoteReadModelFailure): void
-  onStateChange(state: PianoRollNoteReadModelState): void
-}
-
-export type PianoRollNoteReadModelUnsubscribe = () => void
+export type PianoRollNoteReadModelListener = (state: PianoRollNoteReadModelState) => void
 
 export interface PianoRollNoteReadModel {
   readonly state: PianoRollNoteReadModelState
   dispose(): void
   setViewport(viewport: PianoRollViewport): void
-  subscribe(observer: PianoRollNoteReadModelObserver): PianoRollNoteReadModelUnsubscribe
+  subscribe(listener: PianoRollNoteReadModelListener): () => void
 }
 
 export interface CreatePianoRollNoteReadModelInput {
@@ -126,17 +111,10 @@ function queryState(
   })
 }
 
-function createFailure(
-  operation: PianoRollNoteReadModelFailureOperation,
-  cause: unknown,
-): PianoRollNoteReadModelFailure {
-  return Object.freeze({ cause, operation })
-}
-
 class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
   readonly #context: PianoRollClipContext
   readonly #session: Pick<ProjectSession, 'query' | 'subscribe'>
-  readonly #observers = new Set<PianoRollNoteReadModelObserver>()
+  readonly #listeners = new Set<PianoRollNoteReadModelListener>()
   #projectUnsubscribe: ProjectUnsubscribe
   #state: PianoRollNoteReadModelState
   #disposed = false
@@ -168,15 +146,11 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
     this.#notifyStateChange()
   }
 
-  subscribe(observer: PianoRollNoteReadModelObserver): PianoRollNoteReadModelUnsubscribe {
+  subscribe(listener: PianoRollNoteReadModelListener): () => void {
     this.#requireActive()
-    this.#observers.add(observer)
-    let subscribed = true
-
+    this.#listeners.add(listener)
     return () => {
-      if (!subscribed) return
-      subscribed = false
-      this.#observers.delete(observer)
+      this.#listeners.delete(listener)
     }
   }
 
@@ -185,7 +159,7 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
 
     this.#disposed = true
     this.#projectUnsubscribe()
-    this.#observers.clear()
+    this.#listeners.clear()
   }
 
   #subscribeToProject(viewport: PianoRollViewport): ProjectUnsubscribe {
@@ -197,24 +171,13 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
         sourceIds: [this.#context.sourceId],
         affected: { startTick, endTick },
       }),
-      {
-        onCommit: () => this.#refresh(),
-        onError: (failure) => this.#notifyProjectSubscriptionFailure(failure),
-      },
+      () => this.#refresh(),
     )
   }
 
   #refresh(): void {
     if (this.#disposed) return
-
-    let nextState: PianoRollNoteReadModelState
-    try {
-      nextState = queryState(this.#session, this.#context, this.#state.viewport)
-    } catch (cause) {
-      this.#notifyFailure(createFailure('project-query', cause))
-      return
-    }
-
+    const nextState = queryState(this.#session, this.#context, this.#state.viewport)
     if (nextState.modelRevision === this.#state.modelRevision) return
 
     this.#state = nextState
@@ -222,39 +185,12 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
   }
 
   #notifyStateChange(): void {
-    const deliverySnapshot = Array.from(this.#observers)
-    for (const observer of deliverySnapshot) {
-      if (this.#disposed || !this.#observers.has(observer)) continue
-
+    for (const listener of this.#listeners) {
       try {
-        observer.onStateChange(this.#state)
+        listener(this.#state)
       } catch (cause) {
-        this.#deliverFailure(observer, createFailure('observer-delivery', cause))
+        reportListenerError(cause)
       }
-    }
-  }
-
-  #notifyProjectSubscriptionFailure(failure: ProjectSubscriptionDeliveryFailure): void {
-    if (this.#disposed) return
-    this.#notifyFailure(createFailure('project-subscription', failure))
-  }
-
-  #notifyFailure(failure: PianoRollNoteReadModelFailure): void {
-    const deliverySnapshot = Array.from(this.#observers)
-    for (const observer of deliverySnapshot) {
-      if (this.#disposed || !this.#observers.has(observer)) continue
-      this.#deliverFailure(observer, failure)
-    }
-  }
-
-  #deliverFailure(
-    observer: PianoRollNoteReadModelObserver,
-    failure: PianoRollNoteReadModelFailure,
-  ): void {
-    try {
-      observer.onError(failure)
-    } catch {
-      // Observer error reporting is isolated from Project and sibling observers.
     }
   }
 

@@ -2,11 +2,11 @@ import { computed, shallowRef, type ShallowRef } from 'vue'
 import {
   PIANO_ROLL_INTERACTION_TOOL,
   PIANO_ROLL_POINTER_INPUT_PHASE,
+  createEditorPointerInputAdapter,
   createPianoRollSustainPedalInteractionSession,
-  createPianoRollSemanticPointerInputAdapter,
   resolvePianoRollDomSustainPedalEventHit,
+  type EditorPointerInputAdapter,
   type PianoRollGrid,
-  type PianoRollPointerInputAdapter,
   type PianoRollSustainPedalEditingScope,
   type PianoRollSustainPedalInteractionState,
   type PianoRollValueLaneViewport,
@@ -60,7 +60,7 @@ export function useSustainPedalInteraction({
   const interactionState = shallowRef<PianoRollSustainPedalInteractionState>(
     interactionSession.state,
   )
-  let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
+  let pointerInputAdapter: EditorPointerInputAdapter | null = null
   let disposed = false
   let beginning = false
   let captureBounds: DOMRect | null = null
@@ -135,68 +135,61 @@ export function useSustainPedalInteraction({
   function mount(): void {
     const surface = laneSurface.value
     if (disposed || pointerInputAdapter !== null || surface === null) return
-    pointerInputAdapter = createPianoRollSemanticPointerInputAdapter({
-      observer: {
-        onError: ({ cause }) => {
-          if (disposed) return
-          interactionSession.cancel()
-          reportFailure(cause)
-        },
-        onInput: (input) => {
-          if (disposed) return
-          if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL) {
-            interactionSession.handlePointerInput(input)
-            return
-          }
-          if (!stableMapping()) return
-          const bounds = surface.getBoundingClientRect()
-          const currentViewport = getViewport()
-          if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
-            surface.focus({ preventScroll: true })
-            requestFocus()
-          }
-          if (currentViewport === null) {
-            invalidate()
-            return
-          }
-          const model = getReadModel()
-          beginning = input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN
-          let outcome
-          try {
-            outcome = interactionSession.handlePointerInput(
-              input,
-              input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN
-                ? {
-                    target: {
-                      session: getSession(),
-                      baseRevision: model.modelRevision,
-                      activeClipId: 'clipId' in model ? model.clipId : model.activeClipId,
-                      trackId: 'trackId' in model ? model.trackId : null,
-                      channel: model.channel,
-                    },
-                    grid: getGrid(),
-                    scope: resolveEditingScope(),
-                    selectedEventIds: getSelectedEventIds(),
-                    snapEnabled: isSnapEnabled(),
-                    tool: isPencilEnabled()
-                      ? PIANO_ROLL_INTERACTION_TOOL.PENCIL
-                      : PIANO_ROLL_INTERACTION_TOOL.CURSOR,
-                    viewport: currentViewport,
-                  }
-                : undefined,
-            )
-          } finally {
-            beginning = false
-          }
-          if (
-            input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN &&
-            interactionSession.state.pointerId !== null
+    pointerInputAdapter = createEditorPointerInputAdapter({
+      onInput: (input) => {
+        if (disposed) return
+        if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL) {
+          interactionSession.handlePointerInput(input)
+          return
+        }
+        if (!stableMapping()) return
+        const bounds = surface.getBoundingClientRect()
+        const currentViewport = getViewport()
+        if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
+          surface.focus({ preventScroll: true })
+          requestFocus()
+        }
+        if (currentViewport === null) {
+          invalidate()
+          return
+        }
+        const model = getReadModel()
+        beginning = input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN
+        let outcome
+        try {
+          outcome = interactionSession.handlePointerInput(
+            input,
+            input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN
+              ? {
+                  target: {
+                    session: getSession(),
+                    baseRevision: model.modelRevision,
+                    activeClipId: 'clipId' in model ? model.clipId : model.activeClipId,
+                    trackId: 'trackId' in model ? model.trackId : null,
+                    channel: model.channel,
+                  },
+                  grid: getGrid(),
+                  scope: resolveEditingScope(),
+                  selectedEventIds: getSelectedEventIds(),
+                  snapEnabled: isSnapEnabled(),
+                  tool: isPencilEnabled()
+                    ? PIANO_ROLL_INTERACTION_TOOL.PENCIL
+                    : PIANO_ROLL_INTERACTION_TOOL.CURSOR,
+                  viewport: currentViewport,
+                }
+              : undefined,
           )
-            captureBounds = bounds
-          if (outcome.failure !== null) reportFailure(outcome.failure)
-          if (outcome.intent !== null) handleInteractionIntent(outcome.intent)
-          if (interactionSession.state.pointerId === null) pointerInputAdapter?.cancel()
-        },
+        } finally {
+          beginning = false
+        }
+        if (
+          input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN &&
+          interactionSession.state.pointerId !== null
+        )
+          captureBounds = bounds
+        if (outcome.failure !== null) reportFailure(outcome.failure)
+        if (outcome.intent !== null) handleInteractionIntent(outcome.intent)
+        if (interactionSession.state.pointerId === null) pointerInputAdapter?.cancel()
       },
       resolveHit: resolvePianoRollDomSustainPedalEventHit,
       surface,

@@ -1,5 +1,5 @@
 import { ProjectCheckpointError, type ProjectId } from '@seele-daw/project-core'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ActiveProjectError } from '@/workbench/project/active-project-error'
 import { createActiveProjectService } from '@/workbench/project/active-project-service'
@@ -580,7 +580,11 @@ describe('ActiveProjectService saving and dirty state', () => {
   })
 })
 
-describe('ActiveProjectService lifecycle and observers', () => {
+describe('ActiveProjectService lifecycle and listeners', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('forwards each active Session Commit after publishing its matching Ready state', async () => {
     const projectId = createTestProjectId('commit-forwarding')
     let session!: MutableTestProjectSession
@@ -594,12 +598,9 @@ describe('ActiveProjectService lifecycle and observers', () => {
     )
     await service.create()
     const events: unknown[] = []
-    service.subscribeCommits({
-      onCommit(event) {
-        events.push(event)
-        expect(service.state).toBe(event.state)
-      },
-      onError() {},
+    service.subscribeCommits((event) => {
+      events.push(event)
+      expect(service.state).toBe(event.state)
     })
 
     await session.emitCommit()
@@ -613,7 +614,7 @@ describe('ActiveProjectService lifecycle and observers', () => {
     ])
   })
 
-  it('isolates a failed Commit observer from later Commits and independent observers', async () => {
+  it('reports a failing Commit listener without stopping it or the others', async () => {
     const projectId = createTestProjectId('commit-observer')
     let session!: MutableTestProjectSession
     const { service } = createServiceFixture(
@@ -625,32 +626,22 @@ describe('ActiveProjectService lifecycle and observers', () => {
       () => projectId,
     )
     await service.create()
-    const deliveryFailures: unknown[] = []
+    const reportError = vi.fn<(error: unknown) => void>()
+    vi.stubGlobal('reportError', reportError)
+    const failure = new Error('Commit listener failed')
+    const failingRevisions: number[] = []
     const healthyRevisions: number[] = []
-    service.subscribeCommits({
-      onCommit() {
-        throw new Error('Commit observer failed')
-      },
-      onError(failure) {
-        deliveryFailures.push(failure)
-      },
+    service.subscribeCommits((event) => {
+      failingRevisions.push(event.state.modelRevision)
+      throw failure
     })
-    service.subscribeCommits({
-      onCommit(event) {
-        healthyRevisions.push(event.state.modelRevision)
-      },
-      onError() {},
-    })
+    service.subscribeCommits((event) => healthyRevisions.push(event.state.modelRevision))
 
     await session.emitCommit()
     await session.emitCommit()
 
-    expect(deliveryFailures).toEqual([
-      expect.objectContaining({
-        cause: expect.any(Error),
-        event: expect.objectContaining({ state: expect.objectContaining({ modelRevision: 1 }) }),
-      }),
-    ])
+    expect(reportError.mock.calls).toEqual([[failure], [failure]])
+    expect(failingRevisions).toEqual([1, 2])
     expect(healthyRevisions).toEqual([1, 2])
   })
 
@@ -671,60 +662,25 @@ describe('ActiveProjectService lifecycle and observers', () => {
     await expect(service.save()).rejects.toBeInstanceOf(ActiveProjectError)
   })
 
-  it('isolates a failed state observer from independent observers', async () => {
+  it('reports a failing state listener without stopping it or the others', async () => {
     const projectId = createTestProjectId('observer')
     const { service } = createServiceFixture(undefined, undefined, () => projectId)
-    const deliveryFailures: unknown[] = []
+    const reportError = vi.fn<(error: unknown) => void>()
+    vi.stubGlobal('reportError', reportError)
+    const failure = new Error('listener render failed')
+    const failingPhases: string[] = []
     const healthyPhases: string[] = []
-    service.subscribe({
-      onStateChange() {
-        throw new Error('observer render failed')
-      },
-      onError(failure) {
-        deliveryFailures.push(failure)
-      },
+    service.subscribe((state) => {
+      failingPhases.push(state.phase)
+      throw failure
     })
-    service.subscribe({
-      onStateChange(state) {
-        healthyPhases.push(state.phase)
-      },
-      onError() {},
-    })
+    service.subscribe((state) => healthyPhases.push(state.phase))
 
     await service.create()
 
-    expect(deliveryFailures).toEqual([
-      expect.objectContaining({
-        state: expect.objectContaining({ phase: ACTIVE_PROJECT_PHASE.CREATING }),
-        cause: expect.any(Error),
-      }),
-    ])
-    expect(healthyPhases).toEqual([ACTIVE_PROJECT_PHASE.CREATING, ACTIVE_PROJECT_PHASE.READY])
-  })
-
-  it('reports loss of Session commit observation independently from Create and Open', async () => {
-    const projectId = createTestProjectId('session-observation-failure')
-    let session!: MutableTestProjectSession
-    const { service } = createServiceFixture(
-      undefined,
-      vi.fn<(projectId: ProjectId) => MutableTestProjectSession>((requestedProjectId) => {
-        session = createTestSession(requestedProjectId)
-        return session
-      }),
-      () => projectId,
-    )
-    await service.create()
-    const cause = new Error('Active state refresh failed')
-
-    await session.emitSubscriptionFailure(cause)
-
-    expect(service.state).toMatchObject({
-      phase: ACTIVE_PROJECT_PHASE.SESSION_FAILED,
-      projectId,
-      failureCause: expect.objectContaining({
-        code: 'session-subscription-failed',
-        failureCause: expect.objectContaining({ cause }),
-      }),
-    })
+    const phases = [ACTIVE_PROJECT_PHASE.CREATING, ACTIVE_PROJECT_PHASE.READY]
+    expect(reportError.mock.calls).toEqual([[failure], [failure]])
+    expect(failingPhases).toEqual(phases)
+    expect(healthyPhases).toEqual(phases)
   })
 })

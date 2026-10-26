@@ -16,11 +16,11 @@ import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
   completeGesture,
-  createPianoRollPointerInputAdapter,
+  createEditorPointerInputAdapter,
   resolvePianoRollDomNoteHit,
+  type EditorPointerInputAdapter,
   type PianoRollGrid,
   type PianoRollPointerInput,
-  type PianoRollPointerInputAdapter,
   type PianoRollTimelineViewport,
 } from '@seele-daw/editor'
 import { type ClipId, type Tick, type ProjectSession } from '@seele-daw/project-core'
@@ -60,7 +60,7 @@ export function useTrackPlacement({
   const pianoRollPreferences = usePianoRollPreferencesStore()
   const toasts = useUiToastStore()
   const placementPreview = shallowRef<TrackPlacementPreview | null>(null)
-  let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
+  let pointerInputAdapter: EditorPointerInputAdapter | null = null
   let disposed = false
   let beginning = false
   let captureBounds: DOMRect | null = null
@@ -287,13 +287,9 @@ export function useTrackPlacement({
     mount() {
       const host = canvasHost.value
       if (disposed || host === null || pointerInputAdapter !== null) return
-      pointerInputAdapter = createPianoRollPointerInputAdapter({
-        observer: {
-          onError: ({ cause }) => {
-            if (!disposed) reportFailure(cause)
-          },
-          onInput: handlePointerInput,
-        },
+      pointerInputAdapter = createEditorPointerInputAdapter({
+        onInput: handlePointerInput,
+        resolveHit: resolvePianoRollDomNoteHit,
         surface: host,
       })
       window.addEventListener('scroll', checkMapping, true)

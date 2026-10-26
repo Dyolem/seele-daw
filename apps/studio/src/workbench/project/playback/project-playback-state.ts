@@ -29,14 +29,6 @@ export interface ProjectPlaybackState {
   readonly projectId: ProjectId | null
 }
 
-export interface ProjectPlaybackStateDeliveryFailure {
-  readonly cause: unknown
-  readonly state: ProjectPlaybackState
-}
-
-export interface ProjectPlaybackStateObserver {
-  onError(failure: ProjectPlaybackStateDeliveryFailure): void
-  onStateChange(state: ProjectPlaybackState): void
-}
+export type ProjectPlaybackStateListener = (state: ProjectPlaybackState) => void
 
 export type ProjectPlaybackUnsubscribe = () => void

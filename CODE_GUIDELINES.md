@@ -122,6 +122,8 @@ Composable 的参数只传需要的 ref、getter 或能力，不传装着整个 
 
 - 注册 Listener、Subscription、Observer、Timer 或外部资源的 API 返回 disposer，或由明确的
   owner 提供 `dispose()`。disposer 应当幂等；部分创建失败时回滚已创建的资源。
+- 订阅者是函数。发布者逐个调用，某个监听者抛错时用 `reportListenerError` 报告，继续通知其余
+  监听者，也不退订它；不提供 `onError` 回送（ADR-011）。
 - 多个资源有依赖顺序时显式安排创建与释放（组合根用 `DisposalStack`），不依赖多个
   `onMounted` 的注册顺序。释放后排队的任务必须失效，不能再操作旧 DOM 或旧会话。
 - 异步请求要定义重复请求、过期结果、取消、释放和错误传播；latest-wins、排队或拒绝并发由用例

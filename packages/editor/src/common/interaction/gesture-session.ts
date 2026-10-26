@@ -12,7 +12,8 @@ import {
 export interface GestureAuthority {
   readonly baseRevision: number
   currentRevision(): number
-  watch(observer: { onCommit(): void; onError(): void }): () => void
+  /** Calls `listener` after every Commit until the returned function is called. */
+  watch(listener: () => void): () => void
 }
 
 export interface GestureStart<Input, Preview, Result, Target> {
@@ -246,16 +247,11 @@ export class GestureSession<
       target: start.target,
     })
     this.#handoff.reset(start.authority.baseRevision)
-    this.#unwatch = start.authority.watch({
-      onCommit: () => {
-        // Only the claimed execution may publish its own Commit synchronously.
-        if (this.#active?.interactionId === interactionId && this.#executing !== interactionId) {
-          this.cancel()
-        }
-      },
-      onError: () => {
-        if (this.#active?.interactionId === interactionId) this.cancel()
-      },
+    this.#unwatch = start.authority.watch(() => {
+      // Only the claimed execution may publish its own Commit synchronously.
+      if (this.#active?.interactionId === interactionId && this.#executing !== interactionId) {
+        this.cancel()
+      }
     })
     if (start.previewOnPress) this.#host.update(interactionId, input)
   }

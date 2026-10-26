@@ -2,25 +2,21 @@ import type { ProjectCommit } from '#internal/commit/project-commit'
 import type { MidiSourceId, NoteId } from '#internal/model/ids'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { ProjectChange } from '#internal/mutation/project-change'
-import { ProjectSubscriptionError } from '#internal/subscriptions/project-subscription-error'
 import {
   PROJECT_SUBSCRIPTION_TYPE,
-  normalizeProjectSubscription,
   type AffectedTickRange,
   type MidiNoteChangesSubscription,
+  type ProjectCommitListener,
   type ProjectSubscription,
-  type ProjectSubscriptionDeliveryFailure,
-  type ProjectSubscriptionObserver,
   type ProjectUnsubscribe,
 } from '#internal/subscriptions/project-subscription'
+import { reportListenerError } from '#internal/subscriptions/report-listener-error'
 import { addTicks } from '#internal/time/tick'
 
 interface SubscriptionEntry {
   active: boolean
   readonly subscription: ProjectSubscription
-  readonly observer: ProjectSubscriptionObserver
-  readonly onCommit: ProjectSubscriptionObserver['onCommit']
-  readonly onError: ProjectSubscriptionObserver['onError']
+  readonly listener: ProjectCommitListener
 }
 
 export interface PreparedChangePublication {
@@ -93,44 +89,20 @@ function matchesSubscription(subscription: ProjectSubscription, commit: ProjectC
   }
 }
 
-function assertObserver(observer: ProjectSubscriptionObserver): void {
-  if (
-    typeof observer !== 'object' ||
-    observer === null ||
-    typeof observer.onCommit !== 'function' ||
-    typeof observer.onError !== 'function'
-  ) {
-    throw new ProjectSubscriptionError(
-      'invalid-observer',
-      'ProjectSubscription observer must provide onCommit and onError functions',
-    )
-  }
-}
-
 /** Publishes successful commits without exposing listeners to the write transaction. */
 export class ChangePublisher {
   readonly #subscriptions = new Set<SubscriptionEntry>()
 
   subscribe(
     subscription: ProjectSubscription,
-    observer: ProjectSubscriptionObserver,
+    listener: ProjectCommitListener,
   ): ProjectUnsubscribe {
-    const normalizedSubscription = normalizeProjectSubscription(subscription)
-    assertObserver(observer)
-
-    // Capture method references at registration so later mutation of the caller-owned
-    // observer object cannot silently replace this subscription's behavior.
-    const entry: SubscriptionEntry = {
-      active: true,
-      subscription: normalizedSubscription,
-      observer,
-      onCommit: observer.onCommit,
-      onError: observer.onError,
-    }
+    const entry: SubscriptionEntry = { active: true, subscription, listener }
     this.#subscriptions.add(entry)
-
-    const unsubscribe = (): void => this.#deactivate(entry)
-    return Object.freeze(unsubscribe)
+    return () => {
+      entry.active = false
+      this.#subscriptions.delete(entry)
+    }
   }
 
   /**
@@ -161,32 +133,11 @@ export class ChangePublisher {
   #deliver(commit: ProjectCommit, entries: readonly SubscriptionEntry[]): void {
     for (const entry of entries) {
       if (!entry.active) continue
-
       try {
-        entry.onCommit.call(entry.observer, commit)
+        entry.listener(commit)
       } catch (cause) {
-        this.#deactivate(entry)
-
-        const failure = Object.freeze<ProjectSubscriptionDeliveryFailure>({
-          subscription: entry.subscription,
-          commit,
-          cause,
-        })
-
-        try {
-          entry.onError.call(entry.observer, failure)
-        } catch {
-          // The subscription is already terminated. Error reporting must not recurse
-          // or prevent independent observers from receiving the committed fact.
-        }
+        reportListenerError(cause)
       }
     }
-  }
-
-  #deactivate(entry: SubscriptionEntry): void {
-    if (!entry.active) return
-
-    entry.active = false
-    this.#subscriptions.delete(entry)
   }
 }

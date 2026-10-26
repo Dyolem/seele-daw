@@ -10,21 +10,13 @@ import {
 
 export const EDITOR_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL = 4
 
-export type EditorPointerInputAdapterFailureOperation =
-  | 'coordinate-mapping'
-  | 'hit-test'
-  | 'observer-delivery'
-  | 'pointer-capture'
-
-export interface EditorPointerInputAdapterFailure {
-  readonly cause: unknown
-  readonly operation: EditorPointerInputAdapterFailureOperation
-}
-
-export interface EditorPointerInputAdapterObserver<Hit extends object> {
-  onError(failure: EditorPointerInputAdapterFailure): void
-  onInput(input: EditorPointerInput<Hit>): void
-}
+/**
+ * Receives every input of the captured Pointer. If it throws, the adapter releases the capture,
+ * delivers Cancel, and lets the error propagate like any failing event listener.
+ */
+export type EditorPointerInputListener<Hit extends object> = (
+  input: EditorPointerInput<Hit>,
+) => void
 
 export interface EditorPointerInputAdapter {
   cancel(): boolean
@@ -40,7 +32,7 @@ interface CreateEditorPointerInputAdapterBaseInput<Hit extends object> {
   readonly dragThresholdCssPixel?: number
   /** Client coordinates keep a stationary Pointer stable while its Surface scrolls. */
   readonly positionSpace?: 'surface' | 'client'
-  readonly observer: EditorPointerInputAdapterObserver<Hit>
+  readonly onInput: EditorPointerInputListener<Hit>
   readonly surface: HTMLElement
 }
 
@@ -118,16 +110,9 @@ function createPoint(
   })
 }
 
-function createFailure(
-  operation: EditorPointerInputAdapterFailureOperation,
-  cause: unknown,
-): EditorPointerInputAdapterFailure {
-  return Object.freeze({ cause, operation })
-}
-
 class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointerInputAdapter {
   readonly #dragThresholdSquared: number
-  readonly #observer: EditorPointerInputAdapterObserver<Hit>
+  readonly #onInput: EditorPointerInputListener<Hit>
   readonly #resolveHit: EditorBrowserHitResolver<Hit>
   readonly #surface: HTMLElement
   readonly #positionSpace: 'surface' | 'client'
@@ -140,7 +125,7 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
       input.dragThresholdCssPixel ?? EDITOR_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL,
     )
     this.#dragThresholdSquared = dragThreshold * dragThreshold
-    this.#observer = input.observer
+    this.#onInput = input.onInput
     this.#resolveHit = input.resolveHit
     this.#surface = input.surface
     this.#positionSpace = input.positionSpace ?? 'surface'
@@ -216,16 +201,9 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
       return
     }
 
-    let hit: Readonly<Hit> | null
-    try {
-      hit = copyHit(this.#resolveHit(event, this.#surface))
-    } catch (cause) {
-      this.#deliverFailure(createFailure('hit-test', cause))
-      return
-    }
-
+    const hit = copyHit(this.#resolveHit(event, this.#surface))
     const position = this.#readPosition(event)
-    if (position === null || !this.#capturePointer(event.pointerId)) return
+    this.#surface.setPointerCapture(event.pointerId)
     const originModifiers = createModifiers(event)
     const activePointer: ActivePointer<Hit> = {
       currentModifiers: originModifiers,
@@ -247,7 +225,6 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     if (activePointer === null) return
 
     const position = this.#readPosition(event)
-    if (position === null) return
     this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#deliverInput(
       this.#createInput(activePointer, EDITOR_POINTER_INPUT_PHASE.UPDATE, position),
@@ -259,7 +236,6 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     if (activePointer === null) return
 
     const position = this.#readPosition(event)
-    if (position === null) return
     this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#activePointer = null
     this.#releasePointerCapture(activePointer.pointerId)
@@ -271,7 +247,6 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     if (activePointer === null) return
 
     const position = this.#readPosition(event)
-    if (position === null) return
     this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#activePointer = null
     this.#releasePointerCapture(activePointer.pointerId)
@@ -320,16 +295,10 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     return this.#activePointer
   }
 
-  #readPosition(event: PointerEvent): EditorCssPoint | null {
-    try {
-      if (this.#positionSpace === 'client')
-        return Object.freeze({ xCssPixel: event.clientX, yCssPixel: event.clientY })
-      return createPoint(event, this.#surface)
-    } catch (cause) {
-      this.cancel()
-      this.#deliverFailure(createFailure('coordinate-mapping', cause))
-      return null
-    }
+  #readPosition(event: PointerEvent): EditorCssPoint {
+    if (this.#positionSpace === 'client')
+      return Object.freeze({ xCssPixel: event.clientX, yCssPixel: event.clientY })
+    return createPoint(event, this.#surface)
   }
 
   #updateActivePointer(
@@ -366,30 +335,15 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     })
   }
 
-  #capturePointer(pointerId: number): boolean {
-    try {
-      this.#surface.setPointerCapture(pointerId)
-      return true
-    } catch (cause) {
-      this.#deliverFailure(createFailure('pointer-capture', cause))
-      return false
-    }
-  }
-
   #releasePointerCapture(pointerId: number): void {
-    try {
-      if (this.#surface.hasPointerCapture(pointerId)) {
-        this.#surface.releasePointerCapture(pointerId)
-      }
-    } catch (cause) {
-      this.#deliverFailure(createFailure('pointer-capture', cause))
-    }
+    if (this.#surface.hasPointerCapture(pointerId)) this.#surface.releasePointerCapture(pointerId)
   }
 
   #deliverInput(input: EditorPointerInput<Hit>): void {
     try {
-      this.#observer.onInput(input)
+      this.#onInput(input)
     } catch (cause) {
+      // A failed gesture must not keep the Pointer captured or its Session active.
       const active = this.#activePointer
       if (active?.captureId === input.captureId) {
         this.#activePointer = null
@@ -397,22 +351,15 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
       }
       if (input.phase !== EDITOR_POINTER_INPUT_PHASE.CANCEL) {
         try {
-          this.#observer.onInput(
-            Object.freeze({ ...input, phase: EDITOR_POINTER_INPUT_PHASE.CANCEL }),
-          )
-        } catch {
-          // Cleanup delivery is best-effort; the failed capture can no longer produce End.
+          this.#onInput(Object.freeze({ ...input, phase: EDITOR_POINTER_INPUT_PHASE.CANCEL }))
+        } catch (cancelCause) {
+          // Reported like the first error, which propagates from here.
+          queueMicrotask(() => {
+            throw cancelCause
+          })
         }
       }
-      this.#deliverFailure(createFailure('observer-delivery', cause))
-    }
-  }
-
-  #deliverFailure(failure: EditorPointerInputAdapterFailure): void {
-    try {
-      this.#observer.onError(failure)
-    } catch {
-      // Browser event delivery must not escape into the host event loop.
+      throw cause
     }
   }
 }

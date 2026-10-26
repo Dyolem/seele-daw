@@ -123,17 +123,12 @@ export type {
   AllProjectCommitsSubscription,
   CreateMidiNoteChangesSubscriptionInput,
   MidiNoteChangesSubscription,
+  ProjectCommitListener,
   ProjectSubscription,
-  ProjectSubscriptionDeliveryFailure,
-  ProjectSubscriptionObserver,
   ProjectSubscriptionType,
   ProjectUnsubscribe,
 } from './subscriptions/project-subscription'
-export { ProjectSubscriptionError } from './subscriptions/project-subscription-error'
-export type {
-  ProjectSubscriptionErrorCode,
-  ProjectSubscriptionErrorDetails,
-} from './subscriptions/project-subscription-error'
+export { reportListenerError } from './subscriptions/report-listener-error'
 
 export type {
   MidiSourcePartitions,

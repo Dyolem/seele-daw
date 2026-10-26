@@ -6,7 +6,12 @@ import {
   type PlaybackRuntimePort,
   type PlaybackTimerPort,
 } from '@seele-daw/playback'
-import type { ProjectId, ProjectSession, Tick } from '@seele-daw/project-core'
+import {
+  reportListenerError,
+  type ProjectId,
+  type ProjectSession,
+  type Tick,
+} from '@seele-daw/project-core'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
@@ -18,8 +23,7 @@ import { describePlaybackFeedback } from '@/workbench/project/playback/project-p
 import {
   PROJECT_PLAYBACK_PHASE,
   type ProjectPlaybackState,
-  type ProjectPlaybackStateDeliveryFailure,
-  type ProjectPlaybackStateObserver,
+  type ProjectPlaybackStateListener,
   type ProjectPlaybackUnsubscribe,
 } from '@/workbench/project/playback/project-playback-state'
 import type { ProjectPlaybackVisualPosition } from '@/workbench/project/playback/project-playback-visual-position'
@@ -39,14 +43,9 @@ export interface ProjectPlaybackCoordinator {
   play(): Promise<boolean>
   readVisualPosition(): ProjectPlaybackVisualPosition
   returnToLastStartPosition(): boolean
-  subscribe(observer: ProjectPlaybackStateObserver): ProjectPlaybackUnsubscribe
+  subscribe(listener: ProjectPlaybackStateListener): ProjectPlaybackUnsubscribe
   togglePlayPause(): boolean
   dispose(): void
-}
-
-interface StateSubscriptionEntry {
-  active: boolean
-  readonly observer: ProjectPlaybackStateObserver
 }
 
 interface PlayedProject {
@@ -96,7 +95,7 @@ function projectPlaybackState(
  */
 class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   readonly #engine: PlaybackEngine
-  readonly #subscriptions = new Set<StateSubscriptionEntry>()
+  readonly #listeners = new Set<ProjectPlaybackStateListener>()
   readonly #unsubscribeState: ProjectPlaybackUnsubscribe
   readonly #unsubscribeCommits: ProjectPlaybackUnsubscribe
   #project: PlayedProject | null = null
@@ -110,20 +109,27 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
       onStateChange: (state) => this.#publish(state),
     })
     this.#follow(dependencies.activeProject.state)
-    this.#unsubscribeState = dependencies.activeProject.subscribe({
-      onStateChange: (state) => this.#follow(state),
-      onError: (failure) => this.#engine.fail(failure.cause),
+    // Playback that cannot follow the Project must stop where the user hears it, not just log.
+    this.#unsubscribeState = dependencies.activeProject.subscribe((state) => {
+      try {
+        this.#follow(state)
+      } catch (cause) {
+        this.#engine.fail(cause)
+      }
     })
-    this.#unsubscribeCommits = dependencies.activeProject.subscribeCommits({
-      onCommit: ({ commit, projectId, session }) => {
+    this.#unsubscribeCommits = dependencies.activeProject.subscribeCommits(
+      ({ commit, projectId, session }) => {
         const project = this.#project
         if (this.#disposed || project?.projectId !== projectId || project.session !== session) {
           return
         }
-        this.#engine.commit(commit, () => session.getSnapshot())
+        try {
+          this.#engine.commit(commit, () => session.getSnapshot())
+        } catch (cause) {
+          this.#engine.fail(cause)
+        }
       },
-      onError: (failure) => this.#engine.fail(failure.cause),
-    })
+    )
   }
 
   get state(): ProjectPlaybackState {
@@ -171,14 +177,11 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     return this.#engine.togglePlayPause()
   }
 
-  subscribe(observer: ProjectPlaybackStateObserver): ProjectPlaybackUnsubscribe {
+  subscribe(listener: ProjectPlaybackStateListener): ProjectPlaybackUnsubscribe {
     this.#assertLive()
-    const entry: StateSubscriptionEntry = { active: true, observer }
-    this.#subscriptions.add(entry)
+    this.#listeners.add(listener)
     return () => {
-      if (!entry.active) return
-      entry.active = false
-      this.#subscriptions.delete(entry)
+      this.#listeners.delete(listener)
     }
   }
 
@@ -190,8 +193,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     this.#engine.dispose()
     this.#project = null
     this.#state = UNAVAILABLE_STATE
-    for (const entry of this.#subscriptions) entry.active = false
-    this.#subscriptions.clear()
+    this.#listeners.clear()
   }
 
   #assertLive(): void {
@@ -220,19 +222,11 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
     const state =
       projectId === undefined ? UNAVAILABLE_STATE : projectPlaybackState(engine, projectId)
     this.#state = state
-    for (const entry of this.#subscriptions) {
-      if (!entry.active) continue
+    for (const listener of this.#listeners) {
       try {
-        entry.observer.onStateChange(state)
+        listener(state)
       } catch (cause) {
-        entry.active = false
-        this.#subscriptions.delete(entry)
-        const failure = Object.freeze<ProjectPlaybackStateDeliveryFailure>({ cause, state })
-        try {
-          entry.observer.onError(failure)
-        } catch {
-          // The failed observer is detached, so error reporting cannot recurse.
-        }
+        reportListenerError(cause)
       }
     }
   }

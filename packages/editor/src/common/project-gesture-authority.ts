@@ -14,6 +14,6 @@ export function projectGestureAuthority(
   return {
     baseRevision,
     currentRevision: () => session.modelRevision,
-    watch: (observer) => session.subscribe(createAllProjectCommitsSubscription(), observer),
+    watch: (listener) => session.subscribe(createAllProjectCommitsSubscription(), listener),
   }
 }

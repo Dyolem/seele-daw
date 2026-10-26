@@ -1,6 +1,7 @@
 import {
   createAllProjectCommitsSubscription,
   parseProjectId,
+  reportListenerError,
   restoreProjectCheckpoint,
   saveProjectCheckpoint,
   type ModelRevision,
@@ -11,7 +12,6 @@ import {
   type ProjectCommit,
   type ProjectId,
   type ProjectSession,
-  type ProjectSubscriptionDeliveryFailure,
 } from '@seele-daw/project-core'
 
 import { ActiveProjectError } from '@/workbench/project/active-project-error'
@@ -19,8 +19,7 @@ import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,
   type ActiveProjectState,
-  type ActiveProjectStateDeliveryFailure,
-  type ActiveProjectStateObserver,
+  type ActiveProjectStateListener,
   type ActiveProjectUnsubscribe,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
@@ -40,8 +39,9 @@ export interface ActiveProjectService {
   createFromSession(session: ProjectSession): Promise<ProjectId>
   open(projectId: ProjectId): Promise<void>
   save(): Promise<void>
-  subscribe(observer: ActiveProjectStateObserver): ActiveProjectUnsubscribe
-  subscribeCommits(observer: ActiveProjectCommitObserver): ActiveProjectUnsubscribe
+  subscribe(listener: ActiveProjectStateListener): ActiveProjectUnsubscribe
+  /** Called after the ready state of each commit's revision has been published. */
+  subscribeCommits(listener: ActiveProjectCommitListener): ActiveProjectUnsubscribe
   dispose(): void
 }
 
@@ -52,15 +52,7 @@ export interface ActiveProjectCommitEvent {
   readonly state: ReadyActiveProjectState
 }
 
-export interface ActiveProjectCommitDeliveryFailure {
-  readonly event: ActiveProjectCommitEvent
-  readonly cause: unknown
-}
-
-export interface ActiveProjectCommitObserver {
-  onCommit(event: ActiveProjectCommitEvent): void
-  onError(failure: ActiveProjectCommitDeliveryFailure): void
-}
+export type ActiveProjectCommitListener = (event: ActiveProjectCommitEvent) => void
 
 interface ReadyStateInput {
   readonly projectId: ProjectId
@@ -70,20 +62,6 @@ interface ReadyStateInput {
   readonly saveStatus: ReadyActiveProjectState['saveStatus']
   readonly saveFailure: unknown
   readonly recoveryFailures: readonly ProjectCheckpointCandidateFailure[]
-}
-
-interface StateSubscriptionEntry {
-  active: boolean
-  readonly observer: ActiveProjectStateObserver
-  readonly onStateChange: ActiveProjectStateObserver['onStateChange']
-  readonly onError: ActiveProjectStateObserver['onError']
-}
-
-interface CommitSubscriptionEntry {
-  active: boolean
-  readonly observer: ActiveProjectCommitObserver
-  readonly onCommit: ActiveProjectCommitObserver['onCommit']
-  readonly onError: ActiveProjectCommitObserver['onError']
 }
 
 const IDLE_STATE = Object.freeze<ActiveProjectState>({ phase: ACTIVE_PROJECT_PHASE.IDLE })
@@ -127,38 +105,10 @@ function createReadyState(input: ReadyStateInput): ReadyActiveProjectState {
   })
 }
 
-function assertStateObserver(observer: ActiveProjectStateObserver): void {
-  if (
-    typeof observer !== 'object' ||
-    observer === null ||
-    typeof observer.onStateChange !== 'function' ||
-    typeof observer.onError !== 'function'
-  ) {
-    throw new ActiveProjectError(
-      'invalid-observer',
-      'Active Project state observer must provide onStateChange and onError functions',
-    )
-  }
-}
-
-function assertCommitObserver(observer: ActiveProjectCommitObserver): void {
-  if (
-    typeof observer !== 'object' ||
-    observer === null ||
-    typeof observer.onCommit !== 'function' ||
-    typeof observer.onError !== 'function'
-  ) {
-    throw new ActiveProjectError(
-      'invalid-observer',
-      'Active Project commit observer must provide onCommit and onError functions',
-    )
-  }
-}
-
 class ActiveProjectServiceImpl implements ActiveProjectService {
   readonly #dependencies: ActiveProjectServiceDependencies
-  readonly #subscriptions = new Set<StateSubscriptionEntry>()
-  readonly #commitSubscriptions = new Set<CommitSubscriptionEntry>()
+  readonly #listeners = new Set<ActiveProjectStateListener>()
+  readonly #commitListeners = new Set<ActiveProjectCommitListener>()
   #state: ActiveProjectState = IDLE_STATE
   #sessionUnsubscribe: ActiveProjectUnsubscribe | null = null
   #generation = 0
@@ -376,33 +326,20 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
     }
   }
 
-  subscribe(observer: ActiveProjectStateObserver): ActiveProjectUnsubscribe {
+  subscribe(listener: ActiveProjectStateListener): ActiveProjectUnsubscribe {
     this.#assertLive()
-    assertStateObserver(observer)
-
-    const entry: StateSubscriptionEntry = {
-      active: true,
-      observer,
-      onStateChange: observer.onStateChange,
-      onError: observer.onError,
+    this.#listeners.add(listener)
+    return () => {
+      this.#listeners.delete(listener)
     }
-    this.#subscriptions.add(entry)
-
-    return Object.freeze(() => this.#deactivate(entry))
   }
 
-  subscribeCommits(observer: ActiveProjectCommitObserver): ActiveProjectUnsubscribe {
+  subscribeCommits(listener: ActiveProjectCommitListener): ActiveProjectUnsubscribe {
     this.#assertLive()
-    assertCommitObserver(observer)
-
-    const entry: CommitSubscriptionEntry = {
-      active: true,
-      observer,
-      onCommit: observer.onCommit,
-      onError: observer.onError,
+    this.#commitListeners.add(listener)
+    return () => {
+      this.#commitListeners.delete(listener)
     }
-    this.#commitSubscriptions.add(entry)
-    return Object.freeze(() => this.#deactivateCommit(entry))
   }
 
   dispose(): void {
@@ -413,13 +350,14 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
     this.#detachSession()
     this.#setState(DISPOSED_STATE)
 
-    for (const entry of this.#subscriptions) this.#deactivate(entry)
-    for (const entry of this.#commitSubscriptions) this.#deactivateCommit(entry)
+    this.#listeners.clear()
+    this.#commitListeners.clear()
   }
 
   #attachSession(projectId: ProjectId, session: ProjectSession, generation: number): void {
-    this.#sessionUnsubscribe = session.subscribe(createAllProjectCommitsSubscription(), {
-      onCommit: (commit) => {
+    this.#sessionUnsubscribe = session.subscribe(
+      createAllProjectCommitsSubscription(),
+      (commit) => {
         if (!this.#isActiveSession(generation, session)) return
 
         const ready = this.#state as ReadyActiveProjectState
@@ -435,9 +373,7 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
         this.#setState(nextState)
         this.#publishCommit(Object.freeze({ commit, projectId, session, state: nextState }))
       },
-      onError: (failure) =>
-        this.#handleSessionSubscriptionFailure(projectId, session, generation, failure),
-    })
+    )
   }
 
   #createAndValidateNewSession(expectedProjectId: ProjectId): ProjectSession {
@@ -501,29 +437,6 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
     )
   }
 
-  #handleSessionSubscriptionFailure(
-    projectId: ProjectId,
-    session: ProjectSession,
-    generation: number,
-    failure: ProjectSubscriptionDeliveryFailure,
-  ): void {
-    if (!this.#isActiveSession(generation, session)) return
-
-    const error = new ActiveProjectError(
-      'session-subscription-failed',
-      `Active Project ${projectId} could no longer observe Session commits`,
-      { cause: failure, projectId },
-    )
-    this.#detachSession()
-    this.#setState(
-      Object.freeze({
-        phase: ACTIVE_PROJECT_PHASE.SESSION_FAILED,
-        projectId,
-        failureCause: error,
-      }),
-    )
-  }
-
   #isActiveSession(generation: number, session: ProjectSession): boolean {
     return (
       this.#isCurrent(generation) &&
@@ -543,56 +456,23 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
 
   #setState(state: ActiveProjectState): void {
     this.#state = state
-    const entries = [...this.#subscriptions]
-
-    for (const entry of entries) {
-      if (!entry.active) continue
-
+    for (const listener of this.#listeners) {
       try {
-        entry.onStateChange.call(entry.observer, state)
+        listener(state)
       } catch (cause) {
-        this.#deactivate(entry)
-        const failure = Object.freeze<ActiveProjectStateDeliveryFailure>({ state, cause })
-
-        try {
-          entry.onError.call(entry.observer, failure)
-        } catch {
-          // The failed observer is already detached; error reporting cannot recurse.
-        }
+        reportListenerError(cause)
       }
     }
-  }
-
-  #deactivate(entry: StateSubscriptionEntry): void {
-    if (!entry.active) return
-
-    entry.active = false
-    this.#subscriptions.delete(entry)
   }
 
   #publishCommit(event: ActiveProjectCommitEvent): void {
-    for (const entry of this.#commitSubscriptions) {
-      if (!entry.active) continue
+    for (const listener of this.#commitListeners) {
       try {
-        entry.onCommit.call(entry.observer, event)
+        listener(event)
       } catch (cause) {
-        this.#deactivateCommit(entry)
-        try {
-          entry.onError.call(
-            entry.observer,
-            Object.freeze<ActiveProjectCommitDeliveryFailure>({ cause, event }),
-          )
-        } catch {
-          // The failed observer is already detached; error reporting cannot recurse.
-        }
+        reportListenerError(cause)
       }
     }
-  }
-
-  #deactivateCommit(entry: CommitSubscriptionEntry): void {
-    if (!entry.active) return
-    entry.active = false
-    this.#commitSubscriptions.delete(entry)
   }
 
   #assertLive(): void {

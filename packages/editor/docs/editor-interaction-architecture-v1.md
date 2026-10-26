@@ -96,8 +96,8 @@ microtask 发布通知，因此 Update / End 和提交领取还同步检查 `ses
 新 Begin 可以结束旧 handoff 后开始新手势，这只放弃旧 Preview，不撤销已提交事实。
 
 Cancel、Pointer Cancel、lost capture、Window blur、目标 / Session 切换、释放和消费者失败
-都关闭未提交结果。Browser Adapter 在消费者或坐标转换抛错时释放 capture，并尽力发布
-Cancel；Note observer 失败时清除内部状态，也向健康 observer 发布空投影。错误反馈再次
+都关闭未提交结果。Browser Adapter 在消费者抛错时释放 capture、发布 Cancel，再让错误像任何
+失败的事件监听一样传出；Note 投影的监听者失败时清除内部状态，也向其余监听者发布空投影。
 失败不得留下仍可产生 End 的输入。
 
 Note Surface 还处理 Selection 改变、Viewport 尺寸 /范围改变、Surface 位置改变和投影失败。
@@ -195,11 +195,11 @@ Dock Splitter、Ruler 的 Slider 键盘导航、Follow 暂停捕获、Hover 与 
 
 - 公共 host：一次执行、空结果、失败关闭、重入和释放；
 - Note：冻结、动态 Modifier、旧 capture / 回告、两种 handoff 顺序、外部修改前后的通知窗口、映射
-  失效和 observer 失败；
+  失效和监听者失败；
 - Tempo：两种交接顺序、旧捕获 / 回告、映射失效、初始化失败、播放准备期间的外部 Commit、Session
   替换、碰撞拒绝、一次 Undo 及提交后的显示失败；
 - CC64 / Track：配置冻结、同 revision 的 Session 替换、提交通知前的同步校验、旧 capture / 回告 /
-  observer；
+  订阅；
 - Locate：连续重映射、取消后的动画回调、失焦、Scope / 映射改变以及 Pointer / Playback 失败清理；
 - 跨 Surface：Track / Clip Focus / CC64 / Tempo / Locate 的 ownership 交接、连续 Preview 下的
   Cancel 路由、Dock Scope / 最小化 / 关闭、Channel / Active Clip / Session 替换、runtime 提前释放、

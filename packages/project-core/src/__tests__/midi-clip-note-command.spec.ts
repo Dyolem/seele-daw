@@ -440,10 +440,7 @@ describe('MIDI Clip with Note commit, consumers, and History', () => {
         noteIds: [command.note.id],
         affected: { startTick: parseTick(960), endTick: parseTick(1_440) },
       }),
-      {
-        onCommit: (commit) => noteCommits.push(commit),
-        onError: () => undefined,
-      },
+      (commit) => noteCommits.push(commit),
     )
 
     const commit = requireCommitted(session.execute(command))

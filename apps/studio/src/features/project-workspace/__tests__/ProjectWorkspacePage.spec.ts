@@ -404,13 +404,8 @@ describe('ProjectWorkspacePage', () => {
         async () => ({ kind: PROJECT_ENTRY_RESOLUTION_KIND.ACTIVE, projectId }),
         createReadyState(projectId, session),
       )
-      const release = session.subscribe(createAllProjectCommitsSubscription(), {
-        onCommit: () => {
-          fixture.state.value = createReadyState(projectId, session)
-        },
-        onError: (failure) => {
-          throw failure
-        },
+      const release = session.subscribe(createAllProjectCommitsSubscription(), () => {
+        fixture.state.value = createReadyState(projectId, session)
       })
       onTestFinished(release)
       const { wrapper, keyboardBindingRegistry, invoke } = await mountPage(fixture, projectId)

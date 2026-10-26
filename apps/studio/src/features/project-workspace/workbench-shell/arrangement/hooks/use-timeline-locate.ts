@@ -282,7 +282,7 @@ export function useTimelineLocate({
           element.focus({ preventScroll: true })
           return null
         },
-        observer: { onInput, onError: ({ cause }) => fail(cause) },
+        onInput,
       })
       window.addEventListener('scroll', remap, true)
       window.addEventListener('resize', remap)

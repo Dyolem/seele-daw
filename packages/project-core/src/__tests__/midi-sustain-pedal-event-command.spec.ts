@@ -452,14 +452,8 @@ describe('MIDI Sustain Pedal Event commit and History semantics', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const allCommits: ProjectCommit[] = []
     const noteCommits: ProjectCommit[] = []
-    session.subscribe(createAllProjectCommitsSubscription(), {
-      onCommit: (commit) => allCommits.push(commit),
-      onError: () => undefined,
-    })
-    session.subscribe(createMidiNoteChangesSubscription(), {
-      onCommit: (commit) => noteCommits.push(commit),
-      onError: () => undefined,
-    })
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => allCommits.push(commit))
+    session.subscribe(createMidiNoteChangesSubscription(), (commit) => noteCommits.push(commit))
 
     const addResult = session.execute(createAddCommand(store))
     expect(addResult.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)

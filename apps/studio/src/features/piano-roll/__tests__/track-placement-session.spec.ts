@@ -1,6 +1,5 @@
 import {
   createInitialProjectSession,
-  createAllProjectCommitsSubscription,
   createReplaceTempoEventBpmCommand,
   parseProjectId,
   parseTempoBpm,
@@ -11,7 +10,7 @@ import {
   parseMidiPitch,
   parseTrackId,
   type ModelRevision,
-  type ProjectSubscriptionObserver,
+  type ProjectCommitListener,
 } from '@seele-daw/project-core'
 import {
   createPianoRollGrid,
@@ -191,20 +190,20 @@ describe('TrackPlacementSession', () => {
   })
   it('closes failed projections and ignores a retired subscription callback', () => {
     const { session, configuration, begin, end, observer } = fixture()
-    let oldObserver: ProjectSubscriptionObserver | undefined
+    let oldListener: ProjectCommitListener | undefined
     const unsubscribe = vi.fn<() => void>()
     const authority = {
       modelRevision: configuration.session.modelRevision,
       query: configuration.session.query.bind(configuration.session),
       subscribe: vi.fn<typeof configuration.session.subscribe>((_query, recipient) => {
-        oldObserver = recipient
+        oldListener = recipient
         return unsubscribe
       }),
     }
     pointer(session, begin, { ...configuration, session: authority })
     session.cancel()
     expect(unsubscribe).toHaveBeenCalledOnce()
-    const retired = oldObserver
+    const retired = oldListener
     pointer(session, { ...begin, captureId: Symbol('next') }, configuration)
     const id = session.state.interactionId
     const committed = fixture().project.execute(
@@ -215,11 +214,7 @@ describe('TrackPlacementSession', () => {
       }),
     )
     if (committed.status !== 'committed') throw new Error('Expected fixture commit')
-    retired?.onError({
-      subscription: createAllProjectCommitsSubscription(),
-      commit: committed.commit,
-      cause: new Error('Retired subscriber'),
-    })
+    retired?.(committed.commit)
     expect(session.state.interactionId).toBe(id)
     session.cancel()
     observer.mockImplementationOnce(() => {

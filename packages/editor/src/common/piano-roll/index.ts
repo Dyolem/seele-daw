@@ -9,11 +9,8 @@ export { createPianoRollEditorSession } from './piano-roll-editor-session'
 export type {
   CreatePianoRollEditorSessionInput,
   PianoRollEditorSession,
-  PianoRollEditorSessionFailure,
-  PianoRollEditorSessionFailureOperation,
-  PianoRollEditorSessionObserver,
+  PianoRollEditorSessionListener,
   PianoRollEditorSessionState,
-  PianoRollEditorSessionUnsubscribe,
 } from './piano-roll-editor-session'
 
 export { PIANO_ROLL_HIT_ZONE, PIANO_ROLL_POINTER_INPUT_PHASE } from './piano-roll-input'
@@ -66,11 +63,8 @@ export { createPianoRollNoteReadModel } from './piano-roll-note-read-model'
 export type {
   CreatePianoRollNoteReadModelInput,
   PianoRollNoteReadModel,
-  PianoRollNoteReadModelFailure,
-  PianoRollNoteReadModelFailureOperation,
-  PianoRollNoteReadModelObserver,
+  PianoRollNoteReadModelListener,
   PianoRollNoteReadModelState,
-  PianoRollNoteReadModelUnsubscribe,
   PianoRollVisibleNote,
 } from './piano-roll-note-read-model'
 

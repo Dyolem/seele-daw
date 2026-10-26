@@ -30,20 +30,5 @@ export {
   resolvePianoRollDomSustainPedalEventHit,
 } from './piano-roll-dom-sustain-pedal-hit'
 
-export {
-  PIANO_ROLL_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL,
-  createPianoRollPointerInputAdapter,
-  createPianoRollSemanticPointerInputAdapter,
-} from './piano-roll-pointer-input-adapter'
-export type {
-  CreatePianoRollPointerInputAdapterInput,
-  CreatePianoRollSemanticPointerInputAdapterInput,
-  PianoRollBrowserHitResolver,
-  PianoRollPointerInputAdapter,
-  PianoRollPointerInputAdapterFailure,
-  PianoRollPointerInputAdapterFailureOperation,
-  PianoRollPointerInputAdapterObserver,
-} from './piano-roll-pointer-input-adapter'
-
 export { PianoRollBrowserError } from './piano-roll-browser-error'
 export type { PianoRollBrowserErrorCode } from './piano-roll-browser-error'

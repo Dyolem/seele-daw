@@ -236,7 +236,7 @@ export function useTempoTrackDrag({
             event.preventDefault()
             return { tempoEventId: target.id }
           },
-          observer: { onInput, onError: ({ cause }) => reportFailure(cause) },
+          onInput,
         })
         window.addEventListener('scroll', checkMapping, true)
         window.addEventListener('resize', checkMapping)

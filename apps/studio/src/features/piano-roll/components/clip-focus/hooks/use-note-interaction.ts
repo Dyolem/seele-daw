@@ -1,13 +1,14 @@
 import {
   PIANO_ROLL_INTERACTION_TOOL,
   PIANO_ROLL_POINTER_INPUT_PHASE,
-  createPianoRollPointerInputAdapter,
+  createEditorPointerInputAdapter,
+  resolvePianoRollDomNoteHit,
+  type EditorPointerInputAdapter,
   type PianoRollGrid,
   type PianoRollInteractionSession,
   type PianoRollInteractionState,
   type PianoRollInteractionTool,
   type PianoRollPointerInput,
-  type PianoRollPointerInputAdapter,
 } from '@seele-daw/editor'
 import { shallowRef, type ShallowRef } from 'vue'
 import { createProjectPianoRollIntentHandler } from '@/features/piano-roll/interaction/project-piano-roll-intent-handler'
@@ -57,7 +58,7 @@ export function useNoteInteraction({
   const toasts = useUiToastStore()
   const interactionState = shallowRef<PianoRollInteractionState>(interactionSession.state)
   let disposed = false
-  let pointerInputAdapter: PianoRollPointerInputAdapter | null = null
+  let pointerInputAdapter: EditorPointerInputAdapter | null = null
   let captureBounds: Readonly<{ left: number; top: number }> | null = null
   const handleInteractionIntent = createProjectPianoRollIntentHandler({
     getAuthorityRevision: () => noteState.value?.modelRevision ?? null,
@@ -174,14 +175,9 @@ export function useNoteInteraction({
       const host = canvasHost.value
       if (disposed || host === null || pointerInputAdapter !== null) return
       window.addEventListener('scroll', handleSurfaceScroll, true)
-      pointerInputAdapter = createPianoRollPointerInputAdapter({
-        observer: {
-          onError: (failure) => {
-            interactionSession.cancel()
-            interactionFailureMessage.value = describeFailure(failure.cause)
-          },
-          onInput: handlePointerInput,
-        },
+      pointerInputAdapter = createEditorPointerInputAdapter({
+        onInput: handlePointerInput,
+        resolveHit: resolvePianoRollDomNoteHit,
         surface: host,
       })
     },

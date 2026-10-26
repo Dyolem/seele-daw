@@ -7,12 +7,8 @@ import {
   parseNoteId,
   parseTick,
   parseTrackId,
-  type ProjectCommit,
-  type ProjectSession,
-  type ProjectSubscription,
-  type ProjectSubscriptionObserver,
 } from '@seele-daw/project-core'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   PIANO_ROLL_DEFAULT_CENTER_PITCH,
@@ -28,9 +24,13 @@ import {
   pianoRollCssPixelToMidiPitch,
   pianoRollMidiPitchToCssPixel,
   pianoRollSourceTickToClipTick,
-  type PianoRollNoteReadModelObserver,
+  type PianoRollNoteReadModelListener,
 } from '#internal/index'
 import { createPianoRollProjectFixture } from '#internal/__tests__/support/piano-roll-project-fixture'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 function createClipRecords() {
   const source = createMidiSourceRecord({
@@ -296,11 +296,8 @@ describe('PianoRollNoteReadModel', () => {
       session: fixture.session,
       viewport,
     })
-    const onStateChange = vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
-    readModel.subscribe({
-      onError: vi.fn<PianoRollNoteReadModelObserver['onError']>(),
-      onStateChange,
-    })
+    const onStateChange = vi.fn<PianoRollNoteReadModelListener>()
+    readModel.subscribe(onStateChange)
 
     fixture.addNote({
       noteId: parseNoteId('editor-note-visible-added'),
@@ -339,11 +336,8 @@ describe('PianoRollNoteReadModel', () => {
       session: fixture.session,
       viewport: firstViewport,
     })
-    const onStateChange = vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
-    readModel.subscribe({
-      onError: vi.fn<PianoRollNoteReadModelObserver['onError']>(),
-      onStateChange,
-    })
+    const onStateChange = vi.fn<PianoRollNoteReadModelListener>()
+    readModel.subscribe(onStateChange)
     const secondViewport = createPianoRollViewport(fixture.context, {
       widthCssPixel: 480,
       heightCssPixel: 320,
@@ -362,7 +356,7 @@ describe('PianoRollNoteReadModel', () => {
     readModel.dispose()
   })
 
-  it('isolates Observer failures and rejects use after disposal', async () => {
+  it('reports a listener failure without stopping the others, and rejects use after disposal', async () => {
     const fixture = createPianoRollProjectFixture()
     const viewport = createInitialPianoRollViewport(fixture.context, {
       widthCssPixel: 960,
@@ -375,18 +369,14 @@ describe('PianoRollNoteReadModel', () => {
       session: fixture.session,
       viewport,
     })
-    const firstError = vi.fn<PianoRollNoteReadModelObserver['onError']>()
-    const secondStateChange = vi.fn<PianoRollNoteReadModelObserver['onStateChange']>()
-    readModel.subscribe({
-      onError: firstError,
-      onStateChange: () => {
-        throw new Error('Observer failed')
-      },
+    const reportError = vi.fn<(error: unknown) => void>()
+    vi.stubGlobal('reportError', reportError)
+    const failure = new Error('Listener failed')
+    const secondStateChange = vi.fn<PianoRollNoteReadModelListener>()
+    readModel.subscribe(() => {
+      throw failure
     })
-    readModel.subscribe({
-      onError: vi.fn<PianoRollNoteReadModelObserver['onError']>(),
-      onStateChange: secondStateChange,
-    })
+    readModel.subscribe(secondStateChange)
 
     fixture.addNote({
       noteId: parseNoteId('editor-note-observer-isolation'),
@@ -396,73 +386,14 @@ describe('PianoRollNoteReadModel', () => {
     })
     await vi.waitFor(() => expect(secondStateChange).toHaveBeenCalledOnce())
 
-    expect(firstError).toHaveBeenCalledWith(
-      expect.objectContaining({ operation: 'observer-delivery' }),
-    )
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(failure)
 
     readModel.dispose()
     expect(requirePianoRollError(() => readModel.setViewport(viewport)).code).toBe(
       'read-model-disposed',
     )
-    expect(
-      requirePianoRollError(() =>
-        readModel.subscribe({
-          onError: vi.fn<PianoRollNoteReadModelObserver['onError']>(),
-          onStateChange: vi.fn<PianoRollNoteReadModelObserver['onStateChange']>(),
-        }),
-      ).code,
-    ).toBe('read-model-disposed')
-  })
-
-  it('surfaces Project subscription and refresh failures without changing state', () => {
-    const fixture = createPianoRollProjectFixture()
-    const viewport = createInitialPianoRollViewport(fixture.context, {
-      widthCssPixel: 960,
-      heightCssPixel: 480,
-      minimumPitch: parseMidiPitch(48),
-      maximumPitch: parseMidiPitch(72),
-    })
-    let projectObserver: ProjectSubscriptionObserver | null = null
-    let failQuery = false
-    const session: Pick<ProjectSession, 'query' | 'subscribe'> = {
-      query(query) {
-        if (failQuery) throw new Error('Query failed')
-        return fixture.session.query(query)
-      },
-      subscribe(_subscription: ProjectSubscription, observer: ProjectSubscriptionObserver) {
-        projectObserver = observer
-        return () => undefined
-      },
-    }
-    const readModel = createPianoRollNoteReadModel({
-      context: fixture.context,
-      session,
-      viewport,
-    })
-    const onError = vi.fn<PianoRollNoteReadModelObserver['onError']>()
-    readModel.subscribe({
-      onError,
-      onStateChange: vi.fn<PianoRollNoteReadModelObserver['onStateChange']>(),
-    })
-    const initialState = readModel.state
-    const subscribedProjectObserver = projectObserver as ProjectSubscriptionObserver | null
-    if (subscribedProjectObserver === null) {
-      throw new Error('Expected Project subscription')
-    }
-
-    subscribedProjectObserver.onError({
-      cause: new Error('Project observer failed'),
-      commit: Object.freeze({}) as ProjectCommit,
-      subscription: Object.freeze({}) as ProjectSubscription,
-    })
-    failQuery = true
-    subscribedProjectObserver.onCommit(Object.freeze({}) as ProjectCommit)
-
-    expect(onError.mock.calls.map(([failure]) => failure.operation)).toEqual([
-      'project-subscription',
-      'project-query',
-    ])
-    expect(readModel.state).toBe(initialState)
-    readModel.dispose()
+    expect(requirePianoRollError(() => readModel.subscribe(vi.fn())).code).toBe(
+      'read-model-disposed',
+    )
   })
 })

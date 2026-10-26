@@ -1,20 +1,41 @@
 // @vitest-environment jsdom
 
-import type { EditorPointerInputAdapterObserver } from '#internal/browser/interaction/editor-pointer-input-adapter'
 import { parseClipId, parseMidiPitch, parseNoteId, parseTick } from '@seele-daw/project-core'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 
 import {
   PIANO_ROLL_HIT_ZONE,
   PIANO_ROLL_POINTER_INPUT_PHASE,
   PianoRollBrowserError,
   createPianoRollDomNoteRenderer,
-  createPianoRollPointerInputAdapter,
   createEditorPointerInputAdapter,
   resolvePianoRollDomNoteHit,
+  type CreateEditorPointerInputAdapterInput,
+  type EditorPointerInputListener,
+  type PianoRollHit,
   type PianoRollNoteScene,
-  type PianoRollPointerInputAdapterObserver,
 } from '#internal/index'
+
+type NoteInputListener = EditorPointerInputListener<PianoRollHit>
+
+function createNoteInputAdapter(
+  input: Omit<CreateEditorPointerInputAdapterInput<PianoRollHit>, 'resolveHit'> &
+    Partial<Pick<CreateEditorPointerInputAdapterInput<PianoRollHit>, 'resolveHit'>>,
+) {
+  return createEditorPointerInputAdapter({ resolveHit: resolvePianoRollDomNoteHit, ...input })
+}
+
+/** What failing event listeners threw during this test, as the window received it. */
+function captureWindowErrors(): unknown[] {
+  const errors: unknown[] = []
+  const listener = (event: ErrorEvent) => {
+    errors.push(event.error)
+    event.preventDefault()
+  }
+  window.addEventListener('error', listener)
+  onTestFinished(() => window.removeEventListener('error', listener))
+  return errors
+}
 
 interface DispatchPointerInput {
   readonly altKey?: boolean
@@ -232,12 +253,9 @@ describe('Piano Roll DOM Note Hit', () => {
 describe('Piano Roll Pointer Input Adapter', () => {
   it('captures one primary gesture and emits immutable Surface CSS Pixel input', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -307,12 +325,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('emits current Modifier changes without replacing Pointer Down modifiers', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -346,12 +361,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('latches an Edge hit for the complete captured gesture', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -383,12 +395,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('latches the CSS Pixel drag threshold after it is crossed', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -422,12 +431,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('ignores secondary starts and unrelated pointers while one pointer is active', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -454,12 +460,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('cancels on lost capture and allows a later gesture', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -483,12 +486,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('releases capture and cancels on Window blur or an explicit request', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -512,12 +512,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('cancels an active gesture and removes listeners when disposed', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: {
-        onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(),
-        onInput,
-      },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
 
@@ -535,16 +532,16 @@ describe('Piano Roll Pointer Input Adapter', () => {
     fixture.renderer.dispose()
   })
 
-  it('reports configuration, Hit and capture failures without starting a gesture', () => {
+  it('rejects an invalid drag threshold, and starts no gesture when Hit testing or capture fails', () => {
     const fixture = createDomNoteFixture()
-    const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
+    const onInput = vi.fn<NoteInputListener>()
+    const errors = captureWindowErrors()
 
     for (const dragThresholdCssPixel of [0, -1, Number.POSITIVE_INFINITY]) {
       expect(() =>
-        createPianoRollPointerInputAdapter({
+        createNoteInputAdapter({
           dragThresholdCssPixel,
-          observer: { onError, onInput },
+          onInput,
           surface: fixture.surface,
         }),
       ).toThrowError(
@@ -554,8 +551,8 @@ describe('Piano Roll Pointer Input Adapter', () => {
       )
     }
 
-    const hitFailureAdapter = createPianoRollPointerInputAdapter({
-      observer: { onError, onInput },
+    const hitFailureAdapter = createNoteInputAdapter({
+      onInput,
       resolveHit: () => {
         throw new Error('Hit failed')
       },
@@ -567,16 +564,16 @@ describe('Piano Roll Pointer Input Adapter', () => {
     fixture.capture.setPointerCapture.mockImplementationOnce(() => {
       throw new Error('Capture failed')
     })
-    const captureFailureAdapter = createPianoRollPointerInputAdapter({
-      observer: { onError, onInput },
+    const captureFailureAdapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
     dispatchPointer(fixture.note, 'pointerdown', { pointerId: 11 })
 
     expect(onInput).not.toHaveBeenCalled()
-    expect(onError.mock.calls.map(([failure]) => failure.operation)).toEqual([
-      'hit-test',
-      'pointer-capture',
+    expect(errors.map((error) => (error as Error).message)).toEqual([
+      'Hit failed',
+      'Capture failed',
     ])
 
     captureFailureAdapter.dispose()
@@ -587,12 +584,12 @@ describe('Piano Roll Pointer Input Adapter', () => {
     'closes capture when the %s consumer throws and ignores a late Pointer Up',
     (phase) => {
       const fixture = createDomNoteFixture()
-      const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
-      const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>((input) => {
+      const errors = captureWindowErrors()
+      const onInput = vi.fn<NoteInputListener>((input) => {
         if (input.phase === phase) throw new Error('Input consumer failed')
       })
-      const adapter = createPianoRollPointerInputAdapter({
-        observer: { onError, onInput },
+      const adapter = createNoteInputAdapter({
+        onInput,
         surface: fixture.surface,
       })
       dispatchPointer(fixture.note, 'pointerdown')
@@ -605,9 +602,7 @@ describe('Piano Roll Pointer Input Adapter', () => {
       expect(onInput).toHaveBeenLastCalledWith(
         expect.objectContaining({ phase: PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL }),
       )
-      expect(onError).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ operation: 'observer-delivery' }),
-      )
+      expect(errors.map((error) => (error as Error).message)).toEqual(['Input consumer failed'])
       adapter.dispose()
       fixture.renderer.dispose()
     },
@@ -615,9 +610,9 @@ describe('Piano Roll Pointer Input Adapter', () => {
 
   it('assigns a fresh capture identity when the browser reuses a Pointer ID', () => {
     const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: { onError: vi.fn<PianoRollPointerInputAdapterObserver['onError']>(), onInput },
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({
+      onInput,
       surface: fixture.surface,
     })
     dispatchPointer(fixture.note, 'pointerdown')
@@ -632,32 +627,6 @@ describe('Piano Roll Pointer Input Adapter', () => {
     adapter.dispose()
     fixture.renderer.dispose()
   })
-
-  it('cancels and releases capture when coordinate mapping fails', () => {
-    const fixture = createDomNoteFixture()
-    const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-    const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
-    const adapter = createPianoRollPointerInputAdapter({
-      observer: { onError, onInput },
-      surface: fixture.surface,
-    })
-    dispatchPointer(fixture.note, 'pointerdown')
-    vi.spyOn(fixture.surface, 'getBoundingClientRect').mockImplementationOnce(() => {
-      throw new Error('Mapping failed')
-    })
-    dispatchPointer(fixture.surface, 'pointermove')
-    dispatchPointer(fixture.surface, 'pointerup')
-    expect(fixture.capture.capturedPointerIds.size).toBe(0)
-    expect(onInput.mock.calls.map(([input]) => input.phase)).toEqual([
-      PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN,
-      PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL,
-    ])
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({ operation: 'coordinate-mapping' }),
-    )
-    adapter.dispose()
-    fixture.renderer.dispose()
-  })
 })
 
 describe('Editor Pointer resource ownership', () => {
@@ -665,8 +634,7 @@ describe('Editor Pointer resource ownership', () => {
     'rolls back a partially registered adapter when %s registration fails',
     (failedType) => {
       const { surface, capture, renderer } = createDomNoteFixture()
-      const onInput = vi.fn<PianoRollPointerInputAdapterObserver['onInput']>()
-      const onError = vi.fn<PianoRollPointerInputAdapterObserver['onError']>()
+      const onInput = vi.fn<NoteInputListener>()
       const unrelated = vi.fn<EventListener>()
       surface.addEventListener('pointerdown', unrelated)
       const target: EventTarget = failedType === 'keyup' ? window : surface
@@ -676,9 +644,9 @@ describe('Editor Pointer resource ownership', () => {
         if (type === failedType) throw new Error('Listener registration failed')
         add(type, listener, options)
       })
-      expect(() =>
-        createPianoRollPointerInputAdapter({ surface, observer: { onInput, onError } }),
-      ).toThrow('Listener registration failed')
+      expect(() => createNoteInputAdapter({ surface, onInput })).toThrow(
+        'Listener registration failed',
+      )
       registration.mockRestore()
 
       dispatchPointer(surface, 'pointerdown')
@@ -688,7 +656,7 @@ describe('Editor Pointer resource ownership', () => {
       expect(capture.capturedPointerIds.size).toBe(0)
       expect(unrelated).toHaveBeenCalledOnce()
 
-      const retry = createPianoRollPointerInputAdapter({ surface, observer: { onInput, onError } })
+      const retry = createNoteInputAdapter({ surface, onInput })
       dispatchPointer(surface, 'pointerdown')
       dispatchPointer(surface, 'pointerup')
       expect(onInput.mock.calls.map(([input]) => input.phase)).toEqual(['begin', 'end'])
@@ -705,12 +673,12 @@ describe('Editor Pointer coordinate space', () => {
     const bounds = vi
       .spyOn(surface, 'getBoundingClientRect')
       .mockReturnValue({ left: 100, top: 50 } as DOMRect)
-    const onInput = vi.fn<EditorPointerInputAdapterObserver<never>['onInput']>()
+    const onInput = vi.fn<EditorPointerInputListener<never>>()
     const adapter = createEditorPointerInputAdapter({
       surface,
       positionSpace: 'client',
       resolveHit: () => null,
-      observer: { onInput, onError: vi.fn<EditorPointerInputAdapterObserver<never>['onError']>() },
+      onInput,
     })
     dispatchPointer(surface, 'pointerdown', { clientX: 150, clientY: 70 })
     bounds.mockReturnValue({ left: -100, top: 50 } as DOMRect)

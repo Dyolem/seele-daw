@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import * as projectCore from '#internal/index'
 import {
@@ -7,7 +7,6 @@ import {
   PROJECT_HISTORY_DIRECTION,
   PROJECT_SUBSCRIPTION_TYPE,
   ProjectCommandError,
-  ProjectSubscriptionError,
   createAddNoteCommand,
   createAllProjectCommitsSubscription,
   createMidiNoteChangesSubscription,
@@ -26,8 +25,6 @@ import {
   type ProjectCommit,
   type ProjectSession,
   type ProjectSubscription,
-  type ProjectSubscriptionDeliveryFailure,
-  type ProjectSubscriptionObserver,
   type ProjectUnsubscribe,
   type Tick,
 } from '#internal/index'
@@ -35,15 +32,6 @@ import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
 import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { createFixtureProjectSession } from './support/project-session-test-support'
-
-function createObserver(
-  onCommit: ProjectSubscriptionObserver['onCommit'],
-  onError: ProjectSubscriptionObserver['onError'] = (failure) => {
-    void failure
-  },
-): ProjectSubscriptionObserver {
-  return { onCommit, onError }
-}
 
 function executeAddNote(
   session: ProjectSession,
@@ -83,10 +71,7 @@ describe('ProjectSubscription public contract', () => {
     const affected = { startTick: parseTick(240), endTick: parseTick(720) }
     const allCommits = createAllProjectCommitsSubscription()
     const midiNotes = createMidiNoteChangesSubscription({ sourceIds, noteIds, affected })
-    const unsubscribe = session.subscribe(
-      allCommits,
-      createObserver(() => undefined),
-    )
+    const unsubscribe = session.subscribe(allCommits, () => undefined)
 
     sourceIds.push(fixture.records.loopingSource.id)
     noteIds.push(fixture.records.loopingNote.id)
@@ -108,59 +93,33 @@ describe('ProjectSubscription public contract', () => {
     expect(Object.isFrozen(midiNotes.sourceIds)).toBe(true)
     expect(Object.isFrozen(midiNotes.noteIds)).toBe(true)
     expect(Object.isFrozen(midiNotes.affected)).toBe(true)
-    expect(Object.isFrozen(unsubscribe)).toBe(true)
     expectTypeOf(unsubscribe).toEqualTypeOf<ProjectUnsubscribe>()
     expect('ChangePublisher' in projectCore).toBe(false)
     expect('PreparedChangePublication' in projectCore).toBe(false)
     expect('normalizeProjectSubscription' in projectCore).toBe(false)
   })
 
-  it('rejects ambiguous identity filters, invalid ranges, unknown types, and invalid observers', () => {
-    const { session } = createFixtureProjectSession()
-    const observer = createObserver(() => undefined)
-
-    expect(() => createMidiNoteChangesSubscription({ sourceIds: [] })).toThrowError(
-      expect.objectContaining<Partial<ProjectSubscriptionError>>({ code: 'empty-source-ids' }),
-    )
-    expect(() => createMidiNoteChangesSubscription({ noteIds: [] })).toThrowError(
-      expect.objectContaining<Partial<ProjectSubscriptionError>>({ code: 'empty-note-ids' }),
-    )
+  it('rejects filters that could never match', () => {
+    expect(() => createMidiNoteChangesSubscription({ sourceIds: [] })).toThrowError(RangeError)
+    expect(() => createMidiNoteChangesSubscription({ noteIds: [] })).toThrowError(RangeError)
     expect(() =>
       createMidiNoteChangesSubscription({
         affected: { startTick: parseTick(480), endTick: parseTick(480) },
       }),
-    ).toThrowError(
-      expect.objectContaining<Partial<ProjectSubscriptionError>>({ code: 'invalid-tick-range' }),
-    )
-    expect(() =>
-      session.subscribe(
-        { type: 'project-commit.unknown' } as unknown as ProjectSubscription,
-        observer,
-      ),
-    ).toThrowError(
-      expect.objectContaining<Partial<ProjectSubscriptionError>>({
-        code: 'unknown-subscription-type',
-      }),
-    )
-    expect(() =>
-      session.subscribe(createAllProjectCommitsSubscription(), {
-        onCommit: () => undefined,
-      } as unknown as ProjectSubscriptionObserver),
-    ).toThrowError(
-      expect.objectContaining<Partial<ProjectSubscriptionError>>({ code: 'invalid-observer' }),
-    )
+    ).toThrowError(RangeError)
   })
 })
 
 describe('ProjectSession commit publication', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('publishes Command, Undo, and Redo commits asynchronously in revision order', async () => {
     const { fixture, session } = createFixtureProjectSession()
     const received: ProjectCommit[] = []
 
-    session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => received.push(commit)),
-    )
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => received.push(commit))
 
     const commandCommit = executeAddNote(
       session,
@@ -197,10 +156,7 @@ describe('ProjectSession commit publication', () => {
     const { fixture, session } = createFixtureProjectSession()
     const received: ProjectCommit[] = []
 
-    session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => received.push(commit)),
-    )
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => received.push(commit))
 
     expect(session.undo()).toBeNull()
     expect(session.redo()).toBeNull()
@@ -246,12 +202,9 @@ describe('ProjectSession commit publication', () => {
       subscription: ProjectSubscription,
       key: keyof typeof counts,
     ): ProjectUnsubscribe =>
-      session.subscribe(
-        subscription,
-        createObserver(() => {
-          counts[key] += 1
-        }),
-      )
+      session.subscribe(subscription, () => {
+        counts[key] += 1
+      })
 
     subscribe(createMidiNoteChangesSubscription(), 'allNotes')
     subscribe(
@@ -316,17 +269,17 @@ describe('ProjectSession commit publication', () => {
       createMidiNoteChangesSubscription({
         affected: { startTick: parseTick(720), endTick: parseTick(1_200) },
       }),
-      createObserver(() => {
+      () => {
         counts.between += 1
-      }),
+      },
     )
     session.subscribe(
       createMidiNoteChangesSubscription({
         affected: { startTick: parseTick(1_680), endTick: parseTick(1_920) },
       }),
-      createObserver(() => {
+      () => {
         counts.beyond += 1
-      }),
+      },
     )
     session.execute(
       createMoveNotesCommand({
@@ -377,14 +330,14 @@ describe('ProjectSession commit publication', () => {
       createMidiNoteChangesSubscription({
         sourceIds: [fixture.records.nonLoopSource.id, fixture.records.loopingSource.id],
       }),
-      createObserver((published) => received.push(published)),
+      (published) => received.push(published),
     )
     publisher.subscribe(
       createMidiNoteChangesSubscription({
         sourceIds: [firstChange.sourceId],
         noteIds: [secondChange.after.id],
       }),
-      createObserver((published) => crossedConstraints.push(published)),
+      (published) => crossedConstraints.push(published),
     )
     publisher.prepare(syntheticCommit)
 
@@ -396,9 +349,8 @@ describe('ProjectSession commit publication', () => {
   it('supports idempotent cancellation before a queued delivery runs', async () => {
     const { fixture, session } = createFixtureProjectSession()
     const received: ProjectCommit[] = []
-    const unsubscribe = session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => received.push(commit)),
+    const unsubscribe = session.subscribe(createAllProjectCommitsSubscription(), (commit) =>
+      received.push(commit),
     )
 
     executeAddNote(
@@ -425,16 +377,12 @@ describe('ProjectSession commit publication', () => {
     )
 
     let unsubscribeSecond: ProjectUnsubscribe = () => undefined
-    session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => {
-        firstObserverRevisions.push(commit.modelRevision)
-        unsubscribeSecond()
-      }),
-    )
-    unsubscribeSecond = session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => secondObserverRevisions.push(commit.modelRevision)),
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => {
+      firstObserverRevisions.push(commit.modelRevision)
+      unsubscribeSecond()
+    })
+    unsubscribeSecond = session.subscribe(createAllProjectCommitsSubscription(), (commit) =>
+      secondObserverRevisions.push(commit.modelRevision),
     )
 
     await flushCommitDeliveries()
@@ -459,23 +407,18 @@ describe('ProjectSession commit publication', () => {
     const firstNoteId = parseNoteId('note-subscription-reentrant-first')
     const secondNoteId = parseNoteId('note-subscription-reentrant-second')
 
-    session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => {
-        order.push(`a:${commit.modelRevision}`)
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => {
+      order.push(`a:${commit.modelRevision}`)
 
-        if (commit.modelRevision === 1) {
-          session.subscribe(
-            createAllProjectCommitsSubscription(),
-            createObserver((laterCommit) => order.push(`c:${laterCommit.modelRevision}`)),
-          )
-          executeAddNote(session, fixture.records.nonLoopSource.id, secondNoteId, parseTick(1_440))
-        }
-      }),
-    )
-    session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => order.push(`b:${commit.modelRevision}`)),
+      if (commit.modelRevision === 1) {
+        session.subscribe(createAllProjectCommitsSubscription(), (laterCommit) =>
+          order.push(`c:${laterCommit.modelRevision}`),
+        )
+        executeAddNote(session, fixture.records.nonLoopSource.id, secondNoteId, parseTick(1_440))
+      }
+    })
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) =>
+      order.push(`b:${commit.modelRevision}`),
     )
 
     executeAddNote(session, fixture.records.nonLoopSource.id, firstNoteId)
@@ -485,31 +428,20 @@ describe('ProjectSession commit publication', () => {
     expect(session.modelRevision).toBe(2)
   })
 
-  it('isolates listener errors, reports a frozen failure, and terminates only that observer', async () => {
+  it('reports a listener error without stopping other listeners or unsubscribing it', async () => {
     const { fixture, session } = createFixtureProjectSession()
     const cause = new Error('injected subscription listener failure')
     const failingCommits: ProjectCommit[] = []
     const healthyCommits: ProjectCommit[] = []
-    const failures: ProjectSubscriptionDeliveryFailure[] = []
+    const reportError = vi.fn<(error: unknown) => void>()
+    vi.stubGlobal('reportError', reportError)
     const subscription = createAllProjectCommitsSubscription()
 
-    session.subscribe(
-      subscription,
-      createObserver(
-        (commit) => {
-          failingCommits.push(commit)
-          throw cause
-        },
-        (failure) => {
-          failures.push(failure)
-          throw new Error('injected subscription error-handler failure')
-        },
-      ),
-    )
-    session.subscribe(
-      subscription,
-      createObserver((commit) => healthyCommits.push(commit)),
-    )
+    session.subscribe(subscription, (commit) => {
+      failingCommits.push(commit)
+      throw cause
+    })
+    session.subscribe(subscription, (commit) => healthyCommits.push(commit))
 
     const firstCommit = executeAddNote(
       session,
@@ -525,11 +457,9 @@ describe('ProjectSession commit publication', () => {
     )
     await flushCommitDeliveries()
 
-    expect(failingCommits).toEqual([firstCommit])
+    expect(failingCommits).toEqual([firstCommit, secondCommit])
     expect(healthyCommits).toEqual([firstCommit, secondCommit])
-    expect(failures).toHaveLength(1)
-    expect(failures[0]).toEqual({ subscription, commit: firstCommit, cause })
-    expect(Object.isFrozen(failures[0])).toBe(true)
+    expect(reportError.mock.calls).toEqual([[cause], [cause]])
   })
 
   it('cancels a prepared publication when authoritative apply fails', async () => {
@@ -547,10 +477,7 @@ describe('ProjectSession commit publication', () => {
     })
     const received: ProjectCommit[] = []
 
-    session.subscribe(
-      createAllProjectCommitsSubscription(),
-      createObserver((commit) => received.push(commit)),
-    )
+    session.subscribe(createAllProjectCommitsSubscription(), (commit) => received.push(commit))
 
     expect(() =>
       withAuthoritativeMapSetInterceptor(

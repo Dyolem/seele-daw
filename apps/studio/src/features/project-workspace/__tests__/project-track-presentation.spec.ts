@@ -30,7 +30,6 @@ import {
   MIDI_PROGRAM_PLACEHOLDER_DEVICE_DEFINITION,
   createMidiProgramPlaceholderDeviceDescriptor,
 } from '@/workbench/instrument/midi-import-instrument-policy'
-import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/instrument/built-in-instrument-catalogue'
 
 function createSession(): ProjectSession {
   return createInitialProjectSession({
@@ -69,7 +68,7 @@ function addInstrumentTrack(
 }
 
 describe('Project Track presentation', () => {
-  it('projects Catalogue, legacy empty, and unknown Instruments without rewriting facts', () => {
+  it('projects Catalogue, placeholder and unknown Instruments without rewriting facts', () => {
     const session = createSession()
     addInstrumentTrack(
       session,
@@ -100,18 +99,6 @@ describe('Project Track presentation', () => {
         2,
         80,
       ),
-    )
-    addInstrumentTrack(
-      session,
-      'Legacy Slot',
-      createDeviceDescriptor({
-        id: parseDeviceId('device-legacy-slot-presentation'),
-        typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
-        definitionVersion: 1,
-        enabled: true,
-        parameters: {},
-        opaqueState: null,
-      }),
     )
     addInstrumentTrack(
       session,
@@ -154,12 +141,6 @@ describe('Project Track presentation', () => {
         status: PROJECT_TRACK_INSTRUMENT_STATUS.UNAVAILABLE,
       },
       {
-        deviceTypeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
-        displayName: 'No instrument selected',
-        soundbankId: null,
-        status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
-      },
-      {
         deviceTypeId: parseDeviceTypeId('third-party.unavailable-instrument'),
         displayName: 'Missing instrument',
         soundbankId: null,
@@ -174,28 +155,5 @@ describe('Project Track presentation', () => {
         .getSnapshot()
         .devices.find((device) => device.id === 'device-unavailable-presentation')?.opaqueState,
     ).toEqual({ presetId: 'preserved-preset' })
-  })
-
-  it('does not present an incompatible Instrument Slot payload as an empty legacy Slot', () => {
-    const session = createSession()
-    addInstrumentTrack(
-      session,
-      'Incompatible Slot',
-      createDeviceDescriptor({
-        id: parseDeviceId('device-incompatible-slot-presentation'),
-        typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
-        definitionVersion: 1,
-        enabled: true,
-        parameters: {},
-        opaqueState: { future: true },
-      }),
-    )
-
-    expect(createProjectTrackPresentations(session.getSnapshot())[0]?.instrument).toEqual({
-      deviceTypeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
-      displayName: 'Missing instrument',
-      soundbankId: null,
-      status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
-    })
   })
 })

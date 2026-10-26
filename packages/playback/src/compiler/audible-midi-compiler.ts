@@ -1,6 +1,5 @@
 import {
   addTicks,
-  parseDeviceTypeId,
   parseTick,
   type ClipId,
   type ClipRecord,
@@ -43,9 +42,6 @@ import { createTempoMap } from '#internal/time/tempo-map'
 import { deriveAudibleMidiTimelineRange } from '#internal/timeline/audible-midi-timeline'
 
 // These IDs only classify V1 routing failures; they do not define FM or VA state/runtime contracts.
-const INSTRUMENT_SLOT_DEVICE_TYPE_ID = parseDeviceTypeId('seele.instrument-slot')
-const FM_SYNTH_DEVICE_TYPE_ID = parseDeviceTypeId('seele.fm-synth')
-const VA_SYNTH_DEVICE_TYPE_ID = parseDeviceTypeId('seele.va-synth')
 
 interface SnapshotIndexes {
   readonly tracksById: ReadonlyMap<TrackId, TrackRecord>
@@ -190,17 +186,10 @@ function decodeInstrumentPlan(
   }
 
   // The exact Sample schema failed, so classify the route without substituting another sound.
-  let code: PlaybackDiagnosticCode = 'instrument-runtime-missing'
-  if (device.typeId === INSTRUMENT_SLOT_DEVICE_TYPE_ID) {
-    code = 'instrument-not-selected'
-  } else if (
-    device.typeId === FM_SYNTH_DEVICE_TYPE_ID ||
-    device.typeId === VA_SYNTH_DEVICE_TYPE_ID
-  ) {
-    code = 'instrument-engine-unsupported'
-  } else if (device.typeId === SAMPLE_INSTRUMENT_DEVICE_DEFINITION.typeId) {
-    code = 'invalid-sample-instrument-state'
-  }
+  const code: PlaybackDiagnosticCode =
+    device.typeId === SAMPLE_INSTRUMENT_DEVICE_DEFINITION.typeId
+      ? 'invalid-sample-instrument-state'
+      : 'instrument-runtime-missing'
 
   diagnostics.push(createDiagnostic({ code, device, severity: 'warning', trackId: track.id }))
   return null

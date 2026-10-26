@@ -35,8 +35,6 @@ export type PlaybackDiagnosticSeverity = 'blocking' | 'info' | 'warning'
 export type PlaybackDiagnosticCode =
   | 'audio-track-unsupported'
   | 'instrument-disabled'
-  | 'instrument-engine-unsupported'
-  | 'instrument-not-selected'
   | 'instrument-runtime-missing'
   | 'invalid-sample-instrument-state'
   | 'looped-midi-clip-unsupported'

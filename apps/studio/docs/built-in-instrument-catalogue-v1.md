@@ -59,7 +59,6 @@ factory/decoder、definition 与 state type；目录身份与 UI 分组不会下
 | Inspector 状态 | 判定                                                                         | 选择器行为                         |
 | -------------- | ---------------------------------------------------------------------------- | ---------------------------------- |
 | Ready          | Descriptor 是精确 V1 Sample Instrument，且 `soundbankId` 位于目录            | 显示当前音色，可显式替换           |
-| Empty          | Descriptor 是严格匹配的旧 `seele.instrument-slot` V1 空状态                  | 显示空状态，可显式选择             |
 | Missing        | Device 不存在、Descriptor 不兼容、类型未知，或 Sample `soundbankId` 不在目录 | 展示可识别的已保存身份，可显式替换 |
 
 Missing 不会改写 Project Fact。若未知 Sample Device 含合法 `soundbankId`，Inspector 展示该 ID；

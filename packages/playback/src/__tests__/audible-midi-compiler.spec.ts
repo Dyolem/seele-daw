@@ -425,12 +425,9 @@ describe('Audible MIDI Compiler', () => {
     expect(diagnosticCodes(plan)).toEqual(['audio-track-unsupported', 'no-audible-midi-note-spans'])
   })
 
-  it('skips only engine families and invalid routes that cannot produce a Sample plan', () => {
+  it('skips routes that cannot produce a Sample plan', () => {
     const { snapshot } = createAudibleMidiProjectFixture()
     const unsupportedDevices = [
-      createFixtureDevice('device-fm', 'seele.fm-synth'),
-      createFixtureDevice('device-va', 'seele.va-synth'),
-      createFixtureDevice('device-slot', 'seele.instrument-slot'),
       createFixtureDevice('device-third-party', 'third-party.instrument'),
       createFixtureDevice('device-program-placeholder', 'seele.midi-program-placeholder', true, {
         channel: 2,
@@ -455,9 +452,6 @@ describe('Audible MIDI Compiler', () => {
     expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.PARTIAL)
     expect(plan.tracks).toHaveLength(2)
     expect(diagnosticCodes(plan)).toEqual([
-      'instrument-engine-unsupported',
-      'instrument-engine-unsupported',
-      'instrument-not-selected',
       'instrument-runtime-missing',
       'instrument-runtime-missing',
       'instrument-disabled',

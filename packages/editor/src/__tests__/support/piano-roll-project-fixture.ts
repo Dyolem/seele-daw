@@ -92,7 +92,7 @@ export function createPianoRollProjectFixture() {
       },
       instrumentDevice: {
         id: parseDeviceId('editor-piano-roll-device'),
-        typeId: parseDeviceTypeId('seele.instrument-slot'),
+        typeId: parseDeviceTypeId('test.instrument'),
         definitionVersion: DEVICE_DEFINITION_VERSION_MIN,
         enabled: true,
         parameters: {},

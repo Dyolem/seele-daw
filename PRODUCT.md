@@ -622,8 +622,6 @@ Track 上的 MIDI Clip，Instrument 状态和修复入口仍然可见：
 - 439 个来源 Preset 均可见；289 项 MIDISampleSynth 可播放。需要 VASynth 的 139 项与需要
   FMSynth 的 11 项点击后只提示暂未支持，当前 Track 不变。名称和说明保持单行，空间不足时
   整体省略，不做单词截断换行。
-- 旧项目中严格匹配 `seele.instrument-slot` V1 空 Descriptor 的 Track 显示
-  `No instrument selected`，等待用户从同一选择器显式选择。
 - 用户选择后才执行一次 Instrument Device Replace Command；Device ID 与 Track topology 保持
   不变，项目变为 dirty，并形成一个 Undo / Redo 步骤。
 - Undo 恢复旧 Device，Redo 恢复新音色；Save / Reload 保留当前选择。

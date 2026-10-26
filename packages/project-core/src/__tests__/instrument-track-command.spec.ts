@@ -47,7 +47,7 @@ function createCommandInput(
     },
     instrumentDevice: {
       id: parseDeviceId('device-command-instrument-slot'),
-      typeId: parseDeviceTypeId('seele.instrument-slot'),
+      typeId: parseDeviceTypeId('test.instrument'),
       definitionVersion: DEVICE_DEFINITION_VERSION_MIN,
       enabled: true,
       parameters: {},
@@ -129,7 +129,7 @@ describe('AddInstrumentTrackCommand public contract', () => {
         instrumentDeviceId: parseDeviceId('device-command-instrument-slot'),
       },
       instrumentDevice: {
-        typeId: parseDeviceTypeId('seele.instrument-slot'),
+        typeId: parseDeviceTypeId('test.instrument'),
         parameters: { [presetId]: { family: 'piano' } },
       },
     })

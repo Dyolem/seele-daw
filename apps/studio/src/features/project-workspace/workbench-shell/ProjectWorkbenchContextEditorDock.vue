@@ -153,9 +153,6 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
           <p v-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.READY">
             Selected in this Project. Use the Transport to play this Track's MIDI notes.
           </p>
-          <p v-else-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY">
-            This legacy Track has no sound selected.
-          </p>
           <p v-else-if="selectedInstrument.status === PROJECT_TRACK_INSTRUMENT_STATUS.UNAVAILABLE">
             This MIDI Program has no reviewed built-in sound. The Track stays silent until you
             choose a replacement.

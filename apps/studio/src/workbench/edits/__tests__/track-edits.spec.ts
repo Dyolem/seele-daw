@@ -5,6 +5,7 @@ import {
   createProjectSessionFromProjectFile,
   parseBipolarValue,
   parseDeviceId,
+  parseDeviceTypeId,
   parseLinearGain,
   parseTrackId,
   type DeviceDescriptor,
@@ -22,7 +23,6 @@ import { describe, expect, it } from 'vitest'
 import { ProjectEditError } from '@/workbench/edits/edit-session'
 import { createTrackEdits } from '@/workbench/edits/track-edits'
 import { PROJECT_TRACK_PALETTE } from '@/workbench/edits/track-palette'
-import { INSTRUMENT_SLOT_DEVICE_TYPE_ID } from '@/workbench/instrument/built-in-instrument-catalogue'
 import {
   IDLE_PROJECT,
   createEditTestSession,
@@ -122,12 +122,12 @@ describe('track edits', () => {
     expect(session.modelRevision).toBe(2)
   })
 
-  it('replaces a legacy empty instrument slot, surviving save, Undo and Redo', () => {
-    const session = createEditTestSession('track-legacy-slot')
-    const deviceId = parseDeviceId('device-legacy-slot')
+  it('replaces an unknown instrument, surviving save, Undo and Redo', () => {
+    const session = createEditTestSession('track-unknown-instrument')
+    const deviceId = parseDeviceId('device-unknown-instrument')
     const trackId = addTrackWithDevice(session, {
       id: deviceId,
-      typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
+      typeId: parseDeviceTypeId('third-party.instrument'),
       definitionVersion: 1,
       enabled: true,
       parameters: {},
@@ -148,7 +148,7 @@ describe('track edits', () => {
     session.undo()
     expect(session.getSnapshot().devices[0]).toMatchObject({
       id: deviceId,
-      typeId: INSTRUMENT_SLOT_DEVICE_TYPE_ID,
+      typeId: parseDeviceTypeId('third-party.instrument'),
     })
     session.redo()
     expect(deviceState(session)).toEqual({ soundbankId: 'solo-violin' })

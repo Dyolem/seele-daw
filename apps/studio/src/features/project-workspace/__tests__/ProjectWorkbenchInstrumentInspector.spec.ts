@@ -85,7 +85,7 @@ function createTrack(
     id: TRACK_ID,
     instrument: Object.freeze(instrument),
     kind: 'instrument',
-    name: 'Legacy Keys',
+    name: 'Lead Keys',
   })
 }
 
@@ -150,7 +150,7 @@ describe('Project Workbench Instrument Inspector', () => {
     expect(trackButton?.attributes('aria-pressed')).toBe('true')
     expect(clipFocusButton?.text()).toBe('Clip Focus')
     expect(clipFocusButton?.attributes('aria-pressed')).toBe('false')
-    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Legacy Keys')
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Lead Keys')
 
     await clipFocusButton?.trigger('click')
 
@@ -165,13 +165,13 @@ describe('Project Workbench Instrument Inspector', () => {
     await trackButton?.trigger('click')
 
     expect(pianoRollPreferences.editingScope).toBe(PIANO_ROLL_EDITING_SCOPE.TRACK)
-    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Legacy Keys')
+    expect(wrapper.get('.project-workbench__dock-heading').text()).toContain('Lead Keys')
     expect(projectSession.modelRevision).toBe(initialRevision)
     expect(projectSession.contentStateId).toBe(initialContentStateId)
     expect(projectSession.canUndo).toBe(false)
   })
 
-  it('replaces a legacy Slot from the complete two-column Preset catalogue', async () => {
+  it('replaces a missing instrument from the complete two-column Preset catalogue', async () => {
     const selectedClip: ProjectMidiClipPresentation = Object.freeze({
       color: null,
       id: parseClipId('clip-instrument-inspector'),
@@ -184,18 +184,16 @@ describe('Project Workbench Instrument Inspector', () => {
     const { selectBuiltInInstrument, toasts, wrapper } = mountInspector({
       selectedClip,
       selectedTrack: createTrack({
-        deviceTypeId: parseDeviceTypeId('seele.instrument-slot'),
-        displayName: 'No instrument selected',
+        deviceTypeId: parseDeviceTypeId('third-party.instrument'),
+        displayName: 'Missing instrument',
         soundbankId: null,
-        status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
       }),
     })
 
     expect(wrapper.get('.project-workbench__inspector').text()).toContain('Clip inspector')
     expect(wrapper.get('.project-workbench__inspector').text()).toContain('Verse Keys')
-    expect(wrapper.get('[aria-label="Track instrument"]').text()).toContain(
-      'No instrument selected',
-    )
+    expect(wrapper.get('[aria-label="Track instrument"]').text()).toContain('Missing instrument')
 
     const selector = wrapper.get<HTMLButtonElement>('[aria-label="Built-in instrument"]')
     expect(selector.attributes('aria-haspopup')).toBe('dialog')
@@ -339,10 +337,10 @@ describe('Project Workbench Instrument Inspector', () => {
   it('keeps a rejected selection visible and reports the failure through the Toast channel', async () => {
     const { selectBuiltInInstrument, toasts, wrapper } = mountInspector({
       selectedTrack: createTrack({
-        deviceTypeId: parseDeviceTypeId('seele.instrument-slot'),
-        displayName: 'No instrument selected',
+        deviceTypeId: parseDeviceTypeId('third-party.instrument'),
+        displayName: 'Missing instrument',
         soundbankId: null,
-        status: PROJECT_TRACK_INSTRUMENT_STATUS.EMPTY,
+        status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,
       }),
       selectionFailure: new Error('The Track no longer exists'),
     })
@@ -355,7 +353,7 @@ describe('Project Workbench Instrument Inspector', () => {
       parseSoundbankId('studio-grand'),
     )
     expect(selector.text()).toContain('Choose a replacement')
-    expect(wrapper.text()).toContain('No instrument selected')
+    expect(wrapper.text()).toContain('Missing instrument')
     expect(toasts.message).toMatchObject({
       title: 'Instrument could not be selected',
       description: 'The Track no longer exists',

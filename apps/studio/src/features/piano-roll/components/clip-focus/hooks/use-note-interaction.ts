@@ -59,7 +59,6 @@ export function useNoteInteraction({
   const interactionState = shallowRef<PianoRollInteractionState>(interactionSession.state)
   let disposed = false
   let pointerInputAdapter: EditorPointerInputAdapter | null = null
-  let captureBounds: Readonly<{ left: number; top: number }> | null = null
   const handleInteractionIntent = createProjectPianoRollIntentHandler({
     getAuthorityRevision: () => noteState.value?.modelRevision ?? null,
     getSession: () => props.session,
@@ -75,10 +74,7 @@ export function useNoteInteraction({
   const unsubscribeInteractionSession = interactionSession.subscribe((state) => {
     const wasCapturing = interactionState.value.pointerId !== null
     interactionState.value = state
-    if (state.pointerId === null) {
-      captureBounds = null
-      if (wasCapturing) pointerInputAdapter?.cancel()
-    }
+    if (state.pointerId === null && wasCapturing) pointerInputAdapter?.cancel()
   })
   function resolveInteractionTool(tool: PianoRollTool): PianoRollInteractionTool {
     switch (tool) {
@@ -94,11 +90,6 @@ export function useNoteInteraction({
     if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
       focusedEditingTarget.value = 'notes'
       surfaceElement.value?.focus({ preventScroll: true })
-    } else if (
-      input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL &&
-      !hasStablePointerMapping()
-    ) {
-      return
     }
 
     const outcome = interactionSession.handlePointerInput(
@@ -126,28 +117,7 @@ export function useNoteInteraction({
       return
     }
 
-    if (
-      input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN &&
-      interactionState.value.pointerId === input.pointerId
-    ) {
-      // Begin may first retire a previous commit handoff, which clears the old mapping.
-      captureBounds = canvasHost.value?.getBoundingClientRect() ?? null
-    }
-
     if (outcome.intent !== null) handleInteractionIntent(outcome.intent)
-  }
-
-  function hasStablePointerMapping(): boolean {
-    if (disposed) return false
-    if (captureBounds === null) return true
-    const bounds = canvasHost.value?.getBoundingClientRect()
-    if (bounds?.left === captureBounds.left && bounds.top === captureBounds.top) return true
-    interactionSession.cancel()
-    return false
-  }
-
-  function handleSurfaceScroll(): void {
-    hasStablePointerMapping()
   }
 
   function cancelNoteInteraction(): StudioActionCompletion {
@@ -158,7 +128,6 @@ export function useNoteInteraction({
   }
 
   function disposeInput(): void {
-    window.removeEventListener('scroll', handleSurfaceScroll, true)
     pointerInputAdapter?.dispose()
     pointerInputAdapter = null
   }
@@ -170,11 +139,9 @@ export function useNoteInteraction({
       if (!(pointerInputAdapter?.cancel() ?? false)) interactionSession.cancel()
     },
     cancelAction: cancelNoteInteraction,
-    hasStablePointerMapping,
     mount() {
       const host = canvasHost.value
       if (disposed || host === null || pointerInputAdapter !== null) return
-      window.addEventListener('scroll', handleSurfaceScroll, true)
       pointerInputAdapter = createEditorPointerInputAdapter({
         onInput: handlePointerInput,
         resolveHit: resolvePianoRollDomNoteHit,

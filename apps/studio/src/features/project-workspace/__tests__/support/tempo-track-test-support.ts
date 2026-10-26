@@ -187,22 +187,3 @@ export function dispatchTempoPointer(
   Object.defineProperties(event, { isPrimary: { value: true }, pointerId: { value: pointerId } })
   target.dispatchEvent(event)
 }
-
-export function installTempoResizeObserver(failOnObserve = false) {
-  const observers: TestResizeObserver[] = []
-  class TestResizeObserver implements ResizeObserver {
-    readonly disconnect = vi.fn<ResizeObserver['disconnect']>()
-    readonly unobserve = vi.fn<ResizeObserver['unobserve']>()
-    readonly observe = vi.fn<ResizeObserver['observe']>(() => {
-      if (failOnObserve) throw new Error('Tempo viewport observation failed')
-    })
-    constructor(private readonly callback: ResizeObserverCallback) {
-      observers.push(this)
-    }
-    deliver() {
-      this.callback([], this)
-    }
-  }
-  vi.stubGlobal('ResizeObserver', TestResizeObserver)
-  return observers
-}

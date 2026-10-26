@@ -100,9 +100,11 @@ Cancel、Pointer Cancel、lost capture、Window blur、目标 / Session 切换�
 失败的事件监听一样传出；Note 投影的监听者失败时清除内部状态，也向其余监听者发布空投影。
 失败不得留下仍可产生 End 的输入。
 
-Note Surface 还处理 Selection 改变、Viewport 尺寸 /范围改变、Surface 位置改变和投影失败。
-等值 Viewport 和不改变该 Surface 映射的滚动不会取消。映射政策由各自 Surface 决定，不能推广为
-“所有 Editor 遇到 scroll / resize 都取消”；Locate 接受连续的滚动偏移变化，仍会取消尺寸 / 范围的映射重建。
+Surface 坐标下，Pointer Adapter 记住按下时 Surface 的盒子；每个 Pointer 事件以及 window 的
+scroll / resize 都会比较，盒子移动或改变尺寸就取消捕获。Note、Track Pencil、CC64 与 Tempo 都用
+Surface 坐标，不再各自记录和比较。等值的盒子不会取消。Locate 用 Client 坐标，接受连续的滚动偏移
+变化，尺寸 / 范围的映射重建由 Locate 自己取消。Note Surface 另外处理 Selection 改变、Viewport
+尺寸 / 范围改变和投影失败。
 
 ## Studio 输入所有权与跨 Surface 交接
 
@@ -143,9 +145,8 @@ Preview / Result；`TempoTrackDragSession` 拥有冻结的 Project 目标和 Com
 - `edits` 的拖动输入同时携带 `expectedSession` 与 `baseRevision`，在播放准备之后
   再验证 Session 身份；Command 验证原 revision。即时数值操作仍可显式省略拖动目标。
 - 共享 Preview 是只按 InteractionId 发布 / 清除的展示对象，没有第二套 begin / finish 生命周期。
-- Tempo Hook 在 Vue 的 post flush 确认对应事实已投影后交接 Preview。Scroll、Resize
-  与每次 Update / End 都检查 Lane 映射；相等映射保留，实际映射变化取消。此政策不作用于
-  Locate 的 Edge Scroll。
+- Tempo Hook 在 Vue 的 post flush 确认对应事实已投影后交接 Preview。Lane 的盒子变化由
+  Pointer Adapter 取消（见上）；时间 / BPM Scale 的变化由 Hook 取消。
 
 ## CC64、Track Pencil 与 Timeline Locate
 

@@ -29,7 +29,11 @@ export type EditorBrowserHitResolver<Hit extends object> = (
 
 interface CreateEditorPointerInputAdapterBaseInput<Hit extends object> {
   readonly dragThresholdCssPixel?: number
-  /** Client coordinates keep a stationary Pointer stable while its Surface scrolls. */
+  /**
+   * Surface coordinates are measured against the Surface's box, so a captured gesture is cancelled
+   * when that box moves or resizes. Client coordinates keep a stationary Pointer stable while its
+   * Surface scrolls.
+   */
   readonly positionSpace?: 'surface' | 'client'
   readonly onInput: EditorPointerInputListener<Hit>
   readonly surface: HTMLElement
@@ -88,15 +92,23 @@ function copyHit<Hit extends object>(hit: Hit | null): Readonly<Hit> | null {
   return hit === null ? null : Object.freeze({ ...hit })
 }
 
-function createPoint(
+function pointIn(
   event: Pick<PointerEvent, 'clientX' | 'clientY'>,
-  surface: HTMLElement,
+  box: DOMRectReadOnly | null,
 ): EditorCssPoint {
-  const bounds = surface.getBoundingClientRect()
   return Object.freeze({
-    xCssPixel: event.clientX - bounds.left,
-    yCssPixel: event.clientY - bounds.top,
+    xCssPixel: event.clientX - (box?.left ?? 0),
+    yCssPixel: event.clientY - (box?.top ?? 0),
   })
+}
+
+function sameBox(left: DOMRectReadOnly, right: DOMRectReadOnly): boolean {
+  return (
+    left.left === right.left &&
+    left.top === right.top &&
+    left.width === right.width &&
+    left.height === right.height
+  )
 }
 
 class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointerInputAdapter {
@@ -107,6 +119,8 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
   readonly #positionSpace: 'surface' | 'client'
   readonly #window: Window | null
   #activePointer: ActivePointer<Hit> | null = null
+  /** The Surface's box when the captured Pointer went down; null in client space. */
+  #captureBox: DOMRectReadOnly | null = null
   #disposed = false
 
   constructor(input: CreateEditorPointerInputAdapterInput<Hit>) {
@@ -126,6 +140,8 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     this.#window?.addEventListener('blur', this.#handleWindowBlur)
     this.#window?.addEventListener('keydown', this.#handleModifierChange)
     this.#window?.addEventListener('keyup', this.#handleModifierChange)
+    this.#window?.addEventListener('scroll', this.#handleLayoutChange, true)
+    this.#window?.addEventListener('resize', this.#handleLayoutChange)
   }
 
   cancel(): boolean {
@@ -156,6 +172,8 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     this.#window?.removeEventListener('blur', this.#handleWindowBlur)
     this.#window?.removeEventListener('keydown', this.#handleModifierChange)
     this.#window?.removeEventListener('keyup', this.#handleModifierChange)
+    this.#window?.removeEventListener('scroll', this.#handleLayoutChange, true)
+    this.#window?.removeEventListener('resize', this.#handleLayoutChange)
 
     const activePointer = this.#activePointer
     this.#activePointer = null
@@ -183,8 +201,10 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     }
 
     const hit = copyHit(this.#resolveHit(event, this.#surface))
-    const position = this.#readPosition(event)
+    const box = this.#positionSpace === 'surface' ? this.#surface.getBoundingClientRect() : null
+    const position = pointIn(event, box)
     this.#surface.setPointerCapture(event.pointerId)
+    this.#captureBox = box
     const originModifiers = createModifiers(event)
     const activePointer: ActivePointer<Hit> = {
       currentModifiers: originModifiers,
@@ -205,7 +225,8 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     const activePointer = this.#requireActivePointer(event.pointerId)
     if (activePointer === null) return
 
-    const position = this.#readPosition(event)
+    const position = this.#readCapturedPosition(event)
+    if (position === null) return
     this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#deliverInput(
       this.#createInput(activePointer, EDITOR_POINTER_INPUT_PHASE.UPDATE, position),
@@ -216,7 +237,8 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     const activePointer = this.#requireActivePointer(event.pointerId)
     if (activePointer === null) return
 
-    const position = this.#readPosition(event)
+    const position = this.#readCapturedPosition(event)
+    if (position === null) return
     this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#activePointer = null
     this.#releasePointerCapture(activePointer.pointerId)
@@ -227,7 +249,8 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     const activePointer = this.#requireActivePointer(event.pointerId)
     if (activePointer === null) return
 
-    const position = this.#readPosition(event)
+    const position = this.#readCapturedPosition(event)
+    if (position === null) return
     this.#updateActivePointer(activePointer, position, createModifiers(event))
     this.#activePointer = null
     this.#releasePointerCapture(activePointer.pointerId)
@@ -271,15 +294,23 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     this.cancel()
   }
 
+  readonly #handleLayoutChange = (): void => {
+    if (this.#disposed || this.#activePointer === null || this.#captureBox === null) return
+    if (!sameBox(this.#captureBox, this.#surface.getBoundingClientRect())) this.cancel()
+  }
+
   #requireActivePointer(pointerId: number): ActivePointer<Hit> | null {
     if (this.#disposed || this.#activePointer?.pointerId !== pointerId) return null
     return this.#activePointer
   }
 
-  #readPosition(event: PointerEvent): EditorCssPoint {
-    if (this.#positionSpace === 'client')
-      return Object.freeze({ xCssPixel: event.clientX, yCssPixel: event.clientY })
-    return createPoint(event, this.#surface)
+  /** The captured Pointer's point; null after cancelling a gesture whose Surface box changed. */
+  #readCapturedPosition(event: PointerEvent): EditorCssPoint | null {
+    if (this.#captureBox === null) return pointIn(event, null)
+    const box = this.#surface.getBoundingClientRect()
+    if (sameBox(this.#captureBox, box)) return pointIn(event, box)
+    this.cancel()
+    return null
   }
 
   #updateActivePointer(

@@ -164,7 +164,7 @@ onMounted(() => {
     rendering.mount()
     interaction.mount()
     model.mount()
-    pitchView.mount(interaction.hasStablePointerMapping)
+    pitchView.mount()
   } catch (cause) {
     dispose()
     rendering.failureMessage.value = describeFailure(cause)

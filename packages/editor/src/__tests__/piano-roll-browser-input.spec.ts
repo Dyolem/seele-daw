@@ -593,6 +593,33 @@ describe('Piano Roll Pointer Input Adapter', () => {
     },
   )
 
+  it('cancels a captured gesture when its Surface box moves or resizes', () => {
+    const fixture = createDomNoteFixture()
+    const onInput = vi.fn<NoteInputListener>()
+    const adapter = createNoteInputAdapter({ onInput, surface: fixture.surface })
+    const box = vi.mocked(fixture.surface.getBoundingClientRect)
+    const atRest = box()
+    const phases = () => onInput.mock.calls.map(([input]) => input.phase)
+
+    dispatchPointer(fixture.note, 'pointerdown')
+    box.mockReturnValue({ ...atRest, top: atRest.top + 40, y: atRest.y + 40 })
+    window.dispatchEvent(new Event('scroll'))
+    dispatchPointer(fixture.surface, 'pointerup')
+    expect(phases()).toEqual(['begin', 'cancel'])
+    expect(fixture.capture.capturedPointerIds.size).toBe(0)
+
+    // Layout can also change without an event; the next Pointer event finds the new box.
+    box.mockReturnValue(atRest)
+    dispatchPointer(fixture.note, 'pointerdown')
+    box.mockReturnValue({ ...atRest, width: atRest.width - 20 })
+    dispatchPointer(fixture.surface, 'pointermove', { clientX: 260 })
+    expect(phases()).toEqual(['begin', 'cancel', 'begin', 'cancel'])
+    expect(fixture.capture.capturedPointerIds.size).toBe(0)
+
+    adapter.dispose()
+    fixture.renderer.dispose()
+  })
+
   it('assigns a fresh capture identity when the browser reuses a Pointer ID', () => {
     const fixture = createDomNoteFixture()
     const onInput = vi.fn<NoteInputListener>()

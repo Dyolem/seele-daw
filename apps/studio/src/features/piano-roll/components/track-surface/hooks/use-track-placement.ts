@@ -63,7 +63,6 @@ export function useTrackPlacement({
   let pointerInputAdapter: EditorPointerInputAdapter | null = null
   let disposed = false
   let beginning = false
-  let captureBounds: DOMRect | null = null
   const session = createTrackPlacementSession()
   const state = shallowRef(session.state)
   let projectedRevision = getPresentation().readModel.modelRevision
@@ -71,9 +70,8 @@ export function useTrackPlacement({
     const previous = state.value
     state.value = next
     placementPreview.value = next.preview
-    if (next.pointerId === null) {
-      captureBounds = null
-      if (!beginning && previous.pointerId !== null) pointerInputAdapter?.cancel()
+    if (next.pointerId === null && !beginning && previous.pointerId !== null) {
+      pointerInputAdapter?.cancel()
     }
   })
   const { previewNoteStyle, previewClipStyle, previewMessage } = useTrackPlacementPreview({
@@ -174,27 +172,6 @@ export function useTrackPlacement({
     })
   }
 
-  function stableMapping(): boolean {
-    if (captureBounds === null) return true
-    const current = canvasHost.value?.getBoundingClientRect()
-    if (
-      current?.left === captureBounds.left &&
-      current.top === captureBounds.top &&
-      current.width === captureBounds.width &&
-      current.height === captureBounds.height
-    )
-      return true
-    invalidate()
-    return false
-  }
-  function checkMapping(): void {
-    if (disposed) return
-    try {
-      stableMapping()
-    } catch (cause) {
-      reportFailure(cause)
-    }
-  }
   function handlePointerInput(input: PianoRollPointerInput): void {
     if (disposed) return
     if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
@@ -204,7 +181,6 @@ export function useTrackPlacement({
         pointerInputAdapter?.cancel()
         return
       }
-      const bounds = canvasHost.value?.getBoundingClientRect() ?? null
       beginning = true
       let failure: unknown = null
       try {
@@ -213,11 +189,9 @@ export function useTrackPlacement({
         beginning = false
       }
       if (failure !== null) reportFailure(failure)
-      else if (session.state.pointerId !== null) captureBounds = bounds
-      else pointerInputAdapter?.cancel()
+      else if (session.state.pointerId === null) pointerInputAdapter?.cancel()
       return
     }
-    if (input.phase !== PIANO_ROLL_POINTER_INPUT_PHASE.CANCEL && !stableMapping()) return
     const { failure, intent } = session.handlePointerInput(input)
     if (failure !== null) reportFailure(failure)
     else if (intent !== null) complete(intent)
@@ -231,7 +205,6 @@ export function useTrackPlacement({
       session.cancel()
     } finally {
       pointerInputAdapter?.cancel()
-      captureBounds = null
       placementPreview.value = null
     }
   }
@@ -292,16 +265,12 @@ export function useTrackPlacement({
         resolveHit: resolvePianoRollDomNoteHit,
         surface: host,
       })
-      window.addEventListener('scroll', checkMapping, true)
-      window.addEventListener('resize', checkMapping)
     },
     dispose() {
       if (disposed) return
       stopTarget()
       stopClip()
       stopProjection()
-      window.removeEventListener('scroll', checkMapping, true)
-      window.removeEventListener('resize', checkMapping)
       invalidate()
       disposed = true
       pointerInputAdapter?.dispose()

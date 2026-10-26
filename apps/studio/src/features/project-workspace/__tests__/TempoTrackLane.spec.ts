@@ -4,7 +4,6 @@ import { createReplaceTempoEventBpmCommand } from '@seele-daw/project-core'
 import {
   createTempoTrackTestSession,
   dispatchTempoPointer,
-  installTempoResizeObserver,
 } from './support/tempo-track-test-support'
 import { TEMPO_EDITING_KEY } from '@/features/project-workspace/tempo-track/tempo-editing'
 import { createPinia } from 'pinia'
@@ -269,45 +268,21 @@ describe('TempoTrackLane', () => {
     },
   )
 
-  it('releases resized and unmounted captures and ignores queued observer callbacks', () => {
-    const observers = installTempoResizeObserver()
+  it('releases a capture whose plot was resized, and every capture on unmount', () => {
     const { plot, wrapper, interaction, capture, commitDrag } = mountLane()
     const point = wrapper.findAll('.tempo-track-lane__point')[1]!.element
     dispatchTempoPointer(point, 'pointerdown')
     const bounds = plot.getBoundingClientRect()
     vi.mocked(plot.getBoundingClientRect).mockReturnValue({ ...bounds, height: 200 })
-    observers[0]!.deliver()
+    dispatchTempoPointer(plot, 'pointermove', { x: 600 })
     expect(interaction.preview.value).toBeNull()
     expect(capture.captures.size).toBe(0)
     dispatchTempoPointer(point, 'pointerdown')
     wrapper.unmount()
     mountedWrappers.splice(mountedWrappers.indexOf(wrapper), 1)
-    expect(observers[0]!.disconnect).toHaveBeenCalledOnce()
-    vi.mocked(plot.getBoundingClientRect).mockImplementation(() => {
-      throw new Error('Released element accessed')
-    })
-    expect(() => observers[0]!.deliver()).not.toThrow()
     dispatchTempoPointer(plot, 'pointerup', { x: 600 })
     expect(commitDrag).not.toHaveBeenCalled()
     expect(capture.captures.size).toBe(0)
-  })
-
-  it('cleans up when observation fails partway through mount', () => {
-    const observers = installTempoResizeObserver(true)
-    const addListener = vi.spyOn(window, 'addEventListener')
-    const removeListener = vi.spyOn(window, 'removeEventListener')
-    expect(() => mountLane()).toThrow('Tempo viewport observation failed')
-    expect(observers[0]!.disconnect).toHaveBeenCalledOnce()
-    const ownedListeners = addListener.mock.calls.filter(([event]) =>
-      ['scroll', 'resize', 'blur', 'keydown', 'keyup'].includes(event),
-    )
-    for (const [event, handler] of ownedListeners) {
-      expect(
-        removeListener.mock.calls.some(
-          ([removedEvent, removedHandler]) => removedEvent === event && removedHandler === handler,
-        ),
-      ).toBe(true)
-    }
   })
 
   it('reports post-commit preview failures without claiming that the committed facts were rejected', () => {

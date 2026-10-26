@@ -97,7 +97,8 @@ Pointer 生命周期都不产生放置。
 
 **Browser Input。** Surface 级事件委托把 composed path 解析为稳定的语义 Hit；单个 primary Pointer、
 Pointer Capture、默认 4 CSS Pixel 的拖动阈值，每次捕获有独立的 `captureId`；Up、Cancel、lost
-capture、blur、dispose 与消费者失败都会关闭输入。其他语义 Hit 由 Surface 显式提供 Resolver，复用
+capture、blur、dispose、消费者失败，以及 Surface 坐标下 Surface 盒子的移动或尺寸变化，都会关闭
+输入。其他语义 Hit 由 Surface 显式提供 Resolver，复用
 同一套生命周期。
 
 **CC64 Lane。** 按显式 `MidiChannel` 投影 Clip-local 与 Track-global 的 CC64 事件，追赶 Clip

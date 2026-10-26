@@ -9,7 +9,6 @@ export function usePitchViewport(host: Readonly<ShallowRef<HTMLElement | null>>)
   const size = shallowRef<{ width: number; height: number } | null>(null)
   let observer: ResizeObserver | null = null
   let active = false
-  let checkPointerMapping = () => true
   const layout = computed(() =>
     size.value === null
       ? null
@@ -27,7 +26,6 @@ export function usePitchViewport(host: Readonly<ShallowRef<HTMLElement | null>>)
 
   function measure(): void {
     if (!active) return
-    checkPointerMapping()
     const element = host.value
     if (element === null || element.clientWidth <= 0 || element.clientHeight <= 0) {
       size.value = null
@@ -63,10 +61,9 @@ export function usePitchViewport(host: Readonly<ShallowRef<HTMLElement | null>>)
     geometry,
     scrollTo,
     handleWheel,
-    mount(checkMapping = () => true) {
+    mount() {
       if (active || host.value === null) return
       active = true
-      checkPointerMapping = checkMapping
       if (typeof ResizeObserver === 'function') {
         observer = new ResizeObserver(measure)
         observer.observe(host.value)

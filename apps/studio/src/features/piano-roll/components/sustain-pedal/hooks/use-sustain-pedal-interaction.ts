@@ -63,7 +63,6 @@ export function useSustainPedalInteraction({
   let pointerInputAdapter: EditorPointerInputAdapter | null = null
   let disposed = false
   let beginning = false
-  let captureBounds: DOMRect | null = null
   let projectedRevision = getReadModel().modelRevision
   const handleInteractionIntent = createProjectPianoRollSustainPedalIntentHandler({
     getAuthorityRevision: () => projectedRevision,
@@ -75,10 +74,7 @@ export function useSustainPedalInteraction({
   })
   const unsubscribeInteractionSession = interactionSession.subscribe((state) => {
     interactionState.value = state
-    if (state.pointerId === null) {
-      captureBounds = null
-      if (!beginning) pointerInputAdapter?.cancel()
-    }
+    if (state.pointerId === null && !beginning) pointerInputAdapter?.cancel()
   })
 
   function invalidate(): void {
@@ -86,7 +82,6 @@ export function useSustainPedalInteraction({
     try {
       interactionSession.cancel()
     } finally {
-      captureBounds = null
       if (!beginning) pointerInputAdapter?.cancel()
     }
   }
@@ -103,34 +98,10 @@ export function useSustainPedalInteraction({
     if (disposed) return
     invalidate()
     disposed = true
-    window.removeEventListener('scroll', checkMapping, true)
-    window.removeEventListener('resize', checkMapping)
     pointerInputAdapter?.dispose()
     pointerInputAdapter = null
     unsubscribeInteractionSession()
     interactionSession.dispose()
-  }
-  function stableMapping(): boolean {
-    if (captureBounds === null) return true
-    const current = laneSurface.value?.getBoundingClientRect()
-    if (
-      current?.left === captureBounds.left &&
-      current.top === captureBounds.top &&
-      current.width === captureBounds.width &&
-      current.height === captureBounds.height
-    )
-      return true
-    invalidate()
-    return false
-  }
-  function checkMapping(): void {
-    if (disposed) return
-    try {
-      stableMapping()
-    } catch (cause) {
-      invalidate()
-      reportFailure(cause)
-    }
   }
   function mount(): void {
     const surface = laneSurface.value
@@ -142,8 +113,6 @@ export function useSustainPedalInteraction({
           interactionSession.handlePointerInput(input)
           return
         }
-        if (!stableMapping()) return
-        const bounds = surface.getBoundingClientRect()
         const currentViewport = getViewport()
         if (input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN) {
           surface.focus({ preventScroll: true })
@@ -182,11 +151,6 @@ export function useSustainPedalInteraction({
         } finally {
           beginning = false
         }
-        if (
-          input.phase === PIANO_ROLL_POINTER_INPUT_PHASE.BEGIN &&
-          interactionSession.state.pointerId !== null
-        )
-          captureBounds = bounds
         if (outcome.failure !== null) reportFailure(outcome.failure)
         if (outcome.intent !== null) handleInteractionIntent(outcome.intent)
         if (interactionSession.state.pointerId === null) pointerInputAdapter?.cancel()
@@ -194,8 +158,6 @@ export function useSustainPedalInteraction({
       resolveHit: resolvePianoRollDomSustainPedalEventHit,
       surface,
     })
-    window.addEventListener('scroll', checkMapping, true)
-    window.addEventListener('resize', checkMapping)
   }
 
   return {

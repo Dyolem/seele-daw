@@ -43,8 +43,6 @@ export function useTempoTrackDrag({
   const state = shallowRef(session.state)
   let disposed = false
   let adapter: EditorPointerInputAdapter | null = null
-  let observer: ResizeObserver | null = null
-  let captureBounds: DOMRect | null = null
   let projectedRevision = tempo.projectedRevision
   session.subscribe((next) => {
     const previous = state.value
@@ -53,10 +51,7 @@ export function useTempoTrackDrag({
         throw new Error('Another Tempo preview is active.')
     } else if (previous.interactionId !== null) projection.cancelPreview(previous.interactionId)
     state.value = next
-    if (next.pointerId === null) {
-      captureBounds = null
-      if (previous.pointerId !== null) adapter?.cancel()
-    }
+    if (next.pointerId === null && previous.pointerId !== null) adapter?.cancel()
     if (
       previous.preview?.axis == null &&
       next.preview?.axis != null &&
@@ -69,7 +64,6 @@ export function useTempoTrackDrag({
     try {
       session.cancel()
     } finally {
-      captureBounds = null
       adapter?.cancel()
     }
   }
@@ -80,29 +74,6 @@ export function useTempoTrackDrag({
       cause instanceof Error ? cause.message : 'The Tempo interaction could not complete.'
     if (committed) toasts.warning('Tempo edit was committed but could not be displayed', message)
     else toasts.danger('Tempo edit could not complete', message)
-  }
-
-  function hasStableMapping(): boolean {
-    if (disposed) return false
-    if (captureBounds === null) return true
-    const current = plotElement.value?.getBoundingClientRect()
-    if (
-      current?.left === captureBounds.left &&
-      current.top === captureBounds.top &&
-      current.width === captureBounds.width &&
-      current.height === captureBounds.height
-    )
-      return true
-    cancel()
-    return false
-  }
-
-  function checkMapping(): void {
-    try {
-      hasStableMapping()
-    } catch (cause) {
-      reportFailure(cause)
-    }
   }
 
   function complete(intent: TempoTrackDragIntent): void {
@@ -142,12 +113,9 @@ export function useTempoTrackDrag({
         },
       })
       if (failure !== null) reportFailure(failure)
-      // Begin may retire a previous handoff, so record the new mapping after it returns.
-      else if (session.state.pointerId !== null) captureBounds = bounds
-      else adapter?.cancel()
+      else if (session.state.pointerId === null) adapter?.cancel()
       return
     }
-    if (input.phase !== EDITOR_POINTER_INPUT_PHASE.CANCEL && !hasStableMapping()) return
     const { failure, intent } = session.handlePointerInput(input)
     if (failure !== null) reportFailure(failure)
     else if (intent !== null) complete(intent)
@@ -203,10 +171,6 @@ export function useTempoTrackDrag({
     stopInvalidation()
     stopSelection()
     stopProjection()
-    window.removeEventListener('scroll', checkMapping, true)
-    window.removeEventListener('resize', checkMapping)
-    observer?.disconnect()
-    observer = null
     try {
       adapter?.dispose()
     } finally {
@@ -220,34 +184,23 @@ export function useTempoTrackDrag({
     mount() {
       const plot = plotElement.value
       if (disposed || plot === null || adapter !== null) return
-      try {
-        adapter = createEditorPointerInputAdapter({
-          surface: plot,
-          resolveHit: (event) => {
-            const point =
-              event.target instanceof Element
-                ? event.target.closest<HTMLButtonElement>('.tempo-track-lane__point')
-                : null
-            if (point === null) return null
-            const target = hitTest(event, plot.getBoundingClientRect())
-            if (target === null) return null
-            point.focus({ preventScroll: true })
-            tempo.select(target.id)
-            event.preventDefault()
-            return { tempoEventId: target.id }
-          },
-          onInput,
-        })
-        window.addEventListener('scroll', checkMapping, true)
-        window.addEventListener('resize', checkMapping)
-        if (typeof ResizeObserver !== 'undefined') {
-          observer = new ResizeObserver(checkMapping)
-          observer.observe(plot)
-        }
-      } catch (cause) {
-        dispose()
-        throw cause
-      }
+      adapter = createEditorPointerInputAdapter({
+        surface: plot,
+        resolveHit: (event) => {
+          const point =
+            event.target instanceof Element
+              ? event.target.closest<HTMLButtonElement>('.tempo-track-lane__point')
+              : null
+          if (point === null) return null
+          const target = hitTest(event, plot.getBoundingClientRect())
+          if (target === null) return null
+          point.focus({ preventScroll: true })
+          tempo.select(target.id)
+          event.preventDefault()
+          return { tempoEventId: target.id }
+        },
+        onInput,
+      })
     },
     dispose,
   }

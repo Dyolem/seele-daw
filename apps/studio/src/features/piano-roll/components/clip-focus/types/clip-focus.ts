@@ -42,7 +42,6 @@ export interface PianoRollNoteInteraction {
   readonly state: Readonly<ShallowRef<PianoRollInteractionState>>
   cancel(): void
   cancelAction(): StudioActionCompletion
-  hasStablePointerMapping(): boolean
   mount(): void
   disposeInput(): void
   dispose(): void

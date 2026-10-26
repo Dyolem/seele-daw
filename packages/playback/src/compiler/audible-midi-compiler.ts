@@ -1,5 +1,6 @@
 import {
   addTicks,
+  diffSnapshotRecords,
   parseTick,
   type ClipId,
   type ClipRecord,
@@ -11,7 +12,6 @@ import {
   type MidiSourceId,
   type MidiSourcePartitions,
   type MidiSustainPedalEventRecord,
-  type NoteId,
   type ProjectSnapshot,
   type TrackId,
   type TrackRecord,
@@ -330,46 +330,18 @@ function sortedSpans(
   return spans.sort(compareNoteSpans)
 }
 
-/**
- * The previous spans with those of removed or rewritten Notes dropped and those of new or
- * rewritten Notes merged in. Both Note arrays are a Snapshot partition in ID order, so one walk
- * finds the Notes that are no longer the same records.
- */
+/** The previous spans with those of removed or rewritten Notes dropped and new ones merged in. */
 function updateNoteSpans(
   compiled: CompiledClip,
   notes: readonly MidiNoteRecord[],
   compile: (note: MidiNoteRecord) => MidiNoteSpanPlan | null,
 ): readonly MidiNoteSpanPlan[] {
-  const previousNotes = compiled.notes
-  const droppedNoteIds = new Set<NoteId>()
-  const writtenNotes: MidiNoteRecord[] = []
-  let previousIndex = 0
-  let nextIndex = 0
-
-  while (previousIndex < previousNotes.length || nextIndex < notes.length) {
-    const before = previousNotes[previousIndex]
-    const after = notes[nextIndex]
-    if (before === after) {
-      previousIndex += 1
-      nextIndex += 1
-    } else if (after === undefined || (before !== undefined && before.id < after.id)) {
-      droppedNoteIds.add(before!.id)
-      previousIndex += 1
-    } else {
-      if (before?.id === after.id) {
-        droppedNoteIds.add(before.id)
-        previousIndex += 1
-      }
-      writtenNotes.push(after)
-      nextIndex += 1
-    }
-  }
-
+  const { droppedIds, written: writtenNotes } = diffSnapshotRecords(compiled.notes, notes)
   const writtenSpans = sortedSpans(writtenNotes, compile)
   const spans: MidiNoteSpanPlan[] = []
   let written = 0
   for (const span of compiled.spans) {
-    if (droppedNoteIds.has(span.noteId)) continue
+    if (droppedIds.has(span.noteId)) continue
     while (written < writtenSpans.length && compareNoteSpans(writtenSpans[written]!, span) < 0) {
       spans.push(writtenSpans[written++]!)
     }

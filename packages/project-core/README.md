@@ -16,6 +16,7 @@
 | `session.query(query)`                                               | 按 revision 一致地读取 MIDI Note（按 ID 或按区间）                                                                                                    |
 | `session.subscribe(subscription, listener)`                          | 在微任务中收到提交：全部提交，或按 Source / Note / Tick 区间过滤的 Note 变化；监听函数抛错只报告，不影响其他订阅，也不退订（ADR-011）                 |
 | `session.getSnapshot()`                                              | 当前 revision 的全部表（`ProjectTables`），同一 revision 内返回同一个对象；没被改动的表、分区与记录在 revision 之间也是同一个对象（ADR-007、ADR-010） |
+| `diffSnapshotRecords(previous, next)`                                | 比较同一张表或分区在两份 Snapshot 中按 ID 排序的记录，找出删除、新增与改写的；消费者据此沿用由其余记录推导出的结果（ADR-010）                         |
 | `createProjectFileDTO`、`decodeProjectFileDTO`                       | 项目文件的写出与严格读取                                                                                                                              |
 | `saveProjectCheckpoint`、`restoreProjectCheckpoint`                  | 应用内保存与恢复；存储端口由调用方实现                                                                                                                |
 

@@ -132,6 +132,8 @@ export type {
   ProjectSnapshot,
   ProjectTables,
 } from './snapshots/project-snapshot'
+export { diffSnapshotRecords } from './snapshots/snapshot-record-changes'
+export type { SnapshotRecordChanges } from './snapshots/snapshot-record-changes'
 
 export {
   PROJECT_CHECKPOINT_FORMAT_VERSION,

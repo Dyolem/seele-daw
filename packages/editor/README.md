@@ -81,7 +81,9 @@ Track-global Surface 共用 identity-free 的 `PianoRollTimelineViewport` 几何
   匹配的 Commit 到达后重新读取权威结果，不维护第二份 Note。
 - Track 全局 Read Model 从一份 Snapshot 与 `TrackId` 派生排序后的 Clip window，把非循环 Clip 中的
   Note 映射到 Project Tick（`clip.startTick + note.startTick - clip.sourceOffsetTick`）。Looped
-  Clip 出现在投影中但标记为 `unsupported`；失效的 Active Clip 身份会被清空。
+  Clip 出现在投影中但标记为 `unsupported`；失效的 Active Clip 身份会被清空。Clip 记录、Source 与
+  Note 数组都没变时沿用上次的 Clip Read Model；只有 Note 变了时，没变的 Note 沿用它的投影
+  （ADR-010）。
 - 放置解析根据 Pointer 的全局 Tick、当前小节、Active Clip 与 Clip window，纯函数地得出
   `add-to-clip`、`extend-clip` 或 `create-clip`；归属不明、looped Clip 与越过下一 Clip 的自动扩展
   返回带可见原因的 blocked 结果。

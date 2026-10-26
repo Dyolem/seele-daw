@@ -34,6 +34,8 @@ ADR-007 到 ADR-009 之后，一次编辑的成本只随它碰到的 Clip 与 So
   数组分块，让一次编辑只复制它碰到的块；目前没有这样做。
 - 踏板编辑仍重新编译整个 Clip。
 - 沿用按对象身份判断。如果没变的记录被换成新对象，结果仍然正确，只是退回整体编译。
+- 比较两份按 ID 排序的记录这一步由 project-core 的 `diffSnapshotRecords` 提供；播放编译与 editor
+  的 Track Read Model 都用它，各自只写合并。
 
 ## Validation
 
@@ -42,6 +44,8 @@ ADR-007 到 ADR-009 之后，一次编辑的成本只随它碰到的 Clip 与 So
 - `note-span-reuse.spec`：移动一个音符后，这个 Clip 只有它的 span 是新对象。300 步随机编辑、撤销
   与重做，每次编译的计划都等于对全新对象从头编译的计划；调和结果也等于两份从头编译的计划之间的
   调和，后者没有共享对象，每个 span 都按 key 配对。
+- `piano-roll-track-read-model-reuse.spec`：编辑一个 Clip 后，其他 Clip 的 Read Model 与这个 Clip
+  里没变的 Note 投影仍是同一个对象；300 步随机编辑、撤销与重做后，Read Model 都等于从头构建的。
 - 故意破坏合并（Snapshot 3 种、编译 3 种、调和 4 种），上面的测试都会失败；只把调和的比较方向
   反过来时测试仍通过，与第 3 条一致。
 - 基准：`pnpm --filter @seele-daw/project-core bench`、`pnpm --filter @seele-daw/playback bench`。

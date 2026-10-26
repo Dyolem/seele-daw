@@ -1,5 +1,6 @@
 import {
   addTicks,
+  diffSnapshotRecords,
   parseTick,
   type ClipId,
   type MidiClipRecord,
@@ -92,26 +93,80 @@ function createNoteProjection(
   })
 }
 
+interface ClipReadModelMemo {
+  readonly source: MidiSourceRecord
+  readonly notes: readonly MidiNoteRecord[]
+  readonly readModel: PianoRollTrackClipReadModel
+}
+
+const NO_NOTES = Object.freeze<PianoRollTrackNoteProjection[]>([])
+
+/**
+ * Each Clip's read model, kept while its record, its Source record and its Note array are the
+ * same. Snapshots share those across revisions (ADR-007), so an edit rebuilds only the Clip it
+ * touched, and inside it only the Notes that were written (ADR-010).
+ */
+const clipReadModels = new WeakMap<MidiClipRecord, ClipReadModelMemo>()
+
+function projectNotes(
+  clip: ReadyPianoRollTrackClipProjection,
+  notes: readonly MidiNoteRecord[],
+): PianoRollTrackNoteProjection[] {
+  const projections: PianoRollTrackNoteProjection[] = []
+  for (const note of notes) {
+    const projection = createNoteProjection(clip, note)
+    if (projection !== null) projections.push(projection)
+  }
+  return projections.sort(compareNoteProjections)
+}
+
+/** The previous projections with those of removed or rewritten Notes dropped and new ones merged in. */
+function updateNoteProjections(
+  memo: ClipReadModelMemo,
+  clip: ReadyPianoRollTrackClipProjection,
+  notes: readonly MidiNoteRecord[],
+): readonly PianoRollTrackNoteProjection[] {
+  const { droppedIds, written: writtenNotes } = diffSnapshotRecords(memo.notes, notes)
+  const writtenProjections = projectNotes(clip, writtenNotes)
+  const projections: PianoRollTrackNoteProjection[] = []
+  let written = 0
+  for (const projection of memo.readModel.notes) {
+    if (droppedIds.has(projection.note.id)) continue
+    while (
+      written < writtenProjections.length &&
+      compareNoteProjections(writtenProjections[written]!, projection) < 0
+    ) {
+      projections.push(writtenProjections[written++]!)
+    }
+    projections.push(projection)
+  }
+  while (written < writtenProjections.length) projections.push(writtenProjections[written++]!)
+  return Object.freeze(projections)
+}
+
 function createClipReadModel(
   snapshot: ProjectSnapshot,
   sources: ReadonlyMap<MidiSourceId, MidiSourceRecord>,
   clip: MidiClipRecord,
 ): PianoRollTrackClipReadModel {
-  const projection = createPianoRollTrackClipProjection(clip, sources.get(clip.sourceId)!)
-  if (projection.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED) {
-    return Object.freeze({ clip: projection, notes: Object.freeze([]) })
+  const source = sources.get(clip.sourceId)!
+  const notes = snapshot.midiNotes[clip.sourceId]!
+  const memo = clipReadModels.get(clip)
+  if (memo?.source === source && memo.notes === notes) return memo.readModel
+
+  const sameWindow = memo?.source === source
+  const projection = sameWindow
+    ? memo.readModel.clip
+    : createPianoRollTrackClipProjection(clip, source)
+  let noteProjections: readonly PianoRollTrackNoteProjection[] = NO_NOTES
+  if (projection.status === PIANO_ROLL_TRACK_CLIP_STATUS.READY) {
+    noteProjections = sameWindow
+      ? updateNoteProjections(memo, projection, notes)
+      : Object.freeze(projectNotes(projection, notes))
   }
-
-  const notes = snapshot.midiNotes[clip.sourceId]!.flatMap((note) => {
-    const noteProjection = createNoteProjection(projection, note)
-    return noteProjection === null ? [] : [noteProjection]
-  })
-  notes.sort(compareNoteProjections)
-
-  return Object.freeze({
-    clip: projection,
-    notes: Object.freeze(notes),
-  })
+  const readModel = Object.freeze({ clip: projection, notes: noteProjections })
+  clipReadModels.set(clip, { source, notes, readModel })
+  return readModel
 }
 
 /** Creates one immutable, global Track-time Piano Roll projection of an Instrument Track. */

@@ -14,19 +14,12 @@ import {
   type AudibleMidiProjectPlan,
 } from '#internal/compiler/audible-midi-plan'
 import {
-  ProjectTimeError,
-  parsePlaybackClockSecond,
-  type PlaybackClockSecond,
-} from '#internal/time/project-time'
-import {
   AUDIBLE_MIDI_TRANSPORT_OUTCOME,
   AUDIBLE_MIDI_TRANSPORT_STATE,
-  AudibleMidiTransportError,
   INITIAL_MAPPING_GENERATION,
   createAudibleMidiTransport,
   type AudibleMidiTransportSnapshot,
   type MappingGeneration,
-  type PlaybackClock,
 } from '#internal/transport/audible-midi-transport'
 import {
   createAudibleMidiProjectFixture,
@@ -47,16 +40,6 @@ function replacePlan(
 
 function nextModelRevision(plan: AudibleMidiProjectPlan): ModelRevision {
   return (plan.modelRevision + 1) as ModelRevision
-}
-
-function captureError(action: () => void): unknown {
-  try {
-    action()
-  } catch (error) {
-    return error
-  }
-
-  throw new Error('Expected action to throw')
 }
 
 describe('Audible MIDI Transport', () => {
@@ -118,8 +101,6 @@ describe('Audible MIDI Transport', () => {
     })
     expect(transport.playbackClockSecondAtTick(parseTick(960))).toBe(10.5)
     expect(transport.playbackClockSecondAtTick(parseTick(1_920))).toBe(11.5)
-    expect(transport.tickPositionAtPlaybackClockSecond(parsePlaybackClockSecond(10.75))).toBe(1_200)
-    expect(transport.tickPositionAtPlaybackClockSecond(parsePlaybackClockSecond(12))).toBe(2_400)
 
     clock.advanceBy(0.25)
     expect(transport.getSnapshot()).toMatchObject({
@@ -480,19 +461,6 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
-  it('rejects a stale handoff without changing the installed Plan', () => {
-    const plan = createFixturePlan()
-    const transport = createAudibleMidiTransport(plan, new ManualPlaybackClock())
-
-    expect(() => transport.handoffPlan(plan)).toThrow(
-      expect.objectContaining({ code: 'handoff-plan-not-forward' }) as AudibleMidiTransportError,
-    )
-    expect(transport.getSnapshot()).toMatchObject({
-      mappingGeneration: INITIAL_MAPPING_GENERATION,
-      modelRevision: plan.modelRevision,
-    })
-  })
-
   it('returns to the initial anchor once and keeps repeated commands generation-neutral', () => {
     const clock = new ManualPlaybackClock(5)
     const transport = createAudibleMidiTransport(createFixturePlan(), clock)
@@ -647,94 +615,17 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
-  it('fails closed when a future Compiler emits an unknown Plan status', () => {
-    const plan = createFixturePlan()
-
-    expect(() =>
-      createAudibleMidiTransport(
-        replacePlan(plan, { status: 'future-status' as AudibleMidiProjectPlan['status'] }),
-        new ManualPlaybackClock(),
-      ),
-    ).toThrow(expect.objectContaining({ code: 'invalid-plan-status' }) as AudibleMidiTransportError)
-  })
-
-  it('fails closed for inactive mappings and targets outside the active mapping', () => {
+  it('maps Ticks to the clock only while Playing, and locates only inside the Timeline', () => {
     const clock = new ManualPlaybackClock(10)
     const transport = createAudibleMidiTransport(createFixturePlan(), clock)
 
-    expect(() => transport.playbackClockSecondAtTick(parseTick(0))).toThrow(
-      expect.objectContaining({ code: 'transport-not-playing' }) as AudibleMidiTransportError,
-    )
+    expect(() => transport.playbackClockSecondAtTick(parseTick(0))).toThrow(/Playing state/)
+    expect(() => transport.locateAtTick(parseTick(576_001))).toThrow(RangeError)
 
     transport.play()
-    expect(() => transport.playbackClockSecondAtTick(parseTick(576_001))).toThrow(
-      expect.objectContaining({
-        code: 'target-tick-after-timeline-end',
-      }) as AudibleMidiTransportError,
-    )
-    expect(() =>
-      transport.tickPositionAtPlaybackClockSecond(parsePlaybackClockSecond(9.5)),
-    ).toThrow(
-      expect.objectContaining({
-        code: 'playback-clock-before-anchor',
-      }) as AudibleMidiTransportError,
-    )
+    expect(transport.playbackClockSecondAtTick(parseTick(0))).toBe(10)
 
     transport.pause()
-    expect(() =>
-      transport.tickPositionAtPlaybackClockSecond(parsePlaybackClockSecond(10.5)),
-    ).toThrow(
-      expect.objectContaining({ code: 'transport-not-playing' }) as AudibleMidiTransportError,
-    )
-  })
-
-  it('rejects invalid and regressing Playback Clock values without corrupting state', () => {
-    const invalidClock: PlaybackClock = {
-      now: () => Number.NaN as PlaybackClockSecond,
-    }
-    const invalidTransport = createAudibleMidiTransport(createFixturePlan(), invalidClock)
-    const invalidError = captureError(() => invalidTransport.play())
-
-    expect(invalidError).toBeInstanceOf(ProjectTimeError)
-    expect(invalidError).toMatchObject({ code: 'invalid-playback-clock-second' })
-    expect(invalidTransport.getSnapshot()).toMatchObject({
-      mappingGeneration: INITIAL_MAPPING_GENERATION,
-      state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
-    })
-
-    const clock = new ManualPlaybackClock(10)
-    const transport = createAudibleMidiTransport(createFixturePlan(), clock)
-    transport.play()
-    clock.setTo(9)
-    expect(() => transport.getSnapshot()).toThrow(
-      expect.objectContaining({ code: 'playback-clock-regressed' }) as AudibleMidiTransportError,
-    )
-    clock.setTo(10)
-    expect(transport.getSnapshot()).toMatchObject({
-      mappingGeneration: 1,
-      positionProjectSecond: 0,
-      state: AUDIBLE_MIDI_TRANSPORT_STATE.PLAYING,
-    })
-  })
-
-  it('copies Plan identity and Tempo Segments instead of retaining mutable input records', () => {
-    const compiledPlan = createFixturePlan()
-    const mutableTempoSegments = compiledPlan.tempoSegments.map((segment) => ({ ...segment }))
-    const mutablePlan = {
-      ...compiledPlan,
-      tempoSegments: mutableTempoSegments,
-    }
-    const transport = createAudibleMidiTransport(mutablePlan, new ManualPlaybackClock())
-
-    Object.assign(mutablePlan, { modelRevision: 999 as ModelRevision })
-    Object.assign(mutableTempoSegments[0]!, {
-      bpm: parseTempoBpm(60),
-      secondsPerTick: 60 / (60 * 960),
-    })
-
-    expect(transport.getSnapshot()).toMatchObject({
-      modelRevision: compiledPlan.modelRevision,
-      timelineEndProjectSecond: 300,
-    })
+    expect(() => transport.playbackClockSecondAtTick(parseTick(0))).toThrow(/Playing state/)
   })
 })

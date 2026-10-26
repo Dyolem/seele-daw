@@ -42,7 +42,6 @@ import {
   AUDIBLE_MIDI_RECONCILIATION_REASON,
   AUDIBLE_MIDI_RECONCILIATION_SCOPE,
   AUDIBLE_MIDI_TRACK_CHANGE_KIND,
-  AudibleMidiReconciliationError,
   createAudibleMidiReconciliationPlan,
 } from '#internal/reconciliation/audible-midi-reconciliation'
 import {
@@ -384,14 +383,5 @@ describe('Audible MIDI reconciliation', () => {
     expect(continuousPlan.reasons).toEqual([
       AUDIBLE_MIDI_RECONCILIATION_REASON.NEXT_PLAN_UNPLAYABLE,
     ])
-  })
-
-  it('rejects a non-forward Plan pair', () => {
-    const { session } = createFixture()
-    const plan = compileAudibleMidiProject(session.getSnapshot())
-
-    expect(() =>
-      createAudibleMidiReconciliationPlan({ commits: [], nextPlan: plan, previousPlan: plan }),
-    ).toThrowError(AudibleMidiReconciliationError)
   })
 })

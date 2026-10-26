@@ -22,12 +22,10 @@ import {
   parseTick,
   parseTrackId,
   type DeviceDescriptor,
-  type ProjectSnapshot,
 } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
 import { compileAudibleMidiProject } from '#internal/compiler/audible-midi-compiler'
-import { AudibleMidiCompilerError } from '#internal/compiler/audible-midi-compiler-error'
 import {
   AUDIBLE_MIDI_PLAN_STATUS,
   createNoteOccurrenceKey,
@@ -406,29 +404,6 @@ describe('Audible MIDI Compiler', () => {
     expect(pedalHeldSpan?.releaseTick).toBeLessThan(plan.timelineEndTick)
   })
 
-  it('fails closed when a forged Snapshot repeats one CC64 Channel and Tick', () => {
-    const { records, snapshot } = createAudibleMidiProjectFixture()
-    const duplicatePositionEvents = ['pedal-duplicate-a', 'pedal-duplicate-b'].map((id) =>
-      createMidiSustainPedalEventRecord({
-        id: parseMidiSustainPedalEventId(id),
-        tick: parseTick(720),
-        value: parseMidiControlValue(127),
-        channel: parseMidiChannel(0),
-      }),
-    )
-
-    expect(() =>
-      compileAudibleMidiProject(
-        replaceCompilerFixtureSnapshot(snapshot, {
-          midiSustainPedalEvents: {
-            ...snapshot.midiSustainPedalEvents,
-            [records.pianoSource.id]: duplicatePositionEvents,
-          },
-        }),
-      ),
-    ).toThrow(expect.objectContaining({ code: 'duplicate-snapshot-entity' }))
-  })
-
   it('lets every Track Solo fact participate even when the soloed Audio Track is unsupported', () => {
     const { snapshot } = createAudibleMidiProjectFixture()
     const audioTrack = createAudioTrackRecord({
@@ -578,29 +553,6 @@ describe('Audible MIDI Compiler', () => {
     expect(plan.timelineEndTick).toBe(576_000)
     expect(planSpans(plan)).toEqual([])
     expect(diagnosticCodes(plan)).toEqual(['no-audible-midi-note-spans'])
-  })
-
-  it.each([
-    [
-      'duplicate-snapshot-entity',
-      (snapshot: ProjectSnapshot) => ({ tracks: [...snapshot.tracks, snapshot.tracks[0]!] }),
-    ],
-    [
-      'invalid-track-order',
-      (snapshot: ProjectSnapshot) => ({ trackOrder: [snapshot.trackOrder[0]!] }),
-    ],
-    [
-      'invalid-snapshot-reference',
-      (snapshot: ProjectSnapshot) => ({ devices: snapshot.devices.slice(1) }),
-    ],
-  ] as const)('fails closed for inconsistent Snapshots with code %s', (code, createOverrides) => {
-    const { snapshot } = createAudibleMidiProjectFixture()
-
-    expect(() =>
-      compileAudibleMidiProject(
-        replaceCompilerFixtureSnapshot(snapshot, createOverrides(snapshot)),
-      ),
-    ).toThrow(expect.objectContaining({ code }) as AudibleMidiCompilerError)
   })
 
   it('keeps a 10,000 Note compilation baseline deterministic and complete', () => {

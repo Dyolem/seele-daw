@@ -11,21 +11,6 @@ import {
 export const AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT = 150
 export const AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT = 8
 
-export type AudibleMidiTimelineErrorCode =
-  | 'initial-time-signature-ambiguous'
-  | 'initial-time-signature-missing'
-
-/** Stable failure raised when a Project cannot provide the V1 timeline basis. */
-export class AudibleMidiTimelineError extends Error {
-  readonly code: AudibleMidiTimelineErrorCode
-
-  constructor(code: AudibleMidiTimelineErrorCode, message: string) {
-    super(message)
-    this.name = 'AudibleMidiTimelineError'
-    this.code = code
-  }
-}
-
 export interface AudibleMidiTimelineRange {
   readonly initialBarSpanTick: Tick
   readonly minimumTimelineEndTick: Tick
@@ -42,23 +27,8 @@ export interface AudibleMidiTimelineRange {
 export function deriveAudibleMidiTimelineRange(
   snapshot: ProjectSnapshot,
 ): AudibleMidiTimelineRange {
-  const initialTimeSignatures = snapshot.timeSignatureEvents.filter(
-    ({ tick }) => tick === ZERO_TICK,
-  )
-  if (initialTimeSignatures.length === 0) {
-    throw new AudibleMidiTimelineError(
-      'initial-time-signature-missing',
-      'Audible MIDI Timeline requires an initial Project time signature at Tick 0',
-    )
-  }
-  if (initialTimeSignatures.length > 1) {
-    throw new AudibleMidiTimelineError(
-      'initial-time-signature-ambiguous',
-      'Audible MIDI Timeline requires exactly one initial Project time signature',
-    )
-  }
-
-  const initialTimeSignature = initialTimeSignatures[0]!
+  // Project facts hold exactly one time signature at Tick 0.
+  const initialTimeSignature = snapshot.timeSignatureEvents.find(({ tick }) => tick === ZERO_TICK)!
   const beatSpanTick = (PROJECT_PPQ * 4) / initialTimeSignature.denominator
   const initialBarSpanTick = parsePositiveTick(beatSpanTick * initialTimeSignature.numerator)
   const minimumTimelineEndTick = parseTick(

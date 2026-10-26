@@ -7,7 +7,6 @@ import {
   parseTempoBpm,
   parseTempoEventId,
   parseTick,
-  type ModelRevision,
 } from '@seele-daw/project-core'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
@@ -15,16 +14,12 @@ import { compileAudibleMidiProject } from '#internal/compiler/audible-midi-compi
 import type { AudibleMidiProjectPlan } from '#internal/compiler/audible-midi-plan'
 import {
   AUDIBLE_MIDI_SCHEDULER_OUTCOME,
-  AudibleMidiSchedulerError,
   createAudibleMidiSchedulerPlanner,
   type AudibleMidiScheduleBatch,
   type AudibleMidiSchedulerConfiguration,
   type ScheduledSampleVoicePlan,
 } from '#internal/scheduler/audible-midi-scheduler'
-import {
-  parsePlaybackClockDurationSecond,
-  parsePlaybackClockSecond,
-} from '#internal/time/project-time'
+import { parsePlaybackClockDurationSecond } from '#internal/time/project-time'
 import {
   AUDIBLE_MIDI_TRANSPORT_STATE,
   createAudibleMidiTransport,
@@ -283,7 +278,7 @@ describe('Audible MIDI Scheduler Planner', () => {
     ])
   })
 
-  it('resets on a new generation, does not chase a pre-anchor Note, and rejects stale snapshots', () => {
+  it('resets on a new generation and does not chase a pre-anchor Note', () => {
     const plan = createFixturePlan()
     const clock = new ManualPlaybackClock(100)
     const transport = createAudibleMidiTransport(plan, clock)
@@ -319,9 +314,6 @@ describe('Audible MIDI Scheduler Planner', () => {
       startPlaybackClockSecond: 105.5,
       timing: 'on-time',
     })
-    expect(() => planner.planNextWindow(generationOneSnapshot)).toThrow(
-      expect.objectContaining({ code: 'stale-mapping-generation' }) as AudibleMidiSchedulerError,
-    )
   })
 
   it('clamps the final window at Timeline End and becomes inactive after natural end', () => {
@@ -389,44 +381,10 @@ describe('Audible MIDI Scheduler Planner', () => {
     const plan = createFixturePlan()
 
     expect(() => createAudibleMidiSchedulerPlanner(plan, createConfiguration(0, 0.2))).toThrow(
-      expect.objectContaining({
-        code: 'invalid-scheduler-configuration',
-      }) as AudibleMidiSchedulerError,
+      RangeError,
     )
     expect(() => createAudibleMidiSchedulerPlanner(plan, createConfiguration(0.2, 0.2))).toThrow(
-      expect.objectContaining({
-        code: 'invalid-scheduler-configuration',
-      }) as AudibleMidiSchedulerError,
-    )
-  })
-
-  it('rejects Transport snapshots from a different plan or a remapped same generation', () => {
-    const plan = createFixturePlan()
-    const otherPlan = replacePlan(plan, {
-      modelRevision: (plan.modelRevision + 1) as ModelRevision,
-    })
-    const otherTransport = createAudibleMidiTransport(otherPlan, new ManualPlaybackClock())
-    const planner = createAudibleMidiSchedulerPlanner(plan, createConfiguration())
-
-    expect(() => planner.planNextWindow(otherTransport.getSnapshot())).toThrow(
-      expect.objectContaining({ code: 'transport-plan-mismatch' }) as AudibleMidiSchedulerError,
-    )
-
-    const clock = new ManualPlaybackClock(10)
-    const transport = createAudibleMidiTransport(plan, clock)
-    transport.play()
-    const snapshot = transport.getSnapshot()
-    planner.planNextWindow(snapshot)
-    if (snapshot.state !== 'playing') throw new Error('Expected a Playing Transport snapshot')
-
-    const remappedSnapshot = Object.freeze({
-      ...snapshot,
-      anchorPlaybackClockSecond: parsePlaybackClockSecond(snapshot.anchorPlaybackClockSecond + 1),
-    })
-    expect(() => planner.planNextWindow(remappedSnapshot)).toThrow(
-      expect.objectContaining({
-        code: 'transport-mapping-changed-without-generation',
-      }) as AudibleMidiSchedulerError,
+      RangeError,
     )
   })
 })

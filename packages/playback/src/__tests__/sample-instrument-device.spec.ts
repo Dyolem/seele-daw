@@ -10,7 +10,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   SAMPLE_INSTRUMENT_DEVICE_DEFINITION,
   SOUNDBANK_ID_MAX_LENGTH,
-  SoundbankIdError,
   createSampleInstrumentDeviceDescriptor,
   decodeSampleInstrumentDeviceState,
   parseSoundbankId,
@@ -63,7 +62,7 @@ describe('Sample Instrument Device', () => {
   it.each(['', ' leading-space', 'trailing-space ', 'x'.repeat(SOUNDBANK_ID_MAX_LENGTH + 1), null])(
     'rejects invalid Soundbank identity %j',
     (value) => {
-      expect(() => parseSoundbankId(value)).toThrow(SoundbankIdError)
+      expect(() => parseSoundbankId(value)).toThrow(RangeError)
     },
   )
 

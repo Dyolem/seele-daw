@@ -1,12 +1,9 @@
 import {
   isMidiSustainPedalDown,
-  parseTick,
   type MidiChannel,
   type MidiSustainPedalEventRecord,
   type Tick,
 } from '@seele-daw/project-core'
-
-import { AudibleMidiCompilerError } from '#internal/compiler/audible-midi-compiler-error'
 
 interface SustainPedalChannelTimeline {
   readonly events: readonly MidiSustainPedalEventRecord[]
@@ -19,15 +16,6 @@ export interface SustainPedalReleaseResolver {
     keyReleaseTick: Tick,
     sourceWindowEndTick: Tick,
   ): Tick
-}
-
-function compareEvents(
-  left: MidiSustainPedalEventRecord,
-  right: MidiSustainPedalEventRecord,
-): number {
-  if (left.tick !== right.tick) return left.tick - right.tick
-  if (left.channel !== right.channel) return left.channel - right.channel
-  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0
 }
 
 function createChannelTimeline(
@@ -69,27 +57,17 @@ function findLastEventIndexAtOrBefore(
 
 /**
  * Derives final Gate Release without rewriting authored Note duration. CC64 at the same Tick is
- * applied before Note Off, matching the package's deterministic continuous-event ordering.
+ * applied before Note Off. The events are a Snapshot partition: in Tick order, at most one per
+ * Tick and Channel.
  */
 export function createSustainPedalReleaseResolver(
-  inputEvents: readonly MidiSustainPedalEventRecord[],
+  events: readonly MidiSustainPedalEventRecord[],
 ): SustainPedalReleaseResolver {
-  const events = [...inputEvents].sort(compareEvents)
   const eventsByChannel = new Map<MidiChannel, MidiSustainPedalEventRecord[]>()
-  let previous: MidiSustainPedalEventRecord | null = null
-
   for (const event of events) {
-    if (previous !== null && previous.channel === event.channel && previous.tick === event.tick) {
-      throw new AudibleMidiCompilerError(
-        'duplicate-snapshot-entity',
-        `midi-sustain-pedal-position:${event.channel}:${event.tick}`,
-        `Project Snapshot repeats MIDI Sustain Pedal Channel ${event.channel} at Tick ${event.tick}`,
-      )
-    }
-    const channelEvents = eventsByChannel.get(event.channel) ?? []
-    channelEvents.push(event)
-    eventsByChannel.set(event.channel, channelEvents)
-    previous = event
+    const channelEvents = eventsByChannel.get(event.channel)
+    if (channelEvents === undefined) eventsByChannel.set(event.channel, [event])
+    else channelEvents.push(event)
   }
 
   const timelines = new Map<MidiChannel, SustainPedalChannelTimeline>()
@@ -98,20 +76,12 @@ export function createSustainPedalReleaseResolver(
   }
 
   return Object.freeze({
+    /** The key release is never after the window end: the compiler clips Notes to it. */
     resolveFinalReleaseTick(
       channel: MidiChannel,
-      keyReleaseTickInput: Tick,
-      sourceWindowEndTickInput: Tick,
+      keyReleaseTick: Tick,
+      sourceWindowEndTick: Tick,
     ): Tick {
-      const keyReleaseTick = parseTick(keyReleaseTickInput)
-      const sourceWindowEndTick = parseTick(sourceWindowEndTickInput)
-      if (keyReleaseTick > sourceWindowEndTick) {
-        throw new AudibleMidiCompilerError(
-          'invalid-snapshot-reference',
-          `midi-sustain-pedal-release:${channel}:${keyReleaseTick}`,
-          'A MIDI Note key release cannot follow its Clip source-window end',
-        )
-      }
       if (keyReleaseTick === sourceWindowEndTick) return sourceWindowEndTick
 
       const timeline = timelines.get(channel)

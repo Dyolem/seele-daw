@@ -106,19 +106,6 @@ export interface PlaybackEngineDependencies {
   readonly onStateChange: (state: PlaybackEngineState) => void
 }
 
-export type PlaybackEngineErrorCode = 'engine-disposed' | 'playback-unavailable'
-
-/** A request the engine cannot serve in its current state. */
-export class PlaybackEngineError extends Error {
-  readonly code: PlaybackEngineErrorCode
-
-  constructor(code: PlaybackEngineErrorCode, message: string) {
-    super(message)
-    this.name = 'PlaybackEngineError'
-    this.code = code
-  }
-}
-
 interface ActiveLocateSession {
   readonly plan: AudibleMidiProjectPlan
   readonly startedWhilePlaying: boolean
@@ -379,10 +366,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
     this.#assertLive()
     const plan = this.#plan
     if (plan === null || !isPlayablePlan(plan)) {
-      throw new PlaybackEngineError(
-        'playback-unavailable',
-        'The loaded Project has no playable plan',
-      )
+      throw new Error('The loaded Project has no playable plan')
     }
     if (
       this.#locateSession !== null ||
@@ -421,10 +405,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
       this.#prepared = prepared
       const transport = this.#transport
       if (transport === null || this.#scheduler === null) {
-        throw new PlaybackEngineError(
-          'playback-unavailable',
-          'Playback has no transport for the loaded plan',
-        )
+        throw new Error('Playback has no transport for the loaded plan')
       }
 
       const pending = transport.getSnapshot()
@@ -441,10 +422,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
 
       const transition = transport.play()
       if (transition.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) {
-        throw new PlaybackEngineError(
-          'playback-unavailable',
-          `Transport rejected Play with outcome ${transition.outcome}`,
-        )
+        throw new Error(`Transport rejected Play with outcome ${transition.outcome}`)
       }
       this.#scheduleNextWindow(transition.snapshot)
       this.#startTimer()
@@ -511,7 +489,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
   }
 
   #assertLive(): void {
-    if (this.#disposed) throw new PlaybackEngineError('engine-disposed', 'Playback is disposed')
+    if (this.#disposed) throw new Error('Playback is disposed')
   }
 
   #publish(state: PlaybackEngineState): void {
@@ -661,7 +639,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
     const scheduler = this.#scheduler
     const prepared = this.#prepared
     if (scheduler === null || prepared === null) {
-      throw new PlaybackEngineError('playback-unavailable', 'Playback scheduling is unavailable')
+      throw new Error('Playback scheduling is unavailable')
     }
     const batch = scheduler.planNextWindow(snapshot)
     if (batch.outcome !== AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED) return
@@ -805,10 +783,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
     try {
       const played = transport.play()
       if (played.outcome !== AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAYED) {
-        throw new PlaybackEngineError(
-          'playback-unavailable',
-          `Transport rejected locate resume with outcome ${played.outcome}`,
-        )
+        throw new Error(`Transport rejected locate resume with outcome ${played.outcome}`)
       }
       const located = transport.locateAtTick(tick)
       this.#forgetSilentVoices()
@@ -973,10 +948,7 @@ class PlaybackEngineImpl implements PlaybackEngine {
           return
         }
         if (prepared.modelRevision !== nextPlan.modelRevision) {
-          throw new PlaybackEngineError(
-            'playback-unavailable',
-            'The prepared instruments do not match the reconciled revision',
-          )
+          throw new Error('The prepared instruments do not match the reconciled revision')
         }
         this.#installSelectiveHandoff(nextPlan, prepared)
       })

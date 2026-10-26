@@ -11,11 +11,10 @@ export type {
   PlaybackDiagnosticCode,
   TrackPlaybackPlan,
 } from './compiler/audible-midi-plan'
-export { PLAYBACK_PHASE, PlaybackEngineError, createPlaybackEngine } from './engine/playback-engine'
+export { PLAYBACK_PHASE, createPlaybackEngine } from './engine/playback-engine'
 export type {
   PlaybackEngine,
   PlaybackEngineDependencies,
-  PlaybackEngineErrorCode,
   PlaybackEngineState,
   PlaybackLocateSession,
   PlaybackPhase,
@@ -38,7 +37,6 @@ export {
   AUDIBLE_MIDI_RECONCILIATION_REASON,
   AUDIBLE_MIDI_RECONCILIATION_SCOPE,
   AUDIBLE_MIDI_TRACK_CHANGE_KIND,
-  AudibleMidiReconciliationError,
   createAudibleMidiReconciliationPlan,
 } from './reconciliation/audible-midi-reconciliation'
 export type {
@@ -87,13 +85,9 @@ export type {
 export {
   AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
   AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT,
-  AudibleMidiTimelineError,
   deriveAudibleMidiTimelineRange,
 } from './timeline/audible-midi-timeline'
-export type {
-  AudibleMidiTimelineErrorCode,
-  AudibleMidiTimelineRange,
-} from './timeline/audible-midi-timeline'
+export type { AudibleMidiTimelineRange } from './timeline/audible-midi-timeline'
 export {
   AUDIBLE_MIDI_TRANSPORT_OUTCOME,
   createAudibleMidiTransport,

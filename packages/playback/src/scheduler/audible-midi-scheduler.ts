@@ -1,12 +1,12 @@
-import {
-  type BipolarValue,
-  type DeviceId,
-  type LinearGain,
-  type MidiChannel,
-  type MidiPitch,
-  type MidiVelocity,
-  type ModelRevision,
-  type TrackId,
+import type {
+  BipolarValue,
+  DeviceId,
+  LinearGain,
+  MidiChannel,
+  MidiPitch,
+  MidiVelocity,
+  ModelRevision,
+  TrackId,
 } from '@seele-daw/project-core'
 
 import {
@@ -18,12 +18,10 @@ import {
 import type { SoundbankId } from '#internal/sample-instrument-device'
 import {
   parsePlaybackClockDurationSecond,
-  parsePlaybackClockSecond,
   type PlaybackClockDurationSecond,
   type PlaybackClockSecond,
-  type ProjectSecond,
 } from '#internal/time/project-time'
-import { createTempoMapFromSegments, type TempoMap } from '#internal/time/tempo-map'
+import { createTempoMapFromSegments } from '#internal/time/tempo-map'
 import type {
   AudibleMidiTransportSnapshot,
   MappingGeneration,
@@ -38,25 +36,6 @@ export const AUDIBLE_MIDI_SCHEDULER_OUTCOME = Object.freeze({
 
 export type AudibleMidiSchedulerOutcome =
   (typeof AUDIBLE_MIDI_SCHEDULER_OUTCOME)[keyof typeof AUDIBLE_MIDI_SCHEDULER_OUTCOME]
-
-export type AudibleMidiSchedulerErrorCode =
-  | 'invalid-scheduler-configuration'
-  | 'playback-clock-window-out-of-range'
-  | 'schedule-cursor-inconsistent'
-  | 'stale-mapping-generation'
-  | 'transport-mapping-changed-without-generation'
-  | 'transport-plan-mismatch'
-
-/** Stable failure raised when Scheduler planning cannot preserve its timing invariants. */
-export class AudibleMidiSchedulerError extends Error {
-  readonly code: AudibleMidiSchedulerErrorCode
-
-  constructor(code: AudibleMidiSchedulerErrorCode, message: string) {
-    super(message)
-    this.name = 'AudibleMidiSchedulerError'
-    this.code = code
-  }
-}
 
 export interface AudibleMidiSchedulerConfiguration {
   readonly wakeCadenceSecond: PlaybackClockDurationSecond
@@ -110,34 +89,16 @@ interface SchedulerTrackRoute {
   readonly pan: BipolarValue
 }
 
-interface NormalizedSchedulerConfiguration {
-  readonly lookAheadHorizonSecond: PlaybackClockDurationSecond
-}
-
-function normalizeConfiguration(
-  input: AudibleMidiSchedulerConfiguration,
-): NormalizedSchedulerConfiguration {
-  let wakeCadenceSecond: PlaybackClockDurationSecond
-  let lookAheadHorizonSecond: PlaybackClockDurationSecond
-
-  try {
-    wakeCadenceSecond = parsePlaybackClockDurationSecond(input.wakeCadenceSecond)
-    lookAheadHorizonSecond = parsePlaybackClockDurationSecond(input.lookAheadHorizonSecond)
-  } catch {
-    throw new AudibleMidiSchedulerError(
-      'invalid-scheduler-configuration',
-      'Scheduler cadence and horizon must be finite non-negative Playback Clock durations',
-    )
-  }
-
-  if (wakeCadenceSecond <= 0 || lookAheadHorizonSecond <= wakeCadenceSecond) {
-    throw new AudibleMidiSchedulerError(
-      'invalid-scheduler-configuration',
+/** The horizon, once cadence and horizon are valid durations with the horizon past the cadence. */
+function lookAheadHorizon(configuration: AudibleMidiSchedulerConfiguration): number {
+  const wakeCadenceSecond = parsePlaybackClockDurationSecond(configuration.wakeCadenceSecond)
+  const horizonSecond = parsePlaybackClockDurationSecond(configuration.lookAheadHorizonSecond)
+  if (wakeCadenceSecond <= 0 || horizonSecond <= wakeCadenceSecond) {
+    throw new RangeError(
       'Scheduler requires a positive cadence and a look-ahead horizon greater than cadence',
     )
   }
-
-  return Object.freeze({ lookAheadHorizonSecond })
+  return horizonSecond
 }
 
 function trackRoutes(plan: AudibleMidiProjectPlan): ReadonlyMap<TrackId, SchedulerTrackRoute> {
@@ -154,29 +115,14 @@ function trackRoutes(plan: AudibleMidiProjectPlan): ReadonlyMap<TrackId, Schedul
   )
 }
 
-function parseCalculatedPlaybackClockSecond(value: number, context: string): PlaybackClockSecond {
-  try {
-    return parsePlaybackClockSecond(value)
-  } catch {
-    throw new AudibleMidiSchedulerError(
-      'playback-clock-window-out-of-range',
-      `${context} produced an out-of-range PlaybackClockSecond`,
-    )
-  }
-}
-
 function findFirstSpanAtOrAfter(spans: readonly MidiNoteSpanPlan[], tickPosition: number): number {
   let lowerIndex = 0
   let upperIndex = spans.length
 
   while (lowerIndex < upperIndex) {
     const candidateIndex = Math.floor((lowerIndex + upperIndex) / 2)
-    const candidate = spans[candidateIndex]
-    if (candidate !== undefined && candidate.startTick < tickPosition) {
-      lowerIndex = candidateIndex + 1
-    } else {
-      upperIndex = candidateIndex
-    }
+    if (spans[candidateIndex]!.startTick < tickPosition) lowerIndex = candidateIndex + 1
+    else upperIndex = candidateIndex
   }
 
   return lowerIndex
@@ -203,113 +149,58 @@ function createBatch(input: {
 /**
  * Creates a browser-independent look-ahead planner without owning a Timer or audio resource. It
  * reads the plan's spans in place, one Clip at a time, so creating one costs the number of Clips.
+ * Snapshots come from the Transport of the same plan, so the planner follows their mapping
+ * without checking it.
  */
 export function createAudibleMidiSchedulerPlanner(
   plan: AudibleMidiProjectPlan,
-  configurationInput: AudibleMidiSchedulerConfiguration,
+  configuration: AudibleMidiSchedulerConfiguration,
 ): AudibleMidiSchedulerPlanner {
-  const configuration = normalizeConfiguration(configurationInput)
+  const lookAheadHorizonSecond = lookAheadHorizon(configuration)
   const modelRevision = plan.modelRevision
   const masterGain = plan.master.gain
-  const timelineEndTick = plan.timelineEndTick
-  const tempoMap: TempoMap = createTempoMapFromSegments(plan.tempoSegments)
-  const timelineEndProjectSecond = tempoMap.projectSecondAtTick(timelineEndTick)
+  const tempoMap = createTempoMapFromSegments(plan.tempoSegments)
+  const timelineEndProjectSecond = tempoMap.projectSecondAtTick(plan.timelineEndTick)
   const routes = trackRoutes(plan)
   // Each run is one Clip's spans in span order, with the index of the next span to plan.
   const runs = [...plan.clipSpans.values()].filter((spans) => spans.length > 0)
   const cursors = runs.map(() => 0)
 
-  let highestObservedGeneration: MappingGeneration | null = null
-  let activeGeneration: MappingGeneration | null = null
-  let activeAnchorPlaybackClockSecond: PlaybackClockSecond | null = null
-  let activeAnchorProjectSecond: ProjectSecond | null = null
-  let plannedThroughPlaybackClockSecond: PlaybackClockSecond | null = null
+  // The mapping of the generation being planned, and how far ahead it is planned.
+  let generation: MappingGeneration | null = null
+  let anchorPlaybackClockSecond = 0
+  let anchorProjectSecond = 0
+  let plannedThroughPlaybackClockSecond = 0
 
-  function clearActivePlanningState(): void {
-    activeGeneration = null
-    activeAnchorPlaybackClockSecond = null
-    activeAnchorProjectSecond = null
-    plannedThroughPlaybackClockSecond = null
-    cursors.fill(0)
+  function clockAtProjectSecond(projectSecond: number): PlaybackClockSecond {
+    return (anchorPlaybackClockSecond +
+      (projectSecond - anchorProjectSecond)) as PlaybackClockSecond
   }
 
-  function assertSnapshotMatchesPlan(snapshot: AudibleMidiTransportSnapshot): void {
-    if (
-      snapshot.modelRevision !== modelRevision ||
-      snapshot.timelineEndTick !== timelineEndTick ||
-      snapshot.timelineEndProjectSecond !== timelineEndProjectSecond
-    ) {
-      throw new AudibleMidiSchedulerError(
-        'transport-plan-mismatch',
-        'Scheduler received a Transport Snapshot from a different compiled Plan',
-      )
-    }
+  function clockAtTick(tick: MidiNoteSpanPlan['startTick']): PlaybackClockSecond {
+    return clockAtProjectSecond(tempoMap.projectSecondAtTick(tick))
   }
 
-  function observeGeneration(generation: MappingGeneration): void {
-    if (
-      !Number.isSafeInteger(generation) ||
-      generation < 0 ||
-      (highestObservedGeneration !== null && generation < highestObservedGeneration)
-    ) {
-      throw new AudibleMidiSchedulerError(
-        'stale-mapping-generation',
-        `Scheduler cannot return to stale mappingGeneration ${generation}`,
-      )
-    }
-
-    if (highestObservedGeneration === null || generation > highestObservedGeneration) {
-      highestObservedGeneration = generation
-      clearActivePlanningState()
-    }
-  }
-
-  function initializeGeneration(snapshot: PlayingAudibleMidiTransportSnapshot): void {
-    const anchorTickPosition = tempoMap.tickPositionAtProjectSecond(snapshot.anchorProjectSecond)
-
-    activeGeneration = snapshot.mappingGeneration
-    activeAnchorPlaybackClockSecond = snapshot.anchorPlaybackClockSecond
-    activeAnchorProjectSecond = snapshot.anchorProjectSecond
+  /** A new generation starts from its Anchor: each Clip at its first span not before it. */
+  function startGeneration(snapshot: PlayingAudibleMidiTransportSnapshot): void {
+    generation = snapshot.mappingGeneration
+    anchorPlaybackClockSecond = snapshot.anchorPlaybackClockSecond
+    anchorProjectSecond = snapshot.anchorProjectSecond
     plannedThroughPlaybackClockSecond = snapshot.anchorPlaybackClockSecond
+    const anchorTickPosition = tempoMap.tickPositionAtProjectSecond(snapshot.anchorProjectSecond)
     runs.forEach((spans, run) => {
       cursors[run] = findFirstSpanAtOrAfter(spans, anchorTickPosition)
     })
   }
 
-  function assertStableMapping(snapshot: PlayingAudibleMidiTransportSnapshot): void {
-    if (
-      activeAnchorPlaybackClockSecond !== snapshot.anchorPlaybackClockSecond ||
-      activeAnchorProjectSecond !== snapshot.anchorProjectSecond
-    ) {
-      throw new AudibleMidiSchedulerError(
-        'transport-mapping-changed-without-generation',
-        'Transport mapping changed without a new mappingGeneration',
-      )
-    }
-  }
-
-  function playbackClockSecondAtProjectSecond(projectSecond: ProjectSecond): PlaybackClockSecond {
-    if (activeAnchorPlaybackClockSecond === null || activeAnchorProjectSecond === null) {
-      throw new AudibleMidiSchedulerError(
-        'transport-plan-mismatch',
-        'Scheduler has no active Transport mapping',
-      )
-    }
-
-    return parseCalculatedPlaybackClockSecond(
-      activeAnchorPlaybackClockSecond + (projectSecond - activeAnchorProjectSecond),
-      `ProjectSecond ${projectSecond}`,
-    )
-  }
-
   function createScheduledVoice(
     span: MidiNoteSpanPlan,
-    route: SchedulerTrackRoute,
     startPlaybackClockSecond: PlaybackClockSecond,
     keyReleasePlaybackClockSecond: PlaybackClockSecond,
     releasePlaybackClockSecond: PlaybackClockSecond,
     timing: ScheduledVoiceTiming,
   ): ScheduledSampleVoicePlan {
+    const route = routes.get(span.trackId)!
     return Object.freeze({
       channel: span.channel,
       instrumentDeviceId: route.instrumentDeviceId,
@@ -330,9 +221,6 @@ export function createAudibleMidiSchedulerPlanner(
   }
 
   function planNextWindow(snapshot: AudibleMidiTransportSnapshot): AudibleMidiScheduleBatch {
-    assertSnapshotMatchesPlan(snapshot)
-    observeGeneration(snapshot.mappingGeneration)
-
     if (snapshot.state !== 'playing') {
       return createBatch({
         mappingGeneration: snapshot.mappingGeneration,
@@ -340,43 +228,14 @@ export function createAudibleMidiSchedulerPlanner(
         outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.INACTIVE,
       })
     }
+    if (snapshot.mappingGeneration !== generation) startGeneration(snapshot)
 
-    if (activeGeneration !== snapshot.mappingGeneration) {
-      initializeGeneration(snapshot)
-    } else {
-      assertStableMapping(snapshot)
-    }
-
-    if (plannedThroughPlaybackClockSecond === null) {
-      throw new AudibleMidiSchedulerError(
-        'schedule-cursor-inconsistent',
-        'Playing Scheduler generation has no planned-through cursor',
-      )
-    }
-    if (
-      snapshot.positionProjectSecond < snapshot.anchorProjectSecond ||
-      snapshot.positionProjectSecond > timelineEndProjectSecond
-    ) {
-      throw new AudibleMidiSchedulerError(
-        'transport-plan-mismatch',
-        'Transport Snapshot position is outside its active Project range',
-      )
-    }
-
-    const planningPlaybackClockSecond = playbackClockSecondAtProjectSecond(
-      snapshot.positionProjectSecond,
-    )
-    const timelineEndPlaybackClockSecond =
-      playbackClockSecondAtProjectSecond(timelineEndProjectSecond)
-    const candidateWindowEnd = Math.min(
-      planningPlaybackClockSecond + configuration.lookAheadHorizonSecond,
-      timelineEndPlaybackClockSecond,
-    )
-    const toPlaybackClockSecond = parseCalculatedPlaybackClockSecond(
-      candidateWindowEnd,
-      'Scheduler look-ahead window end',
-    )
-    const fromPlaybackClockSecond = plannedThroughPlaybackClockSecond
+    const planningPlaybackClockSecond = clockAtProjectSecond(snapshot.positionProjectSecond)
+    const toPlaybackClockSecond = Math.min(
+      planningPlaybackClockSecond + lookAheadHorizonSecond,
+      clockAtProjectSecond(timelineEndProjectSecond),
+    ) as PlaybackClockSecond
+    const fromPlaybackClockSecond = plannedThroughPlaybackClockSecond as PlaybackClockSecond
 
     if (toPlaybackClockSecond <= fromPlaybackClockSecond) {
       return createBatch({
@@ -389,68 +248,42 @@ export function createAudibleMidiSchedulerPlanner(
 
     // Windows are half-open; an event exactly at the horizon belongs to the next wake.
     const windowSpans: MidiNoteSpanPlan[] = []
-    const nextCursors = [...cursors]
     runs.forEach((spans, run) => {
-      let index = nextCursors[run]!
-      for (; index < spans.length; index += 1) {
-        const span = spans[index]!
-        const targetStartPlaybackClockSecond = playbackClockSecondAtProjectSecond(
-          tempoMap.projectSecondAtTick(span.startTick),
-        )
-        if (targetStartPlaybackClockSecond >= toPlaybackClockSecond) break
-        if (targetStartPlaybackClockSecond < fromPlaybackClockSecond) {
-          throw new AudibleMidiSchedulerError(
-            'schedule-cursor-inconsistent',
-            `Occurrence ${span.occurrenceKey} fell behind the continuous Scheduler cursor`,
-          )
-        }
-        windowSpans.push(span)
+      let index = cursors[run]!
+      while (index < spans.length && clockAtTick(spans[index]!.startTick) < toPlaybackClockSecond) {
+        windowSpans.push(spans[index]!)
+        index += 1
       }
-      nextCursors[run] = index
+      cursors[run] = index
     })
 
     const voicePlans: ScheduledSampleVoicePlan[] = []
     for (const span of windowSpans.sort(compareNoteSpans)) {
-      const targetReleasePlaybackClockSecond = playbackClockSecondAtProjectSecond(
-        tempoMap.projectSecondAtTick(span.releaseTick),
-      )
+      const releasePlaybackClockSecond = clockAtTick(span.releaseTick)
       // A span whose release already passed is dropped; one that already started starts now.
-      if (targetReleasePlaybackClockSecond <= planningPlaybackClockSecond) continue
+      if (releasePlaybackClockSecond <= planningPlaybackClockSecond) continue
 
-      const targetStartPlaybackClockSecond = playbackClockSecondAtProjectSecond(
-        tempoMap.projectSecondAtTick(span.startTick),
-      )
-      const targetKeyReleasePlaybackClockSecond = playbackClockSecondAtProjectSecond(
-        tempoMap.projectSecondAtTick(span.endTick),
-      )
-      const isLate = targetStartPlaybackClockSecond < planningPlaybackClockSecond
-
+      const startPlaybackClockSecond = clockAtTick(span.startTick)
+      const isLate = startPlaybackClockSecond < planningPlaybackClockSecond
       voicePlans.push(
         createScheduledVoice(
           span,
-          routes.get(span.trackId)!,
-          isLate ? planningPlaybackClockSecond : targetStartPlaybackClockSecond,
-          targetKeyReleasePlaybackClockSecond,
-          targetReleasePlaybackClockSecond,
+          isLate ? planningPlaybackClockSecond : startPlaybackClockSecond,
+          clockAtTick(span.endTick),
+          releasePlaybackClockSecond,
           isLate ? 'late-immediate' : 'on-time',
         ),
       )
     }
-
-    // Publish the cursors only after the complete batch is valid.
-    nextCursors.forEach((index, run) => {
-      cursors[run] = index
-    })
     plannedThroughPlaybackClockSecond = toPlaybackClockSecond
 
-    const window = Object.freeze({ fromPlaybackClockSecond, toPlaybackClockSecond })
     return createBatch({
       mappingGeneration: snapshot.mappingGeneration,
       modelRevision,
       outcome: AUDIBLE_MIDI_SCHEDULER_OUTCOME.PLANNED,
       planningPlaybackClockSecond,
       voicePlans: Object.freeze(voicePlans),
-      window,
+      window: Object.freeze({ fromPlaybackClockSecond, toPlaybackClockSecond }),
     })
   }
 

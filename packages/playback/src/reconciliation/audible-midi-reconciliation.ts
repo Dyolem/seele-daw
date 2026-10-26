@@ -94,19 +94,6 @@ export interface CreateAudibleMidiReconciliationPlanInput {
   readonly commits: readonly ProjectCommit[]
 }
 
-export type AudibleMidiReconciliationErrorCode = 'invalid-revision-order'
-
-/** Stable failure raised when two Plans cannot represent a forward reconciliation. */
-export class AudibleMidiReconciliationError extends Error {
-  readonly code: AudibleMidiReconciliationErrorCode
-
-  constructor(code: AudibleMidiReconciliationErrorCode, message: string) {
-    super(message)
-    this.name = 'AudibleMidiReconciliationError'
-    this.code = code
-  }
-}
-
 function compareStrings(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
 }
@@ -356,12 +343,6 @@ export function createAudibleMidiReconciliationPlan(
   input: CreateAudibleMidiReconciliationPlanInput,
 ): AudibleMidiReconciliationPlan {
   const { commits, nextPlan, previousPlan } = input
-  if (nextPlan.modelRevision <= previousPlan.modelRevision) {
-    throw new AudibleMidiReconciliationError(
-      'invalid-revision-order',
-      `Audible MIDI reconciliation requires a revision after ${previousPlan.modelRevision}`,
-    )
-  }
 
   const occurrenceChanges = createOccurrenceChanges(previousPlan, nextPlan)
   const trackChanges = createTrackChanges(previousPlan, nextPlan)

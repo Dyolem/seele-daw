@@ -21,21 +21,6 @@ export interface SampleInstrumentDeviceState {
   readonly soundbankId: SoundbankId
 }
 
-export type SoundbankIdErrorCode = 'invalid-soundbank-id'
-
-/** Stable failure raised when an opaque Soundbank identity is not persistable. */
-export class SoundbankIdError extends RangeError {
-  readonly code: SoundbankIdErrorCode
-
-  constructor() {
-    super(
-      `SoundbankId must be a trimmed non-blank string of at most ${SOUNDBANK_ID_MAX_LENGTH} Unicode characters`,
-    )
-    this.name = 'SoundbankIdError'
-    this.code = 'invalid-soundbank-id'
-  }
-}
-
 export function parseSoundbankId(value: unknown): SoundbankId {
   if (
     typeof value !== 'string' ||
@@ -43,7 +28,9 @@ export function parseSoundbankId(value: unknown): SoundbankId {
     value.trim() !== value ||
     Array.from(value).length > SOUNDBANK_ID_MAX_LENGTH
   ) {
-    throw new SoundbankIdError()
+    throw new RangeError(
+      `SoundbankId must be a trimmed non-blank string of at most ${SOUNDBANK_ID_MAX_LENGTH} Unicode characters`,
+    )
   }
 
   return value as SoundbankId

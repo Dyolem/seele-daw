@@ -51,8 +51,8 @@ Project MIDI Export Bridge 尚未实现，因此当前没有把 Project CC64 写
    强制形成最终释放边界；
 5. 不同 Channel 的状态互不影响。
 
-Compiler 会验证每个 Source 都有踏板分区，并拒绝同一 Source / Channel / Tick 的重复事实。
-Project Core 正常快照不会产生这种重复；验证用于让伪造或损坏的 Snapshot 失败关闭。
+每个 Source 都有踏板分区，同一 Source / Channel / Tick 至多一枚事件，分区按 Tick 排序：这些是
+Project Core 的不变量与 Snapshot 的约定，Compiler 不再检查。
 
 当前 Looped MIDI Clip 仍整体不进入可听编译，因此本批次没有宣称完成跨循环的踏板状态展开。
 非循环 Clip 采用半开 Source Window；位于终点的 CC64 Fact 可以保存和往返，但不会把声音延长到

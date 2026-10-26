@@ -13,7 +13,6 @@ import { describe, expect, it } from 'vitest'
 import {
   AUDIBLE_MIDI_MINIMUM_TIMELINE_BAR_COUNT,
   AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT,
-  AudibleMidiTimelineError,
   deriveAudibleMidiTimelineRange,
 } from '#internal/timeline/audible-midi-timeline'
 import {
@@ -92,24 +91,5 @@ describe('Audible MIDI Timeline', () => {
       timelineBarCount: 151 + AUDIBLE_MIDI_TIMELINE_TAIL_BAR_COUNT,
       timelineEndTick: 610_560,
     })
-  })
-
-  it.each([
-    ['initial-time-signature-missing', []],
-    [
-      'initial-time-signature-ambiguous',
-      [
-        createEmptySnapshot().timeSignatureEvents[0]!,
-        createEmptySnapshot().timeSignatureEvents[0]!,
-      ],
-    ],
-  ] as const)('fails closed with %s when the initial meter is not unique', (code, events) => {
-    const snapshot = createEmptySnapshot()
-
-    expect(() =>
-      deriveAudibleMidiTimelineRange(
-        replaceCompilerFixtureSnapshot(snapshot, { timeSignatureEvents: events }),
-      ),
-    ).toThrow(expect.objectContaining({ code }) as AudibleMidiTimelineError)
   })
 })

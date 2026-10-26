@@ -10,7 +10,6 @@ import {
   type MidiClipRecord,
   type MidiNoteRecord,
   type MidiSourceId,
-  type MidiSourceRecord,
   type MidiSourcePartitions,
   type MidiSustainPedalEventRecord,
   type ProjectSnapshot,
@@ -31,7 +30,6 @@ import {
   type SampleInstrumentPlan,
   type TrackPlaybackPlan,
 } from './audible-midi-plan'
-import { AudibleMidiCompilerError } from './audible-midi-compiler-error'
 import {
   createSustainPedalReleaseResolver,
   type SustainPedalReleaseResolver,
@@ -51,7 +49,6 @@ const VA_SYNTH_DEVICE_TYPE_ID = parseDeviceTypeId('seele.va-synth')
 interface SnapshotIndexes {
   readonly tracksById: ReadonlyMap<TrackId, TrackRecord>
   readonly devicesById: ReadonlyMap<DeviceId, DeviceDescriptor>
-  readonly sourcesById: ReadonlyMap<MidiSourceId, MidiSourceRecord>
   readonly notesBySourceId: ReadonlyMap<MidiSourceId, readonly MidiNoteRecord[]>
   readonly sustainPedalEventsBySourceId: ReadonlyMap<
     MidiSourceId,
@@ -103,24 +100,10 @@ function compareNotes(left: MidiNoteRecord, right: MidiNoteRecord): number {
   return compareIds(left, right)
 }
 
-function indexUnique<Entity extends { readonly id: string }>(
+function indexById<Entity extends { readonly id: string }>(
   entities: readonly Entity[],
-  entityKind: string,
 ): Map<Entity['id'], Entity> {
-  const indexed = new Map<Entity['id'], Entity>()
-
-  for (const entity of entities) {
-    if (indexed.has(entity.id)) {
-      throw new AudibleMidiCompilerError(
-        'duplicate-snapshot-entity',
-        `${entityKind}:${entity.id}`,
-        `Project Snapshot contains duplicate ${entityKind} ${entity.id}`,
-      )
-    }
-    indexed.set(entity.id, entity)
-  }
-
-  return indexed
+  return new Map(entities.map((entity) => [entity.id, entity]))
 }
 
 function indexPartitions<RecordType>(
@@ -129,93 +112,22 @@ function indexPartitions<RecordType>(
   return new Map(Object.entries(partitions) as [MidiSourceId, readonly RecordType[]][])
 }
 
-function requireReference<Entity>(
-  entities: ReadonlyMap<string, Entity>,
-  id: string,
-  context: string,
-): Entity {
-  const entity = entities.get(id)
-  if (entity === undefined) {
-    throw new AudibleMidiCompilerError(
-      'invalid-snapshot-reference',
-      context,
-      `Project Snapshot reference ${context} points to missing entity ${id}`,
-    )
-  }
-  return entity
-}
-
-function validateTrackOrder(
-  trackOrder: readonly TrackId[],
-  tracksById: ReadonlyMap<TrackId, TrackRecord>,
-): void {
-  if (trackOrder.length !== tracksById.size || new Set(trackOrder).size !== trackOrder.length) {
-    throw new AudibleMidiCompilerError(
-      'invalid-track-order',
-      'trackOrder',
-      'Project Snapshot trackOrder must contain every Track exactly once',
-    )
-  }
-
-  for (const trackId of trackOrder) {
-    if (!tracksById.has(trackId)) {
-      throw new AudibleMidiCompilerError(
-        'invalid-track-order',
-        `trackOrder:${trackId}`,
-        `Project Snapshot trackOrder references missing Track ${trackId}`,
-      )
-    }
-  }
-}
-
-/** Validates structural references and prepares deterministic compiler-local indexes. */
+/** Indexes a Snapshot. Its project facts are valid, so every reference the compiler follows resolves. */
 function createSnapshotIndexes(snapshot: ProjectSnapshot): SnapshotIndexes {
-  const tracksById = indexUnique(snapshot.tracks, 'Track')
-  const devicesById = indexUnique(snapshot.devices, 'Device')
-  const sourcesById = indexUnique(snapshot.midiSources, 'MIDI Source')
-  const notesBySourceId = indexPartitions(snapshot.midiNotes)
-  const sustainPedalEventsBySourceId = indexPartitions(snapshot.midiSustainPedalEvents)
-  const mutableClipsByTrackId = new Map<TrackId, ClipRecord[]>()
-  const clipIds = new Set<ClipId>()
-
-  validateTrackOrder(snapshot.trackOrder, tracksById)
-
+  const clipsByTrackId = new Map<TrackId, ClipRecord[]>()
   for (const clip of snapshot.clips) {
-    if (clipIds.has(clip.id)) {
-      throw new AudibleMidiCompilerError(
-        'duplicate-snapshot-entity',
-        `Clip:${clip.id}`,
-        `Project Snapshot contains duplicate Clip ${clip.id}`,
-      )
-    }
-    clipIds.add(clip.id)
-    requireReference(tracksById, clip.trackId, `Clip:${clip.id}.trackId`)
-    requireReference(sourcesById, clip.sourceId, `Clip:${clip.id}.sourceId`)
-    requireReference(notesBySourceId, clip.sourceId, `Clip:${clip.id}.notePartition`)
-    requireReference(
-      sustainPedalEventsBySourceId,
-      clip.sourceId,
-      `Clip:${clip.id}.sustainPedalEventPartition`,
-    )
-
-    const clips = mutableClipsByTrackId.get(clip.trackId) ?? []
-    clips.push(clip)
-    mutableClipsByTrackId.set(clip.trackId, clips)
+    const clips = clipsByTrackId.get(clip.trackId)
+    if (clips === undefined) clipsByTrackId.set(clip.trackId, [clip])
+    else clips.push(clip)
   }
-
-  const clipsByTrackId = new Map<TrackId, readonly ClipRecord[]>()
-  for (const [trackId, clips] of mutableClipsByTrackId) {
-    clips.sort(compareClips)
-    clipsByTrackId.set(trackId, Object.freeze(clips))
-  }
+  for (const clips of clipsByTrackId.values()) clips.sort(compareClips)
 
   return {
     clipsByTrackId,
-    devicesById,
-    notesBySourceId,
-    sustainPedalEventsBySourceId,
-    sourcesById,
-    tracksById,
+    devicesById: indexById(snapshot.devices),
+    notesBySourceId: indexPartitions(snapshot.midiNotes),
+    sustainPedalEventsBySourceId: indexPartitions(snapshot.midiSustainPedalEvents),
+    tracksById: indexById(snapshot.tracks),
   }
 }
 
@@ -233,12 +145,9 @@ function createDiagnostic(input: DiagnosticInput): PlaybackDiagnostic {
 function getEnabledDevices(
   deviceIds: readonly DeviceId[],
   devicesById: ReadonlyMap<DeviceId, DeviceDescriptor>,
-  context: string,
 ): readonly DeviceDescriptor[] {
   // Disabled effects remain persisted facts but are transparent to the V1 playback route.
-  return deviceIds
-    .map((deviceId) => requireReference(devicesById, deviceId, `${context}:${deviceId}`))
-    .filter(({ enabled }) => enabled)
+  return deviceIds.map((deviceId) => devicesById.get(deviceId)!).filter(({ enabled }) => enabled)
 }
 
 function appendEffectDiagnostics(
@@ -262,11 +171,7 @@ function decodeInstrumentPlan(
   devicesById: ReadonlyMap<DeviceId, DeviceDescriptor>,
   diagnostics: PlaybackDiagnostic[],
 ): SampleInstrumentPlan | null {
-  const device = requireReference(
-    devicesById,
-    track.instrumentDeviceId,
-    `Track:${track.id}.instrumentDeviceId`,
-  )
+  const device = devicesById.get(track.instrumentDeviceId)!
 
   if (!device.enabled) {
     diagnostics.push(
@@ -315,16 +220,8 @@ function createTrackPlan(
   masterBlocked: boolean,
 ): TrackPlaybackPlan | null {
   // Enabled effects cannot be bypassed as dry audio without misrepresenting the saved topology.
-  const midiEffects = getEnabledDevices(
-    track.midiEffectIds,
-    indexes.devicesById,
-    `Track:${track.id}.midiEffectIds`,
-  )
-  const audioEffects = getEnabledDevices(
-    track.audioEffectIds,
-    indexes.devicesById,
-    `Track:${track.id}.audioEffectIds`,
-  )
+  const midiEffects = getEnabledDevices(track.midiEffectIds, indexes.devicesById)
+  const audioEffects = getEnabledDevices(track.audioEffectIds, indexes.devicesById)
   appendEffectDiagnostics(
     diagnostics,
     midiEffects,
@@ -407,7 +304,6 @@ function compileClipNoteSpans(
   if (!trackPlan.audible || clip.muted) return NO_SPANS
 
   const sourceWindowEndTick = addTicks(clip.sourceOffsetTick, clip.spanTick)
-  const clipEndTick = addTicks(clip.startTick, clip.spanTick)
   const notes = [...sourceNotes].sort(compareNotes)
   const spans: MidiNoteSpanPlan[] = []
 
@@ -433,19 +329,6 @@ function compileClipNoteSpans(
       clip.startTick,
       parseTick(finalSourceReleaseTick - clip.sourceOffsetTick),
     )
-
-    if (
-      projectEndTick > clipEndTick ||
-      projectEndTick <= projectStartTick ||
-      projectReleaseTick < projectEndTick ||
-      projectReleaseTick > clipEndTick
-    ) {
-      throw new AudibleMidiCompilerError(
-        'invalid-snapshot-reference',
-        `Clip:${clip.id}.Note:${note.id}`,
-        `Projected Note ${note.id} does not form a valid span inside Clip ${clip.id}`,
-      )
-    }
 
     // A Clip-scoped occurrence remains unique when equal-pitch Notes overlap in project time.
     spans.push(
@@ -494,7 +377,6 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
   const enabledMasterEffects = getEnabledDevices(
     snapshot.master.audioEffectIds,
     indexes.devicesById,
-    'Master.audioEffectIds',
   )
   const masterBlocked = enabledMasterEffects.length > 0
 
@@ -507,7 +389,7 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
   )
 
   for (const trackId of snapshot.trackOrder) {
-    const track = requireReference(indexes.tracksById, trackId, `trackOrder:${trackId}`)
+    const track = indexes.tracksById.get(trackId)!
     if (track.kind === 'audio') {
       // Its Solo fact already participated above even though Audio Track playback is deferred.
       diagnostics.push(
@@ -542,16 +424,8 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
         continue
       }
 
-      const sourceNotes = requireReference(
-        indexes.notesBySourceId,
-        clip.sourceId,
-        `Clip:${clip.id}.notePartition`,
-      )
-      const sustainPedalEvents = requireReference(
-        indexes.sustainPedalEventsBySourceId,
-        clip.sourceId,
-        `Clip:${clip.id}.sustainPedalEventPartition`,
-      )
+      const sourceNotes = indexes.notesBySourceId.get(clip.sourceId)!
+      const sustainPedalEvents = indexes.sustainPedalEventsBySourceId.get(clip.sourceId)!
       const spans = compiledClipNoteSpans(trackPlan, clip, sourceNotes, sustainPedalEvents)
       clipSpans.set(clip.id, spans)
       spanCount += spans.length

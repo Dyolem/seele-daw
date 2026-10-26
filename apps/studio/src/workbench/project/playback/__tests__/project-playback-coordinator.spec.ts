@@ -359,7 +359,7 @@ describe('ProjectPlaybackCoordinator', () => {
       phase: 'stopped',
       planStatus: 'empty',
     })
-    await expect(coordinator.play()).rejects.toMatchObject({ code: 'playback-unavailable' })
+    await expect(coordinator.play()).rejects.toThrowError('no playable plan')
     expect(runtime.plans).toEqual([])
     coordinator.dispose()
   })

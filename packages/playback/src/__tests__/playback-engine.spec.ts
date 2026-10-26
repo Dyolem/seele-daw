@@ -1507,9 +1507,7 @@ describe('PlaybackEngine', () => {
 
     engine.dispose()
     expect(runtime.disposeCount).toBe(1)
-    expect(() => engine.readVisualPosition()).toThrowError(
-      expect.objectContaining({ code: 'engine-disposed' }),
-    )
+    expect(() => engine.readVisualPosition()).toThrowError('Playback is disposed')
   })
 
   it('rejects Play for an Empty Plan without preparing the runtime', async () => {
@@ -1523,7 +1521,7 @@ describe('PlaybackEngine', () => {
     const engine = createLoadedEngine(session, runtime)
 
     expect(engine.state).toMatchObject({ phase: 'stopped', plan: { status: 'empty' } })
-    await expect(engine.play()).rejects.toMatchObject({ code: 'playback-unavailable' })
+    await expect(engine.play()).rejects.toThrowError('no playable plan')
     expect(runtime.plans).toEqual([])
     engine.dispose()
   })

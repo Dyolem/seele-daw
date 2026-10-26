@@ -93,17 +93,14 @@ Playhead 表示现在播放到哪里，cursor 表示未来已经安排到哪里�
 planner.planNextWindow(transportSnapshot)
 ```
 
-1. Snapshot 必须来自同一份计划（revision 与 Timeline End 相同）。
-2. generation 不能倒退。遇到更高的 generation，从它的 Anchor 重新定位：每个 Clip 的 cursor 指向
-   第一枚起点不早于 Anchor 的 span。
-3. Transport 不在 Playing，就返回 `inactive`。
-4. 同一 generation 的 Anchor 不能改变，否则旧批次不再与映射一致。
-5. 计算窗口：`from` 是上次安排到的位置，`to = min(当前播放时钟 + horizon, Timeline End)`。
-6. 每个 Clip 从自己的 cursor 往后读起点落在窗口里的 span，然后整批按 span 顺序排序，所以批次
+1. Transport 不在 Playing，就返回 `inactive`。
+2. 遇到新的 generation，从它的 Anchor 重新定位：每个 Clip 的 cursor 指向第一枚起点不早于 Anchor
+   的 span。
+3. 计算窗口：`from` 是上次安排到的位置，`to = min(当前播放时钟 + horizon, Timeline End)`。
+4. 每个 Clip 从自己的 cursor 往后读起点落在窗口里的 span，然后整批按 span 顺序排序，所以批次
    的顺序与 Clip 的顺序无关。
-7. 用同一份 TempoMap 与 Anchor，把起点、松键与最终释放的 Tick 换算成播放时钟秒。
-8. 处理迟到与过期（见下节），生成冻结的 Voice Plan。
-9. 整批成功之后，才写回各个 cursor 与“已安排到哪里”。中途失败不会留下推进了一半的状态。
+5. 用同一份 TempoMap 与 Anchor，把起点、松键与最终释放的 Tick 换算成播放时钟秒。
+6. 处理迟到与过期（见下节），生成冻结的 Voice Plan，记下已经安排到哪里。
 
 创建 Planner 只花与 Clip 数量成正比的时间；每个窗口花 Clip 数量加上本窗口开始的音符数。
 
@@ -154,17 +151,13 @@ timing: on-time | late-immediate
 哪一秒松键、哪一秒释放。释放可以落在当前窗口之外；起点在窗口里，就把完整的释放目标一起
 交出去。
 
-## 9. Planner 拒绝什么
+## 9. Planner 检查什么
 
-- cadence 或 horizon 不合法，或 horizon 不大于 cadence；
-- Transport Snapshot 来自另一份计划；
-- 已经见过更新的 generation 后又收到旧的；
-- 同一 generation 的 Anchor 被改变；
-- 无法表示的播放时钟值；
-- 有 span 落到 cursor 之后（内部不一致）。
+只检查调用方给的配置：cadence 与 horizon 必须是合法的时长，horizon 必须大于 cadence。
 
-它信任编译出的计划：span 有效、每个 Clip 内有序、occurrence key 唯一、所属 Track 可发声，这些
-都由 Compiler 保证，Planner 不再检查一遍，也不复制 span。
+其余都由上游保证，Planner 不再检查：编译出的计划里 span 有效、每个 Clip 内有序、occurrence key
+唯一、所属 Track 可发声；Snapshot 来自同一份计划的 Transport，同一 generation 的 Anchor 不变，
+播放时钟只会前进。Transport 与 TempoMap 也同样信任计划，不重新校验 Tempo Segment。
 
 ## 10. 实现与测试
 

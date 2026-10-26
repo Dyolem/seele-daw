@@ -18,7 +18,6 @@ import {
 } from '@seele-daw/project-core'
 
 import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_HIT_ZONE,
   PIANO_ROLL_POINTER_INPUT_PHASE,
@@ -104,12 +103,6 @@ export function createPianoRollNoteMoveGesture(
         noteId,
       }),
     )
-    if (baseRevision !== null && result.modelRevision !== baseRevision) {
-      throw new PianoRollError(
-        'invalid-move-gesture',
-        'Piano Roll Note move could not capture one stable Project revision',
-      )
-    }
     baseRevision = result.modelRevision
     const note = result.note
     if (note === undefined || !noteIntersectsClip(input.context, note)) return null
@@ -142,13 +135,6 @@ function resolveTickDelta(
     input.pointerInput.position.xCssPixel - input.gesture.originPosition.xCssPixel
   const rawDelta =
     (pointerDeltaCssPixel / input.viewport.widthCssPixel) * input.viewport.visibleSpanTick
-
-  if (!Number.isFinite(rawDelta)) {
-    throw new PianoRollError(
-      'coordinate-outside-viewport',
-      'Piano Roll Note move resolved a non-finite horizontal delta',
-    )
-  }
 
   let candidateDelta: number
   if (!input.snapEnabled || input.bypassSnap) {
@@ -234,20 +220,7 @@ export function resolvePianoRollNoteMovePreview(
     return null
   }
 
-  if (input.viewport.clipId !== input.gesture.context.clipId || input.gesture.notes.length === 0) {
-    throw new PianoRollError(
-      'viewport-clip-mismatch',
-      `Piano Roll Note move does not belong to Clip ${input.gesture.context.clipId}`,
-    )
-  }
-
-  const anchor = input.gesture.notes.find((note) => note.id === input.gesture.anchorNoteId)
-  if (anchor === undefined) {
-    throw new PianoRollError(
-      'invalid-move-gesture',
-      'Piano Roll Note move is missing its anchor Note',
-    )
-  }
+  const anchor = input.gesture.notes.find((note) => note.id === input.gesture.anchorNoteId)!
 
   const deltaTick = resolveTickDelta(input, anchor)
   const deltaPitch = resolvePitchDelta(input)

@@ -1,4 +1,3 @@
-import { EditorPointerInputError } from './editor-pointer-input-error'
 import {
   EDITOR_POINTER_INPUT_PHASE,
   type EditorCssPoint,
@@ -52,16 +51,6 @@ interface ActivePointer<Hit extends object> {
   readonly pointerType: EditorPointerType
   hasExceededDragThreshold: boolean
   lastPosition: EditorCssPoint
-}
-
-function requireDragThreshold(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new EditorPointerInputError(
-      'invalid-pointer-input-configuration',
-      'Editor drag threshold must be a finite positive CSS Pixel value',
-    )
-  }
-  return value
 }
 
 function normalizePointerType(pointerType: string): EditorPointerType {
@@ -121,9 +110,7 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
   #disposed = false
 
   constructor(input: CreateEditorPointerInputAdapterInput<Hit>) {
-    const dragThreshold = requireDragThreshold(
-      input.dragThresholdCssPixel ?? EDITOR_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL,
-    )
+    const dragThreshold = input.dragThresholdCssPixel ?? EDITOR_DEFAULT_DRAG_THRESHOLD_CSS_PIXEL
     this.#dragThresholdSquared = dragThreshold * dragThreshold
     this.#onInput = input.onInput
     this.#resolveHit = input.resolveHit
@@ -131,20 +118,14 @@ class EditorPointerInputAdapterImpl<Hit extends object> implements EditorPointer
     this.#positionSpace = input.positionSpace ?? 'surface'
     this.#window = input.surface.ownerDocument.defaultView
 
-    try {
-      input.surface.addEventListener('pointerdown', this.#handlePointerDown)
-      input.surface.addEventListener('pointermove', this.#handlePointerMove)
-      input.surface.addEventListener('pointerup', this.#handlePointerUp)
-      input.surface.addEventListener('pointercancel', this.#handlePointerCancel)
-      input.surface.addEventListener('lostpointercapture', this.#handleLostPointerCapture)
-      this.#window?.addEventListener('blur', this.#handleWindowBlur)
-      this.#window?.addEventListener('keydown', this.#handleModifierChange)
-      this.#window?.addEventListener('keyup', this.#handleModifierChange)
-    } catch (cause) {
-      // Construction has no owner yet; roll back listeners before propagating the failure.
-      this.dispose()
-      throw cause
-    }
+    input.surface.addEventListener('pointerdown', this.#handlePointerDown)
+    input.surface.addEventListener('pointermove', this.#handlePointerMove)
+    input.surface.addEventListener('pointerup', this.#handlePointerUp)
+    input.surface.addEventListener('pointercancel', this.#handlePointerCancel)
+    input.surface.addEventListener('lostpointercapture', this.#handleLostPointerCapture)
+    this.#window?.addEventListener('blur', this.#handleWindowBlur)
+    this.#window?.addEventListener('keydown', this.#handleModifierChange)
+    this.#window?.addEventListener('keyup', this.#handleModifierChange)
   }
 
   cancel(): boolean {

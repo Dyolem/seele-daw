@@ -391,7 +391,7 @@ describe('Piano Roll Note Resize Interaction', () => {
     })
   })
 
-  it('ignores non-edge gestures and rejects a mismatched Viewport', () => {
+  it('ignores non-edge gestures', () => {
     const fixture = createFixture()
     expect(
       createPianoRollNoteResizeGesture({
@@ -407,31 +407,5 @@ describe('Piano Roll Note Resize Interaction', () => {
         session: fixture.session,
       }),
     ).toBeNull()
-
-    const gesture = createPianoRollNoteResizeGesture({
-      context: fixture.context,
-      pointerInput: createPointerInput(),
-      selectedNoteIds: [],
-      session: fixture.session,
-    })
-    if (gesture === null) throw new Error('Expected Note resize gesture')
-
-    expect(() =>
-      resolvePianoRollNoteResizePreview({
-        bypassSnap: false,
-        gesture,
-        grid: fixture.grid,
-        pointerInput: createPointerInput({
-          hasExceededDragThreshold: true,
-          phase: PIANO_ROLL_POINTER_INPUT_PHASE.UPDATE,
-          position: Object.freeze({ xCssPixel: 170, yCssPixel: 64 }),
-        }),
-        snapEnabled: true,
-        viewport: Object.freeze({
-          ...fixture.viewport,
-          clipId: parseClipId('other-resize-clip'),
-        }),
-      }),
-    ).toThrowError(expect.objectContaining({ code: 'viewport-clip-mismatch' }))
   })
 })

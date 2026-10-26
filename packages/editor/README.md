@@ -65,10 +65,15 @@ package root 复用 Session、Handoff 与 Pointer Adapter，领域规则留在 S
 ## Piano Roll
 
 **坐标与视口。** `PianoRollClipContext` 组合非循环 MIDI Clip 与它唯一的 MidiSource，Clip-local
-Tick 与 Source Tick 一一对应；`PianoRollViewport` 描述 Clip-local 的可见 Tick、Pitch 与 CSS Pixel
-尺寸，提供 Tick / X、Pitch / Y 的双向确定性换算。Clip-local 与 Track-global Surface 共用
-identity-free 的 `PianoRollTimelineViewport` 几何。Looped Clip 不支持编辑：Loop 展开、重复实例的
-选择与 Source 编辑语义尚未确定。
+Tick 与 Source Tick 一一对应；looped Clip 没有 context（`createPianoRollClipContext` 返回
+`null`），调用方据此显示“不支持”。`PianoRollViewport` 描述 Clip-local 的可见 Tick、Pitch 与 CSS
+Pixel 尺寸，提供 Tick / X、Pitch / Y 的线性换算；Y 换算出的 Pitch 夹在可见行内。Clip-local 与
+Track-global Surface 共用 identity-free 的 `PianoRollTimelineViewport` 几何。Looped Clip 不支持
+编辑：Loop 展开、重复实例的选择与 Source 编辑语义尚未确定。
+
+**信任边界。** editor 信任 Snapshot 的不变量（Clip 的 Source、Note 与 CC64 分区都存在）和 Studio
+传入的几何（视口属于当前 Clip，坐标在视口内），不再检查。只检查来自布局和浏览器的值：视口宽高、
+`devicePixelRatio`、Canvas 2D context 与主题色，抛普通错误。
 
 **Read Model。**
 

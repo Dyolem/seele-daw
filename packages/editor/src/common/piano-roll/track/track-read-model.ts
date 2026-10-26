@@ -4,6 +4,8 @@ import {
   type ClipId,
   type MidiClipRecord,
   type MidiNoteRecord,
+  type MidiSourceId,
+  type MidiSourceRecord,
   type ModelRevision,
   type ProjectId,
   type ProjectSnapshot,
@@ -11,7 +13,6 @@ import {
   type TrackId,
 } from '@seele-daw/project-core'
 
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_TRACK_CLIP_STATUS,
   createPianoRollTrackClipProjection,
@@ -92,31 +93,16 @@ function createNoteProjection(
 }
 
 function createClipReadModel(
-  input: CreatePianoRollTrackReadModelInput,
+  snapshot: ProjectSnapshot,
+  sources: ReadonlyMap<MidiSourceId, MidiSourceRecord>,
   clip: MidiClipRecord,
 ): PianoRollTrackClipReadModel {
-  const source = input.snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)
-  if (source === undefined) {
-    throw new PianoRollError(
-      'track-clip-source-missing',
-      `Piano Roll Track Clip ${clip.id} references missing MidiSource ${clip.sourceId}`,
-    )
-  }
-
-  const projection = createPianoRollTrackClipProjection(clip, source)
+  const projection = createPianoRollTrackClipProjection(clip, sources.get(clip.sourceId)!)
   if (projection.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED) {
     return Object.freeze({ clip: projection, notes: Object.freeze([]) })
   }
 
-  const sourceNotes = input.snapshot.midiNotes[clip.sourceId]
-  if (sourceNotes === undefined) {
-    throw new PianoRollError(
-      'track-clip-note-partition-missing',
-      `Piano Roll Track Clip ${clip.id} references missing Note partition ${clip.sourceId}`,
-    )
-  }
-
-  const notes = sourceNotes.flatMap((note) => {
+  const notes = snapshot.midiNotes[clip.sourceId]!.flatMap((note) => {
     const noteProjection = createNoteProjection(projection, note)
     return noteProjection === null ? [] : [noteProjection]
   })
@@ -128,26 +114,15 @@ function createClipReadModel(
   })
 }
 
-/** Creates one immutable, global Track-time Piano Roll projection from a Project Snapshot. */
+/** Creates one immutable, global Track-time Piano Roll projection of an Instrument Track. */
 export function createPianoRollTrackReadModel(
   input: CreatePianoRollTrackReadModelInput,
 ): PianoRollTrackReadModel {
-  const track = input.snapshot.tracks.find((candidate) => candidate.id === input.trackId)
-  if (track === undefined) {
-    throw new PianoRollError(
-      'track-not-found',
-      `Cannot create a Piano Roll Track projection for missing Track ${input.trackId}`,
-    )
-  }
-  if (track.kind !== 'instrument') {
-    throw new PianoRollError(
-      'track-not-instrument',
-      `Cannot create a Piano Roll Track projection for non-Instrument Track ${track.id}`,
-    )
-  }
-
-  const trackClips = input.snapshot.clips.filter((clip) => clip.trackId === track.id)
-  const clips = trackClips.map((clip) => createClipReadModel(input, clip))
+  const { snapshot, trackId } = input
+  const sources = new Map(snapshot.midiSources.map((source) => [source.id, source] as const))
+  const clips = snapshot.clips
+    .filter((clip) => clip.trackId === trackId)
+    .map((clip) => createClipReadModel(snapshot, sources, clip))
   clips.sort(compareClipReadModels)
 
   const requestedActiveClipId = input.activeClipId ?? null
@@ -158,8 +133,8 @@ export function createPianoRollTrackReadModel(
   return Object.freeze({
     activeClipId,
     clips: Object.freeze(clips),
-    modelRevision: input.snapshot.modelRevision,
-    projectId: input.snapshot.project.id,
-    trackId: track.id,
+    modelRevision: snapshot.modelRevision,
+    projectId: snapshot.project.id,
+    trackId,
   })
 }

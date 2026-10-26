@@ -1,7 +1,6 @@
 import {
   MIDI_CONTROL_VALUE_MIN,
   isMidiSustainPedalDown,
-  parseMidiChannel,
   parseMidiControlValue,
   parseTick,
   type ClipId,
@@ -9,6 +8,7 @@ import {
   type MidiClipRecord,
   type MidiControlValue,
   type MidiSourceId,
+  type MidiSourceRecord,
   type MidiSustainPedalEventRecord,
   type ModelRevision,
   type ProjectId,
@@ -21,7 +21,6 @@ import {
   pianoRollSourceTickToClipTick,
   type PianoRollClipContext,
 } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_TRACK_CLIP_STATUS,
   createPianoRollTrackClipProjection,
@@ -105,16 +104,6 @@ interface ProjectedSustainPedalWindow {
   readonly segments: readonly PianoRollSustainPedalLaneStepSegment[]
 }
 
-function compareEvents(
-  left: MidiSustainPedalEventRecord,
-  right: MidiSustainPedalEventRecord,
-): number {
-  if (left.tick !== right.tick) return left.tick - right.tick
-  if (left.id < right.id) return -1
-  if (left.id > right.id) return 1
-  return 0
-}
-
 function createStepSegment(
   startTick: Tick,
   endTick: Tick,
@@ -131,9 +120,8 @@ function createStepSegment(
 function projectSustainPedalWindow(
   input: ProjectSustainPedalWindowInput,
 ): ProjectedSustainPedalWindow {
-  const channelEvents = input.events
-    .filter((event) => event.channel === input.channel)
-    .sort(compareEvents)
+  // The Snapshot partition is in Tick order already.
+  const channelEvents = input.events.filter((event) => event.channel === input.channel)
   let chasedEvent: MidiSustainPedalEventRecord | undefined
   for (const event of channelEvents) {
     if (event.tick >= input.sourceStartTick) break
@@ -177,29 +165,14 @@ function projectSustainPedalWindow(
   })
 }
 
-function requireSustainPedalEvents(
-  snapshot: ProjectSnapshot,
-  sourceId: MidiSourceId,
-): readonly MidiSustainPedalEventRecord[] {
-  const events = snapshot.midiSustainPedalEvents[sourceId]
-  if (events === undefined) {
-    throw new PianoRollError(
-      'sustain-pedal-partition-missing',
-      `Piano Roll references missing Sustain Pedal Event partition ${sourceId}`,
-    )
-  }
-  return events
-}
-
 /** Projects one non-looped Clip's selected-channel CC64 facts into Clip-local time. */
 export function createPianoRollSustainPedalClipLaneReadModel(
   input: CreatePianoRollSustainPedalClipLaneReadModelInput,
 ): PianoRollSustainPedalClipLaneReadModel {
-  const channel = parseMidiChannel(input.channel)
-  const events = requireSustainPedalEvents(input.snapshot, input.context.sourceId)
+  const { channel } = input
   const projection = projectSustainPedalWindow({
     channel,
-    events,
+    events: input.snapshot.midiSustainPedalEvents[input.context.sourceId]!,
     sourceEndTick: input.context.sourceEndTick,
     sourceStartTick: input.context.sourceStartTick,
     timelineEndTick: input.context.clipSpanTick,
@@ -233,19 +206,12 @@ function compareTrackClips(
 }
 
 function createTrackClipReadModel(
-  input: CreatePianoRollTrackSustainPedalLaneReadModelInput,
+  snapshot: ProjectSnapshot,
+  sources: ReadonlyMap<MidiSourceId, MidiSourceRecord>,
   channel: MidiChannel,
   clip: MidiClipRecord,
 ): PianoRollTrackSustainPedalLaneClipReadModel {
-  const source = input.snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)
-  if (source === undefined) {
-    throw new PianoRollError(
-      'track-clip-source-missing',
-      `Piano Roll Track Clip ${clip.id} references missing MidiSource ${clip.sourceId}`,
-    )
-  }
-
-  const projection = createPianoRollTrackClipProjection(clip, source)
+  const projection = createPianoRollTrackClipProjection(clip, sources.get(clip.sourceId)!)
   if (projection.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED) {
     return Object.freeze({
       clip: projection,
@@ -256,7 +222,7 @@ function createTrackClipReadModel(
     })
   }
 
-  return createReadyTrackClipReadModel(input.snapshot, channel, projection)
+  return createReadyTrackClipReadModel(snapshot, channel, projection)
 }
 
 function createReadyTrackClipReadModel(
@@ -264,10 +230,9 @@ function createReadyTrackClipReadModel(
   channel: MidiChannel,
   clip: ReadyPianoRollTrackClipProjection,
 ): PianoRollTrackSustainPedalLaneClipReadModel {
-  const events = requireSustainPedalEvents(snapshot, clip.sourceId)
   const projection = projectSustainPedalWindow({
     channel,
-    events,
+    events: snapshot.midiSustainPedalEvents[clip.sourceId]!,
     sourceEndTick: clip.context.sourceEndTick,
     sourceStartTick: clip.context.sourceStartTick,
     timelineEndTick: clip.endTick,
@@ -288,24 +253,11 @@ function createReadyTrackClipReadModel(
 export function createPianoRollTrackSustainPedalLaneReadModel(
   input: CreatePianoRollTrackSustainPedalLaneReadModelInput,
 ): PianoRollTrackSustainPedalLaneReadModel {
-  const track = input.snapshot.tracks.find((candidate) => candidate.id === input.trackId)
-  if (track === undefined) {
-    throw new PianoRollError(
-      'track-not-found',
-      `Cannot create a Sustain Pedal Lane projection for missing Track ${input.trackId}`,
-    )
-  }
-  if (track.kind !== 'instrument') {
-    throw new PianoRollError(
-      'track-not-instrument',
-      `Cannot create a Sustain Pedal Lane projection for non-Instrument Track ${track.id}`,
-    )
-  }
-
-  const channel = parseMidiChannel(input.channel)
-  const clips = input.snapshot.clips
-    .filter((clip) => clip.trackId === track.id)
-    .map((clip) => createTrackClipReadModel(input, channel, clip))
+  const { channel, snapshot, trackId } = input
+  const sources = new Map(snapshot.midiSources.map((source) => [source.id, source] as const))
+  const clips = snapshot.clips
+    .filter((clip) => clip.trackId === trackId)
+    .map((clip) => createTrackClipReadModel(snapshot, sources, channel, clip))
   clips.sort(compareTrackClips)
 
   const requestedActiveClipId = input.activeClipId ?? null
@@ -317,8 +269,8 @@ export function createPianoRollTrackSustainPedalLaneReadModel(
     activeClipId,
     channel,
     clips: Object.freeze(clips),
-    modelRevision: input.snapshot.modelRevision,
-    projectId: input.snapshot.project.id,
-    trackId: track.id,
+    modelRevision: snapshot.modelRevision,
+    projectId: snapshot.project.id,
+    trackId,
   })
 }

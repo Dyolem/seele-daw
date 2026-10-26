@@ -5,7 +5,6 @@ import {
   type CreateTimelineGridInput,
   type TimelineGrid,
 } from '../timeline-grid'
-import { PianoRollError } from './piano-roll-error'
 
 export interface PianoRollGrid extends TimelineGrid {
   readonly barSpanTick: Tick
@@ -19,10 +18,7 @@ export interface CreatePianoRollGridInput extends CreateTimelineGridInput {
 
 function requireGridNesting(larger: Tick, smaller: Tick, relationship: string): void {
   if (larger < smaller || larger % smaller !== 0) {
-    throw new PianoRollError(
-      'invalid-grid',
-      `Piano Roll ${relationship} must use evenly nested positive Tick spans`,
-    )
+    throw new RangeError(`Piano Roll ${relationship} must use evenly nested positive Tick spans`)
   }
 }
 

@@ -11,8 +11,6 @@ export type {
   TimelineGrid,
   TimelineGridSnapMode,
 } from './timeline-grid'
-export { TimelineGridError } from './timeline-grid-error'
-export type { TimelineGridErrorCode } from './timeline-grid-error'
 
 export { InteractionSession } from './interaction/interaction-session'
 export type { InteractionId, InteractionOperation } from './interaction/interaction-session'

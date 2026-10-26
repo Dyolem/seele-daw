@@ -1,7 +1,6 @@
 import {
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION,
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
-  PianoRollError,
   createPianoRollClipContext,
   createPianoRollTrackReadModel,
   pianoRollClipTickToSourceTick,
@@ -102,18 +101,13 @@ export interface PlacedNote {
 
 function editableClip(snapshot: ProjectSnapshot, clipId: ClipId): PianoRollClipContext {
   const clip = snapshot.clips.find((candidate) => candidate.id === clipId)
-  const source = snapshot.midiSources.find((candidate) => candidate.id === clip?.sourceId)
-  if (clip === undefined || source === undefined) throw staleEdit()
-  try {
-    return createPianoRollClipContext(clip, source)
-  } catch (cause) {
-    if (cause instanceof PianoRollError && cause.code === 'looped-clip-unsupported') {
-      throw new ProjectEditError('unsupported', 'Notes in looped Clips cannot be edited yet.', {
-        cause,
-      })
-    }
-    throw cause
+  if (clip === undefined) throw staleEdit()
+  const source = snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)!
+  const editable = createPianoRollClipContext(clip, source)
+  if (editable === null) {
+    throw new ProjectEditError('unsupported', 'Notes in looped Clips cannot be edited yet.')
   }
+  return editable
 }
 
 export function createNoteEdits(context: Omit<ProjectEditContext, 'random'>) {

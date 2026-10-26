@@ -212,7 +212,7 @@ export function createPianoRollProjectFixture() {
     addNote,
     addSustainPedalEvent,
     clip,
-    context: createPianoRollClipContext(clip, source),
+    context: createPianoRollClipContext(clip, source)!,
     moveNote,
     removeNote,
     session,

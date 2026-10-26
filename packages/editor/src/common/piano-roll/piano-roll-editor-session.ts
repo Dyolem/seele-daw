@@ -11,7 +11,6 @@ import {
 } from '@seele-daw/project-core'
 
 import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 
 export interface PianoRollEditorSessionState {
   readonly clipId: ClipId
@@ -161,12 +160,7 @@ class PianoRollEditorSessionImpl implements PianoRollEditorSession {
   }
 
   #requireActive(): void {
-    if (this.#disposed) {
-      throw new PianoRollError(
-        'editor-session-disposed',
-        'Piano Roll Editor Session has been disposed',
-      )
-    }
+    if (this.#disposed) throw new Error('The Piano Roll Editor Session is disposed')
   }
 }
 

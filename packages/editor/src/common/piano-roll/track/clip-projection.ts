@@ -1,6 +1,5 @@
 import {
   addTicks,
-  parseTick,
   type ClipId,
   type MidiClipRecord,
   type MidiSourceId,
@@ -12,11 +11,9 @@ import {
 
 import {
   createPianoRollClipContext,
-  pianoRollClipTickToSourceTick,
   pianoRollSourceTickToClipTick,
   type PianoRollClipContext,
 } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 
 export const PIANO_ROLL_TRACK_CLIP_STATUS = Object.freeze({
   READY: 'ready',
@@ -54,13 +51,6 @@ export function createPianoRollTrackClipProjection(
   clip: MidiClipRecord,
   source: MidiSourceRecord,
 ): PianoRollTrackClipProjection {
-  if (clip.sourceId !== source.id) {
-    throw new PianoRollError(
-      'clip-source-mismatch',
-      `Cannot project Clip ${clip.id} with unrelated MidiSource ${source.id}`,
-    )
-  }
-
   const base = Object.freeze({
     clipId: clip.id,
     color: clip.color,
@@ -73,35 +63,15 @@ export function createPianoRollTrackClipProjection(
     trackId: clip.trackId,
   })
 
-  if (clip.loop !== null) {
+  const context = createPianoRollClipContext(clip, source)
+  if (context === null) {
     return Object.freeze({
       ...base,
       reason: 'looped-clip',
       status: PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED,
     })
   }
-
-  return Object.freeze({
-    ...base,
-    context: createPianoRollClipContext(clip, source),
-    status: PIANO_ROLL_TRACK_CLIP_STATUS.READY,
-  })
-}
-
-/** Maps a global Project endpoint into one ready Clip's MidiSource window. */
-export function pianoRollTrackProjectTickToSourceTick(
-  clip: ReadyPianoRollTrackClipProjection,
-  projectTickInput: Tick,
-): Tick {
-  const projectTick = parseTick(projectTickInput)
-  if (projectTick < clip.startTick || projectTick > clip.endTick) {
-    throw new PianoRollError(
-      'tick-outside-clip',
-      `Project Tick ${projectTick} is outside Clip ${clip.clipId}`,
-    )
-  }
-
-  return pianoRollClipTickToSourceTick(clip.context, parseTick(projectTick - clip.startTick))
+  return Object.freeze({ ...base, context, status: PIANO_ROLL_TRACK_CLIP_STATUS.READY })
 }
 
 /** Maps a MidiSource endpoint into one ready Clip's global Project window. */

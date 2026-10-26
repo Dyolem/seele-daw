@@ -29,6 +29,3 @@ export {
   PIANO_ROLL_DOM_SUSTAIN_PEDAL_EVENT_ID_ATTRIBUTE,
   resolvePianoRollDomSustainPedalEventHit,
 } from './piano-roll-dom-sustain-pedal-hit'
-
-export { PianoRollBrowserError } from './piano-roll-browser-error'
-export type { PianoRollBrowserErrorCode } from './piano-roll-browser-error'

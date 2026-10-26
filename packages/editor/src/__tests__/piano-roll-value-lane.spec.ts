@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
-  PianoRollError,
   createPianoRollValueLaneViewport,
   createTimelineGrid,
   pianoRollMidiControlValueToValueLaneCssPixel,
@@ -49,18 +48,6 @@ function createPointerInput(
   })
 }
 
-function requirePianoRollError(operation: () => unknown): PianoRollError {
-  let caught: unknown
-  try {
-    operation()
-  } catch (error) {
-    caught = error
-  }
-  expect(caught).toBeInstanceOf(PianoRollError)
-  if (!(caught instanceof PianoRollError)) throw new Error('Expected PianoRollError')
-  return caught
-}
-
 describe('Piano Roll Value Lane Viewport', () => {
   it('maps visible Timeline endpoints and continuous horizontal positions', () => {
     const viewport = createViewport()
@@ -88,28 +75,19 @@ describe('Piano Roll Value Lane Viewport', () => {
     expect(pianoRollValueLaneCssPixelToMidiControlValue(viewport, 127)).toBe(0)
   })
 
-  it('fails closed for invalid dimensions and coordinates', () => {
-    expect(
-      requirePianoRollError(() =>
-        createPianoRollValueLaneViewport({
-          heightCssPixel: 0,
-          visibleSpanTick: parseTick(960),
-          visibleStartTick: parseTick(0),
-          widthCssPixel: 960,
-        }),
-      ).code,
-    ).toBe('invalid-viewport-dimension')
+  it('rejects a lane without size and clamps values past its edges', () => {
+    expect(() =>
+      createPianoRollValueLaneViewport({
+        heightCssPixel: 0,
+        visibleSpanTick: parseTick(960),
+        visibleStartTick: parseTick(0),
+        widthCssPixel: 960,
+      }),
+    ).toThrowError(RangeError)
 
     const viewport = createViewport()
-    expect(
-      requirePianoRollError(() =>
-        pianoRollValueLaneTimelineTickToCssPixel(viewport, parseTick(479)),
-      ).code,
-    ).toBe('coordinate-outside-viewport')
-    expect(
-      requirePianoRollError(() => pianoRollValueLaneCssPixelToMidiControlValue(viewport, 127.01))
-        .code,
-    ).toBe('coordinate-outside-viewport')
+    expect(pianoRollValueLaneCssPixelToMidiControlValue(viewport, 127.01)).toBe(0)
+    expect(pianoRollValueLaneCssPixelToMidiControlValue(viewport, -5)).toBe(127)
   })
 })
 

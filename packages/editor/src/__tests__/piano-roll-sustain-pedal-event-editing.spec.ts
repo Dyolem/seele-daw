@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS,
-  PianoRollError,
   createPianoRollSustainPedalClipLaneReadModel,
   createPianoRollSustainPedalTransformGesture,
   createPianoRollTrackSustainPedalLaneReadModel,
@@ -163,24 +162,6 @@ describe('Piano Roll Sustain Pedal editing scope', () => {
         }),
       }),
     ).toBeNull()
-  })
-
-  it('fails closed when a Clip read model is paired with another context', () => {
-    const fixture = createFixture()
-    const forgedContext = Object.freeze({
-      ...fixture.project.context,
-      sourceId: fixture.project.source.id.replace(
-        'source',
-        'other-source',
-      ) as typeof fixture.project.source.id,
-    })
-
-    expect(() =>
-      resolvePianoRollSustainPedalEditingScope({
-        context: forgedContext,
-        readModel: fixture.clipReadModel,
-      }),
-    ).toThrowError(PianoRollError)
   })
 })
 

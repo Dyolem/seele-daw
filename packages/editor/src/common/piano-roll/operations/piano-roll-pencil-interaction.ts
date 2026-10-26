@@ -6,7 +6,6 @@ import {
   type TimelineGrid,
 } from '#internal/common/timeline-grid'
 import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   type PianoRollPointerInput,
@@ -41,13 +40,6 @@ function clampToClipInterior(
   if (candidateTick <= lastInteriorTick) return candidateTick
   if (!snapEnabled) return lastInteriorTick
 
-  if (grid.originTick > lastInteriorTick) {
-    throw new PianoRollError(
-      'invalid-grid',
-      `Piano Roll Grid origin ${grid.originTick} leaves no start inside Clip ${context.clipId}`,
-    )
-  }
-
   const lastSubdivisionIndex = Math.floor(
     (lastInteriorTick - grid.originTick) / grid.subdivisionSpanTick,
   )
@@ -70,13 +62,6 @@ export function resolvePianoRollPencilNotePlacement(
     pointerInput.hit !== null
   ) {
     return null
-  }
-
-  if (input.viewport.clipId !== input.context.clipId) {
-    throw new PianoRollError(
-      'viewport-clip-mismatch',
-      `Piano Roll Viewport belongs to another Clip, not ${input.context.clipId}`,
-    )
   }
 
   const tickPosition = pianoRollCssPixelToClipTickPosition(

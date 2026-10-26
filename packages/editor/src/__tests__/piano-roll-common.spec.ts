@@ -12,7 +12,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   PIANO_ROLL_DEFAULT_CENTER_PITCH,
-  PianoRollError,
   createInitialPianoRollViewport,
   createPianoRollPitchViewport,
   createPianoRollClipContext,
@@ -53,18 +52,6 @@ function createClipRecords() {
   return { clip, source }
 }
 
-function requirePianoRollError(operation: () => unknown): PianoRollError {
-  let caught: unknown
-  try {
-    operation()
-  } catch (error) {
-    caught = error
-  }
-  expect(caught).toBeInstanceOf(PianoRollError)
-  if (!(caught instanceof PianoRollError)) throw new Error('Expected PianoRollError')
-  return caught
-}
-
 async function flushProjectPublications(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
@@ -73,7 +60,7 @@ async function flushProjectPublications(): Promise<void> {
 describe('PianoRollClipContext', () => {
   it('defines a frozen 1:1 Clip-local window over the owned MidiSource', () => {
     const { clip, source } = createClipRecords()
-    const context = createPianoRollClipContext(clip, source)
+    const context = createPianoRollClipContext(clip, source)!
 
     expect(context).toEqual({
       clipId: clip.id,
@@ -88,24 +75,8 @@ describe('PianoRollClipContext', () => {
     expect(Object.isFrozen(context)).toBe(true)
   })
 
-  it('fails closed for unrelated Sources, invalid ranges and looped Clips', () => {
+  it('has no editing window for a looped Clip', () => {
     const { clip, source } = createClipRecords()
-    const mismatch = createMidiSourceRecord({
-      id: parseMidiSourceId('piano-roll-context-mismatch'),
-      lengthTick: source.lengthTick,
-    })
-    expect(requirePianoRollError(() => createPianoRollClipContext(clip, mismatch)).code).toBe(
-      'clip-source-mismatch',
-    )
-
-    const shortSource = createMidiSourceRecord({
-      id: source.id,
-      lengthTick: parseTick(1_200),
-    })
-    expect(requirePianoRollError(() => createPianoRollClipContext(clip, shortSource)).code).toBe(
-      'clip-source-range-invalid',
-    )
-
     const loopedClip = createMidiClipRecord({
       ...clip,
       loop: {
@@ -113,26 +84,12 @@ describe('PianoRollClipContext', () => {
         sourceSpanTick: parseTick(960),
       },
     })
-    expect(requirePianoRollError(() => createPianoRollClipContext(loopedClip, source)).code).toBe(
-      'looped-clip-unsupported',
-    )
-  })
-
-  it('rejects endpoint conversion outside the Clip window', () => {
-    const { clip, source } = createClipRecords()
-    const context = createPianoRollClipContext(clip, source)
-
-    expect(
-      requirePianoRollError(() => pianoRollClipTickToSourceTick(context, parseTick(961))).code,
-    ).toBe('tick-outside-clip')
-    expect(
-      requirePianoRollError(() => pianoRollSourceTickToClipTick(context, parseTick(479))).code,
-    ).toBe('tick-outside-clip')
+    expect(createPianoRollClipContext(loopedClip, source)).toBeNull()
   })
 })
 
 describe('PianoRollViewport', () => {
-  it('maps partially visible rows and rejects invalid pitch metrics', () => {
+  it('maps partially visible rows', () => {
     const input = {
       heightCssPixel: 40,
       maximumPitch: parseMidiPitch(72),
@@ -146,20 +103,10 @@ describe('PianoRollViewport', () => {
     expect(pianoRollCssPixelToMidiPitch(viewport, 14.99)).toBe(72)
     expect(pianoRollCssPixelToMidiPitch(viewport, 15)).toBe(71)
     expect(pianoRollCssPixelToMidiPitch(viewport, 39.99)).toBe(70)
-    for (const pitchOffsetCssPixel of [-1, 20, Infinity, NaN]) {
-      expect(() => createPianoRollPitchViewport({ ...input, pitchOffsetCssPixel })).toThrow(
-        PianoRollError,
-      )
-    }
-    for (const pitchRowHeightCssPixel of [0, -1, Infinity, NaN]) {
-      expect(() => createPianoRollPitchViewport({ ...input, pitchRowHeightCssPixel })).toThrow(
-        PianoRollError,
-      )
-    }
   })
   it('maps the full initial Clip and discrete pitch rows in CSS Pixels', () => {
     const { clip, source } = createClipRecords()
-    const context = createPianoRollClipContext(clip, source)
+    const context = createPianoRollClipContext(clip, source)!
     const viewport = createInitialPianoRollViewport(context, {
       widthCssPixel: 960,
       heightCssPixel: 480,
@@ -181,7 +128,7 @@ describe('PianoRollViewport', () => {
 
   it('keeps inverse time mapping continuous for later Snap policy', () => {
     const { clip, source } = createClipRecords()
-    const context = createPianoRollClipContext(clip, source)
+    const context = createPianoRollClipContext(clip, source)!
     const viewport = createPianoRollViewport(context, {
       widthCssPixel: 333,
       heightCssPixel: 240,
@@ -199,9 +146,9 @@ describe('PianoRollViewport', () => {
     )
   })
 
-  it('rejects invalid geometry, ranges and coordinates', () => {
+  it('rejects a Surface without size and maps positions past its edges', () => {
     const { clip, source } = createClipRecords()
-    const context = createPianoRollClipContext(clip, source)
+    const context = createPianoRollClipContext(clip, source)!
     const baseInput = {
       widthCssPixel: 960,
       heightCssPixel: 480,
@@ -211,36 +158,17 @@ describe('PianoRollViewport', () => {
       visibleSpanTick: parseTick(960),
     }
 
-    expect(
-      requirePianoRollError(() =>
-        createPianoRollViewport(context, { ...baseInput, widthCssPixel: 0 }),
-      ).code,
-    ).toBe('invalid-viewport-dimension')
-    expect(
-      requirePianoRollError(() =>
-        createPianoRollViewport(context, {
-          ...baseInput,
-          minimumPitch: parseMidiPitch(72),
-        }),
-      ).code,
-    ).toBe('invalid-viewport-pitch-range')
-    expect(
-      requirePianoRollError(() =>
-        createPianoRollViewport(context, {
-          ...baseInput,
-          visibleStartTick: parseTick(1),
-        }),
-      ).code,
-    ).toBe('viewport-outside-clip')
+    expect(() => createPianoRollViewport(context, { ...baseInput, widthCssPixel: 0 })).toThrowError(
+      RangeError,
+    )
+    expect(() =>
+      createPianoRollViewport(context, { ...baseInput, heightCssPixel: Number.NaN }),
+    ).toThrowError(RangeError)
 
     const viewport = createPianoRollViewport(context, baseInput)
-    expect(
-      requirePianoRollError(() => pianoRollClipTickToCssPixel(viewport, parseTick(961))).code,
-    ).toBe('coordinate-outside-viewport')
-    expect(
-      requirePianoRollError(() => pianoRollCssPixelToMidiPitch(viewport, viewport.heightCssPixel))
-        .code,
-    ).toBe('coordinate-outside-viewport')
+    expect(pianoRollClipTickToCssPixel(viewport, parseTick(1_200))).toBe(1_200)
+    expect(pianoRollCssPixelToMidiPitch(viewport, viewport.heightCssPixel)).toBe(48)
+    expect(pianoRollCssPixelToMidiPitch(viewport, -10)).toBe(71)
   })
 })
 
@@ -350,8 +278,7 @@ describe('PianoRollNoteReadModel', () => {
     readModel.setViewport(secondViewport)
 
     expect(onStateChange).toHaveBeenCalledOnce()
-    expect(readModel.state.viewport).not.toBe(secondViewport)
-    expect(readModel.state.viewport).toEqual(secondViewport)
+    expect(readModel.state.viewport).toBe(secondViewport)
     expect(readModel.state.notes).toEqual([])
     readModel.dispose()
   })
@@ -389,11 +316,7 @@ describe('PianoRollNoteReadModel', () => {
     expect(reportError).toHaveBeenCalledExactlyOnceWith(failure)
 
     readModel.dispose()
-    expect(requirePianoRollError(() => readModel.setViewport(viewport)).code).toBe(
-      'read-model-disposed',
-    )
-    expect(requirePianoRollError(() => readModel.subscribe(vi.fn())).code).toBe(
-      'read-model-disposed',
-    )
+    expect(() => readModel.setViewport(viewport)).toThrowError('disposed')
+    expect(() => readModel.subscribe(vi.fn())).toThrowError('disposed')
   })
 })

@@ -1,10 +1,7 @@
 import {
-  PIANO_ROLL_TRACK_CLIP_STATUS,
-  PianoRollError,
   createPianoRollClipContext,
-  createPianoRollTrackClipProjection,
   pianoRollClipTickToSourceTick,
-  pianoRollTrackProjectTickToSourceTick,
+  type PianoRollClipContext,
 } from '@seele-daw/editor'
 import {
   createAddMidiSustainPedalEventCommand,
@@ -12,6 +9,7 @@ import {
   createRemoveMidiSustainPedalEventsCommand,
   createReplaceMidiSustainPedalEventValueCommand,
   parseMidiSustainPedalEventId,
+  parseTick,
   type ClipId,
   type MidiChannel,
   type MidiClipRecord,
@@ -89,24 +87,18 @@ function unloopedClip(snapshot: ProjectSnapshot, clipId: ClipId): MidiClipRecord
   return clip
 }
 
-function clipSource(snapshot: ProjectSnapshot, clip: MidiClipRecord) {
-  const source = snapshot.midiSources.find(({ id }) => id === clip.sourceId)
-  if (source === undefined) throw staleEdit()
-  return source
+/** The window of an unlooped Clip over its MidiSource. */
+function clipWindow(snapshot: ProjectSnapshot, clip: MidiClipRecord): PianoRollClipContext {
+  const source = snapshot.midiSources.find(({ id }) => id === clip.sourceId)!
+  return createPianoRollClipContext(clip, source)!
 }
 
-/** The editor rejects endpoints outside the Clip; for the user that is a placement problem. */
-function sourceTickInsideClip(resolve: () => Tick): Tick {
-  try {
-    return resolve()
-  } catch (cause) {
-    if (cause instanceof PianoRollError && cause.code === 'tick-outside-clip') {
-      throw new ProjectEditError('not-placeable', 'Sustain Pedal events must be inside the Clip.', {
-        cause,
-      })
-    }
-    throw cause
+/** An event may sit on either end of its Clip, never outside it. */
+function insideClip(window: PianoRollClipContext, clipTick: number): Tick {
+  if (clipTick < 0 || clipTick > window.clipSpanTick) {
+    throw new ProjectEditError('not-placeable', 'Sustain Pedal events must be inside the Clip.')
   }
+  return pianoRollClipTickToSourceTick(window, parseTick(clipTick))
 }
 
 export function createSustainPedalEdits(context: Omit<ProjectEditContext, 'random'>) {
@@ -142,12 +134,9 @@ export function createSustainPedalEdits(context: Omit<ProjectEditContext, 'rando
   return {
     placeInClip(input: PlaceSustainPedalEventInClipInput): PlacedSustainPedalEvent {
       const { clip, session } = eventTarget(input)
-      const clipContext = createPianoRollClipContext(clip, clipSource(session.getSnapshot(), clip))
       return place(session, clip, {
         channel: input.channel,
-        sourceTick: sourceTickInsideClip(() =>
-          pianoRollClipTickToSourceTick(clipContext, input.clipTick),
-        ),
+        sourceTick: insideClip(clipWindow(session.getSnapshot(), clip), input.clipTick),
         value: input.value,
       })
     },
@@ -164,18 +153,9 @@ export function createSustainPedalEdits(context: Omit<ProjectEditContext, 'rando
       const snapshot = session.getSnapshot()
       const clip = unloopedClip(snapshot, input.activeClipId)
       if (clip.trackId !== input.trackId) throw staleEdit()
-      const projection = createPianoRollTrackClipProjection(clip, clipSource(snapshot, clip))
-      if (projection.status !== PIANO_ROLL_TRACK_CLIP_STATUS.READY) {
-        throw new ProjectEditError(
-          'unsupported',
-          'Sustain Pedal events in this Clip cannot be edited yet.',
-        )
-      }
       return place(session, clip, {
         channel: input.channel,
-        sourceTick: sourceTickInsideClip(() =>
-          pianoRollTrackProjectTickToSourceTick(projection, input.projectTick),
-        ),
+        sourceTick: insideClip(clipWindow(snapshot, clip), input.projectTick - clip.startTick),
         value: input.value,
       })
     },

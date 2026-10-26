@@ -28,7 +28,6 @@ import {
   createPianoRollNoteScene,
   createPianoRollTimelineViewport,
   createPianoRollViewport,
-  PianoRollError,
   type PianoRollGridCanvasTheme,
   type PianoRollVisibleNote,
 } from '#internal/index'
@@ -65,7 +64,7 @@ function createRendererFixture() {
     sourceOffsetTick: parseTick(0),
     loop: null,
   })
-  const context = createPianoRollClipContext(clip, source)
+  const context = createPianoRollClipContext(clip, source)!
   const viewport = createPianoRollViewport(context, {
     heightCssPixel: 250,
     maximumPitch: parseMidiPitch(72),
@@ -250,7 +249,7 @@ describe('Piano Roll Browser Renderers', () => {
         originTick: parseTick(0),
         subdivisionSpanTick: parsePositiveTick(250),
       }),
-    ).toThrow(PianoRollError)
+    ).toThrowError(RangeError)
   })
 
   it('rejects display grids whose beat and subdivision divisions do not nest evenly', () => {
@@ -261,7 +260,7 @@ describe('Piano Roll Browser Renderers', () => {
         originTick: parseTick(0),
         subdivisionSpanTick: parsePositiveTick(250),
       }),
-    ).toThrow(PianoRollError)
+    ).toThrowError(RangeError)
   })
 
   it('sizes the static Grid bitmap for DPR and suppresses invisible divisions', () => {
@@ -510,9 +509,7 @@ describe('Piano Roll Browser Renderers', () => {
     renderer.dispose()
 
     expect(container.children).toHaveLength(0)
-    expect(() => renderer.render(fixture.noteScene)).toThrow(
-      expect.objectContaining({ code: 'renderer-disposed' }),
-    )
+    expect(() => renderer.render(fixture.noteScene)).toThrowError('disposed')
   })
 
   it('fails Grid composition when the Canvas has no 2D context', () => {
@@ -524,10 +521,6 @@ describe('Piano Roll Browser Renderers', () => {
       createPianoRollGridCanvasRenderer({
         canvas: unavailableCanvas,
       }),
-    ).toThrow(
-      expect.objectContaining({
-        code: 'canvas-context-unavailable',
-      }),
-    )
+    ).toThrowError('does not provide a 2D rendering context')
   })
 })

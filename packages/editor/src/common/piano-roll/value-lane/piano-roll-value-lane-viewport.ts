@@ -4,12 +4,9 @@ import {
   addTicks,
   parseMidiControlValue,
   parsePositiveTick,
-  parseTick,
   type MidiControlValue,
   type Tick,
 } from '@seele-daw/project-core'
-
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 
 export interface PianoRollValueLaneViewport {
   readonly heightCssPixel: number
@@ -26,42 +23,19 @@ export interface CreatePianoRollValueLaneViewportInput {
   readonly widthCssPixel: number
 }
 
+/** Lane sizes come from layout, which reports zero while a panel is hidden. */
 function requirePositiveCssPixel(value: number, field: string): number {
   if (!Number.isFinite(value) || value <= 0) {
-    throw new PianoRollError(
-      'invalid-viewport-dimension',
-      `Piano Roll Value Lane ${field} must be a finite positive CSS Pixel value`,
-    )
+    throw new RangeError(`Piano Roll Value Lane ${field} must be a finite positive CSS Pixel value`)
   }
   return value
-}
-
-function requireCssPixelPosition(value: number, maximum: number, axis: string): number {
-  if (!Number.isFinite(value) || value < 0 || value > maximum) {
-    throw new PianoRollError(
-      'coordinate-outside-viewport',
-      `Piano Roll Value Lane ${axis} CSS Pixel position is outside the Viewport`,
-    )
-  }
-  return value
-}
-
-function requireVisibleTick(viewport: PianoRollValueLaneViewport, tickInput: Tick): Tick {
-  const tick = parseTick(tickInput)
-  if (tick < viewport.visibleStartTick || tick > viewport.visibleEndTick) {
-    throw new PianoRollError(
-      'coordinate-outside-viewport',
-      `Timeline Tick ${tick} is outside the Piano Roll Value Lane Viewport`,
-    )
-  }
-  return tick
 }
 
 /** Creates time-and-value geometry shared by MIDI controller lanes. */
 export function createPianoRollValueLaneViewport(
   input: CreatePianoRollValueLaneViewportInput,
 ): PianoRollValueLaneViewport {
-  const visibleStartTick = parseTick(input.visibleStartTick)
+  const { visibleStartTick } = input
   const visibleSpanTick = parsePositiveTick(input.visibleSpanTick)
 
   return Object.freeze({
@@ -75,39 +49,38 @@ export function createPianoRollValueLaneViewport(
 
 export function pianoRollValueLaneTimelineTickToCssPixel(
   viewport: PianoRollValueLaneViewport,
-  tickInput: Tick,
+  tick: Tick,
 ): number {
-  const tick = requireVisibleTick(viewport, tickInput)
   return ((tick - viewport.visibleStartTick) / viewport.visibleSpanTick) * viewport.widthCssPixel
 }
 
 /** Returns an unrounded Timeline Tick position for the interaction layer to snap. */
 export function pianoRollValueLaneCssPixelToTimelineTickPosition(
   viewport: PianoRollValueLaneViewport,
-  xCssPixelInput: number,
+  xCssPixel: number,
 ): number {
-  const xCssPixel = requireCssPixelPosition(xCssPixelInput, viewport.widthCssPixel, 'horizontal')
   return viewport.visibleStartTick + (xCssPixel / viewport.widthCssPixel) * viewport.visibleSpanTick
 }
 
 /** Maps MIDI 127 to the top edge and MIDI 0 to the inclusive bottom edge. */
 export function pianoRollMidiControlValueToValueLaneCssPixel(
   viewport: PianoRollValueLaneViewport,
-  valueInput: MidiControlValue,
+  value: MidiControlValue,
 ): number {
-  const value = parseMidiControlValue(valueInput)
   const valueSpan = MIDI_CONTROL_VALUE_MAX - MIDI_CONTROL_VALUE_MIN
   return ((MIDI_CONTROL_VALUE_MAX - value) / valueSpan) * viewport.heightCssPixel
 }
 
-/** Resolves the closest discrete MIDI controller value at one vertical position. */
+/** Resolves the closest MIDI controller value at a vertical position, clamped to the lane. */
 export function pianoRollValueLaneCssPixelToMidiControlValue(
   viewport: PianoRollValueLaneViewport,
-  yCssPixelInput: number,
+  yCssPixel: number,
 ): MidiControlValue {
-  const yCssPixel = requireCssPixelPosition(yCssPixelInput, viewport.heightCssPixel, 'vertical')
   const valueSpan = MIDI_CONTROL_VALUE_MAX - MIDI_CONTROL_VALUE_MIN
+  const value = Math.round(
+    MIDI_CONTROL_VALUE_MAX - (yCssPixel / viewport.heightCssPixel) * valueSpan,
+  )
   return parseMidiControlValue(
-    Math.round(MIDI_CONTROL_VALUE_MAX - (yCssPixel / viewport.heightCssPixel) * valueSpan),
+    Math.min(MIDI_CONTROL_VALUE_MAX, Math.max(MIDI_CONTROL_VALUE_MIN, value)),
   )
 }

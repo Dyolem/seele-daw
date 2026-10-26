@@ -197,7 +197,7 @@ describe('sustain pedal edits', () => {
     ).toThrowError(coded('target-stale'))
   })
 
-  it('reports a missing Active Clip, an outside position, a stale gesture and a looped Clip', () => {
+  it('reports a missing Active Clip, positions outside the Clip, a stale gesture and a looped Clip', () => {
     const fixture = createFixture('blocked')
     const input = {
       activeClipId: fixture.clipId,
@@ -214,6 +214,10 @@ describe('sustain pedal edits', () => {
     expect(() =>
       fixture.edits.placeOnTrack({ ...input, projectTick: parseTick(3_000) }),
     ).toThrowError(coded('not-placeable'))
+    expect(() =>
+      fixture.edits.placeOnTrack({ ...input, projectTick: parseTick(1_000) }),
+    ).toThrowError(coded('not-placeable'))
+    expect(() => placeInClip(fixture, 961, 127)).toThrowError(coded('not-placeable'))
     fixture.edits.placeOnTrack(input)
     expect(() => fixture.edits.placeOnTrack(input)).toThrowError(coded('target-stale'))
 

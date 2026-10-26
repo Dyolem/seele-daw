@@ -9,10 +9,8 @@ import {
   parseMidiVelocity,
   parseNoteId,
   parseTick,
-  parseTrackId,
   type ProjectCommand,
   type ProjectSession,
-  type ProjectSnapshot,
 } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
@@ -21,9 +19,7 @@ import {
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON,
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
   PIANO_ROLL_TRACK_CLIP_STATUS,
-  PianoRollError,
   createPianoRollTrackReadModel,
-  pianoRollTrackProjectTickToSourceTick,
   pianoRollTrackSourceTickToProjectTick,
   resolvePianoRollTrackNotePlacement,
 } from '#internal/index'
@@ -92,18 +88,6 @@ function addNote(session: ProjectSession, sourceId: ReturnType<typeof parseMidiS
       velocity: parseMidiVelocity(100),
     }),
   )
-}
-
-function requirePianoRollError(operation: () => unknown): PianoRollError {
-  let caught: unknown
-  try {
-    operation()
-  } catch (error) {
-    caught = error
-  }
-  expect(caught).toBeInstanceOf(PianoRollError)
-  if (!(caught instanceof PianoRollError)) throw new Error('Expected PianoRollError')
-  return caught
 }
 
 describe('Piano Roll Track Read Model', () => {
@@ -185,7 +169,7 @@ describe('Piano Roll Track Read Model', () => {
     expect(Object.isFrozen(model.clips[0]?.notes)).toBe(true)
   })
 
-  it('maps ready Clip endpoints between global Project and MidiSource time', () => {
+  it('maps MidiSource ticks of a ready Clip into Project time', () => {
     const fixture = createPianoRollProjectFixture()
     const model = createPianoRollTrackReadModel({
       activeClipId: fixture.clip.id,
@@ -197,14 +181,9 @@ describe('Piano Roll Track Read Model', () => {
       throw new Error('Expected a ready Track Clip projection')
     }
 
-    expect(pianoRollTrackProjectTickToSourceTick(clip, parseTick(0))).toBe(480)
-    expect(pianoRollTrackProjectTickToSourceTick(clip, parseTick(240))).toBe(720)
-    expect(pianoRollTrackProjectTickToSourceTick(clip, parseTick(1_920))).toBe(2_400)
+    expect(pianoRollTrackSourceTickToProjectTick(clip, parseTick(480))).toBe(0)
     expect(pianoRollTrackSourceTickToProjectTick(clip, parseTick(1_200))).toBe(720)
-    expect(
-      requirePianoRollError(() => pianoRollTrackProjectTickToSourceTick(clip, parseTick(1_921)))
-        .code,
-    ).toBe('tick-outside-clip')
+    expect(pianoRollTrackSourceTickToProjectTick(clip, parseTick(2_400))).toBe(1_920)
   })
 
   it('clears stale active Clip identity without losing the Track projection', () => {
@@ -217,39 +196,6 @@ describe('Piano Roll Track Read Model', () => {
 
     expect(model.activeClipId).toBeNull()
     expect(model.clips).toHaveLength(1)
-  })
-
-  it('fails closed for missing or non-Instrument Track ownership', () => {
-    const fixture = createPianoRollProjectFixture()
-    const snapshot = fixture.session.getSnapshot()
-    expect(
-      requirePianoRollError(() =>
-        createPianoRollTrackReadModel({
-          snapshot,
-          trackId: parseTrackId('missing-track'),
-        }),
-      ).code,
-    ).toBe('track-not-found')
-
-    const track = snapshot.tracks[0]
-    if (track === undefined) throw new Error('Expected an Instrument Track')
-    const audioSnapshot: ProjectSnapshot = Object.freeze({
-      ...snapshot,
-      tracks: Object.freeze([
-        Object.freeze({
-          ...track,
-          kind: 'audio' as const,
-        }),
-      ]),
-    })
-    expect(
-      requirePianoRollError(() =>
-        createPianoRollTrackReadModel({
-          snapshot: audioSnapshot,
-          trackId: track.id,
-        }),
-      ).code,
-    ).toBe('track-not-instrument')
   })
 })
 

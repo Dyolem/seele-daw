@@ -8,7 +8,6 @@ import {
   pianoRollMidiPitchToCssPixel,
   type PianoRollTimelineViewport,
 } from '#internal/common/piano-roll/index'
-import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import type {
   PianoRollNoteScene,
   PianoRollNoteVisual,
@@ -48,20 +47,14 @@ interface SceneNote {
 
 function requireColor(value: string, field: string): string {
   if (value.trim().length === 0) {
-    throw new PianoRollBrowserError(
-      'invalid-theme',
-      `Piano Roll Note ${field} must be a non-empty CSS color`,
-    )
+    throw new Error(`Piano Roll Note ${field} must be a non-empty CSS color`)
   }
   return value
 }
 
 function requireOpacity(value: number): number {
   if (!Number.isFinite(value) || value < 0 || value > 1) {
-    throw new PianoRollBrowserError(
-      'invalid-theme',
-      'Piano Roll Note opacity must be a finite value from 0 through 1',
-    )
+    throw new RangeError('Piano Roll Note opacity must be a finite value from 0 through 1')
   }
   return value
 }

@@ -7,24 +7,8 @@ import {
 } from '@seele-daw/project-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  PianoRollError,
-  createPianoRollEditorSession,
-  type PianoRollEditorSessionListener,
-} from '#internal/index'
+import { createPianoRollEditorSession, type PianoRollEditorSessionListener } from '#internal/index'
 import { createPianoRollProjectFixture } from '#internal/__tests__/support/piano-roll-project-fixture'
-
-function requirePianoRollError(operation: () => unknown): PianoRollError {
-  let caught: unknown
-  try {
-    operation()
-  } catch (error) {
-    caught = error
-  }
-  expect(caught).toBeInstanceOf(PianoRollError)
-  if (!(caught instanceof PianoRollError)) throw new Error('Expected PianoRollError')
-  return caught
-}
 
 async function flushProjectPublications(): Promise<void> {
   await Promise.resolve()
@@ -190,18 +174,13 @@ describe('PianoRollEditorSession selection', () => {
 
     editorSession.dispose()
     editorSession.dispose()
-    expect(requirePianoRollError(() => editorSession.clearSelection()).code).toBe(
-      'editor-session-disposed',
+    expect(() => editorSession.clearSelection()).toThrowError('disposed')
+    expect(() => editorSession.selectOnly(parseNoteId('editor-note-inside'))).toThrowError(
+      'disposed',
     )
-    expect(
-      requirePianoRollError(() => editorSession.selectOnly(parseNoteId('editor-note-inside'))).code,
-    ).toBe('editor-session-disposed')
-    expect(
-      requirePianoRollError(() => editorSession.toggleSelection(parseNoteId('editor-note-inside')))
-        .code,
-    ).toBe('editor-session-disposed')
-    expect(requirePianoRollError(() => editorSession.subscribe(vi.fn())).code).toBe(
-      'editor-session-disposed',
+    expect(() => editorSession.toggleSelection(parseNoteId('editor-note-inside'))).toThrowError(
+      'disposed',
     )
+    expect(() => editorSession.subscribe(vi.fn())).toThrowError('disposed')
   })
 })

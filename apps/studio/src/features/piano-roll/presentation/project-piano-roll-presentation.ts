@@ -25,22 +25,18 @@ export function createProjectPianoRollPresentation(
     trackId: clip.trackId,
   }
 
-  if (clip.loop !== null) {
+  const source = snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)!
+  const context = createPianoRollClipContext(clip, source)
+  if (context === null) {
     return Object.freeze({
       ...base,
       reason: 'looped-clip',
       status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED,
     })
   }
-
-  const source = snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)
-  if (source === undefined) {
-    throw new Error(`MIDI Clip ${clip.id} references missing source ${clip.sourceId}`)
-  }
-
   return Object.freeze({
     ...base,
-    context: createPianoRollClipContext(clip, source),
+    context,
     snapshot,
     status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
   })

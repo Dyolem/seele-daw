@@ -5,7 +5,6 @@ import {
   requirePianoRollDevicePixelRatio,
   type PianoRollCanvasLayer,
 } from '#internal/browser/piano-roll/piano-roll-canvas-layer'
-import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import type {
   CreatePianoRollNoteRendererInput,
   PianoRollNoteRenderer,
@@ -87,10 +86,7 @@ class PianoRollCanvasNoteRenderer implements PianoRollNoteRenderer {
 
   #requireActive(): void {
     if (this.#disposed) {
-      throw new PianoRollBrowserError(
-        'renderer-disposed',
-        'Piano Roll Canvas Note Renderer has been disposed',
-      )
+      throw new Error('The Piano Roll Canvas Note Renderer is disposed')
     }
   }
 }

@@ -1,4 +1,3 @@
-import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import {
   PIANO_ROLL_DOM_NOTE_ID_ATTRIBUTE,
   PIANO_ROLL_DOM_NOTE_CLIP_ID_ATTRIBUTE,
@@ -173,10 +172,7 @@ class PianoRollDomNoteRenderer implements PianoRollNoteRenderer {
 
   #requireActive(): void {
     if (this.#disposed) {
-      throw new PianoRollBrowserError(
-        'renderer-disposed',
-        'Piano Roll DOM Note Renderer has been disposed',
-      )
+      throw new Error('The Piano Roll DOM Note Renderer is disposed')
     }
   }
 }

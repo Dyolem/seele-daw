@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import {
   PIANO_ROLL_HIT_ZONE,
   PIANO_ROLL_POINTER_INPUT_PHASE,
-  PianoRollBrowserError,
   createPianoRollDomNoteRenderer,
   createEditorPointerInputAdapter,
   resolvePianoRollDomNoteHit,
@@ -532,24 +531,10 @@ describe('Piano Roll Pointer Input Adapter', () => {
     fixture.renderer.dispose()
   })
 
-  it('rejects an invalid drag threshold, and starts no gesture when Hit testing or capture fails', () => {
+  it('starts no gesture when Hit testing or capture fails', () => {
     const fixture = createDomNoteFixture()
     const onInput = vi.fn<NoteInputListener>()
     const errors = captureWindowErrors()
-
-    for (const dragThresholdCssPixel of [0, -1, Number.POSITIVE_INFINITY]) {
-      expect(() =>
-        createNoteInputAdapter({
-          dragThresholdCssPixel,
-          onInput,
-          surface: fixture.surface,
-        }),
-      ).toThrowError(
-        expect.objectContaining<Partial<PianoRollBrowserError>>({
-          code: 'invalid-pointer-input-configuration',
-        }),
-      )
-    }
 
     const hitFailureAdapter = createNoteInputAdapter({
       onInput,
@@ -627,43 +612,6 @@ describe('Piano Roll Pointer Input Adapter', () => {
     adapter.dispose()
     fixture.renderer.dispose()
   })
-})
-
-describe('Editor Pointer resource ownership', () => {
-  it.each(['pointermove', 'keyup'])(
-    'rolls back a partially registered adapter when %s registration fails',
-    (failedType) => {
-      const { surface, capture, renderer } = createDomNoteFixture()
-      const onInput = vi.fn<NoteInputListener>()
-      const unrelated = vi.fn<EventListener>()
-      surface.addEventListener('pointerdown', unrelated)
-      const target: EventTarget = failedType === 'keyup' ? window : surface
-      const add = target.addEventListener.bind(target)
-      const registration = vi.spyOn(target, 'addEventListener')
-      registration.mockImplementation((type, listener, options) => {
-        if (type === failedType) throw new Error('Listener registration failed')
-        add(type, listener, options)
-      })
-      expect(() => createNoteInputAdapter({ surface, onInput })).toThrow(
-        'Listener registration failed',
-      )
-      registration.mockRestore()
-
-      dispatchPointer(surface, 'pointerdown')
-      dispatchPointer(surface, 'pointerup')
-      window.dispatchEvent(new Event('blur'))
-      expect(onInput).not.toHaveBeenCalled()
-      expect(capture.capturedPointerIds.size).toBe(0)
-      expect(unrelated).toHaveBeenCalledOnce()
-
-      const retry = createNoteInputAdapter({ surface, onInput })
-      dispatchPointer(surface, 'pointerdown')
-      dispatchPointer(surface, 'pointerup')
-      expect(onInput.mock.calls.map(([input]) => input.phase)).toEqual(['begin', 'end'])
-      retry.dispose()
-      renderer.dispose()
-    },
-  )
 })
 
 describe('Editor Pointer coordinate space', () => {

@@ -12,7 +12,6 @@ import {
 } from '@seele-daw/project-core'
 
 import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_HIT_ZONE,
   PIANO_ROLL_POINTER_INPUT_PHASE,
@@ -121,13 +120,6 @@ function resolveRawTargetEdgeTick(input: ResolvePianoRollNoteResizePreviewInput)
     input.pointerInput.position.xCssPixel - input.gesture.originPosition.xCssPixel
   const rawDelta =
     (pointerDeltaCssPixel / input.viewport.widthCssPixel) * input.viewport.visibleSpanTick
-  if (!Number.isFinite(rawDelta)) {
-    throw new PianoRollError(
-      'coordinate-outside-viewport',
-      'Piano Roll Note resize resolved a non-finite horizontal delta',
-    )
-  }
-
   const note = input.gesture.note
   const originalEdgeTick =
     input.gesture.edge === PIANO_ROLL_HIT_ZONE.RESIZE_START
@@ -196,13 +188,6 @@ export function resolvePianoRollNoteResizePreview(
     pointerInput.pointerId !== input.gesture.pointerId
   ) {
     return null
-  }
-
-  if (input.viewport.clipId !== input.gesture.context.clipId) {
-    throw new PianoRollError(
-      'viewport-clip-mismatch',
-      `Piano Roll Note resize does not belong to Clip ${input.gesture.context.clipId}`,
-    )
   }
 
   const targetEdgeTick = resolveTargetEdgeTick(input)

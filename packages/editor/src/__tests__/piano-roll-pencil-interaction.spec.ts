@@ -38,7 +38,7 @@ function createFixture() {
     sourceOffsetTick: parseTick(0),
     loop: null,
   })
-  const context = createPianoRollClipContext(clip, source)
+  const context = createPianoRollClipContext(clip, source)!
   const viewport = createPianoRollViewport(context, {
     heightCssPixel: 128,
     maximumPitch: parseMidiPitch(67),

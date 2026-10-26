@@ -58,7 +58,7 @@ function createPresentation(startTick = parseTick(3_840)) {
   return Object.freeze({
     clipId: clip.id,
     color: parseProjectColor('#8B5CF6'),
-    context: createPianoRollClipContext(clip, source),
+    context: createPianoRollClipContext(clip, source)!,
     muted: false,
     name: clip.name,
     projectId: PROJECT_ID,

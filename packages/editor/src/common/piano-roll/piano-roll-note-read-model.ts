@@ -17,11 +17,7 @@ import {
   pianoRollClipTickToSourceTick,
   type PianoRollClipContext,
 } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
-import {
-  createPianoRollViewport,
-  type PianoRollViewport,
-} from '#internal/common/piano-roll/piano-roll-viewport'
+import type { PianoRollViewport } from '#internal/common/piano-roll/piano-roll-viewport'
 
 export interface PianoRollVisibleNote {
   readonly note: MidiNoteRecord
@@ -50,20 +46,6 @@ export interface CreatePianoRollNoteReadModelInput {
   readonly context: PianoRollClipContext
   readonly session: Pick<ProjectSession, 'query' | 'subscribe'>
   readonly viewport: PianoRollViewport
-}
-
-function normalizeViewport(
-  context: PianoRollClipContext,
-  viewport: PianoRollViewport,
-): PianoRollViewport {
-  if (viewport.clipId !== context.clipId) {
-    throw new PianoRollError(
-      'viewport-clip-mismatch',
-      `Piano Roll Viewport belongs to another Clip, not ${context.clipId}`,
-    )
-  }
-
-  return createPianoRollViewport(context, viewport)
 }
 
 function createVisibleNote(
@@ -120,11 +102,10 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
   #disposed = false
 
   constructor(input: CreatePianoRollNoteReadModelInput) {
-    const viewport = normalizeViewport(input.context, input.viewport)
     this.#context = input.context
     this.#session = input.session
-    this.#state = queryState(input.session, input.context, viewport)
-    this.#projectUnsubscribe = this.#subscribeToProject(viewport)
+    this.#state = queryState(input.session, input.context, input.viewport)
+    this.#projectUnsubscribe = this.#subscribeToProject(input.viewport)
   }
 
   get state(): PianoRollNoteReadModelState {
@@ -135,9 +116,8 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
     this.#requireActive()
     if (this.#state.viewport === viewport) return
 
-    const normalizedViewport = normalizeViewport(this.#context, viewport)
-    const nextState = queryState(this.#session, this.#context, normalizedViewport)
-    const nextProjectUnsubscribe = this.#subscribeToProject(normalizedViewport)
+    const nextState = queryState(this.#session, this.#context, viewport)
+    const nextProjectUnsubscribe = this.#subscribeToProject(viewport)
     const previousProjectUnsubscribe = this.#projectUnsubscribe
 
     this.#state = nextState
@@ -195,12 +175,7 @@ class PianoRollNoteReadModelImpl implements PianoRollNoteReadModel {
   }
 
   #requireActive(): void {
-    if (this.#disposed) {
-      throw new PianoRollError(
-        'read-model-disposed',
-        'Piano Roll Note Read Model has been disposed',
-      )
-    }
+    if (this.#disposed) throw new Error('The Piano Roll Note Read Model is disposed')
   }
 }
 

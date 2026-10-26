@@ -1,7 +1,6 @@
 export {
   PIANO_ROLL_TRACK_CLIP_STATUS,
   createPianoRollTrackClipProjection,
-  pianoRollTrackProjectTickToSourceTick,
   pianoRollTrackSourceTickToProjectTick,
 } from './clip-projection'
 export type {

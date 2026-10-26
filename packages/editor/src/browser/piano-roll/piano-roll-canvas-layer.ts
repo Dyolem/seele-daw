@@ -1,5 +1,3 @@
-import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
-
 export interface PianoRollCanvasLayer {
   readonly canvas: HTMLCanvasElement
   readonly context: CanvasRenderingContext2D
@@ -7,10 +5,7 @@ export interface PianoRollCanvasLayer {
 
 export function requirePianoRollDevicePixelRatio(value: number): number {
   if (!Number.isFinite(value) || value <= 0) {
-    throw new PianoRollBrowserError(
-      'invalid-device-pixel-ratio',
-      'Piano Roll devicePixelRatio must be a finite positive number',
-    )
+    throw new RangeError('Piano Roll devicePixelRatio must be a finite positive number')
   }
   return value
 }
@@ -21,10 +16,7 @@ export function createPianoRollCanvasLayer(
 ): PianoRollCanvasLayer {
   const context = canvas.getContext('2d')
   if (context === null) {
-    throw new PianoRollBrowserError(
-      'canvas-context-unavailable',
-      `Piano Roll ${layerName} Canvas does not provide a 2D rendering context`,
-    )
+    throw new Error(`Piano Roll ${layerName} Canvas does not provide a 2D rendering context`)
   }
   return { canvas, context }
 }

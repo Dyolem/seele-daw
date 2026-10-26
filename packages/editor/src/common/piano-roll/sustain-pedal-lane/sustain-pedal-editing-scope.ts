@@ -9,7 +9,6 @@ import {
 } from '@seele-daw/project-core'
 
 import type { PianoRollClipContext } from '#internal/common/piano-roll/piano-roll-clip-context'
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import type {
   PianoRollSustainPedalClipLaneReadModel,
   PianoRollSustainPedalLaneEventProjection,
@@ -59,13 +58,6 @@ function resolveClipEditingScope(
   input: Extract<ResolvePianoRollSustainPedalEditingScopeInput, { readonly context: unknown }>,
 ): PianoRollSustainPedalEditingScope {
   const { context, readModel } = input
-  if (readModel.clipId !== context.clipId || readModel.sourceId !== context.sourceId) {
-    throw new PianoRollError(
-      'invalid-sustain-pedal-editing-scope',
-      'The Sustain Pedal Clip Lane does not match its editable Clip context',
-    )
-  }
-
   return createEditingScope({
     channel: readModel.channel,
     context,

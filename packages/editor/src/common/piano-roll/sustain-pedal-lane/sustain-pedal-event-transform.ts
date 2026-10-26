@@ -11,7 +11,6 @@ import {
   type TickDelta,
 } from '@seele-daw/project-core'
 
-import { PianoRollError } from '#internal/common/piano-roll/piano-roll-error'
 import {
   PIANO_ROLL_POINTER_INPUT_PHASE,
   type PianoRollCssPoint,
@@ -83,16 +82,6 @@ export interface ResolvePianoRollSustainPedalTransformPreviewInput {
   readonly viewport: PianoRollValueLaneViewport
 }
 
-function requireFiniteDelta(value: number, axis: 'horizontal' | 'vertical'): number {
-  if (!Number.isFinite(value)) {
-    throw new PianoRollError(
-      'invalid-sustain-pedal-gesture',
-      `Sustain Pedal ${axis} pointer delta must be finite`,
-    )
-  }
-  return value
-}
-
 function isTransformFrame(
   gesture: PianoRollSustainPedalTransformGesture,
   pointerInput: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
@@ -127,16 +116,10 @@ export function createPianoRollSustainPedalTransformGesture(
   const selectedEventIds = reconcilePianoRollSustainPedalSelection(scope, input.selectedEventIds)
   const anchorWasSelected = selectedEventIds.includes(anchorEvent.event.id)
   const moveEventIds = anchorWasSelected ? selectedEventIds : [anchorEvent.event.id]
-  const moveEvents = moveEventIds.map((eventId) => {
-    const projection = scope.events.find(({ event }) => event.id === eventId)
-    if (projection === undefined) {
-      throw new PianoRollError(
-        'invalid-sustain-pedal-gesture',
-        `Sustain Pedal selection references non-editable Event ${eventId}`,
-      )
-    }
-    return projection
-  })
+  // The reconciled selection holds only events of this scope.
+  const moveEvents = moveEventIds.map(
+    (eventId) => scope.events.find(({ event }) => event.id === eventId)!,
+  )
 
   return Object.freeze({
     anchorEvent,
@@ -158,14 +141,8 @@ export function resolvePianoRollSustainPedalTransformAxis(
   pointerInput: PianoRollPointerInput<PianoRollSustainPedalLaneHit>,
 ): PianoRollSustainPedalTransformAxis | null {
   if (!isTransformFrame(gesture, pointerInput)) return null
-  const deltaX = requireFiniteDelta(
-    pointerInput.position.xCssPixel - gesture.originPosition.xCssPixel,
-    'horizontal',
-  )
-  const deltaY = requireFiniteDelta(
-    pointerInput.position.yCssPixel - gesture.originPosition.yCssPixel,
-    'vertical',
-  )
+  const deltaX = pointerInput.position.xCssPixel - gesture.originPosition.xCssPixel
+  const deltaY = pointerInput.position.yCssPixel - gesture.originPosition.yCssPixel
   return Math.abs(deltaX) > Math.abs(deltaY)
     ? PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS.TICK
     : PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS.VALUE
@@ -177,10 +154,8 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 function resolveMoveDelta(input: ResolvePianoRollSustainPedalTransformPreviewInput): TickDelta {
   const gesture = input.gesture
-  const pointerDeltaCssPixel = requireFiniteDelta(
-    input.pointerInput.position.xCssPixel - gesture.originPosition.xCssPixel,
-    'horizontal',
-  )
+  const pointerDeltaCssPixel =
+    input.pointerInput.position.xCssPixel - gesture.originPosition.xCssPixel
   if (pointerDeltaCssPixel === 0) return parseTickDelta(0)
   const rawDelta =
     (pointerDeltaCssPixel / input.viewport.widthCssPixel) * input.viewport.visibleSpanTick
@@ -250,10 +225,8 @@ function resolveValuePreview(
   input: ResolvePianoRollSustainPedalTransformPreviewInput,
 ): PianoRollSustainPedalValuePreview {
   const gesture = input.gesture
-  const pointerDeltaCssPixel = requireFiniteDelta(
-    gesture.originPosition.yCssPixel - input.pointerInput.position.yCssPixel,
-    'vertical',
-  )
+  const pointerDeltaCssPixel =
+    gesture.originPosition.yCssPixel - input.pointerInput.position.yCssPixel
   const rawDelta =
     (pointerDeltaCssPixel / input.viewport.heightCssPixel) *
     (MIDI_CONTROL_VALUE_MAX - MIDI_CONTROL_VALUE_MIN)

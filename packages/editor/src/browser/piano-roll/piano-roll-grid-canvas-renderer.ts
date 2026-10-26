@@ -7,7 +7,6 @@ import {
   requirePianoRollDevicePixelRatio,
   type PianoRollCanvasLayer,
 } from '#internal/browser/piano-roll/piano-roll-canvas-layer'
-import { PianoRollBrowserError } from '#internal/browser/piano-roll/piano-roll-browser-error'
 import {
   createPianoRollGrid,
   pianoRollTimelineTickToCssPixel,
@@ -47,10 +46,7 @@ const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10])
 function requireTheme(theme: PianoRollGridCanvasTheme): PianoRollGridCanvasTheme {
   for (const [name, value] of Object.entries(theme)) {
     if (typeof value !== 'string' || value.trim().length === 0) {
-      throw new PianoRollBrowserError(
-        'invalid-theme',
-        `Piano Roll Grid theme token ${name} must be a non-empty CSS color`,
-      )
+      throw new Error(`Piano Roll Grid theme token ${name} must be a non-empty CSS color`)
     }
   }
   return theme
@@ -177,10 +173,7 @@ class PianoRollGridCanvasRendererImpl implements PianoRollGridCanvasRenderer {
 
   #requireActive(): void {
     if (this.#disposed) {
-      throw new PianoRollBrowserError(
-        'renderer-disposed',
-        'Piano Roll Grid Canvas Renderer has been disposed',
-      )
+      throw new Error('The Piano Roll Grid Canvas Renderer is disposed')
     }
   }
 }

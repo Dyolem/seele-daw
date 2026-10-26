@@ -11,13 +11,11 @@ import {
   type MidiSourceId,
   type ProjectCommand,
   type ProjectSession,
-  type ProjectSnapshot,
 } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
 import {
   PIANO_ROLL_TRACK_CLIP_STATUS,
-  PianoRollError,
   createPianoRollSustainPedalClipLaneReadModel,
   createPianoRollTrackSustainPedalLaneReadModel,
 } from '#internal/index'
@@ -89,18 +87,6 @@ function populateClipLaneFixture() {
   return fixture
 }
 
-function requirePianoRollError(operation: () => unknown): PianoRollError {
-  let caught: unknown
-  try {
-    operation()
-  } catch (error) {
-    caught = error
-  }
-  expect(caught).toBeInstanceOf(PianoRollError)
-  if (!(caught instanceof PianoRollError)) throw new Error('Expected PianoRollError')
-  return caught
-}
-
 describe('Piano Roll Sustain Pedal Clip Lane Read Model', () => {
   it('chases the prior channel state and derives Clip-local CC64 Step segments', () => {
     const fixture = populateClipLaneFixture()
@@ -169,25 +155,6 @@ describe('Piano Roll Sustain Pedal Clip Lane Read Model', () => {
     expect(model.initialValue).toBe(0)
     expect(model.events.map(({ event }) => event.id)).toEqual(['cc64-other-channel'])
     expect(model.segments).toEqual([{ endTick: 1_920, pedalDown: true, startTick: 0, value: 64 }])
-  })
-
-  it('fails closed when a forged Snapshot omits the source CC64 partition', () => {
-    const fixture = createPianoRollProjectFixture()
-    const snapshot = fixture.session.getSnapshot()
-    const forgedSnapshot: ProjectSnapshot = Object.freeze({
-      ...snapshot,
-      midiSustainPedalEvents: Object.freeze({}),
-    })
-
-    expect(
-      requirePianoRollError(() =>
-        createPianoRollSustainPedalClipLaneReadModel({
-          channel: parseMidiChannel(0),
-          context: fixture.context,
-          snapshot: forgedSnapshot,
-        }),
-      ).code,
-    ).toBe('sustain-pedal-partition-missing')
   })
 })
 

@@ -1,10 +1,10 @@
 # @seele-daw/project-midi
 
 `project-midi` 是 Standard MIDI File 中立 Document 与 Seele Project Model 之间的浏览器无关桥接层。
-当前 Import 支持两个浏览器无关结果：`createProjectMidiImportDraft` 输出一个已经通过当前 Project
-File V2 加载边界和完整 Model invariant 校验、但尚未进入 Studio 项目生命周期的 fresh
-`ProjectSession`；`createProjectMidiTrackImportDraft` 输出一个可向既有 `ProjectSession` 原子追加
-新 Instrument Track 的 Project Command。
+当前 Import 支持两个浏览器无关结果：`createProjectMidiImportDraft` 输出一个已经通过项目文件加载
+边界和完整 Model invariant 校验、但尚未进入 Studio 项目生命周期的 fresh `ProjectSession`；
+`createProjectMidiTrackImportDraft` 输出一个可向既有 `ProjectSession` 原子追加新 Instrument Track
+的 Project Command。
 
 ## 当前导入规则
 

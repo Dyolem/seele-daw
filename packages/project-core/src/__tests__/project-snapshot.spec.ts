@@ -3,13 +3,22 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import * as projectCore from '#internal/index'
 import {
   PROJECT_COMMAND_EXECUTION_STATUS,
+  ProjectCommandError,
+  createAddMidiClipWithNoteCommand,
+  createAddMidiSustainPedalEventCommand,
   createAddNoteCommand,
   createInitialProjectSession,
+  createMoveMidiSustainPedalEventsCommand,
   createMoveNotesCommand,
+  createRemoveMidiSustainPedalEventsCommand,
   createRemoveNotesCommand,
+  parseClipId,
   parseMidiChannel,
+  parseMidiControlValue,
   parseMidiPitch,
   parseMidiPitchDelta,
+  parseMidiSourceId,
+  parseMidiSustainPedalEventId,
   parseMidiVelocity,
   parseNoteId,
   parseProjectId,
@@ -24,6 +33,7 @@ import {
 } from '#internal/index'
 import { ModelStore, type ModelStoreSeed } from '#internal/model/model-store'
 import { createProjectSession } from '#internal/session/project-session'
+import { ProjectSnapshots } from '#internal/snapshots/project-snapshot'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
@@ -357,5 +367,129 @@ describe('ProjectSnapshot revision isolation', () => {
       afterUndo.modelRevision,
       afterRedo.modelRevision,
     ]).toEqual([0, 1, 2, 3])
+  })
+})
+
+describe('Snapshot partitions merged from written records', () => {
+  it('equal a fresh copy after edits, new Sources, Undo and Redo', () => {
+    const { fixture, store, session } = createFixtureProjectSession()
+    const trackId = fixture.records.instrumentTrack.id
+    let seed = 7
+    const next = (count: number): number => {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648
+      return seed % count
+    }
+    const pick = <Value>(values: readonly Value[]): Value | undefined =>
+      values.length === 0 ? undefined : values[next(values.length)]
+    let created = 0
+    const fresh = (prefix: string): string => `${prefix}-merge-${(created += 1)}`
+    session.getSnapshot()
+
+    for (let step = 0; step < 400; step += 1) {
+      const sourceId = pick([...store.midiSourceEntries()].map(([id]) => id))!
+      const noteIds = [...store.midiNoteEntries(sourceId)].map(([id]) => id)
+      const eventIds = [...store.midiSustainPedalEventEntries(sourceId)].map(([id]) => id)
+      const base = { baseRevision: session.modelRevision, sourceId }
+      const noteId = pick(noteIds)
+      const eventId = pick(eventIds)
+      try {
+        switch (next(9)) {
+          case 0:
+            session.execute(
+              createAddNoteCommand({
+                ...base,
+                noteId: parseNoteId(fresh('note')),
+                startTick: parseTick(next(30) * 60),
+                durationTick: parseTick(60),
+                pitch: parseMidiPitch(48 + next(24)),
+                velocity: parseMidiVelocity(100),
+                channel: parseMidiChannel(0),
+              }),
+            )
+            break
+          case 1:
+            if (noteId === undefined) break
+            session.execute(
+              createMoveNotesCommand({
+                ...base,
+                noteIds: [noteId],
+                deltaTick: parseTickDelta((next(5) - 2) * 60),
+                deltaPitch: parseMidiPitchDelta(next(3) - 1),
+              }),
+            )
+            break
+          case 2:
+            if (noteId !== undefined) {
+              session.execute(createRemoveNotesCommand({ ...base, noteIds: [noteId] }))
+            }
+            break
+          case 3:
+            session.execute(
+              createAddMidiSustainPedalEventCommand({
+                ...base,
+                eventId: parseMidiSustainPedalEventId(fresh('pedal')),
+                tick: parseTick(next(30) * 60),
+                value: parseMidiControlValue(next(2) * 127),
+                channel: parseMidiChannel(next(2)),
+              }),
+            )
+            break
+          case 4:
+            if (eventId === undefined) break
+            session.execute(
+              createMoveMidiSustainPedalEventsCommand({
+                ...base,
+                eventIds: [eventId],
+                deltaTick: parseTickDelta((next(5) - 2) * 60),
+              }),
+            )
+            break
+          case 5:
+            if (eventId !== undefined) {
+              session.execute(
+                createRemoveMidiSustainPedalEventsCommand({ ...base, eventIds: [eventId] }),
+              )
+            }
+            break
+          case 6:
+            session.execute(
+              createAddMidiClipWithNoteCommand({
+                baseRevision: session.modelRevision,
+                clipId: parseClipId(fresh('clip')),
+                trackId,
+                name: 'Merged',
+                color: null,
+                muted: false,
+                startTick: parseTick(next(8) * 1_920),
+                spanTick: parseTick(1_920),
+                sourceId: parseMidiSourceId(fresh('source')),
+                sourceLengthTick: parseTick(1_920),
+                sourceOffsetTick: parseTick(0),
+                loop: null,
+                noteId: parseNoteId(fresh('note')),
+                noteStartTick: parseTick(0),
+                noteDurationTick: parseTick(240),
+                notePitch: parseMidiPitch(60),
+                noteVelocity: parseMidiVelocity(100),
+                noteChannel: parseMidiChannel(0),
+              }),
+            )
+            break
+          case 7:
+            session.undo()
+            break
+          default:
+            session.redo()
+        }
+      } catch (error) {
+        if (!(error instanceof ProjectCommandError)) throw error
+      }
+
+      // Several commits may pass between reads; each read merges all of them.
+      if (next(3) !== 0) continue
+      expect(session.getSnapshot()).toEqual(new ProjectSnapshots().read(store))
+    }
+
+    expect(session.getSnapshot()).toEqual(new ProjectSnapshots().read(store))
   })
 })

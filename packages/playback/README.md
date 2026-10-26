@@ -59,8 +59,10 @@ Pause、Return、切换项目            runtime.allNotesOff()：所有 Voice �
 都没变时，沿用上次的 span 数组（Snapshot 共享没变的部分，见
 [ADR-007](../../docs/adr/ADR-007-snapshots-share-unchanged-parts.md)）。计划只按 Clip 保存 span
 （`clipSpans`），调和、Scheduler 与 audio-web 的资源准备都逐 Clip 工作，没变的 Clip 不必重新处理
-（[ADR-009](../../docs/adr/ADR-009-playback-plans-keep-spans-by-clip.md)）。停止时不调和，直接换上
-新计划。成本见 `pnpm --filter @seele-daw/playback bench`。
+（[ADR-009](../../docs/adr/ADR-009-playback-plans-keep-spans-by-clip.md)）。只有音符变了的 Clip，
+仍是同一条记录的 Note 沿用它的 span，只编译写过的 Note；调和跳过两边相同的 span 对象
+（[ADR-010](../../docs/adr/ADR-010-edits-inside-a-clip-reuse-untouched-notes.md)）。停止时不调和，
+直接换上新计划。成本见 `pnpm --filter @seele-daw/playback bench`。
 
 引擎读 Commit 的存储变化，不读命令类型（[ADR-002](../../docs/adr/ADR-002-consumers-read-changes-not-command-types.md)）。
 同一个任务里的 Commit 合并成一次调和：

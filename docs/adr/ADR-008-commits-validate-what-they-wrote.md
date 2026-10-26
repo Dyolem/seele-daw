@@ -58,3 +58,4 @@ ADR-001 让每次提交在投影上做一次全量不变量校验。全量校验
 
 - 编排表变得很大（例如上万个 Clip），整体检查成为提交的主要成本：按写过的记录检查编排关系。
 - 读 Snapshot 时排序大分区成为瓶颈：用写过的记录合并上一份 Snapshot 的分区，而不是重新排序。
+  已触发，见 [ADR-010](./ADR-010-edits-inside-a-clip-reuse-untouched-notes.md)。

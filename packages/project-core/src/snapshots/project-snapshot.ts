@@ -42,20 +42,33 @@ function compareStrings(left: string, right: string): number {
   return 0
 }
 
+function compareById(left: StoredRecord, right: StoredRecord): number {
+  return compareStrings(left.id, right.id)
+}
+
+function compareByTick(left: TimelineRecord, right: TimelineRecord): number {
+  return left.tick - right.tick || compareStrings(left.id, right.id)
+}
+
+function copySorted<RecordType>(
+  entries: Iterable<readonly [string, RecordType]>,
+  compare: (left: RecordType, right: RecordType) => number,
+): readonly RecordType[] {
+  const records = Array.from(entries, ([, record]) => record)
+  records.sort(compare)
+  return Object.freeze(records)
+}
+
 function copySortedRecords<RecordType extends StoredRecord>(
   entries: Iterable<readonly [string, RecordType]>,
 ): readonly RecordType[] {
-  const records = Array.from(entries, ([, record]) => record)
-  records.sort((left, right) => compareStrings(left.id, right.id))
-  return Object.freeze(records)
+  return copySorted(entries, compareById)
 }
 
 function copySortedTimelineRecords<RecordType extends TimelineRecord>(
   entries: Iterable<readonly [string, RecordType]>,
 ): readonly RecordType[] {
-  const records = Array.from(entries, ([, record]) => record)
-  records.sort((left, right) => left.tick - right.tick || compareStrings(left.id, right.id))
-  return Object.freeze(records)
+  return copySorted(entries, compareByTick)
 }
 
 /** @internal Freezes partitions into a prototype-free object, in the order given. */
@@ -67,25 +80,65 @@ export function freezePartitions<RecordType>(
   return Object.freeze(frozen)
 }
 
-/** What commits since a Snapshot touched: whole tables, and single partitions by MIDI Source. */
+/** The records of one partition written since the last Snapshot, or `all` when it was replaced. */
+type WrittenRecords = ReadonlySet<string> | 'all'
+
+/** What commits since a Snapshot touched: whole tables, and records of partitions by MIDI Source. */
 interface TouchedParts {
   readonly tables: ReadonlySet<string>
-  readonly partitions: ReadonlyMap<string, ReadonlySet<MidiSourceId>>
+  readonly partitions: ReadonlyMap<string, ReadonlyMap<MidiSourceId, WrittenRecords>>
 }
 
-const NO_SOURCES: ReadonlySet<MidiSourceId> = new Set()
+const NO_SOURCES: ReadonlyMap<MidiSourceId, WrittenRecords> = new Map()
+
+/**
+ * The previous partition with its written records replaced, removed or added, still in order.
+ * Sorting only the written records and merging them in costs one pass, not a sort of the whole.
+ */
+function mergeWrittenRecords<RecordType extends StoredRecord>(
+  previous: readonly RecordType[],
+  writtenIds: ReadonlySet<string>,
+  read: (id: string) => RecordType | undefined,
+  compare: (left: RecordType, right: RecordType) => number,
+): readonly RecordType[] {
+  const written: RecordType[] = []
+  for (const id of writtenIds) {
+    const record = read(id)
+    if (record !== undefined) written.push(record)
+  }
+  written.sort(compare)
+
+  const merged: RecordType[] = []
+  let next = 0
+  for (const record of previous) {
+    if (writtenIds.has(record.id)) continue
+    while (next < written.length && compare(written[next]!, record) < 0)
+      merged.push(written[next++]!)
+    merged.push(record)
+  }
+  while (next < written.length) merged.push(written[next++]!)
+  return Object.freeze(merged)
+}
 
 function copyPartitions<RecordType extends StoredRecord>(
   table: PartitionedTableView<RecordType>,
-  copyRecords: (entries: Iterable<readonly [string, RecordType]>) => readonly RecordType[],
+  compare: (left: RecordType, right: RecordType) => number,
   previous: MidiSourcePartitions<RecordType> | null,
-  touched: ReadonlySet<MidiSourceId>,
+  touched: ReadonlyMap<MidiSourceId, WrittenRecords>,
 ): MidiSourcePartitions<RecordType> {
   if (previous !== null && touched.size === 0) return previous
   return freezePartitions(
     [...table.partitionIds()].sort(compareStrings).map((sourceId) => {
-      const shared = previous === null || touched.has(sourceId) ? undefined : previous[sourceId]
-      return [sourceId, shared ?? copyRecords(table.entries(sourceId))] as const
+      const records = previous?.[sourceId]
+      const written = touched.get(sourceId)
+      if (records === undefined || written === 'all') {
+        return [sourceId, copySorted(table.entries(sourceId), compare)] as const
+      }
+      if (written === undefined) return [sourceId, records] as const
+      return [
+        sourceId,
+        mergeWrittenRecords(records, written, (id) => table.get(sourceId, id), compare),
+      ] as const
     }),
   )
 }
@@ -124,13 +177,13 @@ function createProjectSnapshot(
     devices: part('devices', previous?.devices, () => copySortedRecords(reader.deviceEntries())),
     midiNotes: copyPartitions(
       reader.partitionedTable('midiNotes'),
-      copySortedRecords,
+      compareById,
       previous?.midiNotes ?? null,
       touched.partitions.get('midiNotes') ?? NO_SOURCES,
     ),
     midiSustainPedalEvents: copyPartitions(
       reader.partitionedTable('midiSustainPedalEvents'),
-      copySortedTimelineRecords,
+      compareByTick,
       previous?.midiSustainPedalEvents ?? null,
       touched.partitions.get('midiSustainPedalEvents') ?? NO_SOURCES,
     ),
@@ -139,12 +192,13 @@ function createProjectSnapshot(
 
 /**
  * @internal The Session's Snapshots. It remembers what each commit touched until the next
- * Snapshot is read, so that Snapshot copies only those parts and shares the rest.
+ * Snapshot is read, so that Snapshot copies only those parts and shares the rest. Inside a
+ * partition it remembers the written records, so a large partition is merged, not re-sorted.
  */
 export class ProjectSnapshots {
   #snapshot: ProjectSnapshot | null = null
   readonly #tables = new Set<string>()
-  readonly #partitions = new Map<string, Set<MidiSourceId>>()
+  readonly #partitions = new Map<string, Map<MidiSourceId, Set<string> | 'all'>>()
 
   noteChanges(changes: readonly ProjectChange[]): void {
     if (this.#snapshot === null) return
@@ -154,8 +208,16 @@ export class ProjectSnapshots {
         continue
       }
       let sources = this.#partitions.get(change.table)
-      if (sources === undefined) this.#partitions.set(change.table, (sources = new Set()))
-      sources.add(change.sourceId)
+      if (sources === undefined) this.#partitions.set(change.table, (sources = new Map()))
+      if (change.op === 'insert-partition' || change.op === 'remove-partition') {
+        sources.set(change.sourceId, 'all')
+        continue
+      }
+      const written = sources.get(change.sourceId)
+      if (written === 'all') continue
+      const ids = written ?? new Set<string>()
+      ids.add(change.op === 'insert' ? change.after.id : change.before.id)
+      sources.set(change.sourceId, ids)
     }
   }
 

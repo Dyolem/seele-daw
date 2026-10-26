@@ -2,6 +2,7 @@ import type { ModelRevision, ProjectCommit, TrackId } from '@seele-daw/project-c
 
 import {
   AUDIBLE_MIDI_PLAN_STATUS,
+  compareNoteSpans,
   type AudibleMidiProjectPlan,
   type MidiNoteSpanPlan,
   type NoteOccurrenceKey,
@@ -183,13 +184,40 @@ function createOccurrenceChanges(
   )
 }
 
+/**
+ * Both arrays are one Clip's spans in span order, and a span the edit left alone is the same
+ * object in both, so one walk passes over those; only the spans that differ are matched by key.
+ * The order only keeps the walk in step: a span it passes alone on both sides still matches
+ * itself by key.
+ */
 function appendSpanChanges(
   previousSpans: readonly MidiNoteSpanPlan[],
   nextSpans: readonly MidiNoteSpanPlan[],
   changes: AudibleMidiOccurrenceChange[],
 ): void {
-  const removed = new Map(previousSpans.map((span) => [span.occurrenceKey, span]))
-  for (const after of nextSpans) {
+  const removed = new Map<NoteOccurrenceKey, MidiNoteSpanPlan>()
+  const added: MidiNoteSpanPlan[] = []
+  let previousIndex = 0
+  let nextIndex = 0
+  while (previousIndex < previousSpans.length || nextIndex < nextSpans.length) {
+    const before = previousSpans[previousIndex]
+    const after = nextSpans[nextIndex]
+    if (before === after) {
+      previousIndex += 1
+      nextIndex += 1
+    } else if (
+      after === undefined ||
+      (before !== undefined && compareNoteSpans(before, after) < 0)
+    ) {
+      removed.set(before!.occurrenceKey, before!)
+      previousIndex += 1
+    } else {
+      added.push(after)
+      nextIndex += 1
+    }
+  }
+
+  for (const after of added) {
     const { occurrenceKey } = after
     const before = removed.get(occurrenceKey)
     if (before === undefined) {
@@ -205,7 +233,6 @@ function appendSpanChanges(
       continue
     }
     removed.delete(occurrenceKey)
-    if (before === after) continue
     const changedFields = occurrenceChangedFields(before, after)
     if (changedFields === null) continue
     changes.push(

@@ -12,6 +12,7 @@ import {
   type MidiSourceId,
   type MidiSourcePartitions,
   type MidiSustainPedalEventRecord,
+  type NoteId,
   type ProjectSnapshot,
   type TrackId,
   type TrackRecord,
@@ -63,7 +64,6 @@ interface CompiledClip {
   readonly sustainPedalEvents: readonly MidiSustainPedalEventRecord[]
 }
 
-const NO_SPANS = Object.freeze<MidiNoteSpanPlan[]>([])
 const NO_CLIP_SPANS: ReadonlyMap<ClipId, readonly MidiNoteSpanPlan[]> = new Map()
 
 /**
@@ -91,11 +91,6 @@ function compareIds(left: { readonly id: string }, right: { readonly id: string 
 }
 
 function compareClips(left: ClipRecord, right: ClipRecord): number {
-  if (left.startTick !== right.startTick) return left.startTick - right.startTick
-  return compareIds(left, right)
-}
-
-function compareNotes(left: MidiNoteRecord, right: MidiNoteRecord): number {
   if (left.startTick !== right.startTick) return left.startTick - right.startTick
   return compareIds(left, right)
 }
@@ -270,85 +265,129 @@ function resolveSustainPedalReleases(
   return resolver
 }
 
-/** The Clip's spans, compiled again only when the Clip or its Source changed. */
+/**
+ * The Clip's spans. They are kept while the Clip record and its Source's Note and pedal arrays are
+ * the same; when only the Notes changed, the spans of Notes that are still the same records are
+ * kept too, and only the written Notes are compiled.
+ */
 function compiledClipNoteSpans(
-  trackPlan: TrackPlaybackPlan,
   clip: MidiClipRecord,
   notes: readonly MidiNoteRecord[],
   sustainPedalEvents: readonly MidiSustainPedalEventRecord[],
 ): readonly MidiNoteSpanPlan[] {
   const compiled = compiledClips.get(clip)
-  if (compiled?.notes === notes && compiled.sustainPedalEvents === sustainPedalEvents) {
+  if (compiled?.sustainPedalEvents === sustainPedalEvents && compiled.notes === notes) {
     return compiled.spans
   }
-  const spans = compileClipNoteSpans(
-    trackPlan,
-    clip,
-    notes,
-    resolveSustainPedalReleases(sustainPedalEvents),
-  )
+  const compile = noteSpanCompiler(clip, resolveSustainPedalReleases(sustainPedalEvents))
+  const spans =
+    compiled?.sustainPedalEvents === sustainPedalEvents
+      ? updateNoteSpans(compiled, notes, compile)
+      : Object.freeze(sortedSpans(notes, compile))
   compiledClips.set(clip, Object.freeze({ notes, spans, sustainPedalEvents }))
   return spans
 }
 
 /**
- * Projects Note starts in the Clip's half-open source window and clips their ends at the boundary.
- * Notes already active before the window are deliberately not chased in V1.
+ * Compiles one Note into a span: its start in the Clip's half-open source window, its end clipped
+ * at the boundary. A Note outside the window has none; Notes already active before the window are
+ * deliberately not chased in V1.
  */
-function compileClipNoteSpans(
-  trackPlan: TrackPlaybackPlan,
+function noteSpanCompiler(
   clip: MidiClipRecord,
-  sourceNotes: readonly MidiNoteRecord[],
   sustainPedalReleaseResolver: SustainPedalReleaseResolver,
-): readonly MidiNoteSpanPlan[] {
-  if (!trackPlan.audible || clip.muted) return NO_SPANS
-
+): (note: MidiNoteRecord) => MidiNoteSpanPlan | null {
   const sourceWindowEndTick = addTicks(clip.sourceOffsetTick, clip.spanTick)
-  const notes = [...sourceNotes].sort(compareNotes)
-  const spans: MidiNoteSpanPlan[] = []
 
-  for (const note of notes) {
-    if (note.startTick < clip.sourceOffsetTick || note.startTick >= sourceWindowEndTick) continue
+  return (note) => {
+    if (note.startTick < clip.sourceOffsetTick || note.startTick >= sourceWindowEndTick) return null
 
     const sourceNoteEndTick = addTicks(note.startTick, note.durationTick)
     const clippedSourceEndTick = parseTick(Math.min(sourceNoteEndTick, sourceWindowEndTick))
-    const projectStartTick = addTicks(
-      clip.startTick,
-      parseTick(note.startTick - clip.sourceOffsetTick),
-    )
-    const projectEndTick = addTicks(
-      clip.startTick,
-      parseTick(clippedSourceEndTick - clip.sourceOffsetTick),
-    )
     const finalSourceReleaseTick = sustainPedalReleaseResolver.resolveFinalReleaseTick(
       note.channel,
       clippedSourceEndTick,
       sourceWindowEndTick,
     )
-    const projectReleaseTick = addTicks(
-      clip.startTick,
-      parseTick(finalSourceReleaseTick - clip.sourceOffsetTick),
-    )
+    const projectTick = (sourceTick: number) =>
+      addTicks(clip.startTick, parseTick(sourceTick - clip.sourceOffsetTick))
 
     // A Clip-scoped occurrence remains unique when equal-pitch Notes overlap in project time.
-    spans.push(
-      Object.freeze({
-        channel: note.channel,
-        clipId: clip.id,
-        endTick: projectEndTick,
-        noteId: note.id,
-        occurrenceKey: createNoteOccurrenceKey(trackPlan.trackId, clip.id, clip.sourceId, note.id),
-        pitch: note.pitch,
-        releaseTick: projectReleaseTick,
-        sourceId: clip.sourceId,
-        startTick: projectStartTick,
-        trackId: trackPlan.trackId,
-        velocity: note.velocity,
-      }),
-    )
+    return Object.freeze({
+      channel: note.channel,
+      clipId: clip.id,
+      endTick: projectTick(clippedSourceEndTick),
+      noteId: note.id,
+      occurrenceKey: createNoteOccurrenceKey(clip.trackId, clip.id, clip.sourceId, note.id),
+      pitch: note.pitch,
+      releaseTick: projectTick(finalSourceReleaseTick),
+      sourceId: clip.sourceId,
+      startTick: projectTick(note.startTick),
+      trackId: clip.trackId,
+      velocity: note.velocity,
+    })
+  }
+}
+
+function sortedSpans(
+  notes: readonly MidiNoteRecord[],
+  compile: (note: MidiNoteRecord) => MidiNoteSpanPlan | null,
+): MidiNoteSpanPlan[] {
+  const spans: MidiNoteSpanPlan[] = []
+  for (const note of notes) {
+    const span = compile(note)
+    if (span !== null) spans.push(span)
+  }
+  return spans.sort(compareNoteSpans)
+}
+
+/**
+ * The previous spans with those of removed or rewritten Notes dropped and those of new or
+ * rewritten Notes merged in. Both Note arrays are a Snapshot partition in ID order, so one walk
+ * finds the Notes that are no longer the same records.
+ */
+function updateNoteSpans(
+  compiled: CompiledClip,
+  notes: readonly MidiNoteRecord[],
+  compile: (note: MidiNoteRecord) => MidiNoteSpanPlan | null,
+): readonly MidiNoteSpanPlan[] {
+  const previousNotes = compiled.notes
+  const droppedNoteIds = new Set<NoteId>()
+  const writtenNotes: MidiNoteRecord[] = []
+  let previousIndex = 0
+  let nextIndex = 0
+
+  while (previousIndex < previousNotes.length || nextIndex < notes.length) {
+    const before = previousNotes[previousIndex]
+    const after = notes[nextIndex]
+    if (before === after) {
+      previousIndex += 1
+      nextIndex += 1
+    } else if (after === undefined || (before !== undefined && before.id < after.id)) {
+      droppedNoteIds.add(before!.id)
+      previousIndex += 1
+    } else {
+      if (before?.id === after.id) {
+        droppedNoteIds.add(before.id)
+        previousIndex += 1
+      }
+      writtenNotes.push(after)
+      nextIndex += 1
+    }
   }
 
-  return Object.freeze(spans.sort(compareNoteSpans))
+  const writtenSpans = sortedSpans(writtenNotes, compile)
+  const spans: MidiNoteSpanPlan[] = []
+  let written = 0
+  for (const span of compiled.spans) {
+    if (droppedNoteIds.has(span.noteId)) continue
+    while (written < writtenSpans.length && compareNoteSpans(writtenSpans[written]!, span) < 0) {
+      spans.push(writtenSpans[written++]!)
+    }
+    spans.push(span)
+  }
+  while (written < writtenSpans.length) spans.push(writtenSpans[written++]!)
+  return Object.freeze(spans)
 }
 
 function derivePlanStatus(
@@ -426,7 +465,7 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
 
       const sourceNotes = indexes.notesBySourceId.get(clip.sourceId)!
       const sustainPedalEvents = indexes.sustainPedalEventsBySourceId.get(clip.sourceId)!
-      const spans = compiledClipNoteSpans(trackPlan, clip, sourceNotes, sustainPedalEvents)
+      const spans = compiledClipNoteSpans(clip, sourceNotes, sustainPedalEvents)
       clipSpans.set(clip.id, spans)
       spanCount += spans.length
     }

@@ -8,16 +8,16 @@
 
 一切从 `@seele-daw/project-core` 根入口导入。
 
-| 接口                                                                 | 作用                                                                                                                                   |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `createInitialProjectSession`、`createProjectSessionFromProjectFile` | 新建项目，或从项目文件加载                                                                                                             |
-| `session.execute(command)`                                           | 执行命令，返回 `committed`（带 `ProjectCommit`）或 `no-change`                                                                         |
-| `session.undo()` / `session.redo()`                                  | 重放 History；栈空时返回 `null`                                                                                                        |
-| `session.query(query)`                                               | 按 revision 一致地读取 MIDI Note（按 ID 或按区间）                                                                                     |
-| `session.subscribe(subscription, observer)`                          | 在微任务中收到提交：全部提交，或按 Source / Note / Tick 区间过滤的 Note 变化                                                           |
-| `session.getSnapshot()`                                              | 当前 revision 的全部表（`ProjectTables`），同一 revision 内返回同一个对象；没被改动的表与分区在 revision 之间也是同一个对象（ADR-007） |
-| `createProjectFileDTO`、`decodeProjectFileDTO`                       | 项目文件的写出与严格读取                                                                                                               |
-| `saveProjectCheckpoint`、`restoreProjectCheckpoint`                  | 应用内保存与恢复；存储端口由调用方实现                                                                                                 |
+| 接口                                                                 | 作用                                                                                                                                                  |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createInitialProjectSession`、`createProjectSessionFromProjectFile` | 新建项目，或从项目文件加载                                                                                                                            |
+| `session.execute(command)`                                           | 执行命令，返回 `committed`（带 `ProjectCommit`）或 `no-change`                                                                                        |
+| `session.undo()` / `session.redo()`                                  | 重放 History；栈空时返回 `null`                                                                                                                       |
+| `session.query(query)`                                               | 按 revision 一致地读取 MIDI Note（按 ID 或按区间）                                                                                                    |
+| `session.subscribe(subscription, observer)`                          | 在微任务中收到提交：全部提交，或按 Source / Note / Tick 区间过滤的 Note 变化                                                                          |
+| `session.getSnapshot()`                                              | 当前 revision 的全部表（`ProjectTables`），同一 revision 内返回同一个对象；没被改动的表、分区与记录在 revision 之间也是同一个对象（ADR-007、ADR-010） |
+| `createProjectFileDTO`、`decodeProjectFileDTO`                       | 项目文件的写出与严格读取                                                                                                                              |
+| `saveProjectCheckpoint`、`restoreProjectCheckpoint`                  | 应用内保存与恢复；存储端口由调用方实现                                                                                                                |
 
 命令共 18 种，由 `PROJECT_COMMAND_TYPE` 列出：替换 Instrument Device；新增 Instrument Track
 （单条或批量导入）；新增 MIDI Clip（空 Clip、带第一枚 Note，或向右扩展并加 Note）；MIDI Note

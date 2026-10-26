@@ -45,5 +45,6 @@
 
 ## Revisit Trigger
 
-- 大型单 Clip 的编辑延迟成为问题：在 Source 内按音符增量编译与调和。
+- 大型单 Clip 的编辑延迟成为问题：在 Source 内按音符增量编译与调和。已触发，见
+  [ADR-010](./ADR-010-edits-inside-a-clip-reuse-untouched-notes.md)。
 - 有消费者需要知道哪些部分变了却不能比较对象身份，例如跨线程：让 Snapshot 直接携带变化范围。

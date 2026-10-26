@@ -49,5 +49,6 @@ ADR-007 之后，编译按 Clip 记忆结果，计划也带上了按 Clip 分组
 
 ## Revisit Trigger
 
-- 单个 Clip 的编辑延迟成为问题：在 Clip 内按音符增量编译与调和（同 ADR-007）。
+- 单个 Clip 的编辑延迟成为问题：在 Clip 内按音符增量编译与调和（同 ADR-007）。已触发，见
+  [ADR-010](./ADR-010-edits-inside-a-clip-reuse-untouched-notes.md)。
 - Clip 数量大到每个窗口逐 Clip 检查成为负担（数千个以上）：为窗口查询建按起点的跨 Clip 索引。

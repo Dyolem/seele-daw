@@ -3,7 +3,6 @@ import {
   MIDI_SOURCE_CONTAINER_KIND,
   MIDI_SOURCE_ENVELOPE_SCHEMA_VERSION,
   MIDI_SOURCE_MODE_DECLARATION_KIND,
-  MidiFileCodecError,
   StandardMidiFileEncoder,
   ToneJsMidiFileDecoder,
   createStandardMidiFileSourceEnvelope,
@@ -35,6 +34,5 @@ describe('@seele-daw/midi-file public API', () => {
     ).toBe('inspected')
     expect(ToneJsMidiFileDecoder).toBeTypeOf('function')
     expect(StandardMidiFileEncoder).toBeTypeOf('function')
-    expect(MidiFileCodecError).toBeTypeOf('function')
   })
 })

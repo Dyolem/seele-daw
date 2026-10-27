@@ -59,8 +59,8 @@ MidiFileTrack { notes, controlChanges }
 
 ## 4. 失败与兼容边界
 
-- normalized Document 中任一 Control Change 的 Tick、Controller 或 Value 越界时，整个导入在创建
-  Project Fact 前失败；不 clamp 或猜测损坏的输入。
+- Control Change 的 Tick、Controller 或 Value 越界的文件在解码时就被 midi-file 拒绝；导入信任
+  解码出的 normalized Document，不 clamp 或猜测损坏的输入。
 - 同 Tick Note 与 Controller 的跨事件原始字节顺序没有保留在中立 Document 中。V1 按已批准规则把
   首个 Note Tick 上的最后一条同类 CC 当作初始值，不能据此声称逐字节重放原始事件顺序。
 - Decoder 因中途 Program Change 拆分 Track 时，不会跨拆分 Track 追赶更早的 CC7 / CC10；完整

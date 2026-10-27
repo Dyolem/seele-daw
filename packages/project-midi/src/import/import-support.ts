@@ -1,4 +1,3 @@
-import { assertMidiSourceEnvelope, type MidiFileDocument } from '@seele-daw/midi-file'
 import {
   MAX_ENTITY_NAME_LENGTH,
   parseClipId,
@@ -17,8 +16,6 @@ import {
   type ProjectMidiImportEntityKind,
   type ProjectMidiImportIdFactory,
 } from '#internal/import/project-midi-import-contract'
-import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
-import { assertSourcePpq } from '#internal/import/ppq-converter'
 
 export interface ImportIdContext {
   readonly sourceTrackIndex?: number
@@ -57,21 +54,14 @@ export class ImportIdAllocator {
     try {
       id = ID_PARSERS[kind](this.#createId(request))
     } catch (cause) {
-      throw new ProjectMidiImportError(
-        'identity-factory-failed',
-        `The MIDI import identity factory could not create a valid ${kind} ID.`,
-        { entityKind: kind, sourceTrackIndex: context.sourceTrackIndex },
-        { cause },
-      )
+      throw new Error(`The MIDI import identity factory could not create a valid ${kind} ID.`, {
+        cause,
+      })
     }
 
     const seenIds = this.#seenByKind.get(kind) ?? new Set<string>()
     if (seenIds.has(id)) {
-      throw new ProjectMidiImportError(
-        'duplicate-generated-id',
-        `The MIDI import identity factory generated duplicate ${kind} ID ${id}.`,
-        { entityKind: kind, sourceTrackIndex: context.sourceTrackIndex, value: id },
-      )
+      throw new Error(`The MIDI import identity factory generated duplicate ${kind} ID ${id}.`)
     }
 
     seenIds.add(id)
@@ -88,44 +78,6 @@ export function createDiagnostic(input: ProjectMidiImportDiagnostic): ProjectMid
       ? {}
       : { controllerNumbers: Object.freeze([...input.controllerNumbers]) }),
   })
-}
-
-export function requireNormalizedMidiDocument(document: MidiFileDocument): void {
-  if (document.format !== 0 && document.format !== 1) {
-    throw new ProjectMidiImportError(
-      'invalid-midi-document',
-      'Project MIDI import accepts normalized SMF format 0 or format 1 documents.',
-      { value: document.format },
-    )
-  }
-
-  try {
-    assertMidiSourceEnvelope(document.sourceEnvelope, document.format)
-  } catch (cause) {
-    throw new ProjectMidiImportError(
-      'invalid-midi-document',
-      'Project MIDI import requires a supported MIDI Source Envelope consistent with the document.',
-      { value: document.sourceEnvelope },
-      { cause },
-    )
-  }
-  assertSourcePpq(document.ppq)
-
-  for (const [name, value] of Object.entries({
-    tempos: document.tempos,
-    timeSignatures: document.timeSignatures,
-    keySignatures: document.keySignatures,
-    textEvents: document.textEvents,
-    tracks: document.tracks,
-  })) {
-    if (!Array.isArray(value)) {
-      throw new ProjectMidiImportError(
-        'invalid-midi-document',
-        `MIDI document ${name} must be an array.`,
-        { value },
-      )
-    }
-  }
 }
 
 export function normalizeEntityName(value: string, fallback: string): string {

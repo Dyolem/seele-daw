@@ -4,7 +4,6 @@ import {
   MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS,
   assertMidiSourceEnvelope,
 } from '#internal/contract/midi-source-envelope'
-import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { parseSmfKeySignatureOffset } from '#internal/adapters/midi-file-js/smf-key-signature'
 
 const MAX_MIDI_7_BIT_VALUE = 127
@@ -16,11 +15,7 @@ const MAX_MUSICAL_TRACKS = 0xfffe
 
 export function assertEncodableMidiFileDocument(document: MidiFileDocument): void {
   if (document.format !== 1) {
-    throw new MidiFileCodecError(
-      'unsupported-midi-format',
-      'The built-in MIDI encoder emits Standard MIDI File format 1 only.',
-      { operation: 'encode', format: document.format },
-    )
+    throw new Error('The built-in MIDI encoder emits Standard MIDI File format 1 only.')
   }
 
   try {
@@ -144,5 +139,5 @@ function assertByteString(value: string, label: string): void {
 }
 
 function fail(message: string): never {
-  throw new MidiFileCodecError('invalid-midi-document', message, { operation: 'encode' })
+  throw new Error(message)
 }

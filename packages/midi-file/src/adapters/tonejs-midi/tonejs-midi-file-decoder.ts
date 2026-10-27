@@ -8,7 +8,6 @@ import type {
 } from '#internal/contract/midi-file-document'
 import type { MidiFileDecoder } from '#internal/contract/midi-file-codec'
 import { createStandardMidiFileSourceEnvelopeWithEvidence } from '#internal/contract/midi-source-envelope'
-import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { inspectSmfMidi1ModeDeclarations } from '#internal/adapters/midi-file-js/smf-midi1-mode-declaration-inspector'
 import { readSupportedSmfHeader } from '#internal/adapters/tonejs-midi/smf-header'
 import { ToneJsMidi } from '#internal/adapters/tonejs-midi/tonejs-midi-module'
@@ -53,14 +52,8 @@ export class ToneJsMidiFileDecoder implements MidiFileDecoder {
         })),
         tracks: midi.tracks.map(mapTrack),
       }
-    } catch (error) {
-      if (error instanceof MidiFileCodecError) throw error
-      throw new MidiFileCodecError(
-        'decode-failed',
-        'The Standard MIDI File could not be decoded.',
-        { operation: 'decode', format: smfHeader.format },
-        { cause: error },
-      )
+    } catch (cause) {
+      throw new Error('The Standard MIDI File could not be decoded.', { cause })
     }
   }
 }

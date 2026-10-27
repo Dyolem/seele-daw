@@ -4,7 +4,6 @@ import {
   createStandardMidiFileSourceEnvelope,
   createStandardMidiFileSourceEnvelopeWithEvidence,
 } from '#internal/contract/midi-source-envelope'
-import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { ToneJsMidiFileDecoder } from '#internal/adapters/tonejs-midi/tonejs-midi-file-decoder'
 import { StandardMidiFileEncoder } from '#internal/adapters/midi-file-js/standard-midi-file-encoder'
 import { parseMidi } from 'midi-file'
@@ -159,10 +158,7 @@ describe('StandardMidiFileEncoder', () => {
 
   it('rejects type 0 output because the V1 encoder emits type 1', () => {
     expect(() => new StandardMidiFileEncoder().encode({ ...DOCUMENT, format: 0 })).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({
-        code: 'unsupported-midi-format',
-        details: { operation: 'encode', format: 0 },
-      }),
+      'The built-in MIDI encoder emits Standard MIDI File format 1 only.',
     )
   })
 
@@ -173,10 +169,7 @@ describe('StandardMidiFileEncoder', () => {
     }
 
     expect(() => new StandardMidiFileEncoder().encode(invalidDocument)).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({
-        code: 'invalid-midi-document',
-        details: { operation: 'encode' },
-      }),
+      'Invalid track channel: 16',
     )
   })
 
@@ -186,9 +179,7 @@ describe('StandardMidiFileEncoder', () => {
         ...DOCUMENT,
         sourceEnvelope: createStandardMidiFileSourceEnvelope(0),
       }),
-    ).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
-    )
+    ).toThrowError('Invalid or inconsistent MIDI Source Envelope')
   })
 
   it('rejects evidence that cannot be preserved by the current encoder', () => {
@@ -203,7 +194,7 @@ describe('StandardMidiFileEncoder', () => {
         }),
       }),
     ).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
+      'Cannot encode unclassified System Exclusive source messages without losing evidence',
     )
     expect(() =>
       new StandardMidiFileEncoder().encode({
@@ -213,9 +204,7 @@ describe('StandardMidiFileEncoder', () => {
           status: 'unresolved',
         }),
       }),
-    ).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
-    )
+    ).toThrowError('Cannot encode a source whose MIDI mode declarations could not be inspected')
   })
 
   it('rejects an event gap that cannot be encoded as a four-byte SMF delta', () => {
@@ -242,15 +231,13 @@ describe('StandardMidiFileEncoder', () => {
     }
 
     expect(() => new StandardMidiFileEncoder().encode(invalidDocument)).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
+      new RangeError('SMF delta 268435456 exceeds the four-byte variable-length quantity range.'),
     )
   })
 
   it('rejects text that the current byte-oriented SMF writer would corrupt', () => {
     expect(() =>
       new StandardMidiFileEncoder().encode({ ...DOCUMENT, name: '未编码项目' }),
-    ).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({ code: 'invalid-midi-document' }),
-    )
+    ).toThrowError(/the current SMF text codec accepts byte-range characters only$/)
   })
 })

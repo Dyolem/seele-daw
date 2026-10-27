@@ -36,11 +36,5 @@ export type {
   StandardMidiFileSourceContainer,
   UnresolvedMidiSourceSemanticEvidence,
 } from './contract/midi-source-envelope'
-export { MidiFileCodecError } from './errors/midi-file-codec-error'
-export type {
-  MidiFileCodecErrorCode,
-  MidiFileCodecErrorDetails,
-  MidiFileCodecOperation,
-} from './errors/midi-file-codec-error'
 export { ToneJsMidiFileDecoder } from './adapters/tonejs-midi/tonejs-midi-file-decoder'
 export { StandardMidiFileEncoder } from './adapters/midi-file-js/standard-midi-file-encoder'

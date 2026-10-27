@@ -10,7 +10,6 @@ import {
   MIDI_SOURCE_SEMANTIC_EVIDENCE_STATUS,
   type MidiSourceModeDeclaration,
 } from '#internal/contract/midi-source-envelope'
-import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import { assertEncodableMidiFileDocument } from '#internal/adapters/midi-file-js/midi-file-document-validator'
 import { parseSmfKeySignatureOffset } from '#internal/adapters/midi-file-js/smf-key-signature'
 import { writeMidi } from 'midi-file'
@@ -42,25 +41,20 @@ export class StandardMidiFileEncoder implements MidiFileEncoder {
   encode(document: MidiFileDocument): Uint8Array {
     assertEncodableMidiFileDocument(document)
 
+    const tracks = [encodeConductorTrack(document), ...document.tracks.map(encodeMusicTrack)]
+    const midiData: MidiData = {
+      header: {
+        format: 1,
+        numTracks: tracks.length,
+        ticksPerBeat: document.ppq,
+      },
+      tracks,
+    }
+
     try {
-      const tracks = [encodeConductorTrack(document), ...document.tracks.map(encodeMusicTrack)]
-      const midiData: MidiData = {
-        header: {
-          format: 1,
-          numTracks: tracks.length,
-          ticksPerBeat: document.ppq,
-        },
-        tracks,
-      }
       return new Uint8Array(writeMidi(midiData, { running: true }))
-    } catch (error) {
-      if (error instanceof MidiFileCodecError) throw error
-      throw new MidiFileCodecError(
-        'encode-failed',
-        'The MIDI document could not be encoded as a Standard MIDI File.',
-        { operation: 'encode', format: document.format },
-        { cause: error },
-      )
+    } catch (cause) {
+      throw new Error('The MIDI document could not be encoded as a Standard MIDI File.', { cause })
     }
   }
 }
@@ -263,11 +257,7 @@ function finalizeTrack(events: ScheduledMidiEvent[], requestedEndTick?: number):
 
 function readEncodableDelta(delta: number): number {
   if (delta > MAX_VARIABLE_LENGTH_QUANTITY) {
-    throw new MidiFileCodecError(
-      'invalid-midi-document',
-      `SMF delta ${delta} exceeds the four-byte variable-length quantity range.`,
-      { operation: 'encode' },
-    )
+    throw new RangeError(`SMF delta ${delta} exceeds the four-byte variable-length quantity range.`)
   }
   return delta
 }

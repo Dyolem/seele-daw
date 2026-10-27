@@ -1,4 +1,3 @@
-import { MidiFileCodecError } from '#internal/errors/midi-file-codec-error'
 import type { MidiFileFormat } from '#internal/contract/midi-file-document'
 
 const MINIMUM_HEADER_BYTES = 14
@@ -12,46 +11,26 @@ export interface SupportedSmfHeader {
 
 export function readSupportedSmfHeader(bytes: Uint8Array): SupportedSmfHeader {
   if (bytes.byteLength < MINIMUM_HEADER_BYTES || !hasMidiHeaderSignature(bytes)) {
-    throw new MidiFileCodecError(
-      'invalid-midi-file',
-      'The input does not contain a complete Standard MIDI File header.',
-      { operation: 'decode' },
-    )
+    throw new Error('The input does not contain a complete Standard MIDI File header.')
   }
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const headerLength = view.getUint32(4)
   if (headerLength < STANDARD_HEADER_LENGTH || bytes.byteLength < 8 + headerLength) {
-    throw new MidiFileCodecError(
-      'invalid-midi-file',
-      'The Standard MIDI File header has an invalid length.',
-      { operation: 'decode' },
-    )
+    throw new Error('The Standard MIDI File header has an invalid length.')
   }
 
   const format = view.getUint16(8)
   if (format !== 0 && format !== 1) {
-    throw new MidiFileCodecError(
-      'unsupported-midi-format',
-      `Standard MIDI File format ${format} is not supported.`,
-      { operation: 'decode', format },
-    )
+    throw new Error(`Standard MIDI File format ${format} is not supported.`)
   }
 
   const division = view.getUint16(12)
   if ((division & SMPTE_DIVISION_FLAG) !== 0) {
-    throw new MidiFileCodecError(
-      'unsupported-time-division',
-      'SMPTE time division is not supported; a PPQ time division is required.',
-      { operation: 'decode', division },
-    )
+    throw new Error('SMPTE time division is not supported; a PPQ time division is required.')
   }
   if (division === 0) {
-    throw new MidiFileCodecError(
-      'invalid-midi-file',
-      'The Standard MIDI File PPQ value must be greater than zero.',
-      { operation: 'decode', division },
-    )
+    throw new Error('The Standard MIDI File PPQ value must be greater than zero.')
   }
 
   return { format, ppq: division }

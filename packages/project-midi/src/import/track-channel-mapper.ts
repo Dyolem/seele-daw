@@ -6,7 +6,6 @@ import {
   type BipolarValue,
   type LinearGain,
 } from '@seele-daw/project-core'
-import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 
 const CHANNEL_VOLUME_CONTROLLER = 7
 const PAN_CONTROLLER = 10
@@ -22,41 +21,6 @@ export interface MappedTrackChannel {
   readonly gain: LinearGain
   readonly pan: BipolarValue
   readonly unsupportedControlChanges: readonly MidiFileControlChange[]
-}
-
-function requireControlChange(input: unknown, sourceTrackIndex: number): MidiFileControlChange {
-  if (input === null || typeof input !== 'object') {
-    throwInvalidControlChange(input, sourceTrackIndex)
-  }
-
-  const tick: unknown = Reflect.get(input, 'tick')
-  const controller: unknown = Reflect.get(input, 'controller')
-  const value: unknown = Reflect.get(input, 'value')
-  if (
-    typeof tick !== 'number' ||
-    !Number.isSafeInteger(tick) ||
-    tick < 0 ||
-    typeof controller !== 'number' ||
-    !Number.isSafeInteger(controller) ||
-    controller < 0 ||
-    controller > MIDI_CONTROL_VALUE_MAX ||
-    typeof value !== 'number' ||
-    !Number.isSafeInteger(value) ||
-    value < 0 ||
-    value > MIDI_CONTROL_VALUE_MAX
-  ) {
-    throwInvalidControlChange(input, sourceTrackIndex)
-  }
-
-  return Object.freeze({ tick, controller, value })
-}
-
-function throwInvalidControlChange(input: unknown, sourceTrackIndex: number): never {
-  throw new ProjectMidiImportError(
-    'invalid-midi-document',
-    'MIDI control-change events require a non-negative safe-integer Tick and integer Controller and value from 0 through 127.',
-    { sourceTrackIndex, value: input },
-  )
 }
 
 function selectLaterInitialControl(
@@ -78,14 +42,12 @@ function mapPan(value: number): BipolarValue {
 export function mapTrackChannel(
   track: MidiFileTrack,
   firstNoteTick: number | null,
-  sourceTrackIndex: number,
 ): MappedTrackChannel {
   let channelVolume: InitialControlCandidate | null = null
   let pan: InitialControlCandidate | null = null
   const unsupportedControlChanges: MidiFileControlChange[] = []
 
-  for (const input of track.controlChanges) {
-    const event = requireControlChange(input, sourceTrackIndex)
+  for (const event of track.controlChanges) {
     if (event.controller === MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER) continue
 
     const isInitialChannelControl =

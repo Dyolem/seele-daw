@@ -14,7 +14,8 @@ Codec 的对象投影成 Seele 自有的 `MidiFileDocument`，并提供可独立
 - 保留 tick-domain Note、Tempo、Time Signature、Key Signature、文本事件、Program、Channel、
   Control Change、Pitch Bend 与 End of Track tick；
 - `StandardMidiFileEncoder` 使用 `midi-file` writer 输出 Type 1，并在调用第三方代码前验证当前契约值域；
-- 第三方异常统一转换为带稳定 code 的 `MidiFileCodecError`。
+- 第三方解析与写出的异常统一包成说明哪一步失败的 `Error`，原异常放在 `cause` 里；自身的值域
+  检查直接抛出说明问题的错误。
 
 `@tonejs/midi` 会把一个源 Track 按 Channel / Program 拆成多个 normalized Track，并把 Note On /
 Note Off 配对为 Note。`MidiFileDocument.tracks` 明确表示这种规范化结果，不承诺保留原始 chunk

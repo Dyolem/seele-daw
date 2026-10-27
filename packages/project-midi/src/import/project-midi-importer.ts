@@ -11,8 +11,7 @@ import {
   type ProjectMidiImportSummary,
   type ProjectMidiTrackImportDraft,
 } from '#internal/import/project-midi-import-contract'
-import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
-import { ImportIdAllocator, requireNormalizedMidiDocument } from '#internal/import/import-support'
+import { ImportIdAllocator } from '#internal/import/import-support'
 import { createProjectMidiSemanticBinding } from '#internal/import/midi-semantic-binding'
 import { createImportedProjectFile } from '#internal/import/project-file-builder'
 import { createImportedTrackCollection } from '#internal/import/track-collection-builder'
@@ -36,18 +35,6 @@ interface PreparedProjectMidiImportMapping {
 function prepareProjectMidiImportMapping(
   input: ProjectMidiImportSourceInput,
 ): PreparedProjectMidiImportMapping {
-  requireNormalizedMidiDocument(input.document)
-  if (
-    typeof input.createId !== 'function' ||
-    typeof input.createInstrumentDevice !== 'function' ||
-    typeof input.createTrackColor !== 'function'
-  ) {
-    throw new ProjectMidiImportError(
-      'invalid-midi-document',
-      'Project MIDI import requires identity, instrument device, and Track color factories.',
-    )
-  }
-
   const diagnostics: ProjectMidiImportDiagnostic[] = []
   addGlobalUnsupportedFactDiagnostics(input.document, diagnostics)
 
@@ -68,12 +55,7 @@ export function createProjectMidiImportDraft(
   try {
     session = createProjectSessionFromProjectFile(projectFile)
   } catch (cause) {
-    throw new ProjectMidiImportError(
-      'project-validation-failed',
-      'The imported MIDI document could not form a valid Project Session.',
-      {},
-      { cause },
-    )
+    throw new Error('The imported MIDI document could not form a valid Project Session.', { cause })
   }
 
   return Object.freeze({
@@ -105,10 +87,7 @@ export function createProjectMidiTrackImportDraft(
 ): ProjectMidiTrackImportDraft {
   const { allocator, diagnostics, mappedTracks } = prepareProjectMidiImportMapping(input)
   if (mappedTracks.length === 0) {
-    throw new ProjectMidiImportError(
-      'no-importable-tracks',
-      'The MIDI document has no note-bearing Tracks to add to the current Project.',
-    )
+    throw new Error('The MIDI document has no note-bearing Tracks to add to the current Project.')
   }
   addCurrentProjectTimelineDiagnostics(input.document, diagnostics)
 
@@ -129,12 +108,7 @@ export function createProjectMidiTrackImportDraft(
       insertAt: input.insertAt,
     })
   } catch (cause) {
-    throw new ProjectMidiImportError(
-      'project-validation-failed',
-      'The imported MIDI tracks could not form a valid Project Command.',
-      {},
-      { cause },
-    )
+    throw new Error('The imported MIDI tracks could not form a valid Project Command.', { cause })
   }
 
   return Object.freeze({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MidiFileCodecError, ToneJsMidiFileDecoder } from '#internal/index'
+import { ToneJsMidiFileDecoder } from '#internal/index'
 import {
   createSmfFixture,
   RUNNING_STATUS_NOTE_OFF_FIXTURE,
@@ -181,31 +181,29 @@ describe('ToneJsMidiFileDecoder', () => {
     {
       label: 'format 2',
       bytes: createSmfFixture(2, 480, [[0x00, 0xff, 0x2f, 0x00]]),
-      code: 'unsupported-midi-format',
+      message: 'Standard MIDI File format 2 is not supported.',
     },
     {
       label: 'SMPTE division',
       bytes: createSmfFixture(1, 0xe728, [[0x00, 0xff, 0x2f, 0x00]]),
-      code: 'unsupported-time-division',
+      message: 'SMPTE time division is not supported; a PPQ time division is required.',
     },
     {
       label: 'missing header',
       bytes: new Uint8Array([0x00, 0x01]),
-      code: 'invalid-midi-file',
+      message: 'The input does not contain a complete Standard MIDI File header.',
     },
-  ] as const)('rejects $label with a stable error code', ({ bytes, code }) => {
-    expect(() => new ToneJsMidiFileDecoder().decode(bytes)).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({ code }),
-    )
+  ] as const)('rejects $label', ({ bytes, message }) => {
+    expect(() => new ToneJsMidiFileDecoder().decode(bytes)).toThrowError(message)
   })
 
-  it('translates third-party parse failures without leaking their error shape', () => {
+  it('wraps a third-party parse failure and keeps it as the cause', () => {
     const invalidRunningStatus = createSmfFixture(1, 480, [[0x00, 0x40]])
 
     expect(() => new ToneJsMidiFileDecoder().decode(invalidRunningStatus)).toThrowError(
-      expect.objectContaining<Partial<MidiFileCodecError>>({
-        code: 'decode-failed',
-        details: { operation: 'decode', format: 1 },
+      expect.objectContaining({
+        message: 'The Standard MIDI File could not be decoded.',
+        cause: expect.anything(),
       }),
     )
   })

@@ -25,7 +25,6 @@ import {
   PROJECT_MIDI_IMPORT_ENTITY_KIND,
   type ProjectMidiImportDiagnostic,
 } from '#internal/import/project-midi-import-contract'
-import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 import { createDiagnostic, type ImportIdAllocator } from '#internal/import/import-support'
 import { convertMidiTickToProjectTick } from '#internal/import/ppq-converter'
 
@@ -99,18 +98,9 @@ export function createTempoEvents(
   return [...effectiveEvents]
     .sort(([left], [right]) => left - right)
     .map(([tick, event]) => {
-      if (!Number.isFinite(event.bpm) || event.bpm <= 0) {
-        throw new ProjectMidiImportError(
-          'invalid-midi-document',
-          `MIDI tempo at tick ${event.tick} must have a finite positive BPM.`,
-          { sourceTick: event.tick, value: event.bpm },
-        )
-      }
       if (event.bpm < TEMPO_BPM_MIN || event.bpm > TEMPO_BPM_MAX) {
-        throw new ProjectMidiImportError(
-          'unsupported-tempo',
-          `MIDI tempo ${event.bpm} BPM is outside the Project range ${TEMPO_BPM_MIN}..${TEMPO_BPM_MAX}.`,
-          { sourceTick: event.tick, value: event.bpm },
+        throw new RangeError(
+          `MIDI tempo ${event.bpm} BPM at tick ${event.tick} is outside the Project range ${TEMPO_BPM_MIN}..${TEMPO_BPM_MAX}.`,
         )
       }
       return createTempoEventRecord({
@@ -165,10 +155,8 @@ export function createTimeSignatureEvents(
         (denominator) => denominator === event.denominator,
       )
       if (!supportedNumerator || !supportedDenominator) {
-        throw new ProjectMidiImportError(
-          'unsupported-time-signature',
-          `MIDI time signature ${event.numerator}/${event.denominator} cannot be represented by the current Project model.`,
-          { sourceTick: event.tick, value: `${event.numerator}/${event.denominator}` },
+        throw new RangeError(
+          `MIDI time signature ${event.numerator}/${event.denominator} at tick ${event.tick} cannot be represented by the current Project model.`,
         )
       }
       return createTimeSignatureEventRecord({

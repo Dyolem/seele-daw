@@ -33,7 +33,6 @@ import {
   type ProjectMidiInstrumentDeviceFactoryResult,
   type ProjectMidiTrackColorFactory,
 } from '#internal/import/project-midi-import-contract'
-import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 import { createDiagnostic, type ImportIdAllocator } from '#internal/import/import-support'
 import type { MappedTrack } from '#internal/import/track-mapper'
 
@@ -76,23 +75,15 @@ function createInstrumentDevice(
     }
     device = createDeviceDescriptor(result.device)
   } catch (cause) {
-    throw new ProjectMidiImportError(
-      'instrument-device-factory-failed',
+    throw new Error(
       `The instrument device factory failed for MIDI track ${mappedTrack.sourceTrackIndex}.`,
-      { sourceTrackIndex: mappedTrack.sourceTrackIndex },
       { cause },
     )
   }
 
   if (device.id !== deviceId) {
-    throw new ProjectMidiImportError(
-      'instrument-device-factory-failed',
-      'The instrument device factory returned a descriptor with a different ID.',
-      {
-        entityKind: PROJECT_MIDI_IMPORT_ENTITY_KIND.DEVICE,
-        sourceTrackIndex: mappedTrack.sourceTrackIndex,
-        value: device.id,
-      },
+    throw new Error(
+      `The instrument device factory returned Device ${device.id} for MIDI track ${mappedTrack.sourceTrackIndex}, not ${deviceId}.`,
     )
   }
 
@@ -150,10 +141,8 @@ function createTrackColor(
     )
     return color === null ? null : parseProjectColor(color)
   } catch (cause) {
-    throw new ProjectMidiImportError(
-      'track-color-factory-failed',
+    throw new Error(
       `The Track color factory failed for MIDI track ${mappedTrack.sourceTrackIndex}.`,
-      { sourceTrackIndex: mappedTrack.sourceTrackIndex },
       { cause },
     )
   }
@@ -168,106 +157,93 @@ export function createImportedTrackCollection(
   diagnostics: ProjectMidiImportDiagnostic[],
   placementTick: Tick = ZERO_TICK,
 ): readonly InstrumentTrackCollectionEntry[] {
-  try {
-    return mappedTracks.map((mappedTrack) => {
-      const context = { sourceTrackIndex: mappedTrack.sourceTrackIndex }
-      const trackId = parseTrackId(
-        allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.TRACK, context),
-      )
-      const deviceId = parseDeviceId(
-        allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.DEVICE, context),
-      )
-      const clipId = parseClipId(allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.CLIP, context))
-      const sourceId = parseMidiSourceId(
-        allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SOURCE, context),
-      )
-      const notes = mappedTrack.notes.map((note) =>
-        createMidiNoteRecord({
-          id: parseNoteId(
-            allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_NOTE, {
-              sourceTrackIndex: mappedTrack.sourceTrackIndex,
-              sourceNoteIndex: note.sourceNoteIndex,
-            }),
-          ),
-          startTick: parseTick(note.startTick - mappedTrack.startTick),
-          durationTick: parseTick(note.endTick - note.startTick),
-          pitch: parseMidiPitch(note.pitch),
-          velocity: parseMidiVelocity(note.velocity),
-          channel: parseMidiChannel(note.channel),
-        }),
-      )
-      const sustainPedalEvents = mappedTrack.sustainPedalEvents.map((event) =>
-        createMidiSustainPedalEventRecord({
-          id: parseMidiSustainPedalEventId(
-            allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SUSTAIN_PEDAL_EVENT, {
-              sourceTrackIndex: mappedTrack.sourceTrackIndex,
-              sourceControlChangeIndex: event.sourceControlChangeIndex,
-            }),
-          ),
-          tick: parseTick(event.tick - mappedTrack.startTick),
-          value: parseMidiControlValue(event.value),
-          channel: parseMidiChannel(event.channel),
-        }),
-      )
-      const source = createMidiSourceRecord({
-        id: sourceId,
-        lengthTick: parseTick(mappedTrack.spanTick),
-      })
-      const clip = createMidiClipRecord({
-        id: clipId,
-        trackId,
-        name: mappedTrack.name,
-        color: null,
-        muted: false,
-        // Source file tick zero maps to the caller-owned placement anchor. Per-Track leading
-        // silence therefore remains intact instead of collapsing every Clip onto its first Note.
-        startTick: addTicks(placementTick, parseTick(mappedTrack.startTick)),
-        spanTick: parseTick(mappedTrack.spanTick),
-        sourceId,
-        sourceOffsetTick: parseTick(0),
-        loop: null,
-      })
-      const instrumentMapping = createInstrumentDevice(createDevice, mappedTrack, deviceId)
-      addInstrumentMappingDiagnostic(instrumentMapping, mappedTrack, diagnostics)
-      const instrumentDevice = instrumentMapping.device
-      const color = createTrackColor(createColor, mappedTrack)
-      const track = createInstrumentTrackRecord({
-        id: trackId,
-        name: mappedTrack.name,
-        color,
-        channel: {
-          gain: mappedTrack.channel.gain,
-          pan: mappedTrack.channel.pan,
-          muted: false,
-          soloed: false,
-        },
-        audioEffectIds: [],
-        midiEffectIds: [],
-        instrumentDeviceId: instrumentDevice.id,
-      })
-
-      return Object.freeze({
-        track,
-        instrumentDevice,
-        clips: Object.freeze([
-          Object.freeze({
-            clip,
-            source,
-            notes: Object.freeze(notes),
-            // CC64 stays independent from authored Note duration so playback can derive pedal hold.
-            sustainPedalEvents: Object.freeze(sustainPedalEvents),
-          }),
-        ]),
-      })
-    })
-  } catch (cause) {
-    if (cause instanceof ProjectMidiImportError) throw cause
-
-    throw new ProjectMidiImportError(
-      'project-validation-failed',
-      'The imported MIDI tracks could not form valid Project ownership graphs.',
-      {},
-      { cause },
+  return mappedTracks.map((mappedTrack) => {
+    const context = { sourceTrackIndex: mappedTrack.sourceTrackIndex }
+    const trackId = parseTrackId(allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.TRACK, context))
+    const deviceId = parseDeviceId(
+      allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.DEVICE, context),
     )
-  }
+    const clipId = parseClipId(allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.CLIP, context))
+    const sourceId = parseMidiSourceId(
+      allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SOURCE, context),
+    )
+    const notes = mappedTrack.notes.map((note) =>
+      createMidiNoteRecord({
+        id: parseNoteId(
+          allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_NOTE, {
+            sourceTrackIndex: mappedTrack.sourceTrackIndex,
+            sourceNoteIndex: note.sourceNoteIndex,
+          }),
+        ),
+        startTick: parseTick(note.startTick - mappedTrack.startTick),
+        durationTick: parseTick(note.endTick - note.startTick),
+        pitch: parseMidiPitch(note.pitch),
+        velocity: parseMidiVelocity(note.velocity),
+        channel: parseMidiChannel(note.channel),
+      }),
+    )
+    const sustainPedalEvents = mappedTrack.sustainPedalEvents.map((event) =>
+      createMidiSustainPedalEventRecord({
+        id: parseMidiSustainPedalEventId(
+          allocator.allocate(PROJECT_MIDI_IMPORT_ENTITY_KIND.MIDI_SUSTAIN_PEDAL_EVENT, {
+            sourceTrackIndex: mappedTrack.sourceTrackIndex,
+            sourceControlChangeIndex: event.sourceControlChangeIndex,
+          }),
+        ),
+        tick: parseTick(event.tick - mappedTrack.startTick),
+        value: parseMidiControlValue(event.value),
+        channel: parseMidiChannel(event.channel),
+      }),
+    )
+    const source = createMidiSourceRecord({
+      id: sourceId,
+      lengthTick: parseTick(mappedTrack.spanTick),
+    })
+    const clip = createMidiClipRecord({
+      id: clipId,
+      trackId,
+      name: mappedTrack.name,
+      color: null,
+      muted: false,
+      // Source file tick zero maps to the caller-owned placement anchor. Per-Track leading
+      // silence therefore remains intact instead of collapsing every Clip onto its first Note.
+      startTick: addTicks(placementTick, parseTick(mappedTrack.startTick)),
+      spanTick: parseTick(mappedTrack.spanTick),
+      sourceId,
+      sourceOffsetTick: parseTick(0),
+      loop: null,
+    })
+    const instrumentMapping = createInstrumentDevice(createDevice, mappedTrack, deviceId)
+    addInstrumentMappingDiagnostic(instrumentMapping, mappedTrack, diagnostics)
+    const instrumentDevice = instrumentMapping.device
+    const color = createTrackColor(createColor, mappedTrack)
+    const track = createInstrumentTrackRecord({
+      id: trackId,
+      name: mappedTrack.name,
+      color,
+      channel: {
+        gain: mappedTrack.channel.gain,
+        pan: mappedTrack.channel.pan,
+        muted: false,
+        soloed: false,
+      },
+      audioEffectIds: [],
+      midiEffectIds: [],
+      instrumentDeviceId: instrumentDevice.id,
+    })
+
+    return Object.freeze({
+      track,
+      instrumentDevice,
+      clips: Object.freeze([
+        Object.freeze({
+          clip,
+          source,
+          notes: Object.freeze(notes),
+          // CC64 stays independent from authored Note duration so playback can derive pedal hold.
+          sustainPedalEvents: Object.freeze(sustainPedalEvents),
+        }),
+      ]),
+    })
+  })
 }

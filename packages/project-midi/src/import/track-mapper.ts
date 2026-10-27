@@ -9,7 +9,6 @@ import {
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
   type ProjectMidiImportDiagnostic,
 } from '#internal/import/project-midi-import-contract'
-import { ProjectMidiImportError } from '#internal/import/project-midi-import-error'
 import { createDiagnostic, normalizeEntityName } from '#internal/import/import-support'
 import { convertMidiTickToProjectTick } from '#internal/import/ppq-converter'
 import { mapTrackChannel, type MappedTrackChannel } from '#internal/import/track-channel-mapper'
@@ -107,23 +106,8 @@ function mapSustainPedalEvent(
   event: MidiFileControlChange,
   sourcePpq: number,
   channel: number,
-  sourceTrackIndex: number,
   sourceControlChangeIndex: number,
 ): AbsoluteMappedSustainPedalEvent {
-  if (
-    !Number.isSafeInteger(event.tick) ||
-    event.tick < 0 ||
-    !Number.isSafeInteger(event.value) ||
-    event.value < 0 ||
-    event.value > 127
-  ) {
-    throw new ProjectMidiImportError(
-      'invalid-midi-document',
-      'MIDI sustain-pedal events require a non-negative Tick and an integer value from 0 through 127.',
-      { sourceTrackIndex, sourceTick: event.tick, value: event.value },
-    )
-  }
-
   return {
     channel,
     sourceControlChangeIndex,
@@ -141,15 +125,7 @@ function mapSustainPedalEvents(
 ): readonly AbsoluteMappedSustainPedalEvent[] {
   const mapped = track.controlChanges.flatMap((event, sourceControlChangeIndex) =>
     event.controller === MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER
-      ? [
-          mapSustainPedalEvent(
-            event,
-            sourcePpq,
-            track.channel,
-            sourceTrackIndex,
-            sourceControlChangeIndex,
-          ),
-        ]
+      ? [mapSustainPedalEvent(event, sourcePpq, track.channel, sourceControlChangeIndex)]
       : [],
   )
   mapped.sort(
@@ -184,27 +160,6 @@ function mapSustainPedalEvents(
   return effectiveEvents
 }
 
-function assertTrackShape(track: MidiFileTrack, sourceTrackIndex: number): void {
-  if (
-    typeof track.name !== 'string' ||
-    !Number.isSafeInteger(track.channel) ||
-    track.channel < 0 ||
-    track.channel > 15 ||
-    !Number.isSafeInteger(track.programNumber) ||
-    track.programNumber < 0 ||
-    track.programNumber > 127 ||
-    !Array.isArray(track.notes) ||
-    !Array.isArray(track.controlChanges) ||
-    !Array.isArray(track.pitchBends)
-  ) {
-    throw new ProjectMidiImportError(
-      'invalid-midi-document',
-      `Normalized MIDI track ${sourceTrackIndex} has an invalid shape.`,
-      { sourceTrackIndex, value: track },
-    )
-  }
-}
-
 function mapNote(
   note: MidiFileNote,
   sourcePpq: number,
@@ -212,20 +167,10 @@ function mapNote(
   sourceTrackIndex: number,
   sourceNoteIndex: number,
 ): AbsoluteMappedNote {
-  if (!Number.isSafeInteger(note.durationTicks) || note.durationTicks < 0) {
-    throw new ProjectMidiImportError(
-      'invalid-midi-document',
-      'MIDI note durations must be non-negative safe integers.',
-      { sourceTrackIndex, sourceTick: note.tick, value: note.durationTicks },
-    )
-  }
-
   const sourceEndTick = note.tick + note.durationTicks
   if (!Number.isSafeInteger(sourceEndTick)) {
-    throw new ProjectMidiImportError(
-      'tick-conversion-overflow',
-      'A MIDI note endpoint exceeds the safe integer range.',
-      { sourceTrackIndex, sourceTick: note.tick },
+    throw new RangeError(
+      `The note at tick ${note.tick} of MIDI track ${sourceTrackIndex} ends beyond the safe integer range.`,
     )
   }
 
@@ -234,10 +179,8 @@ function mapNote(
   const durationExpanded = roundedEndTick <= startTick
   const endTick = durationExpanded ? startTick + 1 : roundedEndTick
   if (!Number.isSafeInteger(endTick)) {
-    throw new ProjectMidiImportError(
-      'tick-conversion-overflow',
-      'A rounded MIDI note endpoint exceeds the safe integer range.',
-      { sourceTrackIndex, sourceTick: sourceEndTick },
+    throw new RangeError(
+      `The note at tick ${note.tick} of MIDI track ${sourceTrackIndex} ends beyond the safe integer range once rounded.`,
     )
   }
 
@@ -318,7 +261,6 @@ export function mapTracks(
   document: MidiFileDocument,
   diagnostics: ProjectMidiImportDiagnostic[],
 ): readonly MappedTrack[] {
-  document.tracks.forEach(assertTrackShape)
   const duplicateNameCounts = trackNameCounts(document)
   const mappedTracks: MappedTrack[] = []
 
@@ -339,7 +281,7 @@ export function mapTracks(
       (current, note) => (current === null ? note.tick : Math.min(current, note.tick)),
       null,
     )
-    const channel = mapTrackChannel(track, firstNoteTick, sourceTrackIndex)
+    const channel = mapTrackChannel(track, firstNoteTick)
     addUnsupportedFactDiagnostics(
       track,
       sourceTrackIndex,

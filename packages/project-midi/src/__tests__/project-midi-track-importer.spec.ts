@@ -12,7 +12,6 @@ import {
 } from '@seele-daw/project-core'
 import {
   PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE,
-  ProjectMidiImportError,
   createProjectMidiTrackImportDraft,
   type ProjectMidiImportIdRequest,
   type ProjectMidiTrackColorFactory,
@@ -42,10 +41,6 @@ function createTrackImportInput(
     createTrackColor: shared.createTrackColor,
     ...overrides,
   }
-}
-
-function expectImportError(run: () => unknown, code: ProjectMidiImportError['code']): void {
-  expect(run).toThrowError(expect.objectContaining<Partial<ProjectMidiImportError>>({ code }))
 }
 
 describe('createProjectMidiTrackImportDraft', () => {
@@ -201,13 +196,11 @@ describe('createProjectMidiTrackImportDraft', () => {
 
   it('rejects a document without note-bearing Tracks', () => {
     expect.hasAssertions()
-    expectImportError(
-      () =>
-        createProjectMidiTrackImportDraft(
-          createTrackImportInput(createMidiDocument({ tracks: [createMidiTrack({ notes: [] })] })),
-        ),
-      'no-importable-tracks',
-    )
+    expect(() =>
+      createProjectMidiTrackImportDraft(
+        createTrackImportInput(createMidiDocument({ tracks: [createMidiTrack({ notes: [] })] })),
+      ),
+    ).toThrowError('The MIDI document has no note-bearing Tracks to add to the current Project.')
   })
 
   it('appends to a Session without replacing Project or timeline facts', () => {

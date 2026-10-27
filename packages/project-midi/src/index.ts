@@ -34,8 +34,3 @@ export type {
   ProjectMidiSemanticBinding,
   ProjectMidiSemanticMode,
 } from './import/midi-semantic-binding'
-export { ProjectMidiImportError } from './import/project-midi-import-error'
-export type {
-  ProjectMidiImportErrorCode,
-  ProjectMidiImportErrorDetails,
-} from './import/project-midi-import-error'

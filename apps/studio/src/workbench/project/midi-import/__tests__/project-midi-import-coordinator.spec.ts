@@ -540,7 +540,7 @@ describe('ProjectMidiImportCoordinator', () => {
     await expect(
       fixture.coordinator.importLocalFile(new File([], 'mapping.mid')),
     ).rejects.toMatchObject({
-      code: 'instrument-device-factory-failed',
+      message: 'The instrument device factory failed for MIDI track 0.',
       cause: mappingFailure,
     })
     expect(fixture.createFromSession).not.toHaveBeenCalled()

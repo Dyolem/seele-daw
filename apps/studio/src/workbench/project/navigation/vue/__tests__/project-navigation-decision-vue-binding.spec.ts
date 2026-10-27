@@ -65,25 +65,6 @@ describe('ProjectNavigationDecisionVueBinding', () => {
     binding.dispose()
   })
 
-  it('keeps the current request pending when UI supplies an invalid runtime decision', async () => {
-    const binding = createProjectNavigationDecisionVueBinding()
-    const decision = binding.requestDecision(createDecisionRequest('invalid'))
-    const pending = binding.context.pendingDecision.value
-    if (pending === null) throw new Error('Expected a pending navigation decision')
-
-    expect(() => binding.context.resolve(pending, 'unsupported' as never)).toThrowError(
-      expect.objectContaining({
-        name: 'ProjectNavigationDecisionVueError',
-        code: 'invalid-decision',
-      }),
-    )
-    expect(binding.context.pendingDecision.value).toBe(pending)
-
-    binding.context.resolve(pending, PROJECT_NAVIGATION_DECISION.CANCEL)
-    await expect(decision).resolves.toBe(PROJECT_NAVIGATION_DECISION.CANCEL)
-    binding.dispose()
-  })
-
   it('cancels a pending request on dispose and rejects requests after disposal', async () => {
     const binding = createProjectNavigationDecisionVueBinding()
     const request = createDecisionRequest('dispose')
@@ -97,9 +78,6 @@ describe('ProjectNavigationDecisionVueBinding', () => {
     expect(binding.context.pendingDecision.value).toBeNull()
     await expect(decision).resolves.toBe(PROJECT_NAVIGATION_DECISION.CANCEL)
     expect(binding.context.resolve(pending, PROJECT_NAVIGATION_DECISION.SAVE)).toBe(false)
-    await expect(binding.requestDecision(request)).rejects.toMatchObject({
-      name: 'ProjectNavigationDecisionVueError',
-      code: 'binding-disposed',
-    })
+    await expect(binding.requestDecision(request)).rejects.toThrowError('is disposed')
   })
 })

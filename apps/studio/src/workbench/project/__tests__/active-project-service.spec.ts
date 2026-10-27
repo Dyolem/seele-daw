@@ -113,7 +113,6 @@ describe('ActiveProjectService creation and opening', () => {
 
     await expect(service.createFromSession(createTestSession(projectId))).rejects.toMatchObject({
       code: 'project-id-conflict',
-      projectId,
     })
 
     expect(store.saved).toEqual([])
@@ -147,10 +146,7 @@ describe('ActiveProjectService creation and opening', () => {
     const projectId = createTestProjectId('missing')
     const { createNewSession, service } = createServiceFixture()
 
-    await expect(service.open(projectId)).rejects.toMatchObject({
-      code: 'project-not-found',
-      projectId,
-    })
+    await expect(service.open(projectId)).rejects.toMatchObject({ code: 'project-not-found' })
 
     expect(createNewSession).not.toHaveBeenCalled()
     expect(service.state).toMatchObject({
@@ -249,10 +245,7 @@ describe('ActiveProjectService creation and opening', () => {
     ])
     const { createNewSession, service } = createServiceFixture(store, undefined, () => projectId)
 
-    await expect(service.create()).rejects.toMatchObject({
-      code: 'generated-project-id-conflict',
-      projectId,
-    })
+    await expect(service.create()).rejects.toMatchObject({ code: 'generated-project-id-conflict' })
 
     expect(createNewSession).not.toHaveBeenCalled()
     expect(service.state).toMatchObject({
@@ -313,8 +306,6 @@ describe('ActiveProjectService creation and opening', () => {
 
     await expect(service.create()).rejects.toMatchObject({
       code: 'new-session-project-id-mismatch',
-      expectedProjectId: requestedProjectId,
-      actualProjectId,
     })
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,

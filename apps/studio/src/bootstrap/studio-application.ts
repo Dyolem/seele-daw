@@ -9,7 +9,6 @@ import type { Router } from 'vue-router'
 
 import { DisposalStack } from '@/bootstrap/disposal-stack'
 import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
-import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import { installProjectNavigationGuard } from '@/router/project-navigation-guard'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createProjectEdits } from '@/workbench/edits/project-edits'
@@ -193,17 +192,9 @@ export function composeStudioApplication(
       projectNavigationConfirmation,
       mount(rootContainer) {
         if (disposed) {
-          throw new StudioApplicationError(
-            'application-disposed',
-            'The Studio application cannot be mounted after it has been disposed',
-          )
+          throw new Error('The Studio application cannot be mounted after it has been disposed')
         }
-        if (mounted) {
-          throw new StudioApplicationError(
-            'already-mounted',
-            'The Studio application has already been mounted',
-          )
-        }
+        if (mounted) throw new Error('The Studio application has already been mounted')
         const component = vueApplication.mount(rootContainer)
         mounted = true
         return component

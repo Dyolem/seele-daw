@@ -16,7 +16,6 @@ import {
 import { PROJECT_MIDI_IMPORT_DIAGNOSTIC_CODE } from '@seele-daw/project-midi'
 import { describe, expect, it, vi } from 'vitest'
 
-import { StudioApplicationError } from '@/bootstrap/studio-application-error'
 import { composeStudioApplication } from '@/bootstrap/studio-application'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import { decodeMidiProgramPlaceholderDeviceState } from '@/workbench/instrument/midi-import-instrument-policy'
@@ -534,7 +533,7 @@ describe('StudioApplication', () => {
     expect(fixture.dispose).toHaveBeenCalledOnce()
   })
 
-  it('rejects repeated mount and mounting after disposal with stable lifecycle errors', () => {
+  it('rejects repeated mount and mounting after disposal', () => {
     const mountedFixture = createRuntimeFixture()
     const mountedApplication = composeStudioApplication({
       rootComponent: { render: () => null },
@@ -545,7 +544,7 @@ describe('StudioApplication', () => {
     mountedApplication.mount(document.createElement('div'))
 
     expect(() => mountedApplication.mount(document.createElement('div'))).toThrowError(
-      expect.objectContaining({ name: 'StudioApplicationError', code: 'already-mounted' }),
+      'already been mounted',
     )
     mountedApplication.dispose()
 
@@ -559,10 +558,7 @@ describe('StudioApplication', () => {
     disposedApplication.dispose()
 
     expect(() => disposedApplication.mount(document.createElement('div'))).toThrowError(
-      expect.objectContaining({ name: 'StudioApplicationError', code: 'application-disposed' }),
-    )
-    expect(() => disposedApplication.mount(document.createElement('div'))).toThrow(
-      StudioApplicationError,
+      'after it has been disposed',
     )
   })
 })

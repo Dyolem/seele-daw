@@ -10,8 +10,6 @@ import {
   type HotkeyManager,
 } from '@tanstack/hotkeys'
 
-import { StudioKeyboardShortcutError } from '@/workbench/keyboard/browser/studio-keyboard-shortcut-error'
-
 import type {
   StudioKeyboardBinding,
   StudioKeyboardBindingValidation,
@@ -127,11 +125,7 @@ export function parseStudioKeyboardBinding(input: string): StudioKeyboardBinding
   const validation = validateStudioKeyboardBinding(input)
   if (validation.binding !== null) return validation.binding
 
-  throw new StudioKeyboardShortcutError(
-    'invalid-binding',
-    `Invalid Studio keyboard binding: ${validation.errors.join(', ')}`,
-    { binding: input },
-  )
+  throw new Error(`Invalid Studio keyboard binding ${input}: ${validation.errors.join(', ')}`)
 }
 
 class BrowserTanStackHotkeyRegistry implements StudioKeyboardBindingRegistry {

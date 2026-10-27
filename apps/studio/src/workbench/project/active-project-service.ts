@@ -219,7 +219,6 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
         throw new ActiveProjectError(
           'project-not-found',
           `Project ${expectedProjectId} has no saved Checkpoint`,
-          { projectId: expectedProjectId },
         )
       }
 
@@ -260,7 +259,6 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
       throw new ActiveProjectError(
         'project-not-ready',
         `Cannot save an Active Project while it is ${current.phase}`,
-        { phase: current.phase },
       )
     }
 
@@ -268,7 +266,6 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
       throw new ActiveProjectError(
         'save-in-progress',
         `Project ${current.projectId} already has a save in progress`,
-        { projectId: current.projectId },
       )
     }
 
@@ -388,11 +385,6 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
       throw new ActiveProjectError(
         'new-session-project-id-mismatch',
         `Project Session ${actualProjectId} does not match requested Project ${expectedProjectId}`,
-        {
-          actualProjectId,
-          expectedProjectId,
-          projectId: expectedProjectId,
-        },
       )
     }
 
@@ -412,7 +404,6 @@ class ActiveProjectServiceImpl implements ActiveProjectService {
       throw new ActiveProjectError(
         conflictCode,
         `Project ID ${projectId} already has a saved Checkpoint`,
-        { projectId },
       )
     }
 

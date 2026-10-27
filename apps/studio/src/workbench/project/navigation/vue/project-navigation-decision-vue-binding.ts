@@ -6,7 +6,6 @@ import {
   type ProjectNavigationDecisionRequest,
   type ProjectNavigationDecisionRequester,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { ProjectNavigationDecisionVueError } from '@/workbench/project/navigation/vue/project-navigation-decision-vue-error'
 
 export interface PendingProjectNavigationDecision {
   readonly request: ProjectNavigationDecisionRequest
@@ -21,18 +20,6 @@ export interface ProjectNavigationDecisionVueBinding {
   readonly context: ProjectNavigationDecisionVueContext
   readonly requestDecision: ProjectNavigationDecisionRequester
   dispose(): void
-}
-
-function assertNavigationDecision(
-  decision: unknown,
-): asserts decision is ProjectNavigationDecision {
-  if (!Object.values(PROJECT_NAVIGATION_DECISION).some((candidate) => candidate === decision)) {
-    throw new ProjectNavigationDecisionVueError(
-      'invalid-decision',
-      'Project navigation decision must be save, discard, or cancel',
-      { decision },
-    )
-  }
 }
 
 /** Bridges the async navigation decision port into one shallow Vue dialog slot. */
@@ -55,7 +42,6 @@ export function createProjectNavigationDecisionVueBinding(): ProjectNavigationDe
     context: Object.freeze<ProjectNavigationDecisionVueContext>({
       pendingDecision: shallowReadonly(pendingDecision),
       resolve(pending, decision) {
-        assertNavigationDecision(decision)
         if (current?.pending !== pending) return false
         settle(decision)
         return true
@@ -63,12 +49,7 @@ export function createProjectNavigationDecisionVueBinding(): ProjectNavigationDe
     }),
     requestDecision(request) {
       if (disposed) {
-        return Promise.reject(
-          new ProjectNavigationDecisionVueError(
-            'binding-disposed',
-            'Project Navigation Decision Vue Binding is disposed',
-          ),
-        )
+        return Promise.reject(new Error('The Project Navigation Decision Vue Binding is disposed'))
       }
       return new Promise<ProjectNavigationDecision>((complete) => {
         // The latest navigation owns the single dialog slot; the superseded caller is cancelled.

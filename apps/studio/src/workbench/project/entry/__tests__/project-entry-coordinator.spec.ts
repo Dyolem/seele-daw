@@ -109,9 +109,7 @@ describe('ProjectEntryCoordinator', () => {
     }
     const fixture = createFixture([orphanedRequestedProject, availableProject])
     fixture.open.mockRejectedValue(
-      new ActiveProjectError('project-not-found', `Project ${requestedProjectId} does not exist`, {
-        projectId: requestedProjectId,
-      }),
+      new ActiveProjectError('project-not-found', `Project ${requestedProjectId} does not exist`),
     )
     const coordinator = createProjectEntryCoordinator(fixture)
 
@@ -173,9 +171,7 @@ describe('ProjectEntryCoordinator', () => {
     const requestedProjectId = createProjectId('missing-catalog-failure')
     const missingRequestFixture = createFixture()
     missingRequestFixture.open.mockRejectedValue(
-      new ActiveProjectError('project-not-found', 'Requested Project is missing', {
-        projectId: requestedProjectId,
-      }),
+      new ActiveProjectError('project-not-found', 'Requested Project is missing'),
     )
     missingRequestFixture.listRecentProjects.mockRejectedValue(failureCause)
     const missingRequestCoordinator = createProjectEntryCoordinator(missingRequestFixture)

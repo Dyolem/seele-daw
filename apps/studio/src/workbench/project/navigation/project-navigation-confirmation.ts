@@ -1,4 +1,4 @@
-import { parseProjectId, type ProjectContentStateId, type ProjectId } from '@seele-daw/project-core'
+import type { ProjectContentStateId, ProjectId } from '@seele-daw/project-core'
 
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
@@ -7,7 +7,6 @@ import {
   type ActiveProjectState,
   type ReadyActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { ProjectNavigationConfirmationError } from '@/workbench/project/navigation/project-navigation-confirmation-error'
 
 export const PROJECT_NAVIGATION_INTENT_KIND = {
   CREATE_PROJECT: 'create-project',
@@ -111,30 +110,6 @@ export interface ProjectNavigationConfirmationCoordinator {
   confirm(intent: ProjectNavigationIntent): Promise<ProjectNavigationConfirmationResult>
 }
 
-function normalizeIntent(intent: ProjectNavigationIntent): ProjectNavigationIntent {
-  switch (intent.kind) {
-    case PROJECT_NAVIGATION_INTENT_KIND.CREATE_PROJECT:
-      return Object.freeze({ kind: PROJECT_NAVIGATION_INTENT_KIND.CREATE_PROJECT })
-    case PROJECT_NAVIGATION_INTENT_KIND.LEAVE_PROJECT:
-      return Object.freeze({ kind: PROJECT_NAVIGATION_INTENT_KIND.LEAVE_PROJECT })
-    case PROJECT_NAVIGATION_INTENT_KIND.OPEN_PROJECT:
-      return Object.freeze({
-        kind: PROJECT_NAVIGATION_INTENT_KIND.OPEN_PROJECT,
-        projectId: parseProjectId(intent.projectId),
-      })
-    default:
-      throw new ProjectNavigationConfirmationError(
-        'invalid-intent',
-        'Project navigation intent has an unsupported kind',
-        { intent },
-      )
-  }
-}
-
-function isNavigationDecision(value: unknown): value is ProjectNavigationDecision {
-  return Object.values(PROJECT_NAVIGATION_DECISION).some((decision) => decision === value)
-}
-
 function createDecisionRequest(
   intent: ProjectNavigationIntent,
   state: ReadyActiveProjectState,
@@ -199,11 +174,7 @@ class ProjectNavigationConfirmationCoordinatorImpl implements ProjectNavigationC
     this.#dependencies = dependencies
   }
 
-  async confirm(
-    intentInput: ProjectNavigationIntent,
-  ): Promise<ProjectNavigationConfirmationResult> {
-    const intent = normalizeIntent(intentInput)
-
+  async confirm(intent: ProjectNavigationIntent): Promise<ProjectNavigationConfirmationResult> {
     while (true) {
       const observedState = this.#dependencies.activeProject.state
       if (observedState.phase !== ACTIVE_PROJECT_PHASE.READY) {
@@ -229,15 +200,7 @@ class ProjectNavigationConfirmationCoordinatorImpl implements ProjectNavigationC
       let decision: ProjectNavigationDecision
 
       try {
-        const requestedDecision = await this.#dependencies.requestDecision(decisionRequest)
-        if (!isNavigationDecision(requestedDecision)) {
-          throw new ProjectNavigationConfirmationError(
-            'invalid-decision',
-            'Project navigation decision requester returned an unsupported decision',
-            { decision: requestedDecision },
-          )
-        }
-        decision = requestedDecision
+        decision = await this.#dependencies.requestDecision(decisionRequest)
       } catch (failureCause) {
         return createFailedResult(
           PROJECT_NAVIGATION_CONFIRMATION_FAILURE_OPERATION.REQUEST_DECISION,

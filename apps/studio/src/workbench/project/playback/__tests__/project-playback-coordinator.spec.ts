@@ -444,8 +444,6 @@ describe('ProjectPlaybackCoordinator', () => {
     expect(runtime.disposeCount).toBe(1)
     expect(activeProject.listeners.size).toBe(0)
     expect(activeProject.commitListeners.size).toBe(0)
-    expect(() => coordinator.readVisualPosition()).toThrowError(
-      expect.objectContaining({ code: 'coordinator-disposed' }),
-    )
+    expect(() => coordinator.readVisualPosition()).toThrowError('Project Playback is disposed')
   })
 })

@@ -28,7 +28,6 @@ import {
   type ProjectNavigationDecisionRequester,
   type ProjectNavigationIntent,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { ProjectNavigationConfirmationError } from '@/workbench/project/navigation/project-navigation-confirmation-error'
 
 interface ReadyServiceFixture {
   readonly service: ActiveProjectService
@@ -153,9 +152,8 @@ describe('ProjectNavigationConfirmationCoordinator decisions', () => {
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.IDLE,
       previousSaveFailure: null,
     })
-    expect(request?.intent).not.toBe(inputIntent)
+    expect(request?.intent).toBe(inputIntent)
     expect(Object.isFrozen(request)).toBe(true)
-    expect(Object.isFrozen(request?.intent)).toBe(true)
   })
 
   it('saves the current content before granting permission', async () => {
@@ -215,37 +213,6 @@ describe('ProjectNavigationConfirmationCoordinator decisions', () => {
       failureCause: promptFailure,
     })
     expect(Object.isFrozen(decisionResult)).toBe(true)
-  })
-
-  it('rejects invalid runtime intents and decisions without allowing navigation', async () => {
-    const { service, session } = await createReadyServiceFixture()
-    await session.emitCommit()
-    const invalidDecisionRequester = vi.fn<ProjectNavigationDecisionRequester>(() =>
-      Promise.resolve('unsupported-decision' as ProjectNavigationDecision),
-    )
-    const coordinator = createCoordinator(service, invalidDecisionRequester)
-
-    const invalidDecisionResult = await coordinator.confirm(LEAVE_PROJECT_INTENT)
-    expect(invalidDecisionResult).toMatchObject({
-      kind: PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.FAILED,
-      operation: PROJECT_NAVIGATION_CONFIRMATION_FAILURE_OPERATION.REQUEST_DECISION,
-      failureCause: expect.objectContaining({
-        name: 'ProjectNavigationConfirmationError',
-        code: 'invalid-decision',
-      }),
-    })
-    expect(invalidDecisionResult.kind).toBe(PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.FAILED)
-    if (invalidDecisionResult.kind !== PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.FAILED) {
-      throw new Error('Expected an invalid decision failure')
-    }
-    expect(invalidDecisionResult.failureCause).toBeInstanceOf(ProjectNavigationConfirmationError)
-
-    await expect(
-      coordinator.confirm({ kind: 'unsupported-intent' } as never),
-    ).rejects.toMatchObject({
-      name: 'ProjectNavigationConfirmationError',
-      code: 'invalid-intent',
-    })
   })
 })
 

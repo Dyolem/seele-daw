@@ -171,7 +171,7 @@ describe('BrowserTanStackHotkeyRegistry', () => {
       warnings: [],
     })
     expect(() => parseStudioKeyboardBinding('Mod++S')).toThrowError(
-      expect.objectContaining({ code: 'invalid-binding' }),
+      'Invalid Studio keyboard binding Mod++S: Invalid hotkey format: empty parts detected',
     )
     expect(HotkeyManager.getInstance().getRegistrationCount()).toBe(0)
   })

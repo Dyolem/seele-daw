@@ -18,7 +18,6 @@ import {
   ACTIVE_PROJECT_PHASE,
   type ActiveProjectState,
 } from '@/workbench/project/active-project-state'
-import { ProjectPlaybackError } from '@/workbench/project/playback/project-playback-error'
 import { describePlaybackFeedback } from '@/workbench/project/playback/project-playback-feedback'
 import {
   PROJECT_PLAYBACK_PHASE,
@@ -197,9 +196,7 @@ class ProjectPlaybackCoordinatorImpl implements ProjectPlaybackCoordinator {
   }
 
   #assertLive(): void {
-    if (this.#disposed) {
-      throw new ProjectPlaybackError('coordinator-disposed', 'Project Playback is disposed')
-    }
+    if (this.#disposed) throw new Error('Project Playback is disposed')
   }
 
   #follow(state: ActiveProjectState): void {

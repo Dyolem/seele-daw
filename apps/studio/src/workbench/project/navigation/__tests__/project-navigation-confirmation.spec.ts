@@ -191,14 +191,14 @@ describe('ProjectNavigationConfirmationCoordinator decisions', () => {
     expect(saveResult).toMatchObject({
       kind: PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND.FAILED,
       operation: PROJECT_NAVIGATION_CONFIRMATION_FAILURE_OPERATION.SAVE_PROJECT,
-      failureCause: expect.objectContaining({ cause: saveFailure }),
+      failureCause: saveFailure,
     })
     expect(Object.isFrozen(saveResult)).toBe(true)
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.READY,
       isDirty: true,
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.FAILED,
-      saveFailure: expect.objectContaining({ cause: saveFailure }),
+      saveFailure,
     })
 
     const promptFailure = new Error('Decision UI failed')

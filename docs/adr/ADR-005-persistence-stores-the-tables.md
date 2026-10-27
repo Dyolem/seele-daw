@@ -38,6 +38,9 @@ Checkpoint 的解码器和四个错误类，持久化约 3,000 行，几乎都�
 - 有了真实用户数据之后，“只读当前版本”不再成立：届时在读取前加一步按版本的迁移，迁移只做
   JSON 到 JSON 的变换，记录仍由工厂校验。
 - 浏览器里旧格式的 Checkpoint 无法恢复，打开时报告“没有可用的 Checkpoint”。
+- 第 4 条的错误形状后来按 CODE_GUIDELINES 第 8 节精简：`ProjectFileError` 只用消息说明原因与
+  位置，不再带 `code` 与 `path`；Checkpoint 存储的读写失败原样抛出，没有可恢复的候选时抛
+  `AggregateError`。
 
 ## Validation
 

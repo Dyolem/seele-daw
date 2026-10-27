@@ -12,8 +12,7 @@ import {
   claimModelStoreWriteAccess,
   type ModelStoreWriteAccess,
 } from '#internal/model/model-store-write-access'
-import { MutationApplyError, MutationRollbackError } from './mutation-apply-error'
-import { assertCreatedMutationPlan, type MutationPlan } from './mutation-plan'
+import type { MutationPlan } from './mutation-plan'
 import { changeAfter, changeBefore, type ProjectChange } from './project-change'
 import { ProjectedModelStoreReader } from './projected-model-store-reader'
 
@@ -21,7 +20,8 @@ export class MutationApplier {
   readonly #store: ModelStore
   readonly #writeAccess: ModelStoreWriteAccess
   #isApplying = false
-  #fatalError: MutationRollbackError | null = null
+  /** Set once a rollback failed: the Store can no longer be trusted, so nothing more applies. */
+  #fatalError: AggregateError | null = null
 
   constructor(store: ModelStore) {
     // A writer lease must never make an already-invalid Store appear repairable by mutation.
@@ -31,21 +31,16 @@ export class MutationApplier {
     this.#writeAccess = claimModelStoreWriteAccess(store)
   }
 
-  /** Applies one closed plan and returns the single revision committed for it. */
+  /** Applies one plan and returns the single revision committed for it. */
   apply(plan: MutationPlan): ModelRevision {
     if (this.#fatalError !== null) {
-      throw new MutationApplyError(
-        'applier-faulted',
-        'MutationApplier is faulted after an unrecoverable rollback failure',
-        { cause: this.#fatalError },
-      )
+      throw new Error('MutationApplier is faulted after an unrecoverable rollback failure', {
+        cause: this.#fatalError,
+      })
     }
 
     if (this.#isApplying) {
-      throw new MutationApplyError(
-        'reentrant-apply',
-        'MutationApplier cannot apply a plan while another apply call is active',
-      )
+      throw new Error('MutationApplier cannot apply a plan while another apply call is active')
     }
 
     this.#isApplying = true
@@ -58,24 +53,11 @@ export class MutationApplier {
   }
 
   #applyOnce(plan: MutationPlan): ModelRevision {
-    // Membership is checked before reading plan fields, so Proxy/lookalike plans cannot drift.
-    assertCreatedMutationPlan(plan)
-
     const currentRevision = this.#store.modelRevision
 
     if (plan.baseRevision !== currentRevision) {
-      throw new MutationApplyError(
-        'base-revision-mismatch',
+      throw new Error(
         `MutationPlan revision ${plan.baseRevision} does not match ModelStore revision ${currentRevision}`,
-        { baseRevision: plan.baseRevision, currentRevision },
-      )
-    }
-
-    if (plan.forward.length === 0 || plan.forward.length !== plan.inverse.length) {
-      throw new MutationApplyError(
-        'invalid-plan-shape',
-        'MutationPlan must contain equally sized, non-empty forward and inverse sequences',
-        { baseRevision: plan.baseRevision, currentRevision },
       )
     }
 
@@ -111,14 +93,8 @@ export class MutationApplier {
        * If only the first k forward entries completed, their inverses are therefore the
        * final k entries—not the first k entries—of the inverse array.
        */
-      const rollbackStart = plan.inverse.length - appliedChangeCount
-
-      if (rollbackStart < 0) {
-        throw new Error('MutationPlan inverse sequence is shorter than the applied prefix')
-      }
-
       for (
-        let inverseIndex = rollbackStart;
+        let inverseIndex = plan.inverse.length - appliedChangeCount;
         inverseIndex < plan.inverse.length;
         inverseIndex += 1
       ) {
@@ -137,21 +113,16 @@ export class MutationApplier {
       // required by the original plan are applicable again after restoration.
       new ProjectedModelStoreReader(this.#store, plan.forward)
     } catch (rollbackCause) {
-      const fatalError = new MutationRollbackError(appliedChangeCount, applyCause, rollbackCause)
-
-      this.#fatalError = fatalError
-      throw fatalError
+      this.#fatalError = new AggregateError(
+        [applyCause, rollbackCause],
+        `Failed to restore ModelStore after ${appliedChangeCount} applied changes`,
+      )
+      throw this.#fatalError
     }
 
-    throw new MutationApplyError(
-      'write-failed',
-      `Applying the plan failed after ${appliedChangeCount} completed changes; defensive rollback completed and ModelStore was revalidated`,
-      {
-        appliedChangeCount,
-        baseRevision: plan.baseRevision,
-        currentRevision: this.#store.modelRevision,
-        cause: applyCause,
-      },
+    throw new Error(
+      `Applying the plan failed after ${appliedChangeCount} completed changes; rollback completed and ModelStore was revalidated`,
+      { cause: applyCause },
     )
   }
 

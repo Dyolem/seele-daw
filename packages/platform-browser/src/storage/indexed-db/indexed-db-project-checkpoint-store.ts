@@ -5,10 +5,8 @@ import {
   PROJECT_CHECKPOINT_HEADS_STORE,
   PROJECT_CATALOG_STORE,
   SEELE_PROJECT_DATABASE_NAME,
-  type ProjectCatalogRecordV1,
   type ProjectCheckpointHeadRecordV1,
 } from '#internal/storage/indexed-db/indexed-db-schema'
-import { IndexedDBStorageError } from '#internal/storage/indexed-db/indexed-db-storage-error'
 import { createProjectCatalogRecord } from '#internal/storage/indexed-db/indexed-db-project-catalog-record'
 import { abortAndObserve } from '#internal/storage/indexed-db/indexed-db-transaction'
 import { SeeleProjectDatabase } from '#internal/storage/indexed-db/seele-project-database'
@@ -27,13 +25,6 @@ const HEAD_FIELDS = Object.freeze([
   'activeCheckpointId',
   'previousCheckpointId',
 ] as const)
-
-class InvalidProjectCheckpointHeadError extends Error {
-  constructor(message: string, cause?: unknown) {
-    super(message, cause === undefined ? undefined : { cause })
-    this.name = 'InvalidProjectCheckpointHeadError'
-  }
-}
 
 export interface IndexedDBProjectCheckpointStoreOptions {
   readonly databaseName?: string
@@ -104,10 +95,7 @@ function decodeHeadRecord(
 
     return Object.freeze({ projectId, activeCheckpointId, previousCheckpointId })
   } catch (cause) {
-    throw new InvalidProjectCheckpointHeadError(
-      `Invalid Project Checkpoint Head for ${expectedProjectId}`,
-      cause,
-    )
+    throw new Error(`Invalid Project Checkpoint Head for ${expectedProjectId}`, { cause })
   }
 }
 
@@ -131,13 +119,7 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
 
   constructor(options: IndexedDBProjectCheckpointStoreOptions = {}) {
     const databaseName = options.databaseName ?? SEELE_PROJECT_DATABASE_NAME
-    if (databaseName.length === 0) {
-      throw new IndexedDBStorageError(
-        'invalid-input',
-        'IndexedDB database name must not be empty',
-        { databaseName, operation: 'open-database' },
-      )
-    }
+    if (databaseName.length === 0) throw new RangeError('IndexedDB database name must not be empty')
 
     this.#database = new SeeleProjectDatabase(databaseName)
     this.#getCurrentTime = options.getCurrentTime ?? Date.now
@@ -152,21 +134,8 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
   }
 
   async save(checkpoint: ProjectCheckpoint): Promise<void> {
-    let projectId: ProjectId
-    let checkpointId: ProjectCheckpointId
-    let catalogRecord: ProjectCatalogRecordV1
-
-    try {
-      projectId = parseProjectId(checkpoint.projectId)
-      checkpointId = parseProjectCheckpointId(checkpoint.checkpointId)
-      catalogRecord = createProjectCatalogRecord(checkpoint, projectId, this.#getCurrentTime())
-    } catch (cause) {
-      throw new IndexedDBStorageError('invalid-input', 'Invalid Project Checkpoint storage input', {
-        cause,
-        databaseName: this.databaseName,
-        operation: 'save-checkpoint',
-      })
-    }
+    const { projectId, checkpointId } = checkpoint
+    const catalogRecord = createProjectCatalogRecord(checkpoint, this.#getCurrentTime())
 
     const database = await this.#database.getConnection()
     // The immutable row, pointer rotation, and old-row eviction form one durability boundary.
@@ -184,16 +153,7 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
       const checkpointKey = createProjectCheckpointKey(projectId, checkpointId)
 
       if ((await checkpoints.getKey(checkpointKey)) !== undefined) {
-        throw new IndexedDBStorageError(
-          'record-conflict',
-          `Project Checkpoint ${checkpointId} already exists for ${projectId}`,
-          {
-            checkpointId,
-            databaseName: this.databaseName,
-            operation: 'save-checkpoint',
-            projectId,
-          },
-        )
+        throw new Error(`Project Checkpoint ${checkpointId} already exists for ${projectId}`)
       }
 
       await checkpoints.add(checkpoint)
@@ -215,37 +175,14 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
       await transaction.done
     } catch (cause) {
       await abortAndObserve(transaction)
-      if (cause instanceof IndexedDBStorageError) throw cause
-
-      const code =
-        cause instanceof InvalidProjectCheckpointHeadError ? 'invalid-record' : 'transaction-failed'
-      throw new IndexedDBStorageError(
-        code,
-        `Could not save Project Checkpoint ${checkpointId} in IndexedDB`,
-        {
-          cause,
-          checkpointId,
-          databaseName: this.databaseName,
-          operation: 'save-checkpoint',
-          projectId,
-        },
+      throw new Error(
+        `Could not save Project Checkpoint ${checkpointId} in IndexedDB ${this.databaseName}`,
+        { cause },
       )
     }
   }
 
-  async readCandidates(projectIdInput: ProjectId): Promise<readonly unknown[]> {
-    let projectId: ProjectId
-
-    try {
-      projectId = parseProjectId(projectIdInput)
-    } catch (cause) {
-      throw new IndexedDBStorageError('invalid-input', 'Invalid Project ID for Checkpoint read', {
-        cause,
-        databaseName: this.databaseName,
-        operation: 'read-checkpoint-candidates',
-      })
-    }
-
+  async readCandidates(projectId: ProjectId): Promise<readonly unknown[]> {
     const database = await this.#database.getConnection()
     const transaction = database.transaction(
       [PROJECT_CHECKPOINTS_STORE, PROJECT_CHECKPOINT_HEADS_STORE],
@@ -279,19 +216,9 @@ export class IndexedDBProjectCheckpointStore implements ProjectCheckpointStore {
       return Object.freeze(candidates)
     } catch (cause) {
       await abortAndObserve(transaction)
-      if (cause instanceof IndexedDBStorageError) throw cause
-
-      const code =
-        cause instanceof InvalidProjectCheckpointHeadError ? 'invalid-record' : 'transaction-failed'
-      throw new IndexedDBStorageError(
-        code,
-        `Could not read Project Checkpoint candidates for ${projectId}`,
-        {
-          cause,
-          databaseName: this.databaseName,
-          operation: 'read-checkpoint-candidates',
-          projectId,
-        },
+      throw new Error(
+        `Could not read Project Checkpoint candidates for ${projectId} from IndexedDB ${this.databaseName}`,
+        { cause },
       )
     }
   }

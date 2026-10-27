@@ -11,22 +11,6 @@ import type { ModelRevision } from './model-revision'
 import type { PartitionedTableName, RecordTableName, StoredRecord } from './model-tables'
 import type { ProjectRecord } from './project'
 
-export type ModelStoreWriteAccessErrorCode =
-  | 'write-access-already-registered'
-  | 'write-access-unavailable'
-  | 'write-precondition-failed'
-
-/** Internal failure of the single-writer storage boundary. */
-export class ModelStoreWriteAccessError extends Error {
-  readonly code: ModelStoreWriteAccessErrorCode
-
-  constructor(code: ModelStoreWriteAccessErrorCode, message: string) {
-    super(message)
-    this.name = 'ModelStoreWriteAccessError'
-    this.code = code
-  }
-}
-
 /**
  * A narrow compare-and-swap surface over ModelStore.
  *
@@ -76,10 +60,7 @@ export function registerModelStoreWriteAccess(
   writeAccess: ModelStoreWriteAccess,
 ): void {
   if (everRegisteredStores.has(store)) {
-    throw new ModelStoreWriteAccessError(
-      'write-access-already-registered',
-      'ModelStore write access has already been registered',
-    )
+    throw new Error('ModelStore write access has already been registered')
   }
 
   // Registration history survives claim so a consumed lease can never be recreated.
@@ -92,10 +73,7 @@ export function claimModelStoreWriteAccess(store: object): ModelStoreWriteAccess
   const writeAccess = writeAccessByStore.get(store)
 
   if (writeAccess === undefined) {
-    throw new ModelStoreWriteAccessError(
-      'write-access-unavailable',
-      'ModelStore write access is unavailable or has already been claimed',
-    )
+    throw new Error('ModelStore write access is unavailable or has already been claimed')
   }
 
   // Deleting before returning makes the lease non-recoverable, even if construction fails later.

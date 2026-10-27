@@ -5,7 +5,6 @@ import {
   MIDI_PITCH_MAX,
   MIDI_PITCH_MIN,
   PROJECT_QUERY_TYPE,
-  ProjectQueryError,
   createAddNoteCommand,
   createMidiNoteByIdQuery,
   createMidiNotesIntersectingRangeQuery,
@@ -24,10 +23,8 @@ import {
   type MidiNotesIntersectingRangeQuery,
   type MidiNotesIntersectingRangeQueryResult,
   type ModelRevision,
-  type ProjectQuery,
 } from '#internal/index'
 import type { ModelStore } from '#internal/model/model-store'
-import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
@@ -86,11 +83,10 @@ describe('ProjectQuery public contract', () => {
     expectTypeOf(byIdResult).toEqualTypeOf<MidiNoteByIdQueryResult>()
     expectTypeOf(rangeResult).toEqualTypeOf<MidiNotesIntersectingRangeQueryResult>()
     expect('executeProjectQuery' in projectCore).toBe(false)
-    expect('normalizeProjectQuery' in projectCore).toBe(false)
   })
 
-  it('rejects invalid range relationships and structurally supplied unknown queries', () => {
-    const { fixture, session } = createFixtureProjectSession()
+  it('rejects invalid range relationships', () => {
+    const { fixture } = createFixtureProjectSession()
     const baseInput = {
       sourceId: fixture.records.nonLoopSource.id,
       startTick: parseTick(240),
@@ -105,7 +101,7 @@ describe('ProjectQuery public contract', () => {
         endTick: baseInput.startTick,
       }),
     ).toThrowError(
-      expect.objectContaining<Partial<ProjectQueryError>>({ code: 'invalid-tick-range' }),
+      new RangeError('MIDI Note range Query requires endTick to be greater than startTick'),
     )
     expect(() =>
       createMidiNotesIntersectingRangeQuery({
@@ -113,12 +109,9 @@ describe('ProjectQuery public contract', () => {
         minimumPitch: parseMidiPitch(73),
       }),
     ).toThrowError(
-      expect.objectContaining<Partial<ProjectQueryError>>({ code: 'invalid-pitch-range' }),
-    )
-    expect(() =>
-      session.query({ type: 'midi-note.unknown' } as unknown as ProjectQuery),
-    ).toThrowError(
-      expect.objectContaining<Partial<ProjectQueryError>>({ code: 'unknown-query-type' }),
+      new RangeError(
+        'MIDI Note range Query requires maximumPitch to be greater than or equal to minimumPitch',
+      ),
     )
   })
 })
@@ -381,7 +374,7 @@ describe('ProjectSession MIDI Note queries', () => {
         },
         () => session.execute(command),
       ),
-    ).toThrowError(expect.objectContaining<Partial<MutationApplyError>>({ code: 'write-failed' }))
+    ).toThrowError(/rollback completed and ModelStore was revalidated/)
 
     const result = session.query(createMidiNoteByIdQuery({ sourceId, noteId }))
 

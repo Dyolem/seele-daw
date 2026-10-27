@@ -3,7 +3,6 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   PROJECT_CHECKPOINT_FORMAT_VERSION,
   PROJECT_COMMAND_EXECUTION_STATUS,
-  ProjectCheckpointError,
   ProjectFileError,
   createAddNoteCommand,
   createMidiNoteByIdQuery,
@@ -21,7 +20,6 @@ import {
   saveProjectCheckpoint,
   type ProjectCheckpoint,
   type ProjectCheckpointStore,
-  type ProjectFilePathSegment,
   type ProjectId,
   type ProjectSession,
   type MidiSourceId,
@@ -135,39 +133,44 @@ describe('Project Checkpoint values', () => {
     expect(Object.isFrozen(decoded)).toBe(true)
   })
 
-  it.each<[string, ProjectFilePathSegment[], unknown, string, ProjectFilePathSegment[]]>([
-    ['a missing field', ['checkpointId'], REMOVE, 'invalid-structure', ['checkpointId']],
-    ['an unknown field', ['futureField'], true, 'invalid-structure', ['futureField']],
+  it.each<[string, (string | number)[], unknown, string]>([
+    ['a missing field', ['checkpointId'], REMOVE, 'Missing field checkpointId at ["checkpointId"]'],
+    ['an unknown field', ['futureField'], true, 'Unexpected field futureField at ["futureField"]'],
     [
       'another format version',
       ['checkpointFormatVersion'],
       2,
-      'unsupported-format-version',
-      ['checkpointFormatVersion'],
+      `Expected Checkpoint format ${PROJECT_CHECKPOINT_FORMAT_VERSION}, found 2 at ["checkpointFormatVersion"]`,
     ],
-    ['an invalid Checkpoint ID', ['checkpointId'], '', 'invalid-value', ['checkpointId']],
-    ['an invalid Project ID', ['projectId'], '', 'invalid-value', ['projectId']],
-    ['a negative revision', ['sourceModelRevision'], -1, 'invalid-value', ['sourceModelRevision']],
+    ['an invalid Checkpoint ID', ['checkpointId'], '', ' at ["checkpointId"]'],
+    ['an invalid Project ID', ['projectId'], '', ' at ["projectId"]'],
+    [
+      'a negative revision',
+      ['sourceModelRevision'],
+      -1,
+      'Invalid ModelRevision: expected a non-negative safe integer at ["sourceModelRevision"]',
+    ],
     [
       'a file of another project',
       ['projectId'],
       'project-other',
-      'project-id-mismatch',
-      ['projectFile', 'project', 'id'],
+      'not project-other at ["projectFile","project","id"]',
     ],
     [
       'an invalid file',
       ['projectFile', 'project', 'name'],
       REMOVE,
-      'invalid-structure',
-      ['projectFile', 'project', 'name'],
+      'Missing field name at ["projectFile","project","name"]',
     ],
-  ])('rejects %s', (_, editPath, replacement, code, path) => {
+  ])('rejects %s', (_, editPath, replacement, message) => {
     const { checkpoint } = createTestCheckpoint()
     const input = editedCopy(checkpoint, editPath, replacement)
 
     expect(() => decodeProjectCheckpoint(input)).toThrowError(
-      expect.objectContaining({ name: 'ProjectFileError', code, path }),
+      expect.objectContaining({
+        name: 'ProjectFileError',
+        message: expect.stringContaining(message),
+      }),
     )
   })
 
@@ -184,7 +187,10 @@ describe('Project Checkpoint values', () => {
     })
 
     expect(() => decodeProjectCheckpoint(input)).toThrowError(
-      expect.objectContaining({ code: 'not-json' }),
+      expect.objectContaining({
+        name: 'ProjectFileError',
+        message: 'Expected plain JSON data at []',
+      }),
     )
     expect(getterCalls).toBe(0)
   })
@@ -234,7 +240,7 @@ describe('Project Checkpoint coordination', () => {
     expect(session.contentStateId).not.toBe(receipt.sourceContentStateId)
   })
 
-  it('wraps store write and read failures without changing the Session', async () => {
+  it('passes store write and read failures through without changing the Session', async () => {
     const { fixture, session } = createFixtureProjectSession()
     const writeStore = new TestProjectCheckpointStore()
     const readStore = new TestProjectCheckpointStore()
@@ -252,10 +258,8 @@ describe('Project Checkpoint coordination', () => {
       restoreProjectCheckpoint(readStore, fixture.records.project.id),
     )
 
-    expect(writeFailure).toBeInstanceOf(ProjectCheckpointError)
-    expect(writeFailure).toMatchObject({ code: 'store-write-failed', cause: writeCause })
-    expect(readFailure).toBeInstanceOf(ProjectCheckpointError)
-    expect(readFailure).toMatchObject({ code: 'store-read-failed', cause: readCause })
+    expect(writeFailure).toBe(writeCause)
+    expect(readFailure).toBe(readCause)
     expect(session.modelRevision).toBe(0)
     expect(session.canUndo).toBe(false)
   })
@@ -318,9 +322,15 @@ describe('Project Checkpoint coordination', () => {
     expect(restored?.checkpoint.checkpointId).toBe('checkpoint-previous-valid')
     expect(failures.map(({ candidateIndex }) => candidateIndex)).toEqual([0, 1, 2])
     expect(failures.map(({ failureCause }) => failureCause)).toEqual([
-      expect.objectContaining({ code: 'invalid-structure' }),
-      expect.objectContaining({ code: 'invalid-value' }),
-      expect.objectContaining({ code: 'project-id-mismatch', path: ['projectId'] }),
+      expect.objectContaining({
+        message: 'Missing field name at ["projectFile","project","name"]',
+      }),
+      expect.objectContaining({
+        message: expect.stringContaining('at ["projectFile","midiNotes","source-non-loop",0]'),
+      }),
+      expect.objectContaining({
+        message: expect.stringContaining('belongs to project project-other'),
+      }),
     ])
     expect(Object.isFrozen(failures)).toBe(true)
     expect(failures.every((failure) => Object.isFrozen(failure))).toBe(true)
@@ -336,13 +346,10 @@ describe('Project Checkpoint coordination', () => {
     const failure = await captureRejection(restoreProjectCheckpoint(invalidStore, projectId))
 
     expect(missing).toBeNull()
-    expect(failure).toBeInstanceOf(ProjectCheckpointError)
+    expect(failure).toBeInstanceOf(AggregateError)
     expect(failure).toMatchObject({
-      code: 'no-valid-checkpoint',
-      candidateFailures: [
-        { candidateIndex: 0, failureCause: expect.any(ProjectFileError) },
-        { candidateIndex: 1, failureCause: expect.any(ProjectFileError) },
-      ],
+      message: `No stored Checkpoint could restore ${projectId}`,
+      errors: [expect.any(ProjectFileError), expect.any(ProjectFileError)],
     })
   })
 })

@@ -1,4 +1,4 @@
-import { ProjectCheckpointError, type ProjectId } from '@seele-daw/project-core'
+import { ProjectFileError, type ProjectId } from '@seele-daw/project-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ActiveProjectError } from '@/workbench/project/active-project-error'
@@ -130,15 +130,12 @@ describe('ActiveProjectService creation and opening', () => {
     store.saveFailure = cause
     const { service } = createServiceFixture(store)
 
-    await expect(service.createFromSession(createTestSession(projectId))).rejects.toMatchObject({
-      code: 'store-write-failed',
-      cause,
-    })
+    await expect(service.createFromSession(createTestSession(projectId))).rejects.toBe(cause)
 
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ cause }),
+      failureCause: cause,
     })
   })
 
@@ -188,7 +185,10 @@ describe('ActiveProjectService creation and opening', () => {
     expect(state.recoveryFailures).toEqual([
       {
         candidateIndex: 0,
-        failureCause: expect.objectContaining({ code: 'unsupported-format-version' }),
+        failureCause: expect.objectContaining({
+          name: 'ProjectFileError',
+          message: expect.stringContaining('Expected Checkpoint format'),
+        }),
       },
     ])
     expect(Object.isFrozen(state.recoveryFailures[0])).toBe(true)
@@ -200,23 +200,16 @@ describe('ActiveProjectService creation and opening', () => {
     store.candidatesByProject.set(projectId, [{}, { checkpointFormatVersion: 99 }])
     const { createNewSession, service } = createServiceFixture(store)
 
-    await expect(service.open(projectId)).rejects.toBeInstanceOf(ProjectCheckpointError)
+    await expect(service.open(projectId)).rejects.toBeInstanceOf(AggregateError)
 
     expect(createNewSession).not.toHaveBeenCalled()
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.OPEN_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ code: 'no-valid-checkpoint' }),
+      failureCause: expect.objectContaining({
+        errors: [expect.any(ProjectFileError), expect.any(ProjectFileError)],
+      }),
     })
-    if (
-      service.state.phase !== ACTIVE_PROJECT_PHASE.OPEN_FAILED ||
-      !(service.state.failureCause instanceof ProjectCheckpointError)
-    ) {
-      throw new Error('Expected a Checkpoint operation failure')
-    }
-    expect(
-      service.state.failureCause.candidateFailures.map(({ candidateIndex }) => candidateIndex),
-    ).toEqual([0, 1])
   })
 
   it('does not Create over invalid Checkpoint candidates', async () => {
@@ -225,15 +218,13 @@ describe('ActiveProjectService creation and opening', () => {
     store.candidatesByProject.set(projectId, [{}, { checkpointFormatVersion: 99 }])
     const { createNewSession, service } = createServiceFixture(store, undefined, () => projectId)
 
-    await expect(service.create()).rejects.toMatchObject({
-      code: 'no-valid-checkpoint',
-    })
+    await expect(service.create()).rejects.toBeInstanceOf(AggregateError)
 
     expect(createNewSession).not.toHaveBeenCalled()
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ code: 'no-valid-checkpoint' }),
+      failureCause: expect.any(AggregateError),
     })
   })
 
@@ -262,15 +253,12 @@ describe('ActiveProjectService creation and opening', () => {
     store.readFailure = cause
     const { service } = createServiceFixture(store)
 
-    await expect(service.open(projectId)).rejects.toMatchObject({
-      code: 'store-read-failed',
-      cause,
-    })
+    await expect(service.open(projectId)).rejects.toBe(cause)
 
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.OPEN_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ cause }),
+      failureCause: cause,
     })
   })
 
@@ -281,15 +269,12 @@ describe('ActiveProjectService creation and opening', () => {
     store.readFailure = cause
     const { service } = createServiceFixture(store, undefined, () => projectId)
 
-    await expect(service.create()).rejects.toMatchObject({
-      code: 'store-read-failed',
-      cause,
-    })
+    await expect(service.create()).rejects.toBe(cause)
 
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ cause }),
+      failureCause: cause,
     })
   })
 
@@ -371,14 +356,11 @@ describe('ActiveProjectService creation and opening', () => {
     store.saveFailure = cause
     const { service } = createServiceFixture(store, undefined, () => projectId)
 
-    await expect(service.create()).rejects.toMatchObject({
-      code: 'store-write-failed',
-      cause,
-    })
+    await expect(service.create()).rejects.toBe(cause)
     expect(service.state).toMatchObject({
       phase: ACTIVE_PROJECT_PHASE.CREATE_FAILED,
       projectId,
-      failureCause: expect.objectContaining({ cause }),
+      failureCause: cause,
     })
   })
 })
@@ -546,17 +528,14 @@ describe('ActiveProjectService saving and dirty state', () => {
     const cause = new Error('transaction aborted')
     store.saveFailure = cause
 
-    await expect(service.save()).rejects.toMatchObject({
-      code: 'store-write-failed',
-      cause,
-    })
+    await expect(service.save()).rejects.toBe(cause)
 
     expect(requireReady(service.state)).toMatchObject({
       session,
       savedRevision: 0,
       isDirty: false,
       saveStatus: ACTIVE_PROJECT_SAVE_STATUS.FAILED,
-      saveFailure: expect.objectContaining({ cause }),
+      saveFailure: cause,
     })
 
     store.saveFailure = undefined

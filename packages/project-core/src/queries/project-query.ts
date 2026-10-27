@@ -1,4 +1,3 @@
-import { ProjectQueryError } from '#internal/queries/project-query-error'
 import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '#internal/model/ids'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { ModelRevision } from '#internal/model/model-revision'
@@ -91,22 +90,12 @@ export function createMidiNotesIntersectingRangeQuery(
   const maximumPitch = parseMidiPitch(input.maximumPitch)
 
   if (endTick <= startTick) {
-    throw new ProjectQueryError(
-      'invalid-tick-range',
-      'MIDI Note range Query requires endTick to be greater than startTick',
-      { queryType: PROJECT_QUERY_TYPE.MIDI_NOTE.INTERSECTING_RANGE, startTick, endTick },
-    )
+    throw new RangeError('MIDI Note range Query requires endTick to be greater than startTick')
   }
 
   if (maximumPitch < minimumPitch) {
-    throw new ProjectQueryError(
-      'invalid-pitch-range',
+    throw new RangeError(
       'MIDI Note range Query requires maximumPitch to be greater than or equal to minimumPitch',
-      {
-        queryType: PROJECT_QUERY_TYPE.MIDI_NOTE.INTERSECTING_RANGE,
-        minimumPitch,
-        maximumPitch,
-      },
     )
   }
 
@@ -118,28 +107,6 @@ export function createMidiNotesIntersectingRangeQuery(
     minimumPitch,
     maximumPitch,
   })
-}
-
-function rejectUnknownQuery(query: never): never {
-  const type = (query as { readonly type?: unknown }).type
-
-  throw new ProjectQueryError(
-    'unknown-query-type',
-    `ProjectQuery has an unknown type: ${String(type)}`,
-    { queryType: String(type) },
-  )
-}
-
-/** @internal Revalidates structurally supplied queries before they read model state. */
-export function normalizeProjectQuery(query: ProjectQuery): ProjectQuery {
-  switch (query.type) {
-    case PROJECT_QUERY_TYPE.MIDI_NOTE.BY_ID:
-      return createMidiNoteByIdQuery(query)
-    case PROJECT_QUERY_TYPE.MIDI_NOTE.INTERSECTING_RANGE:
-      return createMidiNotesIntersectingRangeQuery(query)
-    default:
-      return rejectUnknownQuery(query)
-  }
 }
 
 /** @internal Creates a frozen single-entity result at one authoritative revision. */

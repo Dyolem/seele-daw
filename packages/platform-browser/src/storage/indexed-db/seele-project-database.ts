@@ -6,7 +6,6 @@ import {
   SEELE_PROJECT_DATABASE_VERSION,
   type SeeleProjectDatabaseSchema,
 } from '#internal/storage/indexed-db/indexed-db-schema'
-import { IndexedDBStorageError } from '#internal/storage/indexed-db/indexed-db-storage-error'
 import { openDB, type IDBPDatabase } from 'idb'
 
 type SeeleProjectDatabaseConnection = IDBPDatabase<SeeleProjectDatabaseSchema>
@@ -30,11 +29,7 @@ async function assertPhysicalSchema(
   databaseName: string,
 ): Promise<void> {
   if (!hasExactNames(database.objectStoreNames, SEELE_PROJECT_DATABASE_STORES)) {
-    throw new IndexedDBStorageError(
-      'invalid-database-schema',
-      `IndexedDB ${databaseName} does not contain the expected V1 object stores`,
-      { databaseName, operation: 'open-database' },
-    )
+    throw new Error(`IndexedDB ${databaseName} does not contain the expected V1 object stores`)
   }
 
   const transaction = database.transaction(SEELE_PROJECT_DATABASE_STORES, 'readonly')
@@ -53,10 +48,8 @@ async function assertPhysicalSchema(
   await transaction.done
 
   if (!hasExpectedLayout) {
-    throw new IndexedDBStorageError(
-      'invalid-database-schema',
+    throw new Error(
       `IndexedDB ${databaseName} object store layout does not match Physical Schema V1`,
-      { databaseName, operation: 'open-database' },
     )
   }
 }
@@ -100,11 +93,7 @@ export class SeeleProjectDatabase {
       const connection = await opening
       if (this.#opening !== opening) {
         connection.close()
-        throw new IndexedDBStorageError(
-          'database-open-failed',
-          `IndexedDB ${this.#databaseName} was closed while opening`,
-          { databaseName: this.#databaseName, operation: 'open-database' },
-        )
+        throw new Error(`IndexedDB ${this.#databaseName} was closed while opening`)
       }
 
       this.#connection = connection
@@ -150,13 +139,7 @@ export class SeeleProjectDatabase {
       return openedConnection
     } catch (cause) {
       openedConnection?.close()
-      if (cause instanceof IndexedDBStorageError) throw cause
-
-      throw new IndexedDBStorageError(
-        'database-open-failed',
-        `Could not open IndexedDB ${this.#databaseName}`,
-        { cause, databaseName: this.#databaseName, operation: 'open-database' },
-      )
+      throw new Error(`Could not open IndexedDB ${this.#databaseName}`, { cause })
     }
   }
 }

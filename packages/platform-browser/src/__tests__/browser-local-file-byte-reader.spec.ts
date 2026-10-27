@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BrowserLocalFileByteReader, BrowserLocalFileReadError } from '#internal/index'
+import { BrowserLocalFileByteReader } from '#internal/index'
 
 describe('BrowserLocalFileByteReader', () => {
   it('copies File-compatible Blob bytes without exposing the source buffer', async () => {
@@ -22,7 +22,7 @@ describe('BrowserLocalFileByteReader', () => {
     )
   })
 
-  it('preserves a local File name while wrapping an asynchronous read failure', async () => {
+  it('names the local File and keeps the cause of a failed read', async () => {
     const cause = new Error('permission revoked')
     const file = {
       name: 'song.mid',
@@ -31,42 +31,20 @@ describe('BrowserLocalFileByteReader', () => {
     } as unknown as Blob
 
     await expect(new BrowserLocalFileByteReader().read(file)).rejects.toMatchObject({
-      code: 'read-failed',
-      fileName: 'song.mid',
-      failureCause: cause,
+      message: 'Could not read song.mid.',
+      cause,
     })
   })
 
-  it('rejects invalid file values before invoking browser I/O', async () => {
-    const arrayBuffer = () => Promise.resolve(new ArrayBuffer(0))
-    const invalidFile = { size: Number.NaN, arrayBuffer } as unknown as Blob
-
-    await expect(new BrowserLocalFileByteReader().read(invalidFile)).rejects.toEqual(
-      expect.objectContaining<Partial<BrowserLocalFileReadError>>({ code: 'invalid-file' }),
-    )
-  })
-
-  it('rejects non-ArrayBuffer and truncated browser read results explicitly', async () => {
-    const invalidResult = {
-      name: 'invalid.mid',
-      size: 1,
-      arrayBuffer: () => Promise.resolve({ byteLength: 1 }),
-    } as unknown as Blob
-    await expect(new BrowserLocalFileByteReader().read(invalidResult)).rejects.toMatchObject({
-      code: 'invalid-read-result',
-      fileName: 'invalid.mid',
-    })
-
+  it('rejects a read that returns fewer bytes than the file holds', async () => {
     const truncated = {
       name: 'truncated.mid',
       size: 2,
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(1)),
     } as unknown as Blob
-    await expect(new BrowserLocalFileByteReader().read(truncated)).rejects.toMatchObject({
-      code: 'byte-length-mismatch',
-      fileName: 'truncated.mid',
-      expectedByteLength: 2,
-      actualByteLength: 1,
-    })
+
+    await expect(new BrowserLocalFileByteReader().read(truncated)).rejects.toThrowError(
+      'Reading truncated.mid returned 1 bytes for a 2-byte file.',
+    )
   })
 })

@@ -6,11 +6,7 @@ import {
   deleteTestDatabase,
   putRawProjectCatalogRecord,
 } from '#internal/__tests__/support/indexed-db-test-support'
-import {
-  IndexedDBProjectCatalog,
-  IndexedDBProjectCheckpointStore,
-  IndexedDBStorageError,
-} from '#internal/index'
+import { IndexedDBProjectCatalog, IndexedDBProjectCheckpointStore } from '#internal/index'
 import {
   createInitialProjectSession,
   createProjectCheckpoint,
@@ -117,10 +113,9 @@ describe('IndexedDBProjectCatalog', () => {
       },
     } as unknown as ProjectCheckpoint
 
-    await expect(store.save(brokenCheckpoint)).rejects.toMatchObject({
-      code: 'transaction-failed',
-      operation: 'save-checkpoint',
-    })
+    await expect(store.save(brokenCheckpoint)).rejects.toThrowError(
+      /^Could not save Project Checkpoint checkpoint-atomic-broken in IndexedDB /,
+    )
     await expect(catalog.listRecentProjects()).resolves.toEqual([
       { projectId, name: 'Stable name', lastCheckpointSavedAt: 100 },
     ])
@@ -136,11 +131,9 @@ describe('IndexedDBProjectCatalog', () => {
       lastCheckpointSavedAt: 1,
     })
 
-    const failure = catalog.listRecentProjects()
-    await expect(failure).rejects.toBeInstanceOf(IndexedDBStorageError)
-    await expect(failure).rejects.toMatchObject({
-      code: 'invalid-record',
-      operation: 'list-recent-projects',
+    await expect(catalog.listRecentProjects()).rejects.toMatchObject({
+      message: expect.stringMatching(/^Could not read the Project Catalog from IndexedDB /),
+      cause: expect.objectContaining({ message: 'Invalid Project Catalog V1 record' }),
     })
   })
 
@@ -150,7 +143,7 @@ describe('IndexedDBProjectCatalog', () => {
 
     await expect(
       store.save(createCheckpoint(projectId, 'Invalid time', 'invalid-time')),
-    ).rejects.toMatchObject({ code: 'invalid-input', operation: 'save-checkpoint' })
+    ).rejects.toThrowError('expected a non-negative safe integer timestamp')
     await expect(catalog.listRecentProjects()).resolves.toEqual([])
   })
 })

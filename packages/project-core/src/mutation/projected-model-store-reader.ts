@@ -24,11 +24,6 @@ import {
   type StoredRecord,
 } from '#internal/model/model-tables'
 import type { ProjectRecord } from '#internal/model/project'
-import { MutationPlanError } from './mutation-plan-error'
-import {
-  MutationPreconditionError,
-  type MutationPreconditionErrorCode,
-} from './mutation-precondition-error'
 import { changeAfter, changeBefore, changeLabel, type ProjectChange } from './project-change'
 
 /** Marks a record or partition the projection deleted. Never a Project fact. */
@@ -49,12 +44,8 @@ interface ProjectedEntry<RecordType> {
 
 type TablePatch<RecordType> = ProjectedEntry<RecordType> | typeof DELETED
 
-function rejectPrecondition(
-  code: MutationPreconditionErrorCode,
-  context: ChangeContext,
-  detail: string,
-): never {
-  throw new MutationPreconditionError(code, context.index, context.change, detail)
+function rejectPrecondition(context: ChangeContext, detail: string): never {
+  throw new Error(`Change at index ${context.index} (${context.change}) ${detail}`)
 }
 
 /**
@@ -124,11 +115,7 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
 
   #insert(after: StoredRecord, context: ChangeContext): void {
     if (this.get(after.id) !== undefined) {
-      rejectPrecondition(
-        'insert-target-exists',
-        context,
-        `cannot insert existing ${this.#describe(after.id)}`,
-      )
+      rejectPrecondition(context, `cannot insert existing ${this.#describe(after.id)}`)
     }
 
     // Deleting first makes a delete-then-insert move to the real Map append position.
@@ -162,16 +149,11 @@ class ProjectedRecordTable implements RecordTableView<StoredRecord> {
     const current = this.get(before.id)
 
     if (current === undefined) {
-      rejectPrecondition(
-        'target-missing',
-        context,
-        `cannot ${verb} missing ${this.#describe(before.id)}`,
-      )
+      rejectPrecondition(context, `cannot ${verb} missing ${this.#describe(before.id)}`)
     }
 
     if (current !== before) {
       rejectPrecondition(
-        'before-reference-mismatch',
         context,
         `${this.#describe(before.id)} no longer matches the expected before record`,
       )
@@ -249,19 +231,13 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
   ): void {
     const entity = this.#entity
     if (this.has(partitionId)) {
-      rejectPrecondition(
-        'insert-target-exists',
-        context,
-        `cannot insert existing ${entity} partition ${partitionId}`,
-      )
+      rejectPrecondition(context, `cannot insert existing ${entity} partition ${partitionId}`)
     }
     const table = new Map<string, StoredRecord>()
     for (const record of records) {
       if (table.has(record.id)) {
-        throw new MutationPlanError(
-          'duplicate-id-in-partition',
+        throw new Error(
           `Change at index ${context.index} contains duplicate ${entity} ID ${record.id}`,
-          context.index,
         )
       }
       table.set(record.id, record)
@@ -284,15 +260,10 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
   ): void {
     const entity = this.#entity
     if (!this.has(partitionId)) {
-      rejectPrecondition(
-        'target-missing',
-        context,
-        `cannot remove missing ${entity} partition ${partitionId}`,
-      )
+      rejectPrecondition(context, `cannot remove missing ${entity} partition ${partitionId}`)
     }
     if (!this.#matches(partitionId, before)) {
       rejectPrecondition(
-        'partition-content-mismatch',
         context,
         `${entity} partition ${partitionId} no longer matches the expected before records`,
       )
@@ -320,11 +291,7 @@ class ProjectedPartitionedTable implements PartitionedTableView<StoredRecord> {
     const patch = this.#patches.get(partitionId)
     if (patch !== undefined && patch !== DELETED) return patch.records
     if (patch === DELETED || !this.#base.has(partitionId)) {
-      rejectPrecondition(
-        'target-missing',
-        context,
-        `${this.#entity} partition ${partitionId} does not exist`,
-      )
+      rejectPrecondition(context, `${this.#entity} partition ${partitionId} does not exist`)
     }
     const base = this.#base
     const records = new ProjectedRecordTable(this.#describer(partitionId), {
@@ -445,7 +412,6 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
 
     if (!Number.isSafeInteger(index) || index < 0 || index > trackOrder.length) {
       rejectPrecondition(
-        'track-order-index-out-of-bounds',
         context,
         `cannot insert Track ${trackId} at index ${index} for length ${trackOrder.length}`,
       )
@@ -459,7 +425,6 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
 
     if (!Number.isSafeInteger(index) || index < 0 || index >= trackOrder.length) {
       rejectPrecondition(
-        'track-order-index-out-of-bounds',
         context,
         `cannot remove Track ${trackId} at index ${index} for length ${trackOrder.length}`,
       )
@@ -467,7 +432,6 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
 
     if (trackOrder[index] !== trackId) {
       rejectPrecondition(
-        'track-order-entry-mismatch',
         context,
         `expected Track ${trackId} at index ${index}, found ${String(trackOrder[index])}`,
       )
@@ -514,22 +478,14 @@ export class ProjectedModelStoreReader extends ModelStoreReader {
     switch (change.table) {
       case 'project':
         if (this.#project !== change.before) {
-          rejectPrecondition(
-            'before-reference-mismatch',
-            context,
-            'Project no longer matches the expected before record',
-          )
+          rejectPrecondition(context, 'Project no longer matches the expected before record')
         }
         this.#project = change.after
         return
 
       case 'master':
         if (this.#master !== change.before) {
-          rejectPrecondition(
-            'before-reference-mismatch',
-            context,
-            'Master Channel no longer matches the expected before record',
-          )
+          rejectPrecondition(context, 'Master Channel no longer matches the expected before record')
         }
         this.#master = change.after
         return

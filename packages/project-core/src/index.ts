@@ -107,8 +107,6 @@ export type {
   ProjectQueryResultFor,
   ProjectQueryType,
 } from './queries/project-query'
-export { ProjectQueryError } from './queries/project-query-error'
-export type { ProjectQueryErrorCode, ProjectQueryErrorDetails } from './queries/project-query-error'
 
 export {
   PROJECT_SUBSCRIPTION_TYPE,
@@ -153,16 +151,11 @@ export {
   saveProjectCheckpoint,
 } from './persistence/checkpoint/project-checkpoint-coordinator'
 export type {
+  ProjectCheckpointCandidateFailure,
   ProjectCheckpointRestoreResult,
   ProjectCheckpointSaveReceipt,
   SaveProjectCheckpointInput,
 } from './persistence/checkpoint/project-checkpoint-coordinator'
-export { ProjectCheckpointError } from './persistence/checkpoint/project-checkpoint-error'
-export type {
-  ProjectCheckpointCandidateFailure,
-  ProjectCheckpointErrorCode,
-  ProjectCheckpointErrorDetails,
-} from './persistence/checkpoint/project-checkpoint-error'
 
 export {
   PROJECT_FILE_FORMAT_VERSION,
@@ -171,7 +164,6 @@ export {
 } from './persistence/project-file'
 export type { ProjectFile } from './persistence/project-file'
 export { ProjectFileError } from './persistence/project-file-error'
-export type { ProjectFileErrorCode, ProjectFilePathSegment } from './persistence/project-file-error'
 export { createProjectSessionFromProjectFile } from './persistence/project-file-loader'
 
 export { PROJECT_COMMAND_EXECUTION_STATUS } from './session/project-command-execution'

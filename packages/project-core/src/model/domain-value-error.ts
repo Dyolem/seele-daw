@@ -1,13 +1,8 @@
 /** Raised when an untrusted primitive cannot enter the domain model. */
 export class DomainValueError extends RangeError {
-  readonly valueName: string
-  readonly constraint: string
-
   constructor(valueName: string, constraint: string) {
     super(`Invalid ${valueName}: expected ${constraint}`)
     this.name = 'DomainValueError'
-    this.valueName = valueName
-    this.constraint = constraint
   }
 }
 

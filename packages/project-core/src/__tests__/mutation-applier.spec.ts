@@ -15,19 +15,17 @@ import {
 } from './support/mutation-applier-fixture'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { withMapSetInterceptor } from './support/map-set-interceptor'
+import { DomainValueError } from '#internal/model/domain-value-error'
 import { ModelInvariantError } from '#internal/model/invariant-validator'
 import {
   INITIAL_MODEL_REVISION,
-  ModelRevisionError,
   nextModelRevision,
+  parseModelRevision,
   type ModelRevision,
 } from '#internal/model/model-revision'
 import { ModelStore } from '#internal/model/model-store'
 import { MutationApplier } from '#internal/mutation/mutation-applier'
-import { MutationApplyError, MutationRollbackError } from '#internal/mutation/mutation-apply-error'
-import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
-import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
-import { MutationPreconditionError } from '#internal/mutation/mutation-precondition-error'
+import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { PARTITIONED_TABLE_NAMES, RECORD_TABLE_NAMES } from '#internal/model/model-tables'
 import { changeLabel } from '#internal/mutation/project-change'
 import { ProjectedModelStoreReader } from '#internal/mutation/projected-model-store-reader'
@@ -83,59 +81,23 @@ describe('nextModelRevision', () => {
     )
   })
 
-  it('rejects revision exhaustion with the exhausted value attached', () => {
-    const error = captureThrown(() => nextModelRevision(Number.MAX_SAFE_INTEGER as ModelRevision))
-
-    expect(error).toBeInstanceOf(ModelRevisionError)
-    expect(error).toMatchObject({
-      code: 'model-revision-overflow',
-      revision: Number.MAX_SAFE_INTEGER,
-    })
+  it('rejects revision exhaustion', () => {
+    expect(() => nextModelRevision(Number.MAX_SAFE_INTEGER as ModelRevision)).toThrowError(
+      new RangeError('Model revision cannot advance beyond Number.MAX_SAFE_INTEGER'),
+    )
   })
+})
 
+describe('parseModelRevision', () => {
   it.each([-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
-    'rejects invalid current revision %s',
+    'rejects revision %s as a domain value',
     (value) => {
-      const error = captureThrown(() => nextModelRevision(value as ModelRevision))
-
-      expect(error).toBeInstanceOf(ModelRevisionError)
-      expect(error).toMatchObject({ code: 'invalid-model-revision', revision: value })
+      expect(() => parseModelRevision(value)).toThrow(DomainValueError)
     },
   )
 })
 
-describe('MutationApplier plan admission and revision checks', () => {
-  it('accepts the factory-created plan but rejects a frozen structural lookalike with no writes', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const applier = new MutationApplier(store)
-    const replacementProject = createProjectReplacement(fixture)
-    const plan = createMutationPlan(store.modelRevision, [
-      {
-        op: 'replace',
-        table: 'project',
-        before: fixture.records.project,
-        after: replacementProject,
-      },
-    ])
-    const forgedPlan = Object.freeze({
-      baseRevision: plan.baseRevision,
-      forward: plan.forward,
-      inverse: plan.inverse,
-    }) as MutationPlan
-    const before = snapshotModelReader(store)
-
-    const error = captureThrown(() => applier.apply(forgedPlan))
-
-    expect(error).toBeInstanceOf(MutationPlanError)
-    expect(error).toMatchObject({ code: 'unrecognized-plan' })
-    expect(snapshotModelReader(store)).toEqual(before)
-
-    expect(applier.apply(plan)).toBe(1)
-    expect(store.project).toBe(replacementProject)
-    expect(store.modelRevision).toBe(1)
-  })
-
+describe('MutationApplier revision checks', () => {
   it('rejects both replayed and independently stale plans without another write', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
@@ -162,14 +124,9 @@ describe('MutationApplier plan admission and revision checks', () => {
     const committed = snapshotModelReader(store)
 
     for (const rejectedPlan of [winningPlan, stalePlan]) {
-      const error = captureThrown(() => applier.apply(rejectedPlan))
-
-      expect(error).toBeInstanceOf(MutationApplyError)
-      expect(error).toMatchObject({
-        code: 'base-revision-mismatch',
-        baseRevision: INITIAL_MODEL_REVISION,
-        currentRevision: 1,
-      })
+      expect(() => applier.apply(rejectedPlan)).toThrowError(
+        'MutationPlan revision 0 does not match ModelStore revision 1',
+      )
       expect(snapshotModelReader(store)).toEqual(committed)
     }
   })
@@ -179,12 +136,9 @@ describe('MutationApplier plan admission and revision checks', () => {
 
     expect(new MutationApplier(store)).toBeInstanceOf(MutationApplier)
 
-    const error = captureThrown(() => new MutationApplier(store))
-
-    expect(error).toMatchObject({
-      name: 'ModelStoreWriteAccessError',
-      code: 'write-access-unavailable',
-    })
+    expect(() => new MutationApplier(store)).toThrowError(
+      'ModelStore write access is unavailable or has already been claimed',
+    )
   })
 })
 
@@ -267,15 +221,7 @@ describe('MutationApplier validation failures', () => {
     ])
     const before = snapshotModelReader(store)
 
-    const error = captureThrown(() => applier.apply(plan))
-
-    expect(error).toBeInstanceOf(MutationPreconditionError)
-    expect(error).toMatchObject({
-      code: 'before-reference-mismatch',
-      changeIndex: 0,
-      change: 'tracks.replace',
-    })
-    expect(error).not.toBeInstanceOf(MutationApplyError)
+    expect(() => applier.apply(plan)).toThrowError(/^Change at index 0 \(tracks\.replace\) /)
     expect(snapshotModelReader(store)).toEqual(before)
   })
 
@@ -295,7 +241,6 @@ describe('MutationApplier validation failures', () => {
     const error = captureThrown(() => applier.apply(plan))
 
     expect(error).toBeInstanceOf(ModelInvariantError)
-    expect(error).not.toBeInstanceOf(MutationApplyError)
     expect(snapshotModelReader(store)).toEqual(before)
   })
 })
@@ -328,10 +273,10 @@ describe('MutationApplier defensive restoration', () => {
       ),
     )
 
-    expect(error).toBeInstanceOf(MutationApplyError)
-    expect(error).toMatchObject({ code: 'write-failed', appliedChangeCount: 0 })
-    expect(Object.hasOwn(error as object, 'failureCause')).toBe(true)
-    expect((error as MutationApplyError).failureCause).toBe(injectedFailure)
+    expect(error).toMatchObject({ message: expect.stringContaining('after 0 completed changes') })
+    // A thrown undefined is still the cause.
+    expect(Object.hasOwn(error as object, 'cause')).toBe(true)
+    expect((error as Error).cause).toBe(injectedFailure)
     expect(snapshotModelReader(store)).toEqual(before)
   })
 
@@ -376,10 +321,8 @@ describe('MutationApplier defensive restoration', () => {
       ),
     )
 
-    expect(error).toBeInstanceOf(MutationApplyError)
-    expect(error).toMatchObject({ code: 'write-failed', appliedChangeCount: 1 })
-    expect((error as MutationApplyError).cause).toBe(injectedFailure)
-    expect((error as MutationApplyError).failureCause).toBe(injectedFailure)
+    expect(error).toMatchObject({ message: expect.stringContaining('after 1 completed changes') })
+    expect((error as Error).cause).toBe(injectedFailure)
     expect(store.modelRevision).toBe(INITIAL_MODEL_REVISION)
     expect(store.project).toBe(fixture.records.project)
     expect(store.master).toBe(fixture.records.master)
@@ -441,21 +384,22 @@ describe('MutationApplier defensive restoration', () => {
       ),
     )
 
-    expect(fatalError).toBeInstanceOf(MutationRollbackError)
+    expect(fatalError).toBeInstanceOf(AggregateError)
     expect(fatalError).toMatchObject({
-      code: 'rollback-failed',
-      appliedChangeCount: 1,
-      applyCause,
-      rollbackCause,
+      message: 'Failed to restore ModelStore after 1 applied changes',
     })
+    expect((fatalError as AggregateError).errors).toHaveLength(2)
+    expect((fatalError as AggregateError).errors[0]).toBe(applyCause)
+    expect((fatalError as AggregateError).errors[1]).toBe(rollbackCause)
     expect(store.modelRevision).toBe(INITIAL_MODEL_REVISION)
     expect(store.getTrack(fixture.records.audioTrack.id)).toBe(replacementTrack)
 
     const faultedError = captureThrown(() => applier.apply(retryPlan))
 
-    expect(faultedError).toBeInstanceOf(MutationApplyError)
-    expect(faultedError).toMatchObject({ code: 'applier-faulted' })
-    expect((faultedError as MutationApplyError).cause).toBe(fatalError)
+    expect(faultedError).toMatchObject({
+      message: 'MutationApplier is faulted after an unrecoverable rollback failure',
+    })
+    expect((faultedError as Error).cause).toBe(fatalError)
     expect(store.project).toBe(fixture.records.project)
     expect(store.modelRevision).toBe(INITIAL_MODEL_REVISION)
   })
@@ -495,8 +439,9 @@ describe('MutationApplier defensive restoration', () => {
     )
 
     expect(committedRevision).toBe(1)
-    expect(nestedApplyError).toBeInstanceOf(MutationApplyError)
-    expect(nestedApplyError).toMatchObject({ code: 'reentrant-apply' })
+    expect(nestedApplyError).toMatchObject({
+      message: 'MutationApplier cannot apply a plan while another apply call is active',
+    })
     expect(store.project).toBe(fixture.records.project)
     expect(store.getTrack(fixture.records.audioTrack.id)).toBe(replacementTrack)
     expect(store.modelRevision).toBe(1)
@@ -509,17 +454,11 @@ describe('Mutation infrastructure package boundary', () => {
       'ModelStore',
       'INITIAL_MODEL_REVISION',
       'nextModelRevision',
-      'ModelRevisionError',
       'createMutationPlan',
-      'MutationPlanError',
       'MutationApplier',
-      'MutationApplyError',
-      'MutationRollbackError',
       'ProjectedModelStoreReader',
-      'MutationPreconditionError',
       'registerModelStoreWriteAccess',
       'claimModelStoreWriteAccess',
-      'ModelStoreWriteAccessError',
     ]) {
       expect(projectCore).not.toHaveProperty(internalName)
     }

@@ -27,7 +27,6 @@ import {
 } from './support/complete-project-fixture'
 import { ModelInvariantError } from '#internal/model/invariant-validator'
 import { ModelStore, type ModelStoreReader } from '#internal/model/model-store'
-import { MutationPreconditionError } from '#internal/mutation/mutation-precondition-error'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectChange } from '#internal/mutation/project-change'
 import { ProjectedModelStoreReader } from '#internal/mutation/projected-model-store-reader'
@@ -118,7 +117,7 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
   }
 }
 
-function capturePreconditionError(operation: () => unknown): MutationPreconditionError {
+function capturePreconditionError(operation: () => unknown): Error {
   let caughtError: unknown
 
   try {
@@ -127,10 +126,10 @@ function capturePreconditionError(operation: () => unknown): MutationPreconditio
     caughtError = error
   }
 
-  expect(caughtError).toBeInstanceOf(MutationPreconditionError)
+  expect(caughtError).toBeInstanceOf(Error)
 
-  if (!(caughtError instanceof MutationPreconditionError)) {
-    throw new Error('Expected a MutationPreconditionError')
+  if (!(caughtError instanceof Error)) {
+    throw new Error('Expected an Error')
   }
 
   return caughtError
@@ -458,11 +457,7 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       ]),
     )
 
-    expect(error).toMatchObject({
-      code: 'insert-target-exists',
-      changeIndex: 0,
-      change: 'tracks.insert',
-    })
+    expect(error.message).toMatch(/^Change at index 0 \(tracks\.insert\) cannot insert existing /)
   })
 
   it('reports a missing target after an earlier projected removal and preserves base', () => {
@@ -486,11 +481,7 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       ]),
     )
 
-    expect(error).toMatchObject({
-      code: 'target-missing',
-      changeIndex: 1,
-      change: 'midiNotes.remove',
-    })
+    expect(error.message).toMatch(/^Change at index 1 \(midiNotes\.remove\) cannot remove missing /)
     expect(snapshotReader(base)).toEqual(beforeBase)
   })
 
@@ -516,11 +507,9 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       ]),
     )
 
-    expect(error).toMatchObject({
-      code: 'before-reference-mismatch',
-      changeIndex: 0,
-      change: 'project.replace',
-    })
+    expect(error.message).toBe(
+      'Change at index 0 (project.replace) Project no longer matches the expected before record',
+    )
   })
 
   it('reports a track-order index outside the current projected bounds', () => {
@@ -537,11 +526,9 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       ]),
     )
 
-    expect(error).toMatchObject({
-      code: 'track-order-index-out-of-bounds',
-      changeIndex: 0,
-      change: 'trackOrder.insert',
-    })
+    expect(error.message).toMatch(
+      /^Change at index 0 \(trackOrder\.insert\) cannot insert Track .+ at index 3 for length /,
+    )
   })
 
   it('reports a track-order entry mismatch', () => {
@@ -558,11 +545,7 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       ]),
     )
 
-    expect(error).toMatchObject({
-      code: 'track-order-entry-mismatch',
-      changeIndex: 0,
-      change: 'trackOrder.remove',
-    })
+    expect(error.message).toMatch(/^Change at index 0 \(trackOrder\.remove\) expected Track /)
   })
 
   it('requires Note partition before payloads to contain the exact IDs and references', () => {
@@ -586,11 +569,9 @@ describe('ProjectedModelStoreReader local preconditions', () => {
         ]),
       )
 
-      expect(error).toMatchObject({
-        code: 'partition-content-mismatch',
-        changeIndex: 0,
-        change: 'midiNotes.remove-partition',
-      })
+      expect(error.message).toMatch(
+        /^Change at index 0 \(midiNotes\.remove-partition\) .+ no longer matches the expected before records$/,
+      )
     }
   })
 
@@ -611,11 +592,9 @@ describe('ProjectedModelStoreReader local preconditions', () => {
       ]),
     )
 
-    expect(error).toMatchObject({
-      code: 'partition-content-mismatch',
-      changeIndex: 0,
-      change: 'midiSustainPedalEvents.remove-partition',
-    })
+    expect(error.message).toMatch(
+      /^Change at index 0 \(midiSustainPedalEvents\.remove-partition\) .+ no longer matches the expected before records$/,
+    )
   })
 })
 
@@ -830,8 +809,7 @@ describe('Projected iterator ordering', () => {
 })
 
 describe('projected mutation module boundary', () => {
-  it('does not export the projected reader or precondition error from the package root', () => {
+  it('does not export the projected reader from the package root', () => {
     expect(projectCore).not.toHaveProperty('ProjectedModelStoreReader')
-    expect(projectCore).not.toHaveProperty('MutationPreconditionError')
   })
 })

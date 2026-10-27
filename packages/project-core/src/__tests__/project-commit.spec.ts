@@ -5,7 +5,6 @@ import {
   PROJECT_COMMAND_TYPE,
   PROJECT_COMMIT_ORIGIN_KIND,
   createAddNoteCommand,
-  createMidiNoteRecord,
   createRemoveNotesCommand,
   parseMidiChannel,
   parseMidiPitch,
@@ -18,41 +17,13 @@ import {
   type ProjectCommit,
 } from '#internal/index'
 import { prepareProjectCommand } from '#internal/commands/preparation/project-command-preparer'
-import {
-  ProjectCommitCandidateError,
-  type ProjectCommitCandidateErrorCode,
-} from '#internal/commit/project-commit-candidate-error'
 import { createProjectCommitCandidate } from '#internal/commit/project-commit-candidate'
 import { ModelStore } from '#internal/model/model-store'
-import { ModelRevisionError } from '#internal/model/model-revision'
 import { MutationApplier } from '#internal/mutation/mutation-applier'
-import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
-import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
+import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
 import { requireChange } from './support/project-change-test-support'
 import { requireReadyProjectCommandPreparation } from './support/project-command-test-support'
-
-function captureCandidateError(
-  operation: () => unknown,
-  code: ProjectCommitCandidateErrorCode,
-): ProjectCommitCandidateError {
-  let caughtError: unknown
-
-  try {
-    operation()
-  } catch (error) {
-    caughtError = error
-  }
-
-  expect(caughtError).toBeInstanceOf(ProjectCommitCandidateError)
-  expect(caughtError).toMatchObject({ code })
-
-  if (!(caughtError instanceof ProjectCommitCandidateError)) {
-    throw new Error('Expected a ProjectCommitCandidateError')
-  }
-
-  return caughtError
-}
 
 function createAddCommand(store: ModelStore): AddNoteCommand {
   const fixture = createCompleteProjectFixture()
@@ -75,7 +46,6 @@ describe('ProjectCommit public contract', () => {
     expectTypeOf<ProjectCommit['changes'][number]>().toEqualTypeOf<ProjectChange>()
 
     expect('createProjectCommitCandidate' in projectCore).toBe(false)
-    expect('ProjectCommitCandidateError' in projectCore).toBe(false)
     expect('createMutationPlan' in projectCore).toBe(false)
     expect('MutationApplier' in projectCore).toBe(false)
   })
@@ -123,32 +93,6 @@ describe('ProjectCommit candidate boundary', () => {
     )
   })
 
-  it('rejects a structurally similar plan without factory provenance', () => {
-    const fixture = createCompleteProjectFixture()
-    const fakePlan = {
-      baseRevision: 0 as ModelRevision,
-      forward: [
-        {
-          op: 'remove',
-          table: 'midiNotes',
-          sourceId: fixture.records.nonLoopSource.id,
-          before: fixture.records.nonLoopNote,
-        },
-      ],
-      inverse: [],
-    } as MutationPlan
-
-    const command = createRemoveNotesCommand({
-      baseRevision: fakePlan.baseRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [fixture.records.nonLoopNote.id],
-    })
-
-    expect(() => createProjectCommitCandidate(command, fakePlan)).toThrowError(
-      expect.objectContaining<Partial<MutationPlanError>>({ code: 'unrecognized-plan' }),
-    )
-  })
-
   it('rejects revision exhaustion before a candidate can be produced', () => {
     const fixture = createCompleteProjectFixture()
     const baseRevision = Number.MAX_SAFE_INTEGER as ModelRevision
@@ -167,34 +111,7 @@ describe('ProjectCommit candidate boundary', () => {
     ])
 
     expect(() => createProjectCommitCandidate(command, plan)).toThrowError(
-      expect.objectContaining<Partial<ModelRevisionError>>({ code: 'model-revision-overflow' }),
+      new RangeError('Model revision cannot advance beyond Number.MAX_SAFE_INTEGER'),
     )
-  })
-
-  it('rejects a Command and Plan with different base revisions', () => {
-    const fixture = createCompleteProjectFixture()
-    const store = new ModelStore(fixture.seed)
-    const command = createAddCommand(store)
-    const plan = createMutationPlan(1 as ModelRevision, [
-      {
-        op: 'insert',
-        table: 'midiNotes',
-        sourceId: command.sourceId,
-        after: createMidiNoteRecord({
-          id: command.noteId,
-          startTick: command.startTick,
-          durationTick: command.durationTick,
-          pitch: command.pitch,
-          velocity: command.velocity,
-          channel: command.channel,
-        }),
-      },
-    ])
-    const error = captureCandidateError(
-      () => createProjectCommitCandidate(command, plan),
-      'base-revision-mismatch',
-    )
-
-    expect(error.commandType).toBe(PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD)
   })
 })

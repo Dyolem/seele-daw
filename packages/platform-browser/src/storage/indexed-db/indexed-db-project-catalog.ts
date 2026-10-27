@@ -3,7 +3,6 @@ import {
   PROJECT_CATALOG_STORE,
   SEELE_PROJECT_DATABASE_NAME,
 } from '#internal/storage/indexed-db/indexed-db-schema'
-import { IndexedDBStorageError } from '#internal/storage/indexed-db/indexed-db-storage-error'
 import { abortAndObserve } from '#internal/storage/indexed-db/indexed-db-transaction'
 import { SeeleProjectDatabase } from '#internal/storage/indexed-db/seele-project-database'
 import type { ProjectId } from '@seele-daw/project-core'
@@ -18,13 +17,6 @@ export interface IndexedDBProjectCatalogOptions {
   readonly databaseName?: string
 }
 
-class InvalidProjectCatalogRecordError extends Error {
-  constructor(cause: unknown) {
-    super('Invalid Project Catalog V1 record', { cause })
-    this.name = 'InvalidProjectCatalogRecordError'
-  }
-}
-
 function compareRecentProjects(first: RecentProjectSummary, second: RecentProjectSummary): number {
   const timeDifference = second.lastCheckpointSavedAt - first.lastCheckpointSavedAt
   if (timeDifference !== 0) return timeDifference
@@ -37,7 +29,7 @@ function decodeCatalogRecord(value: unknown): RecentProjectSummary {
   try {
     return decodeProjectCatalogRecord(value)
   } catch (cause) {
-    throw new InvalidProjectCatalogRecordError(cause)
+    throw new Error('Invalid Project Catalog V1 record', { cause })
   }
 }
 
@@ -47,13 +39,7 @@ export class IndexedDBProjectCatalog {
 
   constructor(options: IndexedDBProjectCatalogOptions = {}) {
     const databaseName = options.databaseName ?? SEELE_PROJECT_DATABASE_NAME
-    if (databaseName.length === 0) {
-      throw new IndexedDBStorageError(
-        'invalid-input',
-        'IndexedDB database name must not be empty',
-        { databaseName, operation: 'open-database' },
-      )
-    }
+    if (databaseName.length === 0) throw new RangeError('IndexedDB database name must not be empty')
 
     this.#database = new SeeleProjectDatabase(databaseName)
   }
@@ -77,19 +63,9 @@ export class IndexedDBProjectCatalog {
       return Object.freeze(projects)
     } catch (cause) {
       await abortAndObserve(transaction)
-      if (cause instanceof IndexedDBStorageError) throw cause
-
-      const code =
-        cause instanceof InvalidProjectCatalogRecordError ? 'invalid-record' : 'transaction-failed'
-      throw new IndexedDBStorageError(
-        code,
-        `Could not read the Project Catalog from IndexedDB ${this.databaseName}`,
-        {
-          cause,
-          databaseName: this.databaseName,
-          operation: 'list-recent-projects',
-        },
-      )
+      throw new Error(`Could not read the Project Catalog from IndexedDB ${this.databaseName}`, {
+        cause,
+      })
     }
   }
 }

@@ -65,15 +65,15 @@ function readCatalogFields(value: unknown): Readonly<Record<string, unknown>> {
   return fields
 }
 
+/** `currentTime` comes from the injected clock, so it is checked like any outside value. */
 export function createProjectCatalogRecord(
   checkpoint: ProjectCheckpoint,
-  projectId: ProjectId,
   currentTime: unknown,
 ): ProjectCatalogRecordV1 {
   return {
     catalogRecordVersion: PROJECT_CATALOG_RECORD_VERSION,
-    projectId,
-    name: parseEntityName(checkpoint.projectFile.project.name),
+    projectId: checkpoint.projectId,
+    name: checkpoint.projectFile.project.name,
     lastCheckpointSavedAt: parseTimestamp(currentTime),
   }
 }

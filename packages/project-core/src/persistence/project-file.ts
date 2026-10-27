@@ -85,7 +85,6 @@ export function readProjectFile(value: unknown, path: DataPath): ProjectFile {
 
   if (formatVersion !== PROJECT_FILE_FORMAT_VERSION) {
     rejectData(
-      'unsupported-format-version',
       `Expected project file format ${PROJECT_FILE_FORMAT_VERSION}, found ${JSON.stringify(formatVersion)}`,
       [...path, 'formatVersion'],
     )

@@ -23,11 +23,8 @@ import {
   createMidiSustainPedalEventRecord,
   type MidiSustainPedalEventRecord,
 } from '#internal/model/midi-sustain-pedal-event'
-import {
-  ModelRevisionError,
-  parseModelRevision,
-  type ModelRevision,
-} from '#internal/model/model-revision'
+import { DomainValueError } from '#internal/model/domain-value-error'
+import { parseModelRevision, type ModelRevision } from '#internal/model/model-revision'
 import type { ValueOf } from '@seele-daw/type-utils'
 import {
   type ProjectColor,
@@ -438,7 +435,7 @@ function parseCommandBaseRevision(value: ModelRevision): ModelRevision {
   try {
     return parseModelRevision(value)
   } catch (cause) {
-    if (!(cause instanceof ModelRevisionError)) throw cause
+    if (!(cause instanceof DomainValueError)) throw cause
 
     throw new ProjectCommandError(
       'invalid-base-revision',

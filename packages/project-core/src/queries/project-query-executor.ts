@@ -9,10 +9,8 @@ import {
   PROJECT_QUERY_TYPE,
   createMidiNoteByIdQueryResult,
   createMidiNotesIntersectingRangeQueryResult,
-  normalizeProjectQuery,
   type MidiNotesIntersectingRangeQuery,
   type ProjectQuery,
-  type ProjectQueryResult,
   type ProjectQueryResultFor,
 } from '#internal/queries/project-query'
 import type { ProjectSnapshot } from '#internal/snapshots/project-snapshot'
@@ -117,37 +115,25 @@ function noteById(notes: readonly MidiNoteRecord[], noteId: NoteId): MidiNoteRec
   return note?.id === noteId ? note : undefined
 }
 
-function rejectUnhandledQuery(query: never): never {
-  throw new Error(`Unhandled normalized ProjectQuery: ${String((query as ProjectQuery).type)}`)
-}
-
 /** Answers a query from one Snapshot, so the result belongs to that Snapshot's revision. */
 export function executeProjectQuery<Query extends ProjectQuery>(
   snapshot: ProjectSnapshot,
   query: Query,
 ): ProjectQueryResultFor<Query> {
-  const normalizedQuery = normalizeProjectQuery(query)
-  const notes = snapshot.midiNotes[normalizedQuery.sourceId] ?? NO_NOTES
-  let result: ProjectQueryResult
+  const projectQuery: ProjectQuery = query
+  const notes = snapshot.midiNotes[projectQuery.sourceId] ?? NO_NOTES
 
-  switch (normalizedQuery.type) {
+  switch (projectQuery.type) {
     case PROJECT_QUERY_TYPE.MIDI_NOTE.BY_ID:
-      result = createMidiNoteByIdQueryResult(
+      return createMidiNoteByIdQueryResult(
         snapshot.modelRevision,
-        noteById(notes, normalizedQuery.noteId),
-      )
-      break
+        noteById(notes, projectQuery.noteId),
+      ) as ProjectQueryResultFor<Query>
 
     case PROJECT_QUERY_TYPE.MIDI_NOTE.INTERSECTING_RANGE:
-      result = createMidiNotesIntersectingRangeQueryResult(
+      return createMidiNotesIntersectingRangeQueryResult(
         snapshot.modelRevision,
-        notesIntersecting(notes, normalizedQuery),
-      )
-      break
-
-    default:
-      return rejectUnhandledQuery(normalizedQuery)
+        notesIntersecting(notes, projectQuery),
+      ) as ProjectQueryResultFor<Query>
   }
-
-  return result as ProjectQueryResultFor<Query>
 }

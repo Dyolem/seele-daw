@@ -2,7 +2,6 @@ import {
   type ProjectCommand,
   type ProjectCommandType,
 } from '#internal/commands/protocol/project-command'
-import { ProjectCommitCandidateError } from '#internal/commit/project-commit-candidate-error'
 import {
   PROJECT_COMMIT_ORIGIN_KIND,
   type ProjectCommit,
@@ -11,7 +10,7 @@ import {
   type ProjectHistoryDirection,
 } from '#internal/commit/project-commit'
 import { nextModelRevision } from '#internal/model/model-revision'
-import { assertCreatedMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
+import type { MutationPlan } from '#internal/mutation/mutation-plan'
 
 /** A commit publishes the plan's normalized forward changes as they are. */
 function createCandidate(
@@ -35,16 +34,6 @@ export function createProjectCommitCandidate(
   normalizedCommand: ProjectCommand,
   plan: MutationPlan,
 ): ProjectCommit {
-  assertCreatedMutationPlan(plan)
-
-  if (normalizedCommand.baseRevision !== plan.baseRevision) {
-    throw new ProjectCommitCandidateError(
-      'base-revision-mismatch',
-      `Command revision ${normalizedCommand.baseRevision} does not match plan revision ${plan.baseRevision}`,
-      normalizedCommand.type,
-    )
-  }
-
   return createCandidate(
     plan,
     Object.freeze<ProjectCommandCommitOrigin>({
@@ -64,8 +53,6 @@ export function createHistoryProjectCommitCandidate(
   input: CreateHistoryProjectCommitCandidateInput,
   plan: MutationPlan,
 ): ProjectCommit {
-  assertCreatedMutationPlan(plan)
-
   return createCandidate(
     plan,
     Object.freeze<ProjectHistoryCommitOrigin>({

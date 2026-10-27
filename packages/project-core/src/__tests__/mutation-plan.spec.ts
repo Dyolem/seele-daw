@@ -25,7 +25,6 @@ import {
   parseTimeSignatureNumerator,
 } from '#internal/index'
 import { createCompleteProjectFixture } from './support/complete-project-fixture'
-import type { ModelRevision } from '#internal/model/model-revision'
 import { INITIAL_MODEL_REVISION } from '#internal/model/model-revision'
 import {
   PARTITIONED_TABLE_NAMES,
@@ -33,7 +32,6 @@ import {
   type PartitionedTableName,
   type RecordTableName,
 } from '#internal/model/model-tables'
-import { MutationPlanError } from '#internal/mutation/mutation-plan-error'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import {
   changeLabel,
@@ -160,24 +158,6 @@ function expectSameRecords(actual: ProjectChange, expected: readonly object[]): 
   records.forEach((record, index) => expect(record).toBe(expected[index]))
 }
 
-function captureMutationPlanError(operation: () => unknown): MutationPlanError {
-  let caughtError: unknown
-
-  try {
-    operation()
-  } catch (error) {
-    caughtError = error
-  }
-
-  expect(caughtError).toBeInstanceOf(MutationPlanError)
-
-  if (!(caughtError instanceof MutationPlanError)) {
-    throw new Error('Expected a MutationPlanError')
-  }
-
-  return caughtError
-}
-
 describe('ProjectChange vocabulary', () => {
   it('names every model table, and each example covers one table and operation', () => {
     expectTypeOf<ProjectChange['table']>().toEqualTypeOf<
@@ -209,12 +189,9 @@ describe('ProjectChange vocabulary', () => {
     ['tracks', 'insert-partition'],
     ['future', 'insert'],
   ])('rejects %s.%s as an unknown change', (table, op) => {
-    const error = captureMutationPlanError(() =>
-      invertProjectChange({ op, table } as unknown as ProjectChange),
+    expect(() => invertProjectChange({ op, table } as unknown as ProjectChange)).toThrowError(
+      `Change has an unknown table or operation: ${table}.${op}`,
     )
-
-    expect(error.code).toBe('unknown-change')
-    expect(error.changeIndex).toBeNull()
   })
 })
 
@@ -349,32 +326,19 @@ describe('createMutationPlan', () => {
   })
 })
 
-describe('MutationPlanError', () => {
-  it('rejects an empty forward list without a change index', () => {
-    const error = captureMutationPlanError(() => createMutationPlan(INITIAL_MODEL_REVISION, []))
-
-    expect(error.code).toBe('empty-forward')
-    expect(error.changeIndex).toBeNull()
+describe('createMutationPlan rejections', () => {
+  it('rejects an empty forward list', () => {
+    expect(() => createMutationPlan(INITIAL_MODEL_REVISION, [])).toThrowError(
+      'MutationPlan.forward must contain at least one change',
+    )
   })
-
-  it.each([-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
-    'rejects invalid base revision %s without a change index',
-    (value) => {
-      const revision = value as unknown as ModelRevision
-      const error = captureMutationPlanError(() =>
-        createMutationPlan(revision, createChangeExamples().slice(0, 1)),
-      )
-
-      expect(error.code).toBe('invalid-base-revision')
-      expect(error.changeIndex).toBeNull()
-    },
-  )
 
   it.each([-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
     'rejects invalid track-order index %s at its plan position',
     (index) => {
       const fixture = createCompleteProjectFixture()
-      const error = captureMutationPlanError(() =>
+
+      expect(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
           { op: 'insert', table: 'tracks', after: fixture.records.instrumentTrack },
           {
@@ -384,10 +348,7 @@ describe('MutationPlanError', () => {
             trackId: fixture.records.instrumentTrack.id,
           },
         ]),
-      )
-
-      expect(error.code).toBe('invalid-track-order-index')
-      expect(error.changeIndex).toBe(1)
+      ).toThrowError('Change at index 1 requires a non-negative safe integer track-order index')
     },
   )
 
@@ -421,21 +382,17 @@ describe('MutationPlanError', () => {
     ]
 
     for (const change of changes) {
-      const error = captureMutationPlanError(() =>
+      expect(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
           { op: 'insert', table: 'trackOrder', index: 0, trackId: records.instrumentTrack.id },
           change,
         ]),
-      )
-
-      expect(error.code).toBe('no-op-replace')
-      expect(error.changeIndex).toBe(1)
+      ).toThrowError('Change at index 1 must replace a record with a different reference')
     }
 
-    const directError = captureMutationPlanError(() => invertProjectChange(changes[0]!))
-
-    expect(directError.code).toBe('no-op-replace')
-    expect(directError.changeIndex).toBeNull()
+    expect(() => invertProjectChange(changes[0]!)).toThrowError(
+      'Change must replace a record with a different reference',
+    )
   })
 
   it('rejects replacement records whose IDs change', () => {
@@ -481,15 +438,12 @@ describe('MutationPlanError', () => {
     ]
 
     for (const change of changes) {
-      const error = captureMutationPlanError(() =>
+      expect(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
           { op: 'remove', table: 'tracks', before: records.audioTrack },
           change,
         ]),
-      )
-
-      expect(error.code).toBe('record-id-changed')
-      expect(error.changeIndex).toBe(1)
+      ).toThrowError('Change at index 1 cannot change a record identity during replacement')
     }
   })
 
@@ -507,15 +461,12 @@ describe('MutationPlanError', () => {
     ]
 
     for (const change of changes) {
-      const error = captureMutationPlanError(() =>
+      expect(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
           { op: 'remove', table: 'tracks', before: audioTrack },
           change,
         ]),
-      )
-
-      expect(error.code).toBe('duplicate-id-in-partition')
-      expect(error.changeIndex).toBe(1)
+      ).toThrowError(/^Change at index 1 contains duplicate .+ ID /)
     }
   })
 })
@@ -523,7 +474,6 @@ describe('MutationPlanError', () => {
 describe('change module boundary', () => {
   it('does not export plan or change helpers from the package root', () => {
     for (const exportName of [
-      'MutationPlanError',
       'createMutationPlan',
       'changeLabel',
       'invertProjectChange',

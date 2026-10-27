@@ -1,4 +1,4 @@
-import { parseProjectId, type ProjectId } from '#internal/model/ids'
+import type { ProjectId } from '#internal/model/ids'
 import type { ModelRevision } from '#internal/model/model-revision'
 import {
   createProjectCheckpoint,
@@ -8,10 +8,6 @@ import {
   type ProjectCheckpointId,
   type ProjectCheckpointStore,
 } from '#internal/persistence/checkpoint/project-checkpoint'
-import {
-  ProjectCheckpointError,
-  type ProjectCheckpointCandidateFailure,
-} from '#internal/persistence/checkpoint/project-checkpoint-error'
 import { ProjectFileError } from '#internal/persistence/project-file-error'
 import { createSessionFromProjectFile } from '#internal/persistence/project-file-loader'
 import type { ProjectSession } from '#internal/session/project-session'
@@ -24,6 +20,12 @@ export interface ProjectCheckpointSaveReceipt {
   readonly projectId: ProjectId
   readonly sourceModelRevision: ModelRevision
   readonly sourceContentStateId: ProjectContentStateId
+}
+
+/** Why one stored candidate could not be restored. */
+export interface ProjectCheckpointCandidateFailure {
+  readonly candidateIndex: number
+  readonly failureCause: unknown
 }
 
 export interface ProjectCheckpointRestoreResult {
@@ -41,15 +43,7 @@ export async function saveProjectCheckpoint(
   const sourceContentStateId = session.contentStateId
   const checkpoint = createProjectCheckpoint(session.getSnapshot(), input)
 
-  try {
-    await store.save(checkpoint)
-  } catch (cause) {
-    throw new ProjectCheckpointError(
-      'store-write-failed',
-      `Could not save Project Checkpoint ${checkpoint.checkpointId}`,
-      { cause },
-    )
-  }
+  await store.save(checkpoint)
 
   return Object.freeze({
     checkpointId: checkpoint.checkpointId,
@@ -67,9 +61,7 @@ function restoreCandidate(
 
   if (checkpoint.projectId !== projectId) {
     throw new ProjectFileError(
-      'project-id-mismatch',
       `Checkpoint ${checkpoint.checkpointId} belongs to project ${checkpoint.projectId}, not ${projectId}`,
-      ['projectId'],
     )
   }
 
@@ -81,18 +73,7 @@ export async function restoreProjectCheckpoint(
   store: ProjectCheckpointStore,
   projectId: ProjectId,
 ): Promise<ProjectCheckpointRestoreResult | null> {
-  const expectedProjectId = parseProjectId(projectId)
-  let candidates: readonly unknown[]
-
-  try {
-    candidates = Object.freeze([...(await store.readCandidates(expectedProjectId))])
-  } catch (cause) {
-    throw new ProjectCheckpointError(
-      'store-read-failed',
-      `Could not read Project Checkpoints for ${expectedProjectId}`,
-      { cause },
-    )
-  }
+  const candidates = await store.readCandidates(projectId)
 
   if (candidates.length === 0) return null
 
@@ -101,7 +82,7 @@ export async function restoreProjectCheckpoint(
   for (const [candidateIndex, candidate] of candidates.entries()) {
     try {
       return Object.freeze({
-        ...restoreCandidate(candidate, expectedProjectId),
+        ...restoreCandidate(candidate, projectId),
         rejectedCandidates: Object.freeze([...rejectedCandidates]),
       })
     } catch (error) {
@@ -110,9 +91,8 @@ export async function restoreProjectCheckpoint(
     }
   }
 
-  throw new ProjectCheckpointError(
-    'no-valid-checkpoint',
-    `No valid Project Checkpoint could restore ${expectedProjectId}`,
-    { candidateFailures: rejectedCandidates },
+  throw new AggregateError(
+    rejectedCandidates.map(({ failureCause }) => failureCause),
+    `No stored Checkpoint could restore ${projectId}`,
   )
 }

@@ -4,11 +4,7 @@ import {
   type ProjectHistoryDirection,
 } from '#internal/commit/project-commit'
 import type { ModelRevision } from '#internal/model/model-revision'
-import {
-  assertCreatedMutationPlan,
-  createMutationPlan,
-  type MutationPlan,
-} from '#internal/mutation/mutation-plan'
+import { createMutationPlan, type MutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectChange } from '#internal/mutation/project-change'
 import {
   createProjectContentStateId,
@@ -63,8 +59,6 @@ export class HistoryController {
     commandType: ProjectCommandType,
     plan: MutationPlan,
   ): PreparedHistoryTransition<null> {
-    assertCreatedMutationPlan(plan)
-
     const afterContentStateId = createProjectContentStateId()
     const entry = Object.freeze<HistoryEntry>({
       commandType,

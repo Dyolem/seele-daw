@@ -82,7 +82,7 @@ Snapshot 与项目文件共用一个形状 `ProjectTables`：记录表是数组�
 记录数组”的无原型对象。项目文件（`formatVersion: 3`）就是去掉 `modelRevision` 的 Snapshot，
 History 与索引都不进入文件。读取先把输入复制成被动 JSON 数据，按每张表的字段表检查结构，再把记录交给记录
 工厂校验，最后建立 Store 并做一次不变量校验。只读当前版本，不做迁移（ADR-005）。失败统一为
-带 `code` 与 `path` 的 `ProjectFileError`。格式见 [项目文件格式](./docs/project-file-format.md)。
+`ProjectFileError`，消息写明原因与位置。格式见 [项目文件格式](./docs/project-file-format.md)。
 
 Checkpoint 把项目文件包在带来源 revision 的信封里。`ProjectCheckpointStore` 只定义保存与
 “按恢复优先级读取候选”两个操作；浏览器实现（IndexedDB，保留 active 与 previous 两份）在

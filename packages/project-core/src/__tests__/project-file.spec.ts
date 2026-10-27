@@ -16,7 +16,6 @@ import {
   parseMidiVelocity,
   parseNoteId,
   parseTick,
-  type ProjectFilePathSegment,
   type ProjectSession,
 } from '#internal/index'
 import { DomainValueError } from '#internal/model/domain-value-error'
@@ -146,80 +145,81 @@ describe('loading a project file', () => {
 })
 
 describe('rejecting a project file', () => {
-  it.each<[string, ProjectFilePathSegment[], unknown, string, ProjectFilePathSegment[]]>([
+  it.each<[string, (string | number)[], unknown, string, (string | number)[]]>([
     [
       'another format version',
       ['formatVersion'],
       2,
-      'unsupported-format-version',
+      `Expected project file format ${PROJECT_FILE_FORMAT_VERSION}, found 2`,
       ['formatVersion'],
     ],
-    ['a missing table', ['clips'], REMOVE, 'invalid-structure', ['clips']],
+    ['a missing table', ['clips'], REMOVE, 'Missing field clips', ['clips']],
     [
       'an unknown top-level field',
       ['requiredFeatures'],
       [],
-      'invalid-structure',
+      'Unexpected field requiredFeatures',
       ['requiredFeatures'],
     ],
-    ['a record table that is not an array', ['clips'], {}, 'invalid-structure', ['clips']],
-    ['partitions that are not an object', ['midiNotes'], [], 'invalid-structure', ['midiNotes']],
+    ['a record table that is not an array', ['clips'], {}, 'Expected an array', ['clips']],
+    ['partitions that are not an object', ['midiNotes'], [], 'Expected an object', ['midiNotes']],
     [
       'a record without one of its fields',
       ['tracks', 0, 'name'],
       REMOVE,
-      'invalid-structure',
+      'Missing field name',
       ['tracks', 0, 'name'],
     ],
     [
       'a record with an unknown field',
       ['midiNotes', 'source-looping', 0, 'gate'],
       1,
-      'invalid-structure',
+      'Unexpected field gate',
       ['midiNotes', 'source-looping', 0, 'gate'],
     ],
     [
       'an unknown Track kind',
       ['tracks', 0, 'kind'],
       'bus',
-      'invalid-structure',
+      'Expected Track kind "audio" or "instrument"',
       ['tracks', 0, 'kind'],
     ],
     [
       'a Channel that is not an object',
       ['tracks', 1, 'channel'],
       null,
-      'invalid-structure',
+      'Expected an object',
       ['tracks', 1, 'channel'],
     ],
     [
       'effect IDs that are not an array',
       ['master', 'audioEffectIds'],
       'device-master-effect',
-      'invalid-structure',
+      'Expected an array',
       ['master', 'audioEffectIds'],
     ],
     [
       'a loop that is not an object',
       ['clips', 0, 'loop'],
       7,
-      'invalid-structure',
+      'Expected an object',
       ['clips', 0, 'loop'],
     ],
     [
       'a value its record does not allow',
       ['midiNotes', 'source-looping', 0, 'pitch'],
       128,
-      'invalid-value',
+      'Invalid ',
       ['midiNotes', 'source-looping', 0],
     ],
-    ['an invalid Track order ID', ['trackOrder', 0], '', 'invalid-value', ['trackOrder', 0]],
-  ])('rejects %s', (_, editPath, replacement, code, path) => {
+    ['an invalid Track order ID', ['trackOrder', 0], '', 'Invalid ', ['trackOrder', 0]],
+  ])('rejects %s', (_, editPath, replacement, detail, path) => {
     const error = captureFileError(() =>
       decodeProjectFile(editedCopy(golden, editPath, replacement)),
     )
 
-    expect({ code: error.code, path: error.path }).toEqual({ code, path })
+    expect(error.message.startsWith(detail)).toBe(true)
+    expect(error.message.endsWith(` at ${JSON.stringify(path)}`)).toBe(true)
   })
 
   it('rejects a value that is not an object, and a MIDI Source key that is not an ID', () => {
@@ -230,14 +230,12 @@ describe('rejecting a project file', () => {
     })
     setAt(data, ['midiNotes', 'source-looping'], REMOVE)
 
-    expect(captureFileError(() => decodeProjectFile('project'))).toMatchObject({
-      code: 'invalid-structure',
-      path: [],
-    })
-    expect(captureFileError(() => decodeProjectFile(data))).toMatchObject({
-      code: 'invalid-value',
-      path: ['midiNotes', ' source-looping'],
-    })
+    expect(captureFileError(() => decodeProjectFile('project')).message).toBe(
+      'Expected an object at []',
+    )
+    expect(captureFileError(() => decodeProjectFile(data)).message).toMatch(
+      /^Invalid .+ at \["midiNotes"," source-looping"\]$/,
+    )
   })
 
   it('reports the record factory that rejected a value as the cause', () => {
@@ -268,7 +266,9 @@ describe('rejecting a project file', () => {
     }
 
     for (const input of inputs) {
-      expect(captureFileError(() => decodeProjectFile(input)).code).toBe('not-json')
+      expect(captureFileError(() => decodeProjectFile(input)).message).toBe(
+        'Expected plain JSON data at []',
+      )
     }
     expect(getterCalls).toBe(0)
   })
@@ -280,11 +280,11 @@ describe('rejecting a project file', () => {
     duplicateTrack.tracks.push(duplicateTrack.tracks[0]!)
 
     expect(
-      captureFileError(() => createProjectSessionFromProjectFile(duplicateNote)),
-    ).toMatchObject({ code: 'duplicate-id', path: ['midiNotes', 'source-looping', 2] })
+      captureFileError(() => createProjectSessionFromProjectFile(duplicateNote)).message,
+    ).toMatch(/^Duplicate ID .+ at \["midiNotes","source-looping",2\]$/)
     expect(
-      captureFileError(() => createProjectSessionFromProjectFile(duplicateTrack)),
-    ).toMatchObject({ code: 'duplicate-id', path: ['tracks', 2] })
+      captureFileError(() => createProjectSessionFromProjectFile(duplicateTrack)).message,
+    ).toMatch(/^Duplicate ID .+ at \["tracks",2\]$/)
   })
 
   it('rejects records that do not form a valid project', () => {
@@ -296,7 +296,7 @@ describe('rejecting a project file', () => {
     for (const input of inputs) {
       const error = captureFileError(() => createProjectSessionFromProjectFile(input))
 
-      expect(error.code).toBe('invalid-model')
+      expect(error.message).toBe('The file does not form a valid project at []')
       expect(error.cause).toBeInstanceOf(ModelInvariantError)
     }
   })

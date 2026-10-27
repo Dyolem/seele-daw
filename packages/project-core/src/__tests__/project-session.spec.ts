@@ -359,7 +359,7 @@ describe('ProjectSession command execution', () => {
 
     expect(session.modelRevision).toBe(0)
     expect(() => createProjectSession(store)).toThrowError(
-      expect.objectContaining({ code: 'write-access-unavailable' }),
+      'ModelStore write access is unavailable or has already been claimed',
     )
   })
 })

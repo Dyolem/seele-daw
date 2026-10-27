@@ -149,15 +149,12 @@ function decodeTrack(value: unknown, path: DataPath): TrackRecord {
     })
   }
 
-  return rejectData('invalid-structure', 'Expected Track kind "audio" or "instrument"', [
-    ...path,
-    'kind',
-  ])
+  return rejectData('Expected Track kind "audio" or "instrument"', [...path, 'kind'])
 }
 
 function decodeClip(value: unknown, path: DataPath): ClipRecord {
   if (readField(value, 'kind', path) !== 'midi') {
-    rejectData('invalid-structure', 'Expected Clip kind "midi"', [...path, 'kind'])
+    rejectData('Expected Clip kind "midi"', [...path, 'kind'])
   }
 
   const clip = readFields(value, MIDI_CLIP, path)

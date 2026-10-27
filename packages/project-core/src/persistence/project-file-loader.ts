@@ -14,7 +14,7 @@ function indexById<RecordType extends StoredRecord>(
 
   records.forEach((record, index) => {
     if (indexed.has(record.id)) {
-      rejectData('duplicate-id', `Duplicate ID ${JSON.stringify(record.id)}`, [...path, index])
+      rejectData(`Duplicate ID ${JSON.stringify(record.id)}`, [...path, index])
     }
 
     indexed.set(record.id, record)
@@ -57,7 +57,7 @@ export function createSessionFromProjectFile(file: ProjectFile): ProjectSession 
     assertModelInvariants(store)
   } catch (error) {
     if (!(error instanceof ModelInvariantError)) throw error
-    rejectData('invalid-model', 'The file does not form a valid project', [], error)
+    rejectData('The file does not form a valid project', [], error)
   }
 
   return createProjectSession(store)

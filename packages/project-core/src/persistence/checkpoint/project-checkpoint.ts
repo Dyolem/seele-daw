@@ -75,7 +75,6 @@ export function decodeProjectCheckpoint(input: unknown): ProjectCheckpoint {
 
   if (formatVersion !== PROJECT_CHECKPOINT_FORMAT_VERSION) {
     rejectData(
-      'unsupported-format-version',
       `Expected Checkpoint format ${PROJECT_CHECKPOINT_FORMAT_VERSION}, found ${JSON.stringify(formatVersion)}`,
       ['checkpointFormatVersion'],
     )
@@ -92,11 +91,11 @@ export function decodeProjectCheckpoint(input: unknown): ProjectCheckpoint {
   const projectFile = readProjectFile(checkpoint.projectFile, ['projectFile'])
 
   if (projectFile.project.id !== projectId) {
-    rejectData(
-      'project-id-mismatch',
-      `The file belongs to project ${projectFile.project.id}, not ${projectId}`,
-      ['projectFile', 'project', 'id'],
-    )
+    rejectData(`The file belongs to project ${projectFile.project.id}, not ${projectId}`, [
+      'projectFile',
+      'project',
+      'id',
+    ])
   }
 
   return Object.freeze({

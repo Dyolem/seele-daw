@@ -28,7 +28,6 @@ import {
   type ProjectUnsubscribe,
   type Tick,
 } from '#internal/index'
-import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
 import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { createFixtureProjectSession } from './support/project-session-test-support'
@@ -486,7 +485,7 @@ describe('ProjectSession commit publication', () => {
         },
         () => session.execute(command),
       ),
-    ).toThrowError(expect.objectContaining<Partial<MutationApplyError>>({ code: 'write-failed' }))
+    ).toThrowError(/rollback completed and ModelStore was revalidated/)
 
     const successfulCommit = executeAddNote(session, fixture.records.nonLoopSource.id, noteId)
     await flushCommitDeliveries()

@@ -19,7 +19,6 @@ import {
   readRawCheckpoint,
 } from '#internal/__tests__/support/indexed-db-test-support'
 import {
-  ProjectCheckpointError,
   createInitialProjectSession,
   createProjectCheckpoint,
   parseProjectCheckpointId,
@@ -34,7 +33,7 @@ import {
 import { openDB } from 'idb'
 import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 
-import { IndexedDBProjectCheckpointStore, IndexedDBStorageError } from '#internal/index'
+import { IndexedDBProjectCheckpointStore } from '#internal/index'
 
 interface CheckpointFixture {
   readonly checkpoints: readonly ProjectCheckpoint[]
@@ -92,14 +91,13 @@ describe('IndexedDBProjectCheckpointStore public boundary', () => {
     expectTypeOf(store).toMatchTypeOf<ProjectCheckpointStore>()
     expect(store.databaseName).toContain('public-boundary')
     expect(IndexedDBProjectCheckpointStore).toBeTypeOf('function')
-    expect(IndexedDBStorageError).toBeTypeOf('function')
     expect('SEELE_PROJECT_DATABASE_VERSION' in platformBrowser).toBe(false)
     expect('SeeleProjectDatabase' in platformBrowser).toBe(false)
   })
 
   it('rejects an empty database name before opening IndexedDB', () => {
-    expect(() => new IndexedDBProjectCheckpointStore({ databaseName: '' })).toThrow(
-      expect.objectContaining({ code: 'invalid-input', operation: 'open-database' }),
+    expect(() => new IndexedDBProjectCheckpointStore({ databaseName: '' })).toThrowError(
+      new RangeError('IndexedDB database name must not be empty'),
     )
   })
 })
@@ -143,8 +141,10 @@ describe('IndexedDB Physical Schema V1', () => {
     const { projectId } = createCheckpointFixture('invalid-schema', [])
 
     await expect(store.readCandidates(projectId)).rejects.toMatchObject({
-      code: 'invalid-database-schema',
-      operation: 'open-database',
+      message: expect.stringMatching(/^Could not open IndexedDB /),
+      cause: expect.objectContaining({
+        message: expect.stringContaining('does not contain the expected V1 object stores'),
+      }),
     })
   })
 })
@@ -229,10 +229,12 @@ describe('Project Checkpoint persistence', () => {
     await store.save(checkpoints[0]!)
 
     await expect(store.save(checkpoints[0]!)).rejects.toMatchObject({
-      checkpointId: 'checkpoint-only',
-      code: 'record-conflict',
-      operation: 'save-checkpoint',
-      projectId,
+      message: expect.stringMatching(
+        /^Could not save Project Checkpoint checkpoint-only in IndexedDB /,
+      ),
+      cause: expect.objectContaining({
+        message: `Project Checkpoint checkpoint-only already exists for ${projectId}`,
+      }),
     })
     expect(checkpointIds(await store.readCandidates(projectId))).toEqual(['checkpoint-only'])
   })
@@ -250,10 +252,9 @@ describe('Project Checkpoint persistence', () => {
       },
     } as unknown as ProjectCheckpoint
 
-    await expect(store.save(uncloneableCheckpoint)).rejects.toMatchObject({
-      code: 'transaction-failed',
-      operation: 'save-checkpoint',
-    })
+    await expect(store.save(uncloneableCheckpoint)).rejects.toThrowError(
+      /^Could not save Project Checkpoint checkpoint-broken in IndexedDB /,
+    )
     expect(checkpointIds(await store.readCandidates(projectId))).toEqual(['checkpoint-valid'])
   })
 })
@@ -313,18 +314,14 @@ describe('Checkpoint recovery candidates', () => {
       previousCheckpointId: null,
     })
 
-    const directFailure = store.readCandidates(projectId)
-    await expect(directFailure).rejects.toBeInstanceOf(IndexedDBStorageError)
-    await expect(directFailure).rejects.toMatchObject({
-      code: 'invalid-record',
-      operation: 'read-checkpoint-candidates',
-    })
+    const adapterFailure = {
+      message: expect.stringMatching(/^Could not read Project Checkpoint candidates for /),
+      cause: expect.objectContaining({
+        message: `Invalid Project Checkpoint Head for ${projectId}`,
+      }),
+    }
 
-    const coreFailure = restoreProjectCheckpoint(store, projectId)
-    await expect(coreFailure).rejects.toBeInstanceOf(ProjectCheckpointError)
-    await expect(coreFailure).rejects.toMatchObject({
-      code: 'store-read-failed',
-      cause: expect.objectContaining({ code: 'invalid-record' }),
-    })
+    await expect(store.readCandidates(projectId)).rejects.toMatchObject(adapterFailure)
+    await expect(restoreProjectCheckpoint(store, projectId)).rejects.toMatchObject(adapterFailure)
   })
 })

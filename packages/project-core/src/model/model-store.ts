@@ -15,10 +15,7 @@ import type { MidiNoteRecord } from './midi-note'
 import type { MidiSourceRecord } from './midi-source'
 import type { MidiSustainPedalEventRecord } from './midi-sustain-pedal-event'
 import { INITIAL_MODEL_REVISION, nextModelRevision, type ModelRevision } from './model-revision'
-import {
-  ModelStoreWriteAccessError,
-  registerModelStoreWriteAccess,
-} from './model-store-write-access'
+import { registerModelStoreWriteAccess } from './model-store-write-access'
 import {
   PARTITIONED_TABLES,
   PARTITIONED_TABLE_NAMES,
@@ -44,7 +41,7 @@ type RecordContainer = Map<string, StoredRecord>
 type PartitionedContainer = Map<MidiSourceId, RecordContainer>
 
 function rejectStoreWrite(detail: string): never {
-  throw new ModelStoreWriteAccessError('write-precondition-failed', detail)
+  throw new Error(detail)
 }
 
 /**

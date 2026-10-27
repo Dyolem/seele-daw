@@ -10,7 +10,6 @@ import {
   type StoredRecord,
 } from '#internal/model/model-tables'
 import type { ProjectRecord } from '#internal/model/project'
-import { MutationPlanError, type MutationPlanErrorCode } from './mutation-plan-error'
 
 /** Inserts, removes or replaces one record of a table keyed by ID. */
 export type RecordChange<Name extends RecordTableName = RecordTableName> =
@@ -136,8 +135,8 @@ function changePosition(index: number | null): string {
   return index === null ? 'Change' : `Change at index ${index}`
 }
 
-function rejectChange(code: MutationPlanErrorCode, detail: string, index: number | null): never {
-  throw new MutationPlanError(code, `${changePosition(index)} ${detail}`, index)
+function rejectChange(detail: string, index: number | null): never {
+  throw new Error(`${changePosition(index)} ${detail}`)
 }
 
 /** Rejects a structurally supplied change whose table and operation do not exist. */
@@ -154,31 +153,23 @@ function assertKnownChange(change: ProjectChange, index: number | null): void {
       (RECORD_OPERATIONS.has(op) || PARTITION_OPERATIONS.has(op)))
 
   if (!known) {
-    rejectChange(
-      'unknown-change',
-      `has an unknown table or operation: ${String(table)}.${String(op)}`,
-      index,
-    )
+    rejectChange(`has an unknown table or operation: ${String(table)}.${String(op)}`, index)
   }
 }
 
 function assertReplacement(before: StoredRecord, after: StoredRecord, index: number | null): void {
   if (before === after) {
-    rejectChange('no-op-replace', 'must replace a record with a different reference', index)
+    rejectChange('must replace a record with a different reference', index)
   }
 
   if (before.id !== after.id) {
-    rejectChange('record-id-changed', 'cannot change a record identity during replacement', index)
+    rejectChange('cannot change a record identity during replacement', index)
   }
 }
 
 function assertTrackOrderIndex(index: number, changeIndex: number | null): void {
   if (!Number.isSafeInteger(index) || index < 0) {
-    rejectChange(
-      'invalid-track-order-index',
-      'requires a non-negative safe integer track-order index',
-      changeIndex,
-    )
+    rejectChange('requires a non-negative safe integer track-order index', changeIndex)
   }
 }
 
@@ -192,7 +183,6 @@ function assertUniquePartitionIds(
   for (const record of records) {
     if (ids.has(record.id)) {
       rejectChange(
-        'duplicate-id-in-partition',
         `contains duplicate ${PARTITIONED_TABLES[table].entity} ID ${record.id}`,
         changeIndex,
       )
@@ -251,7 +241,7 @@ function normalizeChange(change: ProjectChange, index: number | null): ProjectCh
 
     case 'master':
       if (change.before === change.after) {
-        rejectChange('no-op-replace', 'must replace a record with a different reference', index)
+        rejectChange('must replace a record with a different reference', index)
       }
       return freezeChange({
         op: 'replace',

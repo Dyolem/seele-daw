@@ -52,18 +52,16 @@
 4. 建立 ModelStore（同一张表或同一分区里 ID 重复时在此拒绝），做一次全量不变量校验，得到
    revision 为 0、History 为空的新 Session。
 
-`decodeProjectFile(input)` 只做前三步。失败都是 `ProjectFileError`，带 `code` 和 `path`，
-例如 `["midiNotes", "source-1", 3]`：
+`decodeProjectFile(input)` 只做前三步。失败都是 `ProjectFileError`，消息写明原因与位置，例如
+`Missing field name at ["tracks",0,"name"]`。以下输入会被拒绝：
 
-| `code`                       | 含义                                                          |
-| ---------------------------- | ------------------------------------------------------------- |
-| `not-json`                   | 输入不是被动 JSON 数据                                        |
-| `unsupported-format-version` | 版本不是 3                                                    |
-| `invalid-structure`          | 缺字段、多字段、容器类型不对，或未知的 `kind`                 |
-| `invalid-value`              | 记录工厂或 ID 解析拒绝了一个值；`cause` 是 `DomainValueError` |
-| `duplicate-id`               | 同一张表或同一分区里 ID 重复                                  |
-| `invalid-model`              | 记录合起来违反跨实体不变量；`cause` 是 `ModelInvariantError`  |
-| `project-id-mismatch`        | Checkpoint 与其中的文件属于不同项目                           |
+- 不是被动 JSON 数据；
+- 版本不是 3；
+- 缺字段、多字段、容器类型不对，或未知的 `kind`；
+- 记录工厂或 ID 解析拒绝了一个值，`cause` 是 `DomainValueError`；
+- 同一张表或同一分区里 ID 重复；
+- 记录合起来违反跨实体不变量，`cause` 是 `ModelInvariantError`；
+- Checkpoint 与其中的文件属于不同项目。
 
 ## Checkpoint
 
@@ -73,4 +71,5 @@ sourceModelRevision, projectFile }`。`checkpointId` 让存储可以只追加不
 
 `restoreProjectCheckpoint` 按存储给出的顺序（先 active，再 previous）逐个解码候选，返回第一个
 能组成合法项目的；被拒绝的候选及其 `ProjectFileError` 一并返回。全部失败时抛
-`ProjectCheckpointError('no-valid-checkpoint')`，不会悄悄创建空项目。
+`AggregateError`，`errors` 依次是每个候选的 `ProjectFileError`，不会悄悄创建空项目。存储
+本身读写失败时，它的错误原样抛出。

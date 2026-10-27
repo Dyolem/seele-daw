@@ -23,7 +23,6 @@ import {
   type ProjectCommit,
   type ProjectSession,
 } from '#internal/index'
-import { MutationApplyError } from '#internal/mutation/mutation-apply-error'
 import { withAuthoritativeMapSetInterceptor } from './support/map-set-interceptor'
 import { requireChange } from './support/project-change-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
@@ -429,7 +428,7 @@ describe('ProjectSession Undo / Redo', () => {
         },
         () => session.execute(command),
       ),
-    ).toThrowError(expect.objectContaining<Partial<MutationApplyError>>({ code: 'write-failed' }))
+    ).toThrowError(/rollback completed and ModelStore was revalidated/)
 
     expect(session.modelRevision).toBe(2)
     expect(session.contentStateId).toBe(contentStateIdBeforeFailure)
@@ -464,7 +463,7 @@ describe('ProjectSession Undo / Redo', () => {
             throw new Error('injected History replay write failure')
           }
         }, operation),
-      ).toThrowError(expect.objectContaining<Partial<MutationApplyError>>({ code: 'write-failed' }))
+      ).toThrowError(/rollback completed and ModelStore was revalidated/)
     }
 
     failAuthoritativeWrite(before, () => session.undo())

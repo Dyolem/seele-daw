@@ -1347,7 +1347,7 @@ Canvas 功能至少检查：
 项目内：
 
 - [Web DAW architecture brief](./docs/archive/architecture/web-daw-architecture-brief.md)
-- [Web DAW long-term architecture](./docs/architecture/web-daw-long-term-architecture-v3.md)
+- [Web DAW long-term architecture](./docs/architecture/long-term-architecture.md)
 - [Studio workbench](./apps/studio/src/workbench/README.md)
 - [Piano Roll feature](./apps/studio/src/features/piano-roll/README.md)
 - [Project navigation composition plan](./docs/archive/studio/studio-project-navigation-composition-plan.md)

@@ -1432,7 +1432,7 @@ Audible MIDI Playback V1 已于 2026-08-17 完成收口，以下条件均已满�
 
 - [Audible MIDI Scheduler 工作原理](../../../packages/playback/docs/audible-midi-scheduler-primer.md)
 - [Web DAW 简洁架构总纲](../architecture/web-daw-architecture-brief.md)
-- [Web DAW 长期路线与架构设计](../../architecture/web-daw-long-term-architecture-v3.md)
+- [Web DAW 长期路线与架构设计](../architecture/web-daw-long-term-architecture-v3.md)
 - [MIDI Project Model V1](../../../packages/project-core/docs/midi-project-model-v1.md)
 - [Piano Roll Note Editing 第五阶段计划](../editor/piano-roll-note-editing-phase-plan.md)
 - [Seele Studio Design Language](../../../DESIGN.md)

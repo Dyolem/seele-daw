@@ -85,5 +85,5 @@ Pause、Return、切换项目            runtime.allNotesOff()：所有 Voice �
   排序与最终释放
 - 已完成阶段：[Audible MIDI Playback V1](../../docs/archive/playback/audible-midi-playback-v1-phase-plan.md)、
   [Manual Timeline Locate V1](../../docs/archive/playback/manual-timeline-locate-v1-phase-plan.md)
-- 尚未实现的方向（GraphPlan、Automation、Loop、跨线程 ACK）：
-  [长期路线 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)
+- 尚未实现的方向（常驻通道图、Device 注册表、更多种类的事件、离线渲染）：
+  [长期架构与路线](../../docs/architecture/long-term-architecture.md)的 3.3 节

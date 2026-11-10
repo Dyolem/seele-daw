@@ -5,6 +5,8 @@
 ## 文档
 
 - [架构](ARCHITECTURE.md)：分层、一次编辑的流向、新代码放在哪里、常见改动配方。先读这一篇。
+- [长期架构与路线](docs/architecture/long-term-architecture.md)：现状评估、目标架构、阶段路线与
+  待决定的产品问题
 - [工程代码准则](CODE_GUIDELINES.md)
 - [产品功能手册](PRODUCT.md)与 [Piano Black 设计语言](DESIGN.md)
 - [ADR](docs/adr/README.md)：长期决定及其理由
@@ -20,24 +22,24 @@ seele-daw/
 ├── packages/
 │   ├── type-utils/          纯编译期、跨领域的共享 TypeScript 类型工具
 │   ├── midi-file/           标准 MIDI 文件中立契约与可替换 Codec Adapter
-│   ├── project-core/        项目模型、命令、事务、历史与查询端口
+│   ├── project-core/        项目模型、命令、事务、历史、查询、Snapshot 与持久化格式
 │   ├── project-midi/        MIDI Document 与 Project Model 的可替换映射桥接层
-│   ├── editor/              Tool、Interaction、Selection 与编辑器浏览器层
-│   ├── playback/            Transport、Compiler、Scheduler 契约与播放计划
-│   ├── audio-web/           Web Audio Backend 与 AudioWorklet
-│   └── platform-browser/    存储、文件、权限、Worker 与浏览器服务实现
+│   ├── editor/              输入归一化、手势，以及 Piano Roll 的几何与渲染
+│   ├── playback/            编译、调和、调度、Transport 与播放引擎
+│   ├── audio-web/           Web Audio 输出与采样音源
+│   └── platform-browser/    IndexedDB 项目存储与本地文件读取
 ├── tooling/
 │   ├── architecture-rules/  依赖方向与平台隔离检查
 │   ├── eslint-config/       ESLint 共享配置演进位置
 │   ├── quality-rules/       Workspace 质量命令一致性检查
 │   └── tsconfig/            TypeScript 共享配置
 └── docs/
-    ├── architecture/        架构复盘与长期路线
+    ├── architecture/        长期架构与路线
     ├── adr/                 Architecture Decision Records
     └── archive/             历史计划与收口报告
 ```
 
-当前采用七个业务硬边界包，并增加一个无运行时代码的 `type-utils` 基础叶子包；`editor-renderer`、Asset 和 Persistence 等边界稳定后再拆包。
+当前采用七个业务硬边界包，并增加一个无运行时代码的 `type-utils` 基础叶子包。新建一个包的条件见[长期架构与路线](docs/architecture/long-term-architecture.md)的 3.1 节。
 
 ## 工具链
 

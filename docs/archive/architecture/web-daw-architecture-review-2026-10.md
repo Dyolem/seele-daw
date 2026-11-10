@@ -1,7 +1,7 @@
 # Web DAW 架构复盘与精简提案（2026-10）
 
 > 状态：已实施（2026-10-23）。结果、偏差与复测数字见[第 9 节](#9-实施结果2026-10-23)；现状以
-> [ARCHITECTURE](../../ARCHITECTURE.md) 为准。下文第 1–8 节保留评审时的原文，文中的文件路径
+> [ARCHITECTURE](../../../ARCHITECTURE.md) 为准。下文第 1–8 节保留评审时的原文，文中的文件路径
 > 指向基线 `e556d9e`，其中一些文件已被删除。
 >
 > 日期：2026-10-23
@@ -14,7 +14,7 @@
 ## 0. 如何使用本文
 
 本文回答三个问题：当前架构是什么样、哪些设计是冗余的、应该往哪里收敛。它补充而不替代
-[简洁架构总纲](../archive/architecture/web-daw-architecture-brief.md)与
+[简洁架构总纲](web-daw-architecture-brief.md)与
 [长期路线与架构设计 v3](./web-daw-long-term-architecture-v3.md)，也不修改任何既有规范。
 
 文中的数字均在代码基线上测得，复测方法见文末附录。迁移路线中的每一步都应单独评审、单独
@@ -35,12 +35,12 @@
 
 ## 2. 证据：改动面有多大
 
-| 指标                                       | 数值                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CC64（延音踏板）一个功能涉及的非测试源文件 | 77 个：Studio 25、editor 14、project-core 30、project-midi 5、playback 3                                                                                                                                                                                                                                                                                                                                                          |
-| 最近几次结构性重构提交改动的文件数         | 124（`c614b9c`）/ 51（`5179bee`）/ 49（`2b2d8c6`）/ 47（`f65bd17`）/ 35（`c83d906`）                                                                                                                                                                                                                                                                                                                                              |
-| 变更次数最多的非测试源文件                 | [`project-core/src/index.ts`](../../packages/project-core/src/index.ts) 31 次；[`ProjectWorkbenchArrangement.vue`](../../apps/studio/src/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue) 26 次；[`ProjectWorkspacePage.vue`](../../apps/studio/src/features/project-workspace/ProjectWorkspacePage.vue) 25 次；[`studio-application.ts`](../../apps/studio/src/bootstrap/studio-application.ts) 22 次 |
-| 文档量                                     | 114 个 `.md`，共 1.65 MB；同期生产源码 2.37 MB，测试 2.10 MB                                                                                                                                                                                                                                                                                                                                                                      |
+| 指标                                       | 数值                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CC64（延音踏板）一个功能涉及的非测试源文件 | 77 个：Studio 25、editor 14、project-core 30、project-midi 5、playback 3                                                                                                                                                                                                                                                                                                                                                                      |
+| 最近几次结构性重构提交改动的文件数         | 124（`c614b9c`）/ 51（`5179bee`）/ 49（`2b2d8c6`）/ 47（`f65bd17`）/ 35（`c83d906`）                                                                                                                                                                                                                                                                                                                                                          |
+| 变更次数最多的非测试源文件                 | [`project-core/src/index.ts`](../../../packages/project-core/src/index.ts) 31 次；[`ProjectWorkbenchArrangement.vue`](../../../apps/studio/src/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue) 26 次；[`ProjectWorkspacePage.vue`](../../../apps/studio/src/features/project-workspace/ProjectWorkspacePage.vue) 25 次；[`studio-application.ts`](../../../apps/studio/src/bootstrap/studio-application.ts) 22 次 |
+| 文档量                                     | 114 个 `.md`，共 1.65 MB；同期生产源码 2.37 MB，测试 2.10 MB                                                                                                                                                                                                                                                                                                                                                                                  |
 
 改得最多的都是“枢纽文件”，也就是每加一个概念都必须去登记的地方。CC64 本身横跨模型、编辑、
 播放与导入，涉及面大是正常的；不正常的是 project-core 里那 30 个文件，其中大部分只是按实体
@@ -80,7 +80,7 @@ PointerInputAdapter → PianoRollInteractionSession → InteractionSession → M
 
 配套成本：每个应用能力都要有 coordinator、error、`vue/*-context`、`vue/*-vue-error`、
 `symbols.ts` 中的一个 key、
-[`studio-application.ts`](../../apps/studio/src/bootstrap/studio-application.ts) 中的构造与
+[`studio-application.ts`](../../../apps/studio/src/bootstrap/studio-application.ts) 中的构造与
 provide，以及对应测试。具体表现：
 
 - 8 个 Vue 错误类中，7 个只有 `missing-context` 一个错误码；
@@ -101,10 +101,10 @@ provide，以及对应测试。具体表现：
    （`project-midi-note-coordinator.ts`
    的 `requireEditableMidiNoteTarget`）；
 2. core handler 再检查 MidiSource、partition、修订号与范围；
-3. [`project-commit-candidate.ts`](../../packages/project-core/src/commit/project-commit-candidate.ts)
+3. [`project-commit-candidate.ts`](../../../packages/project-core/src/commit/project-commit-candidate.ts)
    中约 500 行 `matchesXxx` 把每条命令的语义重新实现一遍，用来核对 MutationPlan；
-4. [`mutation-applier.ts`](../../packages/project-core/src/mutation/mutation-applier.ts) 先构造
-   投影（[`ProjectedModelStoreReader`](../../packages/project-core/src/mutation/projected-model-store-reader.ts)
+4. [`mutation-applier.ts`](../../../packages/project-core/src/mutation/mutation-applier.ts) 先构造
+   投影（[`ProjectedModelStoreReader`](../../../packages/project-core/src/mutation/projected-model-store-reader.ts)
    的构造函数做一次全量 `assertModelInvariants`），写入后再做一次全量校验。
 
 Studio 侧的查找本身是必要的：要把 Clip 局部 Tick 换算为 Source Tick。多余的是为每种缺失定义
@@ -125,12 +125,12 @@ Delta，core 才必须证明“标签与 plan 一致”。Tempo 已经改为按 
 外层包装在每处都抄了一份：Pointer capture 匹配、过期检查、提交订阅、executing 认领、
 handoff、publish / clear。
 
-| 文件                                                                                                                                          | 行数 |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| [`tempo-track-drag-session.ts`](../../apps/studio/src/features/project-workspace/tempo-track/interaction/tempo-track-drag-session.ts)         | 240  |
-| [`track-placement-session.ts`](../../apps/studio/src/features/piano-roll/components/track-surface/interaction/track-placement-session.ts)     | 240  |
-| [`piano-roll-interaction-session.ts`](../../packages/editor/src/common/piano-roll/interaction/piano-roll-interaction-session.ts)              | 311  |
-| [`sustain-pedal-interaction-session.ts`](../../packages/editor/src/common/piano-roll/sustain-pedal-lane/sustain-pedal-interaction-session.ts) | 283  |
+| 文件                                                                                                                                             | 行数 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | ---- |
+| [`tempo-track-drag-session.ts`](../../../apps/studio/src/features/project-workspace/tempo-track/interaction/tempo-track-drag-session.ts)         | 240  |
+| [`track-placement-session.ts`](../../../apps/studio/src/features/piano-roll/components/track-surface/interaction/track-placement-session.ts)     | 240  |
+| [`piano-roll-interaction-session.ts`](../../../packages/editor/src/common/piano-roll/interaction/piano-roll-interaction-session.ts)              | 311  |
+| [`sustain-pedal-interaction-session.ts`](../../../packages/editor/src/common/piano-roll/sustain-pedal-lane/sustain-pedal-interaction-session.ts) | 283  |
 
 前两者统一命名后只有 46 行不同；后两者结构相同。另有 4 处 intent 收尾流程（“认领 → 执行 →
 确认提交 → 选中 → finish”）各写一遍：两个 Piano Roll intent handler、`use-tempo-track-drag.ts`
@@ -152,7 +152,7 @@ applier、projected reader、change 推导、commit candidate、invariant valida
 加快捷键策略 → 某个 `create*Actions` 加 `resolve`。
 
 如果需要新的焦点上下文，还要改 `StudioKeyboardContext` 类型、`STUDIO_KEYBOARD_CONTEXTS`、
-[`studio-action-runtime.ts`](../../apps/studio/src/bootstrap/studio-action-runtime.ts) 中的
+[`studio-action-runtime.ts`](../../../apps/studio/src/bootstrap/studio-action-runtime.ts) 中的
 target slot 与 `isContextActive` switch、`symbols.ts`、组合根 provide，以及一个 inject hook，
 最多约 10 处。`satisfies Record<StudioActionId, …>` 能保证不会漏改，但不能减少要改的地方。
 
@@ -169,15 +169,15 @@ target slot 与 `isContextActive` switch、`symbols.ts`、组合根 provide，�
 
 - 上帝组件：`ProjectWorkbenchArrangement.vue` 1334 行，`ProjectWorkspacePage.vue` 722 行，
   几乎所有派生都写在页面里；准则 9.1 要求接近 800 行时重新评估。
-- 读路径不统一：[`createProjectSnapshot`](../../packages/project-core/src/snapshots/project-snapshot.ts)
+- 读路径不统一：[`createProjectSnapshot`](../../../packages/project-core/src/snapshots/project-snapshot.ts)
   每次复制并排序所有表，`getSnapshot()` 不按 revision 缓存；同时还有 `query()` 索引读路径，
   但没有规则说明什么时候用哪个。
 - 架构规则冻结了目录形状：检查除了守护依赖方向，还规定了 keyboard 的 7 层、piano-roll 的
   `hooks / types` 私有性和 Symbol 集中登记，所以每次重组都要同时改规则。
 - 文档过多过散：有为单个协调器方法写的 phase plan（如
-  [`add-empty-midi-clip-coordinator-plan.md`](../archive/studio/add-empty-midi-clip-coordinator-plan.md)），
-  [架构总纲](../archive/architecture/web-daw-architecture-brief.md)的 0.1 节已经变成变更日志，而
-  [ADR 目录](../adr/README.md)仍是空的。知识分散在 114 个文件里，这本身就是项目难以整体
+  [`add-empty-midi-clip-coordinator-plan.md`](../studio/add-empty-midi-clip-coordinator-plan.md)），
+  [架构总纲](web-daw-architecture-brief.md)的 0.1 节已经变成变更日志，而
+  [ADR 目录](../../adr/README.md)仍是空的。知识分散在 114 个文件里，这本身就是项目难以整体
   把握的重要原因。
 
 ## 4. 根因

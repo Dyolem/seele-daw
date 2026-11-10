@@ -1,5 +1,8 @@
 # Web DAW 长期路线与架构设计 v3
 
+> 已于 2026-11 被[长期架构与路线](../../architecture/long-term-architecture.md)取代。保留本文，是
+> 因为其中 Audio Clip、资产提交协议、录音与离线导出的详细草案在对应阶段开工时仍可参考。
+
 > 技术基线：Vue 3 + TypeScript + Vite + Web Audio API + pnpm Workspace\
 > 产品目标：桌面浏览器优先、具备完整创作闭环的轻量 Web DAW\
 > 文档角色：架构宪法、模块边界、关键语义、验证标准与迁移路线\
@@ -7,16 +10,16 @@
 > 最近实现校准：2026-08-26\
 > 状态：Proposed Architecture Baseline v3
 
-> 本文描述长期目标，不是当前实现清单。当前实现见 [ARCHITECTURE](../../ARCHITECTURE.md)，两者冲突时以
+> 本文描述长期目标，不是当前实现清单。当前实现见 [ARCHITECTURE](../../../ARCHITECTURE.md)，两者冲突时以
 > 代码与 ARCHITECTURE 为准。已完成的第一版可听产品切片见
-> [Audible MIDI Playback V1 阶段计划](../archive/playback/audible-midi-playback-v1-phase-plan.md)。
+> [Audible MIDI Playback V1 阶段计划](../playback/audible-midi-playback-v1-phase-plan.md)。
 > 该切片已于 2026-08-17 按验收基线 `f1d0298` 完成，尚未创建阶段 checkpoint tag。后者的 `V1`
 > 不是本文档版本；本文中的通用 Graph、RuntimeDelta、ACK 与 AudioWorklet
 > 仍是长期能力，除非阶段计划明确纳入，否则不能作为首版可听切片的验收要求。
 > 本文其余未加 `Audible MIDI Playback` 限定的 `V1` 是 2026-07-09 长期基线中的“首版产品 /
 > 模型”简称，同样不是文档版本；落地时仍须由对应专项计划重新确认。
 > Manual Timeline Locate 已通过 `checkpoint/manual-timeline-locate-2026-08-18` 收口；随后实施的
-> [Standard MIDI File Import / Export V1](../archive/midi/midi-import-export-v1-phase-plan.md)
+> [Standard MIDI File Import / Export V1](../midi/midi-import-export-v1-phase-plan.md)
 > 以独立 `midi-file` Codec 和 `project-midi` 映射边界开始，不把第三方 Parser 类型、格式规则或
 > 文件 I/O 反向带入 Project Core。当前已完成调用方验证 Session 的新项目生命周期入口、本地 Blob
 > 字节读取 Adapter，以及 Studio Project Entry / Workbench 的文件选择、Codec / Bridge 组合、
@@ -727,7 +730,7 @@ flowchart TD
 ## 19. 类型化 ProjectDelta
 
 > 已实现的做法不同：Commit 发布它写入的存储变化（`{ op, table, ... }`），失效范围由消费者从记录
-> 推导，见 [ADR-004](../adr/ADR-004-commits-publish-storage-changes.md)。下文保留当初的设计。
+> 推导，见 [ADR-004](../../adr/ADR-004-commits-publish-storage-changes.md)。下文保留当初的设计。
 
 通用 changedEntityIds 无法告诉播放编译器“哪条轨、哪个区间、为何失效”。使用语义明确的变化：
 
@@ -878,7 +881,7 @@ type EditorInput =
 WA1／WA2 的离散操作通过应用级 Action 目录调用当前业务目标；Action 不是 Project Command，也不
 要求保存、导航等工作台操作生成 EditorIntent。Pointer 编辑继续经过既有 Editor Input / Intent
 链路。组件不得自行实现一套平行的删除、复制或拖拽语义。当前实现见
-[Studio Action Architecture](../archive/studio/studio-action-architecture.md)。
+[Studio Action Architecture](../studio/studio-action-architecture.md)。
 
 ## 25. Surface、坐标与 Hit Test
 
@@ -2190,7 +2193,7 @@ PointerDown / Move
 ```
 
 单实体、Selection 集合与事务 Command 的正式判断标准见
-[Project Command 集合与事务语义](../../packages/project-core/docs/project-command-collection-semantics.md)。
+[Project Command 集合与事务语义](../../../packages/project-core/docs/project-command-collection-semantics.md)。
 
 ## 73. 一个 Audio 文件的完整路径
 
@@ -2228,7 +2231,7 @@ last valid snapshot
 # 第十七部分：2026-07-09 执行清单（历史基线）
 
 本清单源于 2026-07-09 长期基线，不是当前完成度报告。Project Core、Piano Roll 与 Persistence
-的实际进展以 [产品功能手册](../../PRODUCT.md) 为准；Playback 项按当前阶段计划的批次与 Gate
+的实际进展以 [产品功能手册](../../../PRODUCT.md) 为准；Playback 项按当前阶段计划的批次与 Gate
 执行。
 
 - [ ] 把 v3 中 18 条 ADR 建成文件并逐项确认；

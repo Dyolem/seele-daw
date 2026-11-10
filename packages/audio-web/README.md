@@ -96,6 +96,6 @@ Studio 从同一路径加载。
   Manifest 的规范语义
 - [默认内置 MIDISampleSynth 控制文件逆向分析](./docs/default-built-in-midi-sample-synth-reverse-analysis.md)
 - [General MIDI Percussion Compatibility Policy V1](./docs/general-midi-percussion-compatibility-policy-v1.md)
-- [audio-web 复盘（2026-10）](../../docs/architecture/audio-web-review-2026-10.md)
+- [audio-web 复盘（2026-10）](../../docs/archive/architecture/audio-web-review-2026-10.md)
 - 已完成阶段的计划、收口报告、审计、术语表与本地资产记录：
   [docs/archive/audio-web](../../docs/archive/audio-web/)

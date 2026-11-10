@@ -1,8 +1,8 @@
 # @seele-daw/editor
 
 `editor` 把指针、键盘和 MIDI 输入解释为可预览、可取消、最终只提交一次的项目编辑。它拥有编辑
-会话的状态，但不拥有 Track、Clip、Note 等项目事实。长期路线中的 `editor-core` 与
-`editor-renderer` 暂时合并在本包里；Renderer 边界稳定、满足独立拆包条件后再评估拆分。
+会话的状态，但不拥有 Track、Clip、Note 等项目事实。输入、手势、几何与渲染都在这一个包里；
+Renderer 满足独立拆包的条件后再评估拆分。
 
 ```text
 DOM / Pointer / Keyboard / MIDI
@@ -133,5 +133,6 @@ Scene，可替换并作为性能基准。小节、拍、细分网格分级绘制
 
 - [Editor Interaction V1](./docs/editor-interaction-architecture-v1.md)、
   [Note Renderer 决策](./docs/piano-roll-note-renderer-decision.md)
-- [长期路线 v3](../../docs/architecture/web-daw-long-term-architecture-v3.md)
+- 编辑器的目标（时间轴视口、Arrangement 的几何进本包）：
+  [长期架构与路线](../../docs/architecture/long-term-architecture.md)的 3.4 节
 - 已完成阶段的计划：[docs/archive/editor](../../docs/archive/README.md)

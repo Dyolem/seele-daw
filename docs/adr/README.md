@@ -6,6 +6,9 @@
 命名为 `ADR-NNN-short-title.md`，至少包含 Context、Decision、Consequences、Validation 与
 Revisit Trigger。决定被推翻时，把状态改为 Superseded 并链接到新的 ADR，不删除旧文件。
 
+还没做出、但已经排进路线的决定，见[长期架构与路线](../architecture/long-term-architecture.md)
+第 4 节里标了 ADR 的条目；对应阶段开工前把它们写成 ADR。
+
 | ADR                                                            | 决定                                                    |
 | -------------------------------------------------------------- | ------------------------------------------------------- |
 | [001](./ADR-001-validate-each-commit-once.md)                  | 每次提交只在投影上做一次全量不变量校验（已被 008 取代） |

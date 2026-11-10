@@ -3,10 +3,10 @@
 本文描述代码现在的样子：分层、一次编辑如何流动、新代码放在哪里，以及常见改动要碰哪些文件。
 本文与代码不一致时，以代码为准，并修正本文。
 
-- 为什么这样设计：[ADR](docs/adr/README.md)、[2026-10 架构复盘](docs/architecture/web-daw-architecture-review-2026-10.md)、[audio-web 复盘](docs/architecture/audio-web-review-2026-10.md)
-- 长期方向（尚未实现的部分）：[长期路线 v3](docs/architecture/web-daw-long-term-architecture-v3.md)
+- 为什么这样设计：[ADR](docs/adr/README.md)
+- 现状评估、目标架构与阶段路线：[长期架构与路线](docs/architecture/long-term-architecture.md)
 - 产品行为与设计语言：[PRODUCT](PRODUCT.md)、[DESIGN](DESIGN.md)；编码约定：[CODE_GUIDELINES](CODE_GUIDELINES.md)
-- 已完成阶段的计划与收口报告：[docs/archive](docs/archive/README.md)
+- 已完成阶段的计划、收口报告与 2026-10 的两份复盘：[docs/archive](docs/archive/README.md)
 
 ## 1. 分层
 
@@ -33,6 +33,19 @@
 - 生产代码不导入 `__tests__`。
 
 规则只守护依赖方向与平台隔离，不规定包或 feature 内部的目录形状。
+
+### Studio 内部
+
+Studio 内部按同样的原则分层，下层不导入上层：
+
+| 层                      | 内容                                                        |
+| ----------------------- | ----------------------------------------------------------- |
+| `ui/`                   | 与具体功能无关的控件、样式和通知                            |
+| `workbench/`            | 应用层：写项目的用例、Action 与键盘、项目生命周期、播放适配 |
+| `features/`             | 可见的功能；外壳 feature 可以组合被嵌入的 feature，反向不行 |
+| `bootstrap/`、`router/` | 组合根与路由：创建服务、连接各层                            |
+
+这一层次目前靠约定，工具还不检查，并且有三处违反，见第 7 节。
 
 ## 2. 一次编辑的流向
 
@@ -153,3 +166,23 @@ category, keywords, keys, resolve })`。新建 actions 文件时，再把它加�
 `pnpm check` 依次运行 lint（含架构规则）、type-check、全部测试和构建。各包可以单独运行
 `pnpm --filter @seele-daw/<package> test:run`。project-core 的提交成本基准：
 `pnpm --filter @seele-daw/project-core bench`。
+
+## 7. 已知的薄弱点
+
+下面这些地方的现有写法不是范例，新代码不要照着扩展。原因与解决顺序见
+[长期架构与路线](docs/architecture/long-term-architecture.md)的 1.3 节与第 4 节。
+
+- **Studio 的层次有三处违反。** `workbench/actions/studio-actions.ts` 导入 feature 的 Action
+  声明，与 `defineStudioAction` 构成导入循环；`features/piano-roll` 与
+  `features/project-workspace` 互相导入；`workbench` 引用了 `bootstrap` 里的
+  `StudioActionRuntime` 类型。新的共用状态与几何放进 workbench 或 editor 包，不要再加一条
+  跨 feature 的导入。
+- **播放管线只为采样音源而写。** 编译器按类型 ID 认出唯一的设备，端口的 `schedule` 只接收采样
+  Voice，Track 的 Gain 与 Pan 在排程时乘进每个 Voice。接入第二种设备、效果器或实时混音之前，
+  先做 Device Definition 与常驻通道图，不要在编译器里再加一个类型分支。
+- **模型里有三处空转。** Audio Track、效果链与 Clip Loop 有记录和不变量，但没有界面创建，播放
+  把它们报告为不支持。不要在它们之上继续搭功能，等对应阶段重新设计。
+- **编排的几何在 Studio 里。** Arrangement 与 Tempo Lane 的 Tick 与像素换算写在 feature 的组件和
+  hook 中。新的时间轴几何、命中与拖拽操作写进 `packages/editor` 的 `common/`。
+- **三个文件过大**：`playback-engine.ts`、`ProjectEntryPage.vue`、
+  `ProjectWorkbenchArrangement.vue`。下一次要改它们时先按职责拆开。

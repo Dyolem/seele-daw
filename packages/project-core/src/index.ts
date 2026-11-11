@@ -175,7 +175,7 @@ export type {
 } from './session/project-command-execution'
 export { createInitialProjectSession } from './session/project-session'
 export type { CreateInitialProjectSessionInput, ProjectSession } from './session/project-session'
-export type { ProjectContentStateId } from './session/project-content-state-id'
+export type { ProjectContentStateId } from './history/project-content-state-id'
 
 export { createChannelStripDescriptor, createMasterChannelRecord } from './model/channel'
 export type {
@@ -306,16 +306,16 @@ export {
   parsePositiveTick,
   parseTick,
   parseTickDelta,
-} from './time/tick'
-export type { Tick, TickDelta } from './time/tick'
+} from './model/tick'
+export type { Tick, TickDelta } from './model/tick'
 
 export {
   TEMPO_BPM_MAX,
   TEMPO_BPM_MIN,
   createTempoEventRecord,
   parseTempoBpm,
-} from './time/tempo-event'
-export type { CreateTempoEventRecordInput, TempoBpm, TempoEventRecord } from './time/tempo-event'
+} from './model/tempo-event'
+export type { CreateTempoEventRecordInput, TempoBpm, TempoEventRecord } from './model/tempo-event'
 
 export {
   TIME_SIGNATURE_DENOMINATORS,
@@ -324,10 +324,10 @@ export {
   createTimeSignatureEventRecord,
   parseTimeSignatureDenominator,
   parseTimeSignatureNumerator,
-} from './time/time-signature-event'
+} from './model/time-signature-event'
 export type {
   CreateTimeSignatureEventRecordInput,
   TimeSignatureDenominator,
   TimeSignatureEventRecord,
   TimeSignatureNumerator,
-} from './time/time-signature-event'
+} from './model/time-signature-event'

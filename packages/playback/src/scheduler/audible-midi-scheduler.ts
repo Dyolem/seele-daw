@@ -15,7 +15,7 @@ import {
   type MidiNoteSpanPlan,
   type NoteOccurrenceKey,
 } from '#internal/compiler/audible-midi-plan'
-import type { SoundbankId } from '#internal/sample-instrument-device'
+import type { SoundbankId } from '#internal/device/sample-instrument-device'
 import {
   parsePlaybackClockDurationSecond,
   type PlaybackClockDurationSecond,

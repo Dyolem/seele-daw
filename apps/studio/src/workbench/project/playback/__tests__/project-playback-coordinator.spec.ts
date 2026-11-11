@@ -26,9 +26,9 @@ import {
   type ProjectSession,
 } from '@seele-daw/project-core'
 import {
-  createStudioGrandDeviceDescriptor,
-  parsePlaybackClockSecond,
+  createSampleInstrumentDeviceDescriptor,
   parseSoundbankId,
+  parsePlaybackClockSecond,
 } from '@seele-daw/playback'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -170,8 +170,9 @@ function createPlayableSession(projectId: ProjectId): ProjectSession {
       },
       color: null,
       insertAt: 0,
-      instrumentDevice: createStudioGrandDeviceDescriptor(
+      instrumentDevice: createSampleInstrumentDeviceDescriptor(
         parseDeviceId('device-playback-coordinator'),
+        parseSoundbankId('studio-grand'),
       ),
       name: 'Piano',
       trackId: TRACK_ID,

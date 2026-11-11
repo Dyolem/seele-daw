@@ -66,15 +66,8 @@ export {
   createSampleInstrumentDeviceDescriptor,
   decodeSampleInstrumentDeviceState,
   parseSoundbankId,
-} from './sample-instrument-device'
-export type { SampleInstrumentDeviceState, SoundbankId } from './sample-instrument-device'
-export {
-  STUDIO_GRAND_DEVICE_DEFINITION,
-  STUDIO_GRAND_SOUNDBANK_ID,
-  createStudioGrandDeviceDescriptor,
-  decodeStudioGrandDeviceState,
-} from './studio-grand-device'
-export type { StudioGrandDeviceState } from './studio-grand-device'
+} from './device/sample-instrument-device'
+export type { SampleInstrumentDeviceState, SoundbankId } from './device/sample-instrument-device'
 export { resolveProjectSecondAtTick } from './time/tempo-map'
 export { parsePlaybackClockDurationSecond, parsePlaybackClockSecond } from './time/project-time'
 export type {

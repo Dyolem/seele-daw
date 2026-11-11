@@ -1,6 +1,6 @@
 import type { ProjectCommit } from '#internal/commit/project-commit'
 import type { MidiSourceId, NoteId } from '#internal/model/ids'
-import type { Tick } from '#internal/time/tick'
+import type { Tick } from '#internal/model/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 /** A half-open timeline interval, e.g. the span a subscriber cares about. */

@@ -24,7 +24,7 @@ import {
   type NoChangeProjectCommandExecution,
   type ProjectCommandExecutionResult,
 } from '#internal/session/project-command-execution'
-import type { ProjectContentStateId } from '#internal/session/project-content-state-id'
+import type { ProjectContentStateId } from '#internal/history/project-content-state-id'
 import { ProjectSnapshots, type ProjectSnapshot } from '#internal/snapshots/project-snapshot'
 import { ChangePublisher } from '#internal/subscriptions/change-publisher'
 import type {

@@ -18,7 +18,7 @@ import type {
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectChange } from '#internal/mutation/project-change'
-import { addTicks } from '#internal/time/tick'
+import { addTicks } from '#internal/model/tick'
 
 function rejectReusedId(
   code:

@@ -15,7 +15,7 @@ import type {
   TrackId,
 } from '@seele-daw/project-core'
 
-import type { SoundbankId } from '#internal/sample-instrument-device'
+import type { SoundbankId } from '#internal/device/sample-instrument-device'
 import type { TempoSegmentPlan } from '#internal/time/tempo-map'
 
 export const AUDIBLE_MIDI_PLAN_STATUS = Object.freeze({

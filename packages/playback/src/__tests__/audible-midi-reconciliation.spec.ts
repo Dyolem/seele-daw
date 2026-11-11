@@ -47,7 +47,7 @@ import {
 import {
   createSampleInstrumentDeviceDescriptor,
   parseSoundbankId,
-} from '#internal/sample-instrument-device'
+} from '#internal/device/sample-instrument-device'
 import { planSpans } from '#internal/__tests__/support/plan-spans'
 
 const TRACK_ID = parseTrackId('track-reconciliation')

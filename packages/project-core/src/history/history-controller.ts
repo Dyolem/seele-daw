@@ -9,7 +9,7 @@ import type { ProjectChange } from '#internal/mutation/project-change'
 import {
   createProjectContentStateId,
   type ProjectContentStateId,
-} from '#internal/session/project-content-state-id'
+} from '#internal/history/project-content-state-id'
 
 interface HistoryEntry {
   readonly commandType: ProjectCommandType

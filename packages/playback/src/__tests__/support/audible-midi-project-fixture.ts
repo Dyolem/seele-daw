@@ -26,7 +26,7 @@ import {
 import {
   createSampleInstrumentDeviceDescriptor,
   parseSoundbankId,
-} from '#internal/sample-instrument-device'
+} from '#internal/device/sample-instrument-device'
 
 export function createCompilerFixtureChannel(
   gain: number,

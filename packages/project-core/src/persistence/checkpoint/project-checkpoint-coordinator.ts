@@ -11,7 +11,7 @@ import {
 import { ProjectFileError } from '#internal/persistence/project-file-error'
 import { createSessionFromProjectFile } from '#internal/persistence/project-file-loader'
 import type { ProjectSession } from '#internal/session/project-session'
-import type { ProjectContentStateId } from '#internal/session/project-content-state-id'
+import type { ProjectContentStateId } from '#internal/history/project-content-state-id'
 
 export type SaveProjectCheckpointInput = CreateProjectCheckpointInput
 

@@ -21,7 +21,7 @@ import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectChange } from '#internal/mutation/project-change'
-import { parseTick } from '#internal/time/tick'
+import { parseTick } from '#internal/model/tick'
 
 type MidiNoteCommand = AddNoteCommand | MoveNotesCommand | RemoveNotesCommand | ResizeNoteCommand
 

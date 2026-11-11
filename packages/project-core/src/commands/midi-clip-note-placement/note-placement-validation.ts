@@ -7,7 +7,7 @@ import type { MidiNoteCommandValidationContext } from '#internal/commands/midi-n
 import type { MidiClipRecord } from '#internal/model/midi-clip'
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
-import { addTicks } from '#internal/time/tick'
+import { addTicks } from '#internal/model/tick'
 
 type MidiClipNotePlacementCommand = AddMidiClipWithNoteCommand | ExtendMidiClipWithNoteCommand
 

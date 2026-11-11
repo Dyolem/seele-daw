@@ -26,8 +26,8 @@ import type {
   TrackId,
 } from './ids'
 import type { MidiNoteRecord } from './midi-note'
-import type { TempoEventRecord } from '#internal/time/tempo-event'
-import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
+import type { TempoEventRecord } from '#internal/model/tempo-event'
+import type { TimeSignatureEventRecord } from '#internal/model/time-signature-event'
 
 export type ModelEntityKind =
   | 'clip'

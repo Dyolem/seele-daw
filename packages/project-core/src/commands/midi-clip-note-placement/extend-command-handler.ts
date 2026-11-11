@@ -14,7 +14,7 @@ import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/m
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
 import type { ProjectChange } from '#internal/mutation/project-change'
-import { addTicks, parseTick, type Tick } from '#internal/time/tick'
+import { addTicks, parseTick, type Tick } from '#internal/model/tick'
 
 function requireExtensionClip(
   reader: ModelStoreReader,

@@ -9,7 +9,7 @@ import {
   type MidiChannel,
   type MidiControlValue,
 } from './scalars'
-import { parseTick, type Tick } from '#internal/time/tick'
+import { parseTick, type Tick } from '#internal/model/tick'
 
 export const MIDI_SUSTAIN_PEDAL_CONTROLLER_NUMBER = 64 as const
 export const MIDI_SUSTAIN_PEDAL_DOWN_VALUE_MIN = 64 as const

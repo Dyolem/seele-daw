@@ -5,7 +5,7 @@ import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiSourceRecord } from '#internal/model/midi-source'
 import type { ModelRevision } from '#internal/model/model-revision'
 import type { ModelStoreReader } from '#internal/model/model-store'
-import { addTicks } from '#internal/time/tick'
+import { addTicks } from '#internal/model/tick'
 
 export interface MidiNoteCommandValidationContext {
   readonly baseRevision: ModelRevision

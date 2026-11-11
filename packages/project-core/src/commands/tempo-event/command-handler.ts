@@ -12,8 +12,8 @@ import type {
 } from '#internal/commands/preparation/project-command-preparation'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { createTempoEventRecord, type TempoEventRecord } from '#internal/time/tempo-event'
-import { ZERO_TICK, type Tick } from '#internal/time/tick'
+import { createTempoEventRecord, type TempoEventRecord } from '#internal/model/tempo-event'
+import { ZERO_TICK, type Tick } from '#internal/model/tick'
 
 function findTempoEventAtTick(
   reader: ModelStoreReader,

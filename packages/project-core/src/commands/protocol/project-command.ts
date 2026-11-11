@@ -51,13 +51,13 @@ import {
   parseTickDelta,
   type Tick,
   type TickDelta,
-} from '#internal/time/tick'
+} from '#internal/model/tick'
 import {
   createTempoEventRecord,
   parseTempoBpm,
   type TempoBpm,
   type TempoEventRecord,
-} from '#internal/time/tempo-event'
+} from '#internal/model/tempo-event'
 
 /** Canonical runtime discriminants for product-level project commands. */
 export const PROJECT_COMMAND_TYPE = {

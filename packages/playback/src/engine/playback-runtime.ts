@@ -1,7 +1,7 @@
 import type { ModelRevision } from '@seele-daw/project-core'
 
 import type { AudibleMidiProjectPlan } from '#internal/compiler/audible-midi-plan'
-import type { SoundbankId } from '#internal/sample-instrument-device'
+import type { SoundbankId } from '#internal/device/sample-instrument-device'
 import type { ScheduledSampleVoicePlan } from '#internal/scheduler/audible-midi-scheduler'
 import type { PlaybackClockSecond } from '#internal/time/project-time'
 

@@ -34,8 +34,8 @@ import {
 } from './model-tables'
 import type { ProjectRecord } from './project'
 import type { TrackRecord } from './track'
-import type { TempoEventRecord } from '#internal/time/tempo-event'
-import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
+import type { TempoEventRecord } from '#internal/model/tempo-event'
+import type { TimeSignatureEventRecord } from '#internal/model/time-signature-event'
 
 type RecordContainer = Map<string, StoredRecord>
 type PartitionedContainer = Map<MidiSourceId, RecordContainer>

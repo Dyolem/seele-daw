@@ -11,7 +11,7 @@ import {
   type ProjectUnsubscribe,
 } from '#internal/subscriptions/project-subscription'
 import { reportListenerError } from '#internal/subscriptions/report-listener-error'
-import { addTicks } from '#internal/time/tick'
+import { addTicks } from '#internal/model/tick'
 
 interface SubscriptionEntry {
   active: boolean

@@ -30,11 +30,11 @@ import {
   type InstrumentTrackRecord,
   type TrackRecord,
 } from '#internal/model/track'
-import { createTempoEventRecord, type TempoEventRecord } from '#internal/time/tempo-event'
+import { createTempoEventRecord, type TempoEventRecord } from '#internal/model/tempo-event'
 import {
   createTimeSignatureEventRecord,
   type TimeSignatureEventRecord,
-} from '#internal/time/time-signature-event'
+} from '#internal/model/time-signature-event'
 import {
   readField,
   readFields,

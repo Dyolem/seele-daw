@@ -10,13 +10,13 @@ import { assertModelInvariants } from './invariant-validator'
 import { ModelStore, type ModelStoreSeed } from './model-store'
 import { createProjectRecord } from './project'
 import { parseLinearGain } from './scalars'
-import { createTempoEventRecord, parseTempoBpm } from '#internal/time/tempo-event'
-import { ZERO_TICK } from '#internal/time/tick'
+import { createTempoEventRecord, parseTempoBpm } from '#internal/model/tempo-event'
+import { ZERO_TICK } from '#internal/model/tick'
 import {
   createTimeSignatureEventRecord,
   parseTimeSignatureDenominator,
   parseTimeSignatureNumerator,
-} from '#internal/time/time-signature-event'
+} from '#internal/model/time-signature-event'
 
 const INITIAL_TEMPO_BPM = parseTempoBpm(120)
 const INITIAL_TIME_SIGNATURE_NUMERATOR = parseTimeSignatureNumerator(4)

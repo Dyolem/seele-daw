@@ -6,7 +6,7 @@ import {
 import { provideTestStudioServices } from '@/__tests__/support/studio-services-test-support'
 import { createDeferredActionResult } from '@/workbench/actions/__tests__/support/deferred-action-test-support'
 import { createStandardMidiFileSourceEnvelope, type MidiFileDocument } from '@seele-daw/midi-file'
-import { createStudioGrandDeviceDescriptor } from '@seele-daw/playback'
+import { createSampleInstrumentDeviceDescriptor, parseSoundbankId } from '@seele-daw/playback'
 import {
   createInitialProjectSession,
   createAllProjectCommitsSubscription,
@@ -1275,7 +1275,7 @@ describe('ProjectWorkspacePage', () => {
       document,
       createId: ({ kind, ordinal }) => `tempo-map-${kind}-${ordinal}`,
       createInstrumentDevice: ({ id }) => ({
-        device: createStudioGrandDeviceDescriptor(id),
+        device: createSampleInstrumentDeviceDescriptor(id, parseSoundbankId('studio-grand')),
         mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
       }),
       createTrackColor: () => null,
@@ -1432,7 +1432,7 @@ describe('ProjectWorkspacePage', () => {
       document,
       createId: ({ kind, ordinal }) => `long-import-${kind}-${ordinal}`,
       createInstrumentDevice: ({ id }) => ({
-        device: createStudioGrandDeviceDescriptor(id),
+        device: createSampleInstrumentDeviceDescriptor(id, parseSoundbankId('studio-grand')),
         mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
       }),
       createTrackColor: () => null,

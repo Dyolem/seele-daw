@@ -5,8 +5,8 @@ import type { MidiNoteRecord } from './midi-note'
 import type { MidiSourceRecord } from './midi-source'
 import type { MidiSustainPedalEventRecord } from './midi-sustain-pedal-event'
 import type { TrackRecord } from './track'
-import type { TempoEventRecord } from '#internal/time/tempo-event'
-import type { TimeSignatureEventRecord } from '#internal/time/time-signature-event'
+import type { TempoEventRecord } from '#internal/model/tempo-event'
+import type { TimeSignatureEventRecord } from '#internal/model/time-signature-event'
 
 /** Every stored record carries its own branded ID. */
 export interface StoredRecord {

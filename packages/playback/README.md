@@ -15,9 +15,10 @@
 | `scheduler/`         | look-ahead 窗口：每个窗口里该开始的 Voice Plan                                    |
 | `reconciliation/`    | 比较新旧计划：哪些 Voice 要切断、哪些只需改期、什么时候必须整体重来               |
 | `engine/`            | `PlaybackEngine` 与运行时端口                                                     |
+| `device/`            | 采样乐器的 Device 定义与状态解码                                                  |
 
-`sample-instrument-device.ts` 定义所有采样乐器共用的 Device（`seele.sample-instrument`，状态只有
-`soundbankId`）；Studio Grand 是它的默认实例。
+`device/sample-instrument-device.ts` 定义所有采样乐器共用的 Device（`seele.sample-instrument`，
+状态只有 `soundbankId`）。选哪个 Soundbank 是 Studio 的产品默认值，不在本包里。
 
 ## 一次播放
 

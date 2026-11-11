@@ -37,7 +37,7 @@ import {
 import {
   SAMPLE_INSTRUMENT_DEVICE_DEFINITION,
   decodeSampleInstrumentDeviceState,
-} from '#internal/sample-instrument-device'
+} from '#internal/device/sample-instrument-device'
 import { createTempoMap } from '#internal/time/tempo-map'
 import { deriveAudibleMidiTimelineRange } from '#internal/timeline/audible-midi-timeline'
 

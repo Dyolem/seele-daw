@@ -14,7 +14,7 @@ import {
   type ProjectQueryResultFor,
 } from '#internal/queries/project-query'
 import type { ProjectSnapshot } from '#internal/snapshots/project-snapshot'
-import type { Tick } from '#internal/time/tick'
+import type { Tick } from '#internal/model/tick'
 
 /** One partition's Notes in query order, with the latest end among each prefix. */
 interface MidiNoteRangeIndex {

@@ -33,7 +33,10 @@ import { bench, describe } from 'vitest'
 import { compileAudibleMidiProject } from '#internal/compiler/audible-midi-compiler'
 import { createAudibleMidiReconciliationPlan } from '#internal/reconciliation/audible-midi-reconciliation'
 import { createAudibleMidiSchedulerPlanner } from '#internal/scheduler/audible-midi-scheduler'
-import { createStudioGrandDeviceDescriptor } from '#internal/studio-grand-device'
+import {
+  createSampleInstrumentDeviceDescriptor,
+  parseSoundbankId,
+} from '#internal/device/sample-instrument-device'
 import { parsePlaybackClockDurationSecond } from '#internal/time/project-time'
 
 const NOTE_SPACING_TICK = 120
@@ -43,7 +46,10 @@ const PLANNER_CONFIGURATION = Object.freeze({
 })
 
 function importedTrack(index: number, noteCount: number): InstrumentTrackCollectionEntry {
-  const device = createStudioGrandDeviceDescriptor(parseDeviceId(`device-${index}`))
+  const device = createSampleInstrumentDeviceDescriptor(
+    parseDeviceId(`device-${index}`),
+    parseSoundbankId('studio-grand'),
+  )
   const track = createInstrumentTrackRecord({
     id: parseTrackId(`track-${index}`),
     name: `Track ${index}`,

@@ -12,7 +12,7 @@ import type {
   StoredRecord,
 } from '#internal/model/model-tables'
 import type { ProjectRecord } from '#internal/model/project'
-import type { Tick } from '#internal/time/tick'
+import type { Tick } from '#internal/model/tick'
 
 interface TimelineRecord extends StoredRecord {
   readonly tick: Tick

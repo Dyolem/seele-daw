@@ -1,6 +1,6 @@
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { MidiNotesIntersectingRangeQuery } from '#internal/queries/project-query'
-import { addTicks, type Tick } from '#internal/time/tick'
+import { addTicks, type Tick } from '#internal/model/tick'
 
 function compareOpaqueIds(left: string, right: string): number {
   if (left < right) return -1

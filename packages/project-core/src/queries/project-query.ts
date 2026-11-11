@@ -2,7 +2,7 @@ import { parseMidiSourceId, parseNoteId, type MidiSourceId, type NoteId } from '
 import type { MidiNoteRecord } from '#internal/model/midi-note'
 import type { ModelRevision } from '#internal/model/model-revision'
 import { parseMidiPitch, type MidiPitch } from '#internal/model/scalars'
-import { parseTick, type Tick } from '#internal/time/tick'
+import { parseTick, type Tick } from '#internal/model/tick'
 import type { ValueOf } from '@seele-daw/type-utils'
 
 /** Canonical runtime discriminants for read-only project queries. */

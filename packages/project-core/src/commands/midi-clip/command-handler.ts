@@ -6,7 +6,7 @@ import type {
 import type { ReadyProjectCommandPreparation } from '#internal/commands/preparation/project-command-preparation'
 import type { ModelStoreReader } from '#internal/model/model-store'
 import { createMutationPlan } from '#internal/mutation/mutation-plan'
-import { addTicks } from '#internal/time/tick'
+import { addTicks } from '#internal/model/tick'
 
 type NewMidiClipCommand = AddMidiClipCommand | AddMidiClipWithNoteCommand
 

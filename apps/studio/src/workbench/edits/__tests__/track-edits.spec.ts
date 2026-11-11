@@ -12,10 +12,9 @@ import {
   type ProjectSession,
 } from '@seele-daw/project-core'
 import {
-  STUDIO_GRAND_DEVICE_DEFINITION,
+  SAMPLE_INSTRUMENT_DEVICE_DEFINITION,
   createSampleInstrumentDeviceDescriptor,
   decodeSampleInstrumentDeviceState,
-  decodeStudioGrandDeviceState,
   parseSoundbankId,
 } from '@seele-daw/playback'
 import { describe, expect, it } from 'vitest'
@@ -86,9 +85,9 @@ describe('track edits', () => {
     })
     expect(snapshot.devices[0]).toMatchObject({
       id: 'device-defaults',
-      typeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
+      typeId: SAMPLE_INSTRUMENT_DEVICE_DEFINITION.typeId,
     })
-    expect(decodeStudioGrandDeviceState(snapshot.devices[0]!)).toEqual({
+    expect(decodeSampleInstrumentDeviceState(snapshot.devices[0]!)).toEqual({
       soundbankId: 'studio-grand',
     })
   })

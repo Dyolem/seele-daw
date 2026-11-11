@@ -13,7 +13,8 @@ import {
 } from '@seele-daw/project-core'
 import type { LocalFileByteReader } from '@seele-daw/platform-browser'
 import {
-  createStudioGrandDeviceDescriptor,
+  createSampleInstrumentDeviceDescriptor,
+  parseSoundbankId,
   decodeSampleInstrumentDeviceState,
 } from '@seele-daw/playback'
 import {
@@ -83,7 +84,7 @@ function createFixture(document: MidiFileDocument = createMidiDocument()) {
   const decode = vi.fn<MidiFileDecoder['decode']>(() => document)
   const createId = vi.fn<ProjectMidiImportIdFactory>(({ kind, ordinal }) => `${kind}-${ordinal}`)
   const createInstrumentDevice = vi.fn<ProjectMidiInstrumentDeviceFactory>(({ id }) => ({
-    device: createStudioGrandDeviceDescriptor(id),
+    device: createSampleInstrumentDeviceDescriptor(id, parseSoundbankId('studio-grand')),
     mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
   }))
   const createRandomValue = vi.fn<() => number>(() => 0)
@@ -348,7 +349,7 @@ describe('ProjectMidiImportCoordinator', () => {
       activeProject,
       createId: ({ kind, ordinal }) => `active-import-${kind}-${ordinal}`,
       createInstrumentDevice: ({ id }) => ({
-        device: createStudioGrandDeviceDescriptor(id),
+        device: createSampleInstrumentDeviceDescriptor(id, parseSoundbankId('studio-grand')),
         mappingKind: PROJECT_MIDI_INSTRUMENT_MAPPING_KIND.EXACT,
       }),
       createRandomValue: () => 0,

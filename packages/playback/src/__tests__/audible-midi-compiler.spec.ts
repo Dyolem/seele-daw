@@ -33,7 +33,7 @@ import {
 import {
   createSampleInstrumentDeviceDescriptor,
   parseSoundbankId,
-} from '#internal/sample-instrument-device'
+} from '#internal/device/sample-instrument-device'
 import {
   createAudibleMidiProjectFixture,
   createCompilerFixtureChannel,

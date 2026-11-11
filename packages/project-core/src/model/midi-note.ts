@@ -7,7 +7,7 @@ import {
   type MidiPitch,
   type MidiVelocity,
 } from './scalars'
-import { addTicks, parsePositiveTick, parseTick, type Tick } from '#internal/time/tick'
+import { addTicks, parsePositiveTick, parseTick, type Tick } from '#internal/model/tick'
 
 export interface MidiNoteRecord {
   readonly id: NoteId

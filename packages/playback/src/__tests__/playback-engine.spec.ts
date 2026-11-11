@@ -57,8 +57,11 @@ import {
   type PlaybackRuntimePort,
   type PlaybackTimerPort,
 } from '#internal/engine/playback-runtime'
-import { parseSoundbankId, type SoundbankId } from '#internal/sample-instrument-device'
-import { createStudioGrandDeviceDescriptor } from '#internal/studio-grand-device'
+import {
+  parseSoundbankId,
+  type SoundbankId,
+  createSampleInstrumentDeviceDescriptor,
+} from '#internal/device/sample-instrument-device'
 import { parsePlaybackClockSecond } from '#internal/time/project-time'
 import {
   ControlledPlaybackRuntime,
@@ -145,7 +148,10 @@ function addPlayableTrack(session: ProjectSession, fixture: PlayableTrackFixture
       },
       color: null,
       insertAt: fixture.insertAt,
-      instrumentDevice: createStudioGrandDeviceDescriptor(fixture.deviceId),
+      instrumentDevice: createSampleInstrumentDeviceDescriptor(
+        fixture.deviceId,
+        parseSoundbankId('studio-grand'),
+      ),
       name: 'Piano',
       trackId: fixture.trackId,
     }),
@@ -281,7 +287,10 @@ function createEdgeClippedPlayableSession(projectId: ProjectId): ProjectSession 
       },
       color: null,
       insertAt: 0,
-      instrumentDevice: createStudioGrandDeviceDescriptor(DEVICE_ID),
+      instrumentDevice: createSampleInstrumentDeviceDescriptor(
+        DEVICE_ID,
+        parseSoundbankId('studio-grand'),
+      ),
       name: 'Piano',
       trackId: TRACK_ID,
     }),
@@ -934,7 +943,10 @@ describe('PlaybackEngine', () => {
         },
         color: null,
         insertAt: 1,
-        instrumentDevice: createStudioGrandDeviceDescriptor(SECOND_DEVICE_ID),
+        instrumentDevice: createSampleInstrumentDeviceDescriptor(
+          SECOND_DEVICE_ID,
+          parseSoundbankId('studio-grand'),
+        ),
         name: 'Empty Piano',
         trackId: SECOND_TRACK_ID,
       }),

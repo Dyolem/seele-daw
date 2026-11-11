@@ -38,14 +38,20 @@ import { describe, expect, it } from 'vitest'
 
 import { compileAudibleMidiProject } from '#internal/compiler/audible-midi-compiler'
 import type { AudibleMidiProjectPlan } from '#internal/compiler/audible-midi-plan'
+import {
+  createSampleInstrumentDeviceDescriptor,
+  parseSoundbankId,
+} from '#internal/device/sample-instrument-device'
 import { createAudibleMidiReconciliationPlan } from '#internal/reconciliation/audible-midi-reconciliation'
-import { createStudioGrandDeviceDescriptor } from '#internal/studio-grand-device'
 
 const SOURCE_LENGTH_TICK = 48_000
 const NOTES_PER_TRACK = 200
 
 function importedTrack(index: number): InstrumentTrackCollectionEntry {
-  const device = createStudioGrandDeviceDescriptor(parseDeviceId(`device-reuse-${index}`))
+  const device = createSampleInstrumentDeviceDescriptor(
+    parseDeviceId(`device-reuse-${index}`),
+    parseSoundbankId('studio-grand'),
+  )
   const track = createInstrumentTrackRecord({
     id: `track-reuse-${index}` as InstrumentTrackCollectionEntry['track']['id'],
     name: `Track ${index}`,

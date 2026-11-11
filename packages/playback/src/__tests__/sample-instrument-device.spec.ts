@@ -15,7 +15,7 @@ import {
   parseSoundbankId,
   type SampleInstrumentDeviceState,
   type SoundbankId,
-} from '#internal/sample-instrument-device'
+} from '#internal/device/sample-instrument-device'
 
 describe('Sample Instrument Device', () => {
   it('defines one engine family independently of any specific Soundbank', () => {

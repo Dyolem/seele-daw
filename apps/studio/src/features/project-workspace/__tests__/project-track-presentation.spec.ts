@@ -15,9 +15,8 @@ import {
   type ProjectSession,
 } from '@seele-daw/project-core'
 import {
-  STUDIO_GRAND_DEVICE_DEFINITION,
+  SAMPLE_INSTRUMENT_DEVICE_DEFINITION,
   createSampleInstrumentDeviceDescriptor,
-  createStudioGrandDeviceDescriptor,
   parseSoundbankId,
 } from '@seele-daw/playback'
 import { describe, expect, it } from 'vitest'
@@ -73,7 +72,10 @@ describe('Project Track presentation', () => {
     addInstrumentTrack(
       session,
       'Studio Grand',
-      createStudioGrandDeviceDescriptor(parseDeviceId('device-studio-grand-presentation')),
+      createSampleInstrumentDeviceDescriptor(
+        parseDeviceId('device-studio-grand-presentation'),
+        parseSoundbankId('studio-grand'),
+      ),
     )
     addInstrumentTrack(
       session,
@@ -117,19 +119,19 @@ describe('Project Track presentation', () => {
 
     expect(presentations.map(({ instrument }) => instrument)).toEqual([
       {
-        deviceTypeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
+        deviceTypeId: SAMPLE_INSTRUMENT_DEVICE_DEFINITION.typeId,
         displayName: 'Studio Grand',
         soundbankId: 'studio-grand',
         status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
       },
       {
-        deviceTypeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
+        deviceTypeId: SAMPLE_INSTRUMENT_DEVICE_DEFINITION.typeId,
         displayName: 'Solo Violin',
         soundbankId: 'solo-violin',
         status: PROJECT_TRACK_INSTRUMENT_STATUS.READY,
       },
       {
-        deviceTypeId: STUDIO_GRAND_DEVICE_DEFINITION.typeId,
+        deviceTypeId: SAMPLE_INSTRUMENT_DEVICE_DEFINITION.typeId,
         displayName: 'Missing instrument',
         soundbankId: 'unknown-orchestral-bank',
         status: PROJECT_TRACK_INSTRUMENT_STATUS.MISSING,

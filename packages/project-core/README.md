@@ -92,13 +92,12 @@ Checkpoint 把项目文件包在带来源 revision 的信封里。`ProjectCheckp
 
 ```text
 src/
-├── model/          表定义、ModelStore、记录与 ID、不变量
-├── time/           Tick、Tempo 与拍号事件
+├── model/          表定义、ModelStore、记录（含 Tempo 与拍号事件）、ID、Tick 等值、不变量
 ├── mutation/       ProjectChange、MutationPlan、投影与 MutationApplier
 ├── commands/       protocol/（命令协议）、preparation/（注册表），以及各实体的 handler
 ├── commit/         ProjectCommit 与候选
 ├── session/        ProjectSession 与提交编排
-├── history/        Undo / Redo
+├── history/        Undo / Redo，以及标识 History 位置的内容状态 ID
 ├── queries/        从 Snapshot 回答的查询
 ├── subscriptions/  ChangePublisher 与订阅过滤
 ├── snapshots/      Snapshot

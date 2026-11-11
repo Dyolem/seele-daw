@@ -38,7 +38,7 @@
 | `midiNotes`              | `id`、`startTick`、`durationTick`、`pitch`、`velocity`、`channel`                                                          |
 | `midiSustainPedalEvents` | `id`、`tick`、`value`、`channel`                                                                                           |
 
-值的范围由各自的记录工厂判断（`model/` 与 `time/` 中的 `create…Record`），本文不重复。ID 是
+值的范围由各自的记录工厂判断（`model/` 中的 `create…Record`），本文不重复。ID 是
 不透明字符串，`__proto__` 这样的 ID 或参数名按普通数据读写。
 
 ## 读取

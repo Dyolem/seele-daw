@@ -1,7 +1,6 @@
 import { computed, type StyleValue } from 'vue'
 import {
   PIANO_ROLL_SUSTAIN_PEDAL_TRANSFORM_AXIS,
-  PIANO_ROLL_TRACK_CLIP_STATUS,
   pianoRollMidiControlValueToValueLaneCssPixel,
   pianoRollValueLaneTimelineTickToCssPixel,
   type PianoRollSustainPedalInteractionState,
@@ -43,7 +42,6 @@ export function useSustainPedalProjection({
     readonly key: ClipId
     readonly segments: readonly PianoRollSustainPedalLaneStepSegment[]
     readonly startTick: Tick
-    readonly unsupported: boolean
   }
 
   interface RenderedLaneSegment {
@@ -81,7 +79,6 @@ export function useSustainPedalProjection({
           key: model.clipId,
           segments: model.segments,
           startTick: getVisibleStartTick(),
-          unsupported: false,
         }),
       ])
     }
@@ -101,7 +98,6 @@ export function useSustainPedalProjection({
             key: clip.clipId,
             segments,
             startTick: clip.startTick,
-            unsupported: clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED,
           }),
         ),
     )

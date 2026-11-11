@@ -85,8 +85,8 @@ describe('ProjectSession Undo / Redo', () => {
 
     executeMove(
       session,
-      fixture.records.nonLoopSource.id,
-      fixture.records.nonLoopNote.id,
+      fixture.records.verseSource.id,
+      fixture.records.verseNote.id,
       parseTick(960),
       parseMidiPitch(67),
     )
@@ -104,7 +104,7 @@ describe('ProjectSession Undo / Redo', () => {
       session.execute(
         createAddNoteCommand({
           baseRevision: session.modelRevision,
-          sourceId: fixture.records.nonLoopSource.id,
+          sourceId: fixture.records.verseSource.id,
           noteId: parseNoteId('note-history-content-state-branch'),
           startTick: parseTick(1_200),
           durationTick: parseTick(240),
@@ -125,7 +125,7 @@ describe('ProjectSession Undo / Redo', () => {
     const noteId = parseNoteId('note-history-added')
     const command = createAddNoteCommand({
       baseRevision: session.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       noteId,
       startTick: parseTick(1_200),
       durationTick: parseTick(240),
@@ -176,10 +176,10 @@ describe('ProjectSession Undo / Redo', () => {
 
   it('restores exact before and after Record references across MoveNote Undo / Redo', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
     const moveCommit = executeMove(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       before.id,
       parseTick(960),
       parseMidiPitch(67),
@@ -187,7 +187,7 @@ describe('ProjectSession Undo / Redo', () => {
     const moveChange = requireChange(moveCommit, 'midiNotes', 'replace')
 
     const after = moveChange.after
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(after)
 
     const undoCommit = session.undo()
 
@@ -196,23 +196,23 @@ describe('ProjectSession Undo / Redo', () => {
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
       commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.MOVE,
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
     expect(undoCommit?.changes[0]).toMatchObject({ before: after, after: before })
 
     const redoCommit = session.redo()
 
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(after)
     expect(redoCommit?.changes[0]).toMatchObject({ before, after })
   })
 
   it('restores exact before and after Record references across ResizeNote Undo / Redo', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
     const resizeCommit = requireCommitted(
       session.execute(
         createResizeNoteCommand({
           baseRevision: session.modelRevision,
-          sourceId: fixture.records.nonLoopSource.id,
+          sourceId: fixture.records.verseSource.id,
           noteId: before.id,
           startTick: parseTick(120),
           durationTick: parseTick(600),
@@ -222,68 +222,68 @@ describe('ProjectSession Undo / Redo', () => {
     const resizeChange = requireChange(resizeCommit, 'midiNotes', 'replace')
 
     const after = resizeChange.after
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(after)
 
     expect(session.undo()?.origin).toEqual({
       kind: PROJECT_COMMIT_ORIGIN_KIND.HISTORY,
       direction: PROJECT_HISTORY_DIRECTION.UNDO,
       commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
 
     expect(session.redo()?.origin).toEqual({
       kind: PROJECT_COMMIT_ORIGIN_KIND.HISTORY,
       direction: PROJECT_HISTORY_DIRECTION.REDO,
       commandType: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(after)
   })
 
   it('restores a removed Note by its original Record reference', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
 
     requireCommitted(
       session.execute(
         createRemoveNotesCommand({
           baseRevision: session.modelRevision,
-          sourceId: fixture.records.nonLoopSource.id,
+          sourceId: fixture.records.verseSource.id,
           noteIds: [before.id],
         }),
       ),
     )
 
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBeUndefined()
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBeUndefined()
     expect(session.undo()?.changes[0]).toMatchObject({
       op: 'insert',
       table: 'midiNotes',
       after: before,
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
 
     expect(session.redo()?.changes[0]).toMatchObject({
       op: 'remove',
       table: 'midiNotes',
       before,
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBeUndefined()
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBeUndefined()
   })
 
   it('moves multiple entries between stacks in LIFO order', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const first = fixture.records.nonLoopNote
-    const second = fixture.records.nonLoopHarmonyNote
+    const first = fixture.records.verseNote
+    const second = fixture.records.verseHarmonyNote
 
     executeMove(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       first.id,
       parseTick(960),
       parseMidiPitch(61),
     )
     executeMove(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       second.id,
       parseTick(1_200),
       parseMidiPitch(65),
@@ -291,10 +291,10 @@ describe('ProjectSession Undo / Redo', () => {
 
     const secondUndoChange = requireChange(session.undo(), 'midiNotes', 'replace')
     expect(secondUndoChange.after.id).toBe(second.id)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, second.id)).toBe(second)
+    expect(store.getMidiNote(fixture.records.verseSource.id, second.id)).toBe(second)
     const firstUndoChange = requireChange(session.undo(), 'midiNotes', 'replace')
     expect(firstUndoChange.after.id).toBe(first.id)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toBe(first)
+    expect(store.getMidiNote(fixture.records.verseSource.id, first.id)).toBe(first)
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
@@ -308,11 +308,11 @@ describe('ProjectSession Undo / Redo', () => {
 
   it('clears redo only after a new committed Command', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
 
     executeMove(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       before.id,
       parseTick(960),
       parseMidiPitch(67),
@@ -325,7 +325,7 @@ describe('ProjectSession Undo / Redo', () => {
       session.execute(
         createAddNoteCommand({
           baseRevision: session.modelRevision,
-          sourceId: fixture.records.nonLoopSource.id,
+          sourceId: fixture.records.verseSource.id,
           noteId,
           startTick: parseTick(1_200),
           durationTick: parseTick(240),
@@ -342,11 +342,11 @@ describe('ProjectSession Undo / Redo', () => {
 
   it('preserves redo across no-change and rejected Commands', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
 
     executeMove(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       before.id,
       parseTick(960),
       parseMidiPitch(67),
@@ -357,7 +357,7 @@ describe('ProjectSession Undo / Redo', () => {
     const noChange = session.execute(
       createMoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteIds: [before.id],
         deltaTick: parseTickDelta(0),
         deltaPitch: parseMidiPitchDelta(0),
@@ -372,7 +372,7 @@ describe('ProjectSession Undo / Redo', () => {
       session.execute(
         createMoveNotesCommand({
           baseRevision: session.modelRevision,
-          sourceId: fixture.records.nonLoopSource.id,
+          sourceId: fixture.records.verseSource.id,
           noteIds: [before.id],
           deltaTick: parseTickDelta(1_440),
           deltaPitch: parseMidiPitchDelta(0),
@@ -387,11 +387,11 @@ describe('ProjectSession Undo / Redo', () => {
 
   it('restores the previous History branch when authoritative apply fails', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
 
     executeMove(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       before.id,
       parseTick(960),
       parseMidiPitch(67),
@@ -404,7 +404,7 @@ describe('ProjectSession Undo / Redo', () => {
     const noteId = parseNoteId('note-history-write-failure')
     const command = createAddNoteCommand({
       baseRevision: session.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       noteId,
       startTick: parseTick(1_200),
       durationTick: parseTick(240),
@@ -444,10 +444,10 @@ describe('ProjectSession Undo / Redo', () => {
 
   it('restores Undo and Redo stack heads when a History replay write fails', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
     const moveCommit = executeMove(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       before.id,
       parseTick(960),
       parseMidiPitch(67),
@@ -467,7 +467,7 @@ describe('ProjectSession Undo / Redo', () => {
     }
 
     failAuthoritativeWrite(before, () => session.undo())
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(after)
     expect(session.modelRevision).toBe(1)
     expect(session.contentStateId).toBe(afterContentStateId)
     expect(session.canUndo).toBe(true)
@@ -475,21 +475,21 @@ describe('ProjectSession Undo / Redo', () => {
 
     session.undo()
     const beforeContentStateId = session.contentStateId
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
     expect(session.modelRevision).toBe(2)
     expect(session.contentStateId).toBe(beforeContentStateId)
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
     failAuthoritativeWrite(after, () => session.redo())
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
     expect(session.modelRevision).toBe(2)
     expect(session.contentStateId).toBe(beforeContentStateId)
     expect(session.canUndo).toBe(false)
     expect(session.canRedo).toBe(true)
 
     session.redo()
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(after)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(after)
     expect(session.modelRevision).toBe(3)
     expect(session.contentStateId).toBe(afterContentStateId)
     expect(session.canUndo).toBe(true)

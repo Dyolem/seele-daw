@@ -7,12 +7,12 @@ import type {
 import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import type { ShallowRef } from 'vue'
 import type { StudioActionCompletion } from '@/workbench/actions/studio-action'
-import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 
 export interface ProjectPianoRollSurfaceProps {
   readonly barSpanTick: Tick
-  readonly presentation: ReadyProjectPianoRollPresentation
+  readonly presentation: ProjectPianoRollPresentation
   readonly session: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly timeSignatureNumerator: number
 }

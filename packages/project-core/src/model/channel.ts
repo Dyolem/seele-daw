@@ -1,5 +1,4 @@
 import { rejectDomainValue } from './domain-value-error'
-import { parseDeviceId, type DeviceId } from './ids'
 import { parseBipolarValue, parseLinearGain, type BipolarValue, type LinearGain } from './scalars'
 
 export interface ChannelStripDescriptor {
@@ -12,7 +11,6 @@ export interface ChannelStripDescriptor {
 export interface MasterChannelRecord {
   readonly gain: LinearGain
   readonly muted: boolean
-  readonly audioEffectIds: readonly DeviceId[]
 }
 
 export interface CreateChannelStripDescriptorInput {
@@ -25,7 +23,6 @@ export interface CreateChannelStripDescriptorInput {
 export interface CreateMasterChannelRecordInput {
   readonly gain: LinearGain
   readonly muted: boolean
-  readonly audioEffectIds: readonly DeviceId[]
 }
 
 function parseBoolean(value: unknown, valueName: string): boolean {
@@ -34,19 +31,6 @@ function parseBoolean(value: unknown, valueName: string): boolean {
   }
 
   return value
-}
-
-function copyUniqueAudioEffectIds(
-  deviceIds: readonly DeviceId[],
-  valueName: string,
-): readonly DeviceId[] {
-  const copiedDeviceIds = deviceIds.map((deviceId) => parseDeviceId(deviceId))
-
-  if (new Set(copiedDeviceIds).size !== copiedDeviceIds.length) {
-    rejectDomainValue(valueName, 'an ordered collection of unique DeviceId values')
-  }
-
-  return copiedDeviceIds
 }
 
 export function createChannelStripDescriptor(
@@ -66,6 +50,5 @@ export function createMasterChannelRecord(
   return {
     gain: parseLinearGain(input.gain),
     muted: parseBoolean(input.muted, 'MasterChannel.muted'),
-    audioEffectIds: copyUniqueAudioEffectIds(input.audioEffectIds, 'MasterChannel.audioEffectIds'),
   }
 }

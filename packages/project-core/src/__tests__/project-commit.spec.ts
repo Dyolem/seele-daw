@@ -30,7 +30,7 @@ function createAddCommand(store: ModelStore): AddNoteCommand {
 
   return createAddNoteCommand({
     baseRevision: store.modelRevision,
-    sourceId: fixture.records.nonLoopSource.id,
+    sourceId: fixture.records.verseSource.id,
     noteId: parseNoteId('note-commit-added'),
     startTick: parseTick(960),
     durationTick: parseTick(240),
@@ -98,15 +98,15 @@ describe('ProjectCommit candidate boundary', () => {
     const baseRevision = Number.MAX_SAFE_INTEGER as ModelRevision
     const command = createRemoveNotesCommand({
       baseRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      noteIds: [fixture.records.nonLoopNote.id],
+      sourceId: fixture.records.verseSource.id,
+      noteIds: [fixture.records.verseNote.id],
     })
     const plan = createMutationPlan(baseRevision, [
       {
         op: 'remove',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.verseNote,
       },
     ])
 

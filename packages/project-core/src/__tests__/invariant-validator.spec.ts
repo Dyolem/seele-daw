@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  createAudioTrackRecord,
+  createInstrumentTrackRecord,
   createDeviceDescriptor,
-  createMasterChannelRecord,
   createMidiClipRecord,
   createMidiNoteRecord,
   createMidiSourceRecord,
@@ -14,7 +13,6 @@ import {
   parseClipId,
   parseDeviceId,
   parseDeviceTypeId,
-  parseLinearGain,
   parseMidiChannel,
   parseMidiControlValue,
   parseMidiSourceId,
@@ -61,12 +59,12 @@ function codesFor(seed: ModelStoreSeed): readonly ModelInvariantCode[] {
   return validateSeed(seed).map(({ code }) => code)
 }
 
-function replaceNonLoopClip(
+function replaceVerseClip(
   fixture: CompleteProjectFixture,
   changes: Partial<Parameters<typeof createMidiClipRecord>[0]>,
 ): void {
   const replacement = createMidiClipRecord({
-    ...fixture.records.nonLoopClip,
+    ...fixture.records.verseClip,
     ...changes,
   })
 
@@ -136,39 +134,37 @@ describe('normalized table key invariants', () => {
     [
       'Clip',
       (fixture) => {
-        fixture.containers.clips.delete(fixture.records.nonLoopClip.id)
-        fixture.containers.clips.set(parseClipId('wrong-clip-key'), fixture.records.nonLoopClip)
+        fixture.containers.clips.delete(fixture.records.verseClip.id)
+        fixture.containers.clips.set(parseClipId('wrong-clip-key'), fixture.records.verseClip)
       },
     ],
     [
       'MIDI Source',
       (fixture) => {
-        fixture.containers.midiSources.delete(fixture.records.nonLoopSource.id)
+        fixture.containers.midiSources.delete(fixture.records.verseSource.id)
         fixture.containers.midiSources.set(
           parseMidiSourceId('wrong-source-key'),
-          fixture.records.nonLoopSource,
+          fixture.records.verseSource,
         )
       },
     ],
     [
       'MIDI Note',
       (fixture) => {
-        fixture.containers.nonLoopNotePartition.delete(fixture.records.nonLoopNote.id)
-        fixture.containers.nonLoopNotePartition.set(
+        fixture.containers.verseNotePartition.delete(fixture.records.verseNote.id)
+        fixture.containers.verseNotePartition.set(
           parseNoteId('wrong-note-key'),
-          fixture.records.nonLoopNote,
+          fixture.records.verseNote,
         )
       },
     ],
     [
       'MIDI Sustain Pedal Event',
       (fixture) => {
-        fixture.containers.nonLoopSustainPedalEventPartition.delete(
-          fixture.records.nonLoopPedalDown.id,
-        )
-        fixture.containers.nonLoopSustainPedalEventPartition.set(
+        fixture.containers.verseSustainPedalEventPartition.delete(fixture.records.versePedalDown.id)
+        fixture.containers.verseSustainPedalEventPartition.set(
           parseMidiSustainPedalEventId('wrong-sustain-pedal-event-key'),
-          fixture.records.nonLoopPedalDown,
+          fixture.records.versePedalDown,
         )
       },
     ],
@@ -217,35 +213,15 @@ describe('Clip, Track, and MIDI Source invariants', () => {
   it('rejects a Clip that references a missing Track', () => {
     const fixture = createCompleteProjectFixture()
 
-    replaceNonLoopClip(fixture, { trackId: parseTrackId('missing-track') })
+    replaceVerseClip(fixture, { trackId: parseTrackId('missing-track') })
 
     expect(codesFor(fixture.seed)).toContain('clip-missing-track')
-  })
-
-  it('rejects a MIDI Clip placed on an Audio Track', () => {
-    const fixture = createCompleteProjectFixture()
-    const instrumentTrackAsAudio = createAudioTrackRecord({
-      id: fixture.records.instrumentTrack.id,
-      name: 'Audio',
-      color: null,
-      channel: fixture.records.instrumentTrack.channel,
-      // Retain every Descriptor owner so this corruption isolates the Track kind rule.
-      audioEffectIds: [
-        fixture.records.midiEffectDevice.id,
-        fixture.records.instrumentDevice.id,
-        fixture.records.instrumentAudioEffectDevice.id,
-      ],
-    })
-
-    fixture.containers.tracks.set(instrumentTrackAsAudio.id, instrumentTrackAsAudio)
-
-    expect(codesFor(fixture.seed)).toContain('clip-track-kind-mismatch')
   })
 
   it('rejects a Clip that references a missing MIDI Source', () => {
     const fixture = createCompleteProjectFixture()
 
-    replaceNonLoopClip(fixture, { sourceId: parseMidiSourceId('missing-source') })
+    replaceVerseClip(fixture, { sourceId: parseMidiSourceId('missing-source') })
 
     expect(codesFor(fixture.seed)).toContain('clip-missing-midi-source')
   })
@@ -253,7 +229,7 @@ describe('Clip, Track, and MIDI Source invariants', () => {
   it('rejects an unowned MIDI Source', () => {
     const fixture = createCompleteProjectFixture()
 
-    fixture.containers.clips.delete(fixture.records.nonLoopClip.id)
+    fixture.containers.clips.delete(fixture.records.verseClip.id)
 
     expect(codesFor(fixture.seed)).toContain('midi-source-ownership')
   })
@@ -261,7 +237,7 @@ describe('Clip, Track, and MIDI Source invariants', () => {
   it('rejects a MIDI Source shared by multiple Clips', () => {
     const fixture = createCompleteProjectFixture()
     const secondClip = createMidiClipRecord({
-      ...fixture.records.nonLoopClip,
+      ...fixture.records.verseClip,
       id: parseClipId('clip-shared-source'),
       startTick: parseTick(5_760),
     })
@@ -271,30 +247,14 @@ describe('Clip, Track, and MIDI Source invariants', () => {
     expect(codesFor(fixture.seed)).toContain('midi-source-ownership')
   })
 
-  it('rejects a non-looping Clip window beyond its MIDI Source', () => {
+  it('rejects a Clip window beyond its MIDI Source', () => {
     const fixture = createCompleteProjectFixture()
     const shortSource = createMidiSourceRecord({
-      id: fixture.records.nonLoopSource.id,
+      id: fixture.records.verseSource.id,
       lengthTick: parseTick(960),
     })
 
     fixture.containers.midiSources.set(shortSource.id, shortSource)
-
-    expect(codesFor(fixture.seed)).toContain('clip-outside-midi-source')
-  })
-
-  it('rejects a loop region beyond its MIDI Source', () => {
-    const fixture = createCompleteProjectFixture()
-    const replacement = createMidiClipRecord({
-      ...fixture.records.loopingClip,
-      sourceOffsetTick: parseTick(1_200),
-      loop: {
-        sourceStartTick: parseTick(1_200),
-        sourceSpanTick: parseTick(960),
-      },
-    })
-
-    fixture.containers.clips.set(replacement.id, replacement)
 
     expect(codesFor(fixture.seed)).toContain('clip-outside-midi-source')
   })
@@ -304,7 +264,7 @@ describe('MIDI Note partition invariants', () => {
   it('rejects a MIDI Source without a Note partition', () => {
     const fixture = createCompleteProjectFixture()
 
-    fixture.containers.midiNotes.delete(fixture.records.nonLoopSource.id)
+    fixture.containers.midiNotes.delete(fixture.records.verseSource.id)
 
     expect(codesFor(fixture.seed)).toContain('midi-source-missing-note-partition')
   })
@@ -320,12 +280,12 @@ describe('MIDI Note partition invariants', () => {
   it('rejects a MIDI Note that ends beyond its Source', () => {
     const fixture = createCompleteProjectFixture()
     const note = createMidiNoteRecord({
-      ...fixture.records.nonLoopNote,
+      ...fixture.records.verseNote,
       startTick: parseTick(1_500),
       durationTick: parseTick(500),
     })
 
-    fixture.containers.nonLoopNotePartition.set(note.id, note)
+    fixture.containers.verseNotePartition.set(note.id, note)
 
     expect(codesFor(fixture.seed)).toContain('note-outside-midi-source')
   })
@@ -333,11 +293,11 @@ describe('MIDI Note partition invariants', () => {
   it('requires NoteId values to be unique across Source partitions', () => {
     const fixture = createCompleteProjectFixture()
     const duplicateNote = createMidiNoteRecord({
-      ...fixture.records.nonLoopNote,
+      ...fixture.records.verseNote,
       startTick: parseTick(240),
     })
 
-    fixture.containers.loopingNotePartition.set(duplicateNote.id, duplicateNote)
+    fixture.containers.chorusNotePartition.set(duplicateNote.id, duplicateNote)
 
     expect(codesFor(fixture.seed)).toContain('note-id-duplicate')
   })
@@ -347,7 +307,7 @@ describe('MIDI Sustain Pedal Event partition invariants', () => {
   it('rejects a MIDI Source without a Sustain Pedal Event partition', () => {
     const fixture = createCompleteProjectFixture()
 
-    fixture.containers.midiSustainPedalEvents.delete(fixture.records.nonLoopSource.id)
+    fixture.containers.midiSustainPedalEvents.delete(fixture.records.verseSource.id)
 
     expect(codesFor(fixture.seed)).toContain('midi-source-missing-sustain-pedal-event-partition')
   })
@@ -367,23 +327,20 @@ describe('MIDI Sustain Pedal Event partition invariants', () => {
     const boundaryFixture = createCompleteProjectFixture()
     const boundaryEvent = createMidiSustainPedalEventRecord({
       id: parseMidiSustainPedalEventId('sustain-pedal-at-source-end'),
-      tick: boundaryFixture.records.nonLoopSource.lengthTick,
+      tick: boundaryFixture.records.verseSource.lengthTick,
       value: parseMidiControlValue(0),
       channel: parseMidiChannel(2),
     })
-    boundaryFixture.containers.nonLoopSustainPedalEventPartition.set(
-      boundaryEvent.id,
-      boundaryEvent,
-    )
+    boundaryFixture.containers.verseSustainPedalEventPartition.set(boundaryEvent.id, boundaryEvent)
 
     expect(validateSeed(boundaryFixture.seed)).toEqual([])
 
     const outsideFixture = createCompleteProjectFixture()
     const outsideEvent = createMidiSustainPedalEventRecord({
       ...boundaryEvent,
-      tick: parseTick(outsideFixture.records.nonLoopSource.lengthTick + 1),
+      tick: parseTick(outsideFixture.records.verseSource.lengthTick + 1),
     })
-    outsideFixture.containers.nonLoopSustainPedalEventPartition.set(outsideEvent.id, outsideEvent)
+    outsideFixture.containers.verseSustainPedalEventPartition.set(outsideEvent.id, outsideEvent)
 
     expect(codesFor(outsideFixture.seed)).toContain('sustain-pedal-event-outside-midi-source')
   })
@@ -391,12 +348,12 @@ describe('MIDI Sustain Pedal Event partition invariants', () => {
   it('requires Event IDs to be unique across Source partitions', () => {
     const fixture = createCompleteProjectFixture()
     const duplicate = createMidiSustainPedalEventRecord({
-      ...fixture.records.nonLoopPedalDown,
+      ...fixture.records.versePedalDown,
       tick: parseTick(1_200),
       channel: parseMidiChannel(1),
     })
 
-    fixture.containers.loopingSustainPedalEventPartition.set(duplicate.id, duplicate)
+    fixture.containers.chorusSustainPedalEventPartition.set(duplicate.id, duplicate)
 
     expect(codesFor(fixture.seed)).toContain('sustain-pedal-event-id-duplicate')
   })
@@ -405,15 +362,12 @@ describe('MIDI Sustain Pedal Event partition invariants', () => {
     const fixture = createCompleteProjectFixture()
     const duplicatePosition = createMidiSustainPedalEventRecord({
       id: parseMidiSustainPedalEventId('sustain-pedal-duplicate-position'),
-      tick: fixture.records.nonLoopPedalDown.tick,
+      tick: fixture.records.versePedalDown.tick,
       value: parseMidiControlValue(64),
-      channel: fixture.records.nonLoopPedalDown.channel,
+      channel: fixture.records.versePedalDown.channel,
     })
 
-    fixture.containers.nonLoopSustainPedalEventPartition.set(
-      duplicatePosition.id,
-      duplicatePosition,
-    )
+    fixture.containers.verseSustainPedalEventPartition.set(duplicatePosition.id, duplicatePosition)
 
     expect(codesFor(fixture.seed)).toContain('sustain-pedal-event-duplicate-tick-channel')
   })
@@ -422,12 +376,12 @@ describe('MIDI Sustain Pedal Event partition invariants', () => {
     const fixture = createCompleteProjectFixture()
     const otherChannel = createMidiSustainPedalEventRecord({
       id: parseMidiSustainPedalEventId('sustain-pedal-other-channel'),
-      tick: fixture.records.nonLoopPedalDown.tick,
+      tick: fixture.records.versePedalDown.tick,
       value: parseMidiControlValue(64),
       channel: parseMidiChannel(1),
     })
 
-    fixture.containers.nonLoopSustainPedalEventPartition.set(otherChannel.id, otherChannel)
+    fixture.containers.verseSustainPedalEventPartition.set(otherChannel.id, otherChannel)
 
     expect(validateSeed(fixture.seed)).toEqual([])
   })
@@ -510,34 +464,16 @@ describe('Device topology invariants', () => {
 
   it('rejects a Device shared by two Tracks', () => {
     const fixture = createCompleteProjectFixture()
-    const audioTrack = createAudioTrackRecord({
-      ...fixture.records.audioTrack,
-      audioEffectIds: [
-        ...fixture.records.audioTrack.audioEffectIds,
-        fixture.records.instrumentDevice.id,
-      ],
+    const bassTrack = createInstrumentTrackRecord({
+      ...fixture.records.bassTrack,
+      instrumentDeviceId: fixture.records.instrumentDevice.id,
     })
 
-    fixture.containers.tracks.set(audioTrack.id, audioTrack)
+    fixture.containers.tracks.set(bassTrack.id, bassTrack)
+    // Without its Track the Bass Device would be an orphan, a second ownership problem.
+    fixture.containers.devices.delete(fixture.records.bassDevice.id)
 
-    expect(codesFor(fixture.seed)).toContain('device-ownership')
-  })
-
-  it('rejects a Device shared by a Track and Master', () => {
-    const fixture = createCompleteProjectFixture()
-    const seed = {
-      ...fixture.seed,
-      master: createMasterChannelRecord({
-        gain: parseLinearGain(1),
-        muted: false,
-        audioEffectIds: [
-          fixture.records.masterAudioEffectDevice.id,
-          fixture.records.instrumentDevice.id,
-        ],
-      }),
-    } satisfies ModelStoreSeed
-
-    expect(codesFor(seed)).toContain('device-ownership')
+    expect(codesFor(fixture.seed)).toEqual(['device-ownership'])
   })
 })
 

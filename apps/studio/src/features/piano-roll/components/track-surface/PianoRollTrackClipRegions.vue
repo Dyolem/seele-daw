@@ -16,7 +16,6 @@ const props = defineProps<{
       class="piano-roll-clip-regions__clip"
       :data-clip-id="region.clip.clipId"
       :data-active="props.activeClipId === region.clip.clipId"
-      :data-status="region.clip.status"
       :style="region.style"
     ></div>
   </div>
@@ -42,8 +41,5 @@ const props = defineProps<{
   z-index: 1;
   border-inline-color: color-mix(in srgb, var(--piano-roll-clip-color) 72%, transparent);
   background: color-mix(in srgb, var(--piano-roll-clip-color) 9%, transparent);
-}
-.piano-roll-clip-regions__clip[data-status='unsupported'] {
-  border-inline-style: dashed;
 }
 </style>

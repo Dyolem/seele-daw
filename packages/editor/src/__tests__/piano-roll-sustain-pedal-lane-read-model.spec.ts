@@ -15,7 +15,6 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import {
-  PIANO_ROLL_TRACK_CLIP_STATUS,
   createPianoRollSustainPedalClipLaneReadModel,
   createPianoRollTrackSustainPedalLaneReadModel,
 } from '#internal/index'
@@ -159,23 +158,19 @@ describe('Piano Roll Sustain Pedal Clip Lane Read Model', () => {
 })
 
 describe('Piano Roll Sustain Pedal Track Lane Read Model', () => {
-  it('projects ready Clips into global time and preserves looped-Clip unsupported status', () => {
+  it('projects every Clip into global time', () => {
     const fixture = createPianoRollProjectFixture()
-    const loopedClipId = parseClipId('cc64-looped-clip')
-    const loopedSourceId = parseMidiSourceId('cc64-looped-source')
+    const middleClipId = parseClipId('cc64-middle-clip')
+    const middleSourceId = parseMidiSourceId('cc64-middle-source')
     executeCommitted(
       fixture.session,
       createAddMidiClipCommand({
         baseRevision: fixture.session.modelRevision,
-        clipId: loopedClipId,
+        clipId: middleClipId,
         color: null,
-        loop: {
-          sourceSpanTick: parseTick(1_920),
-          sourceStartTick: parseTick(0),
-        },
         muted: false,
-        name: 'Looped CC64 Clip',
-        sourceId: loopedSourceId,
+        name: 'Middle CC64 Clip',
+        sourceId: middleSourceId,
         sourceLengthTick: parseTick(3_840),
         sourceOffsetTick: parseTick(0),
         spanTick: parseTick(1_920),
@@ -192,7 +187,6 @@ describe('Piano Roll Sustain Pedal Track Lane Read Model', () => {
         baseRevision: fixture.session.modelRevision,
         clipId: laterClipId,
         color: null,
-        loop: null,
         muted: false,
         name: 'Later CC64 Clip',
         sourceId: laterSourceId,
@@ -219,19 +213,10 @@ describe('Piano Roll Sustain Pedal Track Lane Read Model', () => {
     expect(model.activeClipId).toBe(laterClipId)
     expect(model.clips.map(({ clip }) => clip.clipId)).toEqual([
       fixture.clip.id,
-      loopedClipId,
+      middleClipId,
       laterClipId,
     ])
-    expect(model.clips[1]).toMatchObject({
-      clip: {
-        reason: 'looped-clip',
-        status: PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED,
-      },
-      events: [],
-      initialPedalDown: null,
-      initialValue: null,
-      segments: [],
-    })
+    expect(model.clips[1]).toMatchObject({ clip: { clipId: middleClipId }, events: [] })
     expect(model.clips[2]?.events[0]).toMatchObject({
       affectsPlayback: true,
       timelineTick: 8_160,

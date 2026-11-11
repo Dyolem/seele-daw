@@ -49,8 +49,7 @@ Project MIDI Export Bridge 尚未实现，因此当前没有把 Project CC64 写
 每个 Source 都有踏板分区，同一 Source / Channel / Tick 至多一枚事件，分区按 Tick 排序：这些是
 Project Core 的不变量与 Snapshot 的约定，Compiler 不再检查。
 
-Looped MIDI Clip 整体不进入可听编译，所以没有跨循环的踏板状态展开。
-非循环 Clip 采用半开 Source Window；位于终点的 CC64 Fact 可以保存和往返，但不会把声音延长到
+Clip 采用半开 Source Window；位于终点的 CC64 Fact 可以保存和往返，但不会把声音延长到
 Clip 之外。
 
 ## Locate、迟到调度与 Note Chase 边界
@@ -87,7 +86,6 @@ Lane 走同一条路径，一次手势只提交一个 Project Command / History 
 以下能力仍明确延期：
 
 - CC64 精确数值输入、批量 Value 变换、可见播放态踏板指示与通用 Controller Lane 平台；
-- Looped MIDI Clip 的跨循环 Controller 展开与 Note Chase；
 - half-pedal、repedaling 的连续声学模型、damper resonance、pedal noise 与 release sample；
 - Project MIDI Export Bridge、Studio MIDI Export UI 与 WAV Offline Export；
 - CC64 以外的通用 CC、Pitch Bend、Aftertouch、MPE 与 Automation 平台。

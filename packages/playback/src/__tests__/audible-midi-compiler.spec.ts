@@ -1,6 +1,5 @@
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  createAudioTrackRecord,
   createDeviceDescriptor,
   createInstrumentTrackRecord,
   createMasterChannelRecord,
@@ -11,7 +10,6 @@ import {
   parseClipId,
   parseDeviceId,
   parseDeviceTypeId,
-  parseLinearGain,
   parseMidiChannel,
   parseMidiControlValue,
   parseMidiPitch,
@@ -64,9 +62,7 @@ function createFixtureTrack(id: string, instrumentDeviceId: DeviceDescriptor['id
     name: id,
     color: null,
     channel: createCompilerFixtureChannel(1, 0),
-    midiEffectIds: [],
     instrumentDeviceId,
-    audioEffectIds: [],
   })
 }
 
@@ -222,7 +218,6 @@ describe('Audible MIDI Compiler', () => {
         master: createMasterChannelRecord({
           gain: snapshot.master.gain,
           muted: true,
-          audioEffectIds: [],
         }),
       }),
     )
@@ -300,7 +295,6 @@ describe('Audible MIDI Compiler', () => {
       spanTick: parseTick(480),
       sourceId: overlappingSource.id,
       sourceOffsetTick: parseTick(0),
-      loop: null,
     })
     const overlappingNote = createMidiNoteRecord({
       id: parseNoteId('note-fixture-overlapping'),
@@ -404,25 +398,30 @@ describe('Audible MIDI Compiler', () => {
     expect(pedalHeldSpan?.releaseTick).toBeLessThan(plan.timelineEndTick)
   })
 
-  it('lets every Track Solo fact participate even when the soloed Audio Track is unsupported', () => {
+  it('lets a soloed Track silence the others even when its own instrument cannot play', () => {
     const { snapshot } = createAudibleMidiProjectFixture()
-    const audioTrack = createAudioTrackRecord({
-      id: parseTrackId('track-fixture-audio-solo'),
-      name: 'Audio Solo',
+    const device = createFixtureDevice('device-solo-third-party', 'third-party.instrument')
+    const soloTrack = createInstrumentTrackRecord({
+      id: parseTrackId('track-fixture-solo'),
+      name: 'Solo',
       color: null,
       channel: createCompilerFixtureChannel(1, 0, false, true),
-      audioEffectIds: [],
+      instrumentDeviceId: device.id,
     })
     const plan = compileAudibleMidiProject(
       replaceCompilerFixtureSnapshot(snapshot, {
-        trackOrder: [...snapshot.trackOrder, audioTrack.id],
-        tracks: [...snapshot.tracks, audioTrack],
+        devices: [...snapshot.devices, device],
+        trackOrder: [...snapshot.trackOrder, soloTrack.id],
+        tracks: [...snapshot.tracks, soloTrack],
       }),
     )
 
     expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.EMPTY)
     expect(plan.tracks.every(({ audible }) => !audible)).toBe(true)
-    expect(diagnosticCodes(plan)).toEqual(['audio-track-unsupported', 'no-audible-midi-note-spans'])
+    expect(diagnosticCodes(plan)).toEqual([
+      'instrument-runtime-missing',
+      'no-audible-midi-note-spans',
+    ])
   })
 
   it('skips routes that cannot produce a Sample plan', () => {
@@ -457,78 +456,6 @@ describe('Audible MIDI Compiler', () => {
       'instrument-disabled',
       'invalid-sample-instrument-state',
     ])
-  })
-
-  it('skips enabled Track effects, ignores disabled effects, and blocks enabled Master effects', () => {
-    const { records, snapshot } = createAudibleMidiProjectFixture()
-    const enabledMidiEffect = createFixtureDevice('device-enabled-midi-effect', 'seele.midi-effect')
-    const disabledAudioEffect = createFixtureDevice(
-      'device-disabled-audio-effect',
-      'seele.audio-effect',
-      false,
-    )
-    const affectedPianoTrack = createInstrumentTrackRecord({
-      ...records.pianoTrack,
-      midiEffectIds: [enabledMidiEffect.id],
-    })
-    const unaffectedAlternateTrack = createInstrumentTrackRecord({
-      ...records.alternateTrack,
-      audioEffectIds: [disabledAudioEffect.id],
-    })
-    const trackEffectSnapshot = replaceCompilerFixtureSnapshot(snapshot, {
-      tracks: [affectedPianoTrack, unaffectedAlternateTrack],
-      devices: [...snapshot.devices, enabledMidiEffect, disabledAudioEffect],
-    })
-    const trackEffectPlan = compileAudibleMidiProject(trackEffectSnapshot)
-
-    expect(trackEffectPlan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.PARTIAL)
-    expect(trackEffectPlan.tracks.map(({ trackId }) => trackId)).toEqual([
-      records.alternateTrack.id,
-    ])
-    expect(diagnosticCodes(trackEffectPlan)).toEqual(['midi-effect-chain-unsupported'])
-
-    const enabledMasterEffect = createFixtureDevice(
-      'device-enabled-master-effect',
-      'seele.audio-effect',
-    )
-    const blockedPlan = compileAudibleMidiProject(
-      replaceCompilerFixtureSnapshot(snapshot, {
-        devices: [...snapshot.devices, enabledMasterEffect],
-        master: createMasterChannelRecord({
-          gain: parseLinearGain(1),
-          muted: false,
-          audioEffectIds: [enabledMasterEffect.id],
-        }),
-      }),
-    )
-
-    expect(blockedPlan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.BLOCKED)
-    expect(planSpans(blockedPlan)).toEqual([])
-    expect(blockedPlan.diagnostics).toMatchObject([
-      {
-        code: 'master-audio-effect-chain-unsupported',
-        severity: 'blocking',
-        deviceId: enabledMasterEffect.id,
-      },
-    ])
-  })
-
-  it('skips Looped Clips without shrinking the neutral Arrangement extent', () => {
-    const { records, snapshot } = createAudibleMidiProjectFixture()
-    const loopedPianoClip = createMidiClipRecord({
-      ...records.pianoClip,
-      loop: { sourceStartTick: parseTick(0), sourceSpanTick: parseTick(960) },
-    })
-    const plan = compileAudibleMidiProject(
-      replaceCompilerFixtureSnapshot(snapshot, {
-        clips: [loopedPianoClip, records.alternateClip],
-      }),
-    )
-
-    expect(plan.status).toBe(AUDIBLE_MIDI_PLAN_STATUS.PARTIAL)
-    expect(plan.arrangementEndTick).toBe(1_920)
-    expect(planSpans(plan).map(({ trackId }) => trackId)).toEqual([records.alternateTrack.id])
-    expect(diagnosticCodes(plan)).toEqual(['looped-midi-clip-unsupported'])
   })
 
   it('returns a valid Empty plan rather than throwing when no MIDI Note Span is audible', () => {
@@ -570,7 +497,6 @@ describe('Audible MIDI Compiler', () => {
       spanTick: source.lengthTick,
       sourceId: source.id,
       sourceOffsetTick: parseTick(0),
-      loop: null,
     })
     const notes = Object.freeze(
       Array.from({ length: 10_000 }, (_, index) =>

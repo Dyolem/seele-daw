@@ -139,30 +139,30 @@ describe('ProjectSnapshot public contract', () => {
   it('copies and freezes every public container while sharing domain Records', () => {
     const { fixture, session } = createFixtureProjectSession()
     const snapshot = session.getSnapshot()
-    const notes = notesOf(snapshot, fixture.records.nonLoopSource.id)
-    const sustainPedalEvents = sustainPedalEventsOf(snapshot, fixture.records.nonLoopSource.id)
+    const notes = notesOf(snapshot, fixture.records.verseSource.id)
+    const sustainPedalEvents = sustainPedalEventsOf(snapshot, fixture.records.verseSource.id)
 
     expect(snapshot.project).toBe(fixture.records.project)
     expect(snapshot.master).toBe(fixture.records.master)
     expect(snapshot.tracks.find((track) => track.id === fixture.records.instrumentTrack.id)).toBe(
       fixture.records.instrumentTrack,
     )
-    expect(snapshot.clips.find((clip) => clip.id === fixture.records.nonLoopClip.id)).toBe(
-      fixture.records.nonLoopClip,
+    expect(snapshot.clips.find((clip) => clip.id === fixture.records.verseClip.id)).toBe(
+      fixture.records.verseClip,
     )
     expect(
-      snapshot.midiSources.find((source) => source.id === fixture.records.nonLoopSource.id),
-    ).toBe(fixture.records.nonLoopSource)
-    expect(notes.find((note) => note.id === fixture.records.nonLoopNote.id)).toBe(
-      fixture.records.nonLoopNote,
+      snapshot.midiSources.find((source) => source.id === fixture.records.verseSource.id),
+    ).toBe(fixture.records.verseSource)
+    expect(notes.find((note) => note.id === fixture.records.verseNote.id)).toBe(
+      fixture.records.verseNote,
     )
     expect(
       findSustainPedalEvent(
         snapshot,
-        fixture.records.nonLoopSource.id,
-        fixture.records.nonLoopPedalDown.id,
+        fixture.records.verseSource.id,
+        fixture.records.versePedalDown.id,
       ),
-    ).toBe(fixture.records.nonLoopPedalDown)
+    ).toBe(fixture.records.versePedalDown)
     expect(snapshot.devices[0]).toBe([...fixture.seed.devices.values()].sort(compareIds)[0])
 
     expect(Object.isFrozen(snapshot)).toBe(true)
@@ -237,7 +237,7 @@ describe('ProjectSnapshot public contract', () => {
 describe('ProjectSnapshot revision isolation', () => {
   it('keeps earlier snapshots stable across Add, Move, and Remove commits', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
+    const sourceId = fixture.records.verseSource.id
     const noteId = parseNoteId('note-snapshot-versioned')
     const beforeAdd = session.getSnapshot()
     const addResult = session.execute(
@@ -294,9 +294,9 @@ describe('ProjectSnapshot revision isolation', () => {
 
   it('shares the tables and partitions that commits since the last Snapshot did not touch', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const editedSourceId = fixture.records.nonLoopSource.id
-    const untouchedSourceId = fixture.records.loopingSource.id
-    const noteId = fixture.records.nonLoopNote.id
+    const editedSourceId = fixture.records.verseSource.id
+    const untouchedSourceId = fixture.records.chorusSource.id
+    const noteId = fixture.records.verseNote.id
     const before = session.getSnapshot()
     const moveNote = (deltaTick: number) =>
       session.execute(
@@ -335,8 +335,8 @@ describe('ProjectSnapshot revision isolation', () => {
 
   it('captures new Undo and Redo revisions while restoring the corresponding Record versions', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
-    const noteId = fixture.records.nonLoopNote.id
+    const sourceId = fixture.records.verseSource.id
+    const noteId = fixture.records.verseNote.id
     const beforeMove = session.getSnapshot()
     const originalNote = findNote(beforeMove, sourceId, noteId)
 
@@ -357,7 +357,7 @@ describe('ProjectSnapshot revision isolation', () => {
     session.redo()
     const afterRedo = session.getSnapshot()
 
-    expect(originalNote).toBe(fixture.records.nonLoopNote)
+    expect(originalNote).toBe(fixture.records.verseNote)
     expect(movedNote).not.toBe(originalNote)
     expect(findNote(afterUndo, sourceId, noteId)).toBe(originalNote)
     expect(findNote(afterRedo, sourceId, noteId)).toBe(movedNote)
@@ -465,7 +465,6 @@ describe('Snapshot partitions merged from written records', () => {
                 sourceId: parseMidiSourceId(fresh('source')),
                 sourceLengthTick: parseTick(1_920),
                 sourceOffsetTick: parseTick(0),
-                loop: null,
                 noteId: parseNoteId(fresh('note')),
                 noteStartTick: parseTick(0),
                 noteDurationTick: parseTick(240),

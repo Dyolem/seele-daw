@@ -64,12 +64,10 @@ package root 复用 Session、Handoff 与 Pointer Adapter，领域规则留在 S
 
 ## Piano Roll
 
-**坐标与视口。** `PianoRollClipContext` 组合非循环 MIDI Clip 与它唯一的 MidiSource，Clip-local
-Tick 与 Source Tick 一一对应；looped Clip 没有 context（`createPianoRollClipContext` 返回
-`null`），调用方据此显示“不支持”。`PianoRollViewport` 描述 Clip-local 的可见 Tick、Pitch 与 CSS
+**坐标与视口。** `PianoRollClipContext` 组合 MIDI Clip 与它唯一的 MidiSource，Clip-local
+Tick 与 Source Tick 一一对应。`PianoRollViewport` 描述 Clip-local 的可见 Tick、Pitch 与 CSS
 Pixel 尺寸，提供 Tick / X、Pitch / Y 的线性换算；Y 换算出的 Pitch 夹在可见行内。Clip-local 与
-Track-global Surface 共用 identity-free 的 `PianoRollTimelineViewport` 几何。Looped Clip 不支持
-编辑：Loop 展开、重复实例的选择与 Source 编辑语义尚未确定。
+Track-global Surface 共用 identity-free 的 `PianoRollTimelineViewport` 几何。
 
 **信任边界。** editor 信任 Snapshot 的不变量（Clip 的 Source、Note 与 CC64 分区都存在）和 Studio
 传入的几何（视口属于当前 Clip，坐标在视口内），不再检查。只检查来自布局和浏览器的值：视口宽高、
@@ -79,14 +77,14 @@ Track-global Surface 共用 identity-free 的 `PianoRollTimelineViewport` 几何
 
 - `PianoRollNoteReadModel` 用 Project Core 的范围 Query 与局部 Subscription 发布冻结的可见 Note，
   匹配的 Commit 到达后重新读取权威结果，不维护第二份 Note。
-- Track 全局 Read Model 从一份 Snapshot 与 `TrackId` 派生排序后的 Clip window，把非循环 Clip 中的
-  Note 映射到 Project Tick（`clip.startTick + note.startTick - clip.sourceOffsetTick`）。Looped
-  Clip 出现在投影中但标记为 `unsupported`；失效的 Active Clip 身份会被清空。Clip 记录、Source 与
+- Track 全局 Read Model 从一份 Snapshot 与 `TrackId` 派生排序后的 Clip window，把每个 Clip 中的
+  Note 映射到 Project Tick（`clip.startTick + note.startTick - clip.sourceOffsetTick`）；失效的
+  Active Clip 身份会被清空。Clip 记录、Source 与
   Note 数组都没变时沿用上次的 Clip Read Model；只有 Note 变了时，没变的 Note 沿用它的投影
   （ADR-010）。
 - 放置解析根据 Pointer 的全局 Tick、当前小节、Active Clip 与 Clip window，纯函数地得出
-  `add-to-clip`、`extend-clip` 或 `create-clip`；归属不明、looped Clip 与越过下一 Clip 的自动扩展
-  返回带可见原因的 blocked 结果。
+  `add-to-clip`、`extend-clip` 或 `create-clip`；归属不明与越过下一 Clip 的自动扩展返回带可见
+  原因的 blocked 结果。
 
 **Selection。** `PianoRollEditorSession` 随当前 Clip 创建和释放，只保存冻结的 `NoteId` 列表，支持
 单选、追加切换与清空。新增选择前按 `MidiSourceId + NoteId` 查询权威 Note；Note 移出可见范围时

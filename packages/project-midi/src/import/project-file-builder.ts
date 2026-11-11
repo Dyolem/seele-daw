@@ -68,7 +68,6 @@ export function createImportedProjectFile(
     master: createMasterChannelRecord({
       gain: parseLinearGain(1),
       muted: false,
-      audioEffectIds: [],
     }),
     trackOrder: entries.map(({ track }) => track.id),
     tracks: entries.map(({ track }) => track),

@@ -153,10 +153,7 @@ onBeforeUnmount(dispose)
         v-for="occurrence in occurrenceWindows"
         :key="`${occurrence.key}:window`"
         class="piano-roll-sustain-pedal-lane__occurrence"
-        :class="{
-          'piano-roll-sustain-pedal-lane__occurrence--active': occurrence.active,
-          'piano-roll-sustain-pedal-lane__occurrence--unsupported': occurrence.unsupported,
-        }"
+        :class="{ 'piano-roll-sustain-pedal-lane__occurrence--active': occurrence.active }"
         :style="occurrence.style"
         aria-hidden="true"
       ></span>
@@ -256,17 +253,6 @@ onBeforeUnmount(dispose)
 .piano-roll-sustain-pedal-lane__occurrence--active {
   background: color-mix(in srgb, var(--sd-color-border-focus) 9%, transparent);
   opacity: 1;
-}
-
-.piano-roll-sustain-pedal-lane__occurrence--unsupported {
-  border-inline-style: dashed;
-  background: repeating-linear-gradient(
-    -45deg,
-    transparent,
-    transparent 4px,
-    color-mix(in srgb, var(--sd-color-border-strong) 12%, transparent) 4px,
-    color-mix(in srgb, var(--sd-color-border-strong) 12%, transparent) 8px
-  );
 }
 
 .piano-roll-sustain-pedal-lane__segment {

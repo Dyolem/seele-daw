@@ -17,15 +17,11 @@ export interface PianoRollClipContext {
   readonly sourceStartTick: Tick
 }
 
-/**
- * The window a Clip shows of its MidiSource, one Clip Tick to one Source Tick. Null for a looped
- * Clip: the Piano Roll cannot edit repeated Source ranges yet.
- */
+/** The window a Clip shows of its MidiSource, one Clip Tick to one Source Tick. */
 export function createPianoRollClipContext(
   clip: MidiClipRecord,
   source: MidiSourceRecord,
-): PianoRollClipContext | null {
-  if (clip.loop !== null) return null
+): PianoRollClipContext {
   return Object.freeze({
     clipId: clip.id,
     clipSpanTick: clip.spanTick,

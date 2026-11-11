@@ -77,7 +77,6 @@ describe('track edits', () => {
     expect(snapshot.trackOrder).toEqual(['track-defaults'])
     expect(snapshot.tracks[0]).toMatchObject({
       id: 'track-defaults',
-      kind: 'instrument',
       name: 'Instrument 1',
       color: PROJECT_TRACK_PALETTE[0],
       channel: { gain: 1, pan: 0, muted: false, soloed: false },

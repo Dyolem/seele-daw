@@ -53,7 +53,7 @@ import {
 import { describeChanges } from './support/project-change-test-support'
 import { createFixtureProjectSession } from './support/project-session-test-support'
 
-const NON_LOOP_SOURCE = parseMidiSourceId('source-non-loop')
+const NON_LOOP_SOURCE = parseMidiSourceId('source-verse')
 const CHANNEL = { gain: parseLinearGain(1), pan: parseBipolarValue(0), muted: false, soloed: false }
 
 function instrument(id: string) {
@@ -85,9 +85,7 @@ function collectionEntry() {
     name: 'Imported',
     color: null,
     channel: CHANNEL,
-    midiEffectIds: [],
     instrumentDeviceId: device.id,
-    audioEffectIds: [],
   })
   const source = createMidiSourceRecord({
     id: parseMidiSourceId('source-collection'),
@@ -103,7 +101,6 @@ function collectionEntry() {
     spanTick: parseTick(960),
     sourceId: source.id,
     sourceOffsetTick: parseTick(0),
-    loop: null,
   })
   const notes = [
     createMidiNoteRecord({
@@ -231,7 +228,6 @@ const CASES: readonly CommandCase[] = [
         sourceId: parseMidiSourceId('source-added'),
         sourceLengthTick: parseTick(960),
         sourceOffsetTick: parseTick(0),
-        loop: null,
       }),
     changes: [
       'midiSources.insert source-added',
@@ -255,7 +251,6 @@ const CASES: readonly CommandCase[] = [
         sourceId: parseMidiSourceId('source-added-with-note'),
         sourceLengthTick: parseTick(960),
         sourceOffsetTick: parseTick(0),
-        loop: null,
         ...note('note-in-added-clip', 0),
       }),
     changes: [
@@ -270,11 +265,11 @@ const CASES: readonly CommandCase[] = [
     command: ({ modelRevision }) =>
       createExtendMidiClipWithNoteCommand({
         baseRevision: modelRevision,
-        clipId: parseClipId('clip-non-loop'),
+        clipId: parseClipId('clip-verse'),
         spanTick: parseTick(1_440),
         ...note('note-in-extension', 1_300),
       }),
-    changes: ['clips.replace clip-non-loop', 'midiNotes.insert note-in-extension'],
+    changes: ['clips.replace clip-verse', 'midiNotes.insert note-in-extension'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.ADD,
@@ -297,11 +292,11 @@ const CASES: readonly CommandCase[] = [
       createMoveNotesCommand({
         baseRevision: modelRevision,
         sourceId: NON_LOOP_SOURCE,
-        noteIds: [parseNoteId('note-non-loop-primary'), parseNoteId('note-non-loop-harmony')],
+        noteIds: [parseNoteId('note-verse-primary'), parseNoteId('note-verse-harmony')],
         deltaTick: parseTickDelta(10),
         deltaPitch: parseMidiPitchDelta(1),
       }),
-    changes: ['midiNotes.replace note-non-loop-primary', 'midiNotes.replace note-non-loop-harmony'],
+    changes: ['midiNotes.replace note-verse-primary', 'midiNotes.replace note-verse-harmony'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.REMOVE,
@@ -309,9 +304,9 @@ const CASES: readonly CommandCase[] = [
       createRemoveNotesCommand({
         baseRevision: modelRevision,
         sourceId: NON_LOOP_SOURCE,
-        noteIds: [parseNoteId('note-non-loop-harmony')],
+        noteIds: [parseNoteId('note-verse-harmony')],
       }),
-    changes: ['midiNotes.remove note-non-loop-harmony'],
+    changes: ['midiNotes.remove note-verse-harmony'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_NOTE.RESIZE,
@@ -319,11 +314,11 @@ const CASES: readonly CommandCase[] = [
       createResizeNoteCommand({
         baseRevision: modelRevision,
         sourceId: NON_LOOP_SOURCE,
-        noteId: parseNoteId('note-non-loop-primary'),
+        noteId: parseNoteId('note-verse-primary'),
         startTick: parseTick(240),
         durationTick: parseTick(300),
       }),
-    changes: ['midiNotes.replace note-non-loop-primary'],
+    changes: ['midiNotes.replace note-verse-primary'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD,
@@ -344,10 +339,10 @@ const CASES: readonly CommandCase[] = [
       createMoveMidiSustainPedalEventsCommand({
         baseRevision: modelRevision,
         sourceId: NON_LOOP_SOURCE,
-        eventIds: [parseMidiSustainPedalEventId('sustain-non-loop-up')],
+        eventIds: [parseMidiSustainPedalEventId('sustain-verse-up')],
         deltaTick: parseTickDelta(10),
       }),
-    changes: ['midiSustainPedalEvents.replace sustain-non-loop-up'],
+    changes: ['midiSustainPedalEvents.replace sustain-verse-up'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REMOVE,
@@ -355,9 +350,9 @@ const CASES: readonly CommandCase[] = [
       createRemoveMidiSustainPedalEventsCommand({
         baseRevision: modelRevision,
         sourceId: NON_LOOP_SOURCE,
-        eventIds: [parseMidiSustainPedalEventId('sustain-non-loop-up')],
+        eventIds: [parseMidiSustainPedalEventId('sustain-verse-up')],
       }),
-    changes: ['midiSustainPedalEvents.remove sustain-non-loop-up'],
+    changes: ['midiSustainPedalEvents.remove sustain-verse-up'],
   },
   {
     type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE,
@@ -365,10 +360,10 @@ const CASES: readonly CommandCase[] = [
       createReplaceMidiSustainPedalEventValueCommand({
         baseRevision: modelRevision,
         sourceId: NON_LOOP_SOURCE,
-        eventId: parseMidiSustainPedalEventId('sustain-non-loop-down'),
+        eventId: parseMidiSustainPedalEventId('sustain-verse-down'),
         value: parseMidiControlValue(100),
       }),
-    changes: ['midiSustainPedalEvents.replace sustain-non-loop-down'],
+    changes: ['midiSustainPedalEvents.replace sustain-verse-down'],
   },
 ]
 

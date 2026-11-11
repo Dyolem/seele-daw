@@ -60,8 +60,6 @@ interface CompiledClip {
   readonly sustainPedalEvents: readonly MidiSustainPedalEventRecord[]
 }
 
-const NO_CLIP_SPANS: ReadonlyMap<ClipId, readonly MidiNoteSpanPlan[]> = new Map()
-
 /**
  * Each Clip's spans, kept while its record and its Source's note and pedal arrays are the same.
  * Snapshots share the arrays of untouched Sources, so an edit compiles only the Clips it touched.
@@ -133,26 +131,6 @@ function createDiagnostic(input: DiagnosticInput): PlaybackDiagnostic {
   })
 }
 
-function getEnabledDevices(
-  deviceIds: readonly DeviceId[],
-  devicesById: ReadonlyMap<DeviceId, DeviceDescriptor>,
-): readonly DeviceDescriptor[] {
-  // Disabled effects remain persisted facts but are transparent to the V1 playback route.
-  return deviceIds.map((deviceId) => devicesById.get(deviceId)!).filter(({ enabled }) => enabled)
-}
-
-function appendEffectDiagnostics(
-  diagnostics: PlaybackDiagnostic[],
-  devices: readonly DeviceDescriptor[],
-  code: PlaybackDiagnosticCode,
-  severity: PlaybackDiagnosticSeverity,
-  trackId?: TrackId,
-): void {
-  for (const device of devices) {
-    diagnostics.push(createDiagnostic({ code, device, severity, trackId }))
-  }
-}
-
 /**
  * Decodes the generic MIDISampleSynth route without consulting Catalogs or browser assets.
  * Missing manifests and samples are resource-preparation failures handled after compilation.
@@ -201,35 +179,12 @@ function createTrackPlan(
   diagnostics: PlaybackDiagnostic[],
   hasSoloedTrack: boolean,
   masterMuted: boolean,
-  masterBlocked: boolean,
 ): TrackPlaybackPlan | null {
-  // Enabled effects cannot be bypassed as dry audio without misrepresenting the saved topology.
-  const midiEffects = getEnabledDevices(track.midiEffectIds, indexes.devicesById)
-  const audioEffects = getEnabledDevices(track.audioEffectIds, indexes.devicesById)
-  appendEffectDiagnostics(
-    diagnostics,
-    midiEffects,
-    'midi-effect-chain-unsupported',
-    'warning',
-    track.id,
-  )
-  appendEffectDiagnostics(
-    diagnostics,
-    audioEffects,
-    'track-audio-effect-chain-unsupported',
-    'warning',
-    track.id,
-  )
-
   const instrument = decodeInstrumentPlan(track, indexes.devicesById, diagnostics)
-  if (instrument === null || midiEffects.length > 0 || audioEffects.length > 0) return null
+  if (instrument === null) return null
 
-  // hasSoloedTrack includes every Track fact, even Track kinds this compiler cannot render.
-  const audible =
-    !masterBlocked &&
-    !masterMuted &&
-    !track.channel.muted &&
-    (!hasSoloedTrack || track.channel.soloed)
+  // hasSoloedTrack counts every Track, even one whose instrument cannot play.
+  const audible = !masterMuted && !track.channel.muted && (!hasSoloedTrack || track.channel.soloed)
 
   return Object.freeze({
     audible,
@@ -351,13 +306,7 @@ function updateNoteSpans(
   return Object.freeze(spans)
 }
 
-function derivePlanStatus(
-  masterBlocked: boolean,
-  spanCount: number,
-  diagnosticCount: number,
-): AudibleMidiPlanStatus {
-  // Blocking topology dominates; diagnostics otherwise distinguish partial from clean playback.
-  if (masterBlocked) return AUDIBLE_MIDI_PLAN_STATUS.BLOCKED
+function derivePlanStatus(spanCount: number, diagnosticCount: number): AudibleMidiPlanStatus {
   if (spanCount === 0) return AUDIBLE_MIDI_PLAN_STATUS.EMPTY
   if (diagnosticCount > 0) return AUDIBLE_MIDI_PLAN_STATUS.PARTIAL
   return AUDIBLE_MIDI_PLAN_STATUS.PLAYABLE
@@ -372,57 +321,23 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
   const trackPlans: TrackPlaybackPlan[] = []
   const clipSpans = new Map<ClipId, readonly MidiNoteSpanPlan[]>()
   let spanCount = 0
-  // Compute global Solo before unsupported Track kinds are filtered out of executable plans.
+  // Solo is global: a soloed Track silences the others even if its own instrument cannot play.
   const hasSoloedTrack = snapshot.tracks.some(({ channel }) => channel.soloed)
-  const enabledMasterEffects = getEnabledDevices(
-    snapshot.master.audioEffectIds,
-    indexes.devicesById,
-  )
-  const masterBlocked = enabledMasterEffects.length > 0
-
-  // Master effects cannot be skipped per Track, so any enabled entry blocks the whole route.
-  appendEffectDiagnostics(
-    diagnostics,
-    enabledMasterEffects,
-    'master-audio-effect-chain-unsupported',
-    'blocking',
-  )
 
   for (const trackId of snapshot.trackOrder) {
     const track = indexes.tracksById.get(trackId)!
-    if (track.kind === 'audio') {
-      // Its Solo fact already participated above even though Audio Track playback is deferred.
-      diagnostics.push(
-        createDiagnostic({ code: 'audio-track-unsupported', severity: 'info', trackId }),
-      )
-      continue
-    }
-
     const trackPlan = createTrackPlan(
       track,
       indexes,
       diagnostics,
       hasSoloedTrack,
       snapshot.master.muted,
-      masterBlocked,
     )
     if (trackPlan === null) continue
     trackPlans.push(trackPlan)
 
     for (const clip of indexes.clipsByTrackId.get(track.id) ?? []) {
-      if (clip.kind !== 'midi' || clip.muted || !trackPlan.audible) continue
-      if (clip.loop !== null) {
-        // Loop expansion is deferred; skip only this Clip so independent content can continue.
-        diagnostics.push(
-          createDiagnostic({
-            clipId: clip.id,
-            code: 'looped-midi-clip-unsupported',
-            severity: 'warning',
-            trackId: track.id,
-          }),
-        )
-        continue
-      }
+      if (clip.muted || !trackPlan.audible) continue
 
       const sourceNotes = indexes.notesBySourceId.get(clip.sourceId)!
       const sustainPedalEvents = indexes.sustainPedalEventsBySourceId.get(clip.sourceId)!
@@ -432,19 +347,18 @@ export function compileAudibleMidiProject(snapshot: ProjectSnapshot): AudibleMid
     }
   }
 
-  if (!masterBlocked && spanCount === 0) {
+  if (spanCount === 0) {
     diagnostics.push(createDiagnostic({ code: 'no-audible-midi-note-spans', severity: 'info' }))
   }
 
-  const status = derivePlanStatus(masterBlocked, spanCount, diagnostics.length)
+  const status = derivePlanStatus(spanCount, diagnostics.length)
 
   // Freeze the complete plan boundary so later runtimes cannot mutate compiled Project meaning.
   return Object.freeze({
     arrangementEndTick: timelineRange.contentEndTick,
     diagnostics: Object.freeze(diagnostics),
     master: Object.freeze({ gain: snapshot.master.gain, muted: snapshot.master.muted }),
-    // A blocked plan remains inspectable but never exposes events that a scheduler could run.
-    clipSpans: masterBlocked ? NO_CLIP_SPANS : clipSpans,
+    clipSpans,
     modelRevision: snapshot.modelRevision,
     status,
     tempoSegments: tempoMap.segments,

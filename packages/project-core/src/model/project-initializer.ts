@@ -49,7 +49,6 @@ export function createInitialModelStore(input: CreateInitialModelStoreInput): Mo
   const master = createMasterChannelRecord({
     gain: UNITY_GAIN,
     muted: false,
-    audioEffectIds: [],
   })
 
   const seed: ModelStoreSeed = {

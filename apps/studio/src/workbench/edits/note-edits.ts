@@ -103,11 +103,7 @@ function editableClip(snapshot: ProjectSnapshot, clipId: ClipId): PianoRollClipC
   const clip = snapshot.clips.find((candidate) => candidate.id === clipId)
   if (clip === undefined) throw staleEdit()
   const source = snapshot.midiSources.find((candidate) => candidate.id === clip.sourceId)!
-  const editable = createPianoRollClipContext(clip, source)
-  if (editable === null) {
-    throw new ProjectEditError('unsupported', 'Notes in looped Clips cannot be edited yet.')
-  }
-  return editable
+  return createPianoRollClipContext(clip, source)
 }
 
 export function createNoteEdits(context: Omit<ProjectEditContext, 'random'>) {
@@ -244,7 +240,6 @@ export function createNoteEdits(context: Omit<ProjectEditContext, 'random'>) {
               baseRevision: session.modelRevision,
               clipId,
               color: null,
-              loop: null,
               muted: false,
               name: track.name,
               sourceId: parseMidiSourceId(context.createId()),

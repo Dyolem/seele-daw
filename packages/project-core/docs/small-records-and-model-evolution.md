@@ -97,7 +97,7 @@ MIDI Note 是典型例子：项目名称很少修改，但一次钢琴卷帘编�
 ### 直接嵌套值对象
 
 ```ts
-interface TrackBase {
+interface InstrumentTrackRecord {
   readonly id: TrackId
   readonly name: string
   readonly channel: ChannelStripDescriptor
@@ -117,8 +117,6 @@ interface TrackBase {
 ```ts
 interface InstrumentTrackRecord {
   readonly instrumentDeviceId: DeviceId
-  readonly midiEffectIds: readonly DeviceId[]
-  readonly audioEffectIds: readonly DeviceId[]
 }
 ```
 
@@ -264,13 +262,14 @@ interface ProjectRecord {
 
 ### 使用判别联合管理类型扩展
 
-Track 和 Clip 这类存在不同拓扑或语义分支的概念，适合通过判别联合演进：
+Track 和 Clip 出现第二种拓扑或语义分支时（例如 Audio Track），通过判别联合演进：
 
 ```ts
 type TrackRecord = InstrumentTrackRecord | AudioTrackRecord
 ```
 
-增加新分支时，TypeScript 能够暴露需要重新审查的穷尽分支。新增字段则应放在真正共享的 Base 或特定分支中，不能为了减少重复把只属于一种 Track 的字段提升到所有 Track。
+只有一种分支时不预留判别字段和空分支：没有东西创建它们，它们只是每条记录都要写、每个消费者
+都要处理的常量（[ADR-012](../../../docs/adr/ADR-012-model-holds-only-what-the-product-creates.md)）。增加新分支时，TypeScript 能够暴露需要重新审查的穷尽分支。新增字段则应放在真正共享的 Base 或特定分支中，不能为了减少重复把只属于一种 Track 的字段提升到所有 Track。
 
 ### 用测试保护不变量，而不只保护形状
 

@@ -10,18 +10,9 @@ import { addTicks } from '#internal/model/tick'
 
 type NewMidiClipCommand = AddMidiClipCommand | AddMidiClipWithNoteCommand
 
-function requireInstrumentTrack(reader: ModelStoreReader, command: NewMidiClipCommand): void {
-  const track = reader.getTrack(command.clip.trackId)
-
-  if (track === undefined) {
+function requireTrack(reader: ModelStoreReader, command: NewMidiClipCommand): void {
+  if (reader.getTrack(command.clip.trackId) === undefined) {
     throw new ProjectCommandError('track-not-found', `Track ${command.clip.trackId} does not exist`)
-  }
-
-  if (track.kind !== 'instrument') {
-    throw new ProjectCommandError(
-      'midi-clip-track-kind-mismatch',
-      `MIDI Clip ${command.clip.id} cannot belong to non-Instrument Track ${track.id}`,
-    )
   }
 }
 
@@ -45,10 +36,7 @@ function assertClipGraphIdentitiesAvailable(
 }
 
 function assertClipWithinSource(command: NewMidiClipCommand): void {
-  const sourceReadEndTick =
-    command.clip.loop === null
-      ? addTicks(command.clip.sourceOffsetTick, command.clip.spanTick)
-      : addTicks(command.clip.loop.sourceStartTick, command.clip.loop.sourceSpanTick)
+  const sourceReadEndTick = addTicks(command.clip.sourceOffsetTick, command.clip.spanTick)
 
   if (sourceReadEndTick > command.source.lengthTick) {
     throw new ProjectCommandError(
@@ -63,7 +51,7 @@ export function assertNewMidiClipGraphCanBeAdded(
   reader: ModelStoreReader,
   command: NewMidiClipCommand,
 ): void {
-  requireInstrumentTrack(reader, command)
+  requireTrack(reader, command)
   assertClipGraphIdentitiesAvailable(reader, command)
   assertClipWithinSource(command)
 }

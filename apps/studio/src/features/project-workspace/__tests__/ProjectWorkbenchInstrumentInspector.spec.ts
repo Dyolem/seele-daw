@@ -84,7 +84,6 @@ function createTrack(
     color: null,
     id: TRACK_ID,
     instrument: Object.freeze(instrument),
-    kind: 'instrument',
     name: 'Lead Keys',
   })
 }

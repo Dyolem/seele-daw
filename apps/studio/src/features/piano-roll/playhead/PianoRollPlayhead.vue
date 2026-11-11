@@ -3,14 +3,11 @@ import type { PianoRollViewport } from '@seele-daw/editor'
 import { computed, type StyleValue } from 'vue'
 
 import { projectPianoRollPlayheadCssPixel } from '@/features/piano-roll/playhead/playhead-projection'
-import type { ReadyProjectPianoRollPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { useStudio } from '@/workbench/studio-services'
 
 const props = defineProps<{
-  readonly presentation: Pick<
-    ReadyProjectPianoRollPresentation,
-    'context' | 'projectId' | 'startTick'
-  >
+  readonly presentation: Pick<ProjectPianoRollPresentation, 'context' | 'projectId' | 'startTick'>
   readonly viewport: PianoRollViewport
 }>()
 const { visualPosition } = useStudio().playback

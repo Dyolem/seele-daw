@@ -48,7 +48,6 @@ function createNewClipInput(
     sourceId: parseMidiSourceId('source-command-with-note'),
     sourceLengthTick: parseTick(3_840),
     sourceOffsetTick: parseTick(0),
-    loop: null,
     noteId: parseNoteId('note-command-with-new-clip'),
     noteStartTick: parseTick(960),
     noteDurationTick: parseTick(480),
@@ -74,7 +73,7 @@ function createExtensionInput(
 
   return {
     baseRevision: store.modelRevision,
-    clipId: fixture.records.nonLoopClip.id,
+    clipId: fixture.records.verseClip.id,
     spanTick: parseTick(1_920),
     noteId: parseNoteId('note-command-with-extension'),
     noteStartTick: parseTick(1_080),
@@ -128,7 +127,6 @@ describe('MIDI Clip with Note Command public contracts', () => {
       type: PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD_WITH_NOTE,
       clip: {
         id: parseClipId('clip-command-with-note'),
-        loop: null,
         sourceId: parseMidiSourceId('source-command-with-note'),
       },
       source: { lengthTick: 3_840 },
@@ -143,7 +141,7 @@ describe('MIDI Clip with Note Command public contracts', () => {
     })
     expect(extended).toMatchObject({
       type: PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE,
-      clipId: fixture.records.nonLoopClip.id,
+      clipId: fixture.records.verseClip.id,
       spanTick: 1_920,
       note: {
         id: parseNoteId('note-command-with-extension'),
@@ -238,7 +236,7 @@ describe('AddMidiClipWithNoteCommand preparation', () => {
         duplicateStore,
         createNewClipCommand(duplicateStore, {
           trackId: duplicateFixture.records.instrumentTrack.id,
-          noteId: duplicateFixture.records.nonLoopNote.id,
+          noteId: duplicateFixture.records.verseNote.id,
         }),
       ),
     )
@@ -269,26 +267,26 @@ describe('ExtendMidiClipWithNoteCommand preparation', () => {
       {
         op: 'replace',
         table: 'midiSources',
-        before: fixture.records.nonLoopSource,
-        after: { id: fixture.records.nonLoopSource.id, lengthTick: 2_160 },
+        before: fixture.records.verseSource,
+        after: { id: fixture.records.verseSource.id, lengthTick: 2_160 },
       },
       {
         op: 'replace',
         table: 'clips',
-        before: fixture.records.nonLoopClip,
-        after: { id: fixture.records.nonLoopClip.id, spanTick: 1_920 },
+        before: fixture.records.verseClip,
+        after: { id: fixture.records.verseClip.id, spanTick: 1_920 },
       },
       {
         op: 'insert',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         after: preparation.command.note,
       },
     ])
     expect(describeChanges(preparation.plan.inverse)).toEqual([
       `midiNotes.remove ${preparation.command.note.id}`,
-      `clips.replace ${fixture.records.nonLoopClip.id}`,
-      `midiSources.replace ${fixture.records.nonLoopSource.id}`,
+      `clips.replace ${fixture.records.verseClip.id}`,
+      `midiSources.replace ${fixture.records.verseSource.id}`,
     ])
   })
 
@@ -307,27 +305,18 @@ describe('ExtendMidiClipWithNoteCommand preparation', () => {
     )
 
     expect(describeChanges(preparation.plan.forward)).toEqual([
-      `clips.replace ${fixture.records.nonLoopClip.id}`,
+      `clips.replace ${fixture.records.verseClip.id}`,
       'midiNotes.insert note-command-with-extension',
     ])
   })
 
-  it('rejects missing, looped, non-rightward, and unnecessary extension targets', () => {
+  it('rejects missing, non-rightward, and unnecessary extension targets', () => {
     const missingFixture = createCompleteProjectFixture()
     const missingStore = new ModelStore(missingFixture.seed)
     const missing = captureCommandError(() =>
       prepareProjectCommand(
         missingStore,
         createExtensionCommand(missingStore, { clipId: parseClipId('clip-missing') }),
-      ),
-    )
-
-    const loopFixture = createCompleteProjectFixture()
-    const loopStore = new ModelStore(loopFixture.seed)
-    const looped = captureCommandError(() =>
-      prepareProjectCommand(
-        loopStore,
-        createExtensionCommand(loopStore, { clipId: loopFixture.records.loopingClip.id }),
       ),
     )
 
@@ -354,9 +343,6 @@ describe('ExtendMidiClipWithNoteCommand preparation', () => {
     )
 
     expect(missing.code).toBe('clip-not-found')
-    expect(looped).toMatchObject({
-      code: 'looped-midi-clip-unsupported',
-    })
     expect(notRightward).toMatchObject({
       code: 'midi-clip-extension-not-rightward',
     })
@@ -398,7 +384,7 @@ describe('ExtendMidiClipWithNoteCommand preparation', () => {
       prepareProjectCommand(
         duplicateStore,
         createExtensionCommand(duplicateStore, {
-          noteId: duplicateFixture.records.loopingNote.id,
+          noteId: duplicateFixture.records.chorusNote.id,
         }),
       ),
     )
@@ -482,8 +468,8 @@ describe('MIDI Clip with Note commit, consumers, and History', () => {
 
     expect(session.modelRevision).toBe(beforeRevision + 1)
     expect(describeChanges(commit)).toEqual([
-      `midiSources.replace ${fixture.records.nonLoopSource.id}`,
-      `clips.replace ${fixture.records.nonLoopClip.id}`,
+      `midiSources.replace ${fixture.records.verseSource.id}`,
+      `clips.replace ${fixture.records.verseClip.id}`,
       `midiNotes.insert ${command.note.id}`,
     ])
     const sourceReplace = requireChange(commit, 'midiSources', 'replace')
@@ -491,34 +477,34 @@ describe('MIDI Clip with Note commit, consumers, and History', () => {
     const added = requireChange(commit, 'midiNotes', 'insert')
 
     expect(sourceReplace).toMatchObject({
-      before: fixture.records.nonLoopSource,
+      before: fixture.records.verseSource,
       after: { lengthTick: 2_160 },
     })
     expect(clipReplace).toMatchObject({
-      before: fixture.records.nonLoopClip,
+      before: fixture.records.verseClip,
       after: { spanTick: 1_920 },
     })
     expect(added.after).toEqual(command.note)
     expect(
       session.query(
         createMidiNoteByIdQuery({
-          sourceId: fixture.records.nonLoopSource.id,
+          sourceId: fixture.records.verseSource.id,
           noteId: command.note.id,
         }),
       ).note,
     ).toBe(added.after)
 
     const file = createProjectFile(session.getSnapshot())
-    const sourceId = fixture.records.nonLoopSource.id
-    expect(file.clips.find(({ id }) => id === fixture.records.nonLoopClip.id)?.spanTick).toBe(1_920)
+    const sourceId = fixture.records.verseSource.id
+    expect(file.clips.find(({ id }) => id === fixture.records.verseClip.id)?.spanTick).toBe(1_920)
     expect(file.midiSources.find(({ id }) => id === sourceId)?.lengthTick).toBe(2_160)
     expect(file.midiNotes[sourceId]?.some(({ id }) => id === command.note.id)).toBe(true)
 
     const undoCommit = session.undo()
     expect(describeChanges(undoCommit)).toEqual([
       `midiNotes.remove ${command.note.id}`,
-      `clips.replace ${fixture.records.nonLoopClip.id}`,
-      `midiSources.replace ${fixture.records.nonLoopSource.id}`,
+      `clips.replace ${fixture.records.verseClip.id}`,
+      `midiSources.replace ${fixture.records.verseSource.id}`,
     ])
     expect(session.getSnapshot().clips.find(({ id }) => id === clipReplace.before.id)).toBe(
       clipReplace.before,
@@ -529,7 +515,7 @@ describe('MIDI Clip with Note commit, consumers, and History', () => {
     expect(
       session.query(
         createMidiNoteByIdQuery({
-          sourceId: fixture.records.nonLoopSource.id,
+          sourceId: fixture.records.verseSource.id,
           noteId: command.note.id,
         }),
       ).note,

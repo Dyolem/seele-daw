@@ -15,11 +15,9 @@ import {
 } from '@seele-daw/project-core'
 
 import {
-  PIANO_ROLL_TRACK_CLIP_STATUS,
   createPianoRollTrackClipProjection,
   pianoRollTrackSourceTickToProjectTick,
   type PianoRollTrackClipProjection,
-  type ReadyPianoRollTrackClipProjection,
 } from '#internal/common/piano-roll/track/clip-projection'
 
 export interface PianoRollTrackNoteProjection {
@@ -74,7 +72,7 @@ function compareNoteProjections(
 }
 
 function createNoteProjection(
-  clip: ReadyPianoRollTrackClipProjection,
+  clip: PianoRollTrackClipProjection,
   note: MidiNoteRecord,
 ): PianoRollTrackNoteProjection | null {
   const noteEndTick = addTicks(note.startTick, note.durationTick)
@@ -99,8 +97,6 @@ interface ClipReadModelMemo {
   readonly readModel: PianoRollTrackClipReadModel
 }
 
-const NO_NOTES = Object.freeze<PianoRollTrackNoteProjection[]>([])
-
 /**
  * Each Clip's read model, kept while its record, its Source record and its Note array are the
  * same. Snapshots share those across revisions (ADR-007), so an edit rebuilds only the Clip it
@@ -109,7 +105,7 @@ const NO_NOTES = Object.freeze<PianoRollTrackNoteProjection[]>([])
 const clipReadModels = new WeakMap<MidiClipRecord, ClipReadModelMemo>()
 
 function projectNotes(
-  clip: ReadyPianoRollTrackClipProjection,
+  clip: PianoRollTrackClipProjection,
   notes: readonly MidiNoteRecord[],
 ): PianoRollTrackNoteProjection[] {
   const projections: PianoRollTrackNoteProjection[] = []
@@ -123,7 +119,7 @@ function projectNotes(
 /** The previous projections with those of removed or rewritten Notes dropped and new ones merged in. */
 function updateNoteProjections(
   memo: ClipReadModelMemo,
-  clip: ReadyPianoRollTrackClipProjection,
+  clip: PianoRollTrackClipProjection,
   notes: readonly MidiNoteRecord[],
 ): readonly PianoRollTrackNoteProjection[] {
   const { droppedIds, written: writtenNotes } = diffSnapshotRecords(memo.notes, notes)
@@ -158,12 +154,9 @@ function createClipReadModel(
   const projection = sameWindow
     ? memo.readModel.clip
     : createPianoRollTrackClipProjection(clip, source)
-  let noteProjections: readonly PianoRollTrackNoteProjection[] = NO_NOTES
-  if (projection.status === PIANO_ROLL_TRACK_CLIP_STATUS.READY) {
-    noteProjections = sameWindow
-      ? updateNoteProjections(memo, projection, notes)
-      : Object.freeze(projectNotes(projection, notes))
-  }
+  const noteProjections = sameWindow
+    ? updateNoteProjections(memo, projection, notes)
+    : Object.freeze(projectNotes(projection, notes))
   const readModel = Object.freeze({ clip: projection, notes: noteProjections })
   clipReadModels.set(clip, { source, notes, readModel })
   return readModel

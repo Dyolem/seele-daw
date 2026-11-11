@@ -24,7 +24,7 @@ import {
   type PianoRollTimelineViewport,
 } from '@seele-daw/editor'
 import { type ClipId, type Tick, type ProjectSession } from '@seele-daw/project-core'
-import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
@@ -48,7 +48,7 @@ export function useTrackPlacement({
   readonly surfaceElement: Readonly<ShallowRef<HTMLElement | null>>
   readonly getViewport: () => PianoRollTimelineViewport | null
   readonly getSession: () => Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
-  readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
+  readonly getPresentation: () => ProjectPianoRollTrackPresentation
   readonly getTimelineEndTick: () => Tick
   readonly getBarSpanTick: () => Tick
   readonly createDisplayGrid: () => PianoRollGrid

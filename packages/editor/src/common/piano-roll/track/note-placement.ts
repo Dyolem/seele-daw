@@ -6,10 +6,7 @@ import {
   type Tick,
 } from '@seele-daw/project-core'
 
-import {
-  PIANO_ROLL_TRACK_CLIP_STATUS,
-  type ReadyPianoRollTrackClipProjection,
-} from '#internal/common/piano-roll/track/clip-projection'
+import type { PianoRollTrackClipProjection } from '#internal/common/piano-roll/track/clip-projection'
 import type {
   PianoRollTrackClipReadModel,
   PianoRollTrackReadModel,
@@ -29,7 +26,6 @@ export const PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION = Object.freeze({
 export const PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON = Object.freeze({
   AMBIGUOUS_CLIP_TARGET: 'ambiguous-clip-target',
   EXTENSION_CROSSES_NEXT_CLIP: 'extension-crosses-next-clip',
-  LOOPED_CLIP_TARGET: 'looped-clip-target',
 } as const)
 
 type PianoRollTrackNotePlacementAction =
@@ -138,30 +134,9 @@ function selectClip(
   }
 }
 
-function requireReadyClip(
-  selected: SelectedClip,
-  base: PianoRollTrackNotePlacementBase,
-):
-  | { readonly blocked: BlockedPianoRollTrackNotePlacement }
-  | { readonly clip: ReadyPianoRollTrackClipProjection } {
-  if (selected.blocked !== null) return { blocked: selected.blocked }
-  if (selected.clip.clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.READY) {
-    return { clip: selected.clip.clip }
-  }
-
-  return {
-    blocked: createBlockedPlacement(
-      base,
-      PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON.LOOPED_CLIP_TARGET,
-      [selected.clip],
-      `Looped Clip ${selected.clip.clip.name} is visible but cannot receive Track-mode note edits yet.`,
-    ),
-  }
-}
-
 function findNextClip(
   readModel: PianoRollTrackReadModel,
-  target: ReadyPianoRollTrackClipProjection,
+  target: PianoRollTrackClipProjection,
 ): PianoRollTrackClipReadModel | null {
   let next: PianoRollTrackClipReadModel | null = null
 
@@ -181,9 +156,9 @@ function findNextClip(
   return next
 }
 
-function resolveReadyClipPlacement(
+function resolveClipPlacement(
   readModel: PianoRollTrackReadModel,
-  clip: ReadyPianoRollTrackClipProjection,
+  clip: PianoRollTrackClipProjection,
   base: PianoRollTrackNotePlacementBase,
 ): PianoRollTrackNotePlacement {
   const sourceStartTick = addTicks(
@@ -262,10 +237,8 @@ export function resolvePianoRollTrackNotePlacement(
   )
 
   if (containing.length > 0) {
-    const ready = requireReadyClip(selectClip(containing, input.readModel.activeClipId, base), base)
-    return 'blocked' in ready
-      ? ready.blocked
-      : resolveReadyClipPlacement(input.readModel, ready.clip, base)
+    const selected = selectClip(containing, input.readModel.activeClipId, base)
+    return selected.blocked ?? resolveClipPlacement(input.readModel, selected.clip.clip, base)
   }
 
   let nearestLeftEndTick = -1
@@ -282,13 +255,8 @@ export function resolvePianoRollTrackNotePlacement(
   }
 
   if (nearestLeftEndTick >= 0 && projectStartTick - nearestLeftEndTick <= barSpanTick) {
-    const ready = requireReadyClip(
-      selectClip(nearestLeft, input.readModel.activeClipId, base),
-      base,
-    )
-    return 'blocked' in ready
-      ? ready.blocked
-      : resolveReadyClipPlacement(input.readModel, ready.clip, base)
+    const selected = selectClip(nearestLeft, input.readModel.activeClipId, base)
+    return selected.blocked ?? resolveClipPlacement(input.readModel, selected.clip.clip, base)
   }
 
   return createClipPlacement(barSpanTick, base)

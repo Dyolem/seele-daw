@@ -11,7 +11,7 @@ import type { TrackVisibleClipNotes } from '@/features/piano-roll/components/tra
 import { createProjectPianoRollNoteRenderer } from '@/features/piano-roll/presentation/project-piano-roll-note-renderer'
 import { createPianoRollThemeSnapshot } from '@/features/piano-roll/presentation/piano-roll-theme'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
-import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 
 export function useTrackRendering({
   surfaceElement,
@@ -26,7 +26,7 @@ export function useTrackRendering({
   readonly surfaceElement: Readonly<ShallowRef<HTMLElement | null>>
   readonly gridCanvas: Readonly<ShallowRef<HTMLCanvasElement | null>>
   readonly noteHost: Readonly<ShallowRef<HTMLElement | null>>
-  readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
+  readonly getPresentation: () => ProjectPianoRollTrackPresentation
   readonly getViewport: () => PianoRollTimelineViewport | null
   readonly getVisibleClips: () => readonly TrackVisibleClipNotes[]
   readonly createDisplayGrid: () => PianoRollGrid

@@ -582,25 +582,25 @@ describe('Audible MIDI Transport', () => {
     })
   })
 
-  it.each([
-    [AUDIBLE_MIDI_PLAN_STATUS.BLOCKED, AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_BLOCKED],
-    [AUDIBLE_MIDI_PLAN_STATUS.EMPTY, AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_EMPTY],
-  ] as const)('rejects %s Plans without changing state or generation', (status, outcome) => {
-    const plan = createFixturePlan()
-    const transport = createAudibleMidiTransport(
-      replacePlan(plan, { clipSpans: new Map(), status }),
-      new ManualPlaybackClock(),
-    )
+  it.each([[AUDIBLE_MIDI_PLAN_STATUS.EMPTY, AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_EMPTY]] as const)(
+    'rejects %s Plans without changing state or generation',
+    (status, outcome) => {
+      const plan = createFixturePlan()
+      const transport = createAudibleMidiTransport(
+        replacePlan(plan, { clipSpans: new Map(), status }),
+        new ManualPlaybackClock(),
+      )
 
-    expect(transport.play()).toMatchObject({
-      outcome,
-      snapshot: {
-        mappingGeneration: INITIAL_MAPPING_GENERATION,
-        positionTick: 0,
-        state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
-      },
-    })
-  })
+      expect(transport.play()).toMatchObject({
+        outcome,
+        snapshot: {
+          mappingGeneration: INITIAL_MAPPING_GENERATION,
+          positionTick: 0,
+          state: AUDIBLE_MIDI_TRANSPORT_STATE.STOPPED,
+        },
+      })
+    },
+  )
 
   it('allows a Partial Plan to enter Playing', () => {
     const plan = createFixturePlan()

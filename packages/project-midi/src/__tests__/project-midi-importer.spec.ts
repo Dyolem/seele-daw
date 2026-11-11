@@ -146,7 +146,6 @@ describe('createProjectMidiImportDraft', () => {
     expect(projectFile.name).toBe('Imported Lead')
     expect(projectFile.trackOrder).toEqual(['track-0'])
     expect(projectFile.tracks['track-0']).toMatchObject({
-      kind: 'instrument',
       name: 'Lead',
       color: '#23B26D',
       channel: { gain: 1, pan: 0, muted: false, soloed: false },
@@ -157,7 +156,6 @@ describe('createProjectMidiImportDraft', () => {
       startTick: 960,
       spanTick: 2880,
       sourceId: 'midi-source-0',
-      loop: null,
       color: null,
     })
     expect(projectFile.midiSources['midi-source-0']).toEqual({

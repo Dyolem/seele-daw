@@ -1,5 +1,5 @@
 import {
-  createAudioTrackRecord,
+  createInstrumentTrackRecord,
   createDeviceDescriptor,
   createMasterChannelRecord,
   createMidiClipRecord,
@@ -104,21 +104,20 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
     master: createMasterChannelRecord({
       gain: parseLinearGain(0.7),
       muted: true,
-      audioEffectIds: records.master.audioEffectIds,
     }),
-    track: createAudioTrackRecord({
-      id: records.audioTrack.id,
-      name: 'Applied Audio Track',
-      color: records.audioTrack.color,
-      channel: records.audioTrack.channel,
-      audioEffectIds: records.audioTrack.audioEffectIds,
+    track: createInstrumentTrackRecord({
+      id: records.bassTrack.id,
+      name: 'Applied Bass Track',
+      color: records.bassTrack.color,
+      channel: records.bassTrack.channel,
+      instrumentDeviceId: records.bassTrack.instrumentDeviceId,
     }),
     clip: createMidiClipRecord({
-      ...records.nonLoopClip,
+      ...records.verseClip,
       name: 'Applied MIDI Clip',
     }),
     source: createMidiSourceRecord({
-      id: records.nonLoopSource.id,
+      id: records.verseSource.id,
       lengthTick: parseTick(2_400),
     }),
     tempoEvent: createTempoEventRecord({
@@ -135,11 +134,11 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
       enabled: false,
     }),
     note: createMidiNoteRecord({
-      ...records.nonLoopNote,
+      ...records.verseNote,
       velocity: parseMidiVelocity(116),
     }),
     sustainPedalEvent: createMidiSustainPedalEventRecord({
-      ...records.nonLoopPedalDown,
+      ...records.versePedalDown,
       value: parseMidiControlValue(96),
     }),
   }
@@ -153,15 +152,15 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
 export function createCompleteMutationScenario() {
   const fixture = createCompleteProjectFixture()
   const replacement = createReplacementRecords(fixture)
-  const partitionBefore = [fixture.records.nonLoopHarmonyNote, fixture.records.nonLoopNote]
-  const partitionAfter = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
+  const partitionBefore = [fixture.records.verseHarmonyNote, fixture.records.verseNote]
+  const partitionAfter = [fixture.records.verseNote, fixture.records.verseHarmonyNote]
   const sustainPedalEventPartitionBefore = [
-    fixture.records.nonLoopPedalUp,
-    fixture.records.nonLoopPedalDown,
+    fixture.records.versePedalUp,
+    fixture.records.versePedalDown,
   ]
   const sustainPedalEventPartitionAfter = [
-    fixture.records.nonLoopPedalDown,
-    fixture.records.nonLoopPedalUp,
+    fixture.records.versePedalDown,
+    fixture.records.versePedalUp,
   ]
   const mutations: readonly ProjectChange[] = [
     {
@@ -179,49 +178,49 @@ export function createCompleteMutationScenario() {
     {
       op: 'remove',
       table: 'tracks',
-      before: fixture.records.audioTrack,
+      before: fixture.records.bassTrack,
     },
     {
       op: 'insert',
       table: 'tracks',
-      after: fixture.records.audioTrack,
+      after: fixture.records.bassTrack,
     },
     {
       op: 'replace',
       table: 'tracks',
-      before: fixture.records.audioTrack,
+      before: fixture.records.bassTrack,
       after: replacement.track,
     },
     {
       op: 'remove',
       table: 'clips',
-      before: fixture.records.nonLoopClip,
+      before: fixture.records.verseClip,
     },
     {
       op: 'insert',
       table: 'clips',
-      after: fixture.records.nonLoopClip,
+      after: fixture.records.verseClip,
     },
     {
       op: 'replace',
       table: 'clips',
-      before: fixture.records.nonLoopClip,
+      before: fixture.records.verseClip,
       after: replacement.clip,
     },
     {
       op: 'remove',
       table: 'midiSources',
-      before: fixture.records.nonLoopSource,
+      before: fixture.records.verseSource,
     },
     {
       op: 'insert',
       table: 'midiSources',
-      after: fixture.records.nonLoopSource,
+      after: fixture.records.verseSource,
     },
     {
       op: 'replace',
       table: 'midiSources',
-      before: fixture.records.nonLoopSource,
+      before: fixture.records.verseSource,
       after: replacement.source,
     },
     {
@@ -287,63 +286,63 @@ export function createCompleteMutationScenario() {
     {
       op: 'remove-partition',
       table: 'midiNotes',
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       records: partitionBefore,
     },
     {
       op: 'insert-partition',
       table: 'midiNotes',
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       records: partitionAfter,
     },
     {
       op: 'remove',
       table: 'midiNotes',
-      sourceId: fixture.records.nonLoopSource.id,
-      before: fixture.records.nonLoopNote,
+      sourceId: fixture.records.verseSource.id,
+      before: fixture.records.verseNote,
     },
     {
       op: 'insert',
       table: 'midiNotes',
-      sourceId: fixture.records.nonLoopSource.id,
-      after: fixture.records.nonLoopNote,
+      sourceId: fixture.records.verseSource.id,
+      after: fixture.records.verseNote,
     },
     {
       op: 'replace',
       table: 'midiNotes',
-      sourceId: fixture.records.nonLoopSource.id,
-      before: fixture.records.nonLoopNote,
+      sourceId: fixture.records.verseSource.id,
+      before: fixture.records.verseNote,
       after: replacement.note,
     },
     {
       op: 'remove-partition',
       table: 'midiSustainPedalEvents',
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       records: sustainPedalEventPartitionBefore,
     },
     {
       op: 'insert-partition',
       table: 'midiSustainPedalEvents',
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       records: sustainPedalEventPartitionAfter,
     },
     {
       op: 'remove',
       table: 'midiSustainPedalEvents',
-      sourceId: fixture.records.nonLoopSource.id,
-      before: fixture.records.nonLoopPedalDown,
+      sourceId: fixture.records.verseSource.id,
+      before: fixture.records.versePedalDown,
     },
     {
       op: 'insert',
       table: 'midiSustainPedalEvents',
-      sourceId: fixture.records.nonLoopSource.id,
-      after: fixture.records.nonLoopPedalDown,
+      sourceId: fixture.records.verseSource.id,
+      after: fixture.records.versePedalDown,
     },
     {
       op: 'replace',
       table: 'midiSustainPedalEvents',
-      sourceId: fixture.records.nonLoopSource.id,
-      before: fixture.records.nonLoopPedalDown,
+      sourceId: fixture.records.verseSource.id,
+      before: fixture.records.versePedalDown,
       after: replacement.sustainPedalEvent,
     },
   ]

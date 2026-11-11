@@ -8,13 +8,13 @@
 - 项目文件的写出与严格读取；
 - 新建 MIDI Clip 与整轨集合导入命令所需的完整所有权图；
 - Standard MIDI File 的 CC64 导入、PPQ 碰撞诊断与原始 Value / Channel 保留；
-- 非循环 Clip 的播放状态追赶、最终 Gate Release 推导与确定性的同 Tick 排序；
+- Clip 的播放状态追赶、最终 Gate Release 推导与确定性的同 Tick 排序；
 - Studio Piano Roll 的 CC64 Lane：Pencil 新增、Cursor 选择、移动、改值与删除。
 
 尚未提供：
 
 - CC64 的 Standard MIDI File 导出；
-- Looped MIDI Clip 的控制器循环展开与已有 Note 的 Note Chase；
+- 已有 Note 的 Note Chase；
 - 精确数值输入与批量编辑；
 - half-pedal、repedaling、共鸣、pedal noise 与 release sample 等更丰富的音源表现力。
 
@@ -121,7 +121,7 @@ MutationPlan 中原子删除或恢复。新建空 MIDI Clip 也会建立空踏�
 静默猜测事件顺序。
 
 允许 `event.tick === source.lengthTick`，用于保留 Source 终点的控制器状态边界。Playback 的
-Clip / Loop 展开仍采用半开窗口；终点 Event 是否形成实际调度事件，必须由后续 Compiler 的
+Clip 展开采用半开窗口；终点 Event 是否形成实际调度事件，必须由后续 Compiler 的
 边界排序政策统一决定，Project Core 不在保存时移动或删除它。
 
 不同 Channel 可以在同一 Tick 各有一个 CC64 Event。Playback 必须只影响同 Channel 的 Note；

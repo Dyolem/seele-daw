@@ -62,7 +62,6 @@ function createRendererFixture() {
     spanTick: parsePositiveTick(3_840),
     sourceId: source.id,
     sourceOffsetTick: parseTick(0),
-    loop: null,
   })
   const context = createPianoRollClipContext(clip, source)!
   const viewport = createPianoRollViewport(context, {

@@ -46,7 +46,6 @@ function createClipRecords() {
     spanTick: parseTick(960),
     sourceId: source.id,
     sourceOffsetTick: parseTick(480),
-    loop: null,
   })
 
   return { clip, source }
@@ -73,18 +72,6 @@ describe('PianoRollClipContext', () => {
     expect(pianoRollClipTickToSourceTick(context, parseTick(240))).toBe(720)
     expect(pianoRollSourceTickToClipTick(context, parseTick(1_200))).toBe(720)
     expect(Object.isFrozen(context)).toBe(true)
-  })
-
-  it('has no editing window for a looped Clip', () => {
-    const { clip, source } = createClipRecords()
-    const loopedClip = createMidiClipRecord({
-      ...clip,
-      loop: {
-        sourceStartTick: parseTick(0),
-        sourceSpanTick: parseTick(960),
-      },
-    })
-    expect(createPianoRollClipContext(loopedClip, source)).toBeNull()
   })
 })
 

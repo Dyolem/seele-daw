@@ -57,9 +57,7 @@ function importedTrack(index: number): InstrumentTrackCollectionEntry {
     name: `Track ${index}`,
     color: null,
     channel: { gain: parseLinearGain(1), pan: parseBipolarValue(0), muted: false, soloed: false },
-    midiEffectIds: [],
     instrumentDeviceId: device.id,
-    audioEffectIds: [],
   })
   const source = createMidiSourceRecord({
     id: parseMidiSourceId(`source-reuse-${index}`),
@@ -75,7 +73,6 @@ function importedTrack(index: number): InstrumentTrackCollectionEntry {
     spanTick: parseTick(SOURCE_LENGTH_TICK - 1_920),
     sourceId: source.id,
     sourceOffsetTick: parseTick(960),
-    loop: null,
   })
   const notes = Array.from({ length: NOTES_PER_TRACK }, (_, noteIndex) =>
     createMidiNoteRecord({

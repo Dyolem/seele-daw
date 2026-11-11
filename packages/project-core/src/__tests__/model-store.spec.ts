@@ -37,38 +37,33 @@ describe('ModelStore ownership boundary', () => {
     containers.tracks.clear()
     containers.clips.clear()
     containers.midiSources.clear()
-    containers.nonLoopNotePartition.clear()
-    containers.loopingNotePartition.clear()
+    containers.verseNotePartition.clear()
+    containers.chorusNotePartition.clear()
     containers.midiNotes.clear()
-    containers.nonLoopSustainPedalEventPartition.clear()
-    containers.loopingSustainPedalEventPartition.clear()
+    containers.verseSustainPedalEventPartition.clear()
+    containers.chorusSustainPedalEventPartition.clear()
     containers.midiSustainPedalEvents.clear()
     containers.tempoEvents.clear()
     containers.timeSignatureEvents.clear()
     containers.devices.clear()
 
-    expect([...store.orderedTrackIds()]).toEqual([
-      records.instrumentTrack.id,
-      records.audioTrack.id,
-    ])
+    expect([...store.orderedTrackIds()]).toEqual([records.instrumentTrack.id, records.bassTrack.id])
     expect(store.getTrack(records.instrumentTrack.id)).toBe(records.instrumentTrack)
-    expect(store.getTrack(records.audioTrack.id)).toBe(records.audioTrack)
-    expect(store.getClip(records.nonLoopClip.id)).toBe(records.nonLoopClip)
-    expect(store.getClip(records.loopingClip.id)).toBe(records.loopingClip)
-    expect(store.getMidiSource(records.nonLoopSource.id)).toBe(records.nonLoopSource)
-    expect(store.getMidiSource(records.loopingSource.id)).toBe(records.loopingSource)
-    expect(store.getMidiNote(records.nonLoopSource.id, records.nonLoopNote.id)).toBe(
-      records.nonLoopNote,
+    expect(store.getTrack(records.bassTrack.id)).toBe(records.bassTrack)
+    expect(store.getClip(records.verseClip.id)).toBe(records.verseClip)
+    expect(store.getClip(records.chorusClip.id)).toBe(records.chorusClip)
+    expect(store.getMidiSource(records.verseSource.id)).toBe(records.verseSource)
+    expect(store.getMidiSource(records.chorusSource.id)).toBe(records.chorusSource)
+    expect(store.getMidiNote(records.verseSource.id, records.verseNote.id)).toBe(records.verseNote)
+    expect(store.getMidiNote(records.chorusSource.id, records.chorusNote.id)).toBe(
+      records.chorusNote,
     )
-    expect(store.getMidiNote(records.loopingSource.id, records.loopingNote.id)).toBe(
-      records.loopingNote,
+    expect(store.getMidiSustainPedalEvent(records.verseSource.id, records.versePedalDown.id)).toBe(
+      records.versePedalDown,
     )
-    expect(
-      store.getMidiSustainPedalEvent(records.nonLoopSource.id, records.nonLoopPedalDown.id),
-    ).toBe(records.nonLoopPedalDown)
-    expect(
-      store.getMidiSustainPedalEvent(records.loopingSource.id, records.loopingPedalUp.id),
-    ).toBe(records.loopingPedalUp)
+    expect(store.getMidiSustainPedalEvent(records.chorusSource.id, records.chorusPedalUp.id)).toBe(
+      records.chorusPedalUp,
+    )
     expect(store.getTempoEvent(records.initialTempoEvent.id)).toBe(records.initialTempoEvent)
     expect(store.getTempoEvent(records.laterTempoEvent.id)).toBe(records.laterTempoEvent)
     expect(store.getTimeSignatureEvent(records.initialTimeSignatureEvent.id)).toBe(
@@ -78,9 +73,7 @@ describe('ModelStore ownership boundary', () => {
       records.laterTimeSignatureEvent,
     )
     expect(store.getDevice(records.instrumentDevice.id)).toBe(records.instrumentDevice)
-    expect(store.getDevice(records.masterAudioEffectDevice.id)).toBe(
-      records.masterAudioEffectDevice,
-    )
+    expect(store.getDevice(records.bassDevice.id)).toBe(records.bassDevice)
   })
 
   it('does not expose its mutable containers or mutation methods', () => {
@@ -132,47 +125,45 @@ describe('ModelStoreReader', () => {
     const reader: ModelStoreReader = new ModelStore(fixture.seed)
 
     expect(reader.getTrack(records.instrumentTrack.id)).toBe(records.instrumentTrack)
-    expect(reader.getTrack(records.audioTrack.id)).toBe(records.audioTrack)
+    expect(reader.getTrack(records.bassTrack.id)).toBe(records.bassTrack)
     expect([...reader.trackEntries()]).toEqual([...containers.tracks])
 
-    expect(reader.getClip(records.nonLoopClip.id)).toBe(records.nonLoopClip)
-    expect(reader.getClip(records.loopingClip.id)).toBe(records.loopingClip)
+    expect(reader.getClip(records.verseClip.id)).toBe(records.verseClip)
+    expect(reader.getClip(records.chorusClip.id)).toBe(records.chorusClip)
     expect([...reader.clipEntries()]).toEqual([...containers.clips])
 
-    expect(reader.getMidiSource(records.nonLoopSource.id)).toBe(records.nonLoopSource)
-    expect(reader.getMidiSource(records.loopingSource.id)).toBe(records.loopingSource)
+    expect(reader.getMidiSource(records.verseSource.id)).toBe(records.verseSource)
+    expect(reader.getMidiSource(records.chorusSource.id)).toBe(records.chorusSource)
     expect([...reader.midiSourceEntries()]).toEqual([...containers.midiSources])
 
-    expect(reader.hasMidiNotePartition(records.nonLoopSource.id)).toBe(true)
-    expect(reader.hasMidiNotePartition(records.loopingSource.id)).toBe(true)
+    expect(reader.hasMidiNotePartition(records.verseSource.id)).toBe(true)
+    expect(reader.hasMidiNotePartition(records.chorusSource.id)).toBe(true)
     expect([...reader.midiNotePartitionIds()]).toEqual([
-      records.nonLoopSource.id,
-      records.loopingSource.id,
+      records.verseSource.id,
+      records.chorusSource.id,
     ])
-    expect(reader.getMidiNote(records.nonLoopSource.id, records.nonLoopNote.id)).toBe(
-      records.nonLoopNote,
-    )
-    expect([...reader.midiNoteEntries(records.nonLoopSource.id)]).toEqual([
-      ...containers.nonLoopNotePartition,
+    expect(reader.getMidiNote(records.verseSource.id, records.verseNote.id)).toBe(records.verseNote)
+    expect([...reader.midiNoteEntries(records.verseSource.id)]).toEqual([
+      ...containers.verseNotePartition,
     ])
-    expect(reader.getMidiNote(records.loopingSource.id, records.loopingNote.id)).toBe(
-      records.loopingNote,
+    expect(reader.getMidiNote(records.chorusSource.id, records.chorusNote.id)).toBe(
+      records.chorusNote,
     )
-    expect([...reader.midiNoteEntries(records.loopingSource.id)]).toEqual([
-      ...containers.loopingNotePartition,
+    expect([...reader.midiNoteEntries(records.chorusSource.id)]).toEqual([
+      ...containers.chorusNotePartition,
     ])
 
-    expect(reader.hasMidiSustainPedalEventPartition(records.nonLoopSource.id)).toBe(true)
-    expect(reader.hasMidiSustainPedalEventPartition(records.loopingSource.id)).toBe(true)
+    expect(reader.hasMidiSustainPedalEventPartition(records.verseSource.id)).toBe(true)
+    expect(reader.hasMidiSustainPedalEventPartition(records.chorusSource.id)).toBe(true)
     expect([...reader.midiSustainPedalEventPartitionIds()]).toEqual([
-      records.nonLoopSource.id,
-      records.loopingSource.id,
+      records.verseSource.id,
+      records.chorusSource.id,
     ])
-    expect(
-      reader.getMidiSustainPedalEvent(records.nonLoopSource.id, records.nonLoopPedalDown.id),
-    ).toBe(records.nonLoopPedalDown)
-    expect([...reader.midiSustainPedalEventEntries(records.nonLoopSource.id)]).toEqual([
-      ...containers.nonLoopSustainPedalEventPartition,
+    expect(reader.getMidiSustainPedalEvent(records.verseSource.id, records.versePedalDown.id)).toBe(
+      records.versePedalDown,
+    )
+    expect([...reader.midiSustainPedalEventEntries(records.verseSource.id)]).toEqual([
+      ...containers.verseSustainPedalEventPartition,
     ])
 
     expect(reader.getTempoEvent(records.initialTempoEvent.id)).toBe(records.initialTempoEvent)
@@ -187,11 +178,8 @@ describe('ModelStoreReader', () => {
     )
     expect([...reader.timeSignatureEventEntries()]).toEqual([...containers.timeSignatureEvents])
 
-    expect(reader.getDevice(records.midiEffectDevice.id)).toBe(records.midiEffectDevice)
     expect(reader.getDevice(records.instrumentDevice.id)).toBe(records.instrumentDevice)
-    expect(reader.getDevice(records.masterAudioEffectDevice.id)).toBe(
-      records.masterAudioEffectDevice,
-    )
+    expect(reader.getDevice(records.bassDevice.id)).toBe(records.bassDevice)
     expect([...reader.deviceEntries()]).toEqual([...containers.devices])
   })
 
@@ -262,7 +250,7 @@ describe('ModelStoreReader', () => {
     fixture.containers.trackOrder.splice(
       0,
       fixture.containers.trackOrder.length,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
       fixture.records.instrumentTrack.id,
     )
     fixture.containers.tempoEvents.clear()
@@ -278,12 +266,12 @@ describe('ModelStoreReader', () => {
     const reader: ModelStoreReader = new ModelStore(fixture.seed)
 
     expect([...reader.orderedTrackIds()]).toEqual([
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
       fixture.records.instrumentTrack.id,
     ])
     expect([...reader.trackEntries()].map(([id]) => id)).toEqual([
       fixture.records.instrumentTrack.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
     expect([...reader.tempoEventEntries()].map(([id]) => id)).toEqual([
       fixture.records.laterTempoEvent.id,
@@ -308,9 +296,7 @@ describe('ModelStore module boundary', () => {
       name: records.instrumentTrack.name,
       color: records.instrumentTrack.color,
       channel: records.instrumentTrack.channel,
-      midiEffectIds: [],
       instrumentDeviceId: danglingDeviceId,
-      audioEffectIds: [],
     })
 
     seed.trackOrder.splice(0, seed.trackOrder.length, danglingTrackId)

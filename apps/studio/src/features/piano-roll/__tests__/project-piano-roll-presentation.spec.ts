@@ -1,15 +1,12 @@
 import {
   createInitialProjectSession,
-  createMidiLoop,
   parseProjectId,
   parseTempoEventId,
   parseTick,
   parseTimeSignatureEventId,
-  type ProjectSnapshot,
 } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
-import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import {
   createProjectPianoRollPresentation,
   createProjectPianoRollTrackPresentation,
@@ -78,10 +75,9 @@ describe('Project Piano Roll Presentation', () => {
       color: track?.color,
       projectId: snapshot.project.id,
       startTick: 3_840,
-      status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
       trackId: fixture.track.trackId,
     })
-    if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (presentation === null) {
       throw new Error('Expected a ready Piano Roll presentation')
     }
     expect(presentation.context).toMatchObject({
@@ -90,31 +86,6 @@ describe('Project Piano Roll Presentation', () => {
       sourceEndTick: 3_840,
     })
     expect(presentation.snapshot).toBe(snapshot)
-  })
-
-  it('keeps a valid looped Clip visible as explicitly unsupported', () => {
-    const fixture = createFixture()
-    const snapshot = fixture.session.getSnapshot()
-    const clip = snapshot.clips.find(({ id }) => id === fixture.clip.clipId)
-    if (clip === undefined) throw new Error('Fixture Clip is missing')
-
-    const loopedSnapshot: ProjectSnapshot = Object.freeze({
-      ...snapshot,
-      clips: Object.freeze([
-        Object.freeze({
-          ...clip,
-          loop: createMidiLoop({
-            sourceSpanTick: clip.spanTick,
-            sourceStartTick: parseTick(0),
-          }),
-        }),
-      ]),
-    })
-
-    expect(createProjectPianoRollPresentation(loopedSnapshot, fixture.clip.clipId)).toMatchObject({
-      reason: 'looped-clip',
-      status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED,
-    })
   })
 
   it('projects the selected Instrument Track with one explicit Active Clip', () => {
@@ -128,10 +99,9 @@ describe('Project Piano Roll Presentation', () => {
 
     expect(presentation).toMatchObject({
       projectId: snapshot.project.id,
-      status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
       trackId: fixture.track.trackId,
     })
-    if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (presentation === null) {
       throw new Error('Expected a ready Track Piano Roll presentation')
     }
     expect(presentation.readModel).toMatchObject({

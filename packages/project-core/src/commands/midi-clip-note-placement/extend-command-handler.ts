@@ -26,13 +26,6 @@ function requireExtensionClip(
     throw new ProjectCommandError('clip-not-found', `MIDI Clip ${command.clipId} does not exist`)
   }
 
-  if (clip.loop !== null) {
-    throw new ProjectCommandError(
-      'looped-midi-clip-unsupported',
-      `MIDI Clip ${clip.id} cannot be automatically extended while looped`,
-    )
-  }
-
   return clip
 }
 

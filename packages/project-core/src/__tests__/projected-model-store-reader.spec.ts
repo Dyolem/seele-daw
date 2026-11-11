@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import * as projectCore from '#internal/index'
 import {
-  createAudioTrackRecord,
+  createInstrumentTrackRecord,
   createDeviceDescriptor,
   createMasterChannelRecord,
   createMidiClipRecord,
@@ -76,21 +76,20 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
     master: createMasterChannelRecord({
       gain: parseLinearGain(0.7),
       muted: true,
-      audioEffectIds: records.master.audioEffectIds,
     }),
-    track: createAudioTrackRecord({
-      id: records.audioTrack.id,
-      name: 'Projected Audio Track',
-      color: records.audioTrack.color,
-      channel: records.audioTrack.channel,
-      audioEffectIds: records.audioTrack.audioEffectIds,
+    track: createInstrumentTrackRecord({
+      id: records.bassTrack.id,
+      name: 'Projected Bass Track',
+      color: records.bassTrack.color,
+      channel: records.bassTrack.channel,
+      instrumentDeviceId: records.bassTrack.instrumentDeviceId,
     }),
     clip: createMidiClipRecord({
-      ...records.nonLoopClip,
+      ...records.verseClip,
       name: 'Projected MIDI Clip',
     }),
     source: createMidiSourceRecord({
-      id: records.nonLoopSource.id,
+      id: records.verseSource.id,
       lengthTick: parseTick(2_400),
     }),
     tempoEvent: createTempoEventRecord({
@@ -107,11 +106,11 @@ function createReplacementRecords(fixture: CompleteProjectFixture) {
       enabled: false,
     }),
     note: createMidiNoteRecord({
-      ...records.nonLoopNote,
+      ...records.verseNote,
       velocity: parseMidiVelocity(116),
     }),
     sustainPedalEvent: createMidiSustainPedalEventRecord({
-      ...records.nonLoopPedalDown,
+      ...records.versePedalDown,
       value: parseMidiControlValue(96),
     }),
   }
@@ -141,15 +140,15 @@ describe('ProjectedModelStoreReader complete projection', () => {
     const base: ModelStoreReader = new ModelStore(fixture.seed)
     const beforeBase = snapshotReader(base)
     const replacement = createReplacementRecords(fixture)
-    const partitionBefore = [fixture.records.nonLoopHarmonyNote, fixture.records.nonLoopNote]
-    const partitionAfter = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
+    const partitionBefore = [fixture.records.verseHarmonyNote, fixture.records.verseNote]
+    const partitionAfter = [fixture.records.verseNote, fixture.records.verseHarmonyNote]
     const sustainPedalEventPartitionBefore = [
-      fixture.records.nonLoopPedalUp,
-      fixture.records.nonLoopPedalDown,
+      fixture.records.versePedalUp,
+      fixture.records.versePedalDown,
     ]
     const sustainPedalEventPartitionAfter = [
-      fixture.records.nonLoopPedalDown,
-      fixture.records.nonLoopPedalUp,
+      fixture.records.versePedalDown,
+      fixture.records.versePedalUp,
     ]
     const mutations: readonly ProjectChange[] = [
       {
@@ -167,49 +166,49 @@ describe('ProjectedModelStoreReader complete projection', () => {
       {
         op: 'remove',
         table: 'tracks',
-        before: fixture.records.audioTrack,
+        before: fixture.records.bassTrack,
       },
       {
         op: 'insert',
         table: 'tracks',
-        after: fixture.records.audioTrack,
+        after: fixture.records.bassTrack,
       },
       {
         op: 'replace',
         table: 'tracks',
-        before: fixture.records.audioTrack,
+        before: fixture.records.bassTrack,
         after: replacement.track,
       },
       {
         op: 'remove',
         table: 'clips',
-        before: fixture.records.nonLoopClip,
+        before: fixture.records.verseClip,
       },
       {
         op: 'insert',
         table: 'clips',
-        after: fixture.records.nonLoopClip,
+        after: fixture.records.verseClip,
       },
       {
         op: 'replace',
         table: 'clips',
-        before: fixture.records.nonLoopClip,
+        before: fixture.records.verseClip,
         after: replacement.clip,
       },
       {
         op: 'remove',
         table: 'midiSources',
-        before: fixture.records.nonLoopSource,
+        before: fixture.records.verseSource,
       },
       {
         op: 'insert',
         table: 'midiSources',
-        after: fixture.records.nonLoopSource,
+        after: fixture.records.verseSource,
       },
       {
         op: 'replace',
         table: 'midiSources',
-        before: fixture.records.nonLoopSource,
+        before: fixture.records.verseSource,
         after: replacement.source,
       },
       {
@@ -275,63 +274,63 @@ describe('ProjectedModelStoreReader complete projection', () => {
       {
         op: 'remove-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: partitionBefore,
       },
       {
         op: 'insert-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: partitionAfter,
       },
       {
         op: 'remove',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.verseNote,
       },
       {
         op: 'insert',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        after: fixture.records.nonLoopNote,
+        sourceId: fixture.records.verseSource.id,
+        after: fixture.records.verseNote,
       },
       {
         op: 'replace',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.verseNote,
         after: replacement.note,
       },
       {
         op: 'remove-partition',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: sustainPedalEventPartitionBefore,
       },
       {
         op: 'insert-partition',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: sustainPedalEventPartitionAfter,
       },
       {
         op: 'remove',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.versePedalDown,
       },
       {
         op: 'insert',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        after: fixture.records.nonLoopPedalDown,
+        sourceId: fixture.records.verseSource.id,
+        after: fixture.records.versePedalDown,
       },
       {
         op: 'replace',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.versePedalDown,
         after: replacement.sustainPedalEvent,
       },
     ]
@@ -350,12 +349,12 @@ describe('ProjectedModelStoreReader complete projection', () => {
       replacement.timeSignatureEvent,
     )
     expect(projected.getDevice(replacement.device.id)).toBe(replacement.device)
-    expect(projected.getMidiNote(fixture.records.nonLoopSource.id, replacement.note.id)).toBe(
+    expect(projected.getMidiNote(fixture.records.verseSource.id, replacement.note.id)).toBe(
       replacement.note,
     )
     expect(
       projected.getMidiSustainPedalEvent(
-        fixture.records.nonLoopSource.id,
+        fixture.records.verseSource.id,
         replacement.sustainPedalEvent.id,
       ),
     ).toBe(replacement.sustainPedalEvent)
@@ -368,47 +367,47 @@ describe('ProjectedModelStoreReader complete projection', () => {
     const fixture = createCompleteProjectFixture()
     const base = new ModelStore(fixture.seed)
     const beforeBase = snapshotReader(base)
-    const notes = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
+    const notes = [fixture.records.verseNote, fixture.records.verseHarmonyNote]
     const projected = createProjection(base, [
       {
         op: 'remove',
         table: 'clips',
-        before: fixture.records.nonLoopClip,
+        before: fixture.records.verseClip,
       },
       {
         op: 'remove-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: notes,
       },
       {
         op: 'remove',
         table: 'midiSources',
-        before: fixture.records.nonLoopSource,
+        before: fixture.records.verseSource,
       },
       {
         op: 'insert',
         table: 'midiSources',
-        after: fixture.records.nonLoopSource,
+        after: fixture.records.verseSource,
       },
       {
         op: 'insert-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: notes,
       },
       {
         op: 'insert',
         table: 'clips',
-        after: fixture.records.nonLoopClip,
+        after: fixture.records.verseClip,
       },
     ])
 
-    expect(projected.getClip(fixture.records.nonLoopClip.id)).toBe(fixture.records.nonLoopClip)
-    expect(projected.getMidiSource(fixture.records.nonLoopSource.id)).toBe(
-      fixture.records.nonLoopSource,
+    expect(projected.getClip(fixture.records.verseClip.id)).toBe(fixture.records.verseClip)
+    expect(projected.getMidiSource(fixture.records.verseSource.id)).toBe(
+      fixture.records.verseSource,
     )
-    expect(projected.hasMidiNotePartition(fixture.records.nonLoopSource.id)).toBe(true)
+    expect(projected.hasMidiNotePartition(fixture.records.verseSource.id)).toBe(true)
     expect(snapshotReader(base)).toEqual(beforeBase)
   })
 
@@ -469,14 +468,14 @@ describe('ProjectedModelStoreReader local preconditions', () => {
         {
           op: 'remove',
           table: 'midiNotes',
-          sourceId: fixture.records.nonLoopSource.id,
-          before: fixture.records.nonLoopNote,
+          sourceId: fixture.records.verseSource.id,
+          before: fixture.records.verseNote,
         },
         {
           op: 'remove',
           table: 'midiNotes',
-          sourceId: fixture.records.nonLoopSource.id,
-          before: fixture.records.nonLoopNote,
+          sourceId: fixture.records.verseSource.id,
+          before: fixture.records.verseNote,
         },
       ]),
     )
@@ -540,7 +539,7 @@ describe('ProjectedModelStoreReader local preconditions', () => {
           op: 'remove',
           table: 'trackOrder',
           index: 0,
-          trackId: fixture.records.audioTrack.id,
+          trackId: fixture.records.bassTrack.id,
         },
       ]),
     )
@@ -550,10 +549,10 @@ describe('ProjectedModelStoreReader local preconditions', () => {
 
   it('requires Note partition before payloads to contain the exact IDs and references', () => {
     const fixture = createCompleteProjectFixture()
-    const staleNote = createMidiNoteRecord({ ...fixture.records.nonLoopNote })
+    const staleNote = createMidiNoteRecord({ ...fixture.records.verseNote })
     const mismatches: readonly (readonly MidiNoteRecord[])[] = [
-      [staleNote, fixture.records.nonLoopHarmonyNote],
-      [fixture.records.nonLoopNote],
+      [staleNote, fixture.records.verseHarmonyNote],
+      [fixture.records.verseNote],
     ]
 
     for (const before of mismatches) {
@@ -563,7 +562,7 @@ describe('ProjectedModelStoreReader local preconditions', () => {
           {
             op: 'remove-partition',
             table: 'midiNotes',
-            sourceId: fixture.records.nonLoopSource.id,
+            sourceId: fixture.records.verseSource.id,
             records: before,
           },
         ]),
@@ -578,7 +577,7 @@ describe('ProjectedModelStoreReader local preconditions', () => {
   it('requires Sustain Pedal Event partition payloads to contain exact IDs and references', () => {
     const fixture = createCompleteProjectFixture()
     const staleEvent = createMidiSustainPedalEventRecord({
-      ...fixture.records.nonLoopPedalDown,
+      ...fixture.records.versePedalDown,
     })
     const base = new ModelStore(fixture.seed)
     const error = capturePreconditionError(() =>
@@ -586,8 +585,8 @@ describe('ProjectedModelStoreReader local preconditions', () => {
         {
           op: 'remove-partition',
           table: 'midiSustainPedalEvents',
-          sourceId: fixture.records.nonLoopSource.id,
-          records: [staleEvent, fixture.records.nonLoopPedalUp],
+          sourceId: fixture.records.verseSource.id,
+          records: [staleEvent, fixture.records.versePedalUp],
         },
       ]),
     )
@@ -602,25 +601,25 @@ describe('Projected Note partition behavior', () => {
   it('compares partition removal by ID and reference set while ignoring payload order', () => {
     const fixture = createCompleteProjectFixture()
     const base = new ModelStore(fixture.seed)
-    const reversedBefore = [fixture.records.nonLoopHarmonyNote, fixture.records.nonLoopNote]
+    const reversedBefore = [fixture.records.verseHarmonyNote, fixture.records.verseNote]
     const projected = createProjection(base, [
       {
         op: 'remove-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: reversedBefore,
       },
       {
         op: 'insert-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         records: reversedBefore,
       },
     ])
 
-    expect([...projected.midiNoteEntries(fixture.records.nonLoopSource.id)]).toEqual([
-      [fixture.records.nonLoopHarmonyNote.id, fixture.records.nonLoopHarmonyNote],
-      [fixture.records.nonLoopNote.id, fixture.records.nonLoopNote],
+    expect([...projected.midiNoteEntries(fixture.records.verseSource.id)]).toEqual([
+      [fixture.records.verseHarmonyNote.id, fixture.records.verseHarmonyNote],
+      [fixture.records.verseNote.id, fixture.records.verseNote],
     ])
   })
 
@@ -631,77 +630,70 @@ describe('Projected Note partition behavior', () => {
       {
         op: 'remove',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.verseNote,
       },
       {
         op: 'remove',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopHarmonyNote,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.verseHarmonyNote,
       },
     ])
     const missingPartition = createProjection(base, [
       {
         op: 'remove',
         table: 'clips',
-        before: fixture.records.nonLoopClip,
+        before: fixture.records.verseClip,
       },
       {
         op: 'remove-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        records: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
+        sourceId: fixture.records.verseSource.id,
+        records: [fixture.records.verseNote, fixture.records.verseHarmonyNote],
       },
       {
         op: 'remove-partition',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        records: [fixture.records.nonLoopPedalDown, fixture.records.nonLoopPedalUp],
+        sourceId: fixture.records.verseSource.id,
+        records: [fixture.records.versePedalDown, fixture.records.versePedalUp],
       },
       {
         op: 'remove',
         table: 'midiSources',
-        before: fixture.records.nonLoopSource,
+        before: fixture.records.verseSource,
       },
     ])
 
-    expect(emptyPartition.hasMidiNotePartition(fixture.records.nonLoopSource.id)).toBe(true)
-    expect([...emptyPartition.midiNoteEntries(fixture.records.nonLoopSource.id)]).toEqual([])
-    expect(missingPartition.hasMidiNotePartition(fixture.records.nonLoopSource.id)).toBe(false)
-    expect([...missingPartition.midiNoteEntries(fixture.records.nonLoopSource.id)]).toEqual([])
+    expect(emptyPartition.hasMidiNotePartition(fixture.records.verseSource.id)).toBe(true)
+    expect([...emptyPartition.midiNoteEntries(fixture.records.verseSource.id)]).toEqual([])
+    expect(missingPartition.hasMidiNotePartition(fixture.records.verseSource.id)).toBe(false)
+    expect([...missingPartition.midiNoteEntries(fixture.records.verseSource.id)]).toEqual([])
   })
 
   it('changes only the addressed partition when replacing one Note', () => {
     const fixture = createCompleteProjectFixture()
     const base = new ModelStore(fixture.seed)
     const replacement = createMidiNoteRecord({
-      ...fixture.records.nonLoopNote,
+      ...fixture.records.verseNote,
       velocity: parseMidiVelocity(120),
     })
-    const baseLoopingNotes = [...base.midiNoteEntries(fixture.records.loopingSource.id)]
+    const baseChorusNotes = [...base.midiNoteEntries(fixture.records.chorusSource.id)]
     const projected = createProjection(base, [
       {
         op: 'replace',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.verseNote,
         after: replacement,
       },
     ])
 
-    expect(projected.getMidiNote(fixture.records.nonLoopSource.id, replacement.id)).toBe(
-      replacement,
-    )
+    expect(projected.getMidiNote(fixture.records.verseSource.id, replacement.id)).toBe(replacement)
     expect(
-      projected.getMidiNote(
-        fixture.records.nonLoopSource.id,
-        fixture.records.nonLoopHarmonyNote.id,
-      ),
-    ).toBe(fixture.records.nonLoopHarmonyNote)
-    expect([...projected.midiNoteEntries(fixture.records.loopingSource.id)]).toEqual(
-      baseLoopingNotes,
-    )
+      projected.getMidiNote(fixture.records.verseSource.id, fixture.records.verseHarmonyNote.id),
+    ).toBe(fixture.records.verseHarmonyNote)
+    expect([...projected.midiNoteEntries(fixture.records.chorusSource.id)]).toEqual(baseChorusNotes)
   })
 
   it('moves a Note across partitions through remove then insert', () => {
@@ -711,29 +703,29 @@ describe('Projected Note partition behavior', () => {
       {
         op: 'remove',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopNote,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.verseNote,
       },
       {
         op: 'insert',
         table: 'midiNotes',
-        sourceId: fixture.records.loopingSource.id,
-        after: fixture.records.nonLoopNote,
+        sourceId: fixture.records.chorusSource.id,
+        after: fixture.records.verseNote,
       },
     ])
 
     expect(
-      projected.getMidiNote(fixture.records.nonLoopSource.id, fixture.records.nonLoopNote.id),
+      projected.getMidiNote(fixture.records.verseSource.id, fixture.records.verseNote.id),
     ).toBeUndefined()
     expect(
-      projected.getMidiNote(fixture.records.loopingSource.id, fixture.records.nonLoopNote.id),
-    ).toBe(fixture.records.nonLoopNote)
+      projected.getMidiNote(fixture.records.chorusSource.id, fixture.records.verseNote.id),
+    ).toBe(fixture.records.verseNote)
     expect(
-      [...projected.midiNoteEntries(fixture.records.loopingSource.id)].map(([id]) => id),
+      [...projected.midiNoteEntries(fixture.records.chorusSource.id)].map(([id]) => id),
     ).toEqual([
-      fixture.records.loopingNote.id,
-      fixture.records.loopingHarmonyNote.id,
-      fixture.records.nonLoopNote.id,
+      fixture.records.chorusNote.id,
+      fixture.records.chorusHarmonyNote.id,
+      fixture.records.verseNote.id,
     ])
   })
 })
@@ -743,8 +735,8 @@ describe('Projected iterator ordering', () => {
     const fixture = createCompleteProjectFixture()
     const base = new ModelStore(fixture.seed)
     const replacement = createReplacementRecords(fixture)
-    const replacementLoopingNote = createMidiNoteRecord({
-      ...fixture.records.loopingNote,
+    const replacementChorusNote = createMidiNoteRecord({
+      ...fixture.records.chorusNote,
       velocity: parseMidiVelocity(124),
     })
     const projected = createProjection(base, [
@@ -761,27 +753,27 @@ describe('Projected iterator ordering', () => {
       {
         op: 'replace',
         table: 'tracks',
-        before: fixture.records.audioTrack,
+        before: fixture.records.bassTrack,
         after: replacement.track,
       },
       {
         op: 'remove-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        records: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
+        sourceId: fixture.records.verseSource.id,
+        records: [fixture.records.verseNote, fixture.records.verseHarmonyNote],
       },
       {
         op: 'insert-partition',
         table: 'midiNotes',
-        sourceId: fixture.records.nonLoopSource.id,
-        records: [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote],
+        sourceId: fixture.records.verseSource.id,
+        records: [fixture.records.verseNote, fixture.records.verseHarmonyNote],
       },
       {
         op: 'replace',
         table: 'midiNotes',
-        sourceId: fixture.records.loopingSource.id,
-        before: fixture.records.loopingNote,
-        after: replacementLoopingNote,
+        sourceId: fixture.records.chorusSource.id,
+        before: fixture.records.chorusNote,
+        after: replacementChorusNote,
       },
     ])
 
@@ -790,20 +782,20 @@ describe('Projected iterator ordering', () => {
       [fixture.records.instrumentTrack.id, fixture.records.instrumentTrack],
     ])
     expect([...projected.midiNotePartitionIds()]).toEqual([
-      fixture.records.loopingSource.id,
-      fixture.records.nonLoopSource.id,
+      fixture.records.chorusSource.id,
+      fixture.records.verseSource.id,
     ])
-    expect([...projected.midiNoteEntries(fixture.records.loopingSource.id)]).toEqual([
-      [replacementLoopingNote.id, replacementLoopingNote],
-      [fixture.records.loopingHarmonyNote.id, fixture.records.loopingHarmonyNote],
+    expect([...projected.midiNoteEntries(fixture.records.chorusSource.id)]).toEqual([
+      [replacementChorusNote.id, replacementChorusNote],
+      [fixture.records.chorusHarmonyNote.id, fixture.records.chorusHarmonyNote],
     ])
     expect([...base.trackEntries()].map(([id]) => id)).toEqual([
       fixture.records.instrumentTrack.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
     expect([...base.midiNotePartitionIds()]).toEqual([
-      fixture.records.nonLoopSource.id,
-      fixture.records.loopingSource.id,
+      fixture.records.verseSource.id,
+      fixture.records.chorusSource.id,
     ])
   })
 })

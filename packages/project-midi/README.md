@@ -12,7 +12,7 @@
   Studio，但不把来源容器或协议元数据写入 Project Snapshot、History 或 Project File；
 - 来源 PPQ 使用整数有理数换算到 Project PPQ 960；Note 起点和终点独立四舍五入；
 - 四舍五入后为零长度的 Note 扩为一个 Project tick，并产生汇总诊断；
-- 一个含 Note 的 normalized MIDI Track 创建一个 Instrument Track、一个非循环 Clip 和一个独占
+- 一个含 Note 的 normalized MIDI Track 创建一个 Instrument Track、一个 Clip 和一个独占
   MIDI Source；空 Track（包括 conductor Track）不创建 Project Track；
 - Clip 从第一枚 Note 或 CC64 的文件内全局位置开始，结束位置取最后一枚 Note 终点、最后一枚
   CC64 与 End of Track 中的最大值；“新项目”把文件 tick 0 放在 Project tick 0，“新 Track”由

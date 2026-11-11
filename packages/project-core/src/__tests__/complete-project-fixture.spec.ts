@@ -24,30 +24,30 @@ describe('complete project fixture contract', () => {
     expect(first.containers.clips).not.toBe(second.containers.clips)
     expect(first.containers.midiSources).not.toBe(second.containers.midiSources)
     expect(first.containers.midiNotes).not.toBe(second.containers.midiNotes)
-    expect(first.containers.nonLoopNotePartition).not.toBe(second.containers.nonLoopNotePartition)
-    expect(first.containers.loopingNotePartition).not.toBe(second.containers.loopingNotePartition)
+    expect(first.containers.verseNotePartition).not.toBe(second.containers.verseNotePartition)
+    expect(first.containers.chorusNotePartition).not.toBe(second.containers.chorusNotePartition)
     expect(first.containers.midiSustainPedalEvents).not.toBe(
       second.containers.midiSustainPedalEvents,
     )
-    expect(first.containers.nonLoopSustainPedalEventPartition).not.toBe(
-      second.containers.nonLoopSustainPedalEventPartition,
+    expect(first.containers.verseSustainPedalEventPartition).not.toBe(
+      second.containers.verseSustainPedalEventPartition,
     )
-    expect(first.containers.loopingSustainPedalEventPartition).not.toBe(
-      second.containers.loopingSustainPedalEventPartition,
+    expect(first.containers.chorusSustainPedalEventPartition).not.toBe(
+      second.containers.chorusSustainPedalEventPartition,
     )
     expect(first.containers.tempoEvents).not.toBe(second.containers.tempoEvents)
     expect(first.containers.timeSignatureEvents).not.toBe(second.containers.timeSignatureEvents)
     expect(first.containers.devices).not.toBe(second.containers.devices)
 
     first.containers.trackOrder.length = 0
-    first.containers.nonLoopNotePartition.clear()
-    first.containers.nonLoopSustainPedalEventPartition.clear()
+    first.containers.verseNotePartition.clear()
+    first.containers.verseSustainPedalEventPartition.clear()
     first.containers.devices.clear()
 
     expect(second.containers.trackOrder).toHaveLength(2)
-    expect(second.containers.nonLoopNotePartition).toHaveLength(2)
-    expect(second.containers.nonLoopSustainPedalEventPartition).toHaveLength(2)
-    expect(second.containers.devices).toHaveLength(5)
+    expect(second.containers.verseNotePartition).toHaveLength(2)
+    expect(second.containers.verseSustainPedalEventPartition).toHaveLength(2)
+    expect(second.containers.devices).toHaveLength(2)
   })
 
   it('exposes every current entity and topology position through ModelStoreReader', () => {
@@ -68,23 +68,18 @@ describe('complete project fixture contract', () => {
     const timeSignatureEvents = [...reader.timeSignatureEventEntries()].map(([, event]) => event)
     const devices = [...reader.deviceEntries()].map(([, device]) => device)
     const instrumentTrack = reader.getTrack(fixture.records.instrumentTrack.id)
-    const audioTrack = reader.getTrack(fixture.records.audioTrack.id)
+    const bassTrack = reader.getTrack(fixture.records.bassTrack.id)
 
     expect(tracks).toHaveLength(2)
-    expect(tracks.map(({ kind }) => kind)).toEqual(['instrument', 'audio'])
     expect(instrumentTrack).toBe(fixture.records.instrumentTrack)
-    expect(audioTrack).toBe(fixture.records.audioTrack)
+    expect(bassTrack).toBe(fixture.records.bassTrack)
 
     expect(clips).toHaveLength(2)
     expect(clips.every(({ trackId }) => trackId === fixture.records.instrumentTrack.id)).toBe(true)
-    expect(clips.map(({ loop }) => loop === null)).toEqual([true, false])
-    expect(clips.some(({ trackId }) => trackId === fixture.records.audioTrack.id)).toBe(false)
+    expect(clips.some(({ trackId }) => trackId === fixture.records.bassTrack.id)).toBe(false)
 
     expect(sources).toHaveLength(2)
-    expect(partitionIds).toEqual([
-      fixture.records.nonLoopSource.id,
-      fixture.records.loopingSource.id,
-    ])
+    expect(partitionIds).toEqual([fixture.records.verseSource.id, fixture.records.chorusSource.id])
     expect(notes).toHaveLength(4)
     expect(new Set(notes.map(({ id }) => id))).toHaveLength(4)
     expect(sustainPedalEventPartitionIds).toEqual(partitionIds)
@@ -96,22 +91,11 @@ describe('complete project fixture contract', () => {
     expect(timeSignatureEvents).toHaveLength(2)
     expect(timeSignatureEvents.map(({ tick }) => tick)).toEqual([0, 7_680])
 
-    expect(devices).toHaveLength(5)
+    expect(devices).toHaveLength(2)
 
-    if (instrumentTrack?.kind !== 'instrument' || audioTrack?.kind !== 'audio') {
-      throw new Error('Fixture Track kinds do not match their named records')
-    }
+    const referencedDeviceIds = tracks.map(({ instrumentDeviceId }) => instrumentDeviceId)
 
-    const referencedDeviceIds = [
-      ...instrumentTrack.midiEffectIds,
-      instrumentTrack.instrumentDeviceId,
-      ...instrumentTrack.audioEffectIds,
-      ...audioTrack.audioEffectIds,
-      ...reader.master.audioEffectIds,
-    ]
-
-    expect(referencedDeviceIds).toHaveLength(5)
-    expect(new Set(referencedDeviceIds)).toHaveLength(5)
+    expect(new Set(referencedDeviceIds)).toHaveLength(2)
     expect(new Set(referencedDeviceIds)).toEqual(new Set(devices.map(({ id }) => id)))
   })
 })

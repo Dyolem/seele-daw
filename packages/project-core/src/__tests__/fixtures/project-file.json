@@ -1,19 +1,18 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "project": {
     "id": "project-complete-fixture",
     "name": "Complete Project Fixture"
   },
   "master": {
     "gain": 1,
-    "muted": false,
-    "audioEffectIds": ["device-master-effect"]
+    "muted": false
   },
-  "trackOrder": ["track-instrument", "track-audio"],
+  "trackOrder": ["track-instrument", "track-bass"],
   "tracks": [
     {
-      "id": "track-audio",
-      "name": "Fixture Audio",
+      "id": "track-bass",
+      "name": "Fixture Bass",
       "color": null,
       "channel": {
         "gain": 0.9,
@@ -21,8 +20,7 @@
         "muted": false,
         "soloed": false
       },
-      "audioEffectIds": ["device-audio-track-effect"],
-      "kind": "audio"
+      "instrumentDeviceId": "device-bass"
     },
     {
       "id": "track-instrument",
@@ -34,50 +32,40 @@
         "muted": false,
         "soloed": false
       },
-      "audioEffectIds": ["device-instrument-audio-effect"],
-      "kind": "instrument",
-      "midiEffectIds": ["device-instrument-midi-effect"],
       "instrumentDeviceId": "device-instrument"
     }
   ],
   "clips": [
     {
-      "id": "clip-looping",
-      "kind": "midi",
+      "id": "clip-chorus",
       "trackId": "track-instrument",
-      "name": "Fixture Loop",
+      "name": "Fixture Chorus",
       "color": null,
       "muted": false,
       "startTick": 1920,
       "spanTick": 3840,
-      "sourceId": "source-looping",
-      "sourceOffsetTick": 240,
-      "loop": {
-        "sourceStartTick": 0,
-        "sourceSpanTick": 960
-      }
+      "sourceId": "source-chorus",
+      "sourceOffsetTick": 240
     },
     {
-      "id": "clip-non-loop",
-      "kind": "midi",
+      "id": "clip-verse",
       "trackId": "track-instrument",
       "name": "Fixture Verse",
       "color": null,
       "muted": false,
       "startTick": 0,
       "spanTick": 960,
-      "sourceId": "source-non-loop",
-      "sourceOffsetTick": 240,
-      "loop": null
+      "sourceId": "source-verse",
+      "sourceOffsetTick": 240
     }
   ],
   "midiSources": [
     {
-      "id": "source-looping",
-      "lengthTick": 1920
+      "id": "source-chorus",
+      "lengthTick": 4080
     },
     {
-      "id": "source-non-loop",
+      "id": "source-verse",
       "lengthTick": 1920
     }
   ],
@@ -109,8 +97,8 @@
   ],
   "devices": [
     {
-      "id": "device-audio-track-effect",
-      "typeId": "seele.fixture.audio-effect",
+      "id": "device-bass",
+      "typeId": "seele.fixture.instrument",
       "definitionVersion": 1,
       "enabled": true,
       "parameters": {},
@@ -123,36 +111,12 @@
       "enabled": true,
       "parameters": {},
       "opaqueState": null
-    },
-    {
-      "id": "device-instrument-audio-effect",
-      "typeId": "seele.fixture.audio-effect",
-      "definitionVersion": 1,
-      "enabled": true,
-      "parameters": {},
-      "opaqueState": null
-    },
-    {
-      "id": "device-instrument-midi-effect",
-      "typeId": "seele.fixture.midi-effect",
-      "definitionVersion": 1,
-      "enabled": true,
-      "parameters": {},
-      "opaqueState": null
-    },
-    {
-      "id": "device-master-effect",
-      "typeId": "seele.fixture.audio-effect",
-      "definitionVersion": 1,
-      "enabled": true,
-      "parameters": {},
-      "opaqueState": null
     }
   ],
   "midiNotes": {
-    "source-looping": [
+    "source-chorus": [
       {
-        "id": "note-looping-harmony",
+        "id": "note-chorus-harmony",
         "startTick": 480,
         "durationTick": 480,
         "pitch": 71,
@@ -160,7 +124,7 @@
         "channel": 1
       },
       {
-        "id": "note-looping-primary",
+        "id": "note-chorus-primary",
         "startTick": 0,
         "durationTick": 480,
         "pitch": 67,
@@ -168,9 +132,9 @@
         "channel": 1
       }
     ],
-    "source-non-loop": [
+    "source-verse": [
       {
-        "id": "note-non-loop-harmony",
+        "id": "note-verse-harmony",
         "startTick": 720,
         "durationTick": 240,
         "pitch": 64,
@@ -178,7 +142,7 @@
         "channel": 0
       },
       {
-        "id": "note-non-loop-primary",
+        "id": "note-verse-primary",
         "startTick": 240,
         "durationTick": 480,
         "pitch": 60,
@@ -188,29 +152,29 @@
     ]
   },
   "midiSustainPedalEvents": {
-    "source-looping": [
+    "source-chorus": [
       {
-        "id": "sustain-looping-down",
+        "id": "sustain-chorus-down",
         "tick": 120,
         "value": 100,
         "channel": 1
       },
       {
-        "id": "sustain-looping-up",
+        "id": "sustain-chorus-up",
         "tick": 840,
         "value": 32,
         "channel": 1
       }
     ],
-    "source-non-loop": [
+    "source-verse": [
       {
-        "id": "sustain-non-loop-down",
+        "id": "sustain-verse-down",
         "tick": 360,
         "value": 127,
         "channel": 0
       },
       {
-        "id": "sustain-non-loop-up",
+        "id": "sustain-verse-up",
         "tick": 900,
         "value": 0,
         "channel": 0

@@ -1,6 +1,6 @@
 import { computed, type ShallowRef } from 'vue'
 import { createPianoRollTrackSustainPedalLaneReadModel } from '@seele-daw/editor'
-import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
 import { ProjectEditError } from '@/workbench/edits/edit-session'
@@ -10,7 +10,7 @@ export function useTrackSustainPedal({
   getPresentation,
   failureMessage,
 }: {
-  readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
+  readonly getPresentation: () => ProjectPianoRollTrackPresentation
   readonly failureMessage: ShallowRef<string | null>
 }) {
   const pianoRollPreferences = usePianoRollPreferencesStore()

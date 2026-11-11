@@ -189,7 +189,7 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     })
   })
 
-  it('rejects a missing Track, a non-Instrument Track, a changed Device ID, and a missing Device', () => {
+  it('rejects a missing Track, a changed Device ID, and a missing Device', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const missingTrackId = parseTrackId('track-missing-instrument-device')
@@ -199,16 +199,6 @@ describe('ReplaceInstrumentDeviceCommand preparation', () => {
     )
     expect(missingTrack).toMatchObject({
       code: 'track-not-found',
-    })
-
-    const wrongTrackKind = captureCommandError(() =>
-      prepareProjectCommand(
-        store,
-        createCommand(store, fixture, { trackId: fixture.records.audioTrack.id }),
-      ),
-    )
-    expect(wrongTrackKind).toMatchObject({
-      code: 'instrument-device-track-kind-mismatch',
     })
 
     const changedDeviceId = parseDeviceId('device-replacement-with-new-id')
@@ -357,8 +347,8 @@ describe('Instrument Device consumer and persistence compatibility', () => {
   it('advances Note query revision without changing its result', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const query = createMidiNoteByIdQuery({
-      sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      sourceId: fixture.records.verseSource.id,
+      noteId: fixture.records.verseNote.id,
     })
     const before = session.query(query)
 

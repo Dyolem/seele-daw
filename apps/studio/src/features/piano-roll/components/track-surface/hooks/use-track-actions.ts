@@ -2,7 +2,7 @@ import { computed, shallowRef, type ShallowRef } from 'vue'
 import type { ClipId, MidiChannel, ProjectSession } from '@seele-daw/project-core'
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import type { PianoRollContextMenuTarget } from '@/features/piano-roll/types/piano-roll-context-menu-target'
-import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import { STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
 import {
@@ -18,7 +18,7 @@ export function useTrackActions({
   suspendTimelineFollow,
 }: {
   readonly sustainPedalLane: Readonly<ShallowRef<PianoRollSustainPedalLaneHandle | null>>
-  readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
+  readonly getPresentation: () => ProjectPianoRollTrackPresentation
   readonly getSession: () => Pick<ProjectSession, 'query' | 'subscribe'>
   readonly getSustainPedalChannel: () => MidiChannel
   readonly suspendTimelineFollow: () => void

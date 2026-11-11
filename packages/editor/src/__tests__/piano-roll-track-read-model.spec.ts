@@ -18,7 +18,6 @@ import {
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION,
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON,
   PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS,
-  PIANO_ROLL_TRACK_CLIP_STATUS,
   createPianoRollTrackReadModel,
   pianoRollTrackSourceTickToProjectTick,
   resolvePianoRollTrackNotePlacement,
@@ -36,7 +35,6 @@ function addClip(
   session: ProjectSession,
   input: {
     readonly clipId: string
-    readonly looped?: boolean
     readonly sourceId: string
     readonly sourceOffsetTick?: number
     readonly startTick: number
@@ -54,12 +52,6 @@ function addClip(
       baseRevision: session.modelRevision,
       clipId,
       color: null,
-      loop: input.looped
-        ? {
-            sourceSpanTick: parseTick(1_920),
-            sourceStartTick: parseTick(0),
-          }
-        : null,
       muted: false,
       name: input.clipId,
       sourceId,
@@ -93,10 +85,9 @@ function addNote(session: ProjectSession, sourceId: ReturnType<typeof parseMidiS
 describe('Piano Roll Track Read Model', () => {
   it('projects sorted Clip windows and visible Notes into global Project time', () => {
     const fixture = createPianoRollProjectFixture()
-    const looped = addClip(fixture.session, {
-      clipId: 'track-read-model-looped-clip',
-      looped: true,
-      sourceId: 'track-read-model-looped-source',
+    const middle = addClip(fixture.session, {
+      clipId: 'track-read-model-middle-clip',
+      sourceId: 'track-read-model-middle-source',
       startTick: 3_840,
     })
     const later = addClip(fixture.session, {
@@ -120,13 +111,12 @@ describe('Piano Roll Track Read Model', () => {
     })
     expect(model.clips.map(({ clip }) => clip.clipId)).toEqual([
       fixture.clip.id,
-      looped.clipId,
+      middle.clipId,
       later.clipId,
     ])
     expect(model.clips[0]?.clip).toMatchObject({
       endTick: 1_920,
       startTick: 0,
-      status: PIANO_ROLL_TRACK_CLIP_STATUS.READY,
     })
     expect(
       model.clips[0]?.notes.map(({ note, projectEndTick, projectStartTick }) => ({
@@ -151,14 +141,7 @@ describe('Piano Roll Track Read Model', () => {
         projectStartTick: 520,
       },
     ])
-    expect(model.clips[1]).toMatchObject({
-      clip: {
-        clipId: looped.clipId,
-        reason: 'looped-clip',
-        status: PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED,
-      },
-      notes: [],
-    })
+    expect(model.clips[1]).toMatchObject({ clip: { clipId: middle.clipId }, notes: [] })
     expect(model.clips[2]?.notes[0]).toMatchObject({
       clipId: later.clipId,
       projectEndTick: 8_640,
@@ -169,7 +152,7 @@ describe('Piano Roll Track Read Model', () => {
     expect(Object.isFrozen(model.clips[0]?.notes)).toBe(true)
   })
 
-  it('maps MidiSource ticks of a ready Clip into Project time', () => {
+  it('maps MidiSource ticks of a Clip into Project time', () => {
     const fixture = createPianoRollProjectFixture()
     const model = createPianoRollTrackReadModel({
       activeClipId: fixture.clip.id,
@@ -177,9 +160,7 @@ describe('Piano Roll Track Read Model', () => {
       trackId: fixture.clip.trackId,
     })
     const clip = model.clips[0]?.clip
-    if (clip?.status !== PIANO_ROLL_TRACK_CLIP_STATUS.READY) {
-      throw new Error('Expected a ready Track Clip projection')
-    }
+    if (clip === undefined) throw new Error('Expected a Track Clip projection')
 
     expect(pianoRollTrackSourceTickToProjectTick(clip, parseTick(480))).toBe(0)
     expect(pianoRollTrackSourceTickToProjectTick(clip, parseTick(1_200))).toBe(720)
@@ -274,18 +255,12 @@ describe('Piano Roll Track Note placement', () => {
     })
   })
 
-  it('requires Active Clip for overlaps and rejects looped targets', () => {
+  it('requires an Active Clip where Clips overlap', () => {
     const fixture = createPianoRollProjectFixture()
     const overlapping = addClip(fixture.session, {
       clipId: 'track-placement-overlapping-clip',
       sourceId: 'track-placement-overlapping-source',
       startTick: 960,
-    })
-    const looped = addClip(fixture.session, {
-      clipId: 'track-placement-looped-clip',
-      looped: true,
-      sourceId: 'track-placement-looped-source',
-      startTick: 3_840,
     })
     const snapshot = fixture.session.getSnapshot()
 
@@ -319,23 +294,6 @@ describe('Piano Roll Track Note placement', () => {
     ).toMatchObject({
       action: PIANO_ROLL_TRACK_NOTE_PLACEMENT_ACTION.ADD_TO_CLIP,
       clipId: overlapping.clipId,
-    })
-
-    expect(
-      resolvePianoRollTrackNotePlacement({
-        barSpanTick: parseTick(3_840),
-        noteDurationTick: parseTick(240),
-        projectStartTick: parseTick(4_080),
-        readModel: createPianoRollTrackReadModel({
-          activeClipId: looped.clipId,
-          snapshot,
-          trackId: fixture.clip.trackId,
-        }),
-      }),
-    ).toMatchObject({
-      candidateClipIds: [looped.clipId],
-      reason: PIANO_ROLL_TRACK_NOTE_PLACEMENT_BLOCK_REASON.LOOPED_CLIP_TARGET,
-      status: PIANO_ROLL_TRACK_NOTE_PLACEMENT_STATUS.BLOCKED,
     })
   })
 

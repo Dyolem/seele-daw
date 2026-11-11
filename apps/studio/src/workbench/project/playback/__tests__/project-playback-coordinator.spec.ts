@@ -184,7 +184,6 @@ function createPlayableSession(projectId: ProjectId): ProjectSession {
       baseRevision: session.modelRevision,
       clipId: parseClipId('clip-playback-coordinator'),
       color: null,
-      loop: null,
       muted: false,
       name: 'Phrase',
       sourceId: SOURCE_ID,

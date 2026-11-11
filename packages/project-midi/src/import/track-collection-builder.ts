@@ -211,7 +211,6 @@ export function createImportedTrackCollection(
       spanTick: parseTick(mappedTrack.spanTick),
       sourceId,
       sourceOffsetTick: parseTick(0),
-      loop: null,
     })
     const instrumentMapping = createInstrumentDevice(createDevice, mappedTrack, deviceId)
     addInstrumentMappingDiagnostic(instrumentMapping, mappedTrack, diagnostics)
@@ -227,8 +226,6 @@ export function createImportedTrackCollection(
         muted: false,
         soloed: false,
       },
-      audioEffectIds: [],
-      midiEffectIds: [],
       instrumentDeviceId: instrumentDevice.id,
     })
 

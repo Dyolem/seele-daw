@@ -339,7 +339,7 @@ Seele DAW 当前选择数据导向的 Project Model，是由具体约束决定�
 | 对象或模块                         | 首选形式                      | 判断依据                           |
 | ---------------------------------- | ----------------------------- | ---------------------------------- |
 | `ProjectRecord`、Track、Clip、Note | readonly Record               | 可保存事实、按 revision 替换       |
-| `MidiLoop`、Channel Descriptor     | readonly Value Object         | 无独立身份或生命周期               |
+| Channel Descriptor                 | readonly Value Object         | 无独立身份或生命周期               |
 | Command、Change、Commit、DTO       | readonly Record / 联合类型    | 需要传输、模式匹配、测试和序列化   |
 | 本地构造与校验                     | 模块纯函数                    | 无跨调用状态、确定性输入输出       |
 | Command handler                    | 函数或注入依赖的 handler 对象 | 行为跨实体，应显式接收上下文       |
@@ -491,7 +491,7 @@ External Boundaries
 
 对当前 MIDI 纵向切片而言：
 
-- `MidiNoteRecord`、`MidiSourceRecord`、`MidiClipRecord` 和 `MidiLoop` 保持为只读数据；
+- `MidiNoteRecord`、`MidiSourceRecord` 和 `MidiClipRecord` 保持为只读数据；
 - 本地构造使用模块函数；
 - 跨实体行为进入 Command handler 和 InvariantValidator；
 - `ModelStore`、`ProjectSession`、`HistoryController` 和 Editor gesture session 是 Class 的主要候选；

@@ -65,15 +65,15 @@ async function flushCommitDeliveries(turns = 1): Promise<void> {
 describe('ProjectSubscription public contract', () => {
   it('exports normalized frozen descriptors while keeping publisher internals private', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const sourceIds = [fixture.records.nonLoopSource.id, fixture.records.nonLoopSource.id]
-    const noteIds = [fixture.records.nonLoopNote.id, fixture.records.nonLoopNote.id]
+    const sourceIds = [fixture.records.verseSource.id, fixture.records.verseSource.id]
+    const noteIds = [fixture.records.verseNote.id, fixture.records.verseNote.id]
     const affected = { startTick: parseTick(240), endTick: parseTick(720) }
     const allCommits = createAllProjectCommitsSubscription()
     const midiNotes = createMidiNoteChangesSubscription({ sourceIds, noteIds, affected })
     const unsubscribe = session.subscribe(allCommits, () => undefined)
 
-    sourceIds.push(fixture.records.loopingSource.id)
-    noteIds.push(fixture.records.loopingNote.id)
+    sourceIds.push(fixture.records.chorusSource.id)
+    noteIds.push(fixture.records.chorusNote.id)
     affected.startTick = parseTick(0)
 
     expect(PROJECT_SUBSCRIPTION_TYPE).toEqual({
@@ -83,8 +83,8 @@ describe('ProjectSubscription public contract', () => {
     expect(allCommits).toEqual({ type: PROJECT_SUBSCRIPTION_TYPE.ALL_COMMITS })
     expect(midiNotes).toEqual({
       type: PROJECT_SUBSCRIPTION_TYPE.MIDI_NOTE_CHANGES,
-      sourceIds: [fixture.records.nonLoopSource.id],
-      noteIds: [fixture.records.nonLoopNote.id],
+      sourceIds: [fixture.records.verseSource.id],
+      noteIds: [fixture.records.verseNote.id],
       affected: { startTick: 240, endTick: 720 },
     })
     expect(Object.isFrozen(allCommits)).toBe(true)
@@ -122,7 +122,7 @@ describe('ProjectSession commit publication', () => {
 
     const commandCommit = executeAddNote(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       parseNoteId('note-subscription-history'),
     )
     const undoCommit = session.undo()
@@ -162,8 +162,8 @@ describe('ProjectSession commit publication', () => {
     session.execute(
       createMoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
-        noteIds: [fixture.records.nonLoopNote.id],
+        sourceId: fixture.records.verseSource.id,
+        noteIds: [fixture.records.verseNote.id],
         deltaTick: parseTickDelta(0),
         deltaPitch: parseMidiPitchDelta(0),
       }),
@@ -172,8 +172,8 @@ describe('ProjectSession commit publication', () => {
       session.execute(
         createRemoveNotesCommand({
           baseRevision: 1 as ModelRevision,
-          sourceId: fixture.records.nonLoopSource.id,
-          noteIds: [fixture.records.nonLoopNote.id],
+          sourceId: fixture.records.verseSource.id,
+          noteIds: [fixture.records.verseNote.id],
         }),
       ),
     ).toThrowError(
@@ -207,11 +207,11 @@ describe('ProjectSession commit publication', () => {
 
     subscribe(createMidiNoteChangesSubscription(), 'allNotes')
     subscribe(
-      createMidiNoteChangesSubscription({ sourceIds: [fixture.records.nonLoopSource.id] }),
+      createMidiNoteChangesSubscription({ sourceIds: [fixture.records.verseSource.id] }),
       'source',
     )
     subscribe(
-      createMidiNoteChangesSubscription({ sourceIds: [fixture.records.loopingSource.id] }),
+      createMidiNoteChangesSubscription({ sourceIds: [fixture.records.chorusSource.id] }),
       'wrongSource',
     )
     subscribe(createMidiNoteChangesSubscription({ noteIds: [noteId] }), 'note')
@@ -229,7 +229,7 @@ describe('ProjectSession commit publication', () => {
     )
     subscribe(
       createMidiNoteChangesSubscription({
-        sourceIds: [fixture.records.nonLoopSource.id],
+        sourceIds: [fixture.records.verseSource.id],
         noteIds: [noteId],
         affected: { startTick: parseTick(1_200), endTick: parseTick(1_320) },
       }),
@@ -237,14 +237,14 @@ describe('ProjectSession commit publication', () => {
     )
     subscribe(
       createMidiNoteChangesSubscription({
-        sourceIds: [fixture.records.nonLoopSource.id],
-        noteIds: [fixture.records.nonLoopNote.id],
+        sourceIds: [fixture.records.verseSource.id],
+        noteIds: [fixture.records.verseNote.id],
         affected: { startTick: parseTick(1_200), endTick: parseTick(1_320) },
       }),
       'wrongCombined',
     )
 
-    executeAddNote(session, fixture.records.nonLoopSource.id, noteId)
+    executeAddNote(session, fixture.records.verseSource.id, noteId)
     await flushCommitDeliveries()
 
     expect(counts).toEqual({
@@ -283,8 +283,8 @@ describe('ProjectSession commit publication', () => {
     session.execute(
       createMoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
-        noteIds: [fixture.records.nonLoopNote.id],
+        sourceId: fixture.records.verseSource.id,
+        noteIds: [fixture.records.verseNote.id],
         deltaTick: parseTickDelta(960),
         deltaPitch: parseMidiPitchDelta(0),
       }),
@@ -298,12 +298,12 @@ describe('ProjectSession commit publication', () => {
     const { fixture, session } = createFixtureProjectSession()
     const firstCommit = executeAddNote(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       parseNoteId('note-subscription-multi-change-first'),
     )
     const secondCommit = executeAddNote(
       session,
-      fixture.records.loopingSource.id,
+      fixture.records.chorusSource.id,
       parseNoteId('note-subscription-multi-change-second'),
     )
     const firstChange = firstCommit.changes[0]!
@@ -327,7 +327,7 @@ describe('ProjectSession commit publication', () => {
 
     publisher.subscribe(
       createMidiNoteChangesSubscription({
-        sourceIds: [fixture.records.nonLoopSource.id, fixture.records.loopingSource.id],
+        sourceIds: [fixture.records.verseSource.id, fixture.records.chorusSource.id],
       }),
       (published) => received.push(published),
     )
@@ -354,7 +354,7 @@ describe('ProjectSession commit publication', () => {
 
     executeAddNote(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       parseNoteId('note-subscription-cancelled'),
     )
     unsubscribe()
@@ -371,7 +371,7 @@ describe('ProjectSession commit publication', () => {
 
     executeAddNote(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       parseNoteId('note-subscription-before-registration'),
     )
 
@@ -390,7 +390,7 @@ describe('ProjectSession commit publication', () => {
 
     executeAddNote(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       parseNoteId('note-subscription-after-registration'),
       parseTick(1_440),
     )
@@ -413,14 +413,14 @@ describe('ProjectSession commit publication', () => {
         session.subscribe(createAllProjectCommitsSubscription(), (laterCommit) =>
           order.push(`c:${laterCommit.modelRevision}`),
         )
-        executeAddNote(session, fixture.records.nonLoopSource.id, secondNoteId, parseTick(1_440))
+        executeAddNote(session, fixture.records.verseSource.id, secondNoteId, parseTick(1_440))
       }
     })
     session.subscribe(createAllProjectCommitsSubscription(), (commit) =>
       order.push(`b:${commit.modelRevision}`),
     )
 
-    executeAddNote(session, fixture.records.nonLoopSource.id, firstNoteId)
+    executeAddNote(session, fixture.records.verseSource.id, firstNoteId)
     await flushCommitDeliveries(2)
 
     expect(order).toEqual(['a:1', 'b:1', 'a:2', 'b:2', 'c:2'])
@@ -444,13 +444,13 @@ describe('ProjectSession commit publication', () => {
 
     const firstCommit = executeAddNote(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       parseNoteId('note-subscription-failure-first'),
     )
     await flushCommitDeliveries()
     const secondCommit = executeAddNote(
       session,
-      fixture.records.nonLoopSource.id,
+      fixture.records.verseSource.id,
       parseNoteId('note-subscription-failure-second'),
       parseTick(1_440),
     )
@@ -466,7 +466,7 @@ describe('ProjectSession commit publication', () => {
     const noteId = parseNoteId('note-subscription-write-failure')
     const command = createAddNoteCommand({
       baseRevision: session.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       noteId,
       startTick: parseTick(1_200),
       durationTick: parseTick(120),
@@ -487,7 +487,7 @@ describe('ProjectSession commit publication', () => {
       ),
     ).toThrowError(/rollback completed and ModelStore was revalidated/)
 
-    const successfulCommit = executeAddNote(session, fixture.records.nonLoopSource.id, noteId)
+    const successfulCommit = executeAddNote(session, fixture.records.verseSource.id, noteId)
     await flushCommitDeliveries()
 
     expect(received).toEqual([successfulCommit])

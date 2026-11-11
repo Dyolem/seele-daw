@@ -15,14 +15,11 @@ import {
   type PianoRollClipContext,
 } from '#internal/common/piano-roll/piano-roll-clip-context'
 
-export const PIANO_ROLL_TRACK_CLIP_STATUS = Object.freeze({
-  READY: 'ready',
-  UNSUPPORTED: 'unsupported',
-} as const)
-
-interface PianoRollTrackClipProjectionBase {
+/** One Clip in Track time: where it sits, and the window it shows of its Source. */
+export interface PianoRollTrackClipProjection {
   readonly clipId: ClipId
   readonly color: ProjectColor | null
+  readonly context: PianoRollClipContext
   readonly endTick: Tick
   readonly muted: boolean
   readonly name: string
@@ -32,28 +29,15 @@ interface PianoRollTrackClipProjectionBase {
   readonly trackId: TrackId
 }
 
-export interface ReadyPianoRollTrackClipProjection extends PianoRollTrackClipProjectionBase {
-  readonly context: PianoRollClipContext
-  readonly status: typeof PIANO_ROLL_TRACK_CLIP_STATUS.READY
-}
-
-export interface UnsupportedPianoRollTrackClipProjection extends PianoRollTrackClipProjectionBase {
-  readonly reason: 'looped-clip'
-  readonly status: typeof PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED
-}
-
-export type PianoRollTrackClipProjection =
-  | ReadyPianoRollTrackClipProjection
-  | UnsupportedPianoRollTrackClipProjection
-
 /** Projects one Project Clip into its immutable global Track-time window. */
 export function createPianoRollTrackClipProjection(
   clip: MidiClipRecord,
   source: MidiSourceRecord,
 ): PianoRollTrackClipProjection {
-  const base = Object.freeze({
+  return Object.freeze({
     clipId: clip.id,
     color: clip.color,
+    context: createPianoRollClipContext(clip, source),
     endTick: addTicks(clip.startTick, clip.spanTick),
     muted: clip.muted,
     name: clip.name,
@@ -62,21 +46,11 @@ export function createPianoRollTrackClipProjection(
     startTick: clip.startTick,
     trackId: clip.trackId,
   })
-
-  const context = createPianoRollClipContext(clip, source)
-  if (context === null) {
-    return Object.freeze({
-      ...base,
-      reason: 'looped-clip',
-      status: PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED,
-    })
-  }
-  return Object.freeze({ ...base, context, status: PIANO_ROLL_TRACK_CLIP_STATUS.READY })
 }
 
-/** Maps a MidiSource endpoint into one ready Clip's global Project window. */
+/** Maps a MidiSource endpoint into one Clip's global Project window. */
 export function pianoRollTrackSourceTickToProjectTick(
-  clip: ReadyPianoRollTrackClipProjection,
+  clip: PianoRollTrackClipProjection,
   sourceTick: Tick,
 ): Tick {
   return addTicks(clip.startTick, pianoRollSourceTickToClipTick(clip.context, sourceTick))

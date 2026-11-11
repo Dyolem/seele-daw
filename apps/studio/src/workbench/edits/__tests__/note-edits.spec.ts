@@ -36,7 +36,7 @@ interface ClipFixture {
 }
 
 /** One Instrument Track with one 960-tick Clip that reads its Source from tick 480. */
-function createClipFixture(name: string, options: { readonly looped?: boolean } = {}): ClipFixture {
+function createClipFixture(name: string): ClipFixture {
   const session = createEditTestSession(`note-${name}`)
   const track = createTrackEdits(
     editContextFor(session, `track-${name}`, `device-${name}`),
@@ -53,11 +53,8 @@ function createClipFixture(name: string, options: { readonly looped?: boolean } 
       startTick: parseTick(0),
       spanTick: parsePositiveTick(960),
       sourceId: parseMidiSourceId(`source-${name}`),
-      sourceLengthTick: parsePositiveTick(options.looped ? 960 : 1_440),
-      sourceOffsetTick: parseTick(options.looped ? 0 : 480),
-      loop: options.looped
-        ? { sourceStartTick: parseTick(0), sourceSpanTick: parsePositiveTick(960) }
-        : null,
+      sourceLengthTick: parsePositiveTick(1_440),
+      sourceOffsetTick: parseTick(480),
     }),
   )
   return { clipId, session }
@@ -365,23 +362,6 @@ describe('note edits', () => {
         pitch: parseMidiPitch(60),
       }),
     ).toThrowError(expect.objectContaining<Partial<ProjectEditError>>({ code: 'not-placeable' }))
-    expect(createId).not.toHaveBeenCalled()
-  })
-
-  it('rejects looped Clips as unsupported before consuming an identity', () => {
-    const fixture = createClipFixture('looped', { looped: true })
-    const createId = vi.fn<() => string>(() => 'unused')
-
-    expect(() =>
-      createNoteEdits({ activeProject: { state: readyStateOf(fixture.session) }, createId }).add({
-        expectedSession: fixture.session,
-        baseRevision: fixture.session.modelRevision,
-        clipId: fixture.clipId,
-        clipStartTick: parseTick(0),
-        requestedDurationTick: parsePositiveTick(240),
-        pitch: parseMidiPitch(60),
-      }),
-    ).toThrowError(expect.objectContaining<Partial<ProjectEditError>>({ code: 'unsupported' }))
     expect(createId).not.toHaveBeenCalled()
   })
 

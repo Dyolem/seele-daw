@@ -4,7 +4,6 @@ import type {
   ProjectColor,
   ProjectSnapshot,
   TrackId,
-  TrackRecord,
 } from '@seele-daw/project-core'
 import { decodeSampleInstrumentDeviceState, type SoundbankId } from '@seele-daw/playback'
 
@@ -30,8 +29,7 @@ export interface ProjectTrackInstrumentPresentation {
 export interface ProjectTrackPresentation {
   readonly color: ProjectColor | null
   readonly id: TrackId
-  readonly instrument: ProjectTrackInstrumentPresentation | null
-  readonly kind: TrackRecord['kind']
+  readonly instrument: ProjectTrackInstrumentPresentation
   readonly name: string
 }
 
@@ -92,11 +90,7 @@ export function createProjectTrackPresentations(
       Object.freeze({
         color: track.color,
         id: track.id,
-        instrument:
-          track.kind === 'instrument'
-            ? createInstrumentPresentation(devicesById.get(track.instrumentDeviceId))
-            : null,
-        kind: track.kind,
+        instrument: createInstrumentPresentation(devicesById.get(track.instrumentDeviceId)),
         name: track.name,
       }),
     )

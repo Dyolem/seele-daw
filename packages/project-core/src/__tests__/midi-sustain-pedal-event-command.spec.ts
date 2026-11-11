@@ -48,7 +48,7 @@ function createAddCommand(
 
   return createAddMidiSustainPedalEventCommand({
     baseRevision: store.modelRevision,
-    sourceId: fixture.records.nonLoopSource.id,
+    sourceId: fixture.records.verseSource.id,
     eventId: ADDED_EVENT_ID,
     tick: ADDED_EVENT_TICK,
     value: ADDED_EVENT_VALUE,
@@ -65,8 +65,8 @@ function createMoveCommand(
 
   return createMoveMidiSustainPedalEventsCommand({
     baseRevision: store.modelRevision,
-    sourceId: fixture.records.nonLoopSource.id,
-    eventIds: [fixture.records.nonLoopPedalDown.id, fixture.records.nonLoopPedalUp.id],
+    sourceId: fixture.records.verseSource.id,
+    eventIds: [fixture.records.versePedalDown.id, fixture.records.versePedalUp.id],
     deltaTick: parseTickDelta(120),
     ...overrides,
   })
@@ -80,8 +80,8 @@ function createRemoveCommand(
 
   return createRemoveMidiSustainPedalEventsCommand({
     baseRevision: store.modelRevision,
-    sourceId: fixture.records.nonLoopSource.id,
-    eventIds: [fixture.records.nonLoopPedalDown.id, fixture.records.nonLoopPedalUp.id],
+    sourceId: fixture.records.verseSource.id,
+    eventIds: [fixture.records.versePedalDown.id, fixture.records.versePedalUp.id],
     ...overrides,
   })
 }
@@ -94,8 +94,8 @@ function createReplaceValueCommand(
 
   return createReplaceMidiSustainPedalEventValueCommand({
     baseRevision: store.modelRevision,
-    sourceId: fixture.records.nonLoopSource.id,
-    eventId: fixture.records.nonLoopPedalDown.id,
+    sourceId: fixture.records.verseSource.id,
+    eventId: fixture.records.versePedalDown.id,
     value: parseMidiControlValue(64),
     ...overrides,
   })
@@ -143,7 +143,7 @@ describe('MIDI Sustain Pedal Event command public contract', () => {
     expect(add).toEqual({
       type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.ADD,
       baseRevision: store.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       event: {
         id: ADDED_EVENT_ID,
         tick: ADDED_EVENT_TICK,
@@ -156,8 +156,8 @@ describe('MIDI Sustain Pedal Event command public contract', () => {
     expect(replaceValue).toEqual({
       type: PROJECT_COMMAND_TYPE.MIDI_SUSTAIN_PEDAL_EVENT.REPLACE_VALUE,
       baseRevision: store.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
-      eventId: fixture.records.nonLoopPedalDown.id,
+      sourceId: fixture.records.verseSource.id,
+      eventId: fixture.records.versePedalDown.id,
       value: parseMidiControlValue(64),
     })
     expect(Object.isFrozen(move.eventIds)).toBe(true)
@@ -180,7 +180,7 @@ describe('MIDI Sustain Pedal Event command public contract', () => {
     expect(
       captureCommandError(() =>
         createRemoveCommand(store, {
-          eventIds: [fixture.records.nonLoopPedalDown.id, fixture.records.nonLoopPedalDown.id],
+          eventIds: [fixture.records.versePedalDown.id, fixture.records.versePedalDown.id],
         }),
       ),
     ).toMatchObject({
@@ -228,7 +228,7 @@ describe('Add MIDI Sustain Pedal Event preparation', () => {
         store,
         createAddCommand(store, {
           eventId: parseMidiSustainPedalEventId('sustain-pedal-at-source-end'),
-          tick: fixture.records.nonLoopSource.lengthTick,
+          tick: fixture.records.verseSource.lengthTick,
         }),
       ),
     ).not.toThrow()
@@ -237,7 +237,7 @@ describe('Add MIDI Sustain Pedal Event preparation', () => {
         store,
         createAddCommand(store, {
           eventId: parseMidiSustainPedalEventId('sustain-pedal-same-tick-other-channel'),
-          tick: fixture.records.nonLoopPedalDown.tick,
+          tick: fixture.records.versePedalDown.tick,
           channel: parseMidiChannel(1),
         }),
       ),
@@ -258,7 +258,7 @@ describe('Add MIDI Sustain Pedal Event preparation', () => {
       captureCommandError(() =>
         prepareProjectCommand(
           store,
-          createAddCommand(store, { eventId: fixture.records.loopingPedalDown.id }),
+          createAddCommand(store, { eventId: fixture.records.chorusPedalDown.id }),
         ),
       ),
     ).toMatchObject({
@@ -269,7 +269,7 @@ describe('Add MIDI Sustain Pedal Event preparation', () => {
         prepareProjectCommand(
           store,
           createAddCommand(store, {
-            tick: fixture.records.nonLoopPedalDown.tick,
+            tick: fixture.records.versePedalDown.tick,
             channel: parseMidiChannel(0),
           }),
         ),
@@ -282,7 +282,7 @@ describe('Add MIDI Sustain Pedal Event preparation', () => {
         prepareProjectCommand(
           store,
           createAddCommand(store, {
-            tick: parseTick(fixture.records.nonLoopSource.lengthTick + 1),
+            tick: parseTick(fixture.records.verseSource.lengthTick + 1),
           }),
         ),
       ).code,
@@ -302,16 +302,16 @@ describe('Move, Remove, and Value Replace preparation', () => {
       {
         op: 'replace',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
-        after: { ...fixture.records.nonLoopPedalDown, tick: 480 },
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.versePedalDown,
+        after: { ...fixture.records.versePedalDown, tick: 480 },
       },
       {
         op: 'replace',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalUp,
-        after: { ...fixture.records.nonLoopPedalUp, tick: 1_020 },
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.versePedalUp,
+        after: { ...fixture.records.versePedalUp, tick: 1_020 },
       },
     ])
     expect(preparation.plan.inverse.map(({ table, op }) => `${table}.${op}`)).toEqual([
@@ -334,7 +334,7 @@ describe('Move, Remove, and Value Replace preparation', () => {
     expect(
       prepareProjectCommand(
         store,
-        createReplaceValueCommand(store, { value: fixture.records.nonLoopPedalDown.value }),
+        createReplaceValueCommand(store, { value: fixture.records.versePedalDown.value }),
       ),
     ).toEqual({
       status: PROJECT_COMMAND_EXECUTION_STATUS.NO_CHANGE,
@@ -357,10 +357,10 @@ describe('Move, Remove, and Value Replace preparation', () => {
       {
         op: 'replace',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.versePedalDown,
         after: {
-          ...fixture.records.nonLoopPedalDown,
+          ...fixture.records.versePedalDown,
           value: 64,
         },
       },
@@ -369,14 +369,14 @@ describe('Move, Remove, and Value Replace preparation', () => {
       {
         op: 'remove',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalDown,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.versePedalDown,
       },
       {
         op: 'remove',
         table: 'midiSustainPedalEvents',
-        sourceId: fixture.records.nonLoopSource.id,
-        before: fixture.records.nonLoopPedalUp,
+        sourceId: fixture.records.verseSource.id,
+        before: fixture.records.versePedalUp,
       },
     ])
   })
@@ -398,7 +398,7 @@ describe('Move, Remove, and Value Replace preparation', () => {
         prepareProjectCommand(
           store,
           createMoveCommand(store, {
-            eventIds: [fixture.records.nonLoopPedalDown.id],
+            eventIds: [fixture.records.versePedalDown.id],
             deltaTick: parseTickDelta(-400),
           }),
         ),
@@ -409,7 +409,7 @@ describe('Move, Remove, and Value Replace preparation', () => {
         prepareProjectCommand(
           store,
           createMoveCommand(store, {
-            eventIds: [fixture.records.nonLoopPedalUp.id],
+            eventIds: [fixture.records.versePedalUp.id],
             deltaTick: parseTickDelta(1_100),
           }),
         ),
@@ -420,7 +420,7 @@ describe('Move, Remove, and Value Replace preparation', () => {
         prepareProjectCommand(
           store,
           createMoveCommand(store, {
-            eventIds: [fixture.records.nonLoopPedalDown.id],
+            eventIds: [fixture.records.versePedalDown.id],
             deltaTick: parseTickDelta(540),
           }),
         ),
@@ -546,9 +546,9 @@ describe('MIDI Sustain Pedal Event commit and History semantics', () => {
     expect(noteCommits).toEqual([])
     expect(
       store.getMidiSustainPedalEvent(
-        fixture.records.nonLoopSource.id,
-        fixture.records.nonLoopPedalDown.id,
+        fixture.records.verseSource.id,
+        fixture.records.versePedalDown.id,
       ),
-    ).toBe(fixture.records.nonLoopPedalDown)
+    ).toBe(fixture.records.versePedalDown)
   })
 })

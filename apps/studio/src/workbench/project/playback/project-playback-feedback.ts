@@ -19,11 +19,6 @@ const LOADING = Object.freeze<ProjectPlaybackFeedback>({
 
 function planFeedback(status: AudibleMidiPlanStatus): ProjectPlaybackFeedback | null {
   switch (status) {
-    case AUDIBLE_MIDI_PLAN_STATUS.BLOCKED:
-      return Object.freeze({
-        kind: 'error',
-        message: 'Playback is blocked by unsupported project routing.',
-      })
     case AUDIBLE_MIDI_PLAN_STATUS.EMPTY:
       return Object.freeze({ kind: 'info', message: 'No audible MIDI notes to play.' })
     case AUDIBLE_MIDI_PLAN_STATUS.PARTIAL:

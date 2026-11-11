@@ -380,7 +380,7 @@ Action 与上下文的实现见 [Workbench](./apps/studio/src/workbench/README.m
   接通前继续 Disabled；
 - 时间使用稳定的 `mm:ss.mmm`，由 Transport 权威位置投影，不能累计视觉帧差；
 - 没有真实 Meter 数据时显示 `Meter —`，不得用 `0.0 dB` 暗示已有实时测量；
-- Empty 通过 disabled reason 安静反馈；Blocked、Partial 与 Runtime Failure 必须通过邻近 title
+- Empty 通过 disabled reason 安静反馈；Partial 与 Runtime Failure 必须通过邻近 title
   或 Toast 明确反馈；失败不改变 Project dirty、History 或保存事实；
 - Play / Pause 的 `Space` 属于 Workbench Scope，可编辑控件、IME composing 和 Modal 仍优先。
 
@@ -517,15 +517,14 @@ Menu / Modal 的输入屏障包含用户自定义的快捷键，不只依靠控�
   表达；控件在空 Clip Focus 状态仍保持可用，使用户可以显式返回 Track；
 - 两种模式读取相同的 `MidiClipRecord`、`MidiSourceRecord` 与 Note Partition；Clip 末端只由
   `startTick + spanTick` 派生；
-- Track 投影中非循环 Note 的全局位置是
-  `clip.startTick + note.startTick - clip.sourceOffsetTick`；
-- looped Clip 在循环实例编辑语义确认前可以显示，但 MUST 明确不可编辑。
+- Track 投影中 Note 的全局位置是
+  `clip.startTick + note.startTick - clip.sourceOffsetTick`。
 
-Track 模式在空白时间创建 Note 时，优先写入命中的 Active 非循环 Clip；Note 尾端越界或 Pointer
+Track 模式在空白时间创建 Note 时，优先写入命中的 Active Clip；Note 尾端越界或 Pointer
 位于左侧相邻 Clip 末端后一个当前小节以内时，可以向右扩展该 Clip，但 MUST NOT 跨越下一 Clip。
-更远空白以及既有 Clip 之前的空白创建新的、按小节边界对齐的非循环 Clip / MidiSource；V1 不
+更远空白以及既有 Clip 之前的空白创建新的、按小节边界对齐的 Clip / MidiSource；V1 不
 自动左扩已有 Clip。创建 / 扩展 Clip 与创建 Note MUST 由一次原子 Project Command 完成。
-Clip Focus 不自动创建其他 Clip。重叠区域没有 Active Clip 或目标为 looped Clip 时，交互 MUST
+Clip Focus 不自动创建其他 Clip。重叠区域没有 Active Clip 时，交互 MUST
 拒绝提交并解释原因，不能猜测写入归属。
 
 首批默认编辑语义：

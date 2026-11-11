@@ -31,7 +31,6 @@ export const AUDIBLE_MIDI_TRANSPORT_OUTCOME = Object.freeze({
   LOCATED: 'located',
   NO_CHANGE: 'no-change',
   PAUSED: 'paused',
-  PLAN_BLOCKED: 'plan-blocked',
   PLAN_EMPTY: 'plan-empty',
   PLAYED: 'played',
   RETURNED_TO_LAST_START_POSITION: 'returned-to-last-start-position',
@@ -207,9 +206,6 @@ export function createAudibleMidiTransport(
   }
 
   function play(): AudibleMidiTransportTransition {
-    if (planStatus === AUDIBLE_MIDI_PLAN_STATUS.BLOCKED) {
-      return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_BLOCKED, anchorProjectSecond)
-    }
     if (planStatus === AUDIBLE_MIDI_PLAN_STATUS.EMPTY) {
       return createTransition(AUDIBLE_MIDI_TRANSPORT_OUTCOME.PLAN_EMPTY, anchorProjectSecond)
     }

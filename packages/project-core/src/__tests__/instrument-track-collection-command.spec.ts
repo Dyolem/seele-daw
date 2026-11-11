@@ -60,7 +60,6 @@ function createEntry(
     readonly noteId?: string
     readonly clipTrackId?: string
     readonly clipSourceId?: string
-    readonly midiEffectId?: string
     readonly sustainPedalEventId?: string
   } = {},
 ): InstrumentTrackCollectionEntry {
@@ -82,9 +81,7 @@ function createEntry(
       muted: false,
       soloed: false,
     },
-    midiEffectIds: options.midiEffectId === undefined ? [] : [parseDeviceId(options.midiEffectId)],
     instrumentDeviceId: device.id,
-    audioEffectIds: [],
   })
   const source = createMidiSourceRecord({
     id: parseMidiSourceId(`source-import-${suffix}`),
@@ -100,7 +97,6 @@ function createEntry(
     spanTick: parseTick(1_920),
     sourceId: parseMidiSourceId(options.clipSourceId ?? source.id),
     sourceOffsetTick: parseTick(0),
-    loop: null,
   })
   const notes = [
     createMidiNoteRecord({
@@ -233,16 +229,13 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const existingNote = createEntry('existing-note', {
-      noteId: fixture.records.nonLoopNote.id,
+      noteId: fixture.records.verseNote.id,
     })
     const existingSustainPedalEvent = createEntry('existing-sustain-pedal-event', {
-      sustainPedalEventId: fixture.records.nonLoopPedalDown.id,
+      sustainPedalEventId: fixture.records.versePedalDown.id,
     })
     const wrongTrack = createEntry('wrong-track', { clipTrackId: 'track-other' })
     const wrongSource = createEntry('wrong-source', { clipSourceId: 'source-other' })
-    const unsupportedDeviceChain = createEntry('device-chain', {
-      midiEffectId: 'device-unowned-midi-effect',
-    })
 
     expect(
       captureCommandError(() => prepareProjectCommand(store, createCommand(store, [existingNote])))
@@ -256,16 +249,11 @@ describe('AddInstrumentTrackCollectionCommand preparation', () => {
     expect(
       captureCommandError(() => prepareProjectCommand(store, createCommand(store, [wrongTrack])))
         .code,
-    ).toBe('midi-clip-track-kind-mismatch')
+    ).toBe('midi-clip-track-id-mismatch')
     expect(
       captureCommandError(() => prepareProjectCommand(store, createCommand(store, [wrongSource])))
         .code,
     ).toBe('midi-clip-source-id-mismatch')
-    expect(
-      captureCommandError(() =>
-        prepareProjectCommand(store, createCommand(store, [unsupportedDeviceChain])),
-      ).code,
-    ).toBe('instrument-track-device-chain-unsupported')
 
     const before = store.modelRevision
     const duplicateEntries = [createEntry('duplicate'), createEntry('duplicate')]
@@ -301,7 +289,7 @@ describe('Instrument Track collection commit and History semantics', () => {
       fixture.records.instrumentTrack.id,
       command.entries[0]?.track.id,
       command.entries[1]?.track.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
 
     for (const entry of command.entries) {
@@ -335,7 +323,7 @@ describe('Instrument Track collection commit and History semantics', () => {
     )
     expect(session.getSnapshot().trackOrder).toEqual([
       fixture.records.instrumentTrack.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
 
     const redoCommit = session.redo()
@@ -347,7 +335,7 @@ describe('Instrument Track collection commit and History semantics', () => {
       fixture.records.instrumentTrack.id,
       command.entries[0]?.track.id,
       command.entries[1]?.track.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
   })
 })

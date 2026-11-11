@@ -37,11 +37,7 @@ import {
   parseMidiPitchDelta,
 } from '#internal/model/scalars'
 import { createInstrumentTrackRecord, type InstrumentTrackRecord } from '#internal/model/track'
-import {
-  createMidiClipRecord,
-  type CreateMidiLoopInput,
-  type MidiClipRecord,
-} from '#internal/model/midi-clip'
+import { createMidiClipRecord, type MidiClipRecord } from '#internal/model/midi-clip'
 import { createMidiSourceRecord, type MidiSourceRecord } from '#internal/model/midi-source'
 import type { CreateChannelStripDescriptorInput } from '#internal/model/channel'
 import {
@@ -210,7 +206,7 @@ export interface ExtendMidiClipWithNoteCommand extends ProjectCommandBase<
   typeof PROJECT_COMMAND_TYPE.MIDI_CLIP.EXTEND_WITH_NOTE
 > {
   readonly clipId: ClipId
-  /** Final non-looped Clip span after the right-edge extension. */
+  /** Final Clip span after the right-edge extension. */
   readonly spanTick: Tick
   readonly note: MidiNoteRecord
 }
@@ -344,11 +340,9 @@ export interface CreateAddMidiClipCommandInput {
   readonly sourceId: MidiSourceId
   readonly sourceLengthTick: Tick
   readonly sourceOffsetTick: Tick
-  readonly loop: CreateMidiLoopInput | null
 }
 
 export interface CreateAddMidiClipWithNoteCommandInput extends CreateAddMidiClipCommandInput {
-  readonly loop: null
   readonly noteId: NoteId
   readonly noteStartTick: Tick
   readonly noteDurationTick: Tick
@@ -360,7 +354,7 @@ export interface CreateAddMidiClipWithNoteCommandInput extends CreateAddMidiClip
 export interface CreateExtendMidiClipWithNoteCommandInput {
   readonly baseRevision: ModelRevision
   readonly clipId: ClipId
-  /** Final non-looped Clip span after the right-edge extension. */
+  /** Final Clip span after the right-edge extension. */
   readonly spanTick: Tick
   readonly noteId: NoteId
   readonly noteStartTick: Tick
@@ -510,9 +504,7 @@ export function createAddInstrumentTrackCommand(
     name: input.name,
     color: input.color,
     channel: input.channel,
-    midiEffectIds: [],
     instrumentDeviceId: instrumentDevice.id,
-    audioEffectIds: [],
   })
 
   return {
@@ -591,7 +583,6 @@ export function createAddMidiClipCommand(input: CreateAddMidiClipCommandInput): 
     spanTick: input.spanTick,
     sourceId: source.id,
     sourceOffsetTick: input.sourceOffsetTick,
-    loop: input.loop,
   })
 
   return {
@@ -621,13 +612,6 @@ function createPlacementNote(
 export function createAddMidiClipWithNoteCommand(
   input: CreateAddMidiClipWithNoteCommandInput,
 ): AddMidiClipWithNoteCommand {
-  if (input.loop !== null) {
-    throw new ProjectCommandError(
-      'looped-midi-clip-unsupported',
-      'AddMidiClipWithNoteCommand only creates a non-looped MIDI Clip',
-    )
-  }
-
   const clipCommand = createAddMidiClipCommand(input)
 
   return {

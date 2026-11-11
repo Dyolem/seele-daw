@@ -3,7 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import * as projectCore from '#internal/index'
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  createAudioTrackRecord,
+  createInstrumentTrackRecord,
   createDeviceDescriptor,
   createMasterChannelRecord,
   createMidiClipRecord,
@@ -42,23 +42,22 @@ import {
 /** One change for every table and operation the vocabulary accepts. */
 function createChangeExamples(): readonly ProjectChange[] {
   const { records } = createCompleteProjectFixture()
-  const sourceId = records.nonLoopSource.id
-  const notes = [records.nonLoopNote, records.nonLoopHarmonyNote]
-  const pedalEvents = [records.nonLoopPedalDown, records.nonLoopPedalUp]
+  const sourceId = records.verseSource.id
+  const notes = [records.verseNote, records.verseHarmonyNote]
+  const pedalEvents = [records.versePedalDown, records.versePedalUp]
   const project = createProjectRecord({ id: records.project.id, name: 'Updated Project' })
   const master = createMasterChannelRecord({
     gain: parseLinearGain(0.75),
     muted: true,
-    audioEffectIds: records.master.audioEffectIds,
   })
-  const track = createAudioTrackRecord({
-    id: records.audioTrack.id,
-    name: 'Updated Audio Track',
-    color: records.audioTrack.color,
-    channel: records.audioTrack.channel,
-    audioEffectIds: records.audioTrack.audioEffectIds,
+  const track = createInstrumentTrackRecord({
+    id: records.bassTrack.id,
+    name: 'Updated Bass Track',
+    color: records.bassTrack.color,
+    channel: records.bassTrack.channel,
+    instrumentDeviceId: records.bassTrack.instrumentDeviceId,
   })
-  const clip = createMidiClipRecord({ ...records.nonLoopClip, name: 'Updated Clip' })
+  const clip = createMidiClipRecord({ ...records.verseClip, name: 'Updated Clip' })
   const source = createMidiSourceRecord({ id: sourceId, lengthTick: parseTick(2_400) })
   const tempoEvent = createTempoEventRecord({ ...records.laterTempoEvent, bpm: parseTempoBpm(132) })
   const timeSignatureEvent = createTimeSignatureEventRecord({
@@ -74,24 +73,24 @@ function createChangeExamples(): readonly ProjectChange[] {
     parameters: records.instrumentDevice.parameters,
     opaqueState: records.instrumentDevice.opaqueState,
   })
-  const note = createMidiNoteRecord({ ...records.nonLoopNote, velocity: parseMidiVelocity(112) })
+  const note = createMidiNoteRecord({ ...records.verseNote, velocity: parseMidiVelocity(112) })
   const pedalEvent = createMidiSustainPedalEventRecord({
-    ...records.nonLoopPedalDown,
+    ...records.versePedalDown,
     value: parseMidiControlValue(96),
   })
 
   return [
     { op: 'replace', table: 'project', before: records.project, after: project },
     { op: 'replace', table: 'master', before: records.master, after: master },
-    { op: 'insert', table: 'tracks', after: records.audioTrack },
-    { op: 'remove', table: 'tracks', before: records.audioTrack },
-    { op: 'replace', table: 'tracks', before: records.audioTrack, after: track },
-    { op: 'insert', table: 'clips', after: records.nonLoopClip },
-    { op: 'remove', table: 'clips', before: records.nonLoopClip },
-    { op: 'replace', table: 'clips', before: records.nonLoopClip, after: clip },
-    { op: 'insert', table: 'midiSources', after: records.nonLoopSource },
-    { op: 'remove', table: 'midiSources', before: records.nonLoopSource },
-    { op: 'replace', table: 'midiSources', before: records.nonLoopSource, after: source },
+    { op: 'insert', table: 'tracks', after: records.bassTrack },
+    { op: 'remove', table: 'tracks', before: records.bassTrack },
+    { op: 'replace', table: 'tracks', before: records.bassTrack, after: track },
+    { op: 'insert', table: 'clips', after: records.verseClip },
+    { op: 'remove', table: 'clips', before: records.verseClip },
+    { op: 'replace', table: 'clips', before: records.verseClip, after: clip },
+    { op: 'insert', table: 'midiSources', after: records.verseSource },
+    { op: 'remove', table: 'midiSources', before: records.verseSource },
+    { op: 'replace', table: 'midiSources', before: records.verseSource, after: source },
     { op: 'insert', table: 'tempoEvents', after: records.laterTempoEvent },
     { op: 'remove', table: 'tempoEvents', before: records.laterTempoEvent },
     { op: 'replace', table: 'tempoEvents', before: records.laterTempoEvent, after: tempoEvent },
@@ -106,22 +105,22 @@ function createChangeExamples(): readonly ProjectChange[] {
     { op: 'insert', table: 'devices', after: records.instrumentDevice },
     { op: 'remove', table: 'devices', before: records.instrumentDevice },
     { op: 'replace', table: 'devices', before: records.instrumentDevice, after: device },
-    { op: 'insert', table: 'trackOrder', index: 1, trackId: records.audioTrack.id },
-    { op: 'remove', table: 'trackOrder', index: 1, trackId: records.audioTrack.id },
+    { op: 'insert', table: 'trackOrder', index: 1, trackId: records.bassTrack.id },
+    { op: 'remove', table: 'trackOrder', index: 1, trackId: records.bassTrack.id },
     { op: 'insert-partition', table: 'midiNotes', sourceId, records: notes },
     { op: 'remove-partition', table: 'midiNotes', sourceId, records: notes },
-    { op: 'insert', table: 'midiNotes', sourceId, after: records.nonLoopNote },
-    { op: 'remove', table: 'midiNotes', sourceId, before: records.nonLoopNote },
-    { op: 'replace', table: 'midiNotes', sourceId, before: records.nonLoopNote, after: note },
+    { op: 'insert', table: 'midiNotes', sourceId, after: records.verseNote },
+    { op: 'remove', table: 'midiNotes', sourceId, before: records.verseNote },
+    { op: 'replace', table: 'midiNotes', sourceId, before: records.verseNote, after: note },
     { op: 'insert-partition', table: 'midiSustainPedalEvents', sourceId, records: pedalEvents },
     { op: 'remove-partition', table: 'midiSustainPedalEvents', sourceId, records: pedalEvents },
-    { op: 'insert', table: 'midiSustainPedalEvents', sourceId, after: records.nonLoopPedalDown },
-    { op: 'remove', table: 'midiSustainPedalEvents', sourceId, before: records.nonLoopPedalDown },
+    { op: 'insert', table: 'midiSustainPedalEvents', sourceId, after: records.versePedalDown },
+    { op: 'remove', table: 'midiSustainPedalEvents', sourceId, before: records.versePedalDown },
     {
       op: 'replace',
       table: 'midiSustainPedalEvents',
       sourceId,
-      before: records.nonLoopPedalDown,
+      before: records.versePedalDown,
       after: pedalEvent,
     },
   ]
@@ -243,18 +242,18 @@ describe('createMutationPlan', () => {
 
   it('copies and freezes the plan, its changes and partition payloads', () => {
     const fixture = createCompleteProjectFixture()
-    const externalPartition = [fixture.records.nonLoopNote, fixture.records.nonLoopHarmonyNote]
+    const externalPartition = [fixture.records.verseNote, fixture.records.verseHarmonyNote]
     const partitionChange: ProjectChange = {
       op: 'insert-partition',
       table: 'midiNotes',
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       records: externalPartition,
     }
     const trackOrderChange: ProjectChange = {
       op: 'insert',
       table: 'trackOrder',
       index: 1,
-      trackId: fixture.records.audioTrack.id,
+      trackId: fixture.records.bassTrack.id,
     }
     const externalForward: ProjectChange[] = [partitionChange, trackOrderChange]
     const plan = createMutationPlan(INITIAL_MODEL_REVISION, externalForward)
@@ -282,18 +281,18 @@ describe('createMutationPlan', () => {
     expect(Object.isFrozen(forwardPartition.records)).toBe(true)
     expect(inversePartition.records).toBe(forwardPartition.records)
 
-    externalPartition.push(fixture.records.loopingNote)
+    externalPartition.push(fixture.records.chorusNote)
     externalForward.push({
       op: 'insert',
       table: 'midiNotes',
-      sourceId: fixture.records.loopingSource.id,
-      after: fixture.records.loopingNote,
+      sourceId: fixture.records.chorusSource.id,
+      after: fixture.records.chorusNote,
     })
 
     expect(plan.forward).toHaveLength(2)
     expect(forwardPartition.records).toEqual([
-      fixture.records.nonLoopNote,
-      fixture.records.nonLoopHarmonyNote,
+      fixture.records.verseNote,
+      fixture.records.verseHarmonyNote,
     ])
   })
 
@@ -303,13 +302,13 @@ describe('createMutationPlan', () => {
       op: 'insert',
       table: 'tracks',
       after: fixture.records.instrumentTrack,
-      before: fixture.records.audioTrack,
+      before: fixture.records.bassTrack,
       arbitrary: 'ignored insert metadata',
     } as const
     const removeWithExtras = {
       op: 'remove',
       table: 'tracks',
-      before: fixture.records.audioTrack,
+      before: fixture.records.bassTrack,
       after: fixture.records.instrumentTrack,
       arbitrary: 'ignored remove metadata',
     } as const
@@ -317,10 +316,10 @@ describe('createMutationPlan', () => {
 
     expect(plan.forward).toEqual([
       { op: 'insert', table: 'tracks', after: fixture.records.instrumentTrack },
-      { op: 'remove', table: 'tracks', before: fixture.records.audioTrack },
+      { op: 'remove', table: 'tracks', before: fixture.records.bassTrack },
     ])
     expect(plan.inverse).toEqual([
-      { op: 'insert', table: 'tracks', after: fixture.records.audioTrack },
+      { op: 'insert', table: 'tracks', after: fixture.records.bassTrack },
       { op: 'remove', table: 'tracks', before: fixture.records.instrumentTrack },
     ])
   })
@@ -355,7 +354,7 @@ describe('createMutationPlan rejections', () => {
   it('rejects same-reference replacements', () => {
     const fixture = createCompleteProjectFixture()
     const { records } = fixture
-    const sourceId = records.nonLoopSource.id
+    const sourceId = records.verseSource.id
     const changes: readonly ProjectChange[] = [
       { op: 'replace', table: 'project', before: records.project, after: records.project },
       { op: 'replace', table: 'master', before: records.master, after: records.master },
@@ -369,15 +368,15 @@ describe('createMutationPlan rejections', () => {
         op: 'replace',
         table: 'midiNotes',
         sourceId,
-        before: records.nonLoopNote,
-        after: records.nonLoopNote,
+        before: records.verseNote,
+        after: records.verseNote,
       },
       {
         op: 'replace',
         table: 'midiSustainPedalEvents',
         sourceId,
-        before: records.nonLoopPedalDown,
-        after: records.nonLoopPedalDown,
+        before: records.versePedalDown,
+        after: records.versePedalDown,
       },
     ]
 
@@ -398,24 +397,24 @@ describe('createMutationPlan rejections', () => {
   it('rejects replacement records whose IDs change', () => {
     const fixture = createCompleteProjectFixture()
     const { records } = fixture
-    const sourceId = records.nonLoopSource.id
+    const sourceId = records.verseSource.id
     const differentProject = createProjectRecord({
       id: parseProjectId('different-project'),
       name: records.project.name,
     })
-    const differentTrack = createAudioTrackRecord({
-      id: records.audioTrack.id,
+    const differentTrack = createInstrumentTrackRecord({
+      id: records.bassTrack.id,
       name: 'Temporary Track',
       color: null,
       channel: records.instrumentTrack.channel,
-      audioEffectIds: [],
+      instrumentDeviceId: records.instrumentTrack.instrumentDeviceId,
     })
     const differentNote = createMidiNoteRecord({
-      ...records.nonLoopNote,
+      ...records.verseNote,
       id: parseNoteId('different-note'),
     })
     const differentPedalEvent = createMidiSustainPedalEventRecord({
-      ...records.nonLoopPedalDown,
+      ...records.versePedalDown,
       id: parseMidiSustainPedalEventId('different-sustain-pedal-event'),
     })
     const changes: readonly ProjectChange[] = [
@@ -425,14 +424,14 @@ describe('createMutationPlan rejections', () => {
         op: 'replace',
         table: 'midiNotes',
         sourceId,
-        before: records.nonLoopNote,
+        before: records.verseNote,
         after: differentNote,
       },
       {
         op: 'replace',
         table: 'midiSustainPedalEvents',
         sourceId,
-        before: records.nonLoopPedalDown,
+        before: records.versePedalDown,
         after: differentPedalEvent,
       },
     ]
@@ -440,7 +439,7 @@ describe('createMutationPlan rejections', () => {
     for (const change of changes) {
       expect(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
-          { op: 'remove', table: 'tracks', before: records.audioTrack },
+          { op: 'remove', table: 'tracks', before: records.bassTrack },
           change,
         ]),
       ).toThrowError('Change at index 1 cannot change a record identity during replacement')
@@ -449,10 +448,10 @@ describe('createMutationPlan rejections', () => {
 
   it('rejects duplicate record IDs in partition payloads at their plan position', () => {
     const fixture = createCompleteProjectFixture()
-    const { nonLoopNote, nonLoopPedalDown, nonLoopSource, audioTrack } = fixture.records
-    const sourceId = nonLoopSource.id
-    const notes = [nonLoopNote, nonLoopNote]
-    const pedalEvents = [nonLoopPedalDown, nonLoopPedalDown]
+    const { verseNote, versePedalDown, verseSource, bassTrack } = fixture.records
+    const sourceId = verseSource.id
+    const notes = [verseNote, verseNote]
+    const pedalEvents = [versePedalDown, versePedalDown]
     const changes: readonly ProjectChange[] = [
       { op: 'insert-partition', table: 'midiNotes', sourceId, records: notes },
       { op: 'remove-partition', table: 'midiNotes', sourceId, records: notes },
@@ -463,7 +462,7 @@ describe('createMutationPlan rejections', () => {
     for (const change of changes) {
       expect(() =>
         createMutationPlan(INITIAL_MODEL_REVISION, [
-          { op: 'remove', table: 'tracks', before: audioTrack },
+          { op: 'remove', table: 'tracks', before: bassTrack },
           change,
         ]),
       ).toThrowError(/^Change at index 1 contains duplicate .+ ID /)

@@ -65,10 +65,10 @@ describe('ProjectQuery public contract', () => {
   it('exports frozen typed descriptors while keeping index internals private', () => {
     const { fixture, session } = createFixtureProjectSession()
     const byIdQuery = createMidiNoteByIdQuery({
-      sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      sourceId: fixture.records.verseSource.id,
+      noteId: fixture.records.verseNote.id,
     })
-    const rangeQuery = createFullSourceRangeQuery(fixture.records.nonLoopSource.id)
+    const rangeQuery = createFullSourceRangeQuery(fixture.records.verseSource.id)
     const byIdResult = session.query(byIdQuery)
     const rangeResult = session.query(rangeQuery)
 
@@ -88,7 +88,7 @@ describe('ProjectQuery public contract', () => {
   it('rejects invalid range relationships', () => {
     const { fixture } = createFixtureProjectSession()
     const baseInput = {
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       startTick: parseTick(240),
       endTick: parseTick(480),
       minimumPitch: parseMidiPitch(60),
@@ -121,29 +121,29 @@ describe('ProjectSession MIDI Note queries', () => {
     const { fixture, session } = createFixtureProjectSession()
     const existing = session.query(
       createMidiNoteByIdQuery({
-        sourceId: fixture.records.nonLoopSource.id,
-        noteId: fixture.records.nonLoopNote.id,
+        sourceId: fixture.records.verseSource.id,
+        noteId: fixture.records.verseNote.id,
       }),
     )
     const missing = session.query(
       createMidiNoteByIdQuery({
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteId: parseNoteId('note-query-missing'),
       }),
     )
     const missingSource = session.query(
       createMidiNoteByIdQuery({
         sourceId: parseMidiSourceId('source-query-missing'),
-        noteId: fixture.records.nonLoopNote.id,
+        noteId: fixture.records.verseNote.id,
       }),
     )
 
     expect(existing).toEqual({
       queryType: PROJECT_QUERY_TYPE.MIDI_NOTE.BY_ID,
       modelRevision: 0,
-      note: fixture.records.nonLoopNote,
+      note: fixture.records.verseNote,
     })
-    expect(existing.note).toBe(fixture.records.nonLoopNote)
+    expect(existing.note).toBe(fixture.records.verseNote)
     expect(Object.isFrozen(existing)).toBe(true)
     expect(missing.note).toBeUndefined()
     expect(missingSource.note).toBeUndefined()
@@ -151,7 +151,7 @@ describe('ProjectSession MIDI Note queries', () => {
 
   it('uses half-open overlap, inclusive Pitch bounds, and frozen missing results', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
+    const sourceId = fixture.records.verseSource.id
     const startsAtBoundary = session.query(
       createMidiNotesIntersectingRangeQuery({
         sourceId,
@@ -189,8 +189,8 @@ describe('ProjectSession MIDI Note queries', () => {
       }),
     )
 
-    expect(startsAtBoundary.notes).toEqual([fixture.records.nonLoopHarmonyNote])
-    expect(containedViewport.notes).toEqual([fixture.records.nonLoopNote])
+    expect(startsAtBoundary.notes).toEqual([fixture.records.verseHarmonyNote])
+    expect(containedViewport.notes).toEqual([fixture.records.verseNote])
     expect(endsAtBoundary.notes).toEqual([])
     expect(missingSource.notes).toEqual([])
     expect(Object.isFrozen(startsAtBoundary)).toBe(true)
@@ -200,7 +200,7 @@ describe('ProjectSession MIDI Note queries', () => {
 
   it('sorts by startTick, Pitch, and opaque Note ID independently of insertion order', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
+    const sourceId = fixture.records.verseSource.id
     const laterId = parseNoteId('note-query-sort-z')
     const earlierId = parseNoteId('note-query-sort-a')
 
@@ -232,14 +232,14 @@ describe('ProjectSession MIDI Note queries', () => {
     expect(result.notes.map((note) => note.id)).toEqual([
       earlierId,
       laterId,
-      fixture.records.nonLoopHarmonyNote.id,
+      fixture.records.verseHarmonyNote.id,
     ])
     expect(result.modelRevision).toBe(2)
   })
 
   it('keeps indexed results equivalent to scanning across Add, Move, Remove, Undo, and Redo', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
+    const sourceId = fixture.records.verseSource.id
     const noteId = parseNoteId('note-query-sequence')
     const rangeQueries = [
       createFullSourceRangeQuery(sourceId),
@@ -322,12 +322,12 @@ describe('ProjectSession MIDI Note queries', () => {
 
   it('does not advance Query results for no-change execution', () => {
     const { fixture, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
 
     session.execute(
       createMoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteIds: [before.id],
         deltaTick: parseTickDelta(0),
         deltaPitch: parseMidiPitchDelta(0),
@@ -336,7 +336,7 @@ describe('ProjectSession MIDI Note queries', () => {
 
     const result = session.query(
       createMidiNoteByIdQuery({
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteId: before.id,
       }),
     )
@@ -347,7 +347,7 @@ describe('ProjectSession MIDI Note queries', () => {
 
   it('keeps answering at the previous revision when authoritative apply fails', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
+    const sourceId = fixture.records.verseSource.id
     const noteId = parseNoteId('note-query-write-failure')
     const command = createAddNoteCommand({
       baseRevision: session.modelRevision,

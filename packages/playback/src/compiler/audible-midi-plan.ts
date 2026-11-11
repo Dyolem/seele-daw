@@ -19,7 +19,6 @@ import type { SoundbankId } from '#internal/device/sample-instrument-device'
 import type { TempoSegmentPlan } from '#internal/time/tempo-map'
 
 export const AUDIBLE_MIDI_PLAN_STATUS = Object.freeze({
-  BLOCKED: 'blocked',
   EMPTY: 'empty',
   PARTIAL: 'partial',
   PLAYABLE: 'playable',
@@ -30,18 +29,13 @@ export type AudibleMidiPlanStatus =
 
 export type NoteOccurrenceKey = Brand<string, 'NoteOccurrenceKey'>
 
-export type PlaybackDiagnosticSeverity = 'blocking' | 'info' | 'warning'
+export type PlaybackDiagnosticSeverity = 'info' | 'warning'
 
 export type PlaybackDiagnosticCode =
-  | 'audio-track-unsupported'
   | 'instrument-disabled'
   | 'instrument-runtime-missing'
   | 'invalid-sample-instrument-state'
-  | 'looped-midi-clip-unsupported'
-  | 'master-audio-effect-chain-unsupported'
-  | 'midi-effect-chain-unsupported'
   | 'no-audible-midi-note-spans'
-  | 'track-audio-effect-chain-unsupported'
 
 export interface PlaybackDiagnostic {
   readonly code: PlaybackDiagnosticCode

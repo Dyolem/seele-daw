@@ -115,7 +115,6 @@ describe('AddInstrumentTrackCommand public contract', () => {
       insertAt: 1,
       track: {
         id: parseTrackId('track-command-instrument'),
-        kind: 'instrument',
         name: 'Instrument 3',
         color: '#7C5CFF',
         channel: {
@@ -124,8 +123,6 @@ describe('AddInstrumentTrackCommand public contract', () => {
           muted: false,
           soloed: false,
         },
-        midiEffectIds: [],
-        audioEffectIds: [],
         instrumentDeviceId: parseDeviceId('device-command-instrument-slot'),
       },
       instrumentDevice: {
@@ -273,7 +270,7 @@ describe('Instrument Track commit and History semantics', () => {
     expect([...store.orderedTrackIds()]).toEqual([
       fixture.records.instrumentTrack.id,
       command.track.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
 
     const undoCommit = session.undo()
@@ -294,7 +291,7 @@ describe('Instrument Track commit and History semantics', () => {
     expect(store.getDevice(command.instrumentDevice.id)).toBeUndefined()
     expect([...store.orderedTrackIds()]).toEqual([
       fixture.records.instrumentTrack.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
 
     const redoCommit = session.redo()
@@ -304,7 +301,7 @@ describe('Instrument Track commit and History semantics', () => {
     expect([...store.orderedTrackIds()]).toEqual([
       fixture.records.instrumentTrack.id,
       command.track.id,
-      fixture.records.audioTrack.id,
+      fixture.records.bassTrack.id,
     ])
   })
 })
@@ -313,8 +310,8 @@ describe('Instrument Track consumer compatibility', () => {
   it('advances the Note query revision without changing Note results', () => {
     const { fixture, store, session } = createFixtureProjectSession()
     const query = createMidiNoteByIdQuery({
-      sourceId: fixture.records.nonLoopSource.id,
-      noteId: fixture.records.nonLoopNote.id,
+      sourceId: fixture.records.verseSource.id,
+      noteId: fixture.records.verseNote.id,
     })
     const before = session.query(query)
     const result = session.execute(createCommand(store))

@@ -31,7 +31,7 @@ interface PedalFixture {
 }
 
 /** A 960-tick Clip at project tick 1920 that reads its Source from tick 480. */
-function createFixture(name: string, looped = false): PedalFixture {
+function createFixture(name: string): PedalFixture {
   const session = createEditTestSession(`pedal-${name}`)
   const track = createTrackEdits(
     editContextFor(session, `${name}-track`, `${name}-device`),
@@ -42,14 +42,11 @@ function createFixture(name: string, looped = false): PedalFixture {
       baseRevision: session.modelRevision,
       clipId,
       color: null,
-      loop: looped
-        ? { sourceSpanTick: parsePositiveTick(960), sourceStartTick: parseTick(0) }
-        : null,
       muted: false,
       name: 'Pedal Clip',
       sourceId: parseMidiSourceId(`${name}-source`),
-      sourceLengthTick: parsePositiveTick(looped ? 960 : 1_440),
-      sourceOffsetTick: parseTick(looped ? 0 : 480),
+      sourceLengthTick: parsePositiveTick(1_440),
+      sourceOffsetTick: parseTick(480),
       spanTick: parsePositiveTick(960),
       startTick: parseTick(1_920),
       trackId: track.trackId,
@@ -197,7 +194,7 @@ describe('sustain pedal edits', () => {
     ).toThrowError(coded('target-stale'))
   })
 
-  it('reports a missing Active Clip, positions outside the Clip, a stale gesture and a looped Clip', () => {
+  it('reports a missing Active Clip, positions outside the Clip and a stale gesture', () => {
     const fixture = createFixture('blocked')
     const input = {
       activeClipId: fixture.clipId,
@@ -220,9 +217,6 @@ describe('sustain pedal edits', () => {
     expect(() => placeInClip(fixture, 961, 127)).toThrowError(coded('not-placeable'))
     fixture.edits.placeOnTrack(input)
     expect(() => fixture.edits.placeOnTrack(input)).toThrowError(coded('target-stale'))
-
-    const looped = createFixture('looped', true)
-    expect(() => placeInClip(looped, 0, 127)).toThrowError(coded('unsupported'))
   })
 
   it('rejects every gesture captured on a replaced Session, even with equal ids and revision', () => {

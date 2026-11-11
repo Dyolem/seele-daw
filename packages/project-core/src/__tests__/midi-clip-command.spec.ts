@@ -46,7 +46,6 @@ function createCommandInput(
     sourceId: parseMidiSourceId('source-command-empty'),
     sourceLengthTick: parseTick(3_840),
     sourceOffsetTick: parseTick(0),
-    loop: null,
     ...overrides,
   }
 }
@@ -80,19 +79,12 @@ describe('AddMidiClipCommand public contract', () => {
   it('normalizes a complete MIDI Clip and its exclusively owned Source', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
-    const loop = {
-      sourceStartTick: parseTick(0),
-      sourceSpanTick: parseTick(960),
-    }
     const command = createCommand(store, {
       color: '#7c5cff' as ReturnType<typeof parseProjectColor>,
-      spanTick: parseTick(3_840),
+      spanTick: parseTick(1_680),
       sourceLengthTick: parseTick(1_920),
       sourceOffsetTick: parseTick(240),
-      loop,
     })
-
-    loop.sourceSpanTick = parseTick(480)
 
     expect(PROJECT_COMMAND_TYPE.MIDI_CLIP.ADD).toBe('midi-clip.add')
     expect(command).toEqual({
@@ -100,19 +92,14 @@ describe('AddMidiClipCommand public contract', () => {
       baseRevision: store.modelRevision,
       clip: {
         id: parseClipId('clip-command-empty'),
-        kind: 'midi',
         trackId: fixture.records.instrumentTrack.id,
         name: 'Fixture Instrument',
         color: '#7C5CFF',
         muted: false,
         startTick: parseTick(3_840),
-        spanTick: parseTick(3_840),
+        spanTick: parseTick(1_680),
         sourceId: parseMidiSourceId('source-command-empty'),
         sourceOffsetTick: parseTick(240),
-        loop: {
-          sourceStartTick: parseTick(0),
-          sourceSpanTick: parseTick(960),
-        },
       },
       source: {
         id: parseMidiSourceId('source-command-empty'),
@@ -196,25 +183,16 @@ describe('AddMidiClipCommand preparation', () => {
     expect(plan.forward[3].after).toBe(preparation.command.clip)
   })
 
-  it('rejects missing and non-Instrument target Tracks', () => {
+  it('rejects a missing target Track', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const missingTrackId = parseTrackId('track-command-missing')
     const missingTrack = captureCommandError(() =>
       prepareProjectCommand(store, createCommand(store, { trackId: missingTrackId })),
     )
-    const audioTrack = captureCommandError(() =>
-      prepareProjectCommand(
-        store,
-        createCommand(store, { trackId: fixture.records.audioTrack.id }),
-      ),
-    )
 
     expect(missingTrack).toMatchObject({
       code: 'track-not-found',
-    })
-    expect(audioTrack).toMatchObject({
-      code: 'midi-clip-track-kind-mismatch',
     })
   })
 
@@ -225,7 +203,7 @@ describe('AddMidiClipCommand preparation', () => {
       prepareProjectCommand(
         duplicateClipStore,
         createCommand(duplicateClipStore, {
-          clipId: duplicateClipFixture.records.nonLoopClip.id,
+          clipId: duplicateClipFixture.records.verseClip.id,
         }),
       ),
     )
@@ -236,7 +214,7 @@ describe('AddMidiClipCommand preparation', () => {
       prepareProjectCommand(
         duplicateSourceStore,
         createCommand(duplicateSourceStore, {
-          sourceId: duplicateSourceFixture.records.nonLoopSource.id,
+          sourceId: duplicateSourceFixture.records.verseSource.id,
         }),
       ),
     )

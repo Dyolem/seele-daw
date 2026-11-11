@@ -31,7 +31,7 @@ import {
   type Fields,
 } from './stored-data'
 
-export const PROJECT_FILE_FORMAT_VERSION = 3
+export const PROJECT_FILE_FORMAT_VERSION = 4
 
 /** A project as stored or exported: a Snapshot's tables, without revision, History or indexes. */
 export type ProjectFile = ProjectTables & {

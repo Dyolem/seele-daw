@@ -31,10 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
-import {
-  PROJECT_PIANO_ROLL_PRESENTATION_STATUS,
-  type ReadyProjectPianoRollPresentation,
-} from '@/features/piano-roll/types/piano-roll-presentation'
+import { type ProjectPianoRollPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import { createProjectPianoRollPresentation } from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
@@ -102,7 +99,7 @@ function createFakeCanvasContext(): CanvasRenderingContext2D {
   } as unknown as CanvasRenderingContext2D
 }
 
-function createPresentation(identity = 'studio-piano-roll'): ReadyProjectPianoRollPresentation {
+function createPresentation(identity = 'studio-piano-roll'): ProjectPianoRollPresentation {
   return Object.freeze({
     ...createInteractiveFixture(identity).presentation,
     name: 'Midnight Keys',
@@ -168,7 +165,7 @@ function createInteractiveFixture(identity: string) {
     trackId: track.trackId,
   })
   const presentation = createProjectPianoRollPresentation(session.getSnapshot(), clip.clipId)
-  if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+  if (presentation === null) {
     throw new Error('Expected an editable Piano Roll fixture')
   }
 
@@ -313,8 +310,7 @@ function mountSelectionMenuFixture(identity: string) {
     fixture.session.getSnapshot(),
     fixture.presentation.clipId,
   )
-  if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-    throw new Error('Expected editable menu fixture')
+  if (presentation === null) throw new Error('Expected editable menu fixture')
   const keyboard = createTestStudioActionRuntime()
   const invoke = vi.spyOn(keyboard.runtime.actions, 'invoke')
   const pinia = createPinia()
@@ -1549,7 +1545,7 @@ describe('ProjectPianoRollSurface', () => {
       fixture.session.getSnapshot(),
       fixture.presentation.clipId,
     )
-    if (refreshedPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (refreshedPresentation === null) {
       throw new Error('Expected refreshed Sustain Pedal presentation')
     }
     await wrapper.setProps({ presentation: refreshedPresentation })
@@ -1590,7 +1586,7 @@ describe('ProjectPianoRollSurface', () => {
       fixture.session.getSnapshot(),
       fixture.presentation.clipId,
     )
-    if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (presentation === null) {
       throw new Error('Expected editable Sustain Pedal presentation')
     }
     const keyboard = createTestStudioActionRuntime()
@@ -1657,7 +1653,7 @@ describe('ProjectPianoRollSurface', () => {
       fixture.session.getSnapshot(),
       presentation.clipId,
     )
-    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (refreshed === null) {
       throw new Error('Expected refreshed Sustain Pedal move presentation')
     }
     await wrapper.setProps({ presentation: refreshed })
@@ -1699,7 +1695,7 @@ describe('ProjectPianoRollSurface', () => {
       fixture.session.getSnapshot(),
       presentation.clipId,
     )
-    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (refreshed === null) {
       throw new Error('Expected refreshed Sustain Pedal value presentation')
     }
     await wrapper.setProps({ presentation: refreshed })

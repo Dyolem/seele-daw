@@ -18,7 +18,6 @@ const emit = defineEmits<{
 const trackStyle = computed<StyleValue>(() => ({
   '--project-track-color': props.track.color ?? 'var(--sd-color-border-focus)',
 }))
-const trackKindLabel = computed(() => (props.track.kind === 'instrument' ? 'Instrument' : 'Audio'))
 </script>
 
 <template>
@@ -40,7 +39,7 @@ const trackKindLabel = computed(() => (props.track.kind === 'instrument' ? 'Inst
       </span>
       <span class="project-track-row__identity">
         <strong>{{ props.track.name }}</strong>
-        <span>{{ trackKindLabel }}</span>
+        <span>Instrument</span>
       </span>
     </button>
     <span class="project-track-row__controls">

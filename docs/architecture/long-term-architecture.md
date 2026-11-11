@@ -20,23 +20,25 @@
 底座已经可以长期维护：包的分层、项目内核和提交管线是稳固的，往里加同类的东西（命令、实体表、
 Action、手势、订阅者）有固定配方，漏了什么由类型检查指出。
 
+阶段 0 之后，Studio 内部的层次与全仓无循环由架构规则检查，模型只剩有命令创建、有消费者读取的
+概念，CI 在每次推送时运行 `pnpm check`。
+
 但整体还不能说已经是可扩展的形态。产品接下来要做的混音、合成器、Automation 和音频，走的都是
 目前最窄的几处：播放与音频是专为“MIDI 音符 → 采样 Voice”写的，Device 只有描述没有定义，
-Studio 内部的层次靠约定并且已有违反，数据安全与自动化门禁也还没有。
+数据安全也还没有。
 
 | 维度              | 判断     | 依据                                                                                                                           |
 | ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | 包之间的层次      | 达标     | 依赖图无环，方向与 ARCHITECTURE 的表一致，`pnpm lint` 检查，零违规；核心包的 tsconfig 不含 DOM 类型                            |
 | 包之间的耦合      | 达标     | 消费者只读 Commit 里的存储变化（ADR-002、ADR-004）；audio-web 只实现 playback 的一个端口；平台实现都由 Studio 注入             |
-| 项目内核          | 达标     | 一份事实、一条提交管线；表与命令注册表是声明式的；提交、Snapshot、编译的成本随改动增长（ADR-007 至 ADR-010）；458 个测试       |
-| MIDI 领域模型     | 达标     | Track、Clip、Source、Note、踏板、Tempo、拍号的身份、时间与不变量清楚                                                           |
-| 模型里的空转部分  | 未达标   | Audio Track、效果链、Clip Loop 有记录、不变量和文件格式，却没有界面创建，播放只把它们报告为不支持                              |
+| 项目内核          | 达标     | 一份事实、一条提交管线；表与命令注册表是声明式的；提交、Snapshot、编译的成本随改动增长（ADR-007 至 ADR-010）；443 个测试       |
+| MIDI 领域模型     | 达标     | Track、Clip、Source、Note、踏板、Tempo、拍号的身份、时间与不变量清楚；没有空转的概念（ADR-012）                                |
 | Device            | 未达标   | 只有通用的 `DeviceDescriptor`；唯一的设备类型写死在 playback 的编译器里，目录与路由在 Studio，没有 Device Definition           |
 | 播放与音频的扩展  | 未达标   | 计划类型与运行时端口按采样 Voice 命名和成形；Track 的 Gain / Pan 在排程时乘进每个 Voice，没有常驻的通道节点                    |
 | 编辑器的扩展      | 部分达标 | 输入与手势内核是通用的；但只有 Piano Roll 的几何在 editor 包里，Arrangement 与 Tempo Lane 的几何在 Studio 的组件里，且没有缩放 |
-| Studio 内部的层次 | 未达标   | 方向靠约定，工具不检查；一个 14 个文件的导入循环，两个 feature 互相导入，workbench 引用了 bootstrap 的类型                     |
+| Studio 内部的层次 | 达标     | ui ← workbench ← features ← router ← bootstrap，feature 之间不互相导入，生产代码没有运行时导入循环；`pnpm lint` 检查，零违规   |
 | 数据安全          | 未达标   | 只有显式保存；没有自动保存、关闭页面保护和多标签页协调                                                                         |
-| 自动化门禁        | 未达标   | `pnpm check` 只在本机手动运行；没有 CI，没有浏览器端到端测试；音质报告要手动打开页面看                                         |
+| 自动化门禁        | 部分达标 | CI 在每次推送时运行 `pnpm check`；核心流程只有手动验证；音质报告要手动打开页面看                                               |
 
 ### 1.2 已经稳固的部分
 
@@ -57,27 +59,20 @@ Studio 内部的层次靠约定并且已有违反，数据安全与自动化门�
 
 这些是路线里要解决的问题，编号在第 4 节引用。
 
-1. **Studio 内部没有被检查的层次。** `workbench/actions/studio-actions.ts` 导入三个 feature 的
-   Action 声明，而 feature 又导入 workbench 的 `defineStudioAction`，形成 14 个文件的循环；
-   `features/piano-roll` 与 `features/project-workspace` 互相导入（时间轴刻度、选择 Store 与
-   Piano Roll 组件）；`workbench` 有两处引用 `bootstrap` 里的类型。
-2. **模型里有空转的事实。** Audio Track 没有命令能创建；效果链数组永远为空；Clip Loop 能随
-   Add Clip 命令写入，但没有界面使用，编辑与播放都拒绝它。它们让不变量、解码器、诊断码和
-   测试夹具为不存在的功能付出成本。
-3. **Device 没有定义层。** 设备的参数、状态解码和能力没有统一的声明；`SampleInstrument` 的知识
+1. **Device 没有定义层。** 设备的参数、状态解码和能力没有统一的声明；`SampleInstrument` 的知识
    分散在 playback（定义与状态解码）、audio-web（Manifest 与 Voice）和 Studio（目录与路由）。
    目录里 150 个合成器 Preset 还不能发声；要接入它们的引擎，先得有这一层。
-4. **播放管线是单一用途的。** `TrackPlaybackPlan.instrument` 只有一种；端口的 `schedule` 只接收
+2. **播放管线是单一用途的。** `TrackPlaybackPlan.instrument` 只有一种；端口的 `schedule` 只接收
    采样 Voice；没有常驻的通道图，所以推子、Mute 的实时生效、效果器和电平表都无处安放。
-5. **编排的几何不在 editor 包里。** Arrangement 是固定刻度的 DOM 布局；时间轴的 Tick 与像素换算
-   在 Studio 的一个 feature 里，被另一个 feature 跨界导入。
-6. **数据安全只有显式保存。** 刷新或关闭页面会丢掉未保存的工作；两个标签页可以同时写同一个
+3. **编排的几何不在 editor 包里。** Arrangement 是固定刻度的 DOM 布局；时间轴的 Tick 与像素换算
+   在 Studio 的 `workbench/timeline/`，Arrangement 与 Tempo Lane 的其余几何写在组件和 hook 里。
+4. **数据安全只有显式保存。** 刷新或关闭页面会丢掉未保存的工作；两个标签页可以同时写同一个
    项目；恢复到较旧的 Checkpoint 时用户不知道。
-7. **门禁要人来跑。** 没有 CI；核心流程（新建、画音符、播放、保存、刷新恢复）只有手动验证；
-   内置音色的人工听测状态仍是 `not-run`。
-8. **几个文件过大。** `playback-engine.ts` 1,051 行，`ProjectEntryPage.vue` 959 行，
+5. **门禁还有人工的部分。** 核心流程（新建、画音符、播放、保存、刷新恢复）只有手动验证；
+   音质报告要手动打开页面看；内置音色的人工听测状态仍是 `not-run`。
+6. **几个文件过大。** `playback-engine.ts` 1,051 行，`ProjectEntryPage.vue` 959 行，
    `ProjectWorkbenchArrangement.vue` 820 行。它们各自内聚，但下一次要改时应先按职责拆开。
-9. **公开构建没有声音。** 采样资产是开发者本机文件，生产构建不带；这是产品与许可问题，也是
+7. **公开构建没有声音。** 采样资产是开发者本机文件，生产构建不带；这是产品与许可问题，也是
    发布的前提。
 
 ## 2. 不变的规则
@@ -110,17 +105,9 @@ Studio 内部的层次靠约定并且已有违反，数据安全与自动化门�
 包图保持不变。新建一个包要同时满足：依赖方向清楚、能脱离应用单独测试、至少有两个上层消费者
 或者必须隔离一个平台或第三方实现、拆出来不会产生成对的转换类型。
 
-要补上的是包内部的方向：
-
-- **Studio**：`ui` ← `workbench` ← `features` ← `bootstrap`、`router`、`App`，右边可以导入
-  左边，反过来不行。workbench 不导入 feature 和 bootstrap；feature 之间只能单向依赖，外壳可以组合被嵌入的 feature，反过来不行；
-  多个 feature 共用的状态与几何下沉到 workbench 或 editor 包。
-- **全仓**：生产代码没有文件级的导入循环。
-- **project-core**（指导性，不入规则）：基础值（ID、标量、Tick、JSON）← 记录 ← mutation ←
-  commands ← commit、history ← session；snapshots、queries、subscriptions 是读侧；persistence
-  在最上层。
-
-前两条写进 `tooling/architecture-rules`。规则仍然只检查方向与循环，不规定目录的形状。
+Studio 的层次与全仓无运行时导入循环已经写进架构规则（见 ARCHITECTURE 第 1 节）。project-core
+内部的方向是指导性的，不入规则：基础值（ID、标量、Tick、JSON）← 记录 ← mutation ← commands ←
+commit、history ← session；snapshots、queries、subscriptions 是读侧；persistence 在最上层。
 
 ### 3.2 领域模型
 
@@ -202,9 +189,8 @@ Canvas 渲染；Studio 只保留 Vue 组件、把意图接到 `edits` 的胶水�
 
 ### 3.6 质量门禁
 
-- CI 在每次推送时运行 `pnpm check`。
-- 一条浏览器冒烟测试覆盖核心流程：新建项目、加 Track、画音符、播放、保存、刷新后恢复。
-- 架构规则增加 3.1 的两条。
+- 核心流程（新建项目、加 Track、画音符、播放、保存、刷新后恢复）的界面稳定之后，加一条浏览器
+  冒烟测试覆盖它。在那之前不写端到端测试，免得为还在变的界面维护测试。
 - 性能预算（第 7 节）在每个阶段结束时复测，结果写进对应的 ADR。
 - 声音：AQ0 的合成 PCM 报告改成可以脚本运行的检查；改变听感的变更仍需要人工听测。
 
@@ -214,28 +200,15 @@ Canvas 渲染；Studio 只保留 Vue 组件、把意图接到 `edits` 的胶水�
 ADR 的决定写成 ADR。
 
 ```text
-阶段 0 收口 → 阶段 1 编排与混音 → 阶段 3 Device 与合成器 → 阶段 4 Automation
+阶段 1 编排与混音 → 阶段 3 Device 与合成器 → 阶段 4 Automation
               阶段 1 → 阶段 5 Audio
               阶段 3 与阶段 5 → 阶段 6 录音
 阶段 2 数据安全与交付：与阶段 1 互不依赖，可以穿插
 阶段 7 云端：在阶段 2 与阶段 5 之后
 ```
 
-### 阶段 0：收口
-
-不加功能，解决 1.3 里已经清楚该怎么做的问题。
-
-- Studio 层次（1.3-1）：Action 的汇总移到组合层，workbench 只提供声明、注册与分发的机制；
-  时间轴刻度与工作台选择 Store 下沉，Piano Roll 不再导入 Project Workspace；`StudioActionRuntime`
-  的类型归到 workbench。然后把 3.1 的两条规则写进工具。
-- 模型去空转（1.3-2）：Audio Track、效果链与 Clip Loop 要么接通，要么删除。建议删除，到对应
-  阶段带着真实语义重新加入；现在没有需要兼容的数据。这一项等第 5 节第 2 条的决定。
-- 包内整理：project-core 里 `time` 与 `model` 互相导入，`history` 引用 `session` 的类型，把基础值
-  与内容状态 ID 放回各自该在的一层；playback 的设备定义离开包根目录。
-- 门禁（1.3-7）：CI 与一条浏览器冒烟测试。
-
-完成标准：架构规则检查 Studio 层次与文件级循环并且零违规；CI 通过；模型里每张表、每个字段
-都有命令写入和消费者读取。
+阶段 0（收口）已完成：Studio 层次与运行时导入循环由架构规则检查，模型去掉了没有命令创建的
+概念（ADR-012），包内目录理顺，CI 运行 `pnpm check`。浏览器冒烟测试推迟到核心流程稳定之后（3.6）。
 
 ### 阶段 1：编排与混音可编辑
 
@@ -313,17 +286,16 @@ WAV 与实时播放在 AQ0 的指标上一致；每一步存储操作失败都�
 这些不是实现细节；不先定下来，会在编辑、播放和历史几处出现不一致。
 
 1. **阶段的顺序**，尤其是阶段 3（合成器）与阶段 5（Audio）谁先，以及阶段 2 何时插入。
-2. **模型里三处空转**（Audio Track、效果链、Clip Loop）是删除还是保留。
-3. **自动保存的语义**：是单独的恢复点，还是取代显式保存；有了它之后 Discard 意味着什么。
-4. **Mute 的语义**：是通道静音（解除后正在响的音符能听到），还是像现在这样不排程。
-5. **Clip 编辑的边界**：同一条 Track 上的 Clip 能否重叠；拆分和缩短时，跨边界的音符怎么处理。
-6. **循环**：Clip Loop 与 Transport Loop 是否进入阶段 1；循环边界上 Note Off 与下一轮 Note On
-   的顺序。
-7. **恢复提示**：打开项目时最新的 Checkpoint 损坏、回退到上一份，要不要告诉用户。
-8. **可分发的音源**：用哪些资产，许可与托管方式。这是公开发布的前提。
-9. **公开发布的时间**。它决定迁移机制何时从“以后再说”变成硬要求。
-10. **Audio 阶段开工前**：同一条 Track 上重叠的 Audio Clip 是混音、覆盖还是交叉淡化；导出时
-    遇到只能实时运行的设备怎么办；录音延迟补偿的默认策略。
+2. **自动保存的语义**：是单独的恢复点，还是取代显式保存；有了它之后 Discard 意味着什么。
+3. **Mute 的语义**：是通道静音（解除后正在响的音符能听到），还是像现在这样不排程。
+4. **Clip 编辑的边界**：同一条 Track 上的 Clip 能否重叠；拆分和缩短时，跨边界的音符怎么处理。
+5. **循环**：Clip Loop（已从模型删除，ADR-012）与 Transport Loop 是否进入阶段 1；循环边界上
+   Note Off 与下一轮 Note On 的顺序。
+6. **恢复提示**：打开项目时最新的 Checkpoint 损坏、回退到上一份，要不要告诉用户。
+7. **可分发的音源**：用哪些资产，许可与托管方式。这是公开发布的前提。
+8. **公开发布的时间**。它决定迁移机制何时从“以后再说”变成硬要求。
+9. **Audio 阶段开工前**：同一条 Track 上重叠的 Audio Clip 是混音、覆盖还是交叉淡化；导出时
+   遇到只能实时运行的设备怎么办；录音延迟补偿的默认策略。
 
 ## 6. 明确不做
 

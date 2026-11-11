@@ -15,7 +15,6 @@ import { mount } from '@vue/test-utils'
 import { nextTick, shallowRef } from 'vue'
 import { describe, expect, it } from 'vitest'
 import PianoRollPlayhead from '@/features/piano-roll/playhead/PianoRollPlayhead.vue'
-import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import {
   PROJECT_PLAYBACK_PHASE,
@@ -46,7 +45,6 @@ function createPresentation(startTick = parseTick(3_840)) {
   const clip = createMidiClipRecord({
     color: null,
     id: parseClipId('piano-roll-playhead-clip'),
-    loop: null,
     muted: false,
     name: 'Playhead Clip',
     sourceId: source.id,
@@ -63,7 +61,6 @@ function createPresentation(startTick = parseTick(3_840)) {
     name: clip.name,
     projectId: PROJECT_ID,
     startTick: clip.startTick,
-    status: PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY,
     trackId: clip.trackId,
   })
 }

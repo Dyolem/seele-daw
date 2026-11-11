@@ -7,7 +7,7 @@
 本文档不定义 Command handler 的具体实现。普通 Add / Resize Note 和同一 MidiSource 内的 Move
 Note 已确定采用严格 Source 边界；通用 Clip Move / Resize、跨 Source Note Move 与 Split 的
 算法仍暂缓。Track 全局 Piano Roll 已另行确定一项窄范围例外：创建 populated Clip，或为越过
-非循环 Clip 右端的新增 Note 原子右扩 Clip / Source。
+Clip 右端的新增 Note 原子右扩 Clip / Source。
 
 ## 目标与范围
 
@@ -25,26 +25,26 @@ V1 数据模型需要支持以下闭环：
 当前纳入模型：
 
 - Project 基本身份；
-- Instrument Track，以及未来 Audio Track 所需的拓扑判别方式；
+- Instrument Track；
 - 一张统一的 Clip 表；
 - MidiClip、MidiSource、MidiNote 和 Source-owned Sustain Pedal CC64 Event；
-- MIDI Loop 的存储语义；
 - Tempo 和 Time Signature；
 - 最小 Device descriptor 和 Channel Strip；
 - 运行时实体表、可重建索引与项目文件边界。
 
 当前不纳入模型：
 
-- AudioClip 的完整字段和时间算法；
+- Audio Track、AudioClip 及其时间算法；
+- MIDI / Audio 效果链与 Master 效果；
+- Clip Loop 及 Loop 边界的事件排序；
 - Automation；
 - CC64 以外的 MIDI CC、Pitch Bend、Aftertouch、MPE 和 Note Expression；
 - Recording、Asset 和媒体垃圾回收；
 - Linked Clip、Take Lane、Comping；
 - Group、Return、Send 和任意路由图；
-- 通用 Clip Move / Resize、跨 Source Note Move、Split 的边界算法；
-- Loop 边界事件排序。
+- 通用 Clip Move / Resize、跨 Source Note Move、Split 的边界算法。
 
-这些能力不提前创建空表或占位抽象，在对应产品语义确定后通过新字段、联合类型分支和新的文件格式版本加入。
+这些能力不提前创建空表、空字段或占位抽象，在对应产品语义确定后通过新字段、联合类型分支和新的文件格式版本加入（[ADR-012](../../../docs/adr/ADR-012-model-holds-only-what-the-product-creates.md)）。
 
 ## 已确定的设计原则
 
@@ -60,8 +60,8 @@ Read Model 或专门的导出格式接入，不能直接取得 ModelStore。
 - Track 到 Clip 的查询通过可重建索引完成；
 - Note 与 Sustain Pedal Event 的所属 Source 分别由 Source 分区表达，事件本身不重复保存
   `sourceId`；
-- Device 的所属位置和顺序由 Track 的 Device ID 集合表达，Device 不保存 `trackId`；
-- 只有真正表达人工顺序的关系才保存 ID 数组，例如 `trackOrder` 和 Device Chain。
+- Device 的所属位置由 Track 的 `instrumentDeviceId` 表达，Device 不保存 `trackId`；
+- 只有真正表达人工顺序的关系才保存 ID 数组，例如 `trackOrder`。
 
 反向索引可以为了性能存在，但它不是第二份项目事实。
 
@@ -70,16 +70,17 @@ Read Model 或专门的导出格式接入，不能直接取得 ModelStore。
 拥有独立身份、选择、生命周期或 Undo 语义的数据进入实体表，例如 Track、Clip、MidiSource、
 Note、Sustain Pedal Event、Tempo Event 和 Device。
 
-没有独立生命周期的组合值直接嵌入实体，例如 `ChannelStripDescriptor` 和 `MidiLoop`。规范化不等于把每一个小对象都拆成独立表。
+没有独立生命周期的组合值直接嵌入实体，例如 `ChannelStripDescriptor`。规范化不等于把每一个小对象都拆成独立表。
 
 ### Track 表达信号拓扑
 
-Track 类型表示输入到输出的真实信号拓扑，而不是产品模板名称：
+Track 表示输入到输出的信号拓扑，而不是产品模板名称。目前只有 Instrument Track：MIDI Clip
+经乐器 Device 与 Channel 进入 Master。
 
-- Drum 是带 Drum Rack 或鼓类 Instrument 的 Instrument Track；
-- Bass 是 Track Template、设备预设或编辑器显示偏好；
-- Vocal 是带人声设备链或预设的 Audio Track；
-- Drum、Bass、Vocal 不成为新的 Track 领域子类。
+- Drum 是带鼓类乐器的 Instrument Track；
+- Bass 是 Track 模板、设备预设或编辑器显示偏好；
+- Drum、Bass 不成为新的 Track 领域子类。Audio Track 是另一种拓扑，接通录音与 AudioClip
+  时作为联合类型分支加入。
 
 ## 基础类型
 
@@ -140,31 +141,19 @@ interface ProjectRecord {
 
 ## Track
 
-Track 使用顶层 `kind` 作为判别字段，使 TypeScript 收窄、Clip 兼容性检查和命令验证保持直接。
-
 ```ts
-type TrackRecord = InstrumentTrackRecord | AudioTrackRecord
-
-interface TrackBase {
+interface InstrumentTrackRecord {
   readonly id: TrackId
   readonly name: string
   readonly color: ProjectColor | null
   readonly channel: ChannelStripDescriptor
-  readonly audioEffectIds: readonly DeviceId[]
-}
-
-interface InstrumentTrackRecord extends TrackBase {
-  readonly kind: 'instrument'
-  readonly midiEffectIds: readonly DeviceId[]
   readonly instrumentDeviceId: DeviceId
 }
 
-interface AudioTrackRecord extends TrackBase {
-  readonly kind: 'audio'
-}
+type TrackRecord = InstrumentTrackRecord
 ```
 
-当前 MIDI 纵向切片只创建 `InstrumentTrackRecord`。`AudioTrackRecord` 明确未来的拓扑分支，但在 AudioClip、Recording 与输入语义确定前不增加更多字段。
+只有一种 Track，所以记录不带 `kind`。第二种 Track 出现时再加判别字段，并升级文件格式。
 
 Track 规则：
 
@@ -174,9 +163,7 @@ Track 规则：
 - Track 名称允许重复，身份只由 `id` 决定；
 - `name` 为 1 到 128 个 Unicode 字符；
 - `color` 使用规范化的 `#RRGGBB`，`null` 表示使用项目默认色；
-- `midiEffectIds` 和 `audioEffectIds` 表达信号处理顺序，因此是合法的有序 ID 集合；
-- Instrument Track 的 `instrumentDeviceId` 必须引用 Instrument 类型设备；
-- MIDI Clip 只能属于 Instrument Track；
+- `instrumentDeviceId` 引用该 Track 独占的乐器 Device；
 - V1 输出固定为 Track 到 Master，不保存重复的 `outputRoute: 'master'`。
 
 ### Channel Strip
@@ -192,7 +179,6 @@ interface ChannelStripDescriptor {
 interface MasterChannelRecord {
   readonly gain: LinearGain
   readonly muted: boolean
-  readonly audioEffectIds: readonly DeviceId[]
 }
 ```
 
@@ -208,27 +194,23 @@ interface MasterChannelRecord {
 
 ## 统一 Clip 表
 
-所有 Clip 放入同一张表，通过 `kind` 形成判别联合。V1 实际创建的分支只有 `MidiClipRecord`，AudioClip 在其时间语义确定后加入。
+所有 Clip 放入同一张表。目前只有 MIDI Clip，所以记录不带 `kind`；AudioClip 在其时间语义确定后
+作为联合类型分支加入。
 
 ```ts
-type ClipRecord = MidiClipRecord
-
-interface ClipBase {
+interface MidiClipRecord {
   readonly id: ClipId
   readonly trackId: TrackId
   readonly name: string
   readonly color: ProjectColor | null
   readonly muted: boolean
   readonly startTick: Tick
-}
-
-interface MidiClipRecord extends ClipBase {
-  readonly kind: 'midi'
   readonly spanTick: Tick
   readonly sourceId: MidiSourceId
   readonly sourceOffsetTick: Tick
-  readonly loop: MidiLoop | null
 }
+
+type ClipRecord = MidiClipRecord
 ```
 
 字段语义：
@@ -250,7 +232,7 @@ sourceOffsetTick >= 0
 startTick + spanTick 是安全整数
 ```
 
-非循环 Clip 还必须满足：
+Clip 的 Source 窗口还必须落在它的 MidiSource 内：
 
 ```text
 sourceOffsetTick + spanTick <= midiSource.lengthTick
@@ -340,7 +322,7 @@ Mutex 或 Release 参数。完整事务与兼容边界见
 
 普通 Add Note 和同一 MidiSource 内的 Move Notes 使用严格边界：每个 Note 区间必须完整落在
 Source 的半开区间内，Pitch 必须落在 0–127。越界 Command 必须整体拒绝，不执行 Core
-clamp、loop wrap 或隐式 MidiSource / Clip 自动扩展。`MoveNotesCommand` 对非空、无重复的
+clamp 或隐式 MidiSource / Clip 自动扩展。`MoveNotesCommand` 对非空、无重复的
 `noteIds` 应用共享 `deltaTick` 与 `deltaPitch`，保持 Note ID、相对位置、duration、
 velocity 和 channel；两个 Delta 同时为零时返回 `no-change`，不形成空 MutationPlan。
 Snap、量化、像素坐标转换与交互边界 Clamp 由 Editor 在创建 Command 前完成，Core 仍在
@@ -349,12 +331,12 @@ Snap、量化、像素坐标转换与交互边界 Clamp 由 Editor 在创建 Com
 
 Track 全局 Piano Roll 的 Pencil 放置使用两个显式产品命令，而不是放宽普通 Note Command：
 
-- `AddMidiClipWithNoteCommand` 原子创建非循环 Clip、其独占 MidiSource 和包含第一枚 Note 的
+- `AddMidiClipWithNoteCommand` 原子创建 Clip、其独占 MidiSource 和包含第一枚 Note 的
   Partition；
 - `ExtendMidiClipWithNoteCommand` 只允许确实越过现有 Source window 的 Note，原子向右扩展
-  非循环 Clip、按需增长 MidiSource 并插入该 Note；
+  Clip、按需增长 MidiSource 并插入该 Note；
 - 自动右扩不能越过同 Track 上从当前 Clip 末端起遇到的下一 Clip；与下一 Clip 恰好相接合法；
-- looped Clip、向左扩展和通用 Resize 仍不属于该协议；
+- 向左扩展和通用 Resize 仍不属于该协议；
 - 两种命令各自产生一个 Commit、一次 revision 推进和一个 History 步骤。
 
 完整边界见
@@ -388,40 +370,11 @@ midiSustainPedalEventsBySource: Map<
 - Undo 必须原子恢复整个所有权图，不能暴露中间状态；
 - 任意已提交状态中都不能存在孤立 Source 或一个 Source 被多个 Clip 引用。
 
-## MIDI Loop
+## 暂缓的 Clip 编辑
 
-Loop 是 MidiClip 的嵌套值对象，没有独立身份和生命周期：
-
-```ts
-interface MidiLoop {
-  readonly sourceStartTick: Tick
-  readonly sourceSpanTick: Tick
-}
-```
-
-字段语义：
-
-- `sourceStartTick` 是循环区域在 Source 内的起点；
-- `sourceSpanTick` 是循环区域在 Source 内的长度；
-- `clip.spanTick` 仍然是时间线窗口长度；
-- `sourceOffsetTick` 表示 Clip 起点在循环区域中的初始位置。
-
-不变量：
-
-```text
-sourceStartTick >= 0
-sourceSpanTick > 0
-sourceStartTick + sourceSpanTick <= midiSource.lengthTick
-
-sourceStartTick
-  <= sourceOffsetTick
-  < sourceStartTick + sourceSpanTick
-```
-
-通用 Clip Move / Resize、跨 Source Note Move 与 Split 如何改变这些字段，以及 Loop 边界的事件
-排序，留到相应命令和 Playback 实现前单独讨论。`ExtendMidiClipWithNoteCommand` 只是非循环
-Clip 的窄范围右扩，不定义 looped Clip 或交互式 Resize 语义。单 Note Resize 只改变 Note 自身的
-Start / Duration，不改变 Clip 或 Source 字段。
+通用 Clip Move / Resize、跨 Source Note Move 与 Split 如何改变 Clip 与 Source 字段，留到相应
+命令实现前单独讨论。`ExtendMidiClipWithNoteCommand` 只是窄范围右扩，不定义交互式 Resize
+语义。单 Note Resize 只改变 Note 自身的 Start / Duration，不改变 Clip 或 Source 字段。
 
 ## Timeline、Tempo 与 Time Signature
 
@@ -501,8 +454,8 @@ interface DeviceDescriptor {
 - `definitionVersion` 是从 `1` 开始的安全整数，用于设备状态迁移，不等于项目文件格式版本；
 - Device Definition 声明端口类型、参数 schema、稳定 Parameter ID、默认值和状态迁移；
 - Device 不保存 `trackId`；
-- Device ID 必须在一个 Track 或 Master 的设备位置中恰好出现一次；
-- Device 角色和 Track 设备链位置必须兼容；该规则需要 Device Definition Catalog，当前结构 Validator 只验证 Descriptor 存在性和唯一所有权；
+- 每个 Device 恰好被一个 Track 的 `instrumentDeviceId` 引用；
+- 被引用的 Device 应当是乐器；该规则需要 Device Definition Catalog，当前结构 Validator 只验证 Descriptor 存在性和唯一所有权；
 - 第三方运行时实例、AudioNode、Tone.js 对象和不可验证闭包不能进入项目数据；
 - 找不到设备实现时仍保留原始 Descriptor，由上层创建 MissingDevice 占位；
 - 保存项目时不得丢弃未知 `parameters` 或 `opaqueState`。
@@ -576,7 +529,7 @@ Map insertion order 不表达实体表的领域顺序。防御性回滚或 Undo 
 - 一个 Project Record；
 - Tick 0 的 120 BPM Tempo Event；
 - Tick 0 的 4/4 Time Signature Event；
-- gain 为 `1`、未静音且没有 Audio Effect 的 Master；
+- gain 为 `1`、未静音的 Master；
 - 空的 `trackOrder`、Track、Clip、MidiSource、Note 分区、Sustain Pedal Event 分区和 Device
   表；
 - revision 为 `0` 的 ModelStore。
@@ -593,7 +546,7 @@ Map insertion order 不表达实体表的领域顺序。防御性回滚或 Undo 
 
 ## 项目文件
 
-项目文件是 ModelStore 表的 JSON 形式（`formatVersion: 3`）：记录表是记录数组，Note 与 Sustain
+项目文件是 ModelStore 表的 JSON 形式（`formatVersion: 4`）：记录表是记录数组，Note 与 Sustain
 Pedal Event 按 Source ID 分组，另有 `project`、`master` 与 `trackOrder`。本地 `modelRevision`、
 History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelStore)`，而是从 Snapshot 写出。
 
@@ -616,9 +569,9 @@ History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelSt
 每次提交完成后，至少必须满足：
 
 1. `trackOrder` 中的 ID 与 `tracks` 表完全对应，每个 ID 恰好一次。
-2. 每个 Clip 引用存在的 Track，并且 Clip 类型与 Track 拓扑兼容。
+2. 每个 Clip 引用存在的 Track。
 3. 每个 MidiClip 引用存在的 MidiSource。
-4. 非循环 Clip 的 Source 窗口以及循环 Clip 的 Loop 区域都落在 MidiSource 长度内。
+4. 每个 Clip 的 Source 窗口落在 MidiSource 长度内。
 5. 每个 MidiSource 被且仅被一个 MidiClip 引用。
 6. 每个 MidiSource 恰好存在一张 Note Table 和一张 Sustain Pedal Event Table；不存在没有
    Source 的孤立内容分区。
@@ -626,7 +579,7 @@ History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelSt
 8. 所有 Sustain Pedal Event 都落在所属 Source 的 `0..lengthTick` 范围内，Event ID 在全部
    Source 分区中唯一；同一 Source、Channel、Tick 最多一枚 Event。
 9. Tick 0 存在唯一的初始 Tempo 和 Time Signature，同类 Timeline 事件在同一 Tick 最多一个。
-10. 每个 Device Descriptor 恰好拥有一个 Track 或 Master 拓扑位置，所有设备引用都存在。
+10. 每个 Device Descriptor 恰好被一个 Track 引用，所有设备引用都存在。
 11. 所有实体表 key 与记录自身 `id` 相同。
 12. 不存在孤立 Source、Device 或悬空外键。
 
@@ -638,7 +591,7 @@ History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelSt
 
 结构 Validator 接受 `ModelStoreReader`，聚合所有违规并返回稳定排序的 `ModelInvariantViolation`。`assertModelInvariants` 在需要强制合法状态的边界抛出携带完整违规列表的 `ModelInvariantError`。它不修改或自动修复 Store，也不把 Map 插入顺序当作项目语义。
 
-当前尚无 Device Definition Catalog，因此结构 Validator 不判断 MIDI Effect、Instrument 和 Audio Effect 的角色兼容性。Descriptor 存在且拥有唯一位置时，未知 Device Definition 仍然可以加载并由上层显示 MissingDevice；Catalog 建立后再增加 definition-aware 角色检查。
+当前尚无 Device Definition Catalog，因此结构 Validator 不判断 `instrumentDeviceId` 引用的 Device 是否真是乐器。Descriptor 存在且拥有唯一位置时，未知 Device Definition 仍然可以加载并由上层显示 MissingDevice；Catalog 建立后再增加 definition-aware 角色检查。
 
 跨实体新增、删除和级联变化必须先形成完整 MutationPlan，通过全部验证后一次提交。任何已发布的 Snapshot 或 ProjectCommit 都不能观察到中间状态。
 
@@ -650,8 +603,6 @@ History 与索引不写入文件，保存时也不调用 `JSON.stringify(ModelSt
 2. Note 超过 Clip 右边界时，在 Clip 边界强制 Note Off。
 3. 从一枚已经开始的长 Note 中间进入播放窗口时，V1 不执行 Note Chase，不在窗口起点重新触发该 Note。
 4. 同音高 Note 可以重叠，运行时不能只用 `channel + pitch` 充当内部 Voice 身份。
-
-Loop 边界 Note Off / Note On 的排序仍需在 Playback Compiler 实现前确定。
 
 ## 不进入 Project Model 的状态
 
@@ -674,7 +625,6 @@ Loop 边界 Note Off / Note On 的排序仍需在 Playback Compiler 实现前确
 - Move Clip、跨 Source Note Move 的边界与目标兼容性算法；
 - 通用 Resize Clip 的最小长度、裁剪、向左扩展和交互算法；
 - Split Clip 对 Source 复制、窗口和 Note 的具体处理；
-- Loop 边界事件排序；
 - Snap、量化与舍入策略；
 - AudioClip 同轨重叠、fixed-time 与未来 warped 模式；
 - Tempo 改变时正在播放的 Voice 处理。

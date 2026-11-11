@@ -221,7 +221,7 @@ describe('Project Checkpoint coordination', () => {
       checkpointId: parseProjectCheckpointId('checkpoint-stale-completion'),
     })
 
-    addCheckpointTestNote(session, fixture.records.nonLoopSource.id)
+    addCheckpointTestNote(session, fixture.records.verseSource.id)
     deferred.resolve()
     const receipt = await saving
 
@@ -266,7 +266,7 @@ describe('Project Checkpoint coordination', () => {
 
   it('restores a valid candidate as a fresh queryable and writable Session', async () => {
     const { fixture, session } = createFixtureProjectSession()
-    const noteId = addCheckpointTestNote(session, fixture.records.nonLoopSource.id)
+    const noteId = addCheckpointTestNote(session, fixture.records.verseSource.id)
     const checkpoint = createProjectCheckpoint(session.getSnapshot(), {
       checkpointId: parseProjectCheckpointId('checkpoint-valid-active'),
     })
@@ -283,14 +283,14 @@ describe('Project Checkpoint coordination', () => {
     expect(restored?.rejectedCandidates).toEqual([])
     expect(
       restored?.session.query(
-        createMidiNoteByIdQuery({ sourceId: fixture.records.nonLoopSource.id, noteId }),
+        createMidiNoteByIdQuery({ sourceId: fixture.records.verseSource.id, noteId }),
       ).note,
     ).toMatchObject({ id: noteId, pitch: 72 })
 
     const execution = restored?.session.execute(
       createAddNoteCommand({
         baseRevision: restored.session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteId: parseNoteId('note-checkpoint-restored-session'),
         startTick: parseTick(1_500),
         durationTick: parseTick(120),
@@ -308,7 +308,7 @@ describe('Project Checkpoint coordination', () => {
     const corruptActive = editedCopy(checkpoint, ['projectFile', 'project', 'name'], REMOVE)
     const invalidValue = editedCopy(
       checkpoint,
-      ['projectFile', 'midiNotes', 'source-non-loop', 0, 'pitch'],
+      ['projectFile', 'midiNotes', 'source-verse', 0, 'pitch'],
       999,
     )
     const wrongProject = editedCopy(checkpoint, ['projectId'], 'project-other')
@@ -326,7 +326,7 @@ describe('Project Checkpoint coordination', () => {
         message: 'Missing field name at ["projectFile","project","name"]',
       }),
       expect.objectContaining({
-        message: expect.stringContaining('at ["projectFile","midiNotes","source-non-loop",0]'),
+        message: expect.stringContaining('at ["projectFile","midiNotes","source-verse",0]'),
       }),
       expect.objectContaining({
         message: expect.stringContaining('belongs to project project-other'),

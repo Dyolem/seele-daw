@@ -64,7 +64,7 @@ describe('writing a project file', () => {
   it('writes the complete project exactly as the golden file', () => {
     const { session } = createFixtureProjectSession()
 
-    expect(PROJECT_FILE_FORMAT_VERSION).toBe(3)
+    expect(PROJECT_FILE_FORMAT_VERSION).toBe(4)
     expect(asJson(createProjectFile(session.getSnapshot()))).toEqual(golden)
   })
 
@@ -86,7 +86,7 @@ describe('writing a project file', () => {
     const file = createProjectFile(session.getSnapshot())
     const written = JSON.stringify(file)
 
-    addNote(session, 'source-non-loop', 'note-written-later')
+    addNote(session, 'source-verse', 'note-written-later')
 
     expect(JSON.stringify(file)).toBe(written)
   })
@@ -103,13 +103,13 @@ describe('loading a project file', () => {
 
   it('loads a Session that queries and accepts Commands', () => {
     const session = createProjectSessionFromProjectFile(goldenCopy())
-    const result = addNote(session, 'source-non-loop', 'note-after-load')
+    const result = addNote(session, 'source-verse', 'note-after-load')
 
     expect(result.status).toBe(PROJECT_COMMAND_EXECUTION_STATUS.COMMITTED)
     expect(
       session.query(
         createMidiNoteByIdQuery({
-          sourceId: parseMidiSourceId('source-non-loop'),
+          sourceId: parseMidiSourceId('source-verse'),
           noteId: parseNoteId('note-after-load'),
         }),
       ).note,
@@ -119,13 +119,13 @@ describe('loading a project file', () => {
   it('keeps IDs and Device parameters named __proto__ as ordinary data', () => {
     const data: typeof golden = JSON.parse(
       JSON.stringify(golden)
-        .replaceAll('"source-non-loop"', '"__proto__"')
+        .replaceAll('"source-verse"', '"__proto__"')
         .replace('"parameters":{}', '"parameters":{"__proto__":{"nested":[1,true,null]}}'),
     )
     const file = createProjectFile(createProjectSessionFromProjectFile(data).getSnapshot())
     const parameters = file.devices[0]?.parameters
 
-    expect(file.midiSources.map(({ id }) => id)).toEqual(['__proto__', 'source-looping'])
+    expect(file.midiSources.map(({ id }) => id)).toEqual(['__proto__', 'source-chorus'])
     expect(Object.getPrototypeOf(file.midiNotes)).toBeNull()
     expect(asJson(file.midiNotes)).toEqual(data.midiNotes)
     expect(Object.getPrototypeOf(parameters)).toBe(Object.prototype)
@@ -137,10 +137,10 @@ describe('loading a project file', () => {
     const file = decodeProjectFile(data)
 
     data.project.name = 'Edited after decoding'
-    data.midiNotes['source-looping'].pop()
+    data.midiNotes['source-chorus'].pop()
 
     expect(file.project.name).toBe('Complete Project Fixture')
-    expect(file.midiNotes[parseMidiSourceId('source-looping')]).toHaveLength(2)
+    expect(file.midiNotes[parseMidiSourceId('source-chorus')]).toHaveLength(2)
   })
 })
 
@@ -149,8 +149,8 @@ describe('rejecting a project file', () => {
     [
       'another format version',
       ['formatVersion'],
-      2,
-      `Expected project file format ${PROJECT_FILE_FORMAT_VERSION}, found 2`,
+      3,
+      `Expected project file format ${PROJECT_FILE_FORMAT_VERSION}, found 3`,
       ['formatVersion'],
     ],
     ['a missing table', ['clips'], REMOVE, 'Missing field clips', ['clips']],
@@ -172,17 +172,10 @@ describe('rejecting a project file', () => {
     ],
     [
       'a record with an unknown field',
-      ['midiNotes', 'source-looping', 0, 'gate'],
+      ['midiNotes', 'source-chorus', 0, 'gate'],
       1,
       'Unexpected field gate',
-      ['midiNotes', 'source-looping', 0, 'gate'],
-    ],
-    [
-      'an unknown Track kind',
-      ['tracks', 0, 'kind'],
-      'bus',
-      'Expected Track kind "audio" or "instrument"',
-      ['tracks', 0, 'kind'],
+      ['midiNotes', 'source-chorus', 0, 'gate'],
     ],
     [
       'a Channel that is not an object',
@@ -192,25 +185,11 @@ describe('rejecting a project file', () => {
       ['tracks', 1, 'channel'],
     ],
     [
-      'effect IDs that are not an array',
-      ['master', 'audioEffectIds'],
-      'device-master-effect',
-      'Expected an array',
-      ['master', 'audioEffectIds'],
-    ],
-    [
-      'a loop that is not an object',
-      ['clips', 0, 'loop'],
-      7,
-      'Expected an object',
-      ['clips', 0, 'loop'],
-    ],
-    [
       'a value its record does not allow',
-      ['midiNotes', 'source-looping', 0, 'pitch'],
+      ['midiNotes', 'source-chorus', 0, 'pitch'],
       128,
       'Invalid ',
-      ['midiNotes', 'source-looping', 0],
+      ['midiNotes', 'source-chorus', 0],
     ],
     ['an invalid Track order ID', ['trackOrder', 0], '', 'Invalid ', ['trackOrder', 0]],
   ])('rejects %s', (_, editPath, replacement, detail, path) => {
@@ -224,17 +203,17 @@ describe('rejecting a project file', () => {
 
   it('rejects a value that is not an object, and a MIDI Source key that is not an ID', () => {
     const data = goldenCopy()
-    Object.defineProperty(data.midiNotes, ' source-looping', {
+    Object.defineProperty(data.midiNotes, ' source-chorus', {
       enumerable: true,
-      value: data.midiNotes['source-looping'],
+      value: data.midiNotes['source-chorus'],
     })
-    setAt(data, ['midiNotes', 'source-looping'], REMOVE)
+    setAt(data, ['midiNotes', 'source-chorus'], REMOVE)
 
     expect(captureFileError(() => decodeProjectFile('project')).message).toBe(
       'Expected an object at []',
     )
     expect(captureFileError(() => decodeProjectFile(data)).message).toMatch(
-      /^Invalid .+ at \["midiNotes"," source-looping"\]$/,
+      /^Invalid .+ at \["midiNotes"," source-chorus"\]$/,
     )
   })
 
@@ -275,13 +254,13 @@ describe('rejecting a project file', () => {
 
   it('rejects duplicate IDs when loading', () => {
     const duplicateNote = goldenCopy()
-    duplicateNote.midiNotes['source-looping'].push(duplicateNote.midiNotes['source-looping'][0]!)
+    duplicateNote.midiNotes['source-chorus'].push(duplicateNote.midiNotes['source-chorus'][0]!)
     const duplicateTrack = goldenCopy()
     duplicateTrack.tracks.push(duplicateTrack.tracks[0]!)
 
     expect(
       captureFileError(() => createProjectSessionFromProjectFile(duplicateNote)).message,
-    ).toMatch(/^Duplicate ID .+ at \["midiNotes","source-looping",2\]$/)
+    ).toMatch(/^Duplicate ID .+ at \["midiNotes","source-chorus",2\]$/)
     expect(
       captureFileError(() => createProjectSessionFromProjectFile(duplicateTrack)).message,
     ).toMatch(/^Duplicate ID .+ at \["tracks",2\]$/)
@@ -290,7 +269,7 @@ describe('rejecting a project file', () => {
   it('rejects records that do not form a valid project', () => {
     const inputs = [
       editedCopy(golden, ['clips', 0, 'trackId'], 'track-missing'),
-      editedCopy(golden, ['midiSustainPedalEvents', 'source-looping'], REMOVE),
+      editedCopy(golden, ['midiSustainPedalEvents', 'source-chorus'], REMOVE),
     ]
 
     for (const input of inputs) {

@@ -17,7 +17,7 @@ import PianoRollPitchScrollbar from '@/features/piano-roll/components/pitch-view
 import { usePitchViewport } from '@/features/piano-roll/viewport/use-pitch-viewport'
 import { describeCause } from '@/features/piano-roll/presentation/piano-roll-feedback'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
-import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import { usePianoRollToolActions } from '@/features/piano-roll/actions/use-piano-roll-tool-actions'
@@ -37,7 +37,7 @@ import PianoRollTrackClipRegions from './PianoRollTrackClipRegions.vue'
 
 interface ProjectPianoRollTrackSurfaceProps {
   readonly barSpanTick: Tick
-  readonly presentation: ReadyProjectPianoRollTrackPresentation
+  readonly presentation: ProjectPianoRollTrackPresentation
   readonly session: Pick<ProjectSession, 'query' | 'subscribe' | 'modelRevision'>
   readonly timelineEndTick: Tick
   readonly timeSignatureNumerator: number

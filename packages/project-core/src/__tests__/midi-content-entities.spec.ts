@@ -7,7 +7,6 @@ import {
   ZERO_TICK,
   addTicks,
   createMidiClipRecord,
-  createMidiLoop,
   createMidiNoteRecord,
   createMidiSourceRecord,
   createMidiSustainPedalEventRecord,
@@ -25,7 +24,6 @@ import {
   parseTick,
   parseTrackId,
   type MidiClipRecord,
-  type MidiLoop,
   type MidiNoteRecord,
   type MidiSourceRecord,
   type MidiSustainPedalEventRecord,
@@ -137,33 +135,6 @@ describe('MidiSustainPedalEventRecord', () => {
   })
 })
 
-describe('MidiLoop', () => {
-  it('creates a new loop value with a safe source range', () => {
-    const input = {
-      sourceStartTick: parseTick(240),
-      sourceSpanTick: parsePositiveTick(960),
-    }
-
-    const loop = createMidiLoop(input)
-
-    expect(loop).not.toBe(input)
-    expect(loop).toEqual(input)
-    expectTypeOf(loop).toEqualTypeOf<MidiLoop>()
-  })
-
-  it('rejects zero span and unsafe loop end', () => {
-    expect(() => createMidiLoop({ sourceStartTick: ZERO_TICK, sourceSpanTick: ZERO_TICK })).toThrow(
-      DomainValueError,
-    )
-    expect(() =>
-      createMidiLoop({
-        sourceStartTick: parseTick(Number.MAX_SAFE_INTEGER),
-        sourceSpanTick: parsePositiveTick(1),
-      }),
-    ).toThrow(DomainValueError)
-  })
-})
-
 describe('MidiClipRecord', () => {
   const baseInput = {
     id: parseClipId('clip-1'),
@@ -175,47 +146,17 @@ describe('MidiClipRecord', () => {
     spanTick: parsePositiveTick(1920),
     sourceId: parseMidiSourceId('source-1'),
     sourceOffsetTick: ZERO_TICK,
-    loop: null,
   }
 
   it('creates a MIDI discriminant and a fresh record', () => {
     const clip = createMidiClipRecord(baseInput)
 
     expect(clip).not.toBe(baseInput)
-    expect(clip).toEqual({ ...baseInput, color: '#A0B1C2', kind: 'midi' })
+    expect(clip).toEqual({ ...baseInput, color: '#A0B1C2' })
     expectTypeOf(clip).toEqualTypeOf<MidiClipRecord>()
   })
 
-  it('copies the nested loop instead of retaining the input object', () => {
-    const loop = createMidiLoop({
-      sourceStartTick: parseTick(240),
-      sourceSpanTick: parsePositiveTick(960),
-    })
-    const clip = createMidiClipRecord({
-      ...baseInput,
-      sourceOffsetTick: parseTick(480),
-      loop,
-    })
-
-    expect(clip.loop).not.toBe(loop)
-    expect(clip.loop).toEqual(loop)
-  })
-
-  it('requires a looped source offset to fall inside the loop range', () => {
-    const loop = createMidiLoop({
-      sourceStartTick: parseTick(240),
-      sourceSpanTick: parsePositiveTick(960),
-    })
-
-    expect(() =>
-      createMidiClipRecord({ ...baseInput, sourceOffsetTick: parseTick(239), loop }),
-    ).toThrow(DomainValueError)
-    expect(() =>
-      createMidiClipRecord({ ...baseInput, sourceOffsetTick: parseTick(1200), loop }),
-    ).toThrow(DomainValueError)
-  })
-
-  it('rejects unsafe timeline and non-loop source window ends', () => {
+  it('rejects unsafe timeline and source window ends', () => {
     expect(() =>
       createMidiClipRecord({
         ...baseInput,

@@ -53,7 +53,6 @@ export function createClipEdits(context: Omit<ProjectEditContext, 'random'>) {
           sourceId: parseMidiSourceId(context.createId()),
           sourceLengthTick: bar.spanTick,
           sourceOffsetTick: ZERO_TICK,
-          loop: null,
         }),
       )
       return { clipId, commit, trackId: track.id }

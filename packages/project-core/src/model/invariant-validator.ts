@@ -32,7 +32,6 @@ import type { TimeSignatureEventRecord } from '#internal/model/time-signature-ev
 export type ModelEntityKind =
   | 'clip'
   | 'device'
-  | 'master'
   | 'midi-note'
   | 'midi-note-partition'
   | 'midi-source'
@@ -46,7 +45,6 @@ export type ModelInvariantCode =
   | 'clip-missing-midi-source'
   | 'clip-missing-track'
   | 'clip-outside-midi-source'
-  | 'clip-track-kind-mismatch'
   | 'device-missing'
   | 'device-ownership'
   | 'midi-source-missing-note-partition'
@@ -255,10 +253,7 @@ function validateClipSourceRange(
   source: MidiSourceRecord,
   violations: ViolationList,
 ): void {
-  const sourceEndTick =
-    clip.loop === null
-      ? clip.sourceOffsetTick + clip.spanTick
-      : clip.loop.sourceStartTick + clip.loop.sourceSpanTick
+  const sourceEndTick = clip.sourceOffsetTick + clip.spanTick
 
   if (!Number.isSafeInteger(sourceEndTick) || sourceEndTick > source.lengthTick) {
     addViolation(
@@ -285,13 +280,6 @@ function validateClips(
         'clip-missing-track',
         `Clip ${clip.id} references missing Track ${clip.trackId}`,
         [subject('clip', clip.id), subject('track', clip.trackId)],
-      )
-    } else if (clip.kind === 'midi' && track.kind !== 'instrument') {
-      addViolation(
-        violations,
-        'clip-track-kind-mismatch',
-        `MIDI Clip ${clip.id} belongs to non-Instrument Track ${track.id}`,
-        [subject('clip', clip.id), subject('track', track.id)],
       )
     }
 
@@ -456,30 +444,13 @@ function validateDevices(model: ModelStoreReader, violations: ViolationList): vo
   const referencesByDeviceId = new Map<DeviceId, DeviceReference[]>()
 
   for (const [, track] of model.trackEntries()) {
-    const owner = subject('track', track.id)
-
-    if (track.kind === 'instrument') {
-      track.midiEffectIds.forEach((deviceId, index) => {
-        addDeviceReference(referencesByDeviceId, deviceId, owner, `midiEffectIds[${index}]`)
-      })
-      addDeviceReference(
-        referencesByDeviceId,
-        track.instrumentDeviceId,
-        owner,
-        'instrumentDeviceId',
-      )
-    }
-
-    track.audioEffectIds.forEach((deviceId, index) => {
-      addDeviceReference(referencesByDeviceId, deviceId, owner, `audioEffectIds[${index}]`)
-    })
+    addDeviceReference(
+      referencesByDeviceId,
+      track.instrumentDeviceId,
+      subject('track', track.id),
+      'instrumentDeviceId',
+    )
   }
-
-  const masterOwner = subject('master', 'master')
-
-  model.master.audioEffectIds.forEach((deviceId, index) => {
-    addDeviceReference(referencesByDeviceId, deviceId, masterOwner, `audioEffectIds[${index}]`)
-  })
 
   for (const [deviceId, references] of referencesByDeviceId) {
     if (model.getDevice(deviceId) === undefined) {

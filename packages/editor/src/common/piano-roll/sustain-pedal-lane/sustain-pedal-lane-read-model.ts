@@ -22,11 +22,9 @@ import {
   type PianoRollClipContext,
 } from '#internal/common/piano-roll/piano-roll-clip-context'
 import {
-  PIANO_ROLL_TRACK_CLIP_STATUS,
   createPianoRollTrackClipProjection,
   pianoRollTrackSourceTickToProjectTick,
   type PianoRollTrackClipProjection,
-  type ReadyPianoRollTrackClipProjection,
 } from '#internal/common/piano-roll/track/clip-projection'
 
 const DEFAULT_SUSTAIN_PEDAL_VALUE = parseMidiControlValue(MIDI_CONTROL_VALUE_MIN)
@@ -165,7 +163,7 @@ function projectSustainPedalWindow(
   })
 }
 
-/** Projects one non-looped Clip's selected-channel CC64 facts into Clip-local time. */
+/** Projects one Clip's selected-channel CC64 facts into Clip-local time. */
 export function createPianoRollSustainPedalClipLaneReadModel(
   input: CreatePianoRollSustainPedalClipLaneReadModelInput,
 ): PianoRollSustainPedalClipLaneReadModel {
@@ -212,23 +210,13 @@ function createTrackClipReadModel(
   clip: MidiClipRecord,
 ): PianoRollTrackSustainPedalLaneClipReadModel {
   const projection = createPianoRollTrackClipProjection(clip, sources.get(clip.sourceId)!)
-  if (projection.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED) {
-    return Object.freeze({
-      clip: projection,
-      events: Object.freeze([]),
-      initialPedalDown: null,
-      initialValue: null,
-      segments: Object.freeze([]),
-    })
-  }
-
-  return createReadyTrackClipReadModel(snapshot, channel, projection)
+  return createProjectedTrackClipReadModel(snapshot, channel, projection)
 }
 
-function createReadyTrackClipReadModel(
+function createProjectedTrackClipReadModel(
   snapshot: ProjectSnapshot,
   channel: MidiChannel,
-  clip: ReadyPianoRollTrackClipProjection,
+  clip: PianoRollTrackClipProjection,
 ): PianoRollTrackSustainPedalLaneClipReadModel {
   const projection = projectSustainPedalWindow({
     channel,

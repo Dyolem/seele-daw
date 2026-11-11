@@ -54,10 +54,7 @@ function assertClipWithinSource(
   entry: InstrumentTrackCollectionEntry,
   clipGraph: InstrumentTrackCollectionClip,
 ): void {
-  const sourceReadEndTick =
-    clipGraph.clip.loop === null
-      ? addTicks(clipGraph.clip.sourceOffsetTick, clipGraph.clip.spanTick)
-      : addTicks(clipGraph.clip.loop.sourceStartTick, clipGraph.clip.loop.sourceSpanTick)
+  const sourceReadEndTick = addTicks(clipGraph.clip.sourceOffsetTick, clipGraph.clip.spanTick)
 
   if (sourceReadEndTick <= clipGraph.source.lengthTick) return
 
@@ -123,17 +120,10 @@ function assertCollectionGraphCanBeAdded(
       )
     }
 
-    if (entry.track.midiEffectIds.length > 0 || entry.track.audioEffectIds.length > 0) {
-      throw new ProjectCommandError(
-        'instrument-track-device-chain-unsupported',
-        `Instrument Track ${entry.track.id} collection entry cannot reference Device chains that the command does not carry`,
-      )
-    }
-
     for (const clipGraph of entry.clips) {
       if (clipGraph.clip.trackId !== entry.track.id) {
         throw new ProjectCommandError(
-          'midi-clip-track-kind-mismatch',
+          'midi-clip-track-id-mismatch',
           `MIDI Clip ${clipGraph.clip.id} does not belong to supplied Instrument Track ${entry.track.id}`,
         )
       }

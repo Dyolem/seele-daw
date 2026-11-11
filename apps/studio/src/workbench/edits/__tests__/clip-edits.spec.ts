@@ -42,7 +42,6 @@ describe('clip edits', () => {
     )
     expect(snapshot.clips[0]).toEqual({
       id: 'clip-defaults',
-      kind: 'midi',
       trackId: track.trackId,
       name: 'Instrument 1',
       color: null,
@@ -51,7 +50,6 @@ describe('clip edits', () => {
       spanTick: 3_840,
       sourceId: 'source-defaults',
       sourceOffsetTick: 0,
-      loop: null,
     })
     expect(snapshot.midiSources[0]).toEqual({ id: 'source-defaults', lengthTick: 3_840 })
     expect(snapshot.midiNotes).toEqual({ 'source-defaults': [] })

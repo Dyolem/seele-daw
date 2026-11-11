@@ -353,10 +353,7 @@ function createReasons(
   if (!masterRoutesHaveSameValues(previousPlan, nextPlan)) {
     reasons.push(AUDIBLE_MIDI_RECONCILIATION_REASON.MASTER_ROUTE_CHANGED)
   }
-  if (
-    nextPlan.status === AUDIBLE_MIDI_PLAN_STATUS.BLOCKED ||
-    nextPlan.status === AUDIBLE_MIDI_PLAN_STATUS.EMPTY
-  ) {
+  if (nextPlan.status === AUDIBLE_MIDI_PLAN_STATUS.EMPTY) {
     reasons.push(AUDIBLE_MIDI_RECONCILIATION_REASON.NEXT_PLAN_UNPLAYABLE)
   }
   return Object.freeze(reasons)

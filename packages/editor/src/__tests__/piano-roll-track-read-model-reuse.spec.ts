@@ -63,9 +63,7 @@ function createSession(): ProjectSession {
     name: 'Reuse',
     color: null,
     channel: { gain: parseLinearGain(1), pan: parseBipolarValue(0), muted: false, soloed: false },
-    midiEffectIds: [],
     instrumentDeviceId: device.id,
-    audioEffectIds: [],
   })
   const clips = [0, 1].map((clipIndex) => {
     const source = createMidiSourceRecord({
@@ -83,7 +81,6 @@ function createSession(): ProjectSession {
         spanTick: parseTick(SOURCE_LENGTH_TICK - 960),
         sourceId: source.id,
         sourceOffsetTick: parseTick(480),
-        loop: null,
       }),
       source,
       notes: Array.from({ length: NOTES_PER_CLIP }, (_, noteIndex) =>

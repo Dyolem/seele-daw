@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { PIANO_ROLL_TRACK_CLIP_STATUS, type PianoRollTrackReadModel } from '@seele-daw/editor'
+import type { PianoRollTrackReadModel } from '@seele-daw/editor'
 import { type ClipId } from '@seele-daw/project-core'
 import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import PianoRollToolControls from '@/features/piano-roll/components/PianoRollToolControls.vue'
@@ -28,7 +28,7 @@ const clipOptions = computed(() => [
   { value: 'none', label: 'None' },
   ...props.clips.map(({ clip }) => ({
     value: `clip:${clip.clipId}`,
-    label: `${clip.name}${clip.status === PIANO_ROLL_TRACK_CLIP_STATUS.UNSUPPORTED ? ' (looped)' : ''}`,
+    label: clip.name,
   })),
 ])
 const fitPitches = computed(() =>

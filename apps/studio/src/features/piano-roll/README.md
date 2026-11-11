@@ -173,7 +173,7 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
 
 当前已实现：
 
-- 从 Snapshot 派生选中 Clip 的非循环 `PianoRollClipContext`、Track Color 和 muted；
+- 从 Snapshot 派生选中 Clip 的 `PianoRollClipContext`、Track Color 和 muted；
 - 在 Context Editor Dock 组合真实 Project Query / Subscription；
 - DOM 标尺、MIDI 0–127 可滚动钢琴键盘、焦点与可访问 Note 摘要；
 - `Standard keys` 固定 20px 行高；`Pitch range` 保留目标跨度、随面板适配为 16–48px 行高；
@@ -198,7 +198,6 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
   Escape / blur 取消、单次 Command、Selection 与权威 revision 交接；
 - 聚焦 Piano Roll 时使用 `Delete` / `Backspace` 原子删除完整 Note Selection；成功后由
   权威 Subscription 清理 Selection，失败保留 Project 与 Selection 并显示 Toast；
-- looped Clip 的明确不支持状态。
 - 与 Arrangement 共用 Transport 视觉位置的不可交互 Clip Focus Playhead；Studio
   Presentation 提供 Project 身份与 Arrangement Clip 起点，独立子组件将全局 Tick 投影到当前
   完整 Clip Viewport，并只用 `translate3d(...)` 移动；Clip 外、项目切换或编辑器退出时不保留
@@ -209,7 +208,7 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
 - Track-time Surface 使用独立 transform-only Playhead 直接投影全局 Tick；每次进入 Playing
   默认启用自身的分页 Follow，手动滚动、Pointer 或 Keyboard 时间轴操作会暂停，可见控制可立即
   恢复；Follow 状态不进入 Project Fact；
-- Active Clip 下拉选择、Clip window / Note 点击选择，以及 looped Clip 的可见不可编辑状态；
+- Active Clip 下拉选择与 Clip window / Note 点击选择；
 - Track Pencil Hover Preview：明确显示写入已有 Clip、右扩 Clip、新建 Bar Clip 或 blocked
   原因；按下时冻结 Active Clip / Tool / Grid / Snap / revision；完成时 `edits.notes` 对同一 Session 和原 revision 重新验证，并用 Add Note、
   Add Clip With Note 或 Extend Clip With Note 形成一次 Commit / History；
@@ -221,8 +220,8 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
 - Clip Focus Pencil 空白 Click 按当前 Grid/Snap 解析 Clip Tick 和原始 Value，并通过
   `edits.sustainPedal` 执行一个 `AddMidiSustainPedalEventCommand`；已有 Marker、Drag、Cursor 不新增；
 - Track Scope 显示全部 Clip 的 CC64 投影并弱化非 Active Clip；Pencil 只允许写入明确选择的
-  非循环 Active Clip，Pointer 必须落在其闭合时间窗口内。V1 不为 CC64 自动新建或扩展 Clip，
-  无 Active Clip、越界、looped Clip 或 stale revision 都保持事实不变并显示 Toast；
+  Active Clip，Pointer 必须落在其闭合时间窗口内。V1 不为 CC64 自动新建或扩展 Clip，
+  无 Active Clip、越界或 stale revision 都保持事实不变并显示 Toast；
 - Cursor Click 选择 Active Clip 当前 Channel 的 CC64 Event，修饰键 Click 切换、空白 Click 清空；
   横向拖动以一次 Command 移动完整 Selection，纵向拖动以一次 Command 替换锚点原始 Value；
 - Marker Preview 在 Pointer Move 期间不写 Project，并在提交后的 Lane Snapshot 到达 commit

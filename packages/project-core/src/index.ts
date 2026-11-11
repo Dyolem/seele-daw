@@ -190,15 +190,8 @@ export { DomainValueError } from './model/domain-value-error'
 export { DEVICE_DEFINITION_VERSION_MIN, createDeviceDescriptor } from './model/device'
 export type { CreateDeviceDescriptorInput, DeviceDescriptor } from './model/device'
 
-export { createMidiClipRecord, createMidiLoop } from './model/midi-clip'
-export type {
-  ClipBase,
-  ClipRecord,
-  CreateMidiClipRecordInput,
-  CreateMidiLoopInput,
-  MidiClipRecord,
-  MidiLoop,
-} from './model/midi-clip'
+export { createMidiClipRecord } from './model/midi-clip'
+export type { ClipRecord, CreateMidiClipRecordInput, MidiClipRecord } from './model/midi-clip'
 
 export { createMidiNoteRecord } from './model/midi-note'
 export type { CreateMidiNoteRecordInput, MidiNoteAddress, MidiNoteRecord } from './model/midi-note'
@@ -223,14 +216,10 @@ export type { CreateProjectRecordInput, ProjectRecord } from './model/project'
 
 export type { ModelRevision } from './model/model-revision'
 
-export { createAudioTrackRecord, createInstrumentTrackRecord } from './model/track'
+export { createInstrumentTrackRecord } from './model/track'
 export type {
-  AudioTrackRecord,
-  CreateAudioTrackRecordInput,
   CreateInstrumentTrackRecordInput,
-  CreateTrackBaseInput,
   InstrumentTrackRecord,
-  TrackBase,
   TrackRecord,
 } from './model/track'
 

@@ -12,7 +12,6 @@ import { computed } from 'vue'
 
 import ProjectPianoRollSurface from '@/features/piano-roll/components/clip-focus/ProjectPianoRollSurface.vue'
 import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track-surface/ProjectPianoRollTrackSurface.vue'
-import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import { PIANO_ROLL_EDITING_SCOPE } from '@/features/piano-roll/types/piano-roll-preferences'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
@@ -137,8 +136,8 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
             will appear here as editing capabilities arrive.
           </p>
           <p v-else-if="props.selectedTrack">
-            {{ props.selectedTrack.kind === 'instrument' ? 'Instrument' : 'Audio' }} track selected.
-            Track properties will appear here as editing capabilities arrive.
+            Instrument track selected. Track properties will appear here as editing capabilities
+            arrive.
           </p>
           <p v-else>Select a track to inspect its editing context.</p>
         </section>
@@ -258,7 +257,7 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
         <ProjectPianoRollTrackSurface
           v-if="
             pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK &&
-            pianoRollTrack?.status === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+            pianoRollTrack !== null
           "
           :bar-span-tick="project.barSpanTick"
           :presentation="pianoRollTrack"
@@ -269,7 +268,7 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
         <ProjectPianoRollSurface
           v-else-if="
             pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.CLIP &&
-            pianoRoll?.status === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
+            pianoRoll !== null
           "
           :bar-span-tick="project.barSpanTick"
           :presentation="pianoRoll"
@@ -279,20 +278,7 @@ function reportUnavailableInstrument(preset: RuntimeUnavailableBuiltInInstrument
         <div v-else class="project-workbench__surface-empty">
           <span><UiIcon :icon="MidiIcon" :size="24" /></span>
           <strong>{{ contextEmptyTitle }}</strong>
-          <p
-            v-if="
-              (pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK
-                ? pianoRollTrack?.status
-                : pianoRoll?.status) === PROJECT_PIANO_ROLL_PRESENTATION_STATUS.UNSUPPORTED
-            "
-          >
-            {{
-              pianoRollPreferences.editingScope === PIANO_ROLL_EDITING_SCOPE.TRACK
-                ? 'Track Piano Roll is available for Instrument Tracks.'
-                : 'Looped MIDI clips are not supported by Clip Focus.'
-            }}
-          </p>
-          <p v-else-if="props.selectedClip">
+          <p v-if="props.selectedClip">
             This MIDI clip is selected, but its Piano Roll context is unavailable.
           </p>
           <p v-else-if="props.selectedTrack">

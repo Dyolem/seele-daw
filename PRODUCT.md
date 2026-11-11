@@ -517,7 +517,7 @@ Ruler 的键盘语义为：左右方向键逐拍定位，Page Up / Page Down 逐
 到新 Timeline End。Anchor 不进入 Project、Checkpoint、History、dirty 或 Pinia。
 
 Stopped / Paused 定位保持原状态；Playing 定位以快速淡出停止当前全部声音，再从目标继续安排；
-Loading 定位更新 pending start；Empty / Blocked 仍允许移动位置但 Play 不可用。定位到
+Loading 定位更新 pending start；Empty 仍允许移动位置但 Play 不可用。定位到
 已经开始的长 Note 中间不执行 Note Chase。
 
 Clip Focus Piano Roll 显示不可交互 Playhead：它用
@@ -663,7 +663,7 @@ Program / Channel 10 的导入优先级、占位事实与诊断边界见
 - 默认长度为一个小节；当前阶段按项目起始拍号计算小节长度。
 - Clip 初始名称复制 Track 当前名称，但之后是独立 Project Fact，Track 改名不会隐式更新 Clip 名称。
 - `color = null`，显示时继承 Track 颜色。
-- 默认非静音、非循环，`sourceOffsetTick = 0`。
+- 默认非静音，`sourceOffsetTick = 0`。
 - 同一事务创建等长的空 MidiSource 和空 Note Partition。
 - 每个 MidiClip 独占一个 MidiSource；不能产生孤立 Source 或共享 Source。
 - 创建成功后自动选择新 Clip，并保持其所属 Track 为当前 Track。
@@ -749,8 +749,8 @@ Swipe dismiss。业务 Feature 通过应用级 Pinia Toast Store 的命令式
 Project Core 已实现：
 
 - Add MIDI Note Command。
-- Add MIDI Clip with Note Command；原子创建非循环 Clip、独占 MidiSource 与第一枚 Note。
-- Extend MIDI Clip with Note Command；原子右扩非循环 Clip、按需增长 MidiSource 并创建越界
+- Add MIDI Clip with Note Command；原子创建 Clip、独占 MidiSource 与第一枚 Note。
+- Extend MIDI Clip with Note Command；原子右扩 Clip、按需增长 MidiSource 并创建越界
   Note，且不得跨越同 Track 的下一 Clip。
 - Move MIDI Notes Command；一元素列表用于单 Note Move，多元素列表用于原子
   Selection Move。
@@ -802,21 +802,20 @@ Piano Roll 已确认采用“一个 Project 模型、两种编辑投影”，不
 - 模式选择是 Studio 应用生命周期偏好，不是 Project Fact，不产生 dirty、History 或 Commit；
 - 两种模式读取同一 `MidiClipRecord`、`MidiSourceRecord` 和 Note Partition。Clip 右端始终由
   `startTick + spanTick` 派生，不创建 Piano Roll 专用 Clip 或重复 `endTick`；
-- 非循环 Clip 的 Note 全局 Tick 为
+- Clip 中 Note 的全局 Tick 为
   `clip.startTick + note.startTick - clip.sourceOffsetTick`；Clip Focus 则继续使用当前
-  Clip-local / Source-local 映射；
-- looped Clip 可以出现在 Track 投影中，但在循环实例选择与 Source 写回语义确认前不可编辑。
+  Clip-local / Source-local 映射。
 
 Track 模式 Pencil 在全局空白时间轴上的产品规则：
 
-| Pointer 位置                                 | 行为                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------------ |
-| 位于一个非循环 Clip 内                       | 写入该 Clip；重叠 Clip 区域优先使用 Active Clip，没有明确目标时不猜测    |
-| Note 起点在 Clip 内但尾端越界                | 若不跨越下一 Clip，原子扩展 Clip 右端并创建 Note                         |
-| 位于左侧相邻 Clip 末端之后不超过一个当前小节 | 若不与下一 Clip 相交，原子向右扩展该 Clip 并创建 Note                    |
-| 更远的空白区域                               | 从包含 Pointer 的小节边界创建新非循环 Clip / MidiSource，并原子创建 Note |
-| 位于既有 Clip 之前                           | 创建新 Clip；V1 不自动向左扩展已有 Clip                                  |
-| looped Clip 或目标归属有歧义                 | 拒绝本次提交并显示原因                                                   |
+| Pointer 位置                                 | 行为                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------- |
+| 位于一个 Clip 内                             | 写入该 Clip；重叠 Clip 区域优先使用 Active Clip，没有明确目标时不猜测 |
+| Note 起点在 Clip 内但尾端越界                | 若不跨越下一 Clip，原子扩展 Clip 右端并创建 Note                      |
+| 位于左侧相邻 Clip 末端之后不超过一个当前小节 | 若不与下一 Clip 相交，原子向右扩展该 Clip 并创建 Note                 |
+| 更远的空白区域                               | 从包含 Pointer 的小节边界创建新 Clip / MidiSource，并原子创建 Note    |
+| 位于既有 Clip 之前                           | 创建新 Clip；V1 不自动向左扩展已有 Clip                               |
+| 目标归属有歧义                               | 拒绝本次提交并显示原因                                                |
 
 自动扩展永远不能跨越下一 Clip。新建 / 扩展 Clip 与创建 Note 是一次用户手势、一个原子 Project
 Command、一个 Commit 和一个 History 步骤；Studio 不得通过多次命令拼接事务。Clip Focus
@@ -841,9 +840,8 @@ Project Core 当前仍强制 Clip 与 Source 一对一；显示层的实例身�
 
 `@seele-daw/editor/common` 已提供：
 
-- 非循环 MIDI Clip 与其 MidiSource 的稳定 1:1 编辑上下文；
-- immutable Snapshot 派生的 Track 全局 Clip / Note Read Model，以及明确的 looped Clip
-  unsupported 投影；
+- MIDI Clip 与其 MidiSource 的稳定 1:1 编辑上下文；
+- immutable Snapshot 派生的 Track 全局 Clip / Note Read Model；
 - Clip-local Tick 与 Source Tick 的双向映射；
 - 可见 Tick / Pitch / CSS Pixel Viewport；
 - 不提前 Snap 的连续 X → Tick 位置换算；
@@ -955,7 +953,6 @@ Track 的 Grid 与 Note 按水平可视窗口及相邻页缓冲绘制，纵向�
 
 当前明确限制：
 
-- 不支持 looped Clip 编辑，不能把循环实例错误显示成非循环 Source；
 - Grid Preset UI 当前只显示已确认的 `1/16`，尚不能选择其他直线、三连音或附点值；
 - Clip Focus 在横向显示完整 Clip，Track Scope 已有横向 Scroll，二者尚无时间轴 Zoom；
 - 用户可以创建、选择、移动、调整长度和删除 Note，但还不能编辑 Velocity；
@@ -990,23 +987,23 @@ Project 并显示 Toast。
 
 两种 Scope 的写入边界不同：
 
-- Clip Focus 把局部 Tick 映射到该非循环 Clip 的 Source Tick，允许在闭合右端添加明确的
+- Clip Focus 把局部 Tick 映射到该 Clip 的 Source Tick，允许在闭合右端添加明确的
   Terminal Event；
 - Track Scope 显示当前 Instrument Track 全部 Clip 的 CC64 投影，Active Clip 完整强调、其他
-  Clip 弱化、looped Clip 显示为不支持；
-- Track Scope 只向用户明确选择的非循环 Active Clip 写入，Pointer 必须位于其闭合窗口内；
+  Clip 弱化；
+- Track Scope 只向用户明确选择的 Active Clip 写入，Pointer 必须位于其闭合窗口内；
   V1 不为 CC64 自动新建或延长 Clip，也不在重叠或空白区域猜测 Source；
-- 无 Active Clip、Pointer 越界、looped Clip、stale revision 或事实图缺失时拒绝整个意图。
+- 无 Active Clip、Pointer 越界、stale revision 或事实图缺失时拒绝整个意图。
 
 Cursor Click 只选择 Active Clip 中当前 Channel 的 Event，修饰键 Click 切换 Selection，空白 Click
 清空。超过共享 Drag Threshold 后按主导轴锁定：横向拖动对完整 Selection 产生一次批量 Move，
 纵向拖动只对锚点产生一次 Replace Value；Preview 不写 Project，成功提交后保留到 Lane Snapshot
 到达 commit revision。聚焦 CC64 Lane 时，`Delete` / `Backspace` 复用既有 Piano Roll Action，
-一次删除完整 Selection；Track Scope 的非 Active Clip Marker 与 looped Clip 仍只读。
+一次删除完整 Selection；Track Scope 的非 Active Clip Marker 仍只读。
 
 每次 Move、Replace Value 或 Remove 最多执行一个 Project Command / History 步骤；Tick / Channel
 碰撞、stale revision 或事实图缺失时拒绝整个编辑并保留合法 Project。当前不提供框选、精确数值
-输入、原子批量 Value Transform 或 looped Clip 实例编辑。它仍不是通用 Controller / Automation
+输入或原子批量 Value Transform。它仍不是通用 Controller / Automation
 平台，也不代表 Audio Runtime 已支持连续 half-pedal 响应。
 
 ### 8.4 Project File 与 Checkpoint
@@ -1015,8 +1012,8 @@ Cursor Click 只选择 Active Clip 中当前 Channel 的 Event，修饰键 Click
 
 Project Core 已具备：
 
-- Project File（`formatVersion: 3`）：文件就是项目的存储表。只读当前版本，其他版本以
-  `unsupported-format-version` 拒绝，不做迁移。
+- Project File（`formatVersion: 4`）：文件就是项目的存储表。只读当前版本，其他版本直接
+  拒绝，不做迁移。
 - 与存储无关的 Checkpoint 保存与恢复协调；Studio 用它把项目保存在 IndexedDB。
 
 当前没有面向用户的项目文件导入 / 导出 UI；Standard MIDI File 导入是独立的交换格式入口，不替代

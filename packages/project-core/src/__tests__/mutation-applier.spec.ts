@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import * as projectCore from '#internal/index'
 import {
-  createAudioTrackRecord,
+  createInstrumentTrackRecord,
   createMasterChannelRecord,
   createMidiClipRecord,
   createProjectRecord,
@@ -55,21 +55,20 @@ function createProjectReplacement(fixture: ReturnType<typeof createCompleteProje
   })
 }
 
-function createAudioTrackReplacement(fixture: ReturnType<typeof createCompleteProjectFixture>) {
-  return createAudioTrackRecord({
-    id: fixture.records.audioTrack.id,
-    name: 'Mutation Applier Audio Track',
-    color: fixture.records.audioTrack.color,
-    channel: fixture.records.audioTrack.channel,
-    audioEffectIds: fixture.records.audioTrack.audioEffectIds,
+function createBassTrackReplacement(fixture: ReturnType<typeof createCompleteProjectFixture>) {
+  return createInstrumentTrackRecord({
+    id: fixture.records.bassTrack.id,
+    name: 'Mutation Applier Bass Track',
+    color: fixture.records.bassTrack.color,
+    channel: fixture.records.bassTrack.channel,
+    instrumentDeviceId: fixture.records.bassTrack.instrumentDeviceId,
   })
 }
 
-function createMasterReplacement(fixture: ReturnType<typeof createCompleteProjectFixture>) {
+function createMasterReplacement() {
   return createMasterChannelRecord({
     gain: parseLinearGain(0.65),
     muted: true,
-    audioEffectIds: fixture.records.master.audioEffectIds,
   })
 }
 
@@ -116,7 +115,7 @@ describe('MutationApplier revision checks', () => {
         op: 'replace',
         table: 'master',
         before: fixture.records.master,
-        after: createMasterReplacement(fixture),
+        after: createMasterReplacement(),
       },
     ])
 
@@ -194,7 +193,7 @@ describe('MutationApplier complete transaction', () => {
     expect(snapshotSemanticProjectFacts(store)).toEqual(originalFacts)
     expect(store.project).toBe(fixture.records.project)
     expect(store.master).toBe(fixture.records.master)
-    expect(store.getTrack(fixture.records.audioTrack.id)).toBe(fixture.records.audioTrack)
+    expect(store.getTrack(fixture.records.bassTrack.id)).toBe(fixture.records.bassTrack)
     expect([...store.clipEntries()].map(([clipId]) => clipId)).not.toEqual(
       originalPhysicalClipOrder,
     )
@@ -206,8 +205,8 @@ describe('MutationApplier validation failures', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const applier = new MutationApplier(store)
-    const staleBefore = createAudioTrackReplacement(fixture)
-    const replacement = createAudioTrackRecord({
+    const staleBefore = createBassTrackReplacement(fixture)
+    const replacement = createInstrumentTrackRecord({
       ...staleBefore,
       name: 'Never Applied Track',
     })
@@ -250,12 +249,12 @@ describe('MutationApplier defensive restoration', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const applier = new MutationApplier(store)
-    const replacementTrack = createAudioTrackReplacement(fixture)
+    const replacementTrack = createBassTrackReplacement(fixture)
     const plan = createMutationPlan(store.modelRevision, [
       {
         op: 'replace',
         table: 'tracks',
-        before: fixture.records.audioTrack,
+        before: fixture.records.bassTrack,
         after: replacementTrack,
       },
     ])
@@ -285,8 +284,8 @@ describe('MutationApplier defensive restoration', () => {
     const store = new ModelStore(fixture.seed)
     const applier = new MutationApplier(store)
     const replacementProject = createProjectReplacement(fixture)
-    const replacementTrack = createAudioTrackReplacement(fixture)
-    const replacementMaster = createMasterReplacement(fixture)
+    const replacementTrack = createBassTrackReplacement(fixture)
+    const replacementMaster = createMasterReplacement()
     const plan = createMutationPlan(store.modelRevision, [
       {
         op: 'replace',
@@ -297,7 +296,7 @@ describe('MutationApplier defensive restoration', () => {
       {
         op: 'replace',
         table: 'tracks',
-        before: fixture.records.audioTrack,
+        before: fixture.records.bassTrack,
         after: replacementTrack,
       },
       {
@@ -333,22 +332,22 @@ describe('MutationApplier defensive restoration', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const applier = new MutationApplier(store)
-    const replacementTrack = createAudioTrackReplacement(fixture)
+    const replacementTrack = createBassTrackReplacement(fixture)
     const replacementClip = createMidiClipRecord({
-      ...fixture.records.nonLoopClip,
+      ...fixture.records.verseClip,
       name: 'Rollback Failure Clip',
     })
     const plan = createMutationPlan(store.modelRevision, [
       {
         op: 'replace',
         table: 'tracks',
-        before: fixture.records.audioTrack,
+        before: fixture.records.bassTrack,
         after: replacementTrack,
       },
       {
         op: 'replace',
         table: 'clips',
-        before: fixture.records.nonLoopClip,
+        before: fixture.records.verseClip,
         after: replacementClip,
       },
     ])
@@ -374,8 +373,8 @@ describe('MutationApplier defensive restoration', () => {
 
           if (
             forwardFailed &&
-            key === fixture.records.audioTrack.id &&
-            value === fixture.records.audioTrack
+            key === fixture.records.bassTrack.id &&
+            value === fixture.records.bassTrack
           ) {
             throw rollbackCause
           }
@@ -392,7 +391,7 @@ describe('MutationApplier defensive restoration', () => {
     expect((fatalError as AggregateError).errors[0]).toBe(applyCause)
     expect((fatalError as AggregateError).errors[1]).toBe(rollbackCause)
     expect(store.modelRevision).toBe(INITIAL_MODEL_REVISION)
-    expect(store.getTrack(fixture.records.audioTrack.id)).toBe(replacementTrack)
+    expect(store.getTrack(fixture.records.bassTrack.id)).toBe(replacementTrack)
 
     const faultedError = captureThrown(() => applier.apply(retryPlan))
 
@@ -408,12 +407,12 @@ describe('MutationApplier defensive restoration', () => {
     const fixture = createCompleteProjectFixture()
     const store = new ModelStore(fixture.seed)
     const applier = new MutationApplier(store)
-    const replacementTrack = createAudioTrackReplacement(fixture)
+    const replacementTrack = createBassTrackReplacement(fixture)
     const outerPlan = createMutationPlan(store.modelRevision, [
       {
         op: 'replace',
         table: 'tracks',
-        before: fixture.records.audioTrack,
+        before: fixture.records.bassTrack,
         after: replacementTrack,
       },
     ])
@@ -443,7 +442,7 @@ describe('MutationApplier defensive restoration', () => {
       message: 'MutationApplier cannot apply a plan while another apply call is active',
     })
     expect(store.project).toBe(fixture.records.project)
-    expect(store.getTrack(fixture.records.audioTrack.id)).toBe(replacementTrack)
+    expect(store.getTrack(fixture.records.bassTrack.id)).toBe(replacementTrack)
     expect(store.modelRevision).toBe(1)
   })
 })

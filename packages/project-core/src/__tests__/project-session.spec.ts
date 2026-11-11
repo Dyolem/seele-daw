@@ -68,7 +68,7 @@ describe('ProjectSession command execution', () => {
     const addResult = session.execute(
       createAddNoteCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteId,
         startTick: parseTick(960),
         durationTick: parseTick(240),
@@ -87,12 +87,12 @@ describe('ProjectSession command execution', () => {
       },
     })
     expect(session.modelRevision).toBe(1)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, noteId)).toBeDefined()
+    expect(store.getMidiNote(fixture.records.verseSource.id, noteId)).toBeDefined()
 
     const moveResult = session.execute(
       createMoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteIds: [noteId],
         deltaTick: parseTickDelta(240),
         deltaPitch: parseMidiPitchDelta(2),
@@ -107,7 +107,7 @@ describe('ProjectSession command execution', () => {
         changes: [{ op: 'replace', table: 'midiNotes', after: { id: noteId } }],
       },
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, noteId)).toMatchObject({
+    expect(store.getMidiNote(fixture.records.verseSource.id, noteId)).toMatchObject({
       startTick: 1_200,
       pitch: 74,
     })
@@ -115,7 +115,7 @@ describe('ProjectSession command execution', () => {
     const removeResult = session.execute(
       createRemoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteIds: [noteId],
       }),
     )
@@ -129,16 +129,16 @@ describe('ProjectSession command execution', () => {
       },
     })
     expect(session.modelRevision).toBe(3)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, noteId)).toBeUndefined()
+    expect(store.getMidiNote(fixture.records.verseSource.id, noteId)).toBeUndefined()
   })
 
   it('executes one Resize as one committed Note update', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
     const result = session.execute(
       createResizeNoteCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteId: before.id,
         startTick: parseTick(120),
         durationTick: parseTick(600),
@@ -165,7 +165,7 @@ describe('ProjectSession command execution', () => {
       },
     })
     expect(session.modelRevision).toBe(1)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toEqual({
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toEqual({
       ...before,
       startTick: parseTick(120),
       durationTick: parseTick(600),
@@ -174,12 +174,12 @@ describe('ProjectSession command execution', () => {
 
   it('moves multiple Notes in one Commit and one reversible History step', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const first = fixture.records.nonLoopNote
-    const second = fixture.records.nonLoopHarmonyNote
+    const first = fixture.records.verseNote
+    const second = fixture.records.verseHarmonyNote
     const result = session.execute(
       createMoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteIds: [first.id, second.id],
         deltaTick: parseTickDelta(240),
         deltaPitch: parseMidiPitchDelta(2),
@@ -197,19 +197,19 @@ describe('ProjectSession command execution', () => {
         ],
       },
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toMatchObject({
+    expect(store.getMidiNote(fixture.records.verseSource.id, first.id)).toMatchObject({
       startTick: 480,
       pitch: 62,
     })
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, second.id)).toMatchObject({
+    expect(store.getMidiNote(fixture.records.verseSource.id, second.id)).toMatchObject({
       startTick: 960,
       pitch: 66,
     })
 
     session.undo()
 
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, first.id)).toBe(first)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, second.id)).toBe(second)
+    expect(store.getMidiNote(fixture.records.verseSource.id, first.id)).toBe(first)
+    expect(store.getMidiNote(fixture.records.verseSource.id, second.id)).toBe(second)
   })
 
   it('returns a fully frozen committed result after successful application', () => {
@@ -217,8 +217,8 @@ describe('ProjectSession command execution', () => {
     const result = session.execute(
       createRemoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
-        noteIds: [fixture.records.nonLoopNote.id],
+        sourceId: fixture.records.verseSource.id,
+        noteIds: [fixture.records.verseNote.id],
       }),
     )
 
@@ -235,8 +235,8 @@ describe('ProjectSession command execution', () => {
 
   it('removes multiple Notes in one Commit and one reversible History step', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
-    const noteIds = [fixture.records.nonLoopNote.id, fixture.records.nonLoopHarmonyNote.id]
+    const sourceId = fixture.records.verseSource.id
+    const noteIds = [fixture.records.verseNote.id, fixture.records.verseHarmonyNote.id]
     const result = session.execute(
       createRemoveNotesCommand({
         baseRevision: session.modelRevision,
@@ -274,8 +274,8 @@ describe('ProjectSession command execution', () => {
 
   it('rejects a missing multi-Note target before removing any Note', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const sourceId = fixture.records.nonLoopSource.id
-    const existingNoteId = fixture.records.nonLoopNote.id
+    const sourceId = fixture.records.verseSource.id
+    const existingNoteId = fixture.records.verseNote.id
     const missingNoteId = parseNoteId('note-session-remove-many-missing')
 
     expect(() =>
@@ -292,16 +292,16 @@ describe('ProjectSession command execution', () => {
       }),
     )
     expect(session.modelRevision).toBe(0)
-    expect(store.getMidiNote(sourceId, existingNoteId)).toBe(fixture.records.nonLoopNote)
+    expect(store.getMidiNote(sourceId, existingNoteId)).toBe(fixture.records.verseNote)
   })
 
   it('returns a frozen no-change result without writing or advancing revision', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
     const result = session.execute(
       createMoveNotesCommand({
         baseRevision: session.modelRevision,
-        sourceId: fixture.records.nonLoopSource.id,
+        sourceId: fixture.records.verseSource.id,
         noteIds: [before.id],
         deltaTick: parseTickDelta(0),
         deltaPitch: parseMidiPitchDelta(0),
@@ -315,15 +315,15 @@ describe('ProjectSession command execution', () => {
     })
     expect(Object.isFrozen(result)).toBe(true)
     expect(session.modelRevision).toBe(0)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
   })
 
   it('propagates stale Command errors without changing model state', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
     const command = createRemoveNotesCommand({
       baseRevision: 1 as ModelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       noteIds: [before.id],
     })
 
@@ -331,15 +331,15 @@ describe('ProjectSession command execution', () => {
       expect.objectContaining<Partial<ProjectCommandError>>({ code: 'base-revision-mismatch' }),
     )
     expect(session.modelRevision).toBe(0)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
   })
 
   it('propagates range rejection before any authoritative write', () => {
     const { fixture, store, session } = createFixtureProjectSession()
-    const before = fixture.records.nonLoopNote
+    const before = fixture.records.verseNote
     const command = createMoveNotesCommand({
       baseRevision: session.modelRevision,
-      sourceId: fixture.records.nonLoopSource.id,
+      sourceId: fixture.records.verseSource.id,
       noteIds: [before.id],
       deltaTick: parseTickDelta(1_440),
       deltaPitch: parseMidiPitchDelta(0),
@@ -349,7 +349,7 @@ describe('ProjectSession command execution', () => {
       expect.objectContaining<Partial<ProjectCommandError>>({ code: 'note-out-of-source-range' }),
     )
     expect(session.modelRevision).toBe(0)
-    expect(store.getMidiNote(fixture.records.nonLoopSource.id, before.id)).toBe(before)
+    expect(store.getMidiNote(fixture.records.verseSource.id, before.id)).toBe(before)
   })
 
   it('cannot create a second Session writer for the same ModelStore', () => {

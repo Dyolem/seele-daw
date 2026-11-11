@@ -47,9 +47,8 @@ const { handleScroll, handleWheel } = useClipHeaderScroll({
         :aria-label="`Use ${region.clip.name} as the Active Clip`"
         :aria-pressed="props.activeClipId === region.clip.clipId"
         :data-active="props.activeClipId === region.clip.clipId"
-        :data-status="region.clip.status"
         :data-clip-id="region.clip.clipId"
-        :title="`${region.clip.name} · ${region.clip.startTick}–${region.clip.endTick} ticks${region.clip.status === 'unsupported' ? ' · Loop editing unavailable' : ''}`"
+        :title="`${region.clip.name} · ${region.clip.startTick}–${region.clip.endTick} ticks`"
         :style="[
           region.style,
           {
@@ -102,9 +101,6 @@ const { handleScroll, handleWheel } = useClipHeaderScroll({
   border-color: var(--piano-roll-clip-color);
   box-shadow: inset 0 2px var(--piano-roll-clip-color);
   background: color-mix(in srgb, var(--piano-roll-clip-color) 32%, var(--sd-color-surface-panel));
-}
-.piano-roll-clip-headers__clip[data-status='unsupported'] {
-  border-style: dashed;
 }
 .piano-roll-clip-headers__clip:focus-visible {
   outline: 2px solid var(--sd-color-border-focus);

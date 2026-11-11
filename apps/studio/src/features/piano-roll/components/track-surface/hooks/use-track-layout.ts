@@ -3,7 +3,7 @@ import { createPianoRollTimelineViewport } from '@seele-daw/editor'
 import { ZERO_TICK, parseTick, type Tick } from '@seele-daw/project-core'
 import type { PianoRollSurfaceGeometry } from '@/features/piano-roll/types/piano-roll-pitch-viewport'
 import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/workbench/timeline/scale'
-import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import {
   CLIP_HEADER_ROW_HEIGHT,
   CLIP_HEADER_MAXIMUM_VISIBLE_ROWS,
@@ -20,7 +20,7 @@ export function useTrackLayout({
   getRenderWindow,
 }: {
   readonly getGeometry: () => PianoRollSurfaceGeometry | null
-  readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
+  readonly getPresentation: () => ProjectPianoRollTrackPresentation
   readonly getTimelineEndTick: () => Tick
   readonly getBarSpanTick: () => Tick
   readonly getRenderWindow: () => TrackRenderWindow | null

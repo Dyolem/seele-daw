@@ -64,7 +64,7 @@ export interface AddFixtureSustainPedalEventInput {
   readonly value: MidiControlValue
 }
 
-/** Creates one public-API Project graph with a non-looped, offset MIDI Clip. */
+/** Creates one public-API Project graph with an offset MIDI Clip. */
 export function createPianoRollProjectFixture() {
   const projectId = parseProjectId('editor-piano-roll-project')
   const trackId = parseTrackId('editor-piano-roll-track')
@@ -115,7 +115,6 @@ export function createPianoRollProjectFixture() {
       sourceId,
       sourceLengthTick: parseTick(3_840),
       sourceOffsetTick: parseTick(480),
-      loop: null,
     }),
   )
 

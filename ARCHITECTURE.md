@@ -171,7 +171,8 @@ category, keywords, keys, resolve })`。ID 类型、目录、默认键位和设�
 
 ## 6. 检查
 
-`pnpm check` 依次运行 lint（含架构规则）、type-check、全部测试和构建。各包可以单独运行
+`pnpm check` 依次运行 lint（含架构规则）、type-check、全部测试和构建；CI
+（`.github/workflows/check.yml`）在每次推送和 Pull Request 时运行它。各包可以单独运行
 `pnpm --filter @seele-daw/<package> test:run`。project-core 的提交成本基准：
 `pnpm --filter @seele-daw/project-core bench`。
 
@@ -183,8 +184,6 @@ category, keywords, keys, resolve })`。ID 类型、目录、默认键位和设�
 - **播放管线只为采样音源而写。** 编译器按类型 ID 认出唯一的设备，端口的 `schedule` 只接收采样
   Voice，Track 的 Gain 与 Pan 在排程时乘进每个 Voice。接入第二种设备、效果器或实时混音之前，
   先做 Device Definition 与常驻通道图，不要在编译器里再加一个类型分支。
-- **模型里有三处空转。** Audio Track、效果链与 Clip Loop 有记录和不变量，但没有界面创建，播放
-  把它们报告为不支持。不要在它们之上继续搭功能，等对应阶段重新设计。
 - **编排的几何在 Studio 里。** 时间轴的刻度与滚动换算在 `workbench/timeline/`，Arrangement 与
   Tempo Lane 的其余几何写在 feature 的组件和 hook 中。新的时间轴几何、命中与拖拽操作写进
   `packages/editor` 的 `common/`。

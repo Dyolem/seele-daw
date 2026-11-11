@@ -31,7 +31,6 @@ import ProjectPianoRollTrackSurface from '@/features/piano-roll/components/track
 import { createTestProjectWorkspace } from '@/features/project-workspace/__tests__/support/project-workspace-test-support'
 import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/workbench-shell/ProjectWorkbenchContextEditorDock.vue'
 import { usePianoRollPreferencesStore } from '@/features/piano-roll/state/piano-roll-preferences-store'
-import { PROJECT_PIANO_ROLL_PRESENTATION_STATUS } from '@/features/piano-roll/types/piano-roll-presentation'
 import {
   createProjectPianoRollTrackPresentation,
   createProjectPianoRollPresentation,
@@ -266,7 +265,7 @@ function createSurfaceFixture(linkedClipStarts: readonly number[] = []) {
     track.trackId,
     clip.clipId,
   )
-  if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+  if (presentation === null) {
     throw new Error('Expected a ready Track Piano Roll presentation')
   }
 
@@ -416,8 +415,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       clip.clipId,
     )
-    if (longPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected Track')
+    if (longPresentation === null) throw new Error('Expected Track')
     await wrapper.setProps({ presentation: longPresentation })
     const revision = session.modelRevision
     const canvas = wrapper.get<HTMLCanvasElement>('canvas').element
@@ -524,8 +522,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       selection.selectedClipId,
     )
-    if (active?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected presentation')
+    if (active === null) throw new Error('Expected presentation')
     await wrapper.setProps({ presentation: active })
     expect(
       wrapper.findAll('.sd-piano-roll-dom-note').at(-1)?.attributes('data-piano-roll-clip-id'),
@@ -603,8 +600,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       clip.clipId,
     )
-    if (initial?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected presentation')
+    if (initial === null) throw new Error('Expected presentation')
     await wrapper.setProps({ presentation: initial })
     await wrapper.get(`button[data-clip-id="${overlapping.clipId}"]`).trigger('click')
     expect(session.modelRevision).toBe(before.modelRevision)
@@ -614,8 +610,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       selection.selectedClipId,
     )
-    if (active?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected presentation')
+    if (active === null) throw new Error('Expected presentation')
     await wrapper.setProps({ presentation: active })
     const host = wrapper.get('.project-piano-roll-track__canvas-host').element
     dispatchPointer(host, 'pointerdown', { clientX: 10, clientY: 125 })
@@ -703,8 +698,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       fixture.session.getSnapshot(),
       fixture.clip.clipId,
     )
-    if (clipPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected Clip presentation')
+    if (clipPresentation === null) throw new Error('Expected Clip presentation')
     const { runtime } = fixture.keyboard
     let previous = fixture.wrapper
     ;(previous.get('.project-piano-roll-track').element as HTMLElement).focus()
@@ -773,8 +767,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       session.getSnapshot(),
       fixture.clip.clipId,
     )
-    if (clipPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected Clip presentation')
+    if (clipPresentation === null) throw new Error('Expected Clip presentation')
     const oldHost = wrapper.get('.project-piano-roll-track__canvas-host').element
     const revision = session.modelRevision
     dispatchPointer(oldHost, 'pointerdown', { clientX: 10, clientY: 125 })
@@ -891,8 +884,7 @@ describe('ProjectPianoRollTrackSurface', () => {
           fixture.presentation.trackId,
           null,
         )
-        if (presentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-          throw new Error('Expected Track presentation')
+        if (presentation === null) throw new Error('Expected Track presentation')
         await wrapper.setProps({ presentation })
       }
       if (change === 'session') {
@@ -1078,7 +1070,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       clip.clipId,
     )
-    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (refreshed === null) {
       throw new Error('Expected a refreshed Track Piano Roll presentation')
     }
     await wrapper.setProps({ presentation: refreshed })
@@ -1103,7 +1095,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       clip.clipId,
     )
-    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (refreshed === null) {
       throw new Error('Expected a refreshed Track Sustain Pedal presentation')
     }
     await wrapper.setProps({ presentation: refreshed })
@@ -1160,8 +1152,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       clip.clipId,
     )
-    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected Track presentation')
+    if (refreshed === null) throw new Error('Expected Track presentation')
     await wrapper.setProps({ presentation: refreshed })
     const marker = wrapper.get(`[data-piano-roll-sustain-pedal-event-id="${event.eventId}"]`)
     const revision = session.modelRevision
@@ -1198,8 +1189,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       clip.clipId,
     )
-    if (refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected Track presentation')
+    if (refreshed === null) throw new Error('Expected Track presentation')
     await wrapper.setProps({ presentation: refreshed })
     const active = wrapper.get(`[data-piano-roll-clip-id="${clip.clipId}"]`)
     const inactive = wrapper.get(`[data-piano-roll-clip-id="${laterClip.clipId}"]`)
@@ -1221,8 +1211,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       null,
     )
-    if (withoutActiveClip?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY)
-      throw new Error('Expected Track presentation')
+    if (withoutActiveClip === null) throw new Error('Expected Track presentation')
     await wrapper.setProps({ presentation: withoutActiveClip })
     await staleDelete.trigger('click')
     await flushPromises()
@@ -1251,11 +1240,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       clip.clipId,
     )
     const clipPresentation = createProjectPianoRollPresentation(session.getSnapshot(), clip.clipId)
-    if (
-      refreshed?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY ||
-      clipPresentation?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY
-    )
-      throw new Error('Expected editable scopes')
+    if (refreshed === null || clipPresentation === null) throw new Error('Expected editable scopes')
     await wrapper.setProps({ presentation: refreshed })
     const marker = wrapper.get('[data-piano-roll-sustain-pedal-event-id]')
     await requestPianoRollContextMenu(marker.element)
@@ -1294,7 +1279,7 @@ describe('ProjectPianoRollTrackSurface', () => {
       presentation.trackId,
       null,
     )
-    if (withoutActiveClip?.status !== PROJECT_PIANO_ROLL_PRESENTATION_STATUS.READY) {
+    if (withoutActiveClip === null) {
       throw new Error('Expected a Track Piano Roll presentation without an Active Clip')
     }
     await wrapper.setProps({ presentation: withoutActiveClip })

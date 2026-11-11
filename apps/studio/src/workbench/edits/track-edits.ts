@@ -31,13 +31,11 @@ export interface AddedTrack {
 
 export function createTrackEdits(context: ProjectEditContext) {
   return {
-    /** Appends a Studio Grand Instrument Track named after its position among Instrument Tracks. */
+    /** Appends a Studio Grand Instrument Track named after its position among the Tracks. */
     addInstrumentTrack(): AddedTrack {
       const session = requireEditSession(context)
       const snapshot = session.getSnapshot()
-      const instrumentTrackCount = snapshot.tracks.filter(
-        ({ kind }) => kind === 'instrument',
-      ).length
+      const instrumentTrackCount = snapshot.tracks.length
       const lastTrack = snapshot.tracks.find(({ id }) => id === snapshot.trackOrder.at(-1))
       const color = selectProjectTrackColor(context.random(), lastTrack?.color ?? null)
       const trackId = parseTrackId(context.createId())
@@ -73,9 +71,6 @@ export function createTrackEdits(context: ProjectEditContext) {
       }
       const track = session.getSnapshot().tracks.find(({ id }) => id === trackId)
       if (track === undefined) throw staleEdit()
-      if (track.kind !== 'instrument') {
-        throw new ProjectEditError('unsupported', 'Only Instrument Tracks have an instrument.')
-      }
       return executeEdit(
         session,
         createReplaceInstrumentDeviceCommand({

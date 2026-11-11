@@ -221,7 +221,7 @@ function sourceLengthChange(draft: Draft, generator: Generator): ProjectChange |
 
 function clipWindowChange(draft: Draft, generator: Generator): ProjectChange | null {
   const before = generator.pick([...draft.tables.clips!.values()]) as ClipRecord | undefined
-  if (before === undefined || before.loop !== null) return null
+  if (before === undefined) return null
   const after = createMidiClipRecord({
     ...before,
     sourceOffsetTick: parseTick(generator.integer(0, 16) * 60),
@@ -269,7 +269,6 @@ function sourceInsertion(draft: Draft, generator: Generator): ProjectChange[] {
         spanTick: parseTick(960),
         sourceId,
         sourceOffsetTick: parseTick(0),
-        loop: null,
       }),
     })
   }

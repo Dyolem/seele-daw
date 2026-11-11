@@ -19,13 +19,6 @@ function requireInstrumentTrack(
     throw new ProjectCommandError('track-not-found', `Track ${command.trackId} does not exist`)
   }
 
-  if (track.kind !== 'instrument') {
-    throw new ProjectCommandError(
-      'instrument-device-track-kind-mismatch',
-      `Track ${command.trackId} is ${track.kind}, not instrument`,
-    )
-  }
-
   return track
 }
 

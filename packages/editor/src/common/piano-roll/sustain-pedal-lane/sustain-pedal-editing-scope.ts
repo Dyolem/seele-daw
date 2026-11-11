@@ -14,7 +14,6 @@ import type {
   PianoRollSustainPedalLaneEventProjection,
   PianoRollTrackSustainPedalLaneReadModel,
 } from '#internal/common/piano-roll/sustain-pedal-lane/sustain-pedal-lane-read-model'
-import { PIANO_ROLL_TRACK_CLIP_STATUS } from '#internal/common/piano-roll/track/clip-projection'
 
 export interface PianoRollSustainPedalEditingScope {
   readonly channel: MidiChannel
@@ -75,9 +74,7 @@ function resolveTrackEditingScope(
   if (readModel.activeClipId === null) return null
 
   const activeClip = readModel.clips.find(({ clip }) => clip.clipId === readModel.activeClipId)
-  if (activeClip === undefined || activeClip.clip.status !== PIANO_ROLL_TRACK_CLIP_STATUS.READY) {
-    return null
-  }
+  if (activeClip === undefined) return null
 
   return createEditingScope({
     channel: readModel.channel,
@@ -90,7 +87,7 @@ function resolveTrackEditingScope(
   })
 }
 
-/** Resolves the one non-looped Clip whose CC64 facts an Editor gesture may mutate. */
+/** Resolves the one Clip whose CC64 facts an Editor gesture may mutate. */
 export function resolvePianoRollSustainPedalEditingScope(
   input: ResolvePianoRollSustainPedalEditingScopeInput,
 ): PianoRollSustainPedalEditingScope | null {

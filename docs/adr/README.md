@@ -22,3 +22,4 @@ Revisit Trigger。决定被推翻时，把状态改为 Superseded 并链接到�
 | [009](./ADR-009-playback-plans-keep-spans-by-clip.md)          | 播放计划只按 Clip 保存音符                              |
 | [010](./ADR-010-edits-inside-a-clip-reuse-untouched-notes.md)  | Clip 内的编辑沿用没变的音符                             |
 | [011](./ADR-011-listener-errors-are-reported-not-delivered.md) | 订阅者抛错时只报告，不回送                              |
+| [012](./ADR-012-model-holds-only-what-the-product-creates.md)  | 模型只保留产品会创建的概念                              |

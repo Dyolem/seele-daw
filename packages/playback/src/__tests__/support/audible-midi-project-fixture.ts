@@ -77,18 +77,14 @@ export function createAudibleMidiProjectFixture() {
     name: 'Piano',
     color: null,
     channel: createCompilerFixtureChannel(0.8, -0.25),
-    midiEffectIds: [],
     instrumentDeviceId: pianoDevice.id,
-    audioEffectIds: [],
   })
   const alternateTrack = createInstrumentTrackRecord({
     id: parseTrackId('track-fixture-alternate'),
     name: 'Alternate Sample Instrument',
     color: null,
     channel: createCompilerFixtureChannel(0.6, 0.25),
-    midiEffectIds: [],
     instrumentDeviceId: alternateDevice.id,
-    audioEffectIds: [],
   })
 
   const pianoSource = createMidiSourceRecord({
@@ -109,7 +105,6 @@ export function createAudibleMidiProjectFixture() {
     spanTick: parseTick(960),
     sourceId: pianoSource.id,
     sourceOffsetTick: parseTick(240),
-    loop: null,
   })
   const alternateClip = createMidiClipRecord({
     id: parseClipId('clip-fixture-alternate'),
@@ -121,7 +116,6 @@ export function createAudibleMidiProjectFixture() {
     spanTick: parseTick(960),
     sourceId: alternateSource.id,
     sourceOffsetTick: parseTick(0),
-    loop: null,
   })
 
   const pianoNotes = Object.freeze([

@@ -7,7 +7,7 @@ import {
   type PianoRollTimelineViewport,
 } from '@seele-daw/editor'
 import { parseTick, type Tick } from '@seele-daw/project-core'
-import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
+import type { ProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import type { TrackPlacementPreview } from '@/features/piano-roll/components/track-surface/types/track-placement'
 
 /** Projects the active or hover preview without owning its lifetime. */
@@ -20,7 +20,7 @@ export function useTrackPlacementPreview({
 }: {
   readonly placementPreview: Readonly<ShallowRef<TrackPlacementPreview | null>>
   readonly getViewport: () => PianoRollTimelineViewport | null
-  readonly getPresentation: () => ReadyProjectPianoRollTrackPresentation
+  readonly getPresentation: () => ProjectPianoRollTrackPresentation
   readonly getTimelineEndTick: () => Tick
   readonly getBarSpanTick: () => Tick
 }) {

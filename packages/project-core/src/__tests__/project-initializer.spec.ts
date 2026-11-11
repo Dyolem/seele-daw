@@ -58,7 +58,6 @@ describe('createInitialModelStore', () => {
     expect(store.master).toEqual({
       gain: 1,
       muted: false,
-      audioEffectIds: [],
     })
     expect([...store.orderedTrackIds()]).toEqual([])
     expect([...store.trackEntries()]).toEqual([])

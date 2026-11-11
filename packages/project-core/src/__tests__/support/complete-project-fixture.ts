@@ -1,6 +1,5 @@
 import {
   DEVICE_DEFINITION_VERSION_MIN,
-  createAudioTrackRecord,
   createDeviceDescriptor,
   createInstrumentTrackRecord,
   createMasterChannelRecord,
@@ -80,132 +79,110 @@ export function createCompleteProjectFixture() {
     name: 'Complete Project Fixture',
   })
 
-  const midiEffectDevice = createFixtureDevice(
-    'device-instrument-midi-effect',
-    'seele.fixture.midi-effect',
-  )
   const instrumentDevice = createFixtureDevice('device-instrument', 'seele.fixture.instrument')
-  const instrumentAudioEffectDevice = createFixtureDevice(
-    'device-instrument-audio-effect',
-    'seele.fixture.audio-effect',
-  )
-  const audioTrackAudioEffectDevice = createFixtureDevice(
-    'device-audio-track-effect',
-    'seele.fixture.audio-effect',
-  )
-  const masterAudioEffectDevice = createFixtureDevice(
-    'device-master-effect',
-    'seele.fixture.audio-effect',
-  )
+  const bassDevice = createFixtureDevice('device-bass', 'seele.fixture.instrument')
 
   const instrumentTrack = createInstrumentTrackRecord({
     id: parseTrackId('track-instrument'),
     name: 'Fixture Instrument',
     color: null,
     channel: createChannelInput(0.8, -0.1),
-    midiEffectIds: [midiEffectDevice.id],
     instrumentDeviceId: instrumentDevice.id,
-    audioEffectIds: [instrumentAudioEffectDevice.id],
   })
-  const audioTrack = createAudioTrackRecord({
-    id: parseTrackId('track-audio'),
-    name: 'Fixture Audio',
+  const bassTrack = createInstrumentTrackRecord({
+    id: parseTrackId('track-bass'),
+    name: 'Fixture Bass',
     color: null,
     channel: createChannelInput(0.9, 0.1),
-    audioEffectIds: [audioTrackAudioEffectDevice.id],
+    instrumentDeviceId: bassDevice.id,
   })
 
-  const nonLoopSource = createMidiSourceRecord({
-    id: parseMidiSourceId('source-non-loop'),
+  const verseSource = createMidiSourceRecord({
+    id: parseMidiSourceId('source-verse'),
     lengthTick: parseTick(1_920),
   })
-  const loopingSource = createMidiSourceRecord({
-    id: parseMidiSourceId('source-looping'),
-    lengthTick: parseTick(1_920),
+  const chorusSource = createMidiSourceRecord({
+    id: parseMidiSourceId('source-chorus'),
+    lengthTick: parseTick(4_080),
   })
-  const nonLoopNote = createMidiNoteRecord({
-    id: parseNoteId('note-non-loop-primary'),
+  const verseNote = createMidiNoteRecord({
+    id: parseNoteId('note-verse-primary'),
     startTick: parseTick(240),
     durationTick: parseTick(480),
     pitch: parseMidiPitch(60),
     velocity: parseMidiVelocity(100),
     channel: parseMidiChannel(0),
   })
-  const nonLoopHarmonyNote = createMidiNoteRecord({
-    id: parseNoteId('note-non-loop-harmony'),
+  const verseHarmonyNote = createMidiNoteRecord({
+    id: parseNoteId('note-verse-harmony'),
     startTick: parseTick(720),
     durationTick: parseTick(240),
     pitch: parseMidiPitch(64),
     velocity: parseMidiVelocity(96),
     channel: parseMidiChannel(0),
   })
-  const loopingNote = createMidiNoteRecord({
-    id: parseNoteId('note-looping-primary'),
+  const chorusNote = createMidiNoteRecord({
+    id: parseNoteId('note-chorus-primary'),
     startTick: parseTick(0),
     durationTick: parseTick(480),
     pitch: parseMidiPitch(67),
     velocity: parseMidiVelocity(108),
     channel: parseMidiChannel(1),
   })
-  const loopingHarmonyNote = createMidiNoteRecord({
-    id: parseNoteId('note-looping-harmony'),
+  const chorusHarmonyNote = createMidiNoteRecord({
+    id: parseNoteId('note-chorus-harmony'),
     startTick: parseTick(480),
     durationTick: parseTick(480),
     pitch: parseMidiPitch(71),
     velocity: parseMidiVelocity(92),
     channel: parseMidiChannel(1),
   })
-  const nonLoopPedalDown = createMidiSustainPedalEventRecord({
-    id: parseMidiSustainPedalEventId('sustain-non-loop-down'),
+  const versePedalDown = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-verse-down'),
     tick: parseTick(360),
     value: parseMidiControlValue(127),
     channel: parseMidiChannel(0),
   })
-  const nonLoopPedalUp = createMidiSustainPedalEventRecord({
-    id: parseMidiSustainPedalEventId('sustain-non-loop-up'),
+  const versePedalUp = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-verse-up'),
     tick: parseTick(900),
     value: parseMidiControlValue(0),
     channel: parseMidiChannel(0),
   })
-  const loopingPedalDown = createMidiSustainPedalEventRecord({
-    id: parseMidiSustainPedalEventId('sustain-looping-down'),
+  const chorusPedalDown = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-chorus-down'),
     tick: parseTick(120),
     value: parseMidiControlValue(100),
     channel: parseMidiChannel(1),
   })
-  const loopingPedalUp = createMidiSustainPedalEventRecord({
-    id: parseMidiSustainPedalEventId('sustain-looping-up'),
+  const chorusPedalUp = createMidiSustainPedalEventRecord({
+    id: parseMidiSustainPedalEventId('sustain-chorus-up'),
     tick: parseTick(840),
     value: parseMidiControlValue(32),
     channel: parseMidiChannel(1),
   })
 
-  const nonLoopClip = createMidiClipRecord({
-    id: parseClipId('clip-non-loop'),
+  const verseClip = createMidiClipRecord({
+    id: parseClipId('clip-verse'),
     trackId: instrumentTrack.id,
     name: 'Fixture Verse',
     color: null,
     muted: false,
     startTick: parseTick(0),
     spanTick: parseTick(960),
-    sourceId: nonLoopSource.id,
+    sourceId: verseSource.id,
     sourceOffsetTick: parseTick(240),
-    loop: null,
   })
-  const loopingClip = createMidiClipRecord({
-    id: parseClipId('clip-looping'),
+  const chorusClip = createMidiClipRecord({
+    id: parseClipId('clip-chorus'),
     trackId: instrumentTrack.id,
-    name: 'Fixture Loop',
+    name: 'Fixture Chorus',
     color: null,
     muted: false,
     startTick: parseTick(1_920),
     spanTick: parseTick(3_840),
-    sourceId: loopingSource.id,
+    sourceId: chorusSource.id,
     sourceOffsetTick: parseTick(240),
-    loop: {
-      sourceStartTick: parseTick(0),
-      sourceSpanTick: parseTick(960),
-    },
   })
 
   const initialTempoEvent = createTempoEventRecord({
@@ -233,54 +210,53 @@ export function createCompleteProjectFixture() {
   const master = createMasterChannelRecord({
     gain: parseLinearGain(1),
     muted: false,
-    audioEffectIds: [masterAudioEffectDevice.id],
   })
 
-  const trackOrder = [instrumentTrack.id, audioTrack.id]
+  const trackOrder = [instrumentTrack.id, bassTrack.id]
   const tracks = new Map<TrackId, TrackRecord>([
     [instrumentTrack.id, instrumentTrack],
-    [audioTrack.id, audioTrack],
+    [bassTrack.id, bassTrack],
   ])
   const clips = new Map<ClipId, ClipRecord>([
-    [nonLoopClip.id, nonLoopClip],
-    [loopingClip.id, loopingClip],
+    [verseClip.id, verseClip],
+    [chorusClip.id, chorusClip],
   ])
   const midiSources = new Map<MidiSourceId, MidiSourceRecord>([
-    [nonLoopSource.id, nonLoopSource],
-    [loopingSource.id, loopingSource],
+    [verseSource.id, verseSource],
+    [chorusSource.id, chorusSource],
   ])
-  const nonLoopNotePartition = new Map<NoteId, MidiNoteRecord>([
-    [nonLoopNote.id, nonLoopNote],
-    [nonLoopHarmonyNote.id, nonLoopHarmonyNote],
+  const verseNotePartition = new Map<NoteId, MidiNoteRecord>([
+    [verseNote.id, verseNote],
+    [verseHarmonyNote.id, verseHarmonyNote],
   ])
-  const loopingNotePartition = new Map<NoteId, MidiNoteRecord>([
-    [loopingNote.id, loopingNote],
-    [loopingHarmonyNote.id, loopingHarmonyNote],
+  const chorusNotePartition = new Map<NoteId, MidiNoteRecord>([
+    [chorusNote.id, chorusNote],
+    [chorusHarmonyNote.id, chorusHarmonyNote],
   ])
   const midiNotes = new Map<MidiSourceId, Map<NoteId, MidiNoteRecord>>([
-    [nonLoopSource.id, nonLoopNotePartition],
-    [loopingSource.id, loopingNotePartition],
+    [verseSource.id, verseNotePartition],
+    [chorusSource.id, chorusNotePartition],
   ])
-  const nonLoopSustainPedalEventPartition = new Map<
+  const verseSustainPedalEventPartition = new Map<
     MidiSustainPedalEventId,
     MidiSustainPedalEventRecord
   >([
-    [nonLoopPedalDown.id, nonLoopPedalDown],
-    [nonLoopPedalUp.id, nonLoopPedalUp],
+    [versePedalDown.id, versePedalDown],
+    [versePedalUp.id, versePedalUp],
   ])
-  const loopingSustainPedalEventPartition = new Map<
+  const chorusSustainPedalEventPartition = new Map<
     MidiSustainPedalEventId,
     MidiSustainPedalEventRecord
   >([
-    [loopingPedalDown.id, loopingPedalDown],
-    [loopingPedalUp.id, loopingPedalUp],
+    [chorusPedalDown.id, chorusPedalDown],
+    [chorusPedalUp.id, chorusPedalUp],
   ])
   const midiSustainPedalEvents = new Map<
     MidiSourceId,
     Map<MidiSustainPedalEventId, MidiSustainPedalEventRecord>
   >([
-    [nonLoopSource.id, nonLoopSustainPedalEventPartition],
-    [loopingSource.id, loopingSustainPedalEventPartition],
+    [verseSource.id, verseSustainPedalEventPartition],
+    [chorusSource.id, chorusSustainPedalEventPartition],
   ])
   const tempoEvents = new Map<TempoEventId, TempoEventRecord>([
     [initialTempoEvent.id, initialTempoEvent],
@@ -291,11 +267,8 @@ export function createCompleteProjectFixture() {
     [laterTimeSignatureEvent.id, laterTimeSignatureEvent],
   ])
   const devices = new Map<DeviceId, DeviceDescriptor>([
-    [midiEffectDevice.id, midiEffectDevice],
     [instrumentDevice.id, instrumentDevice],
-    [instrumentAudioEffectDevice.id, instrumentAudioEffectDevice],
-    [audioTrackAudioEffectDevice.id, audioTrackAudioEffectDevice],
-    [masterAudioEffectDevice.id, masterAudioEffectDevice],
+    [bassDevice.id, bassDevice],
   ])
 
   const seed = {
@@ -317,28 +290,25 @@ export function createCompleteProjectFixture() {
     records: {
       project,
       instrumentTrack,
-      audioTrack,
-      nonLoopClip,
-      loopingClip,
-      nonLoopSource,
-      loopingSource,
-      nonLoopNote,
-      nonLoopHarmonyNote,
-      loopingNote,
-      loopingHarmonyNote,
-      nonLoopPedalDown,
-      nonLoopPedalUp,
-      loopingPedalDown,
-      loopingPedalUp,
+      bassTrack,
+      verseClip,
+      chorusClip,
+      verseSource,
+      chorusSource,
+      verseNote,
+      verseHarmonyNote,
+      chorusNote,
+      chorusHarmonyNote,
+      versePedalDown,
+      versePedalUp,
+      chorusPedalDown,
+      chorusPedalUp,
       initialTempoEvent,
       laterTempoEvent,
       initialTimeSignatureEvent,
       laterTimeSignatureEvent,
-      midiEffectDevice,
       instrumentDevice,
-      instrumentAudioEffectDevice,
-      audioTrackAudioEffectDevice,
-      masterAudioEffectDevice,
+      bassDevice,
       master,
     },
     containers: {
@@ -346,11 +316,11 @@ export function createCompleteProjectFixture() {
       tracks,
       clips,
       midiSources,
-      nonLoopNotePartition,
-      loopingNotePartition,
+      verseNotePartition,
+      chorusNotePartition,
       midiNotes,
-      nonLoopSustainPedalEventPartition,
-      loopingSustainPedalEventPartition,
+      verseSustainPedalEventPartition,
+      chorusSustainPedalEventPartition,
       midiSustainPedalEvents,
       tempoEvents,
       timeSignatureEvents,

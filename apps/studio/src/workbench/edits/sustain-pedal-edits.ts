@@ -75,22 +75,16 @@ export interface PlacedSustainPedalEvent {
   readonly eventId: MidiSustainPedalEventId
 }
 
-function unloopedClip(snapshot: ProjectSnapshot, clipId: ClipId): MidiClipRecord {
+function requireClip(snapshot: ProjectSnapshot, clipId: ClipId): MidiClipRecord {
   const clip = snapshot.clips.find((candidate) => candidate.id === clipId)
   if (clip === undefined) throw staleEdit()
-  if (clip.loop !== null) {
-    throw new ProjectEditError(
-      'unsupported',
-      'Sustain Pedal events in looped Clips cannot be edited yet.',
-    )
-  }
   return clip
 }
 
-/** The window of an unlooped Clip over its MidiSource. */
+/** The window of a Clip over its MidiSource. */
 function clipWindow(snapshot: ProjectSnapshot, clip: MidiClipRecord): PianoRollClipContext {
   const source = snapshot.midiSources.find(({ id }) => id === clip.sourceId)!
-  return createPianoRollClipContext(clip, source)!
+  return createPianoRollClipContext(clip, source)
 }
 
 /** An event may sit on either end of its Clip, never outside it. */
@@ -128,7 +122,7 @@ export function createSustainPedalEdits(context: Omit<ProjectEditContext, 'rando
 
   function eventTarget(input: EventEditTarget) {
     const session = requireEditSession(context, input)
-    return { clip: unloopedClip(session.getSnapshot(), input.clipId), session }
+    return { clip: requireClip(session.getSnapshot(), input.clipId), session }
   }
 
   return {
@@ -151,7 +145,7 @@ export function createSustainPedalEdits(context: Omit<ProjectEditContext, 'rando
         )
       }
       const snapshot = session.getSnapshot()
-      const clip = unloopedClip(snapshot, input.activeClipId)
+      const clip = requireClip(snapshot, input.activeClipId)
       if (clip.trackId !== input.trackId) throw staleEdit()
       return place(session, clip, {
         channel: input.channel,

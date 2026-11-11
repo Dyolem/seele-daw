@@ -7,7 +7,7 @@ import {
   validateStudioKeyboardBinding,
 } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
-import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
+import { STUDIO_ACTIONS } from '@/bootstrap/studio-actions'
 
 afterEach(() => {
   HotkeyManager.resetInstance()

@@ -10,8 +10,8 @@ import {
   type StudioActionPresentation,
   type StudioActionSource,
   type StudioActionState,
+  type StudioActionId,
 } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import type { StudioContextRegistry } from '@/workbench/actions/studio-context-registry'
 
 export interface StudioActionCoordinator {

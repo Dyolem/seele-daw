@@ -1,9 +1,24 @@
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
 import {
   defineStudioKeyboardBinding,
   type StudioHotkey,
   type StudioKeyboardBinding,
 } from '@/workbench/keyboard'
+
+/**
+ * Every action ID, as a key. A module that declares actions adds its IDs by declaration merging,
+ * so neither this file nor the keyboard imports a feature; the composition root lists the
+ * declarations themselves.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- filled in by the declaring modules
+export interface StudioActionIds {}
+
+export type StudioActionId = keyof StudioActionIds & string
+
+/** The `StudioActionIds` entries of a list of declared actions. */
+export type StudioActionIdsOf<Actions extends readonly { readonly id: string }[]> = Record<
+  Actions[number]['id'],
+  true
+>
 
 export type StudioActionSource = 'keyboard' | 'menu' | 'toolbar' | 'context-menu'
 

@@ -2,6 +2,7 @@ import {
   defineStudioAction,
   defineStudioContext,
   type StudioActionCompletion,
+  type StudioActionIdsOf,
 } from '@/workbench/actions/studio-action'
 
 export interface ArrangementKeyboardTarget {
@@ -47,3 +48,7 @@ export const ARRANGEMENT_ACTIONS = [
     resolve: (bar) => ({ execute: () => bar.execute() }),
   }),
 ] as const
+
+declare module '@/workbench/actions/studio-action' {
+  interface StudioActionIds extends StudioActionIdsOf<typeof ARRANGEMENT_ACTIONS> {}
+}

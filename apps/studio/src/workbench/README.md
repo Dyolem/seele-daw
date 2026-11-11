@@ -11,6 +11,11 @@ Studio 的应用层：写项目的用例、用户动作与键盘、项目生命�
 | `keyboard/`   | 键位、输入分派、用户 Keymap 与录制，见 [Keyboard](./keyboard/README.md)              |
 | `project/`    | `ActiveProjectService`、项目入口、导航确认、MIDI 导入、播放适配                      |
 | `instrument/` | 内置音色目录与 MIDI 导入时的音色路由                                                 |
+| `timeline/`   | Arrangement 与 Piano Roll 共用的时间轴刻度、滚动换算与小节位置                       |
+
+`track-palette.ts` 是新建与导入 Track 共用的调色板。本层不导入 `features/`、`router/` 和
+`bootstrap/`；多个 feature 共用的状态与几何放在这里，例如 `project/` 下的工作台选择 Store 与
+路由位置。
 
 ## Edits
 
@@ -29,8 +34,9 @@ Keyboard → Input Router ───────┴→ StudioActionCoordinator �
 ```
 
 - 声明：所属 feature 用 `defineStudioAction` 一次写出 ID、文案、类别、检索词、上下文、默认
-  键位、是否重复触发，以及 `resolve(target)`。[studio-actions.ts](./actions/studio-actions.ts)
-  汇总全部声明，并从中推导 `StudioActionId`。
+  键位、是否重复触发，以及 `resolve(target)`。声明所在的文件用一段声明合并把自己的 ID 并进
+  `StudioActionIds`，`StudioActionId` 就是它的键，所以本层不必导入任何 feature；组合根的
+  [studio-actions.ts](../bootstrap/studio-actions.ts) 按目录顺序汇总全部声明。
 - 上下文：`defineStudioContext` 声明 `id`、`label`、`priority`，以及可选的 `overlaps` 与
   `ownsEnter`。视图挂载或聚焦时调用 `contexts.bind(context, target)`，返回的函数用于释放。
   重新绑定会让旧目标失效，旧视图延迟执行的释放不会解绑新目标。

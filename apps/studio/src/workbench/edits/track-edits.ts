@@ -18,7 +18,7 @@ import {
   staleEdit,
   type ProjectEditContext,
 } from '@/workbench/edits/edit-session'
-import { selectProjectTrackColor } from '@/workbench/edits/track-palette'
+import { selectProjectTrackColor } from '@/workbench/track-palette'
 import {
   DEFAULT_BUILT_IN_INSTRUMENT,
   findBuiltInInstrumentCatalogueEntry,

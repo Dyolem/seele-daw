@@ -1,4 +1,8 @@
-import { defineStudioAction, defineStudioContext } from '@/workbench/actions/studio-action'
+import {
+  defineStudioAction,
+  defineStudioContext,
+  type StudioActionIdsOf,
+} from '@/workbench/actions/studio-action'
 
 export interface StudioInterfaceActionTarget {
   showShortcuts(): void
@@ -35,3 +39,7 @@ export const INTERFACE_ACTIONS = [
     resolve: (shell) => ({ execute: () => shell.focusNotifications() }),
   }),
 ] as const
+
+declare module '@/workbench/actions/studio-action' {
+  interface StudioActionIds extends StudioActionIdsOf<typeof INTERFACE_ACTIONS> {}
+}

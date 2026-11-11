@@ -3,7 +3,10 @@ import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
 import ProjectEntryPage from '@/features/project-entry/ProjectEntryPage.vue'
 import ProjectCreationPage from '@/features/project-workspace/ProjectCreationPage.vue'
 import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
-import { PROJECT_ROUTE_NAME, PROJECT_ROUTE_NAVIGATION_KIND } from '@/router/project-routes'
+import {
+  PROJECT_ROUTE_NAME,
+  PROJECT_ROUTE_NAVIGATION_KIND,
+} from '@/workbench/project/navigation/project-routes'
 
 export function createStudioRouter(
   history: RouterHistory = createWebHistory(import.meta.env.BASE_URL),

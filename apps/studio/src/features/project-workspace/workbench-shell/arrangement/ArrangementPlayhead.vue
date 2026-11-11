@@ -2,8 +2,8 @@
 import type { Tick } from '@seele-daw/project-core'
 import { computed, type StyleValue } from 'vue'
 
-import { timelinePositionRatio } from '@/features/project-workspace/timeline/layout'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
+import { timelinePositionRatio } from '@/workbench/timeline/layout'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/workbench/timeline/scale'
 import { useStudio } from '@/workbench/studio-services'
 
 const props = defineProps<{

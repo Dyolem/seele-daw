@@ -20,7 +20,7 @@ import {
 } from 'vue'
 
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import { useProjectWorkspace } from '@/features/project-workspace/project-workspace'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
 import TempoTrackControl from '@/features/project-workspace/tempo-track/TempoTrackControl.vue'
@@ -28,7 +28,7 @@ import TempoTrackLane from '@/features/project-workspace/tempo-track/TempoTrackL
 import { useTempoSelection } from '@/features/project-workspace/tempo-track/hooks/use-tempo-selection'
 import { useTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
 import { describeProjectTempoAt } from '@/features/project-workspace/tempo-track/tempo-track'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/workbench/timeline/scale'
 import ProjectAddTrackMenu from '@/features/project-workspace/workbench-shell/ProjectAddTrackMenu.vue'
 import ProjectWorkbenchMidiClip from '@/features/project-workspace/workbench-shell/ProjectWorkbenchMidiClip.vue'
 import ProjectWorkbenchTrackRow from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTrackRow.vue'

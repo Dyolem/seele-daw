@@ -14,8 +14,7 @@ import UiSelect from '@/ui/components/UiSelect.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import KeyboardIcon from '~icons/fluent/keyboard-20-regular'
 import ArrowResetIcon from '~icons/fluent/arrow-reset-20-regular'
-import type { StudioActionDescriptor } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
 import type {
   StudioUserKeymapResult,
   StudioUserKeymapState,

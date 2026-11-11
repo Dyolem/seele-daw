@@ -1,6 +1,6 @@
 import { inject, type InjectionKey } from 'vue'
 
-import type { StudioActionRuntime } from '@/bootstrap/studio-action-runtime'
+import type { StudioActionRuntime } from '@/workbench/actions/studio-action-runtime'
 import type { ProjectEdits } from '@/workbench/edits/project-edits'
 import type { ProjectEntryCoordinator } from '@/workbench/project/entry/project-entry-coordinator'
 import type { ProjectMidiImportCoordinator } from '@/workbench/project/midi-import/project-midi-import-coordinator'

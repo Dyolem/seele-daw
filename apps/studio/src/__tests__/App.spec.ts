@@ -13,7 +13,10 @@ import { createMemoryHistory } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 import App from '@/App.vue'
 import { createStudioRouter } from '@/router'
-import { createProjectWorkspaceLocation, PROJECT_ROUTE_NAME } from '@/router/project-routes'
+import {
+  createProjectWorkspaceLocation,
+  PROJECT_ROUTE_NAME,
+} from '@/workbench/project/navigation/project-routes'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'

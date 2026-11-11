@@ -5,6 +5,7 @@ import {
   type StudioActionCompletion,
   type StudioActionState,
   type StudioContextReader,
+  type StudioActionIdsOf,
 } from '@/workbench/actions/studio-action'
 
 export interface StudioEditorSelectionTarget {
@@ -98,3 +99,7 @@ export const EDITOR_ACTIONS = [
     }),
   }),
 ] as const
+
+declare module '@/workbench/actions/studio-action' {
+  interface StudioActionIds extends StudioActionIdsOf<typeof EDITOR_ACTIONS> {}
+}

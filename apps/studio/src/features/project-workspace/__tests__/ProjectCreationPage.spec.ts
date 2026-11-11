@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 import ProjectCreationPage from '@/features/project-workspace/ProjectCreationPage.vue'
 import { createStudioRouter } from '@/router'
-import { PROJECT_ROUTE_NAME } from '@/router/project-routes'
+import { PROJECT_ROUTE_NAME } from '@/workbench/project/navigation/project-routes'
 import type { ActiveProjectService } from '@/workbench/project/active-project-service'
 import {
   ACTIVE_PROJECT_PHASE,

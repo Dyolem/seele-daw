@@ -22,6 +22,17 @@ export default defineConfigWithVueTs(
   vueTsConfigs.recommended,
 
   {
+    name: 'app/declaration-merging',
+    rules: {
+      // A module adds the IDs it declares to an open interface, e.g. StudioActionIds.
+      '@typescript-eslint/no-empty-object-type': [
+        'error',
+        { allowInterfaces: 'with-single-extends' },
+      ],
+    },
+  },
+
+  {
     ...pluginVitest.configs.recommended,
     files: ['**/src/**/__tests__/*'],
   },

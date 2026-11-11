@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from 'reka-ui'
 
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioActionId } from '@/workbench/actions/studio-action'
 import type { ProjectWorkbenchActionControls } from '@/features/project-workspace/actions/project-workbench-action-controls'
 import {
   useStudioActions,

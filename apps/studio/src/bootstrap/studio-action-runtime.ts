@@ -1,7 +1,8 @@
 import { DisposalStack } from '@/bootstrap/disposal-stack'
 import type { StudioActionFailure } from '@/workbench/actions/studio-action'
+import { STUDIO_ACTIONS } from '@/bootstrap/studio-actions'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
-import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
+import type { StudioActionRuntime } from '@/workbench/actions/studio-action-runtime'
 import { createStudioContextRegistry } from '@/workbench/actions/studio-context-registry'
 import {
   createBrowserStudioShortcutRecorder,
@@ -65,11 +66,9 @@ export function createStudioActionRuntime(options: StudioActionRuntimeOptions) {
       shortcutRecorder,
       userKeymap,
       dispose: () => stack.dispose(),
-    }
+    } satisfies StudioActionRuntime
   } catch (cause) {
     stack.dispose()
     throw cause
   }
 }
-
-export type StudioActionRuntime = ReturnType<typeof createStudioActionRuntime>

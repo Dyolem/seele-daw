@@ -4,10 +4,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ContextMenuRoot } from 'reka-ui'
 import { defineComponent, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
-import {
-  createStudioActionRuntime,
-  type StudioActionRuntime,
-} from '@/bootstrap/studio-action-runtime'
+import { createStudioActionRuntime } from '@/bootstrap/studio-action-runtime'
+import type { StudioActionRuntime } from '@/workbench/actions/studio-action-runtime'
 import PianoRollContextMenu from '@/features/piano-roll/actions/PianoRollContextMenu.vue'
 import {
   getPianoRollContextMenu,

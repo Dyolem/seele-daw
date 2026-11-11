@@ -7,8 +7,11 @@ import { presentProjectWorkbenchActions } from '@/features/project-workspace/act
 import { useProjectWorkbenchMidiImport } from '@/features/project-workspace/actions/use-project-workbench-midi-import'
 import type { ProjectWorkbenchWorkspaceHandle } from '@/features/project-workspace/workbench-shell/project-workbench-dock'
 import { provideTempoEditing } from '@/features/project-workspace/tempo-track/tempo-editing'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
-import { createProjectEntryLocation, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
+import {
+  createProjectEntryLocation,
+  PROJECT_ROUTE_QUERY,
+} from '@/workbench/project/navigation/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { ACTIVE_PROJECT_PHASE } from '@/workbench/project/active-project-state'

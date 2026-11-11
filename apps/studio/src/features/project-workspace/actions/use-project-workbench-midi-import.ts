@@ -2,8 +2,8 @@ import type { ProjectSession, Tick } from '@seele-daw/project-core'
 import { onBeforeUnmount, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
-import { createProjectWorkspaceLocation } from '@/router/project-routes'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
+import { createProjectWorkspaceLocation } from '@/workbench/project/navigation/project-routes'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   STUDIO_ACTION_CANCELLED,

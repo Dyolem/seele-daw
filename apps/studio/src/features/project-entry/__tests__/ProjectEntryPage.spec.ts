@@ -6,7 +6,10 @@ import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 import ProjectEntryPage from '@/features/project-entry/ProjectEntryPage.vue'
-import { PROJECT_ROUTE_NAME, PROJECT_ROUTE_QUERY } from '@/router/project-routes'
+import {
+  PROJECT_ROUTE_NAME,
+  PROJECT_ROUTE_QUERY,
+} from '@/workbench/project/navigation/project-routes'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import {
   PROJECT_ENTRY_FAILURE_OPERATION,

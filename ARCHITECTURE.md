@@ -30,22 +30,28 @@
   `common/` 不碰 DOM，浏览器适配集中在 `browser/`。
 - ModelStore 的写能力只能由 ModelStore 注册，只能由 MutationApplier 领取。
 - TanStack Hotkeys 的运行时只出现在 Studio Keyboard 的 `browser/` 层；契约层只借用它的按键类型。
+- Studio 内部下层不导入上层，feature 之间不互相导入（见下）。
+- 生产代码没有运行时导入循环；`import type` 不算。
 - 生产代码不导入 `__tests__`。
 
-规则只守护依赖方向与平台隔离，不规定包或 feature 内部的目录形状。
+规则只守护依赖方向、循环与平台隔离，不规定包或 feature 内部的目录形状。
 
 ### Studio 内部
 
-Studio 内部按同样的原则分层，下层不导入上层：
+Studio 内部按同样的原则分层。下表从下到上排列，每一层只导入自己和它下面的层，仅类型的导入
+也算：
 
-| 层                      | 内容                                                        |
-| ----------------------- | ----------------------------------------------------------- |
-| `ui/`                   | 与具体功能无关的控件、样式和通知                            |
-| `workbench/`            | 应用层：写项目的用例、Action 与键盘、项目生命周期、播放适配 |
-| `features/`             | 可见的功能；外壳 feature 可以组合被嵌入的 feature，反向不行 |
-| `bootstrap/`、`router/` | 组合根与路由：创建服务、连接各层                            |
+| 层           | 内容                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| `ui/`        | 与具体功能无关的控件、样式和通知                                                           |
+| `workbench/` | 应用层：写项目的用例、Action 与键盘、项目生命周期、播放适配、多个 feature 共用的状态与几何 |
+| `features/`  | 可见的功能；外壳 feature 可以组合被嵌入的 feature，反向不行                                |
+| `router/`    | 路由表与导航守卫                                                                           |
+| `bootstrap/` | 组合根：创建服务，汇总各 feature 声明的 Action                                             |
 
-这一层次目前靠约定，工具还不检查，并且有三处违反，见第 7 节。
+`App.vue` 与 `main.ts` 在最上面。上层才知道的东西要让下层使用时，由下层声明形状、上层填充：
+Action 的 ID 类型是 workbench 里的开放接口 `StudioActionIds`，每个声明 Action 的文件把自己的 ID
+并进去；`StudioActionRuntime` 的形状在 workbench 声明，由 bootstrap 创建。
 
 ## 2. 一次编辑的流向
 
@@ -104,6 +110,7 @@ Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 | 播放行为                       | `packages/playback`：`engine/`、`reconciliation/`、`scheduler/`                                  |
 | 浏览器音频与音源               | `packages/audio-web`；Studio 只给资产地址：`workbench/instrument/built-in-sample-assets.ts`      |
 | 工作台视图要读的项目数据       | `features/project-workspace/project-workspace.ts`：Shell 提供，视图用 `useProjectWorkspace()` 读 |
+| 多个 feature 共用的状态与几何  | `workbench/`：时间轴在 `timeline/`，工作台选择与路由位置在 `project/`                            |
 | 可见功能                       | `apps/studio/src/features/<功能>/`                                                               |
 | 与具体功能无关的控件和样式     | `apps/studio/src/ui/`                                                                            |
 
@@ -127,8 +134,9 @@ Undo / Redo 走同一条提交管线，只是 Plan 来自 History。
 ### 加一个 Action
 
 在所属 feature 的 actions 文件里加一个 `defineStudioAction({ id, context, label, description,
-category, keywords, keys, resolve })`。新建 actions 文件时，再把它加进
-`workbench/actions/studio-actions.ts`。ID 类型、目录、默认键位和设置页都从这一处声明派生。
+category, keywords, keys, resolve })`。ID 类型、目录、默认键位和设置页都从这一处声明派生。
+新建 actions 文件时多做两件事：在文件末尾把它的 ID 并进 `StudioActionIds`（照抄已有文件的那
+一段），再把列表加进 `bootstrap/studio-actions.ts`；漏了后一步，目录的类型测试会失败。
 需要新的焦点区域时，再加一个 `defineStudioContext`，并在视图里绑定目标。
 
 ### 加一种拖拽手势
@@ -172,17 +180,13 @@ category, keywords, keys, resolve })`。新建 actions 文件时，再把它加�
 下面这些地方的现有写法不是范例，新代码不要照着扩展。原因与解决顺序见
 [长期架构与路线](docs/architecture/long-term-architecture.md)的 1.3 节与第 4 节。
 
-- **Studio 的层次有三处违反。** `workbench/actions/studio-actions.ts` 导入 feature 的 Action
-  声明，与 `defineStudioAction` 构成导入循环；`features/piano-roll` 与
-  `features/project-workspace` 互相导入；`workbench` 引用了 `bootstrap` 里的
-  `StudioActionRuntime` 类型。新的共用状态与几何放进 workbench 或 editor 包，不要再加一条
-  跨 feature 的导入。
 - **播放管线只为采样音源而写。** 编译器按类型 ID 认出唯一的设备，端口的 `schedule` 只接收采样
   Voice，Track 的 Gain 与 Pan 在排程时乘进每个 Voice。接入第二种设备、效果器或实时混音之前，
   先做 Device Definition 与常驻通道图，不要在编译器里再加一个类型分支。
 - **模型里有三处空转。** Audio Track、效果链与 Clip Loop 有记录和不变量，但没有界面创建，播放
   把它们报告为不支持。不要在它们之上继续搭功能，等对应阶段重新设计。
-- **编排的几何在 Studio 里。** Arrangement 与 Tempo Lane 的 Tick 与像素换算写在 feature 的组件和
-  hook 中。新的时间轴几何、命中与拖拽操作写进 `packages/editor` 的 `common/`。
+- **编排的几何在 Studio 里。** 时间轴的刻度与滚动换算在 `workbench/timeline/`，Arrangement 与
+  Tempo Lane 的其余几何写在 feature 的组件和 hook 中。新的时间轴几何、命中与拖拽操作写进
+  `packages/editor` 的 `common/`。
 - **三个文件过大**：`playback-engine.ts`、`ProjectEntryPage.vue`、
   `ProjectWorkbenchArrangement.vue`。下一次要改它们时先按职责拆开。

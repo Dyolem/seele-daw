@@ -34,7 +34,7 @@ import ProjectWorkbenchContextEditorDock from '@/features/project-workspace/work
 import ProjectWorkbenchGlobalBar from '@/features/project-workspace/workbench-shell/ProjectWorkbenchGlobalBar.vue'
 import ProjectWorkbenchTransport from '@/features/project-workspace/workbench-shell/ProjectWorkbenchTransport.vue'
 import ProjectWorkbenchWorkspace from '@/features/project-workspace/workbench-shell/ProjectWorkbenchWorkspace.vue'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import {
   PROJECT_TRACK_INSTRUMENT_STATUS,
   type ProjectTrackPresentation,

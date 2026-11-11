@@ -18,7 +18,7 @@ import {
 } from '@/features/piano-roll/presentation/project-piano-roll-presentation'
 import { createProjectMidiClipPresentations } from '@/features/project-workspace/project-clip-presentation'
 import { createProjectTrackPresentations } from '@/features/project-workspace/project-track-presentation'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import { resolveInitialBarRange } from '@/workbench/edits/bar-range'
 import type { ReadyActiveProjectState } from '@/workbench/project/active-project-state'
 

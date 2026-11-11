@@ -1,6 +1,10 @@
 import type { PianoRollToolActionTarget } from '@/features/piano-roll/types/piano-roll-tool-action-target'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
-import { defineStudioAction, defineStudioContext } from '@/workbench/actions/studio-action'
+import {
+  defineStudioAction,
+  defineStudioContext,
+  type StudioActionIdsOf,
+} from '@/workbench/actions/studio-action'
 import { EDITOR_SELECTION_CONTEXT } from '@/workbench/actions/studio-editor-actions'
 
 export const PIANO_ROLL_CONTEXT = defineStudioContext<PianoRollToolActionTarget>({
@@ -53,3 +57,7 @@ export const PIANO_ROLL_TOOL_ACTIONS = [
     }),
   }),
 ] as const
+
+declare module '@/workbench/actions/studio-action' {
+  interface StudioActionIds extends StudioActionIdsOf<typeof PIANO_ROLL_TOOL_ACTIONS> {}
+}

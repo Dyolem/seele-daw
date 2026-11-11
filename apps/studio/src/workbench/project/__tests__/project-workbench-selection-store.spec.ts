@@ -2,7 +2,7 @@ import { parseClipId, parseProjectId, parseTrackId } from '@seele-daw/project-co
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 
 beforeEach(() => {
   setActivePinia(createPinia())

@@ -5,7 +5,7 @@ import {
   describeInvalidProjectRouteValue,
   PROJECT_ROUTE_QUERY,
   resolveProjectRouteIntent,
-} from '@/router/project-routes'
+} from '@/workbench/project/navigation/project-routes'
 import {
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,
   type ProjectNavigationConfirmationCoordinator,

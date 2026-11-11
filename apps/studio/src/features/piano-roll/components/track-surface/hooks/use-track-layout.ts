@@ -2,7 +2,7 @@ import { computed, type StyleValue } from 'vue'
 import { createPianoRollTimelineViewport } from '@seele-daw/editor'
 import { ZERO_TICK, parseTick, type Tick } from '@seele-daw/project-core'
 import type { PianoRollSurfaceGeometry } from '@/features/piano-roll/types/piano-roll-pitch-viewport'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/workbench/timeline/scale'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
 import {
   CLIP_HEADER_ROW_HEIGHT,

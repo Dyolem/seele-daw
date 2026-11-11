@@ -25,7 +25,7 @@ import {
   formatProjectTimelineMusicalPosition,
   formatProjectTimelineTime,
   resolveProjectTimelineMusicalPosition,
-} from '@/features/project-workspace/timeline/presentation'
+} from '@/workbench/timeline/presentation'
 
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MINIMUM_BPM = 40
 export const PROJECT_TEMPO_TRACK_DEFAULT_VISIBLE_MAXIMUM_BPM = 240

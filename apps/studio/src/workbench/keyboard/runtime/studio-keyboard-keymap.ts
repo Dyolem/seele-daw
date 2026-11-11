@@ -1,5 +1,4 @@
-import type { StudioActionDescriptor } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
 import type {
   StudioKeyboardBinding,
   StudioKeyboardKeymap,

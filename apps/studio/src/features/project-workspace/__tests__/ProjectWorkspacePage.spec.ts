@@ -35,13 +35,13 @@ import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/stud
 import ProjectWorkspacePage from '@/features/project-workspace/ProjectWorkspacePage.vue'
 import { STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
 import ProjectWorkbenchShell from '@/features/project-workspace/ProjectWorkbenchShell.vue'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import { createStudioRouter } from '@/router'
 import {
   createProjectWorkspaceLocation,
   PROJECT_ROUTE_NAME,
   PROJECT_ROUTE_QUERY,
-} from '@/router/project-routes'
+} from '@/workbench/project/navigation/project-routes'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
 import { createTestSession } from '@/workbench/project/__tests__/active-project-test-support'

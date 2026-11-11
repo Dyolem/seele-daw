@@ -36,7 +36,7 @@ import {
   createProjectPianoRollTrackPresentation,
   createProjectPianoRollPresentation,
 } from '@/features/piano-roll/presentation/project-piano-roll-presentation'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import {
   ACTIVE_PROJECT_PHASE,
   ACTIVE_PROJECT_SAVE_STATUS,

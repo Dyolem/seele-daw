@@ -13,8 +13,7 @@ import DismissIcon from '~icons/fluent/dismiss-20-regular'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiSelect from '@/ui/components/UiSelect.vue'
 import StudioShortcutEditor from '@/features/keyboard-shortcuts/StudioShortcutEditor.vue'
-import type { StudioActionDescriptor } from '@/workbench/actions/studio-action'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioActionDescriptor, StudioActionId } from '@/workbench/actions/studio-action'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import {
   useStudioActions,

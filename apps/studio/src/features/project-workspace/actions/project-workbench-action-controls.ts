@@ -1,4 +1,4 @@
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioActionId } from '@/workbench/actions/studio-action'
 import {
   presentStudioAction,
   type StudioActionControl,

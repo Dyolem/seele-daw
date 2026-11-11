@@ -1,5 +1,5 @@
 import { createDeferredActionResult } from '@/workbench/actions/__tests__/support/deferred-action-test-support'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import { createActionInvocationFixture } from '@/workbench/actions/__tests__/support/studio-action-definition-test-support'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
@@ -7,11 +7,16 @@ import {
   STUDIO_ACTION_COMPLETED,
   type StudioActionFailure,
   type StudioActionCompletion,
+  type StudioActionId,
 } from '@/workbench/actions/studio-action'
-import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
+import { STUDIO_ACTIONS } from '@/bootstrap/studio-actions'
 import { createStudioActionCoordinator } from '@/workbench/actions/studio-action-coordinator'
 
 describe('Studio Action invocation', () => {
+  it('lists every module that declares action IDs in the catalogue', () => {
+    expectTypeOf<StudioActionId>().toEqualTypeOf<(typeof STUDIO_ACTIONS)[number]['id']>()
+  })
+
   it('exposes the immutable catalogue without mounting any target or supplying a key binding', () => {
     const { runtime, bindingRegistry } = createTestStudioActionRuntime({
       keymap: { 'project.save': [] },

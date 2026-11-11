@@ -6,6 +6,7 @@ import {
   defineStudioContext,
   type StudioActionCompletion,
   type StudioActionState,
+  type StudioActionIdsOf,
 } from '@/workbench/actions/studio-action'
 import {
   ACTIVE_PROJECT_SAVE_STATUS,
@@ -263,3 +264,7 @@ export const PROJECT_WORKBENCH_ACTIONS = [
     }),
   }),
 ] as const
+
+declare module '@/workbench/actions/studio-action' {
+  interface StudioActionIds extends StudioActionIdsOf<typeof PROJECT_WORKBENCH_ACTIONS> {}
+}

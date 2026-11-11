@@ -1,9 +1,6 @@
 import { computed, nextTick, shallowRef, watch, type ShallowRef } from 'vue'
 import type { ProjectId, Tick } from '@seele-daw/project-core'
-import {
-  resolvePagedFollowScrollLeft,
-  timelinePositionRatio,
-} from '@/features/project-workspace/timeline/layout'
+import { resolvePagedFollowScrollLeft, timelinePositionRatio } from '@/workbench/timeline/layout'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'
 import { useStudio } from '@/workbench/studio-services'
 

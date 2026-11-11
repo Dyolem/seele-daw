@@ -159,10 +159,10 @@ History，包括原 Tick 不在网格上的情况。Track Hover 使用当前设�
 
 - 写项目通过 `useStudio().edits`（[workbench/edits](../../workbench/edits/project-edits.ts)）；
   快捷键与菜单沿统一的 Studio Action 路由执行。
-- Project Workspace 继续拥有 `project-workbench-selection-store.ts` 的 Arrangement Selection；
-  Track 通过该 Store 选择 Active Clip，目录调整不创建第二份 Selection 权威。
-- Timeline 宽度规则与分页计算继续消费 Project Workspace 的 `timeline/scale.ts` 和
-  `timeline/layout.ts`，跨 feature 归属治理另行评估。
+- Arrangement Selection 在 workbench 的 `project/project-workbench-selection-store.ts` 里；Track
+  通过该 Store 选择 Active Clip，不创建第二份 Selection 权威。
+- Timeline 宽度规则与分页计算使用 workbench 的 `timeline/scale.ts` 和 `timeline/layout.ts`，与
+  Arrangement 共用。本 feature 不导入 Project Workspace；是 Project Workspace 嵌入本 feature。
 - 共享类型直接从 `types/` 导入；局部共享类型进入所属子模块 `types/`，不从 Vue 实例反推。
   有限 discriminator 常量可与契约共置，不加载组件或 hook 的实现。
 - 子模块的 `hooks/` 与 `types/` 是私有实现，其他子模块使用组件或 feature 层的共享契约；

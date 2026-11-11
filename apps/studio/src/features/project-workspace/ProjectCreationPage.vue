@@ -2,7 +2,10 @@
 import { onMounted, onUnmounted, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { createProjectEntryLocation, createProjectWorkspaceLocation } from '@/router/project-routes'
+import {
+  createProjectEntryLocation,
+  createProjectWorkspaceLocation,
+} from '@/workbench/project/navigation/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import { useStudio } from '@/workbench/studio-services'
 

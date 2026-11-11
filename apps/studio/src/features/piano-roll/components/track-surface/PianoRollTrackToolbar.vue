@@ -6,7 +6,7 @@ import TargetArrowIcon from '~icons/fluent/target-arrow-20-regular'
 import PianoRollToolControls from '@/features/piano-roll/components/PianoRollToolControls.vue'
 import PianoRollPitchControls from '@/features/piano-roll/components/pitch-view/PianoRollPitchControls.vue'
 import type { PianoRollToolControlsProps } from '@/features/piano-roll/types/piano-roll-tool-controls'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioActionId } from '@/workbench/actions/studio-action'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import UiSelect from '@/ui/components/UiSelect.vue'
 

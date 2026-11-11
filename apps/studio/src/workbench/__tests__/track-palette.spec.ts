@@ -1,7 +1,7 @@
 import { parseProjectColor } from '@seele-daw/project-core'
 import { describe, expect, it } from 'vitest'
 
-import { PROJECT_TRACK_PALETTE, selectProjectTrackColor } from '@/workbench/edits/track-palette'
+import { PROJECT_TRACK_PALETTE, selectProjectTrackColor } from '@/workbench/track-palette'
 
 describe('Project Track Palette', () => {
   it('publishes a fixed unique uppercase Palette', () => {

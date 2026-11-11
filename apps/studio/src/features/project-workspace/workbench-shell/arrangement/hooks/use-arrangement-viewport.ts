@@ -5,7 +5,7 @@ import {
   resolveCenteredTimelineScrollLeft,
   resolvePagedFollowScrollLeft,
   timelinePositionRatio,
-} from '@/features/project-workspace/timeline/layout'
+} from '@/workbench/timeline/layout'
 import { useTimelineLocate } from '@/features/project-workspace/workbench-shell/arrangement/hooks/use-timeline-locate'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import { PROJECT_PLAYBACK_PHASE } from '@/workbench/project/playback/project-playback-state'

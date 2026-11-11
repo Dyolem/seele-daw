@@ -26,7 +26,7 @@ import {
   PROJECT_NAVIGATION_INTENT_KIND,
   type ProjectNavigationConfirmationCoordinator,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { selectProjectTrackColor } from '@/workbench/edits/track-palette'
+import { selectProjectTrackColor } from '@/workbench/track-palette'
 
 export interface ProjectMidiImportResult {
   readonly diagnostics: readonly ProjectMidiImportDiagnostic[]

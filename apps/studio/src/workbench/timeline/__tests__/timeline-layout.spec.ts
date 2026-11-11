@@ -6,7 +6,7 @@ import {
   resolveTimelineEdgeScrollVelocity,
   resolveTimelineLocateTick,
   timelinePositionRatio,
-} from '@/features/project-workspace/timeline/layout'
+} from '@/workbench/timeline/layout'
 import { parseTick } from '@seele-daw/project-core'
 
 describe('Arrangement Timeline layout', () => {

@@ -7,8 +7,9 @@ import {
   defineStudioContext,
   type StudioActionCompletion,
   type StudioActionFailure,
+  type StudioActionId,
 } from '@/workbench/actions/studio-action'
-import { STUDIO_ACTIONS, type StudioActionId } from '@/workbench/actions/studio-actions'
+import { STUDIO_ACTIONS } from '@/bootstrap/studio-actions'
 import { createStudioContextRegistry } from '@/workbench/actions/studio-context-registry'
 import { createBrowserTanStackHotkeyRegistry } from '@/workbench/keyboard/browser/browser-tanstack-hotkey-registry'
 import { createStudioKeyboardInputRouter } from '@/workbench/keyboard/runtime/studio-keyboard-input-router'

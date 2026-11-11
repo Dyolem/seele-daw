@@ -4,7 +4,10 @@ import { PIANO_ROLL_TOOL_ACTIONS } from '@/features/piano-roll/actions/piano-rol
 import { EDITOR_ACTIONS } from '@/workbench/actions/studio-editor-actions'
 import { INTERFACE_ACTIONS } from '@/workbench/actions/studio-interface-actions'
 
-/** Every Studio action, in catalogue order. Each feature declares its own. */
+/**
+ * Every Studio action, in catalogue order. Each module declares its own and adds its IDs to
+ * `StudioActionIds`; a module missing from this list fails the catalogue's type test.
+ */
 export const STUDIO_ACTIONS = [
   ...PROJECT_WORKBENCH_ACTIONS,
   ...EDITOR_ACTIONS,
@@ -12,5 +15,3 @@ export const STUDIO_ACTIONS = [
   ...PIANO_ROLL_TOOL_ACTIONS,
   ...INTERFACE_ACTIONS,
 ] as const
-
-export type StudioActionId = (typeof STUDIO_ACTIONS)[number]['id']

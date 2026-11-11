@@ -40,7 +40,7 @@ import {
 } from '@/features/project-workspace/project-track-presentation'
 import ProjectWorkbenchArrangement from '@/features/project-workspace/workbench-shell/ProjectWorkbenchArrangement.vue'
 import StudioKeyboardShortcutsDialog from '@/features/keyboard-shortcuts/StudioKeyboardShortcutsDialog.vue'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'
 import type { ClipEdits } from '@/workbench/edits/clip-edits'
 import type { TrackEdits } from '@/workbench/edits/track-edits'

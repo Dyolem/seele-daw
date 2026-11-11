@@ -7,7 +7,9 @@ import {
   editorInteractionFileViolation,
   editorInteractionImportViolation,
 } from './editor-interaction-boundaries.mjs'
+import { findCycles, runtimeImportsFrom } from './import-cycles.mjs'
 import { studioKeyboardImportViolation } from './studio-keyboard-boundaries.mjs'
+import { studioFeatureOf, studioLayerImportViolation } from './studio-layer-boundaries.mjs'
 
 const root = process.cwd()
 const packageRoot = path.join(root, 'packages')
@@ -57,6 +59,10 @@ const tanStackHotkeyImporters = [
   'apps/studio/src/workbench/keyboard/contracts/studio-keyboard-binding.ts',
 ]
 const errors = []
+// Runtime imports between production files, and imports between Studio features, by path
+// relative to the repository root.
+const runtimeImports = new Map()
+const featureImports = new Map()
 
 async function collectFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -158,13 +164,45 @@ function explicitlyExportsWriteAccess(source, specifier) {
   return false
 }
 
-for (const file of await collectFiles(root)) {
+const sourceFiles = await collectFiles(root)
+const sourceFileSet = new Set(sourceFiles)
+
+/** The file an extensionless import target names, if it is one of the collected sources. */
+function resolveSourceFile(target) {
+  const candidates = [
+    target,
+    ...[...sourceExtensions].map((extension) => `${target}${extension}`),
+    path.join(target, 'index.ts'),
+  ]
+  return candidates.find((candidate) => sourceFileSet.has(candidate))
+}
+
+function localImportTarget(specifier, file, workspaceDirectory) {
+  if (specifier.startsWith('.')) return path.resolve(path.dirname(file), specifier)
+  return (
+    workspaceAliasTarget(specifier, workspaceDirectory) ??
+    workspacePrivateImportTarget(specifier, workspaceDirectory)
+  )
+}
+
+for (const file of sourceFiles) {
   const owner = ownerOf(file)
   const workspaceDirectory = workspaceDirectoryOf(file)
   if (!workspaceDirectory) continue
 
   const source = await readFile(file, 'utf8')
   const relativeFile = path.relative(root, file).split(path.sep).join('/')
+  if (!isTestPath(workspaceDirectory, file)) {
+    const targets = new Set()
+    for (const specifier of runtimeImportsFrom(source)) {
+      const target = localImportTarget(specifier, file, workspaceDirectory)
+      const targetFile = target === undefined ? undefined : resolveSourceFile(target)
+      if (targetFile !== undefined && !isTestPath(workspaceDirectory, targetFile)) {
+        targets.add(path.relative(root, targetFile).split(path.sep).join('/'))
+      }
+    }
+    runtimeImports.set(relativeFile, targets)
+  }
   const interactionFileViolation = editorInteractionFileViolation(root, file, source)
   if (interactionFileViolation) errors.push(`${relativeFile}: ${interactionFileViolation}`)
 
@@ -183,6 +221,20 @@ for (const file of await collectFiles(root)) {
     if (interactionImportViolation) errors.push(`${relativeFile}: ${interactionImportViolation}`)
     const keyboardImportViolation = studioKeyboardImportViolation(root, file, localTarget)
     if (keyboardImportViolation) errors.push(`${relativeFile}: ${keyboardImportViolation}`)
+    const layerImportViolation = studioLayerImportViolation(root, file, localTarget)
+    if (layerImportViolation) errors.push(`${relativeFile}: ${layerImportViolation}`)
+    const sourceFeature = studioFeatureOf(root, file)
+    const targetFeature = localTarget ? studioFeatureOf(root, localTarget) : null
+    if (
+      sourceFeature !== null &&
+      targetFeature !== null &&
+      sourceFeature !== targetFeature &&
+      !isTestPath(workspaceDirectory, file)
+    ) {
+      if (!featureImports.has(sourceFeature)) featureImports.set(sourceFeature, new Set())
+      if (!featureImports.has(targetFeature)) featureImports.set(targetFeature, new Set())
+      featureImports.get(sourceFeature).add(targetFeature)
+    }
 
     if (
       /^@tanstack\/(?:hotkeys|vue-hotkeys|react-hotkeys)(?:\/|$)/u.test(specifier) &&
@@ -298,6 +350,14 @@ for (const packageName of packageNames) {
   if (manifest.imports?.['#internal/*'] !== './src/*.ts') {
     errors.push(`packages/${packageName}/package.json: 必须声明 #internal/* 包内映射`)
   }
+}
+
+for (const features of findCycles(featureImports)) {
+  errors.push(`Studio feature 互相导入：${features.join('、')}；feature 之间只能单向依赖`)
+}
+
+for (const files of findCycles(runtimeImports)) {
+  errors.push(`运行时导入循环：${files.join(' ↔ ')}`)
 }
 
 if (errors.length > 0) {

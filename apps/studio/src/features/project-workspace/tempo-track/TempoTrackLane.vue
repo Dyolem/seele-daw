@@ -18,7 +18,7 @@ import {
   resolveProjectTempoTrackBpm,
   resolveProjectTempoTrackTick,
 } from '@/features/project-workspace/tempo-track/tempo-track'
-import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/features/project-workspace/timeline/scale'
+import { PROJECT_TIMELINE_BAR_INLINE_SIZE_REM } from '@/workbench/timeline/scale'
 
 const props = defineProps<{
   readonly barSpanTick: Tick

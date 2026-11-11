@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, watch } from 'vue'
 import { ARRANGEMENT_BAR_CONTEXT } from '@/features/project-workspace/actions/arrangement-keyboard-actions'
 import type { ProjectMidiClipPresentation } from '@/features/project-workspace/project-clip-presentation'
 import type { ProjectTrackPresentation } from '@/features/project-workspace/project-track-presentation'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import {
   PROJECT_ADD_TRACK_TYPE,
   type ProjectAddTrackType,

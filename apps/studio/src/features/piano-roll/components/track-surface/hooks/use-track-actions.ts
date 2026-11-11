@@ -3,7 +3,7 @@ import type { ClipId, MidiChannel, ProjectSession } from '@seele-daw/project-cor
 import type { PianoRollSustainPedalLaneHandle } from '@/features/piano-roll/types/piano-roll-sustain-pedal'
 import type { PianoRollContextMenuTarget } from '@/features/piano-roll/types/piano-roll-context-menu-target'
 import type { ReadyProjectPianoRollTrackPresentation } from '@/features/piano-roll/types/piano-roll-presentation'
-import { useProjectWorkbenchSelectionStore } from '@/features/project-workspace/project-workbench-selection-store'
+import { useProjectWorkbenchSelectionStore } from '@/workbench/project/project-workbench-selection-store'
 import { STUDIO_ACTION_NOT_APPLIED } from '@/workbench/actions/studio-action'
 import {
   useStudioEditorSelectionTarget,

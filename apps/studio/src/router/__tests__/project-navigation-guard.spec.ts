@@ -9,7 +9,7 @@ import {
   createProjectWorkspaceLocation,
   PROJECT_ROUTE_NAME,
   PROJECT_ROUTE_QUERY,
-} from '@/router/project-routes'
+} from '@/workbench/project/navigation/project-routes'
 import {
   PROJECT_NAVIGATION_CONFIRMATION_FAILURE_OPERATION,
   PROJECT_NAVIGATION_CONFIRMATION_RESULT_KIND,

@@ -18,7 +18,7 @@ import {
   createProjectEntryLocation,
   createProjectWorkspaceLocation,
   PROJECT_ROUTE_QUERY,
-} from '@/router/project-routes'
+} from '@/workbench/project/navigation/project-routes'
 import UiButton from '@/ui/components/UiButton.vue'
 import UiIcon from '@/ui/components/UiIcon.vue'
 import { useUiToastStore } from '@/ui/stores/ui-toast-store'

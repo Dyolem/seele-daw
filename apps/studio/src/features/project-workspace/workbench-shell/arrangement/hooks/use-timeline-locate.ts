@@ -21,11 +21,11 @@ import type {
 import {
   resolveTimelineEdgeScrollVelocity,
   resolveTimelineLocateTick,
-} from '@/features/project-workspace/timeline/layout'
+} from '@/workbench/timeline/layout'
 import {
   PROJECT_TIMELINE_LOCATE_EDGE_INLINE_SIZE_PX,
   PROJECT_TIMELINE_LOCATE_MAXIMUM_SCROLL_VELOCITY_PX_PER_SECOND,
-} from '@/features/project-workspace/timeline/scale'
+} from '@/workbench/timeline/scale'
 import type { ProjectPlaybackCoordinator } from '@/workbench/project/playback/project-playback-coordinator'
 import { useStudioInteractionTarget } from '@/workbench/actions/vue/studio-editor-action-context'
 import {

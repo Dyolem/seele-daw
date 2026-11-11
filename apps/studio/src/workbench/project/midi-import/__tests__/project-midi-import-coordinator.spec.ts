@@ -50,7 +50,7 @@ import {
   PROJECT_NAVIGATION_PROCEED_REASON,
   type ProjectNavigationConfirmationCoordinator,
 } from '@/workbench/project/navigation/project-navigation-confirmation'
-import { PROJECT_TRACK_PALETTE } from '@/workbench/edits/track-palette'
+import { PROJECT_TRACK_PALETTE } from '@/workbench/track-palette'
 import { createTrackEdits } from '@/workbench/edits/track-edits'
 
 function createMidiDocument(overrides: Partial<MidiFileDocument> = {}): MidiFileDocument {

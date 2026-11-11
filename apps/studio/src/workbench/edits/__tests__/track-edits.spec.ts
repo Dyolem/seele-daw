@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ProjectEditError } from '@/workbench/edits/edit-session'
 import { createTrackEdits } from '@/workbench/edits/track-edits'
-import { PROJECT_TRACK_PALETTE } from '@/workbench/edits/track-palette'
+import { PROJECT_TRACK_PALETTE } from '@/workbench/track-palette'
 import {
   IDLE_PROJECT,
   createEditTestSession,

@@ -9,7 +9,7 @@ import {
   createProjectWorkspaceLocation,
   PROJECT_ROUTE_NAME,
   resolveProjectRouteIntent,
-} from '@/router/project-routes'
+} from '@/workbench/project/navigation/project-routes'
 import { PROJECT_NAVIGATION_INTENT_KIND } from '@/workbench/project/navigation/project-navigation-confirmation'
 
 describe('Project Routes', () => {

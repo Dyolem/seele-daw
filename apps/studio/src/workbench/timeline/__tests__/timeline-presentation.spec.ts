@@ -5,7 +5,7 @@ import {
   describeProjectTimelineMusicalPosition,
   formatProjectTimelineMusicalPosition,
   formatProjectTimelineTime,
-} from '@/features/project-workspace/timeline/presentation'
+} from '@/workbench/timeline/presentation'
 
 describe('Project Timeline presentation', () => {
   it('formats an exact position against the fixed Arrangement meter grid', () => {

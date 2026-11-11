@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createTestStudioActionRuntime } from '@/workbench/actions/__tests__/support/studio-action-test-support'
-import { STUDIO_ACTIONS } from '@/workbench/actions/studio-actions'
+import { STUDIO_ACTIONS } from '@/bootstrap/studio-actions'
 import { defineStudioKeyboardBinding } from '@/workbench/keyboard/contracts/studio-keyboard-binding'
 import { queryStudioShortcuts } from '@/workbench/keyboard/runtime/studio-shortcut-catalogue'
 

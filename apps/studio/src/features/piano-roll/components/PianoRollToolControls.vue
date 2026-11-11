@@ -5,7 +5,7 @@ import PenIcon from '~icons/fluent/pen-20-regular'
 import UiIconButton from '@/ui/components/UiIconButton.vue'
 import { PIANO_ROLL_TOOL } from '@/features/piano-roll/types/piano-roll-preferences'
 import type { PianoRollToolControlsProps } from '@/features/piano-roll/types/piano-roll-tool-controls'
-import type { StudioActionId } from '@/workbench/actions/studio-actions'
+import type { StudioActionId } from '@/workbench/actions/studio-action'
 
 defineProps<PianoRollToolControlsProps>()
 const emit = defineEmits<{ invoke: [actionId: StudioActionId] }>()
